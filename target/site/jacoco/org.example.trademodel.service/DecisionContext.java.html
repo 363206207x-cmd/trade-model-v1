@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DecisionContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service</a> &gt; <span class="el_source">DecisionContext.java</span></div><h1>DecisionContext.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service;
+
+<span class="nc" id="L3">public class DecisionContext {</span>
+
+    private String symbol;
+    private String ruleMarketBias;
+    private String ruleConfidenceLevel;
+    /** 与本次 K 线多周期是否对齐一致（来自 DecisionEngineService 本 run 计算） */
+<span class="nc" id="L9">    private boolean multiTimeframeAligned = true;</span>
+    /** LOW / MEDIUM — 来自本 run 风险档位 */
+<span class="nc" id="L11">    private String riskTier = &quot;MEDIUM&quot;;</span>
+    /** 本 run 是否认为值得开仓 */
+    private Boolean worthOpening;
+<span class="nc" id="L14">    private boolean hasRuleBaseOutput = true;</span>
+<span class="nc" id="L15">    private boolean gptConsistentWithRule = true;</span>
+    private Integer driverConflictScore;
+    private Integer executionInstabilityScore;
+    private Integer microstructureTrapScore;
+    private Integer causeEffectDivergenceScore;
+    private Integer aiConflictScore;
+<span class="nc" id="L21">    private Integer consecutiveLowConfusedCount = 0;</span>
+
+    /** 主链估算的数据质量分（可为 null，规则侧不强制） */
+    private Integer dataQualityScore;
+
+    public String getSymbol() {
+<span class="nc" id="L27">        return symbol;</span>
+    }
+
+    public void setSymbol(String symbol) {
+<span class="nc" id="L31">        this.symbol = symbol;</span>
+<span class="nc" id="L32">    }</span>
+
+    public String getRuleMarketBias() {
+<span class="nc" id="L35">        return ruleMarketBias;</span>
+    }
+
+    public void setRuleMarketBias(String ruleMarketBias) {
+<span class="nc" id="L39">        this.ruleMarketBias = ruleMarketBias;</span>
+<span class="nc" id="L40">    }</span>
+
+    public String getRuleConfidenceLevel() {
+<span class="nc" id="L43">        return ruleConfidenceLevel;</span>
+    }
+
+    public void setRuleConfidenceLevel(String ruleConfidenceLevel) {
+<span class="nc" id="L47">        this.ruleConfidenceLevel = ruleConfidenceLevel;</span>
+<span class="nc" id="L48">    }</span>
+
+    public boolean isMultiTimeframeAligned() {
+<span class="nc" id="L51">        return multiTimeframeAligned;</span>
+    }
+
+    public void setMultiTimeframeAligned(boolean multiTimeframeAligned) {
+<span class="nc" id="L55">        this.multiTimeframeAligned = multiTimeframeAligned;</span>
+<span class="nc" id="L56">    }</span>
+
+    public String getRiskTier() {
+<span class="nc" id="L59">        return riskTier;</span>
+    }
+
+    public void setRiskTier(String riskTier) {
+<span class="nc" id="L63">        this.riskTier = riskTier;</span>
+<span class="nc" id="L64">    }</span>
+
+    public Boolean getWorthOpening() {
+<span class="nc" id="L67">        return worthOpening;</span>
+    }
+
+    public void setWorthOpening(Boolean worthOpening) {
+<span class="nc" id="L71">        this.worthOpening = worthOpening;</span>
+<span class="nc" id="L72">    }</span>
+
+    public boolean isHasRuleBaseOutput() {
+<span class="nc" id="L75">        return hasRuleBaseOutput;</span>
+    }
+
+    public void setHasRuleBaseOutput(boolean hasRuleBaseOutput) {
+<span class="nc" id="L79">        this.hasRuleBaseOutput = hasRuleBaseOutput;</span>
+<span class="nc" id="L80">    }</span>
+
+    public boolean isGptConsistentWithRule() {
+<span class="nc" id="L83">        return gptConsistentWithRule;</span>
+    }
+
+    public void setGptConsistentWithRule(boolean gptConsistentWithRule) {
+<span class="nc" id="L87">        this.gptConsistentWithRule = gptConsistentWithRule;</span>
+<span class="nc" id="L88">    }</span>
+
+    public Integer getDriverConflictScore() {
+<span class="nc" id="L91">        return driverConflictScore;</span>
+    }
+
+    public void setDriverConflictScore(Integer driverConflictScore) {
+<span class="nc" id="L95">        this.driverConflictScore = driverConflictScore;</span>
+<span class="nc" id="L96">    }</span>
+
+    public Integer getExecutionInstabilityScore() {
+<span class="nc" id="L99">        return executionInstabilityScore;</span>
+    }
+
+    public void setExecutionInstabilityScore(Integer executionInstabilityScore) {
+<span class="nc" id="L103">        this.executionInstabilityScore = executionInstabilityScore;</span>
+<span class="nc" id="L104">    }</span>
+
+    public Integer getMicrostructureTrapScore() {
+<span class="nc" id="L107">        return microstructureTrapScore;</span>
+    }
+
+    public void setMicrostructureTrapScore(Integer microstructureTrapScore) {
+<span class="nc" id="L111">        this.microstructureTrapScore = microstructureTrapScore;</span>
+<span class="nc" id="L112">    }</span>
+
+    public Integer getCauseEffectDivergenceScore() {
+<span class="nc" id="L115">        return causeEffectDivergenceScore;</span>
+    }
+
+    public void setCauseEffectDivergenceScore(Integer causeEffectDivergenceScore) {
+<span class="nc" id="L119">        this.causeEffectDivergenceScore = causeEffectDivergenceScore;</span>
+<span class="nc" id="L120">    }</span>
+
+    public Integer getAiConflictScore() {
+<span class="nc" id="L123">        return aiConflictScore;</span>
+    }
+
+    public void setAiConflictScore(Integer aiConflictScore) {
+<span class="nc" id="L127">        this.aiConflictScore = aiConflictScore;</span>
+<span class="nc" id="L128">    }</span>
+
+    public Integer getConsecutiveLowConfusedCount() {
+<span class="nc" id="L131">        return consecutiveLowConfusedCount;</span>
+    }
+
+    public void setConsecutiveLowConfusedCount(Integer consecutiveLowConfusedCount) {
+<span class="nc" id="L135">        this.consecutiveLowConfusedCount = consecutiveLowConfusedCount;</span>
+<span class="nc" id="L136">    }</span>
+
+    public Integer getDataQualityScore() {
+<span class="nc" id="L139">        return dataQualityScore;</span>
+    }
+
+    public void setDataQualityScore(Integer dataQualityScore) {
+<span class="nc" id="L143">        this.dataQualityScore = dataQualityScore;</span>
+<span class="nc" id="L144">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

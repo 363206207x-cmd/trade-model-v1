@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MissedOpportunityQueryItemVO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.vo</a> &gt; <span class="el_source">MissedOpportunityQueryItemVO.java</span></div><h1>MissedOpportunityQueryItemVO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.vo;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+<span class="nc" id="L6">public class MissedOpportunityQueryItemVO {</span>
+
+    private String missedId;
+    private String decisionId;
+    private String analysisId;
+    private String symbol;
+    private LocalDate bizDate;
+    private String reasonJson;
+    private MissedReasonViewVO reasonView;
+    private String ruleVersion;
+    private String traceId;
+    private LocalDateTime createTime;
+
+    public String getMissedId() {
+<span class="nc" id="L20">        return missedId;</span>
+    }
+
+    public void setMissedId(String missedId) {
+<span class="nc" id="L24">        this.missedId = missedId;</span>
+<span class="nc" id="L25">    }</span>
+
+    public String getDecisionId() {
+<span class="nc" id="L28">        return decisionId;</span>
+    }
+
+    public void setDecisionId(String decisionId) {
+<span class="nc" id="L32">        this.decisionId = decisionId;</span>
+<span class="nc" id="L33">    }</span>
+
+    public String getAnalysisId() {
+<span class="nc" id="L36">        return analysisId;</span>
+    }
+
+    public void setAnalysisId(String analysisId) {
+<span class="nc" id="L40">        this.analysisId = analysisId;</span>
+<span class="nc" id="L41">    }</span>
+
+    public String getSymbol() {
+<span class="nc" id="L44">        return symbol;</span>
+    }
+
+    public void setSymbol(String symbol) {
+<span class="nc" id="L48">        this.symbol = symbol;</span>
+<span class="nc" id="L49">    }</span>
+
+    public LocalDate getBizDate() {
+<span class="nc" id="L52">        return bizDate;</span>
+    }
+
+    public void setBizDate(LocalDate bizDate) {
+<span class="nc" id="L56">        this.bizDate = bizDate;</span>
+<span class="nc" id="L57">    }</span>
+
+    public String getReasonJson() {
+<span class="nc" id="L60">        return reasonJson;</span>
+    }
+
+    public void setReasonJson(String reasonJson) {
+<span class="nc" id="L64">        this.reasonJson = reasonJson;</span>
+<span class="nc" id="L65">    }</span>
+
+    public MissedReasonViewVO getReasonView() {
+<span class="nc" id="L68">        return reasonView;</span>
+    }
+
+    public void setReasonView(MissedReasonViewVO reasonView) {
+<span class="nc" id="L72">        this.reasonView = reasonView;</span>
+<span class="nc" id="L73">    }</span>
+
+    public String getRuleVersion() {
+<span class="nc" id="L76">        return ruleVersion;</span>
+    }
+
+    public void setRuleVersion(String ruleVersion) {
+<span class="nc" id="L80">        this.ruleVersion = ruleVersion;</span>
+<span class="nc" id="L81">    }</span>
+
+    public String getTraceId() {
+<span class="nc" id="L84">        return traceId;</span>
+    }
+
+    public void setTraceId(String traceId) {
+<span class="nc" id="L88">        this.traceId = traceId;</span>
+<span class="nc" id="L89">    }</span>
+
+    public LocalDateTime getCreateTime() {
+<span class="nc" id="L92">        return createTime;</span>
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+<span class="nc" id="L96">        this.createTime = createTime;</span>
+<span class="nc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

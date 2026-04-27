@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssetStateServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">AssetStateServiceImpl.java</span></div><h1>AssetStateServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.HotResetEventDO;
+import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.HotResetEventMapper;
+import org.example.trademodel.service.AssetStateService;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+/**
+ * 快照 JSON 仍由本 run 合成；权威行写入 tm_asset_state。
+ */
+@Service
+public class AssetStateServiceImpl implements AssetStateService {
+
+<span class="fc" id="L22">    private static final ObjectMapper MAPPER = new ObjectMapper();</span>
+
+    private final AssetStateMapper assetStateMapper;
+    private final HotResetEventMapper hotResetEventMapper;
+
+<span class="fc" id="L27">    public AssetStateServiceImpl(AssetStateMapper assetStateMapper, HotResetEventMapper hotResetEventMapper) {</span>
+<span class="fc" id="L28">        this.assetStateMapper = assetStateMapper;</span>
+<span class="fc" id="L29">        this.hotResetEventMapper = hotResetEventMapper;</span>
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    public String buildSnapshotAtDecision(String symbol, String analysisId, AssetStateEnum state, int confusedScore,
+                                          boolean multiTimeframeAligned) {
+<span class="nc" id="L35">        ObjectNode n = MAPPER.createObjectNode();</span>
+<span class="nc" id="L36">        n.put(&quot;source&quot;, &quot;synthetic_at_decision&quot;);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        n.put(&quot;symbol&quot;, symbol != null ? symbol : &quot;&quot;);</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        n.put(&quot;analysisId&quot;, analysisId != null ? analysisId : &quot;&quot;);</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        n.put(&quot;state&quot;, state != null ? state.name() : &quot;&quot;);</span>
+<span class="nc" id="L40">        n.put(&quot;confusedScore&quot;, confusedScore);</span>
+<span class="nc" id="L41">        n.put(&quot;multiTimeframeAligned&quot;, multiTimeframeAligned);</span>
+<span class="nc" id="L42">        String json = n.toString();</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (json.length() &gt; 512) {</span>
+<span class="nc" id="L44">            return json.substring(0, 509) + &quot;...&quot;;</span>
+        }
+<span class="nc" id="L46">        return json;</span>
+    }
+
+    @Override
+    public void persistAuthoritativeState(String symbol, AssetStateEnum state, int confusedScore, String traceId) {
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (symbol == null || symbol.isBlank()) {</span>
+<span class="nc" id="L52">            return;</span>
+        }
+<span class="fc" id="L54">        AssetStateDO row = new AssetStateDO();</span>
+<span class="fc" id="L55">        row.setSymbol(symbol.trim());</span>
+<span class="fc" id="L56">        row.setState(state);</span>
+<span class="fc" id="L57">        row.setConfusedScore(confusedScore);</span>
+<span class="fc" id="L58">        row.setLastUpdateTime(LocalDateTime.now());</span>
+<span class="fc" id="L59">        row.setTraceId(traceId);</span>
+<span class="fc" id="L60">        assetStateMapper.mergeUpsertCore(row);</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    public AssetStateDO findLatestHotResetSnapshot() {
+<span class="nc" id="L65">        return assetStateMapper.selectLatestHotResetRow();</span>
+    }
+
+    @Override
+    public void recordHotResetEvent(String analysisId, String traceId, String symbol, String triggerType, String triggerValue,
+                                    String decisionId, AssetStateEnum decisionState, int confusedScoreSnapshot,
+                                    boolean multiTimeframeAlignedSnapshot, String triggerReasonCode, String triggerReasonText,
+                                    int eventVersion, LocalDateTime occurredAt, AssetStateEnum preState, AssetStateEnum postState) {
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">        if (symbol == null || symbol.isBlank()) {</span>
+<span class="fc" id="L74">            return;</span>
+        }
+<span class="fc" id="L76">        String sym = symbol.trim();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        LocalDateTime at = occurredAt != null ? occurredAt : LocalDateTime.now();</span>
+<span class="fc" id="L78">        AssetStateDO existing = assetStateMapper.selectBySymbol(sym);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (existing == null) {</span>
+<span class="fc" id="L80">            AssetStateDO seed = new AssetStateDO();</span>
+<span class="fc" id="L81">            seed.setSymbol(sym);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            seed.setState(postState != null ? postState : AssetStateEnum.OBSERVING);</span>
+<span class="fc" id="L83">            seed.setConfusedScore(0);</span>
+<span class="fc" id="L84">            seed.setLastUpdateTime(LocalDateTime.now());</span>
+<span class="fc" id="L85">            seed.setTraceId(null);</span>
+<span class="fc" id="L86">            assetStateMapper.mergeUpsertCore(seed);</span>
+        }
+<span class="fc" id="L88">        AssetStateDO hot = new AssetStateDO();</span>
+<span class="fc" id="L89">        hot.setSymbol(sym);</span>
+<span class="fc" id="L90">        hot.setHotResetFlag(true);</span>
+<span class="fc" id="L91">        hot.setHotResetTriggerType(triggerType);</span>
+<span class="fc" id="L92">        hot.setHotResetTriggerValue(triggerValue);</span>
+<span class="fc" id="L93">        hot.setHotResetTime(at);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        hot.setPreResetState(preState != null ? preState.name() : null);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        hot.setPostResetState(postState != null ? postState.name() : null);</span>
+<span class="fc" id="L96">        hot.setLastUpdateTime(LocalDateTime.now());</span>
+<span class="fc" id="L97">        assetStateMapper.updateHotResetColumns(hot);</span>
+
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (analysisId == null || analysisId.isBlank()) {</span>
+<span class="fc" id="L100">            return;</span>
+        }
+<span class="fc" id="L102">        HotResetEventDO event = new HotResetEventDO();</span>
+<span class="fc" id="L103">        event.setEventId(&quot;hre-&quot; + UUID.randomUUID().toString().substring(0, 12));</span>
+<span class="fc" id="L104">        event.setAnalysisId(analysisId);</span>
+<span class="fc" id="L105">        event.setTraceId(traceId);</span>
+<span class="fc" id="L106">        event.setSymbol(sym);</span>
+<span class="fc" id="L107">        event.setTriggerType(triggerType);</span>
+<span class="fc" id="L108">        event.setTriggerValue(triggerValue);</span>
+<span class="fc" id="L109">        event.setDecisionId(decisionId);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        event.setDecisionState(decisionState != null ? decisionState.name() : null);</span>
+<span class="fc" id="L111">        event.setConfusedScoreSnapshot(confusedScoreSnapshot);</span>
+<span class="fc" id="L112">        event.setMultiTimeframeAlignedSnapshot(multiTimeframeAlignedSnapshot);</span>
+<span class="fc" id="L113">        event.setTriggerReasonCode(triggerReasonCode);</span>
+<span class="fc" id="L114">        event.setTriggerReasonText(triggerReasonText);</span>
+<span class="fc" id="L115">        event.setEventVersion(eventVersion);</span>
+<span class="fc" id="L116">        event.setEventTime(at);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        event.setPreState(preState != null ? preState.name() : null);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        event.setPostState(postState != null ? postState.name() : null);</span>
+<span class="fc" id="L119">        event.setCreateTime(LocalDateTime.now());</span>
+<span class="fc" id="L120">        hotResetEventMapper.insert(event);</span>
+<span class="fc" id="L121">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

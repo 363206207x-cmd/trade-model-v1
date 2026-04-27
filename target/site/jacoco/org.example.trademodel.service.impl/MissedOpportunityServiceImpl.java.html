@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MissedOpportunityServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">MissedOpportunityServiceImpl.java</span></div><h1>MissedOpportunityServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.example.trademodel.entity.MissedOpportunityDO;
+import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.mapper.MissedOpportunityMapper;
+import org.example.trademodel.mapper.RealPositionMapper;
+import org.example.trademodel.service.MissedOpportunityService;
+import org.example.trademodel.vo.DecisionBundleVO;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class MissedOpportunityServiceImpl implements MissedOpportunityService {
+
+    private static final String MISSED_RULE_VERSION = &quot;missed-v1&quot;;
+<span class="fc" id="L22">    private static final ObjectMapper REASON_JSON = new ObjectMapper();</span>
+
+    private final MissedOpportunityMapper missedOpportunityMapper;
+    private final RealPositionMapper realPositionMapper;
+
+    public MissedOpportunityServiceImpl(MissedOpportunityMapper missedOpportunityMapper,
+<span class="fc" id="L28">                                        RealPositionMapper realPositionMapper) {</span>
+<span class="fc" id="L29">        this.missedOpportunityMapper = missedOpportunityMapper;</span>
+<span class="fc" id="L30">        this.realPositionMapper = realPositionMapper;</span>
+<span class="fc" id="L31">    }</span>
+
+    @Override
+    public void recordFromAuthoritativeAnalysisIfEligible(String analysisId, String symbol, String traceId,
+                                                          DecisionBundleVO decision, boolean hotResetWouldFire) {
+<span class="pc bpc" id="L36" title="3 of 6 branches missed.">        if (decision == null || analysisId == null || analysisId.isBlank()) {</span>
+<span class="nc" id="L37">            return;</span>
+        }
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!Boolean.TRUE.equals(decision.getIsWorthOpening())) {</span>
+<span class="nc" id="L40">            return;</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (hotResetWouldFire) {</span>
+<span class="nc" id="L43">            return;</span>
+        }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (decision.getAssetState() == AssetStateEnum.INVALIDATED) {</span>
+<span class="nc" id="L46">            return;</span>
+        }
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">        if (symbol == null || symbol.isBlank()) {</span>
+<span class="nc" id="L49">            return;</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (hasOpenPositionForSymbol(symbol)) {</span>
+<span class="fc" id="L52">            return;</span>
+        }
+<span class="fc" id="L54">        String decisionId = decision.getDecisionId();</span>
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (decisionId == null || decisionId.isBlank()) {</span>
+<span class="nc" id="L56">            return;</span>
+        }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!listByDecisionId(decisionId).isEmpty()) {</span>
+<span class="nc" id="L59">            return;</span>
+        }
+
+<span class="fc" id="L62">        MissedOpportunityDO row = new MissedOpportunityDO();</span>
+<span class="fc" id="L63">        row.setMissedId(&quot;mo-&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 16));</span>
+<span class="fc" id="L64">        row.setDecisionId(decisionId);</span>
+<span class="fc" id="L65">        row.setAnalysisId(analysisId);</span>
+<span class="fc" id="L66">        row.setSymbol(symbol.trim());</span>
+<span class="fc" id="L67">        row.setBizDate(LocalDate.now());</span>
+<span class="fc" id="L68">        row.setReasonJson(buildReasonJsonV1(decision, analysisId, decisionId, symbol, hotResetWouldFire));</span>
+<span class="fc" id="L69">        row.setRuleVersion(MISSED_RULE_VERSION);</span>
+<span class="fc" id="L70">        row.setTraceId(traceId);</span>
+<span class="fc" id="L71">        row.setCreateTime(LocalDateTime.now());</span>
+<span class="fc" id="L72">        missedOpportunityMapper.insert(row);</span>
+<span class="fc" id="L73">    }</span>
+
+    private boolean hasOpenPositionForSymbol(String symbol) {
+        try {
+<span class="fc" id="L77">            String n = normalizeSymbol(symbol);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (n == null) {</span>
+<span class="nc" id="L79">                return false;</span>
+            }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            return realPositionMapper.countOpenPositionsBySymbol(n) &gt; 0;</span>
+<span class="fc" id="L82">        } catch (Exception ignored) {</span>
+<span class="fc" id="L83">            return false;</span>
+        }
+    }
+
+    private static String normalizeSymbol(String symbol) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (symbol == null) {</span>
+<span class="nc" id="L89">            return null;</span>
+        }
+<span class="fc" id="L91">        String normalized = symbol.trim().toUpperCase();</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        return normalized.isEmpty() ? null : normalized;</span>
+    }
+
+    private String buildReasonJsonV1(DecisionBundleVO decision, String analysisId, String decisionId, String symbol,
+                                     boolean hotResetWouldFire) {
+<span class="fc" id="L97">        ObjectNode root = REASON_JSON.createObjectNode();</span>
+<span class="fc" id="L98">        root.put(&quot;version&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L99">        root.put(&quot;rule&quot;, &quot;WORTH_OPENING_NO_OPEN_POSITION_NOT_INVALIDATED_NOT_HOT_RESET&quot;);</span>
+<span class="fc" id="L100">        root.put(&quot;whyMissed&quot;,</span>
+                &quot;Worth opening and no open position on symbol, but trade not executed in this system scope (minimal rule v1).&quot;);
+<span class="fc" id="L102">        ObjectNode facts = REASON_JSON.createObjectNode();</span>
+<span class="fc" id="L103">        facts.put(&quot;isWorthOpening&quot;, Boolean.TRUE.equals(decision.getIsWorthOpening()));</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        facts.put(&quot;assetState&quot;, decision.getAssetState() != null ? decision.getAssetState().name() : &quot;&quot;);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        facts.put(&quot;confusedScore&quot;, decision.getConfusedScore() != null ? decision.getConfusedScore() : 0);</span>
+<span class="fc" id="L106">        facts.put(&quot;multiTimeframeAligned&quot;, decision.isMultiTimeframeAligned());</span>
+<span class="fc" id="L107">        facts.put(&quot;hotResetWouldFire&quot;, hotResetWouldFire);</span>
+<span class="fc" id="L108">        facts.put(&quot;openPositionCountForSymbol&quot;, 0);</span>
+<span class="fc" id="L109">        root.set(&quot;facts&quot;, facts);</span>
+<span class="fc" id="L110">        ObjectNode refs = REASON_JSON.createObjectNode();</span>
+<span class="fc" id="L111">        refs.put(&quot;analysisId&quot;, analysisId);</span>
+<span class="fc" id="L112">        refs.put(&quot;decisionId&quot;, decisionId);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        refs.put(&quot;symbol&quot;, symbol != null ? symbol.trim() : &quot;&quot;);</span>
+<span class="fc" id="L114">        root.set(&quot;refs&quot;, refs);</span>
+        try {
+<span class="fc" id="L116">            return REASON_JSON.writeValueAsString(root);</span>
+<span class="nc" id="L117">        } catch (Exception e) {</span>
+<span class="nc" id="L118">            return &quot;{\&quot;version\&quot;:\&quot;1\&quot;,\&quot;rule\&quot;:\&quot;serialization_failed\&quot;,\&quot;whyMissed\&quot;:\&quot;\&quot;,\&quot;facts\&quot;:{},\&quot;refs\&quot;:{}}&quot;;</span>
+        }
+    }
+
+    @Override
+    public void save(MissedOpportunityDO row) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (row.getCreateTime() == null) {</span>
+<span class="nc" id="L125">            row.setCreateTime(LocalDateTime.now());</span>
+        }
+<span class="nc" id="L127">        missedOpportunityMapper.insert(row);</span>
+<span class="nc" id="L128">    }</span>
+
+    @Override
+    public MissedOpportunityDO findByMissedId(String missedId) {
+<span class="nc" id="L132">        return missedOpportunityMapper.selectByMissedId(missedId);</span>
+    }
+
+    @Override
+    public List&lt;MissedOpportunityDO&gt; listByDecisionId(String decisionId) {
+<span class="fc" id="L137">        return missedOpportunityMapper.listByDecisionId(decisionId);</span>
+    }
+
+    @Override
+    public List&lt;MissedOpportunityDO&gt; listBySymbol(String symbol, int limit) {
+<span class="nc" id="L142">        return missedOpportunityMapper.listBySymbol(symbol, limit);</span>
+    }
+
+    @Override
+    public List&lt;MissedOpportunityDO&gt; listByAnalysisId(String analysisId) {
+<span class="nc" id="L147">        return missedOpportunityMapper.listByAnalysisId(analysisId);</span>
+    }
+
+    @Override
+    public List&lt;MissedOpportunityDO&gt; listByBizDate(LocalDate bizDate, int limit) {
+<span class="nc" id="L152">        return missedOpportunityMapper.listByBizDate(bizDate, sanitizeLimit(limit));</span>
+    }
+
+    @Override
+    public List&lt;MissedOpportunityDO&gt; query(String analysisId, String symbol, LocalDate bizDate, int limit) {
+<span class="fc" id="L157">        return missedOpportunityMapper.listByQuery(trimToNull(analysisId), normalizeSymbol(symbol), bizDate, sanitizeLimit(limit));</span>
+    }
+
+    @Override
+    public int countByBizDate(LocalDate bizDate) {
+<span class="nc" id="L162">        return missedOpportunityMapper.countByBizDate(bizDate);</span>
+    }
+
+    private static int sanitizeLimit(int limit) {
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (limit &lt;= 0) {</span>
+<span class="nc" id="L167">            return 20;</span>
+        }
+<span class="fc" id="L169">        return Math.min(limit, 200);</span>
+    }
+
+    private static String trimToNull(String value) {
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L174">            return null;</span>
+        }
+<span class="fc" id="L176">        String t = value.trim();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        return t.isEmpty() ? null : t;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

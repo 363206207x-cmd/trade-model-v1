@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Apr 16 17:24:49 CST 2026
+byte-buddy-1.14.19.jar>nexus-tencentyun=
+byte-buddy-1.14.19.pom>nexus-tencentyun=

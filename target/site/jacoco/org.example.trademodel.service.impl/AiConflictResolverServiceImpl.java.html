@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AiConflictResolverServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">AiConflictResolverServiceImpl.java</span></div><h1>AiConflictResolverServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import org.example.trademodel.enums.AiConflictLevelEnum;
+import org.example.trademodel.service.AiConflictResolverService;
+import org.example.trademodel.service.AiConflictResult;
+import org.example.trademodel.service.DecisionContext;
+import org.springframework.stereotype.Service;
+
+@Service
+<span class="nc" id="L10">public class AiConflictResolverServiceImpl implements AiConflictResolverService {</span>
+
+    @Override
+    public AiConflictResult resolve(DecisionContext context) {
+<span class="nc bnc" id="L14" title="All 2 branches missed.">        if (!context.isHasRuleBaseOutput()) {</span>
+<span class="nc" id="L15">            throw new IllegalStateException(&quot;规则层必须先产出基础方向&quot;);</span>
+        }
+
+<span class="nc" id="L18">        int directionConflict = calculateDirectionConflict(context);</span>
+<span class="nc" id="L19">        int riskConflict = calculateRiskConflict(context);</span>
+<span class="nc" id="L20">        int planConflict = calculatePlanConflict(context);</span>
+
+<span class="nc" id="L22">        int aiConflictScore = Math.min(100, directionConflict + riskConflict + planConflict);</span>
+<span class="nc" id="L23">        context.setAiConflictScore(aiConflictScore);</span>
+
+<span class="nc bnc" id="L25" title="All 4 branches missed.">        if (aiConflictScore &lt;= 20 &amp;&amp; context.isGptConsistentWithRule()) {</span>
+<span class="nc" id="L26">            return new AiConflictResult(</span>
+                    AiConflictLevelEnum.LEVEL_1_CONSISTENT,
+<span class="nc" id="L28">                    context.getRuleMarketBias(),</span>
+<span class="nc" id="L29">                    context.getRuleConfidenceLevel(),</span>
+                    &quot;CONFIRM&quot;,
+                    aiConflictScore
+            );
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        } else if (aiConflictScore &lt;= 45) {</span>
+<span class="nc" id="L34">            return new AiConflictResult(</span>
+                    AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE,
+<span class="nc" id="L36">                    context.getRuleMarketBias(),</span>
+<span class="nc" id="L37">                    downgradeConfidence(context),</span>
+                    &quot;REDUCED&quot;,
+                    aiConflictScore
+            );
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        } else if (aiConflictScore &lt;= 70) {</span>
+<span class="nc" id="L42">            return new AiConflictResult(</span>
+                    AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DIVERGENCE,
+                    null,
+                    null,
+                    &quot;PREPARE_ONLY&quot;,
+                    aiConflictScore
+            );
+        } else {
+<span class="nc" id="L50">            return new AiConflictResult(</span>
+                    AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                    null,
+                    null,
+                    &quot;CONFUSED&quot;,
+                    aiConflictScore
+            );
+        }
+    }
+
+    /** 来源：规则层 1m 方向 vs 综合裁决方向、多周期是否对齐（由 DecisionEngineService 写入 context） */
+    private int calculateDirectionConflict(DecisionContext ctx) {
+<span class="nc" id="L62">        int c = 0;</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (!ctx.isGptConsistentWithRule()) {</span>
+<span class="nc" id="L64">            c += 32;</span>
+        }
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (!ctx.isMultiTimeframeAligned()) {</span>
+<span class="nc" id="L67">            c += 24;</span>
+        }
+<span class="nc" id="L69">        return Math.min(56, c);</span>
+    }
+
+    /** 来源：本 run 风险档位 riskTier */
+    private int calculateRiskConflict(DecisionContext ctx) {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (&quot;MEDIUM&quot;.equalsIgnoreCase(ctx.getRiskTier())) {</span>
+<span class="nc" id="L75">            return 18;</span>
+        }
+<span class="nc" id="L77">        return 8;</span>
+    }
+
+    /** 来源：本 run 是否 worthOpening 与计划张力 */
+    private int calculatePlanConflict(DecisionContext ctx) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (Boolean.TRUE.equals(ctx.getWorthOpening())) {</span>
+<span class="nc" id="L83">            return 10;</span>
+        }
+<span class="nc" id="L85">        return 20;</span>
+    }
+
+    private String downgradeConfidence(DecisionContext ctx) {
+<span class="nc" id="L89">        return &quot;MEDIUM&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

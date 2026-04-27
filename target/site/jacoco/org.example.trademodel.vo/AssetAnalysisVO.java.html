@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssetAnalysisVO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.vo</a> &gt; <span class="el_source">AssetAnalysisVO.java</span></div><h1>AssetAnalysisVO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.vo;
+
+import java.util.List;
+
+<span class="fc" id="L5">public class AssetAnalysisVO {</span>
+    private String analysisId;
+    private String symbol;
+    private String timeframe;
+    private String analysisTime;
+    private MarketEnvironmentVO marketEnvironment;
+    private List&lt;EvidenceItemVO&gt; evidenceList;
+    private List&lt;ScoreItemVO&gt; scoreList;
+    private DecisionBundleVO decisionBundle;
+    private Integer dataQualityScore;
+
+<span class="fc" id="L16">    public String getAnalysisId() { return analysisId; }</span>
+<span class="fc" id="L17">    public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }</span>
+<span class="fc" id="L18">    public String getSymbol() { return symbol; }</span>
+<span class="fc" id="L19">    public void setSymbol(String symbol) { this.symbol = symbol; }</span>
+<span class="nc" id="L20">    public String getTimeframe() { return timeframe; }</span>
+<span class="nc" id="L21">    public void setTimeframe(String timeframe) { this.timeframe = timeframe; }</span>
+<span class="nc" id="L22">    public String getAnalysisTime() { return analysisTime; }</span>
+<span class="nc" id="L23">    public void setAnalysisTime(String analysisTime) { this.analysisTime = analysisTime; }</span>
+<span class="nc" id="L24">    public MarketEnvironmentVO getMarketEnvironment() { return marketEnvironment; }</span>
+<span class="nc" id="L25">    public void setMarketEnvironment(MarketEnvironmentVO marketEnvironment) { this.marketEnvironment = marketEnvironment; }</span>
+<span class="nc" id="L26">    public List&lt;EvidenceItemVO&gt; getEvidenceList() { return evidenceList; }</span>
+<span class="nc" id="L27">    public void setEvidenceList(List&lt;EvidenceItemVO&gt; evidenceList) { this.evidenceList = evidenceList; }</span>
+<span class="nc" id="L28">    public List&lt;ScoreItemVO&gt; getScoreList() { return scoreList; }</span>
+<span class="nc" id="L29">    public void setScoreList(List&lt;ScoreItemVO&gt; scoreList) { this.scoreList = scoreList; }</span>
+<span class="nc" id="L30">    public DecisionBundleVO getDecisionBundle() { return decisionBundle; }</span>
+<span class="nc" id="L31">    public void setDecisionBundle(DecisionBundleVO decisionBundle) { this.decisionBundle = decisionBundle; }</span>
+<span class="fc" id="L32">    public Integer getDataQualityScore() { return dataQualityScore; }</span>
+<span class="nc" id="L33">    public void setDataQualityScore(Integer dataQualityScore) { this.dataQualityScore = dataQualityScore; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

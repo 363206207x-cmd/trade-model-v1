@@ -1,0 +1,2 @@
+package org.example.trademodel.enums;
+public enum AiConflictLevelEnum { LEVEL_1_CONSISTENT, LEVEL_2_LIGHT_DIVERGENCE, LEVEL_3_SIGNIFICANT_DIVERGENCE, LEVEL_4_EXTREME_DIVERGENCE }

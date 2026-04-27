@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mock-analysis 测试页</title>
+</head>
+<body>
+    <h1>mock-analysis 测试页</h1>
+    <p>
+        <button type="button" id="btn-btc-1h">测 BTC + 1h</button>
+        <button type="button" id="btn-eth-4h">测 ETH + 4h</button>
+    </p>
+    <pre id="output" style="white-space: pre-wrap; word-break: break-all; border: 1px solid #ccc; padding: 8px; min-height: 120px;"></pre>
+
+    <script>
+        const output = document.getElementById('output');
+
+        async function runTest(assetSymbol, timeframe) {
+            output.textContent = '请求中…';
+            const url = '/decision/mock-analysis?assetSymbol=' + encodeURIComponent(assetSymbol) + '&timeframe=' + encodeURIComponent(timeframe);
+            try {
+                const res = await fetch(url, { method: 'GET' });
+                const text = await res.text();
+                if (!res.ok) {
+                    output.textContent = '请求失败：HTTP ' + res.status + '\n' + text;
+                    return;
+                }
+                output.textContent = text;
+            } catch (e) {
+                output.textContent = '请求失败：' + (e && e.message ? e.message : String(e));
+            }
+        }
+
+        document.getElementById('btn-btc-1h').addEventListener('click', function () {
+            runTest('BTC', '1h');
+        });
+        document.getElementById('btn-eth-4h').addEventListener('click', function () {
+            runTest('ETH', '4h');
+        });
+    </script>
+</body>
+</html>

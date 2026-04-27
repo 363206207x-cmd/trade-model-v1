@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReviewAggregateServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">ReviewAggregateServiceImpl.java</span></div><h1>ReviewAggregateServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.DecisionResult;
+import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.entity.HotResetEventDO;
+import org.example.trademodel.entity.MissedOpportunityDO;
+import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.entity.TmPushRecheckLogDO;
+import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
+import org.example.trademodel.mapper.HotResetEventMapper;
+import org.example.trademodel.mapper.MissedOpportunityMapper;
+import org.example.trademodel.mapper.MonitorAlertMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
+import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.service.MissedReasonViewParser;
+import org.example.trademodel.service.ReviewAggregateService;
+import org.example.trademodel.vo.ReviewAggregateVO;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 组装 {@link ReviewAggregateVO}：从各表读摘要字段；Push/Recheck 中 JSON 列原样映射至 VO，不做解析。
+ * Hot Reset 区：仅对 missed.reasonJson 做最小只读解析以生成旁证文案，不改动规则与落库。
+ */
+@Service
+public class ReviewAggregateServiceImpl implements ReviewAggregateService {
+
+<span class="nc" id="L42">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+
+    private final AnalysisRunMapper analysisRunMapper;
+    private final DecisionResultMapper decisionResultMapper;
+    private final ExecutionPlanMapper executionPlanMapper;
+    private final PushSnapshotMapper pushSnapshotMapper;
+    private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    private final PushRecheckLogMapper pushRecheckLogMapper;
+    private final MissedOpportunityMapper missedOpportunityMapper;
+    private final MonitorAlertMapper monitorAlertMapper;
+    private final AssetStateMapper assetStateMapper;
+    private final HotResetEventMapper hotResetEventMapper;
+
+    public ReviewAggregateServiceImpl(
+            AnalysisRunMapper analysisRunMapper,
+            DecisionResultMapper decisionResultMapper,
+            ExecutionPlanMapper executionPlanMapper,
+            PushSnapshotMapper pushSnapshotMapper,
+            AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+            PushRecheckLogMapper pushRecheckLogMapper,
+            MissedOpportunityMapper missedOpportunityMapper,
+            MonitorAlertMapper monitorAlertMapper,
+            AssetStateMapper assetStateMapper,
+<span class="nc" id="L65">            HotResetEventMapper hotResetEventMapper) {</span>
+<span class="nc" id="L66">        this.analysisRunMapper = analysisRunMapper;</span>
+<span class="nc" id="L67">        this.decisionResultMapper = decisionResultMapper;</span>
+<span class="nc" id="L68">        this.executionPlanMapper = executionPlanMapper;</span>
+<span class="nc" id="L69">        this.pushSnapshotMapper = pushSnapshotMapper;</span>
+<span class="nc" id="L70">        this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;</span>
+<span class="nc" id="L71">        this.pushRecheckLogMapper = pushRecheckLogMapper;</span>
+<span class="nc" id="L72">        this.missedOpportunityMapper = missedOpportunityMapper;</span>
+<span class="nc" id="L73">        this.monitorAlertMapper = monitorAlertMapper;</span>
+<span class="nc" id="L74">        this.assetStateMapper = assetStateMapper;</span>
+<span class="nc" id="L75">        this.hotResetEventMapper = hotResetEventMapper;</span>
+<span class="nc" id="L76">    }</span>
+
+    @Override
+    public Optional&lt;ReviewAggregateVO&gt; getAggregateByAnalysisId(String analysisId) {
+<span class="nc" id="L80">        AnalysisRunDO run = analysisRunMapper.selectById(analysisId);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (run == null) {</span>
+<span class="nc" id="L82">            return Optional.empty();</span>
+        }
+
+<span class="nc" id="L85">        ReviewAggregateVO vo = new ReviewAggregateVO();</span>
+<span class="nc" id="L86">        vo.setRun(toRunSummary(run));</span>
+
+<span class="nc" id="L88">        DecisionResult dr = decisionResultMapper.selectLatestByAnalysisId(analysisId);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        vo.setDecision(dr == null ? null : toDecisionSummary(dr));</span>
+
+<span class="nc" id="L91">        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(analysisId);</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        vo.setPlan(plan == null ? null : toPlanSummary(plan));</span>
+
+<span class="nc" id="L94">        vo.setPushRecheck(buildPushRecheck(analysisId));</span>
+<span class="nc" id="L95">        List&lt;MissedOpportunityDO&gt; missedRows = missedOpportunityMapper.listByAnalysisId(analysisId);</span>
+<span class="nc" id="L96">        vo.setMissed(toMissedList(missedRows));</span>
+<span class="nc" id="L97">        vo.setHotReset(toHotReset(run, dr, missedRows));</span>
+<span class="nc" id="L98">        vo.setAlerts(toAlertList(monitorAlertMapper.listByAnalysisId(analysisId)));</span>
+
+<span class="nc" id="L100">        return Optional.of(vo);</span>
+    }
+
+    private List&lt;ReviewAggregateVO.ReviewPushWithRecheck&gt; buildPushRecheck(String analysisId) {
+<span class="nc" id="L104">        List&lt;TmPushSnapshotDO&gt; snaps = pushSnapshotMapper.listByAnalysisId(analysisId);</span>
+<span class="nc bnc" id="L105" title="All 4 branches missed.">        if (snaps == null || snaps.isEmpty()) {</span>
+<span class="nc" id="L106">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L108">        List&lt;ReviewAggregateVO.ReviewPushWithRecheck&gt; out = new ArrayList&lt;&gt;(snaps.size());</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (TmPushSnapshotDO s : snaps) {</span>
+<span class="nc" id="L110">            ReviewAggregateVO.ReviewPushWithRecheck bundle = new ReviewAggregateVO.ReviewPushWithRecheck();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            TmAccountRiskSnapshotDO risk = s.getAccountRiskSnapshotId() == null</span>
+<span class="nc" id="L112">                    ? null</span>
+<span class="nc" id="L113">                    : accountRiskSnapshotMapper.selectById(s.getAccountRiskSnapshotId());</span>
+<span class="nc" id="L114">            bundle.setPush(toPushSummary(s, risk));</span>
+<span class="nc" id="L115">            bundle.setRechecks(toRecheckList(pushRecheckLogMapper.selectByPushId(s.getPushId())));</span>
+<span class="nc" id="L116">            out.add(bundle);</span>
+<span class="nc" id="L117">        }</span>
+<span class="nc" id="L118">        return out;</span>
+    }
+
+    private static ReviewAggregateVO.ReviewRunSummary toRunSummary(AnalysisRunDO r) {
+<span class="nc" id="L122">        ReviewAggregateVO.ReviewRunSummary s = new ReviewAggregateVO.ReviewRunSummary();</span>
+<span class="nc" id="L123">        s.setAnalysisId(r.getAnalysisId());</span>
+<span class="nc" id="L124">        s.setSymbol(r.getSymbol());</span>
+<span class="nc" id="L125">        s.setTimeframe(r.getTimeframe());</span>
+<span class="nc" id="L126">        s.setAnalysisTime(r.getAnalysisTime());</span>
+<span class="nc" id="L127">        s.setRuleVersion(r.getRuleVersion());</span>
+<span class="nc" id="L128">        s.setDataQualityScore(r.getDataQualityScore());</span>
+<span class="nc" id="L129">        s.setTraceId(r.getTraceId());</span>
+<span class="nc" id="L130">        s.setStatus(r.getStatus());</span>
+<span class="nc" id="L131">        return s;</span>
+    }
+
+    private static ReviewAggregateVO.ReviewDecisionSummary toDecisionSummary(DecisionResult d) {
+<span class="nc" id="L135">        ReviewAggregateVO.ReviewDecisionSummary s = new ReviewAggregateVO.ReviewDecisionSummary();</span>
+<span class="nc" id="L136">        s.setDecisionId(d.getDecisionId());</span>
+<span class="nc" id="L137">        s.setSymbol(d.getSymbol());</span>
+<span class="nc" id="L138">        s.setMarketBiasHierarchy(d.getMarketBiasHierarchy());</span>
+<span class="nc" id="L139">        s.setTradeType(d.getTradeType());</span>
+<span class="nc" id="L140">        s.setConfidenceLevel(d.getConfidenceLevel());</span>
+<span class="nc" id="L141">        s.setRiskLevel(d.getRiskLevel());</span>
+<span class="nc" id="L142">        s.setActionPriority(d.getActionPriority());</span>
+<span class="nc" id="L143">        s.setConclusionSummary(d.getConclusionSummary());</span>
+<span class="nc" id="L144">        s.setIsWorthOpening(d.getIsWorthOpening());</span>
+<span class="nc" id="L145">        s.setMultiTfConvergence(d.getMultiTfConvergence());</span>
+<span class="nc" id="L146">        s.setIsAdopted(d.getIsAdopted());</span>
+<span class="nc" id="L147">        s.setValidPeriod(d.getValidPeriod());</span>
+<span class="nc" id="L148">        s.setInvalidCondition(d.getInvalidCondition());</span>
+<span class="nc" id="L149">        s.setEvidenceSummary(d.getEvidenceSummary());</span>
+<span class="nc" id="L150">        s.setExplanationJson(d.getExplanationJson());</span>
+<span class="nc" id="L151">        s.setReviewReasons(d.getReviewReasons());</span>
+<span class="nc" id="L152">        s.setAiConflictLevel(d.getAiConflictLevel());</span>
+<span class="nc" id="L153">        s.setAiConflictScore(d.getAiConflictScore());</span>
+<span class="nc" id="L154">        s.setAiPlanMode(d.getAiPlanMode());</span>
+<span class="nc" id="L155">        s.setConfusedScore(d.getConfusedScore());</span>
+<span class="nc" id="L156">        s.setAssetStateSnapshot(d.getAssetStateSnapshot());</span>
+<span class="nc" id="L157">        s.setCreateTime(d.getCreateTime());</span>
+<span class="nc" id="L158">        return s;</span>
+    }
+
+    private static ReviewAggregateVO.ReviewPlanSummary toPlanSummary(ExecutionPlanDO p) {
+<span class="nc" id="L162">        ReviewAggregateVO.ReviewPlanSummary s = new ReviewAggregateVO.ReviewPlanSummary();</span>
+<span class="nc" id="L163">        s.setPlanId(p.getPlanId());</span>
+<span class="nc" id="L164">        s.setRecommendedAction(p.getRecommendedAction());</span>
+<span class="nc" id="L165">        s.setEntryZone(p.getEntryZone());</span>
+<span class="nc" id="L166">        s.setStopLoss(p.getStopLoss());</span>
+<span class="nc" id="L167">        s.setTakeProfitRules(p.getTakeProfitRules());</span>
+<span class="nc" id="L168">        s.setLeverageSuggestion(p.getLeverageSuggestion());</span>
+<span class="nc" id="L169">        s.setPositionSuggestion(p.getPositionSuggestion());</span>
+<span class="nc" id="L170">        s.setCreateTime(p.getCreateTime());</span>
+<span class="nc" id="L171">        return s;</span>
+    }
+
+    private static ReviewAggregateVO.ReviewPushSummary toPushSummary(TmPushSnapshotDO p, TmAccountRiskSnapshotDO risk) {
+<span class="nc" id="L175">        ReviewAggregateVO.ReviewPushSummary s = new ReviewAggregateVO.ReviewPushSummary();</span>
+<span class="nc" id="L176">        s.setPushId(p.getPushId());</span>
+<span class="nc" id="L177">        s.setAnalysisId(p.getAnalysisId());</span>
+<span class="nc" id="L178">        s.setSymbol(p.getSymbol());</span>
+<span class="nc" id="L179">        s.setTimeframe(p.getTimeframe());</span>
+<span class="nc" id="L180">        s.setPushType(p.getPushType());</span>
+<span class="nc" id="L181">        s.setPushStatus(p.getPushStatus());</span>
+<span class="nc" id="L182">        s.setPushCreateTime(p.getPushCreateTime());</span>
+<span class="nc" id="L183">        s.setRuleVersion(p.getRuleVersion());</span>
+<span class="nc" id="L184">        s.setTriggerPrice(p.getTriggerPrice());</span>
+<span class="nc" id="L185">        s.setEntryZoneJson(p.getEntryZoneJson());</span>
+<span class="nc" id="L186">        s.setStopZoneJson(p.getStopZoneJson());</span>
+<span class="nc" id="L187">        s.setInvalidationConditionJson(p.getInvalidationConditionJson());</span>
+<span class="nc" id="L188">        s.setPlanModeSnapshot(p.getPlanModeSnapshot());</span>
+<span class="nc" id="L189">        s.setCauseEffectAlignmentSnapshot(p.getCauseEffectAlignmentSnapshot());</span>
+<span class="nc" id="L190">        s.setExecutionFeasibilitySnapshot(p.getExecutionFeasibilitySnapshot());</span>
+<span class="nc" id="L191">        s.setDataQualityScoreSnapshot(p.getDataQualityScoreSnapshot());</span>
+<span class="nc" id="L192">        s.setConfusedScoreSnapshot(p.getConfusedScoreSnapshot());</span>
+<span class="nc" id="L193">        s.setAccountRiskSnapshotId(p.getAccountRiskSnapshotId());</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (risk != null) {</span>
+<span class="nc" id="L195">            s.setAccountRiskAllowed(risk.getRiskAllowed());</span>
+<span class="nc" id="L196">            s.setRiskLevelSnapshot(risk.getRiskLevelSnapshot());</span>
+<span class="nc" id="L197">            s.setRiskReasonCode(risk.getRiskReasonCode());</span>
+<span class="nc" id="L198">            s.setRiskReasonText(risk.getRiskReasonText());</span>
+<span class="nc" id="L199">            s.setPositionExposure(risk.getPositionExposure());</span>
+<span class="nc" id="L200">            s.setMaxAllowedExposure(risk.getMaxAllowedExposure());</span>
+<span class="nc" id="L201">            s.setSnapshotSource(risk.getSnapshotSource());</span>
+<span class="nc" id="L202">            s.setSnapshotVersion(risk.getSnapshotVersion());</span>
+        }
+<span class="nc" id="L204">        s.setExpiresAt(p.getExpiresAt());</span>
+<span class="nc" id="L205">        s.setTraceId(p.getTraceId());</span>
+<span class="nc" id="L206">        s.setCreateTime(p.getCreateTime());</span>
+<span class="nc" id="L207">        return s;</span>
+    }
+
+    private static List&lt;ReviewAggregateVO.ReviewRecheckSummary&gt; toRecheckList(List&lt;TmPushRecheckLogDO&gt; logs) {
+<span class="nc bnc" id="L211" title="All 4 branches missed.">        if (logs == null || logs.isEmpty()) {</span>
+<span class="nc" id="L212">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L214">        List&lt;ReviewAggregateVO.ReviewRecheckSummary&gt; out = new ArrayList&lt;&gt;(logs.size());</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        for (TmPushRecheckLogDO l : logs) {</span>
+<span class="nc" id="L216">            out.add(toRecheckSummary(l));</span>
+<span class="nc" id="L217">        }</span>
+<span class="nc" id="L218">        return out;</span>
+    }
+
+    private static ReviewAggregateVO.ReviewRecheckSummary toRecheckSummary(TmPushRecheckLogDO l) {
+<span class="nc" id="L222">        ReviewAggregateVO.ReviewRecheckSummary s = new ReviewAggregateVO.ReviewRecheckSummary();</span>
+<span class="nc" id="L223">        s.setLogId(l.getLogId());</span>
+<span class="nc" id="L224">        s.setPushId(l.getPushId());</span>
+<span class="nc" id="L225">        s.setRecheckTime(l.getRecheckTime());</span>
+<span class="nc" id="L226">        s.setRecheckStatus(l.getRecheckStatus());</span>
+<span class="nc" id="L227">        s.setCurrentPrice(l.getCurrentPrice());</span>
+<span class="nc" id="L228">        s.setPriceDriftRatio(l.getPriceDriftRatio());</span>
+<span class="nc" id="L229">        s.setCurrentSlippageEstimation(l.getCurrentSlippageEstimation());</span>
+<span class="nc" id="L230">        s.setCurrentDataQualityScore(l.getCurrentDataQualityScore());</span>
+<span class="nc" id="L231">        s.setCurrentConfusedScore(l.getCurrentConfusedScore());</span>
+<span class="nc" id="L232">        s.setCurrentAccountRiskAllowed(l.getCurrentAccountRiskAllowed());</span>
+<span class="nc" id="L233">        s.setFailReasonJson(l.getFailReasonJson());</span>
+<span class="nc" id="L234">        s.setCreateTime(l.getCreateTime());</span>
+<span class="nc" id="L235">        return s;</span>
+    }
+
+    private static List&lt;ReviewAggregateVO.ReviewMissedSummary&gt; toMissedList(List&lt;MissedOpportunityDO&gt; rows) {
+<span class="nc bnc" id="L239" title="All 4 branches missed.">        if (rows == null || rows.isEmpty()) {</span>
+<span class="nc" id="L240">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L242">        List&lt;ReviewAggregateVO.ReviewMissedSummary&gt; out = new ArrayList&lt;&gt;(rows.size());</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        for (MissedOpportunityDO m : rows) {</span>
+<span class="nc" id="L244">            ReviewAggregateVO.ReviewMissedSummary s = new ReviewAggregateVO.ReviewMissedSummary();</span>
+<span class="nc" id="L245">            s.setMissedId(m.getMissedId());</span>
+<span class="nc" id="L246">            s.setDecisionId(m.getDecisionId());</span>
+<span class="nc" id="L247">            s.setAnalysisId(m.getAnalysisId());</span>
+<span class="nc" id="L248">            s.setSymbol(m.getSymbol());</span>
+<span class="nc" id="L249">            s.setBizDate(m.getBizDate());</span>
+<span class="nc" id="L250">            s.setReasonJson(m.getReasonJson());</span>
+<span class="nc" id="L251">            s.setReasonView(MissedReasonViewParser.parse(m.getReasonJson()));</span>
+<span class="nc" id="L252">            s.setRuleVersion(m.getRuleVersion());</span>
+<span class="nc" id="L253">            s.setTraceId(m.getTraceId());</span>
+<span class="nc" id="L254">            s.setCreateTime(m.getCreateTime());</span>
+<span class="nc" id="L255">            out.add(s);</span>
+<span class="nc" id="L256">        }</span>
+<span class="nc" id="L257">        return out;</span>
+    }
+
+    private ReviewAggregateVO.ReviewHotResetSummary toHotReset(
+            AnalysisRunDO run, DecisionResult decision, List&lt;MissedOpportunityDO&gt; missedRows) {
+<span class="nc bnc" id="L262" title="All 6 branches missed.">        if (run == null || run.getSymbol() == null || run.getSymbol().isBlank()) {</span>
+<span class="nc" id="L263">            return null;</span>
+        }
+<span class="nc" id="L265">        String symbol = run.getSymbol().trim();</span>
+<span class="nc" id="L266">        AssetStateDO row = assetStateMapper.selectBySymbol(symbol);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L268">            return null;</span>
+        }
+<span class="nc" id="L270">        ReviewAggregateVO.ReviewHotResetSummary s = new ReviewAggregateVO.ReviewHotResetSummary();</span>
+<span class="nc" id="L271">        s.setSymbol(row.getSymbol());</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        s.setState(row.getState() != null ? row.getState().name() : null);</span>
+<span class="nc" id="L273">        s.setConfusedScore(row.getConfusedScore());</span>
+<span class="nc" id="L274">        s.setHotResetFlag(row.getHotResetFlag());</span>
+<span class="nc" id="L275">        s.setHotResetTriggerType(row.getHotResetTriggerType());</span>
+<span class="nc" id="L276">        s.setHotResetTriggerValue(row.getHotResetTriggerValue());</span>
+<span class="nc" id="L277">        s.setHotResetTime(row.getHotResetTime());</span>
+<span class="nc" id="L278">        s.setPreResetState(row.getPreResetState());</span>
+<span class="nc" id="L279">        s.setPostResetState(row.getPostResetState());</span>
+<span class="nc" id="L280">        s.setLastUpdateTime(row.getLastUpdateTime());</span>
+<span class="nc" id="L281">        HotResetEventDO event = hotResetEventMapper.selectLatestByAnalysisId(run.getAnalysisId());</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        s.setAnalysisEventRecorded(event != null);</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (event != null) {</span>
+<span class="nc" id="L284">            s.setAnalysisEventId(event.getEventId());</span>
+<span class="nc" id="L285">            s.setAnalysisEventTraceId(event.getTraceId());</span>
+<span class="nc" id="L286">            s.setAnalysisEventTriggerType(event.getTriggerType());</span>
+<span class="nc" id="L287">            s.setAnalysisEventTriggerValue(event.getTriggerValue());</span>
+<span class="nc" id="L288">            s.setAnalysisEventDecisionId(event.getDecisionId());</span>
+<span class="nc" id="L289">            s.setAnalysisEventDecisionState(event.getDecisionState());</span>
+<span class="nc" id="L290">            s.setAnalysisEventConfusedScoreSnapshot(event.getConfusedScoreSnapshot());</span>
+<span class="nc" id="L291">            s.setAnalysisEventMultiTimeframeAlignedSnapshot(event.getMultiTimeframeAlignedSnapshot());</span>
+<span class="nc" id="L292">            s.setAnalysisEventTriggerReasonCode(event.getTriggerReasonCode());</span>
+<span class="nc" id="L293">            s.setAnalysisEventTriggerReasonText(event.getTriggerReasonText());</span>
+<span class="nc" id="L294">            s.setAnalysisEventVersion(event.getEventVersion());</span>
+<span class="nc" id="L295">            s.setAnalysisEventTime(event.getEventTime());</span>
+<span class="nc" id="L296">            s.setAnalysisEventPreState(event.getPreState());</span>
+<span class="nc" id="L297">            s.setAnalysisEventPostState(event.getPostState());</span>
+        }
+
+<span class="nc" id="L300">        s.setSemanticScope(ReviewAggregateVO.ReviewHotResetSummary.SEMANTIC_SCOPE_CURRENT_ROW_BY_SYMBOL);</span>
+<span class="nc" id="L301">        s.setScopeExplanationZh(</span>
+                &quot;数据来自 tm_asset_state 按本 run 的 symbol 查询的「当前一行」。&quot;
+                        + &quot;其中 state、confusedScore 会随后续分析被覆盖更新；&quot;
+                        + &quot;hot_reset_* 与 pre/post 记录的是该表上最近一次 Hot Reset 写入的元数据，&quot;
+                        + &quot;不是按 analysisId 单独归档的事件流水，也不能单独还原「仅属于本次 analysis」的完整时序。&quot;);
+<span class="nc" id="L306">        s.setPrePostStateMeaningZh(</span>
+                &quot;preResetState：触发最近一次 Hot Reset 时，该标的在权威表中的资产状态（枚举名）。&quot;
+                        + &quot; postResetState：Hot Reset 写入后目标状态（主链常见为 OBSERVING）。&quot;
+                        + &quot; 二者描述的是「那一次 Hot Reset」的前后边界，不是本区其它字段的通用释义。&quot;);
+<span class="nc" id="L310">        s.setRelationToThisAnalysisZh(buildHotResetRelationZh(run, decision, row));</span>
+<span class="nc" id="L311">        s.setMissedRelationHintZh(buildMissedHotResetHintZh(missedRows));</span>
+<span class="nc" id="L312">        return s;</span>
+    }
+
+    private static String buildHotResetRelationZh(AnalysisRunDO run, DecisionResult decision, AssetStateDO row) {
+<span class="nc" id="L316">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L317">        sb.append(&quot;本复盘 analysisId=&quot;).append(nullToEmpty(run.getAnalysisId()));</span>
+<span class="nc" id="L318">        sb.append(&quot;；symbol=&quot;).append(nullToEmpty(run.getSymbol()));</span>
+<span class="nc" id="L319">        sb.append(&quot;。本节与「本次 decision」的关系：decision.assetStateSnapshot / confusedScore 是决策落库时的快照；&quot;);</span>
+<span class="nc" id="L320">        sb.append(&quot;本节为权威表当前行，二者不是同一对象。&quot;);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        if (decision != null) {</span>
+<span class="nc" id="L322">            Integer dcs = decision.getConfusedScore();</span>
+<span class="nc" id="L323">            Integer rcs = row.getConfusedScore();</span>
+<span class="nc bnc" id="L324" title="All 6 branches missed.">            if (dcs != null &amp;&amp; rcs != null &amp;&amp; !dcs.equals(rcs)) {</span>
+<span class="nc" id="L325">                sb.append(&quot; 当前行 confusedScore=&quot;).append(rcs).append(&quot; 与本次 decision 的 &quot;).append(dcs).append(&quot; 不一致时，通常表示行在后续运行中被更新。&quot;);</span>
+<span class="nc bnc" id="L326" title="All 4 branches missed.">            } else if (dcs != null &amp;&amp; rcs != null) {</span>
+<span class="nc" id="L327">                sb.append(&quot; 当前行 confusedScore 与本次 decision 一致或可比，仍不代表「仅本次 analysis」的冻结历史。&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (row.getHotResetTime() == null) {</span>
+<span class="nc" id="L331">            sb.append(&quot; hotResetTime 为空：可能尚未发生 Hot Reset，或该列尚未写入；其它字段仍表示当前行快照。&quot;);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        } else if (run.getAnalysisTime() != null) {</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (row.getHotResetTime().isBefore(run.getAnalysisTime())) {</span>
+<span class="nc" id="L334">                sb.append(&quot; hotResetTime 早于本次 analysisTime：该次 Hot Reset 发生在本次分析时间之前，不要把本节误读为「本次 analysis 专属刚发生事件」。&quot;);</span>
+            } else {
+<span class="nc" id="L336">                sb.append(&quot; hotResetTime 不早于本次 analysisTime：可能与本次或之后流水线写入有关，但仍仅代表当前库内状态，非独立审计流水。&quot;);</span>
+            }
+        }
+<span class="nc" id="L339">        return sb.toString();</span>
+    }
+
+    private static String buildMissedHotResetHintZh(List&lt;MissedOpportunityDO&gt; missedRows) {
+<span class="nc bnc" id="L343" title="All 4 branches missed.">        if (missedRows == null || missedRows.isEmpty()) {</span>
+<span class="nc" id="L344">            return &quot;本 analysis 下无 missed 记录：无法从 missed.reasonJson 读取旁证；不据此推断 Hot Reset 是否命中，请结合 decision 与主链。&quot;;</span>
+        }
+<span class="nc" id="L346">        Boolean would = tryParseHotResetWouldFire(missedRows.get(0).getReasonJson());</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (Boolean.FALSE.equals(would)) {</span>
+<span class="nc" id="L348">            return &quot;存在 missed 记录：reasonJson.facts.hotResetWouldFire=false 与「主链未因 Hot Reset 跳过 missed」一致；&quot;</span>
+                    + &quot;与本节展示的当前资产行无逐条绑定。&quot;;
+        }
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        if (Boolean.TRUE.equals(would)) {</span>
+<span class="nc" id="L352">            return &quot;存在 missed 记录：reasonJson.facts.hotResetWouldFire=true（若与主链预期不符请核对数据）；仅只读旁证。&quot;;</span>
+        }
+<span class="nc" id="L354">        return &quot;存在 missed 记录：reasonJson 中未能解析 facts.hotResetWouldFire；请以 decision 与主链为准。&quot;;</span>
+    }
+
+    private static Boolean tryParseHotResetWouldFire(String reasonJson) {
+<span class="nc bnc" id="L358" title="All 4 branches missed.">        if (reasonJson == null || reasonJson.isBlank()) {</span>
+<span class="nc" id="L359">            return null;</span>
+        }
+        try {
+<span class="nc" id="L362">            JsonNode n = JSON.readTree(reasonJson);</span>
+<span class="nc" id="L363">            JsonNode f = n.path(&quot;facts&quot;).path(&quot;hotResetWouldFire&quot;);</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            if (f.isBoolean()) {</span>
+<span class="nc" id="L365">                return f.booleanValue();</span>
+            }
+<span class="nc" id="L367">        } catch (Exception ignored) {</span>
+            // 保持 null，由文案提示无法解析
+<span class="nc" id="L369">        }</span>
+<span class="nc" id="L370">        return null;</span>
+    }
+
+    private static String nullToEmpty(String s) {
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        return s != null ? s : &quot;&quot;;</span>
+    }
+
+    private static List&lt;ReviewAggregateVO.ReviewAlertSummary&gt; toAlertList(List&lt;MonitorAlertDO&gt; rows) {
+<span class="nc bnc" id="L378" title="All 4 branches missed.">        if (rows == null || rows.isEmpty()) {</span>
+<span class="nc" id="L379">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L381">        List&lt;ReviewAggregateVO.ReviewAlertSummary&gt; out = new ArrayList&lt;&gt;(rows.size());</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        for (MonitorAlertDO a : rows) {</span>
+<span class="nc" id="L383">            ReviewAggregateVO.ReviewAlertSummary s = new ReviewAggregateVO.ReviewAlertSummary();</span>
+<span class="nc" id="L384">            s.setId(a.getId());</span>
+<span class="nc" id="L385">            s.setAlertType(a.getAlertType());</span>
+<span class="nc" id="L386">            s.setAlertLevel(a.getAlertLevel());</span>
+<span class="nc" id="L387">            s.setAlertMessage(a.getAlertMessage());</span>
+<span class="nc" id="L388">            s.setStatus(a.getStatus());</span>
+<span class="nc" id="L389">            s.setCooldownUntil(a.getCooldownUntil());</span>
+<span class="nc" id="L390">            s.setSuppressReason(a.getSuppressReason());</span>
+<span class="nc" id="L391">            s.setCreatedAt(a.getCreatedAt());</span>
+<span class="nc" id="L392">            out.add(s);</span>
+<span class="nc" id="L393">        }</span>
+<span class="nc" id="L394">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

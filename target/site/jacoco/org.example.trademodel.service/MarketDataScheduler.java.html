@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MarketDataScheduler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service</a> &gt; <span class="el_source">MarketDataScheduler.java</span></div><h1>MarketDataScheduler.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+/**
+ * MarketDataScheduler - V2 增强版
+ * 支持任意币种 + 简单自定义规则
+ *
+ * &lt;p&gt;定时路径每 symbol 每轮只触发一次权威主链：{@code fetchRealMarketData → assemble → makeDecision（含 dataQuality）+ 落库}。
+ * 不在此再调用 {@code DecisionEngineService#makeDecision}，避免与 assemble 内决策重复。&lt;/p&gt;
+ */
+@Component
+public class MarketDataScheduler {
+
+<span class="nc" id="L18">    private static final Logger log = LoggerFactory.getLogger(MarketDataScheduler.class);</span>
+
+    private final RealMarketDataFetcherService realMarketDataFetcherService;
+
+<span class="nc" id="L22">    public MarketDataScheduler(RealMarketDataFetcherService realMarketDataFetcherService) {</span>
+<span class="nc" id="L23">        this.realMarketDataFetcherService = realMarketDataFetcherService;</span>
+<span class="nc" id="L24">    }</span>
+
+    @Scheduled(initialDelay = 60000, fixedRate = 30000)  // 首次延迟60秒，之后每30秒执行一次
+    public void fetchRealMarketDataScheduled() {
+<span class="nc" id="L28">        log.info(&quot;=== [V2 定时任务] 开始：每币种仅走 assemble 主链（含单次 AI 决策与落库） ===&quot;);</span>
+
+<span class="nc" id="L30">        String[] symbols = {</span>
+            &quot;BTCUSDT&quot;,
+            &quot;ETHUSDT&quot;,
+            &quot;SOLUSDT&quot;,
+            &quot;XRPUSDT&quot;,
+            &quot;BNBUSDT&quot;,
+            &quot;DOGEUSDT&quot;
+        };
+
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        for (String symbol : symbols) {</span>
+<span class="nc" id="L40">            log.info(&quot;[sched-single-chain] symbol={} interval=1m → fetchRealMarketData only (no extra makeDecision)&quot;, symbol);</span>
+<span class="nc" id="L41">            realMarketDataFetcherService.fetchRealMarketData(symbol, &quot;1m&quot;);</span>
+        }
+
+<span class="nc" id="L44">        log.info(&quot;=== [V2 定时任务] 本轮 {} 个币种处理完成（每 symbol 单次决策链） ===&quot;, symbols.length);</span>
+<span class="nc" id="L45">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

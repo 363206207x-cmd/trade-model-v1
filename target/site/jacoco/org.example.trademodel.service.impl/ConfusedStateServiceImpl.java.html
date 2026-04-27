@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConfusedStateServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">ConfusedStateServiceImpl.java</span></div><h1>ConfusedStateServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import org.example.trademodel.service.ConfusedResult;
+import org.example.trademodel.service.ConfusedStateService;
+import org.example.trademodel.service.DecisionContext;
+import org.springframework.stereotype.Service;
+
+@Service
+<span class="nc" id="L9">public class ConfusedStateServiceImpl implements ConfusedStateService {</span>
+
+    @Override
+    public ConfusedResult calculateConfused(String symbol, DecisionContext context) {
+<span class="nc bnc" id="L13" title="All 2 branches missed.">        int driverConflict = context.getDriverConflictScore() != null ? context.getDriverConflictScore() : 30;</span>
+<span class="nc bnc" id="L14" title="All 2 branches missed.">        int executionInstability = context.getExecutionInstabilityScore() != null ? context.getExecutionInstabilityScore() : 25;</span>
+<span class="nc bnc" id="L15" title="All 2 branches missed.">        int microstructureTrap = context.getMicrostructureTrapScore() != null ? context.getMicrostructureTrapScore() : 35;</span>
+<span class="nc bnc" id="L16" title="All 2 branches missed.">        int causeEffectDivergence = context.getCauseEffectDivergenceScore() != null ? context.getCauseEffectDivergenceScore() : 20;</span>
+<span class="nc bnc" id="L17" title="All 2 branches missed.">        int aiConflict = context.getAiConflictScore() != null ? context.getAiConflictScore() : 40;</span>
+
+<span class="nc" id="L19">        int confusedScore = (int) (</span>
+                0.30 * driverConflict +
+                0.20 * executionInstability +
+                0.20 * microstructureTrap +
+                0.15 * causeEffectDivergence +
+                0.15 * aiConflict
+        );
+
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        boolean shouldEnter = confusedScore &gt;= 70;</span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">        boolean shouldExit = confusedScore &lt; 55 &amp;&amp; context.getConsecutiveLowConfusedCount() &gt;= 2;</span>
+
+<span class="nc" id="L30">        return new ConfusedResult(</span>
+                confusedScore,
+                shouldEnter,
+                shouldExit,
+<span class="nc" id="L34">                generateConflictReasons(context)</span>
+        );
+    }
+
+    private String generateConflictReasons(DecisionContext context) {
+<span class="nc" id="L39">        return &quot;Driver冲突:&quot; + context.getDriverConflictScore()</span>
+<span class="nc" id="L40">                + &quot; | 执行不稳定:&quot; + context.getExecutionInstabilityScore();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

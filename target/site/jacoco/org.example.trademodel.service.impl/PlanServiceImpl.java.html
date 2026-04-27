@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlanServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">PlanServiceImpl.java</span></div><h1>PlanServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import org.example.trademodel.service.PlanService;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.ExecutionPlanVO;
+import org.example.trademodel.vo.MarketEnvironmentVO;
+import org.example.trademodel.vo.ScoreItemVO;
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+<span class="nc" id="L14">public class PlanServiceImpl implements PlanService {</span>
+
+    @Override
+    public ExecutionPlanVO generateExecutionPlan(DecisionBundleVO decisionBundle, List&lt;ScoreItemVO&gt; scoreList,
+                                                 MarketEnvironmentVO marketEnv, AssetAnalysisVO assetAnalysis) {
+<span class="nc" id="L19">        ExecutionPlanVO plan = new ExecutionPlanVO();</span>
+<span class="nc" id="L20">        plan.setPlanId(&quot;plan-&quot; + UUID.randomUUID().toString().substring(0, 8));</span>
+<span class="nc" id="L21">        plan.setRecommendedAction(&quot;观望&quot;);</span>
+<span class="nc" id="L22">        plan.setEntryZone(&quot;暂无&quot;);</span>
+<span class="nc" id="L23">        plan.setStopLoss(&quot;暂无&quot;);</span>
+<span class="nc" id="L24">        plan.setTakeProfitRules(&quot;暂无&quot;);</span>
+<span class="nc" id="L25">        plan.setLeverageSuggestion(&quot;1-5x&quot;);</span>
+<span class="nc" id="L26">        plan.setPositionSuggestion(&quot;单笔风险不超过总资金 2%&quot;);</span>
+<span class="nc bnc" id="L27" title="All 4 branches missed.">        if (decisionBundle.getPushInvalidationSummary() != null &amp;&amp; !decisionBundle.getPushInvalidationSummary().isBlank()) {</span>
+<span class="nc" id="L28">            plan.setInvalidCondition(decisionBundle.getPushInvalidationSummary());</span>
+        }
+<span class="nc" id="L30">        return plan;</span>
+    }
+
+    @Override
+    public ExecutionPlanVO buildExecutionPlanFromEnvironment(MarketEnvironmentVO env) {
+<span class="nc" id="L35">        return new ExecutionPlanVO();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

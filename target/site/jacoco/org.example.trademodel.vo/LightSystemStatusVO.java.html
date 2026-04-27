@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LightSystemStatusVO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.vo</a> &gt; <span class="el_source">LightSystemStatusVO.java</span></div><h1>LightSystemStatusVO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.vo;
+
+import java.time.LocalDateTime;
+
+<span class="nc" id="L5">public class LightSystemStatusVO {</span>
+
+    private String status;
+    private Integer monitoredCoins;
+    private LocalDateTime lastDecisionTime;
+    private Integer totalDecisionsToday;
+
+    /** 今日错失有效机会条数：按 tm_missed_opportunity.biz_date = 当日（与 JVM 默认时区的「今天」一致）。 */
+    private Integer missedValidOpportunityCount;
+
+    /** 最近一次 Hot Reset（全库按 hot_reset_time 聚合）；无事件时为 false。 */
+    private Boolean hotResetFired;
+    /** 触发该次 Hot Reset 的 symbol（最近一次事件所在行） */
+    private String hotResetSymbol;
+    private String hotResetTriggerType;
+    private String hotResetTriggerValue;
+    private LocalDateTime hotResetTime;
+
+    public String getStatus() {
+<span class="nc" id="L24">        return status;</span>
+    }
+
+    public void setStatus(String status) {
+<span class="nc" id="L28">        this.status = status;</span>
+<span class="nc" id="L29">    }</span>
+
+    public Integer getMonitoredCoins() {
+<span class="nc" id="L32">        return monitoredCoins;</span>
+    }
+
+    public void setMonitoredCoins(Integer monitoredCoins) {
+<span class="nc" id="L36">        this.monitoredCoins = monitoredCoins;</span>
+<span class="nc" id="L37">    }</span>
+
+    public LocalDateTime getLastDecisionTime() {
+<span class="nc" id="L40">        return lastDecisionTime;</span>
+    }
+
+    public void setLastDecisionTime(LocalDateTime lastDecisionTime) {
+<span class="nc" id="L44">        this.lastDecisionTime = lastDecisionTime;</span>
+<span class="nc" id="L45">    }</span>
+
+    public Integer getTotalDecisionsToday() {
+<span class="nc" id="L48">        return totalDecisionsToday;</span>
+    }
+
+    public void setTotalDecisionsToday(Integer totalDecisionsToday) {
+<span class="nc" id="L52">        this.totalDecisionsToday = totalDecisionsToday;</span>
+<span class="nc" id="L53">    }</span>
+
+    public Integer getMissedValidOpportunityCount() {
+<span class="nc" id="L56">        return missedValidOpportunityCount;</span>
+    }
+
+    public void setMissedValidOpportunityCount(Integer missedValidOpportunityCount) {
+<span class="nc" id="L60">        this.missedValidOpportunityCount = missedValidOpportunityCount;</span>
+<span class="nc" id="L61">    }</span>
+
+    public Boolean getHotResetFired() {
+<span class="nc" id="L64">        return hotResetFired;</span>
+    }
+
+    public void setHotResetFired(Boolean hotResetFired) {
+<span class="nc" id="L68">        this.hotResetFired = hotResetFired;</span>
+<span class="nc" id="L69">    }</span>
+
+    public String getHotResetSymbol() {
+<span class="nc" id="L72">        return hotResetSymbol;</span>
+    }
+
+    public void setHotResetSymbol(String hotResetSymbol) {
+<span class="nc" id="L76">        this.hotResetSymbol = hotResetSymbol;</span>
+<span class="nc" id="L77">    }</span>
+
+    public String getHotResetTriggerType() {
+<span class="nc" id="L80">        return hotResetTriggerType;</span>
+    }
+
+    public void setHotResetTriggerType(String hotResetTriggerType) {
+<span class="nc" id="L84">        this.hotResetTriggerType = hotResetTriggerType;</span>
+<span class="nc" id="L85">    }</span>
+
+    public String getHotResetTriggerValue() {
+<span class="nc" id="L88">        return hotResetTriggerValue;</span>
+    }
+
+    public void setHotResetTriggerValue(String hotResetTriggerValue) {
+<span class="nc" id="L92">        this.hotResetTriggerValue = hotResetTriggerValue;</span>
+<span class="nc" id="L93">    }</span>
+
+    public LocalDateTime getHotResetTime() {
+<span class="nc" id="L96">        return hotResetTime;</span>
+    }
+
+    public void setHotResetTime(LocalDateTime hotResetTime) {
+<span class="nc" id="L100">        this.hotResetTime = hotResetTime;</span>
+<span class="nc" id="L101">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,132 @@
+package org.example.trademodel.entity;
+
+import org.example.trademodel.enums.AssetStateEnum;
+
+import java.time.LocalDateTime;
+
+/**
+ * 权威资产状态行（tm_asset_state）；与 MyBatis 写入一致，非 JPA 托管。
+ */
+public class AssetStateDO {
+
+    private Long id;
+
+    private String symbol;
+
+    /** 存库为枚举名，与 {@link AssetStateEnum} 一致 */
+    private AssetStateEnum state;
+
+    private Integer confusedScore;
+
+    private Boolean hotResetFlag = false;
+
+    private String hotResetTriggerType;
+
+    private String hotResetTriggerValue;
+
+    private LocalDateTime hotResetTime;
+
+    private String preResetState;
+
+    private String postResetState;
+
+    private LocalDateTime lastUpdateTime = LocalDateTime.now();
+
+    private String traceId;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getSymbol() {
+        return symbol;
+    }
+
+    public void setSymbol(String symbol) {
+        this.symbol = symbol;
+    }
+
+    public AssetStateEnum getState() {
+        return state;
+    }
+
+    public void setState(AssetStateEnum state) {
+        this.state = state;
+    }
+
+    public Integer getConfusedScore() {
+        return confusedScore;
+    }
+
+    public void setConfusedScore(Integer confusedScore) {
+        this.confusedScore = confusedScore;
+    }
+
+    public Boolean getHotResetFlag() {
+        return hotResetFlag;
+    }
+
+    public void setHotResetFlag(Boolean hotResetFlag) {
+        this.hotResetFlag = hotResetFlag;
+    }
+
+    public String getHotResetTriggerType() {
+        return hotResetTriggerType;
+    }
+
+    public void setHotResetTriggerType(String hotResetTriggerType) {
+        this.hotResetTriggerType = hotResetTriggerType;
+    }
+
+    public String getHotResetTriggerValue() {
+        return hotResetTriggerValue;
+    }
+
+    public void setHotResetTriggerValue(String hotResetTriggerValue) {
+        this.hotResetTriggerValue = hotResetTriggerValue;
+    }
+
+    public LocalDateTime getHotResetTime() {
+        return hotResetTime;
+    }
+
+    public void setHotResetTime(LocalDateTime hotResetTime) {
+        this.hotResetTime = hotResetTime;
+    }
+
+    public String getPreResetState() {
+        return preResetState;
+    }
+
+    public void setPreResetState(String preResetState) {
+        this.preResetState = preResetState;
+    }
+
+    public String getPostResetState() {
+        return postResetState;
+    }
+
+    public void setPostResetState(String postResetState) {
+        this.postResetState = postResetState;
+    }
+
+    public LocalDateTime getLastUpdateTime() {
+        return lastUpdateTime;
+    }
+
+    public void setLastUpdateTime(LocalDateTime lastUpdateTime) {
+        this.lastUpdateTime = lastUpdateTime;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
+    }
+}

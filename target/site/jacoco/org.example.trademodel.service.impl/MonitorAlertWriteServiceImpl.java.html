@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MonitorAlertWriteServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service.impl</a> &gt; <span class="el_source">MonitorAlertWriteServiceImpl.java</span></div><h1>MonitorAlertWriteServiceImpl.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service.impl;
+
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.mapper.MonitorAlertMapper;
+import org.example.trademodel.service.MonitorAlertWriteService;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DecisionBundleVO;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+
+@Service
+public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
+
+<span class="fc" id="L18">    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm:ss&quot;);</span>
+
+    /** 与决策引擎 {@code riskLevelLabel == &quot;HIGH&quot;} 对齐。 */
+    public static final String ALERT_TYPE_HIGH_RISK_DECISION = &quot;HIGH_RISK_DECISION&quot;;
+
+    /** 与 AnalysisAssemblerServiceImpl#estimateDataQualityScore 档位一致：低于 60 视为不足。 */
+    public static final String ALERT_TYPE_DATA_QUALITY_INSUFFICIENT = &quot;DATA_QUALITY_INSUFFICIENT&quot;;
+
+    /**
+     * 与 {@link org.example.trademodel.service.impl.AiConflictResolverServiceImpl} 档位一致：
+     * LEVEL_3 / LEVEL_4，或 aiConflictScore ≥ 46（显著/极端分歧带）。
+     */
+    public static final String ALERT_TYPE_AI_CONFLICT_ELEVATED = &quot;AI_CONFLICT_ELEVATED&quot;;
+
+    /** 与 {@link DecisionBundleVO#getMultiTfConvergence()} 的 WEAK 标签一致（本引擎写 STRONG/WEAK）。 */
+    public static final String ALERT_TYPE_MULTI_TF_WEAK = &quot;MULTI_TF_WEAK&quot;;
+    /** 同一 analysis 内：开仓被高冲突阻断。 */
+    public static final String ALERT_TYPE_OPEN_BLOCKED_BY_CONFLICT = &quot;OPEN_BLOCKED_BY_CONFLICT&quot;;
+    /** 同一 analysis 内：冲突升高且多周期弱收敛。 */
+    public static final String ALERT_TYPE_CONFLUENCE_BREAKDOWN = &quot;CONFLUENCE_BREAKDOWN&quot;;
+
+    private static final int DATA_QUALITY_THRESHOLD = 60;
+
+    /** 与 AiConflictResolverServiceImpl：LEVEL_3 下界一致（显著分歧及以上才告警）。 */
+    private static final int AI_CONFLICT_SCORE_ELEVATED_MIN = 46;
+
+    /** 与 PROJECT_SPEC / tm_user_config.cooldown_minutes 默认 15 对齐的最小 DB 节流窗（分钟）。 */
+    static final int DEFAULT_ALERT_COOLDOWN_MINUTES = 15;
+    /** 在 DB 窗口节流之外，再补一层同类语义近似抑制。 */
+    static final int DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES = 45;
+
+    private final MonitorAlertMapper monitorAlertMapper;
+
+<span class="fc" id="L51">    public MonitorAlertWriteServiceImpl(MonitorAlertMapper monitorAlertMapper) {</span>
+<span class="fc" id="L52">        this.monitorAlertMapper = monitorAlertMapper;</span>
+<span class="fc" id="L53">    }</span>
+
+    @Override
+    public void emitAfterAnalysisPersist(AnalysisRunDO run, AssetAnalysisVO analysis, DecisionBundleVO decision) {
+<span class="pc bpc" id="L57" title="3 of 6 branches missed.">        if (run == null || analysis == null || analysis.getAnalysisId() == null) {</span>
+<span class="nc" id="L58">            return;</span>
+        }
+<span class="fc" id="L60">        String analysisId = analysis.getAnalysisId();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        String symbol = analysis.getSymbol() != null ? analysis.getSymbol() : &quot;&quot;;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        String traceId = run.getTraceId() != null ? run.getTraceId() : &quot;&quot;;</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        String ruleVersion = run.getRuleVersion() != null ? run.getRuleVersion() : &quot;v1.0&quot;;</span>
+
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (decision != null &amp;&amp; isHighRisk(decision)) {</span>
+<span class="fc" id="L66">            tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_HIGH_RISK_DECISION, &quot;HIGH&quot;,</span>
+<span class="fc" id="L67">                    String.format(&quot;高风险决策：riskLevel=HIGH（analysisId=%s, symbol=%s）&quot;, analysisId, symbol),</span>
+                    traceId, ruleVersion);
+        }
+
+<span class="fc" id="L71">        Integer dqs = analysis.getDataQualityScore();</span>
+<span class="pc bpc" id="L72" title="3 of 4 branches missed.">        if (dqs != null &amp;&amp; dqs &lt; DATA_QUALITY_THRESHOLD) {</span>
+<span class="nc" id="L73">            tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, &quot;WARN&quot;,</span>
+<span class="nc" id="L74">                    String.format(&quot;数据质量不足：dataQualityScore=%d（低于阈值 %d，analysisId=%s, symbol=%s）&quot;,</span>
+<span class="nc" id="L75">                            dqs, DATA_QUALITY_THRESHOLD, analysisId, symbol),</span>
+                    traceId, ruleVersion);
+        }
+
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (decision != null) {</span>
+<span class="fc" id="L80">            boolean aiConflictElevated = isAiConflictElevated(decision);</span>
+<span class="fc" id="L81">            boolean multiTfWeak = isMultiTfWeak(decision);</span>
+<span class="fc" id="L82">            boolean openBlocked = isOpenBlockedByConflict(decision, aiConflictElevated);</span>
+<span class="fc" id="L83">            boolean confluenceBreakdown = isConfluenceBreakdown(aiConflictElevated, multiTfWeak);</span>
+
+            // 方案 A：同一次 analysis 两条新规则同时满足时，仅保留更高优先级的 CONFLUENCE_BREAKDOWN。
+<span class="fc" id="L86">            boolean conflictFamilyEmitted = false;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (confluenceBreakdown) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                int score = decision.getAiConflictScore() != null ? decision.getAiConflictScore() : 0;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                String lvl = decision.getAiConflictLevel() != null ? decision.getAiConflictLevel() : &quot;&quot;;</span>
+<span class="fc" id="L90">                tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_CONFLUENCE_BREAKDOWN, &quot;HIGH&quot;,</span>
+<span class="fc" id="L91">                        String.format(&quot;收敛破裂：冲突升高且多周期弱收敛（冲突家族优先保留 CONFLUENCE_BREAKDOWN，不重复写 OPEN_BLOCKED_BY_CONFLICT；aiConflictLevel=%s, aiConflictScore=%d, multiTfConvergence=WEAK, analysisId=%s, symbol=%s）&quot;,</span>
+<span class="fc" id="L92">                                lvl, score, analysisId, symbol),</span>
+                        traceId, ruleVersion);
+<span class="fc" id="L94">                conflictFamilyEmitted = true;</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            } else if (openBlocked) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                int score = decision.getAiConflictScore() != null ? decision.getAiConflictScore() : 0;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                String lvl = decision.getAiConflictLevel() != null ? decision.getAiConflictLevel() : &quot;&quot;;</span>
+<span class="nc" id="L98">                tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_OPEN_BLOCKED_BY_CONFLICT, &quot;WARN&quot;,</span>
+<span class="nc" id="L99">                        String.format(&quot;开仓被冲突阻断：isWorthOpening=false 且冲突升高（aiConflictLevel=%s, aiConflictScore=%d, analysisId=%s, symbol=%s）&quot;,</span>
+<span class="nc" id="L100">                                lvl, score, analysisId, symbol),</span>
+                        traceId, ruleVersion);
+<span class="nc" id="L102">                conflictFamilyEmitted = true;</span>
+            }
+
+            // 若新规则未命中，再保留历史单项规则，避免信息断层。
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">            if (!conflictFamilyEmitted &amp;&amp; aiConflictElevated) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                int score = decision.getAiConflictScore() != null ? decision.getAiConflictScore() : 0;</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                String lvl = decision.getAiConflictLevel() != null ? decision.getAiConflictLevel() : &quot;&quot;;</span>
+<span class="nc" id="L109">                tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_AI_CONFLICT_ELEVATED, &quot;WARN&quot;,</span>
+<span class="nc" id="L110">                        String.format(&quot;多模型冲突升高：aiConflictLevel=%s, aiConflictScore=%d（analysisId=%s, symbol=%s）&quot;,</span>
+<span class="nc" id="L111">                                lvl, score, analysisId, symbol),</span>
+                        traceId, ruleVersion);
+            }
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            if (!conflictFamilyEmitted &amp;&amp; multiTfWeak) {</span>
+<span class="nc" id="L115">                tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_MULTI_TF_WEAK, &quot;WARN&quot;,</span>
+<span class="nc" id="L116">                        String.format(&quot;多周期收敛弱：multiTfConvergence=WEAK（analysisId=%s, symbol=%s）&quot;,</span>
+                                analysisId, symbol),
+                        traceId, ruleVersion);
+            }
+        }
+<span class="fc" id="L121">    }</span>
+
+    private static boolean isHighRisk(DecisionBundleVO decision) {
+<span class="fc" id="L124">        String r = decision.getRiskLevel();</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        return r != null &amp;&amp; &quot;HIGH&quot;.equalsIgnoreCase(r.trim());</span>
+    }
+
+    private static boolean isAiConflictElevated(DecisionBundleVO decision) {
+<span class="fc" id="L129">        String level = decision.getAiConflictLevel();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (level != null) {</span>
+<span class="fc" id="L131">            String u = level.toUpperCase();</span>
+<span class="pc bpc" id="L132" title="3 of 4 branches missed.">            if (u.contains(&quot;LEVEL_3&quot;) || u.contains(&quot;LEVEL_4&quot;)) {</span>
+<span class="fc" id="L133">                return true;</span>
+            }
+        }
+<span class="fc" id="L136">        Integer s = decision.getAiConflictScore();</span>
+<span class="pc bpc" id="L137" title="3 of 4 branches missed.">        return s != null &amp;&amp; s &gt;= AI_CONFLICT_SCORE_ELEVATED_MIN;</span>
+    }
+
+    private static boolean isMultiTfWeak(DecisionBundleVO decision) {
+<span class="fc" id="L141">        String m = decision.getMultiTfConvergence();</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        return m != null &amp;&amp; &quot;WEAK&quot;.equalsIgnoreCase(m.trim());</span>
+    }
+
+    private static boolean isOpenBlockedByConflict(DecisionBundleVO decision, boolean aiConflictElevated) {
+<span class="fc" id="L146">        Boolean worthOpening = decision.getIsWorthOpening();</span>
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        return Boolean.FALSE.equals(worthOpening) &amp;&amp; aiConflictElevated;</span>
+    }
+
+    private static boolean isConfluenceBreakdown(boolean aiConflictElevated, boolean multiTfWeak) {
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        return aiConflictElevated &amp;&amp; multiTfWeak;</span>
+    }
+
+    /**
+     * 先按 analysisId+alertType 去重；再按 asset_symbol+alertType+时间窗对 OPEN 节流：
+     * 可写 OPEN（带 cooldown_until）或写 SUPPRESSED（suppress_reason 说明原因）。
+     */
+    private void tryEmitOpenOrSuppressed(String analysisId, String symbol, String alertType, String alertLevel,
+                                         String message, String traceId, String ruleVersion) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (monitorAlertMapper.countByAnalysisIdAndAlertType(analysisId, alertType) &gt; 0) {</span>
+<span class="nc" id="L161">            return;</span>
+        }
+<span class="fc" id="L163">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        boolean windowHasOpen = monitorAlertMapper.countOpenInThrottleWindow(</span>
+                symbol, alertType, DEFAULT_ALERT_COOLDOWN_MINUTES) &gt; 0;
+
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (windowHasOpen) {</span>
+<span class="fc" id="L168">            MonitorAlertDO suppressed = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);</span>
+<span class="fc" id="L169">            suppressed.setStatus(&quot;SUPPRESSED&quot;);</span>
+<span class="fc" id="L170">            suppressed.setSuppressReason(String.format(</span>
+                    &quot;THROTTLE_DB:%dm window: OPEN already exists for same asset_symbol+alert_type; skip duplicate OPEN&quot;,
+<span class="fc" id="L172">                    DEFAULT_ALERT_COOLDOWN_MINUTES));</span>
+<span class="fc" id="L173">            suppressed.setCooldownUntil(null);</span>
+<span class="fc" id="L174">            monitorAlertMapper.insert(suppressed);</span>
+<span class="fc" id="L175">            return;</span>
+        }
+
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        boolean semanticSimilarRecent = monitorAlertMapper.countAnyInSemanticWindow(</span>
+                symbol, alertType, DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES) &gt; 0;
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (semanticSimilarRecent) {</span>
+<span class="nc" id="L181">            MonitorAlertDO suppressed = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);</span>
+<span class="nc" id="L182">            suppressed.setStatus(&quot;SUPPRESSED&quot;);</span>
+<span class="nc" id="L183">            suppressed.setSuppressReason(String.format(</span>
+                    &quot;SEMANTIC_SIMILAR_RECENT:%dm window: similar alert_type already emitted for same asset_symbol&quot;,
+<span class="nc" id="L185">                    DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES));</span>
+<span class="nc" id="L186">            suppressed.setCooldownUntil(null);</span>
+<span class="nc" id="L187">            monitorAlertMapper.insert(suppressed);</span>
+<span class="nc" id="L188">            return;</span>
+        }
+
+<span class="fc" id="L191">        MonitorAlertDO open = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);</span>
+<span class="fc" id="L192">        open.setStatus(&quot;OPEN&quot;);</span>
+<span class="fc" id="L193">        open.setSuppressReason(null);</span>
+<span class="fc" id="L194">        open.setCooldownUntil(now.plusMinutes(DEFAULT_ALERT_COOLDOWN_MINUTES).format(TS));</span>
+<span class="fc" id="L195">        monitorAlertMapper.insert(open);</span>
+<span class="fc" id="L196">    }</span>
+
+    private static MonitorAlertDO baseRow(String analysisId, String symbol, String alertType, String alertLevel,
+                                          String message, String traceId, String ruleVersion) {
+<span class="fc" id="L200">        MonitorAlertDO row = new MonitorAlertDO();</span>
+<span class="fc" id="L201">        row.setId(&quot;mal-&quot; + UUID.randomUUID().toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 12));</span>
+<span class="fc" id="L202">        row.setAnalysisId(analysisId);</span>
+<span class="fc" id="L203">        row.setAssetSymbol(symbol);</span>
+<span class="fc" id="L204">        row.setAlertType(alertType);</span>
+<span class="fc" id="L205">        row.setAlertLevel(alertLevel);</span>
+<span class="fc" id="L206">        row.setAlertMessage(message);</span>
+<span class="fc" id="L207">        row.setTraceId(traceId);</span>
+<span class="fc" id="L208">        row.setRuleVersion(ruleVersion);</span>
+<span class="fc" id="L209">        row.setCreatedBy(&quot;system&quot;);</span>
+<span class="fc" id="L210">        row.setIsDeleted(0);</span>
+<span class="fc" id="L211">        row.setVersionNo(1);</span>
+<span class="fc" id="L212">        return row;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

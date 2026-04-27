@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PositionSyncService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service</a> &gt; <span class="el_source">PositionSyncService.java</span></div><h1>PositionSyncService.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.example.trademodel.mapper.RealPositionMapper;
+import org.example.trademodel.position.PositionProvider;
+import org.example.trademodel.position.PositionProviderResult;
+import org.example.trademodel.position.PositionSnapshot;
+import org.example.trademodel.vo.PositionSyncStatusVO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class PositionSyncService {
+
+<span class="nc" id="L24">    private static final Logger log = LoggerFactory.getLogger(PositionSyncService.class);</span>
+
+    private final PositionProvider positionProvider;
+    private final RealPositionMapper realPositionMapper;
+    private final String configuredProviderType;
+<span class="nc" id="L29">    private final Object statusLock = new Object();</span>
+<span class="nc" id="L30">    private final PositionSyncStatusVO latestStatus = new PositionSyncStatusVO();</span>
+
+    public PositionSyncService(PositionProvider positionProvider,
+                               RealPositionMapper realPositionMapper,
+<span class="nc" id="L34">                               @Value(&quot;${position.provider.type:SIMULATED}&quot;) String configuredProviderType) {</span>
+<span class="nc" id="L35">        this.positionProvider = positionProvider;</span>
+<span class="nc" id="L36">        this.realPositionMapper = realPositionMapper;</span>
+<span class="nc" id="L37">        this.configuredProviderType = normalizeProviderType(configuredProviderType);</span>
+<span class="nc" id="L38">        this.latestStatus.setConfiguredProviderType(this.configuredProviderType);</span>
+<span class="nc" id="L39">        this.latestStatus.setLastSyncMessage(&quot;sync not started yet&quot;);</span>
+<span class="nc" id="L40">        this.latestStatus.setCurrentOpenPositionCount(safeCountOpenPositions());</span>
+<span class="nc" id="L41">    }</span>
+
+    @Transactional
+    public void syncPositions() {
+<span class="nc" id="L45">        LocalDateTime startTime = LocalDateTime.now();</span>
+<span class="nc" id="L46">        updateStatusOnStart(startTime);</span>
+<span class="nc" id="L47">        log.info(&quot;[position-sync] start sync positions&quot;);</span>
+        try {
+<span class="nc" id="L49">            PositionProviderResult result = positionProvider.fetchOpenPositions();</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            List&lt;PositionSnapshot&gt; openPositions = result != null ? result.getOpenPositions() : null;</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (openPositions == null) {</span>
+<span class="nc" id="L52">                openPositions = new ArrayList&lt;&gt;();</span>
+            }
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            String sourceType = result != null ? safeText(result.getSourceType(), &quot;UNKNOWN&quot;) : &quot;UNKNOWN&quot;;</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            String sourceName = result != null ? safeText(result.getSourceName(), &quot;unknown-provider&quot;) : &quot;unknown-provider&quot;;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            String configuredType = result != null</span>
+<span class="nc" id="L57">                    ? safeText(result.getConfiguredProviderType(), this.configuredProviderType)</span>
+<span class="nc" id="L58">                    : this.configuredProviderType;</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">            boolean fallbackOccurred = result != null &amp;&amp; result.isFallbackOccurred();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            String fallbackReason = result != null ? safeText(result.getFallbackReason(), null) : null;</span>
+<span class="nc" id="L61">            log.info(&quot;[position-sync] provider={} sourceType={} fetchedOpenCount={}&quot;, sourceName, sourceType, openPositions.size());</span>
+
+<span class="nc" id="L63">            int upserted = 0;</span>
+<span class="nc" id="L64">            Set&lt;String&gt; openSymbols = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            for (PositionSnapshot position : openPositions) {</span>
+<span class="nc" id="L66">                String symbol = normalizeSymbol(position.getSymbol());</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                if (symbol == null) {</span>
+<span class="nc" id="L68">                    continue;</span>
+                }
+<span class="nc" id="L70">                openSymbols.add(symbol);</span>
+<span class="nc" id="L71">                int affected = realPositionMapper.updateOpenPositionBySymbol(</span>
+                        symbol,
+                        sourceType,
+                        sourceName,
+<span class="nc" id="L75">                        position.getPositionSide(),</span>
+<span class="nc" id="L76">                        position.getAvgOpenPrice(),</span>
+<span class="nc" id="L77">                        position.getPositionOpenTime(),</span>
+<span class="nc" id="L78">                        position.getPositionQuantity(),</span>
+<span class="nc" id="L79">                        position.getUnrealizedPnlPct(),</span>
+<span class="nc" id="L80">                        position.getMarkPrice(),</span>
+<span class="nc" id="L81">                        position.getBreakEvenPrice(),</span>
+<span class="nc" id="L82">                        position.getLiquidationPrice(),</span>
+                        startTime
+                );
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (affected == 0) {</span>
+<span class="nc" id="L86">                    realPositionMapper.insertOpenPosition(</span>
+<span class="nc" id="L87">                            UUID.randomUUID().toString(),</span>
+                            symbol,
+                            sourceType,
+                            sourceName,
+<span class="nc" id="L91">                            position.getPositionSide(),</span>
+<span class="nc" id="L92">                            position.getAvgOpenPrice(),</span>
+<span class="nc" id="L93">                            position.getPositionOpenTime(),</span>
+<span class="nc" id="L94">                            position.getPositionQuantity(),</span>
+<span class="nc" id="L95">                            position.getUnrealizedPnlPct(),</span>
+<span class="nc" id="L96">                            position.getMarkPrice(),</span>
+<span class="nc" id="L97">                            position.getBreakEvenPrice(),</span>
+<span class="nc" id="L98">                            position.getLiquidationPrice(),</span>
+                            startTime
+                    );
+                }
+<span class="nc" id="L102">                upserted++;</span>
+<span class="nc" id="L103">            }</span>
+
+<span class="nc" id="L105">            int closed = realPositionMapper.closeMissingOpenPositions(new ArrayList&lt;&gt;(openSymbols), startTime);</span>
+<span class="nc" id="L106">            int currentOpenCount = safeCountOpenPositions();</span>
+<span class="nc" id="L107">            log.info(&quot;[position-sync] upserted={} closed={} sourceType={} sourceName={}&quot;, upserted, closed, sourceType, sourceName);</span>
+<span class="nc" id="L108">            updateStatusOnSuccess(</span>
+                    configuredType,
+                    sourceType,
+                    sourceName,
+                    fallbackOccurred,
+                    fallbackReason,
+                    startTime,
+<span class="nc" id="L115">                    LocalDateTime.now(),</span>
+<span class="nc" id="L116">                    openPositions.size(),</span>
+                    upserted,
+                    closed,
+                    currentOpenCount
+            );
+<span class="nc" id="L121">        } catch (Exception e) {</span>
+<span class="nc" id="L122">            log.warn(&quot;[position-sync] sync failed err={}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L123">            updateStatusOnFailure(startTime, LocalDateTime.now(), e.getMessage());</span>
+<span class="nc" id="L124">        }</span>
+<span class="nc" id="L125">    }</span>
+
+    public PositionSyncStatusVO getPositionSyncStatus() {
+<span class="nc" id="L128">        synchronized (statusLock) {</span>
+<span class="nc" id="L129">            PositionSyncStatusVO snapshot = new PositionSyncStatusVO();</span>
+<span class="nc" id="L130">            snapshot.setConfiguredProviderType(latestStatus.getConfiguredProviderType());</span>
+<span class="nc" id="L131">            snapshot.setActiveProviderType(latestStatus.getActiveProviderType());</span>
+<span class="nc" id="L132">            snapshot.setActiveProviderName(latestStatus.getActiveProviderName());</span>
+<span class="nc" id="L133">            snapshot.setFallbackOccurred(latestStatus.getFallbackOccurred());</span>
+<span class="nc" id="L134">            snapshot.setFallbackReason(latestStatus.getFallbackReason());</span>
+<span class="nc" id="L135">            snapshot.setLastSyncStartTime(latestStatus.getLastSyncStartTime());</span>
+<span class="nc" id="L136">            snapshot.setLastSyncEndTime(latestStatus.getLastSyncEndTime());</span>
+<span class="nc" id="L137">            snapshot.setLastSyncSuccess(latestStatus.getLastSyncSuccess());</span>
+<span class="nc" id="L138">            snapshot.setLastSyncMessage(latestStatus.getLastSyncMessage());</span>
+<span class="nc" id="L139">            snapshot.setLastFetchedOpenCount(latestStatus.getLastFetchedOpenCount());</span>
+<span class="nc" id="L140">            snapshot.setLastUpsertedCount(latestStatus.getLastUpsertedCount());</span>
+<span class="nc" id="L141">            snapshot.setLastClosedCount(latestStatus.getLastClosedCount());</span>
+<span class="nc" id="L142">            snapshot.setCurrentOpenPositionCount(latestStatus.getCurrentOpenPositionCount());</span>
+<span class="nc" id="L143">            return snapshot;</span>
+        }
+    }
+
+    private String normalizeSymbol(String symbol) {
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (symbol == null) {</span>
+<span class="nc" id="L149">            return null;</span>
+        }
+<span class="nc" id="L151">        String normalized = symbol.trim().toUpperCase();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        return normalized.isEmpty() ? null : normalized;</span>
+    }
+
+    private String safeText(String text, String fallback) {
+<span class="nc bnc" id="L156" title="All 4 branches missed.">        if (text == null || text.trim().isEmpty()) {</span>
+<span class="nc" id="L157">            return fallback;</span>
+        }
+<span class="nc" id="L159">        return text.trim();</span>
+    }
+
+    private String normalizeProviderType(String providerType) {
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        if (providerType == null || providerType.trim().isEmpty()) {</span>
+<span class="nc" id="L164">            return &quot;SIMULATED&quot;;</span>
+        }
+<span class="nc" id="L166">        return providerType.trim().toUpperCase();</span>
+    }
+
+    private void updateStatusOnStart(LocalDateTime startTime) {
+<span class="nc" id="L170">        synchronized (statusLock) {</span>
+<span class="nc" id="L171">            latestStatus.setConfiguredProviderType(this.configuredProviderType);</span>
+<span class="nc" id="L172">            latestStatus.setLastSyncStartTime(startTime);</span>
+<span class="nc" id="L173">            latestStatus.setLastSyncEndTime(null);</span>
+<span class="nc" id="L174">            latestStatus.setLastSyncSuccess(null);</span>
+<span class="nc" id="L175">            latestStatus.setLastSyncMessage(&quot;sync in progress&quot;);</span>
+<span class="nc" id="L176">            latestStatus.setLastFetchedOpenCount(null);</span>
+<span class="nc" id="L177">            latestStatus.setLastUpsertedCount(null);</span>
+<span class="nc" id="L178">            latestStatus.setLastClosedCount(null);</span>
+<span class="nc" id="L179">        }</span>
+<span class="nc" id="L180">    }</span>
+
+    private void updateStatusOnSuccess(String configuredType,
+                                       String activeProviderType,
+                                       String activeProviderName,
+                                       boolean fallbackOccurred,
+                                       String fallbackReason,
+                                       LocalDateTime startTime,
+                                       LocalDateTime endTime,
+                                       int fetchedCount,
+                                       int upsertedCount,
+                                       int closedCount,
+                                       int currentOpenCount) {
+<span class="nc" id="L193">        synchronized (statusLock) {</span>
+<span class="nc" id="L194">            latestStatus.setConfiguredProviderType(configuredType);</span>
+<span class="nc" id="L195">            latestStatus.setActiveProviderType(activeProviderType);</span>
+<span class="nc" id="L196">            latestStatus.setActiveProviderName(activeProviderName);</span>
+<span class="nc" id="L197">            latestStatus.setFallbackOccurred(fallbackOccurred);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            latestStatus.setFallbackReason(fallbackOccurred ? fallbackReason : null);</span>
+<span class="nc" id="L199">            latestStatus.setLastSyncStartTime(startTime);</span>
+<span class="nc" id="L200">            latestStatus.setLastSyncEndTime(endTime);</span>
+<span class="nc" id="L201">            latestStatus.setLastSyncSuccess(true);</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            latestStatus.setLastSyncMessage(fallbackOccurred ? &quot;sync success with fallback&quot; : &quot;sync success&quot;);</span>
+<span class="nc" id="L203">            latestStatus.setLastFetchedOpenCount(fetchedCount);</span>
+<span class="nc" id="L204">            latestStatus.setLastUpsertedCount(upsertedCount);</span>
+<span class="nc" id="L205">            latestStatus.setLastClosedCount(closedCount);</span>
+<span class="nc" id="L206">            latestStatus.setCurrentOpenPositionCount(currentOpenCount);</span>
+<span class="nc" id="L207">        }</span>
+<span class="nc" id="L208">    }</span>
+
+    private void updateStatusOnFailure(LocalDateTime startTime, LocalDateTime endTime, String errorMessage) {
+<span class="nc" id="L211">        synchronized (statusLock) {</span>
+<span class="nc" id="L212">            latestStatus.setConfiguredProviderType(this.configuredProviderType);</span>
+<span class="nc" id="L213">            latestStatus.setLastSyncStartTime(startTime);</span>
+<span class="nc" id="L214">            latestStatus.setLastSyncEndTime(endTime);</span>
+<span class="nc" id="L215">            latestStatus.setLastSyncSuccess(false);</span>
+<span class="nc" id="L216">            latestStatus.setLastSyncMessage(&quot;sync failed: &quot; + safeText(errorMessage, &quot;unknown error&quot;));</span>
+<span class="nc" id="L217">            latestStatus.setCurrentOpenPositionCount(safeCountOpenPositions());</span>
+<span class="nc" id="L218">        }</span>
+<span class="nc" id="L219">    }</span>
+
+    private int safeCountOpenPositions() {
+        try {
+<span class="nc" id="L223">            return realPositionMapper.countOpenPositions();</span>
+<span class="nc" id="L224">        } catch (Exception e) {</span>
+<span class="nc" id="L225">            log.warn(&quot;[position-sync] count open positions failed err={}&quot;, e.getMessage());</span>
+<span class="nc" id="L226">            return 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title}">复盘</title>
+    <style>
+        :root {
+            --bg-canvas: #f5f7fa;
+            --bg-surface: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border-subtle: #e2e8f0;
+            --brand-accent: #2563eb;
+            --status-error: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg-canvas);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.45;
+            min-height: 100vh;
+        }
+        .top-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 18px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .top-bar h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+        .top-bar .muted { color: var(--text-secondary); font-size: 0.82rem; }
+        .top-bar a { color: var(--brand-accent); text-decoration: none; font-size: 0.85rem; }
+        .wrap { padding: 14px 18px 32px; max-width: 1100px; margin: 0 auto; }
+        .banner {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            font-size: 0.9rem;
+        }
+        .banner.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .banner.loading { background: #f8fafc; color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+        .section {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }
+        .section h2 {
+            margin: 0 0 10px 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .kv { display: grid; grid-template-columns: 160px 1fr; gap: 6px 12px; font-size: 0.86rem; }
+        .kv dt { color: var(--text-secondary); margin: 0; }
+        .kv dd { margin: 0; word-break: break-word; }
+        .kv dd.raw-json, td.raw-json {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.78rem;
+            max-height: 12rem;
+            overflow: auto;
+        }
+        .decision-review-reasons {
+            margin: 0;
+            padding-left: 1.15em;
+            font-size: 0.86rem;
+        }
+        .decision-review-reasons li { margin: 0.15em 0; }
+        .decision-evidence-list {
+            margin: 0;
+            padding-left: 1.15em;
+            font-size: 0.84rem;
+        }
+        .decision-evidence-list li { margin: 0.15em 0; }
+        .structured-evidence-wrap { margin-bottom: 10px; }
+        .structured-score-wrap { margin-bottom: 10px; }
+        .structured-evidence-hint { font-size: 0.78rem; margin: 6px 0 0 0; line-height: 1.35; color: var(--text-secondary); }
+        .structured-evidence-top3 .muted { opacity: 0.85; }
+        .evidence-dir-tag { font-size: 0.78rem; margin-right: 6px; }
+        .evidence-src-muted { font-size: 0.72rem; opacity: 0.82; margin-left: 2px; }
+        .simple-list {
+            margin: 0;
+            padding-left: 1.15em;
+            font-size: 0.84rem;
+        }
+        .simple-list li { margin: 0.15em 0; }
+        .decision-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .signal-card {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #f8fafc;
+        }
+        .signal-card .signal-k {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+        .signal-card .signal-v {
+            font-size: 0.86rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            word-break: break-word;
+        }
+        .mini-kv {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 4px 10px;
+            margin: 0;
+            font-size: 0.81rem;
+        }
+        .mini-kv dt {
+            margin: 0;
+            color: var(--text-secondary);
+            word-break: break-word;
+        }
+        .mini-kv dd {
+            margin: 0;
+            color: var(--text-primary);
+            word-break: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.78rem;
+        }
+        .review-market-env-mini {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+        .review-market-env-mini .review-me-title {
+            margin: 0 0 8px 0;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .empty { color: var(--text-secondary); font-size: 0.86rem; margin: 0; }
+        table.simple { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        table.simple th, table.simple td {
+            border: 1px solid var(--border-subtle);
+            padding: 6px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        table.simple th { background: #f8fafc; color: var(--text-secondary); font-weight: 600; }
+        .push-block { border: 1px dashed var(--border-subtle); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        .push-block:last-child { margin-bottom: 0; }
+        .push-digest {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0 0 8px 0;
+        }
+        .push-digest .digest-item {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+        }
+        .subhead { font-size: 0.8rem; color: var(--text-secondary); margin: 8px 0 6px; font-weight: 600; }
+        .simple-details {
+            margin-top: 8px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: #fafcff;
+        }
+        .simple-details > summary {
+            cursor: pointer;
+            padding: 8px 10px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            user-select: none;
+        }
+        .simple-details[open] > summary {
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .simple-details-body {
+            padding: 8px 10px;
+        }
+        .form-row { margin-bottom: 10px; }
+        .form-row label { display: block; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .form-row input[type="text"], .form-row textarea, .form-row select {
+            width: 100%; max-width: 100%; padding: 8px 10px; border: 1px solid var(--border-subtle);
+            border-radius: 8px; font-family: inherit; font-size: 0.86rem;
+        }
+        .form-actions { margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .form-actions button {
+            padding: 8px 14px; border-radius: 8px; border: none; background: var(--brand-accent);
+            color: #fff; font-size: 0.86rem; font-weight: 600; cursor: pointer;
+        }
+        .form-actions button:hover { filter: brightness(1.05); }
+        .form-actions .muted { font-size: 0.82rem; }
+        /* Hot Reset：语义说明区（由 review-page.js 注入） */
+        .hr-callout {
+            margin: 0 0 12px 0;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+        .hr-callout .hr-lead { margin: 0 0 8px 0; color: var(--text-primary); font-weight: 600; }
+        .hr-callout p { margin: 0 0 8px 0; line-height: 1.5; }
+        .hr-callout p:last-child { margin-bottom: 0; }
+        .hr-callout .hr-k { color: var(--text-secondary); font-size: 0.78rem; margin-bottom: 2px; }
+        /* 区块导航（锚点） */
+        .review-nav {
+            display: none;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            background: rgba(245, 247, 250, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            font-size: 0.82rem;
+        }
+        .review-nav.visible { display: flex; }
+        .review-nav .review-nav-label {
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-right: 4px;
+        }
+        .review-nav a {
+            color: var(--brand-accent);
+            text-decoration: none;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+        }
+        .review-nav a:hover {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+        /* 录入区：与只读区拉开边界 */
+        .review-entry-card {
+            border: 2px solid #bfdbfe;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 48%);
+            box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+        }
+        .review-entry-card .entry-ribbon {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            margin: 0 0 10px 0;
+        }
+        .review-entry-card .entry-ribbon h2 { margin: 0; }
+        .review-entry-card .entry-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #1d4ed8;
+            background: #dbeafe;
+            padding: 3px 8px;
+            border-radius: 999px;
+        }
+        .review-entry-card .entry-hint {
+            margin: 0 0 12px 0;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+        .entry-context {
+            margin: 0 0 12px 0;
+            padding: 10px 12px;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            background: #eff6ff;
+        }
+        .entry-context-lead {
+            margin: 0 0 8px 0;
+            font-size: 0.82rem;
+            color: #1e3a8a;
+            line-height: 1.45;
+        }
+        /* 只读聚合区 */
+        .readonly-region {
+            margin-top: 4px;
+        }
+        .readonly-region .readonly-heading {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin: 0 0 10px 0;
+        }
+        .readonly-region .readonly-heading h2 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .readonly-region .readonly-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--border-subtle);
+        }
+        .readonly-region .readonly-hint {
+            margin: 0 0 12px 0;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+        /* 锚点偏移（避免被 sticky 遮挡） */
+        .section.anchor-target { scroll-margin-top: 88px; }
+        /* JSON / 长文本块 */
+        .json-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        .json-toolbar .json-label { font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; }
+        .json-toolbar button {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            background: #fff;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        .json-toolbar button:hover { background: #f8fafc; }
+        .json-collapsible > .raw-json {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.78rem;
+            max-height: 14rem;
+            overflow: auto;
+        }
+        .json-collapsible.is-expanded > .raw-json {
+            max-height: none;
+        }
+        /* 空状态 */
+        .empty-panel {
+            margin: 0;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        .empty-panel strong { color: var(--text-primary); font-weight: 600; }
+        .closure-lead {
+            margin: 0 0 10px 0;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+        }
+        .closure-list {
+            margin: 0;
+            padding-left: 1.15em;
+            font-size: 0.84rem;
+        }
+        .closure-list li { margin: 0.2em 0; }
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .fact-ref-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 8px;
+        }
+        .fact-ref-card {
+            text-align: left;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            background: #f8fafc;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        .fact-ref-card:hover {
+            border-color: #93c5fd;
+            background: #eff6ff;
+        }
+        .fact-ref-label {
+            font-size: 0.83rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .fact-ref-reason {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body>
+<header class="top-bar">
+    <div>
+        <h1>复盘</h1>
+        <p class="muted">analysisId：<span th:text="${analysisId}">—</span></p>
+        <p class="muted" style="margin:4px 0 0 0;max-width:42rem;">本页绑定单次 analysis（固定快照）；与 Dashboard 按标的展示的最新一轮分析不一定是同一对象，请勿跨页逐项对拍。</p>
+        <p class="muted" style="margin:4px 0 0 0;max-width:42rem;">上方为「复盘录入」（可保存）；下方为管道聚合摘要（只读）。可用顶部快速跳转在各区块间移动。</p>
+    </div>
+    <div>
+        <a href="/dashboard">返回 Dashboard</a>
+    </div>
+</header>
+
+<main class="wrap">
+    <div id="status-banner" class="banner loading">正在加载聚合数据…</div>
+    <nav id="review-nav" class="review-nav" aria-label="复盘页区块导航"></nav>
+    <div id="review-entry" class="section review-entry-card" style="display:none;">
+        <div class="entry-ribbon">
+            <h2 id="sec-review-entry">复盘录入</h2>
+            <span class="entry-badge">可编辑 · 保存至库</span>
+        </div>
+        <p class="entry-hint">此处填写对本次分析的复盘结论；不会改写上游管道规则，仅写入复盘表。建议先看下方“复盘闭环总览”和重点事实块，再基于当前事实链录入。</p>
+        <div id="review-entry-context" class="entry-context"></div>
+        <div class="form-row">
+            <label for="rf-error-type">错误类型 errorType</label>
+            <select id="rf-error-type" name="errorType" autocomplete="off">
+                <option value="">（空）</option>
+                <option value="DATA_ISSUE">数据缺失/延迟/异常（DATA_ISSUE）</option>
+                <option value="RULE_TOO_LOOSE">规则过松（RULE_TOO_LOOSE）</option>
+                <option value="RULE_TOO_STRICT">规则过严（RULE_TOO_STRICT）</option>
+                <option value="TF_CONFLICT_MISJUDGED">多周期冲突误判（TF_CONFLICT_MISJUDGED）</option>
+                <option value="EVENT_RISK_UNDERWEIGHT">事件权重低估（EVENT_RISK_UNDERWEIGHT）</option>
+                <option value="LEVERAGE_RISK_UNDERWEIGHT">杠杆风险低估（LEVERAGE_RISK_UNDERWEIGHT）</option>
+                <option value="LIQUIDITY_TRAP_MISSED">插针/流动性扫荡漏判（LIQUIDITY_TRAP_MISSED）</option>
+                <option value="AI_OVERRULE_BIAS">AI 辅助结论偏移（AI_OVERRULE_BIAS）</option>
+                <option value="PLAN_EXECUTION_MISMATCH">计划和市场演化不匹配（PLAN_EXECUTION_MISMATCH）</option>
+                <option value="UNKNOWN">未知原因（UNKNOWN）</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label for="rf-actual-outcome">实际结果 actualOutcome</label>
+            <textarea id="rf-actual-outcome" name="actualOutcome" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+            <label for="rf-adjustment">调整建议 adjustmentSuggestion</label>
+            <textarea id="rf-adjustment" name="adjustmentSuggestion" rows="4"></textarea>
+        </div>
+        <div class="form-actions">
+            <button type="button" id="rf-save">保存复盘</button>
+            <span id="rf-save-msg" class="muted"></span>
+        </div>
+    </div>
+    <div id="review-closure-root" style="display:none;"></div>
+    <div id="readonly-region" class="readonly-region" style="display:none;">
+        <div class="readonly-heading">
+            <h2 id="sec-readonly">管道聚合摘要</h2>
+            <span class="readonly-badge">只读</span>
+        </div>
+        <p class="readonly-hint">以下区块按三层语义组织：事实层（Run/Decision/Plan/Push/Missed/Hot Reset/Alerts）、人工结论层（治理输入摘要）、规则审计层（RuleVersionLog）。</p>
+        <div id="review-root"></div>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    window.__REVIEW_ANALYSIS_ID__ = /*[[${analysisId}]]*/ '';
+</script>
+<script src="/js/alert-explain.js" defer></script>
+<script src="/js/review-page.js" defer></script>
+</body>
+</html>

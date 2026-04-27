@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DecisionResultVO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.vo</a> &gt; <span class="el_source">DecisionResultVO.java</span></div><h1>DecisionResultVO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.vo;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+<span class="nc" id="L6">public class DecisionResultVO {</span>
+
+    private String decisionId;
+    private String analysisId;
+    private String symbol;
+    private String marketBiasHierarchy;
+    private String tradeType;
+    private String confidenceLevel;
+    private String riskLevel;
+    private String actionPriority;
+    private String conclusionSummary;
+    private Boolean isWorthOpening;
+    private String multiTfConvergence;
+    private String aiRoleResults;
+    private Boolean isAdopted;
+    private String validPeriod;
+    private String invalidCondition;
+    private String evidenceSummary;
+    private String explanationJson;
+    private String reviewReasons;
+    private String aiConflictLevel;
+    private Integer aiConflictScore;
+    private String aiPlanMode;
+    private Integer confusedScore;
+    private String assetStateSnapshot;
+    private String executionPlanSummary;
+    private LocalDateTime createTime;
+    private BigDecimal latestPrice;
+    private BigDecimal priceChangePct;
+    private Long priceUpdateTimeMs;
+    private Boolean hasOpenPosition;
+    private String positionSide;
+    private BigDecimal avgOpenPrice;
+    private LocalDateTime positionOpenTime;
+    private BigDecimal positionQuantity;
+    private BigDecimal unrealizedPnlPct;
+    private String positionStatus;
+    private BigDecimal markPrice;
+    private BigDecimal breakEvenPrice;
+    private BigDecimal liquidationPrice;
+
+    /**
+     * When any persisted read-model field is absent, lists LEGACY_MISSING:field,... so clients
+     * do not confuse empty data with a real business outcome.
+     */
+    private String readModelFallbackReason;
+
+    public String getDecisionId() {
+<span class="nc" id="L54">        return decisionId;</span>
+    }
+
+    public void setDecisionId(String decisionId) {
+<span class="nc" id="L58">        this.decisionId = decisionId;</span>
+<span class="nc" id="L59">    }</span>
+
+    public String getAnalysisId() {
+<span class="nc" id="L62">        return analysisId;</span>
+    }
+
+    public void setAnalysisId(String analysisId) {
+<span class="nc" id="L66">        this.analysisId = analysisId;</span>
+<span class="nc" id="L67">    }</span>
+
+    public String getSymbol() {
+<span class="nc" id="L70">        return symbol;</span>
+    }
+
+    public void setSymbol(String symbol) {
+<span class="nc" id="L74">        this.symbol = symbol;</span>
+<span class="nc" id="L75">    }</span>
+
+    public String getMarketBiasHierarchy() {
+<span class="nc" id="L78">        return marketBiasHierarchy;</span>
+    }
+
+    public void setMarketBiasHierarchy(String marketBiasHierarchy) {
+<span class="nc" id="L82">        this.marketBiasHierarchy = marketBiasHierarchy;</span>
+<span class="nc" id="L83">    }</span>
+
+    public String getTradeType() {
+<span class="nc" id="L86">        return tradeType;</span>
+    }
+
+    public void setTradeType(String tradeType) {
+<span class="nc" id="L90">        this.tradeType = tradeType;</span>
+<span class="nc" id="L91">    }</span>
+
+    public String getConfidenceLevel() {
+<span class="nc" id="L94">        return confidenceLevel;</span>
+    }
+
+    public void setConfidenceLevel(String confidenceLevel) {
+<span class="nc" id="L98">        this.confidenceLevel = confidenceLevel;</span>
+<span class="nc" id="L99">    }</span>
+
+    public String getRiskLevel() {
+<span class="nc" id="L102">        return riskLevel;</span>
+    }
+
+    public void setRiskLevel(String riskLevel) {
+<span class="nc" id="L106">        this.riskLevel = riskLevel;</span>
+<span class="nc" id="L107">    }</span>
+
+    public String getActionPriority() {
+<span class="nc" id="L110">        return actionPriority;</span>
+    }
+
+    public void setActionPriority(String actionPriority) {
+<span class="nc" id="L114">        this.actionPriority = actionPriority;</span>
+<span class="nc" id="L115">    }</span>
+
+    public String getConclusionSummary() {
+<span class="nc" id="L118">        return conclusionSummary;</span>
+    }
+
+    public void setConclusionSummary(String conclusionSummary) {
+<span class="nc" id="L122">        this.conclusionSummary = conclusionSummary;</span>
+<span class="nc" id="L123">    }</span>
+
+    public Boolean getIsWorthOpening() {
+<span class="nc" id="L126">        return isWorthOpening;</span>
+    }
+
+    public void setIsWorthOpening(Boolean isWorthOpening) {
+<span class="nc" id="L130">        this.isWorthOpening = isWorthOpening;</span>
+<span class="nc" id="L131">    }</span>
+
+    public String getMultiTfConvergence() {
+<span class="nc" id="L134">        return multiTfConvergence;</span>
+    }
+
+    public void setMultiTfConvergence(String multiTfConvergence) {
+<span class="nc" id="L138">        this.multiTfConvergence = multiTfConvergence;</span>
+<span class="nc" id="L139">    }</span>
+
+    public String getAiRoleResults() {
+<span class="nc" id="L142">        return aiRoleResults;</span>
+    }
+
+    public void setAiRoleResults(String aiRoleResults) {
+<span class="nc" id="L146">        this.aiRoleResults = aiRoleResults;</span>
+<span class="nc" id="L147">    }</span>
+
+    public Boolean getIsAdopted() {
+<span class="nc" id="L150">        return isAdopted;</span>
+    }
+
+    public void setIsAdopted(Boolean isAdopted) {
+<span class="nc" id="L154">        this.isAdopted = isAdopted;</span>
+<span class="nc" id="L155">    }</span>
+
+    public String getValidPeriod() {
+<span class="nc" id="L158">        return validPeriod;</span>
+    }
+
+    public void setValidPeriod(String validPeriod) {
+<span class="nc" id="L162">        this.validPeriod = validPeriod;</span>
+<span class="nc" id="L163">    }</span>
+
+    public String getInvalidCondition() {
+<span class="nc" id="L166">        return invalidCondition;</span>
+    }
+
+    public void setInvalidCondition(String invalidCondition) {
+<span class="nc" id="L170">        this.invalidCondition = invalidCondition;</span>
+<span class="nc" id="L171">    }</span>
+
+    public String getEvidenceSummary() {
+<span class="nc" id="L174">        return evidenceSummary;</span>
+    }
+
+    public void setEvidenceSummary(String evidenceSummary) {
+<span class="nc" id="L178">        this.evidenceSummary = evidenceSummary;</span>
+<span class="nc" id="L179">    }</span>
+
+    public String getExplanationJson() {
+<span class="nc" id="L182">        return explanationJson;</span>
+    }
+
+    public void setExplanationJson(String explanationJson) {
+<span class="nc" id="L186">        this.explanationJson = explanationJson;</span>
+<span class="nc" id="L187">    }</span>
+
+    public String getReviewReasons() {
+<span class="nc" id="L190">        return reviewReasons;</span>
+    }
+
+    public void setReviewReasons(String reviewReasons) {
+<span class="nc" id="L194">        this.reviewReasons = reviewReasons;</span>
+<span class="nc" id="L195">    }</span>
+
+    public String getAiConflictLevel() {
+<span class="nc" id="L198">        return aiConflictLevel;</span>
+    }
+
+    public void setAiConflictLevel(String aiConflictLevel) {
+<span class="nc" id="L202">        this.aiConflictLevel = aiConflictLevel;</span>
+<span class="nc" id="L203">    }</span>
+
+    public Integer getAiConflictScore() {
+<span class="nc" id="L206">        return aiConflictScore;</span>
+    }
+
+    public void setAiConflictScore(Integer aiConflictScore) {
+<span class="nc" id="L210">        this.aiConflictScore = aiConflictScore;</span>
+<span class="nc" id="L211">    }</span>
+
+    public String getAiPlanMode() {
+<span class="nc" id="L214">        return aiPlanMode;</span>
+    }
+
+    public void setAiPlanMode(String aiPlanMode) {
+<span class="nc" id="L218">        this.aiPlanMode = aiPlanMode;</span>
+<span class="nc" id="L219">    }</span>
+
+    public Integer getConfusedScore() {
+<span class="nc" id="L222">        return confusedScore;</span>
+    }
+
+    public void setConfusedScore(Integer confusedScore) {
+<span class="nc" id="L226">        this.confusedScore = confusedScore;</span>
+<span class="nc" id="L227">    }</span>
+
+    public String getAssetStateSnapshot() {
+<span class="nc" id="L230">        return assetStateSnapshot;</span>
+    }
+
+    public void setAssetStateSnapshot(String assetStateSnapshot) {
+<span class="nc" id="L234">        this.assetStateSnapshot = assetStateSnapshot;</span>
+<span class="nc" id="L235">    }</span>
+
+    public String getExecutionPlanSummary() {
+<span class="nc" id="L238">        return executionPlanSummary;</span>
+    }
+
+    public void setExecutionPlanSummary(String executionPlanSummary) {
+<span class="nc" id="L242">        this.executionPlanSummary = executionPlanSummary;</span>
+<span class="nc" id="L243">    }</span>
+
+    public LocalDateTime getCreateTime() {
+<span class="nc" id="L246">        return createTime;</span>
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+<span class="nc" id="L250">        this.createTime = createTime;</span>
+<span class="nc" id="L251">    }</span>
+
+    public BigDecimal getLatestPrice() {
+<span class="nc" id="L254">        return latestPrice;</span>
+    }
+
+    public void setLatestPrice(BigDecimal latestPrice) {
+<span class="nc" id="L258">        this.latestPrice = latestPrice;</span>
+<span class="nc" id="L259">    }</span>
+
+    public BigDecimal getPriceChangePct() {
+<span class="nc" id="L262">        return priceChangePct;</span>
+    }
+
+    public void setPriceChangePct(BigDecimal priceChangePct) {
+<span class="nc" id="L266">        this.priceChangePct = priceChangePct;</span>
+<span class="nc" id="L267">    }</span>
+
+    public Long getPriceUpdateTimeMs() {
+<span class="nc" id="L270">        return priceUpdateTimeMs;</span>
+    }
+
+    public void setPriceUpdateTimeMs(Long priceUpdateTimeMs) {
+<span class="nc" id="L274">        this.priceUpdateTimeMs = priceUpdateTimeMs;</span>
+<span class="nc" id="L275">    }</span>
+
+    public Boolean getHasOpenPosition() {
+<span class="nc" id="L278">        return hasOpenPosition;</span>
+    }
+
+    public void setHasOpenPosition(Boolean hasOpenPosition) {
+<span class="nc" id="L282">        this.hasOpenPosition = hasOpenPosition;</span>
+<span class="nc" id="L283">    }</span>
+
+    public String getPositionSide() {
+<span class="nc" id="L286">        return positionSide;</span>
+    }
+
+    public void setPositionSide(String positionSide) {
+<span class="nc" id="L290">        this.positionSide = positionSide;</span>
+<span class="nc" id="L291">    }</span>
+
+    public BigDecimal getAvgOpenPrice() {
+<span class="nc" id="L294">        return avgOpenPrice;</span>
+    }
+
+    public void setAvgOpenPrice(BigDecimal avgOpenPrice) {
+<span class="nc" id="L298">        this.avgOpenPrice = avgOpenPrice;</span>
+<span class="nc" id="L299">    }</span>
+
+    public LocalDateTime getPositionOpenTime() {
+<span class="nc" id="L302">        return positionOpenTime;</span>
+    }
+
+    public void setPositionOpenTime(LocalDateTime positionOpenTime) {
+<span class="nc" id="L306">        this.positionOpenTime = positionOpenTime;</span>
+<span class="nc" id="L307">    }</span>
+
+    public BigDecimal getPositionQuantity() {
+<span class="nc" id="L310">        return positionQuantity;</span>
+    }
+
+    public void setPositionQuantity(BigDecimal positionQuantity) {
+<span class="nc" id="L314">        this.positionQuantity = positionQuantity;</span>
+<span class="nc" id="L315">    }</span>
+
+    public BigDecimal getUnrealizedPnlPct() {
+<span class="nc" id="L318">        return unrealizedPnlPct;</span>
+    }
+
+    public void setUnrealizedPnlPct(BigDecimal unrealizedPnlPct) {
+<span class="nc" id="L322">        this.unrealizedPnlPct = unrealizedPnlPct;</span>
+<span class="nc" id="L323">    }</span>
+
+    public String getPositionStatus() {
+<span class="nc" id="L326">        return positionStatus;</span>
+    }
+
+    public void setPositionStatus(String positionStatus) {
+<span class="nc" id="L330">        this.positionStatus = positionStatus;</span>
+<span class="nc" id="L331">    }</span>
+
+    public BigDecimal getMarkPrice() {
+<span class="nc" id="L334">        return markPrice;</span>
+    }
+
+    public void setMarkPrice(BigDecimal markPrice) {
+<span class="nc" id="L338">        this.markPrice = markPrice;</span>
+<span class="nc" id="L339">    }</span>
+
+    public BigDecimal getBreakEvenPrice() {
+<span class="nc" id="L342">        return breakEvenPrice;</span>
+    }
+
+    public void setBreakEvenPrice(BigDecimal breakEvenPrice) {
+<span class="nc" id="L346">        this.breakEvenPrice = breakEvenPrice;</span>
+<span class="nc" id="L347">    }</span>
+
+    public BigDecimal getLiquidationPrice() {
+<span class="nc" id="L350">        return liquidationPrice;</span>
+    }
+
+    public void setLiquidationPrice(BigDecimal liquidationPrice) {
+<span class="nc" id="L354">        this.liquidationPrice = liquidationPrice;</span>
+<span class="nc" id="L355">    }</span>
+
+    public String getReadModelFallbackReason() {
+<span class="nc" id="L358">        return readModelFallbackReason;</span>
+    }
+
+    public void setReadModelFallbackReason(String readModelFallbackReason) {
+<span class="nc" id="L362">        this.readModelFallbackReason = readModelFallbackReason;</span>
+<span class="nc" id="L363">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

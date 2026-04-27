@@ -1,0 +1,370 @@
+-- V1 核心表结构
+
+CREATE TABLE IF NOT EXISTS tm_analysis_run (
+    analysis_id VARCHAR(64) PRIMARY KEY,
+    symbol VARCHAR(20) NOT NULL,
+    timeframe VARCHAR(10) NOT NULL,
+    analysis_time TIMESTAMP NOT NULL,
+    rule_version VARCHAR(20),
+    data_quality_score INT,
+    trace_id VARCHAR(64),
+    status VARCHAR(20)
+);
+
+CREATE TABLE IF NOT EXISTS tm_evidence_item (
+    evidence_id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    evidence_type VARCHAR(50),
+    description TEXT,
+    direction VARCHAR(20),
+    strength DOUBLE,
+    confidence DOUBLE,
+    source VARCHAR(100),
+    create_time TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tm_score_item (
+    score_id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    score_type VARCHAR(50),
+    score_value DOUBLE,
+    weight DOUBLE,
+    direction VARCHAR(20),
+    description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tm_decision_result (
+    decision_id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    symbol VARCHAR(20),
+    market_bias_hierarchy VARCHAR(30),
+    trade_type VARCHAR(30),
+    confidence_level VARCHAR(20),
+    risk_level VARCHAR(20),
+    action_priority VARCHAR(20),
+    conclusion_summary TEXT,
+    is_worth_opening BOOLEAN,
+    multi_tf_convergence VARCHAR(50),
+    ai_role_results TEXT,
+    is_adopted BOOLEAN,
+    valid_period VARCHAR(200),
+    invalid_condition TEXT,
+    evidence_summary TEXT,
+    explanation_json TEXT,
+    review_reasons TEXT,
+    ai_conflict_level VARCHAR(64),
+    ai_conflict_score INT,
+    ai_plan_mode VARCHAR(50),
+    confused_score INT,
+    asset_state_snapshot VARCHAR(512),
+    create_time TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tm_execution_plan (
+    plan_id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    plan_mode VARCHAR(32) NOT NULL DEFAULT 'ADVISORY',
+    recommended_action VARCHAR(50),
+    entry_zone VARCHAR(100),
+    stop_loss VARCHAR(100),
+    take_profit_rules TEXT,
+    leverage_suggestion VARCHAR(50),
+    position_suggestion VARCHAR(100),
+    account_risk_json TEXT,
+    invalid_condition TEXT,
+    create_time TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tm_market_environment_snapshot (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL UNIQUE,
+    symbol VARCHAR(20) NOT NULL,
+    timeframe VARCHAR(10) NOT NULL,
+    environment_type VARCHAR(50),
+    risk_mode VARCHAR(50),
+    trend_friendliness INT,
+    leverage_suggestion VARCHAR(50),
+    range_pct_24h DOUBLE,
+    volatility_regime VARCHAR(50),
+    last_funding_rate DECIMAL(20, 10),
+    perp_funding_applied BOOLEAN,
+    last_open_interest DECIMAL(28, 8),
+    open_interest_delta DECIMAL(28, 8),
+    oi_applied BOOLEAN,
+    derivatives_crowding_state VARCHAR(32),
+    summary TEXT,
+    source_type VARCHAR(64) NOT NULL,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_market_env_snapshot_symbol_create_time
+    ON tm_market_environment_snapshot(symbol, create_time);
+CREATE INDEX IF NOT EXISTS idx_tm_market_env_snapshot_source_type
+    ON tm_market_environment_snapshot(source_type);
+
+CREATE TABLE IF NOT EXISTS tm_rule_config (
+    rule_id VARCHAR(64) PRIMARY KEY,
+    rule_type VARCHAR(50),
+    rule_key VARCHAR(100) UNIQUE,
+    rule_value TEXT,
+    description TEXT,
+    version VARCHAR(20),
+    enabled BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS tm_user_config (
+    user_id VARCHAR(64) PRIMARY KEY,
+    risk_preference VARCHAR(50),
+    ai_model_preference VARCHAR(50),
+    notify_channels VARCHAR(100),
+    cooldown_minutes INT DEFAULT 15
+);
+
+CREATE TABLE IF NOT EXISTS tm_real_position (
+    position_id VARCHAR(64) PRIMARY KEY,
+    symbol VARCHAR(20) NOT NULL,
+    source_type VARCHAR(20) DEFAULT 'UNKNOWN',
+    source_name VARCHAR(50),
+    position_side VARCHAR(10),
+    avg_open_price DECIMAL(20, 8),
+    position_open_time TIMESTAMP,
+    position_quantity DECIMAL(20, 8),
+    unrealized_pnl_pct DECIMAL(10, 4),
+    position_status VARCHAR(20) DEFAULT 'OPEN',
+    mark_price DECIMAL(20, 8),
+    break_even_price DECIMAL(20, 8),
+    liquidation_price DECIMAL(20, 8),
+    update_time TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_real_position_symbol_status ON tm_real_position(symbol, position_status);
+
+-- Push 快照 / 二次校验（与 tm_analysis_run.analysis_id 类型一致：VARCHAR(64)）
+-- 下列 CLOB JSON 列由 /api/review/aggregate 原样透出至复盘页文本展示，应用层不对其做解析或折叠 UI。
+CREATE TABLE IF NOT EXISTS tm_push_snapshot (
+    push_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    symbol VARCHAR(20),
+    timeframe VARCHAR(10),
+    push_type VARCHAR(50),
+    push_status VARCHAR(30),
+    push_create_time TIMESTAMP,
+    rule_version VARCHAR(20),
+    trigger_price DECIMAL(20, 8),
+    entry_zone_json CLOB,
+    stop_zone_json CLOB,
+    invalidation_condition_json CLOB,
+    plan_mode_snapshot VARCHAR(100),
+    cause_effect_alignment_snapshot VARCHAR(200),
+    execution_feasibility_snapshot INT,
+    data_quality_score_snapshot INT,
+    confused_score_snapshot INT,
+    account_risk_snapshot_id BIGINT,
+    expires_at TIMESTAMP,
+    trace_id VARCHAR(64),
+    create_time TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_push_snapshot_analysis_id ON tm_push_snapshot(analysis_id);
+
+-- 账户风险快照（第一轮最小真值链）：由 PushSnapshotService 在推送快照时同步写入；
+-- risk_allowed 为 current_account_risk_allowed 的直接真值来源，source_note 记录判定来源口径。
+CREATE TABLE IF NOT EXISTS tm_account_risk_snapshot (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    symbol VARCHAR(20),
+    risk_level_snapshot VARCHAR(32),
+    risk_allowed BOOLEAN NOT NULL,
+    risk_reason_code VARCHAR(64),
+    risk_reason_text VARCHAR(512),
+    position_exposure DECIMAL(10, 4),
+    max_allowed_exposure DECIMAL(10, 4),
+    snapshot_source VARCHAR(128),
+    snapshot_version INT,
+    source_note VARCHAR(128),
+    trace_id VARCHAR(64),
+    create_time TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_account_risk_snapshot_analysis_id ON tm_account_risk_snapshot(analysis_id);
+
+-- fail_reason_json：复盘聚合原样透传（与上表 JSON 列展示策略一致）。
+-- current_slippage_estimation：Recheck 时基于 current_price 与 trigger_price 的当次估算。
+-- current_account_risk_allowed：第一轮来源为 tm_account_risk_snapshot.risk_allowed（按 push.account_risk_snapshot_id 回查）。
+CREATE TABLE IF NOT EXISTS tm_push_recheck_log (
+    log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    push_id BIGINT NOT NULL,
+    dispatch_batch_id VARCHAR(64),
+    dispatch_instruction_id VARCHAR(64),
+    trigger_source VARCHAR(32),
+    retry_attempt INT,
+    max_attempts INT,
+    retry_backoff_minutes INT,
+    replay_from_log_id BIGINT,
+    execution_status VARCHAR(32),
+    execution_error_code VARCHAR(64),
+    execution_error_message VARCHAR(512),
+    recheck_time TIMESTAMP,
+    recheck_status VARCHAR(30),
+    current_price DECIMAL(20, 8),
+    price_drift_ratio DECIMAL(20, 8),
+    current_slippage_estimation DECIMAL(20, 8),
+    current_data_quality_score INT,
+    current_confused_score INT,
+    current_account_risk_allowed BOOLEAN,
+    fail_reason_json CLOB,
+    trace_id VARCHAR(64),
+    create_time TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_push_recheck_log_push_id ON tm_push_recheck_log(push_id);
+CREATE INDEX IF NOT EXISTS idx_tm_push_recheck_log_dispatch_batch_id ON tm_push_recheck_log(dispatch_batch_id);
+CREATE INDEX IF NOT EXISTS idx_tm_push_recheck_log_dispatch_instruction_id ON tm_push_recheck_log(dispatch_instruction_id);
+
+-- 调度配置持久化：替换内存态参数源，支持实例重启后恢复。
+CREATE TABLE IF NOT EXISTS tm_push_recheck_dispatch_config (
+    config_key VARCHAR(64) PRIMARY KEY,
+    config_value INT NOT NULL,
+    updated_by VARCHAR(64),
+    update_source VARCHAR(64),
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 调度配置变更审计：记录每次配置修改的前后值。
+CREATE TABLE IF NOT EXISTS tm_push_recheck_dispatch_config_audit (
+    audit_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    config_key VARCHAR(64) NOT NULL,
+    old_value INT,
+    new_value INT NOT NULL,
+    changed_by VARCHAR(64),
+    change_source VARCHAR(64),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_push_recheck_dispatch_config_audit_key_time
+    ON tm_push_recheck_dispatch_config_audit(config_key, create_time);
+
+-- 监控告警（与 MonitorAlertDO 对齐；冷却/抑制字段按 PROJECT_SPEC 一并落表，避免短期二次改表）
+CREATE TABLE IF NOT EXISTS tm_monitor_alert (
+    id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64),
+    asset_symbol VARCHAR(20),
+    alert_type VARCHAR(50),
+    alert_level VARCHAR(20),
+    alert_message TEXT,
+    status VARCHAR(30),
+    cooldown_until TIMESTAMP,
+    suppress_reason VARCHAR(512),
+    trace_id VARCHAR(64),
+    rule_version VARCHAR(20),
+    created_by VARCHAR(64),
+    updated_by VARCHAR(64),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INT NOT NULL DEFAULT 0,
+    version_no INT DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_monitor_alert_list ON tm_monitor_alert(is_deleted, created_at);
+
+-- Missed Opportunity（窄表；主链仅在 hotResetWouldFire=false 时落库；dashboard 仅消费当日计数）
+CREATE TABLE IF NOT EXISTS tm_missed_opportunity (
+    missed_id VARCHAR(64) PRIMARY KEY,
+    decision_id VARCHAR(64) NOT NULL,
+    analysis_id VARCHAR(64) NOT NULL,
+    symbol VARCHAR(20),
+    biz_date DATE NOT NULL,
+    reason_json CLOB,
+    rule_version VARCHAR(20),
+    trace_id VARCHAR(64),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_missed_opportunity_biz_date ON tm_missed_opportunity(biz_date);
+CREATE INDEX IF NOT EXISTS idx_tm_missed_opportunity_decision_id ON tm_missed_opportunity(decision_id);
+CREATE INDEX IF NOT EXISTS idx_tm_missed_opportunity_symbol ON tm_missed_opportunity(symbol);
+
+-- 复盘结果（按 analysis_id 单行 upsert；用户经 /api/review/save 写入，与聚合摘要分离）
+CREATE TABLE IF NOT EXISTS tm_review_result (
+    id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    error_type VARCHAR(200),
+    actual_outcome VARCHAR(2000),
+    adjustment_suggestion VARCHAR(4000),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_review_result_analysis_id ON tm_review_result(analysis_id);
+
+-- 规则版本演进审计链（最小链路）：用于挂载人工复盘反馈的版本追踪信息
+-- 目标：确保 tm_review_result 保存后，审计链不停摆（即使 rule_version / error_type 为空也可落库）
+CREATE TABLE IF NOT EXISTS tm_rule_version_log (
+    id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64),
+    rule_version VARCHAR(20),
+    error_type VARCHAR(200),
+    change_category VARCHAR(64),
+    change_summary VARCHAR(1024),
+    change_detail TEXT,
+    operator VARCHAR(64),
+    publish_time VARCHAR(64),
+    rollback_flag VARCHAR(20),
+    created_by VARCHAR(64),
+    updated_by VARCHAR(64),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INT NOT NULL DEFAULT 0,
+    version_no INT DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_analysis_time ON tm_rule_version_log(analysis_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_rule_version_time ON tm_rule_version_log(rule_version, created_at);
+CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_operator_time ON tm_rule_version_log(operator, created_at);
+CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_rollback_time ON tm_rule_version_log(rollback_flag, created_at);
+
+CREATE TABLE IF NOT EXISTS tm_asset_state (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    symbol VARCHAR(20) NOT NULL UNIQUE,
+    state VARCHAR(32),
+    confused_score INT,
+    hot_reset_flag BOOLEAN DEFAULT FALSE,
+    hot_reset_trigger_type VARCHAR(64),
+    hot_reset_trigger_value VARCHAR(128),
+    hot_reset_time TIMESTAMP,
+    pre_reset_state VARCHAR(32),
+    post_reset_state VARCHAR(32),
+    last_update_time TIMESTAMP NOT NULL,
+    trace_id VARCHAR(64)
+);
+
+-- Hot Reset 事件流水（第二轮最小语义）：
+-- trigger_type 固定表示事件类别（如 HOT_RESET），trigger_reason_code 表示触发原因码（如 CONFUSED_HIGH_MTF_MISALIGNED）。
+-- 两者语义不同，避免混用；本表仍仅服务 Hot Reset，不扩展为通用事件平台。
+CREATE TABLE IF NOT EXISTS tm_hot_reset_event (
+    event_id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64) NOT NULL,
+    trace_id VARCHAR(64),
+    symbol VARCHAR(20) NOT NULL,
+    trigger_type VARCHAR(64) NOT NULL,
+    trigger_value VARCHAR(128),
+    decision_id VARCHAR(64),
+    decision_state VARCHAR(32),
+    confused_score_snapshot INT,
+    multi_timeframe_aligned_snapshot BOOLEAN,
+    trigger_reason_code VARCHAR(64),
+    trigger_reason_text VARCHAR(512),
+    event_version INT,
+    event_time TIMESTAMP NOT NULL,
+    pre_state VARCHAR(32),
+    post_state VARCHAR(32),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_analysis_id ON tm_hot_reset_event(analysis_id);
+CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_trace_id ON tm_hot_reset_event(trace_id);
+CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_symbol_event_time ON tm_hot_reset_event(symbol, event_time);
+
+-- tm_asset_state 语义：每个 symbol 当前仅一行（会被后续分析覆盖更新）。
+-- hot_reset_* / pre_reset_state / post_reset_state 记录的是该行最近一次 Hot Reset 元数据，
+-- 不是按 analysis_id 归档的事件流水；review 仅做当前行解释展示。

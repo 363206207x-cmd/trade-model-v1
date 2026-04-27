@@ -1,0 +1,149 @@
+package org.example.trademodel.vo;
+
+import java.time.LocalDateTime;
+
+public class LightSystemStatusVO {
+
+    private String status;
+    private Integer monitoredCoins;
+    private LocalDateTime lastDecisionTime;
+    private Integer totalDecisionsToday;
+
+    /** 今日错失有效机会条数：按 tm_missed_opportunity.biz_date = 当日（与 JVM 默认时区的「今天」一致）。 */
+    private Integer missedValidOpportunityCount;
+
+    /**
+     * 当前处于困惑态的 symbol 个数：tm_asset_state 全库当前态中 confused_score 大于 0 的行数（每 symbol 一行）。
+     * 不是「当日困惑决策条数」。
+     */
+    private Integer confusedCount;
+
+    /**
+     * 当前积压待复核的 push 条数，来源 tm_push_snapshot：
+     * push_status 为 CAPTURED 或 RECHECK_VALID_WAITING，且 expires_at 为空或大于当前时间。
+     * 不是「下一批可被调度器拉取的条数」；不 join tm_push_recheck_log，不读 dispatch 配置。
+     */
+    private Integer pendingCount;
+
+    /**
+     * 反转信号数量：当前仍有 OPEN 持仓的 distinct symbol 中，该 symbol 在 tm_decision_result 最新一条决策的
+     * {@code market_bias_hierarchy}（规范化后）与持仓 {@code position_side} 方向相反的数量。
+     * <p>
+     * 反向判定：LONG + BEARISH、SHORT + BULLISH；同向：LONG + BULLISH、SHORT + BEARISH。
+     * 不计入：无 OPEN 持仓、决策方向缺失、非 BULLISH/BEARISH（含 RANGE/WAIT 等）、持仓 side 缺失或非 LONG/SHORT。
+     * 计数按 symbol 去重（同一 symbol 多条 OPEN 仅计一次）；比较使用每 symbol 最新决策，create_time 并列时以 decision_id 决胜。
+     */
+    private Integer reverseSignalCount;
+
+    /** 最近一次 Hot Reset（全库按 hot_reset_time 聚合）；无事件时为 false。 */
+    private Boolean hotResetFired;
+    /** 触发该次 Hot Reset 的 symbol（最近一次事件所在行） */
+    private String hotResetSymbol;
+    private String hotResetTriggerType;
+    private String hotResetTriggerValue;
+    private LocalDateTime hotResetTime;
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Integer getMonitoredCoins() {
+        return monitoredCoins;
+    }
+
+    public void setMonitoredCoins(Integer monitoredCoins) {
+        this.monitoredCoins = monitoredCoins;
+    }
+
+    public LocalDateTime getLastDecisionTime() {
+        return lastDecisionTime;
+    }
+
+    public void setLastDecisionTime(LocalDateTime lastDecisionTime) {
+        this.lastDecisionTime = lastDecisionTime;
+    }
+
+    public Integer getTotalDecisionsToday() {
+        return totalDecisionsToday;
+    }
+
+    public void setTotalDecisionsToday(Integer totalDecisionsToday) {
+        this.totalDecisionsToday = totalDecisionsToday;
+    }
+
+    public Integer getMissedValidOpportunityCount() {
+        return missedValidOpportunityCount;
+    }
+
+    public void setMissedValidOpportunityCount(Integer missedValidOpportunityCount) {
+        this.missedValidOpportunityCount = missedValidOpportunityCount;
+    }
+
+    public Integer getConfusedCount() {
+        return confusedCount;
+    }
+
+    public void setConfusedCount(Integer confusedCount) {
+        this.confusedCount = confusedCount;
+    }
+
+    public Integer getPendingCount() {
+        return pendingCount;
+    }
+
+    public void setPendingCount(Integer pendingCount) {
+        this.pendingCount = pendingCount;
+    }
+
+    public Integer getReverseSignalCount() {
+        return reverseSignalCount;
+    }
+
+    public void setReverseSignalCount(Integer reverseSignalCount) {
+        this.reverseSignalCount = reverseSignalCount;
+    }
+
+    public Boolean getHotResetFired() {
+        return hotResetFired;
+    }
+
+    public void setHotResetFired(Boolean hotResetFired) {
+        this.hotResetFired = hotResetFired;
+    }
+
+    public String getHotResetSymbol() {
+        return hotResetSymbol;
+    }
+
+    public void setHotResetSymbol(String hotResetSymbol) {
+        this.hotResetSymbol = hotResetSymbol;
+    }
+
+    public String getHotResetTriggerType() {
+        return hotResetTriggerType;
+    }
+
+    public void setHotResetTriggerType(String hotResetTriggerType) {
+        this.hotResetTriggerType = hotResetTriggerType;
+    }
+
+    public String getHotResetTriggerValue() {
+        return hotResetTriggerValue;
+    }
+
+    public void setHotResetTriggerValue(String hotResetTriggerValue) {
+        this.hotResetTriggerValue = hotResetTriggerValue;
+    }
+
+    public LocalDateTime getHotResetTime() {
+        return hotResetTime;
+    }
+
+    public void setHotResetTime(LocalDateTime hotResetTime) {
+        this.hotResetTime = hotResetTime;
+    }
+}

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MissedReasonViewParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service</a> &gt; <span class="el_source">MissedReasonViewParser.java</span></div><h1>MissedReasonViewParser.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.vo.MissedReasonViewVO;
+
+import java.util.Collections;
+import java.util.Map;
+
+public final class MissedReasonViewParser {
+
+<span class="fc" id="L13">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+<span class="fc" id="L14">    private static final TypeReference&lt;Map&lt;String, Object&gt;&gt; MAP_TYPE = new TypeReference&lt;Map&lt;String, Object&gt;&gt;() {</span>
+    };
+
+    private MissedReasonViewParser() {
+    }
+
+    public static MissedReasonViewVO parse(String reasonJson) {
+<span class="fc" id="L21">        MissedReasonViewVO vo = new MissedReasonViewVO();</span>
+<span class="fc" id="L22">        vo.setFacts(Collections.emptyMap());</span>
+<span class="fc" id="L23">        vo.setRefs(Collections.emptyMap());</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (reasonJson == null || reasonJson.isBlank()) {</span>
+<span class="fc" id="L25">            vo.setParseStatus(&quot;EMPTY_REASON_JSON&quot;);</span>
+<span class="fc" id="L26">            return vo;</span>
+        }
+        try {
+<span class="fc" id="L29">            JsonNode root = JSON.readTree(reasonJson);</span>
+<span class="fc" id="L30">            vo.setVersion(nullIfBlank(root.path(&quot;version&quot;).asText(null)));</span>
+<span class="fc" id="L31">            vo.setRule(nullIfBlank(root.path(&quot;rule&quot;).asText(null)));</span>
+<span class="fc" id="L32">            vo.setWhyMissed(nullIfBlank(root.path(&quot;whyMissed&quot;).asText(null)));</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (root.path(&quot;facts&quot;).isObject()) {</span>
+<span class="fc" id="L34">                vo.setFacts(JSON.convertValue(root.path(&quot;facts&quot;), MAP_TYPE));</span>
+            }
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (root.path(&quot;refs&quot;).isObject()) {</span>
+<span class="fc" id="L37">                vo.setRefs(JSON.convertValue(root.path(&quot;refs&quot;), MAP_TYPE));</span>
+            }
+<span class="fc" id="L39">            vo.setParseStatus(&quot;OK&quot;);</span>
+<span class="fc" id="L40">            return vo;</span>
+<span class="fc" id="L41">        } catch (Exception ignored) {</span>
+<span class="fc" id="L42">            vo.setParseStatus(&quot;PARSE_FAILED&quot;);</span>
+<span class="fc" id="L43">            return vo;</span>
+        }
+    }
+
+    private static String nullIfBlank(String value) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L49">            return null;</span>
+        }
+<span class="fc" id="L51">        String trimmed = value.trim();</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        return trimmed.isEmpty() ? null : trimmed;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

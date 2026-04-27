@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReviewReasonsBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.service</a> &gt; <span class="el_source">ReviewReasonsBuilder.java</span></div><h1>ReviewReasonsBuilder.java</h1><pre class="source lang-java linenums">package org.example.trademodel.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.enums.AiConflictLevelEnum;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * 由本 run 信号（风险、多周期、冲突、数据质量）生成 review_reasons JSON 数组文本；无命中时 {@code []}。
+ */
+public final class ReviewReasonsBuilder {
+
+<span class="nc" id="L16">    private static final ObjectMapper MAPPER = new ObjectMapper();</span>
+
+    private ReviewReasonsBuilder() {}
+
+    public static String toJsonArray(String riskLevel,
+                                     String multiTfConvergence,
+                                     AiConflictLevelEnum conflictLevel,
+                                     Integer aiConflictScore,
+                                     Integer dataQualityScore) {
+<span class="nc" id="L25">        Set&lt;String&gt; codes = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        if (riskLevel != null) {</span>
+<span class="nc" id="L27">            String r = riskLevel.trim().toUpperCase();</span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">            if (&quot;HIGH&quot;.equals(r) || &quot;CRITICAL&quot;.equals(r)) {</span>
+<span class="nc" id="L29">                codes.add(&quot;RISK_LEVEL_HIGH&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L32" title="All 4 branches missed.">        if (multiTfConvergence != null &amp;&amp; &quot;WEAK&quot;.equalsIgnoreCase(multiTfConvergence.trim())) {</span>
+<span class="nc" id="L33">            codes.add(&quot;MULTI_TF_CONVERGENCE_WEAK&quot;);</span>
+        }
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        boolean conflictElevated = conflictLevel == AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DIVERGENCE</span>
+                || conflictLevel == AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE;
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        if (conflictElevated) {</span>
+<span class="nc" id="L38">            codes.add(&quot;AI_CONFLICT_LEVEL_ELEVATED&quot;);</span>
+        }
+<span class="nc bnc" id="L40" title="All 4 branches missed.">        if (aiConflictScore != null &amp;&amp; aiConflictScore &gt;= 50) {</span>
+<span class="nc" id="L41">            codes.add(&quot;AI_CONFLICT_SCORE_HIGH&quot;);</span>
+        }
+<span class="nc bnc" id="L43" title="All 4 branches missed.">        if (dataQualityScore != null &amp;&amp; dataQualityScore &lt; 60) {</span>
+<span class="nc" id="L44">            codes.add(&quot;DATA_QUALITY_INSUFFICIENT&quot;);</span>
+        }
+<span class="nc" id="L46">        List&lt;String&gt; list = new ArrayList&lt;&gt;(codes);</span>
+        try {
+<span class="nc" id="L48">            return MAPPER.writeValueAsString(list);</span>
+<span class="nc" id="L49">        } catch (Exception e) {</span>
+<span class="nc" id="L50">            return &quot;[]&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

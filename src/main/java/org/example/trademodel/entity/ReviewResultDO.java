@@ -1,0 +1,73 @@
+package org.example.trademodel.entity;
+
+import java.time.LocalDateTime;
+
+/**
+ * 复盘结果落库行（首轮窄表，与 tm_review_result 对齐）。
+ */
+public class ReviewResultDO {
+
+    private String id;
+    private String analysisId;
+    private String errorType;
+    private String actualOutcome;
+    private String adjustmentSuggestion;
+    private LocalDateTime createTime;
+    private LocalDateTime updateTime;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getAnalysisId() {
+        return analysisId;
+    }
+
+    public void setAnalysisId(String analysisId) {
+        this.analysisId = analysisId;
+    }
+
+    public String getErrorType() {
+        return errorType;
+    }
+
+    public void setErrorType(String errorType) {
+        this.errorType = errorType;
+    }
+
+    public String getActualOutcome() {
+        return actualOutcome;
+    }
+
+    public void setActualOutcome(String actualOutcome) {
+        this.actualOutcome = actualOutcome;
+    }
+
+    public String getAdjustmentSuggestion() {
+        return adjustmentSuggestion;
+    }
+
+    public void setAdjustmentSuggestion(String adjustmentSuggestion) {
+        this.adjustmentSuggestion = adjustmentSuggestion;
+    }
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(LocalDateTime updateTime) {
+        this.updateTime = updateTime;
+    }
+}

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScoreItemVO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.vo</a> &gt; <span class="el_source">ScoreItemVO.java</span></div><h1>ScoreItemVO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.vo;
+
+<span class="nc" id="L3">public class ScoreItemVO {</span>
+    private String scoreId;
+    private String scoreType;      // 趋势结构分、资金推动分、杠杆风险分...
+    private Double scoreValue;     // 0-100
+    private Double weight;
+    private String direction;
+    private String description;
+
+<span class="nc" id="L11">    public String getScoreId() { return scoreId; }</span>
+<span class="nc" id="L12">    public void setScoreId(String scoreId) { this.scoreId = scoreId; }</span>
+<span class="nc" id="L13">    public String getScoreType() { return scoreType; }</span>
+<span class="nc" id="L14">    public void setScoreType(String scoreType) { this.scoreType = scoreType; }</span>
+<span class="nc" id="L15">    public Double getScoreValue() { return scoreValue; }</span>
+<span class="nc" id="L16">    public void setScoreValue(Double scoreValue) { this.scoreValue = scoreValue; }</span>
+<span class="nc" id="L17">    public Double getWeight() { return weight; }</span>
+<span class="nc" id="L18">    public void setWeight(Double weight) { this.weight = weight; }</span>
+<span class="nc" id="L19">    public String getDirection() { return direction; }</span>
+<span class="nc" id="L20">    public void setDirection(String direction) { this.direction = direction; }</span>
+<span class="nc" id="L21">    public String getDescription() { return description; }</span>
+<span class="nc" id="L22">    public void setDescription(String description) { this.description = description; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

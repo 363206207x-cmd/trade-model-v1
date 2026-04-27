@@ -1,0 +1,28 @@
+server:
+  port: 8081
+  address: 0.0.0.0
+
+spring:
+  application:
+    name: trade-model-v1
+
+  datasource:
+    url: jdbc:h2:mem:trade_model_v1;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: org.example.trademodel.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    org.example.trademodel: DEBUG

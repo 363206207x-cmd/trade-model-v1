@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DecisionResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.entity</a> &gt; <span class="el_source">DecisionResult.java</span></div><h1>DecisionResult.java</h1><pre class="source lang-java linenums">package org.example.trademodel.entity;
+
+import jakarta.persistence.Column;
+import java.time.LocalDateTime;
+
+<span class="nc" id="L6">public class DecisionResult {</span>
+
+    @Column(name = &quot;decision_id&quot;)
+    private String decisionId;
+
+    @Column(name = &quot;analysis_id&quot;)
+    private String analysisId;
+
+    @Column(name = &quot;symbol&quot;)
+    private String symbol;
+
+    @Column(name = &quot;market_bias_hierarchy&quot;)
+    private String marketBiasHierarchy;
+
+    @Column(name = &quot;trade_type&quot;)
+    private String tradeType;
+
+    @Column(name = &quot;confidence_level&quot;)
+    private String confidenceLevel;
+
+    @Column(name = &quot;risk_level&quot;)
+    private String riskLevel;
+
+    @Column(name = &quot;action_priority&quot;)
+    private String actionPriority;
+
+    @Column(name = &quot;conclusion_summary&quot;)
+    private String conclusionSummary;
+
+    @Column(name = &quot;is_worth_opening&quot;)
+    private Boolean isWorthOpening;
+
+    @Column(name = &quot;multi_tf_convergence&quot;)
+    private String multiTfConvergence;
+
+    @Column(name = &quot;ai_role_results&quot;)
+    private String aiRoleResults;
+
+    @Column(name = &quot;is_adopted&quot;)
+    private Boolean isAdopted;
+
+    @Column(name = &quot;valid_period&quot;)
+    private String validPeriod;
+
+    @Column(name = &quot;invalid_condition&quot;)
+    private String invalidCondition;
+
+    @Column(name = &quot;evidence_summary&quot;)
+    private String evidenceSummary;
+
+    @Column(name = &quot;explanation_json&quot;)
+    private String explanationJson;
+
+    @Column(name = &quot;review_reasons&quot;)
+    private String reviewReasons;
+
+    @Column(name = &quot;ai_conflict_level&quot;, length = 64)
+    private String aiConflictLevel;
+
+    @Column(name = &quot;ai_conflict_score&quot;)
+    private Integer aiConflictScore;
+
+    @Column(name = &quot;ai_plan_mode&quot;)
+    private String aiPlanMode;
+
+    @Column(name = &quot;confused_score&quot;)
+    private Integer confusedScore;
+
+    @Column(name = &quot;asset_state_snapshot&quot;, length = 512)
+    private String assetStateSnapshot;
+
+    @Column(name = &quot;create_time&quot;)
+    private LocalDateTime createTime;
+
+    public String getDecisionId() {
+<span class="nc" id="L81">        return decisionId;</span>
+    }
+
+    public void setDecisionId(String decisionId) {
+<span class="nc" id="L85">        this.decisionId = decisionId;</span>
+<span class="nc" id="L86">    }</span>
+
+    public String getAnalysisId() {
+<span class="nc" id="L89">        return analysisId;</span>
+    }
+
+    public void setAnalysisId(String analysisId) {
+<span class="nc" id="L93">        this.analysisId = analysisId;</span>
+<span class="nc" id="L94">    }</span>
+
+    public String getSymbol() {
+<span class="nc" id="L97">        return symbol;</span>
+    }
+
+    public void setSymbol(String symbol) {
+<span class="nc" id="L101">        this.symbol = symbol;</span>
+<span class="nc" id="L102">    }</span>
+
+    public String getMarketBiasHierarchy() {
+<span class="nc" id="L105">        return marketBiasHierarchy;</span>
+    }
+
+    public void setMarketBiasHierarchy(String marketBiasHierarchy) {
+<span class="nc" id="L109">        this.marketBiasHierarchy = marketBiasHierarchy;</span>
+<span class="nc" id="L110">    }</span>
+
+    public String getTradeType() {
+<span class="nc" id="L113">        return tradeType;</span>
+    }
+
+    public void setTradeType(String tradeType) {
+<span class="nc" id="L117">        this.tradeType = tradeType;</span>
+<span class="nc" id="L118">    }</span>
+
+    public String getConfidenceLevel() {
+<span class="nc" id="L121">        return confidenceLevel;</span>
+    }
+
+    public void setConfidenceLevel(String confidenceLevel) {
+<span class="nc" id="L125">        this.confidenceLevel = confidenceLevel;</span>
+<span class="nc" id="L126">    }</span>
+
+    public String getRiskLevel() {
+<span class="nc" id="L129">        return riskLevel;</span>
+    }
+
+    public void setRiskLevel(String riskLevel) {
+<span class="nc" id="L133">        this.riskLevel = riskLevel;</span>
+<span class="nc" id="L134">    }</span>
+
+    public String getActionPriority() {
+<span class="nc" id="L137">        return actionPriority;</span>
+    }
+
+    public void setActionPriority(String actionPriority) {
+<span class="nc" id="L141">        this.actionPriority = actionPriority;</span>
+<span class="nc" id="L142">    }</span>
+
+    public String getConclusionSummary() {
+<span class="nc" id="L145">        return conclusionSummary;</span>
+    }
+
+    public void setConclusionSummary(String conclusionSummary) {
+<span class="nc" id="L149">        this.conclusionSummary = conclusionSummary;</span>
+<span class="nc" id="L150">    }</span>
+
+    public Boolean getIsWorthOpening() {
+<span class="nc" id="L153">        return isWorthOpening;</span>
+    }
+
+    public void setIsWorthOpening(Boolean isWorthOpening) {
+<span class="nc" id="L157">        this.isWorthOpening = isWorthOpening;</span>
+<span class="nc" id="L158">    }</span>
+
+    public String getMultiTfConvergence() {
+<span class="nc" id="L161">        return multiTfConvergence;</span>
+    }
+
+    public void setMultiTfConvergence(String multiTfConvergence) {
+<span class="nc" id="L165">        this.multiTfConvergence = multiTfConvergence;</span>
+<span class="nc" id="L166">    }</span>
+
+    public String getAiRoleResults() {
+<span class="nc" id="L169">        return aiRoleResults;</span>
+    }
+
+    public void setAiRoleResults(String aiRoleResults) {
+<span class="nc" id="L173">        this.aiRoleResults = aiRoleResults;</span>
+<span class="nc" id="L174">    }</span>
+
+    public Boolean getIsAdopted() {
+<span class="nc" id="L177">        return isAdopted;</span>
+    }
+
+    public void setIsAdopted(Boolean isAdopted) {
+<span class="nc" id="L181">        this.isAdopted = isAdopted;</span>
+<span class="nc" id="L182">    }</span>
+
+    public String getValidPeriod() {
+<span class="nc" id="L185">        return validPeriod;</span>
+    }
+
+    public void setValidPeriod(String validPeriod) {
+<span class="nc" id="L189">        this.validPeriod = validPeriod;</span>
+<span class="nc" id="L190">    }</span>
+
+    public String getInvalidCondition() {
+<span class="nc" id="L193">        return invalidCondition;</span>
+    }
+
+    public void setInvalidCondition(String invalidCondition) {
+<span class="nc" id="L197">        this.invalidCondition = invalidCondition;</span>
+<span class="nc" id="L198">    }</span>
+
+    public String getEvidenceSummary() {
+<span class="nc" id="L201">        return evidenceSummary;</span>
+    }
+
+    public void setEvidenceSummary(String evidenceSummary) {
+<span class="nc" id="L205">        this.evidenceSummary = evidenceSummary;</span>
+<span class="nc" id="L206">    }</span>
+
+    public String getExplanationJson() {
+<span class="nc" id="L209">        return explanationJson;</span>
+    }
+
+    public void setExplanationJson(String explanationJson) {
+<span class="nc" id="L213">        this.explanationJson = explanationJson;</span>
+<span class="nc" id="L214">    }</span>
+
+    public String getReviewReasons() {
+<span class="nc" id="L217">        return reviewReasons;</span>
+    }
+
+    public void setReviewReasons(String reviewReasons) {
+<span class="nc" id="L221">        this.reviewReasons = reviewReasons;</span>
+<span class="nc" id="L222">    }</span>
+
+    public String getAiConflictLevel() {
+<span class="nc" id="L225">        return aiConflictLevel;</span>
+    }
+
+    public void setAiConflictLevel(String aiConflictLevel) {
+<span class="nc" id="L229">        this.aiConflictLevel = aiConflictLevel;</span>
+<span class="nc" id="L230">    }</span>
+
+    public Integer getAiConflictScore() {
+<span class="nc" id="L233">        return aiConflictScore;</span>
+    }
+
+    public void setAiConflictScore(Integer aiConflictScore) {
+<span class="nc" id="L237">        this.aiConflictScore = aiConflictScore;</span>
+<span class="nc" id="L238">    }</span>
+
+    public String getAiPlanMode() {
+<span class="nc" id="L241">        return aiPlanMode;</span>
+    }
+
+    public void setAiPlanMode(String aiPlanMode) {
+<span class="nc" id="L245">        this.aiPlanMode = aiPlanMode;</span>
+<span class="nc" id="L246">    }</span>
+
+    public Integer getConfusedScore() {
+<span class="nc" id="L249">        return confusedScore;</span>
+    }
+
+    public void setConfusedScore(Integer confusedScore) {
+<span class="nc" id="L253">        this.confusedScore = confusedScore;</span>
+<span class="nc" id="L254">    }</span>
+
+    public String getAssetStateSnapshot() {
+<span class="nc" id="L257">        return assetStateSnapshot;</span>
+    }
+
+    public void setAssetStateSnapshot(String assetStateSnapshot) {
+<span class="nc" id="L261">        this.assetStateSnapshot = assetStateSnapshot;</span>
+<span class="nc" id="L262">    }</span>
+
+    public LocalDateTime getCreateTime() {
+<span class="nc" id="L265">        return createTime;</span>
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+<span class="nc" id="L269">        this.createTime = createTime;</span>
+<span class="nc" id="L270">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

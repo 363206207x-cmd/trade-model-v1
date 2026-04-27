@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RealPositionVO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.vo</a> &gt; <span class="el_source">RealPositionVO.java</span></div><h1>RealPositionVO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.vo;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+<span class="nc" id="L6">public class RealPositionVO {</span>
+
+    private String symbol;
+    private String positionSide;
+    private BigDecimal avgOpenPrice;
+    private LocalDateTime positionOpenTime;
+    private BigDecimal positionQuantity;
+    private BigDecimal unrealizedPnlPct;
+    private String positionStatus;
+    private BigDecimal markPrice;
+    private BigDecimal breakEvenPrice;
+    private BigDecimal liquidationPrice;
+
+    public String getSymbol() {
+<span class="nc" id="L20">        return symbol;</span>
+    }
+
+    public void setSymbol(String symbol) {
+<span class="nc" id="L24">        this.symbol = symbol;</span>
+<span class="nc" id="L25">    }</span>
+
+    public String getPositionSide() {
+<span class="nc" id="L28">        return positionSide;</span>
+    }
+
+    public void setPositionSide(String positionSide) {
+<span class="nc" id="L32">        this.positionSide = positionSide;</span>
+<span class="nc" id="L33">    }</span>
+
+    public BigDecimal getAvgOpenPrice() {
+<span class="nc" id="L36">        return avgOpenPrice;</span>
+    }
+
+    public void setAvgOpenPrice(BigDecimal avgOpenPrice) {
+<span class="nc" id="L40">        this.avgOpenPrice = avgOpenPrice;</span>
+<span class="nc" id="L41">    }</span>
+
+    public LocalDateTime getPositionOpenTime() {
+<span class="nc" id="L44">        return positionOpenTime;</span>
+    }
+
+    public void setPositionOpenTime(LocalDateTime positionOpenTime) {
+<span class="nc" id="L48">        this.positionOpenTime = positionOpenTime;</span>
+<span class="nc" id="L49">    }</span>
+
+    public BigDecimal getPositionQuantity() {
+<span class="nc" id="L52">        return positionQuantity;</span>
+    }
+
+    public void setPositionQuantity(BigDecimal positionQuantity) {
+<span class="nc" id="L56">        this.positionQuantity = positionQuantity;</span>
+<span class="nc" id="L57">    }</span>
+
+    public BigDecimal getUnrealizedPnlPct() {
+<span class="nc" id="L60">        return unrealizedPnlPct;</span>
+    }
+
+    public void setUnrealizedPnlPct(BigDecimal unrealizedPnlPct) {
+<span class="nc" id="L64">        this.unrealizedPnlPct = unrealizedPnlPct;</span>
+<span class="nc" id="L65">    }</span>
+
+    public String getPositionStatus() {
+<span class="nc" id="L68">        return positionStatus;</span>
+    }
+
+    public void setPositionStatus(String positionStatus) {
+<span class="nc" id="L72">        this.positionStatus = positionStatus;</span>
+<span class="nc" id="L73">    }</span>
+
+    public BigDecimal getMarkPrice() {
+<span class="nc" id="L76">        return markPrice;</span>
+    }
+
+    public void setMarkPrice(BigDecimal markPrice) {
+<span class="nc" id="L80">        this.markPrice = markPrice;</span>
+<span class="nc" id="L81">    }</span>
+
+    public BigDecimal getBreakEvenPrice() {
+<span class="nc" id="L84">        return breakEvenPrice;</span>
+    }
+
+    public void setBreakEvenPrice(BigDecimal breakEvenPrice) {
+<span class="nc" id="L88">        this.breakEvenPrice = breakEvenPrice;</span>
+<span class="nc" id="L89">    }</span>
+
+    public BigDecimal getLiquidationPrice() {
+<span class="nc" id="L92">        return liquidationPrice;</span>
+    }
+
+    public void setLiquidationPrice(BigDecimal liquidationPrice) {
+<span class="nc" id="L96">        this.liquidationPrice = liquidationPrice;</span>
+<span class="nc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

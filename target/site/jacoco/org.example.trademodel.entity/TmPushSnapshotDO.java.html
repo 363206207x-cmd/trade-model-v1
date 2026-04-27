@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TmPushSnapshotDO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.entity</a> &gt; <span class="el_source">TmPushSnapshotDO.java</span></div><h1>TmPushSnapshotDO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.entity;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * 推送时刻快照，与表 tm_push_snapshot 对齐；持久化经 MyBatis {@code PushSnapshotMapper}。
+ */
+<span class="fc" id="L9">public class TmPushSnapshotDO {</span>
+
+    private Long pushId;
+    private String analysisId;
+    private String symbol;
+    private String timeframe;
+    private String pushType;
+    private String pushStatus;
+    private LocalDateTime pushCreateTime;
+    private String ruleVersion;
+    private BigDecimal triggerPrice;
+    private String entryZoneJson;
+    private String stopZoneJson;
+    private String invalidationConditionJson;
+    private String planModeSnapshot;
+    private String causeEffectAlignmentSnapshot;
+    private Integer executionFeasibilitySnapshot;
+    private Integer dataQualityScoreSnapshot;
+    private Integer confusedScoreSnapshot;
+    private Long accountRiskSnapshotId;
+    private LocalDateTime expiresAt;
+    private String traceId;
+    private LocalDateTime createTime;
+
+    public Long getPushId() {
+<span class="nc" id="L34">        return pushId;</span>
+    }
+
+    public void setPushId(Long pushId) {
+<span class="nc" id="L38">        this.pushId = pushId;</span>
+<span class="nc" id="L39">    }</span>
+
+    public String getAnalysisId() {
+<span class="nc" id="L42">        return analysisId;</span>
+    }
+
+    public void setAnalysisId(String analysisId) {
+<span class="nc" id="L46">        this.analysisId = analysisId;</span>
+<span class="nc" id="L47">    }</span>
+
+    public String getSymbol() {
+<span class="nc" id="L50">        return symbol;</span>
+    }
+
+    public void setSymbol(String symbol) {
+<span class="nc" id="L54">        this.symbol = symbol;</span>
+<span class="nc" id="L55">    }</span>
+
+    public String getTimeframe() {
+<span class="nc" id="L58">        return timeframe;</span>
+    }
+
+    public void setTimeframe(String timeframe) {
+<span class="nc" id="L62">        this.timeframe = timeframe;</span>
+<span class="nc" id="L63">    }</span>
+
+    public String getPushType() {
+<span class="nc" id="L66">        return pushType;</span>
+    }
+
+    public void setPushType(String pushType) {
+<span class="nc" id="L70">        this.pushType = pushType;</span>
+<span class="nc" id="L71">    }</span>
+
+    public String getPushStatus() {
+<span class="nc" id="L74">        return pushStatus;</span>
+    }
+
+    public void setPushStatus(String pushStatus) {
+<span class="nc" id="L78">        this.pushStatus = pushStatus;</span>
+<span class="nc" id="L79">    }</span>
+
+    public LocalDateTime getPushCreateTime() {
+<span class="nc" id="L82">        return pushCreateTime;</span>
+    }
+
+    public void setPushCreateTime(LocalDateTime pushCreateTime) {
+<span class="nc" id="L86">        this.pushCreateTime = pushCreateTime;</span>
+<span class="nc" id="L87">    }</span>
+
+    public String getRuleVersion() {
+<span class="nc" id="L90">        return ruleVersion;</span>
+    }
+
+    public void setRuleVersion(String ruleVersion) {
+<span class="nc" id="L94">        this.ruleVersion = ruleVersion;</span>
+<span class="nc" id="L95">    }</span>
+
+    public BigDecimal getTriggerPrice() {
+<span class="fc" id="L98">        return triggerPrice;</span>
+    }
+
+    public void setTriggerPrice(BigDecimal triggerPrice) {
+<span class="fc" id="L102">        this.triggerPrice = triggerPrice;</span>
+<span class="fc" id="L103">    }</span>
+
+    public String getEntryZoneJson() {
+<span class="nc" id="L106">        return entryZoneJson;</span>
+    }
+
+    public void setEntryZoneJson(String entryZoneJson) {
+<span class="nc" id="L110">        this.entryZoneJson = entryZoneJson;</span>
+<span class="nc" id="L111">    }</span>
+
+    public String getStopZoneJson() {
+<span class="nc" id="L114">        return stopZoneJson;</span>
+    }
+
+    public void setStopZoneJson(String stopZoneJson) {
+<span class="nc" id="L118">        this.stopZoneJson = stopZoneJson;</span>
+<span class="nc" id="L119">    }</span>
+
+    public String getInvalidationConditionJson() {
+<span class="fc" id="L122">        return invalidationConditionJson;</span>
+    }
+
+    public void setInvalidationConditionJson(String invalidationConditionJson) {
+<span class="fc" id="L126">        this.invalidationConditionJson = invalidationConditionJson;</span>
+<span class="fc" id="L127">    }</span>
+
+    public String getPlanModeSnapshot() {
+<span class="nc" id="L130">        return planModeSnapshot;</span>
+    }
+
+    public void setPlanModeSnapshot(String planModeSnapshot) {
+<span class="nc" id="L134">        this.planModeSnapshot = planModeSnapshot;</span>
+<span class="nc" id="L135">    }</span>
+
+    public String getCauseEffectAlignmentSnapshot() {
+<span class="nc" id="L138">        return causeEffectAlignmentSnapshot;</span>
+    }
+
+    public void setCauseEffectAlignmentSnapshot(String causeEffectAlignmentSnapshot) {
+<span class="nc" id="L142">        this.causeEffectAlignmentSnapshot = causeEffectAlignmentSnapshot;</span>
+<span class="nc" id="L143">    }</span>
+
+    public Integer getExecutionFeasibilitySnapshot() {
+<span class="fc" id="L146">        return executionFeasibilitySnapshot;</span>
+    }
+
+    public void setExecutionFeasibilitySnapshot(Integer executionFeasibilitySnapshot) {
+<span class="nc" id="L150">        this.executionFeasibilitySnapshot = executionFeasibilitySnapshot;</span>
+<span class="nc" id="L151">    }</span>
+
+    public Integer getDataQualityScoreSnapshot() {
+<span class="fc" id="L154">        return dataQualityScoreSnapshot;</span>
+    }
+
+    public void setDataQualityScoreSnapshot(Integer dataQualityScoreSnapshot) {
+<span class="fc" id="L158">        this.dataQualityScoreSnapshot = dataQualityScoreSnapshot;</span>
+<span class="fc" id="L159">    }</span>
+
+    public Integer getConfusedScoreSnapshot() {
+<span class="fc" id="L162">        return confusedScoreSnapshot;</span>
+    }
+
+    public void setConfusedScoreSnapshot(Integer confusedScoreSnapshot) {
+<span class="fc" id="L166">        this.confusedScoreSnapshot = confusedScoreSnapshot;</span>
+<span class="fc" id="L167">    }</span>
+
+    public Long getAccountRiskSnapshotId() {
+<span class="fc" id="L170">        return accountRiskSnapshotId;</span>
+    }
+
+    public void setAccountRiskSnapshotId(Long accountRiskSnapshotId) {
+<span class="fc" id="L174">        this.accountRiskSnapshotId = accountRiskSnapshotId;</span>
+<span class="fc" id="L175">    }</span>
+
+    public LocalDateTime getExpiresAt() {
+<span class="fc" id="L178">        return expiresAt;</span>
+    }
+
+    public void setExpiresAt(LocalDateTime expiresAt) {
+<span class="fc" id="L182">        this.expiresAt = expiresAt;</span>
+<span class="fc" id="L183">    }</span>
+
+    public String getTraceId() {
+<span class="fc" id="L186">        return traceId;</span>
+    }
+
+    public void setTraceId(String traceId) {
+<span class="nc" id="L190">        this.traceId = traceId;</span>
+<span class="nc" id="L191">    }</span>
+
+    public LocalDateTime getCreateTime() {
+<span class="nc" id="L194">        return createTime;</span>
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+<span class="nc" id="L198">        this.createTime = createTime;</span>
+<span class="nc" id="L199">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

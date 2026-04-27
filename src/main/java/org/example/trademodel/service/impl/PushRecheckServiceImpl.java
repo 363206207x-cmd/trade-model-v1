@@ -1,0 +1,576 @@
+package org.example.trademodel.service.impl;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.entity.TmPushRecheckLogDO;
+import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.enums.RecheckStatusEnum;
+import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
+import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.service.PushRecheckDispatchConfigService;
+import org.example.trademodel.service.PushRecheckService;
+import org.example.trademodel.service.PushRecheckStatusContract;
+import org.example.trademodel.service.RecheckExecutionCommand;
+import org.example.trademodel.service.RecheckResult;
+import org.example.trademodel.vo.PushRecheckLogItemVO;
+import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
+import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+public class PushRecheckServiceImpl implements PushRecheckService {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** 相对 trigger_price 的漂移比例上限（例如 0.02 = 2%） */
+    private static final BigDecimal DRIFT_RATIO_THRESHOLD = new BigDecimal("0.02");
+
+    /** 快照困惑分 ≥ 此值 → VALID_WAITING（仍认为计划可读，但建议暂缓） */
+    private static final int CONFUSED_WAIT_THRESHOLD = 70;
+
+    /** 快照困惑分 ≥ 此值 → CONFUSED_BLOCKED（困惑度过高，直接阻断） */
+    private static final int CONFUSED_BLOCK_THRESHOLD = 85;
+
+    /** 快照执行可行性低于此值 → VALID_WAITING（若字段存在） */
+    private static final int EXEC_FEASIBILITY_WAIT_THRESHOLD = 60;
+
+    private final PushSnapshotMapper pushSnapshotMapper;
+    private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    private final PushRecheckLogMapper pushRecheckLogMapper;
+    private final PushRecheckDispatchConfigService dispatchConfigService;
+
+    public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
+                                  AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+                                  PushRecheckLogMapper pushRecheckLogMapper,
+                                  PushRecheckDispatchConfigService dispatchConfigService) {
+        this.pushSnapshotMapper = pushSnapshotMapper;
+        this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
+        this.pushRecheckLogMapper = pushRecheckLogMapper;
+        this.dispatchConfigService = dispatchConfigService;
+    }
+
+    @Override
+    public RecheckResult recheck(Long pushId, BigDecimal currentPrice) {
+        return recheck(pushId, currentPrice, RecheckExecutionCommand.manual());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command) {
+        RecheckExecutionCommand executionCommand = command != null ? command : RecheckExecutionCommand.manual();
+        if (pushId == null) {
+            RecheckResult early = new RecheckResult();
+            early.setPushId(null);
+            early.setRecheckStatus(RecheckStatusEnum.INVALIDATED);
+            early.setCurrentPrice(currentPrice);
+            early.setValid(false);
+            early.setMessage("push_id 不能为空");
+            return early;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        TmPushSnapshotDO snap = pushSnapshotMapper.selectByPushId(pushId);
+
+        RecheckStatusEnum status;
+        String message;
+        BigDecimal priceDriftRatio = null;
+        String failReasonJson = null;
+        Boolean currentAccountRiskAllowed = null;
+        TmAccountRiskSnapshotDO accountRiskSnapshot = null;
+
+        if (snap == null) {
+            status = RecheckStatusEnum.INVALIDATED;
+            message = "未找到推送快照，无法二次校验";
+            failReasonJson = failJson("SNAPSHOT_NOT_FOUND", "push_id=" + pushId);
+        } else if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            status = RecheckStatusEnum.INVALIDATED;
+            message = "当前价格无效，无法二次校验";
+            failReasonJson = failJson("PRICE_REQUIRED", "current_price null or non-positive");
+        } else if (snap.getExpiresAt() != null && now.isAfter(snap.getExpiresAt())) {
+            status = RecheckStatusEnum.EXPIRED;
+            message = "推送已过期";
+            failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
+        } else {
+            accountRiskSnapshot = resolveAccountRiskSnapshot(snap);
+            currentAccountRiskAllowed = accountRiskSnapshot != null ? accountRiskSnapshot.getRiskAllowed() : null;
+            String invHit = evaluateStructuredInvalidation(snap.getInvalidationConditionJson(), currentPrice);
+            if (invHit != null) {
+                status = RecheckStatusEnum.INVALIDATED;
+                message = "命中快照中的失效条件";
+                failReasonJson = failJson("INVALIDATION_HIT", invHit);
+            } else if (snap.getTriggerPrice() != null
+                    && snap.getTriggerPrice().compareTo(BigDecimal.ZERO) > 0) {
+                priceDriftRatio = currentPrice.subtract(snap.getTriggerPrice()).abs()
+                        .divide(snap.getTriggerPrice(), 8, RoundingMode.HALF_UP);
+                if (priceDriftRatio.compareTo(DRIFT_RATIO_THRESHOLD) > 0) {
+                    status = RecheckStatusEnum.DRIFTED;
+                    message = "相对快照基准价漂移超过阈值";
+                    failReasonJson = failJson("DRIFT",
+                            "threshold=" + DRIFT_RATIO_THRESHOLD + ",ratio=" + priceDriftRatio);
+                } else {
+                    status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
+                    message = statusMessage(status, currentAccountRiskAllowed);
+                    failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
+                }
+            } else {
+                priceDriftRatio = null;
+                status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
+                message = status == RecheckStatusEnum.VALID_EXECUTABLE
+                        ? "二次确认通过，可执行（未配置 trigger_price，跳过漂移检测）"
+                        : statusMessage(status, currentAccountRiskAllowed);
+                failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
+            }
+        }
+
+        boolean executable = status == RecheckStatusEnum.VALID_EXECUTABLE;
+        RecheckResult result = new RecheckResult();
+        result.setPushId(pushId);
+        result.setRecheckStatus(status);
+        result.setCurrentPrice(currentPrice);
+        result.setValid(executable);
+        result.setMessage(message);
+
+        TmPushRecheckLogDO row = new TmPushRecheckLogDO();
+        row.setPushId(pushId);
+        row.setDispatchBatchId(executionCommand.getDispatchBatchId());
+        row.setDispatchInstructionId(executionCommand.getDispatchInstructionId());
+        row.setTriggerSource(executionCommand.getTriggerSource());
+        row.setRetryAttempt(executionCommand.getRetryAttempt());
+        row.setMaxAttempts(executionCommand.getMaxAttempts());
+        row.setRetryBackoffMinutes(executionCommand.getRetryBackoffMinutes());
+        row.setReplayFromLogId(executionCommand.getReplayFromLogId());
+        row.setExecutionStatus("COMPLETED");
+        row.setExecutionErrorCode(extractFailCode(failReasonJson));
+        row.setExecutionErrorMessage(message);
+        row.setRecheckTime(now);
+        row.setRecheckStatus(status.name());
+        row.setCurrentPrice(currentPrice);
+        row.setPriceDriftRatio(priceDriftRatio);
+        // Recheck 仅有实时价与快照 trigger_price，可稳定复用为“当前滑点估算”。
+        row.setCurrentSlippageEstimation(priceDriftRatio);
+        row.setCurrentAccountRiskAllowed(currentAccountRiskAllowed);
+        row.setFailReasonJson(failReasonJson);
+        row.setTraceId(snap != null ? snap.getTraceId() : null);
+        fillSnapshotSideMetrics(row, snap);
+        row.setCreateTime(now);
+        pushRecheckLogMapper.insert(row);
+
+        // 先落 recheck 日志，再在同一事务里回写 push_snapshot.push_status，
+        // 让手动触发与自动调度共用同一“状态跟随链”。
+        String nextPushStatus = PushRecheckStatusContract.toPushStatus(status);
+        pushSnapshotMapper.updatePushStatus(pushId, nextPushStatus);
+
+        return result;
+    }
+
+    @Override
+    public PushRecheckLogItemVO getLatestLog(Long pushId) {
+        List<TmPushRecheckLogDO> list = pushRecheckLogMapper.selectByPushId(pushId);
+        if (list == null || list.isEmpty()) {
+            return null;
+        }
+        return toLogVo(list.get(0));
+    }
+
+    @Override
+    public List<PushRecheckLogItemVO> listLogs(Long pushId) {
+        List<TmPushRecheckLogDO> list = pushRecheckLogMapper.selectByPushId(pushId);
+        if (list == null || list.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return list.stream().map(this::toLogVo).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<RecheckResult> replayByDispatch(String dispatchBatchId, String dispatchInstructionId) {
+        List<TmPushRecheckLogDO> sourceLogs = selectReplaySource(dispatchBatchId, dispatchInstructionId);
+        if (sourceLogs == null || sourceLogs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String replayBatchId = "REPLAY-" + System.currentTimeMillis();
+        return sourceLogs.stream()
+                .filter(Objects::nonNull)
+                .filter(row -> row.getPushId() != null)
+                .filter(row -> row.getCurrentPrice() != null && row.getCurrentPrice().compareTo(BigDecimal.ZERO) > 0)
+                .map(row -> recheck(
+                        row.getPushId(),
+                        row.getCurrentPrice(),
+                        RecheckExecutionCommand.replay(
+                                replayBatchId,
+                                replayInstructionId(row, dispatchInstructionId),
+                                row.getLogId())))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public PushRecheckReplaySummaryVO summarizeReplayByDispatch(String dispatchBatchId, String dispatchInstructionId) {
+        List<TmPushRecheckLogDO> logs = selectReplaySource(dispatchBatchId, dispatchInstructionId);
+        PushRecheckReplaySummaryVO summary = new PushRecheckReplaySummaryVO();
+        summary.setDispatchBatchId(blankToNull(trimToNull(dispatchBatchId)));
+        summary.setDispatchInstructionId(blankToNull(trimToNull(dispatchInstructionId)));
+        if (logs == null || logs.isEmpty()) {
+            summary.setTotalCount(0);
+            summary.setSuccessCount(0);
+            summary.setBlockingCount(0);
+            summary.setWaitingCount(0);
+            summary.setExpiredCount(0);
+            summary.setReplayCount(0);
+            summary.setHasError(false);
+            return summary;
+        }
+        int success = 0;
+        int blocking = 0;
+        int waiting = 0;
+        int expired = 0;
+        int replay = 0;
+        for (TmPushRecheckLogDO row : logs) {
+            if (row == null) {
+                continue;
+            }
+            if ("VALID_EXECUTABLE".equalsIgnoreCase(trimToNull(row.getRecheckStatus()))) {
+                success++;
+            } else if ("VALID_WAITING".equalsIgnoreCase(trimToNull(row.getRecheckStatus()))) {
+                waiting++;
+            } else if ("EXPIRED".equalsIgnoreCase(trimToNull(row.getRecheckStatus()))) {
+                expired++;
+            } else if (isBlockingStatus(row.getRecheckStatus())) {
+                blocking++;
+            }
+            if ("REPLAY".equalsIgnoreCase(trimToNull(row.getTriggerSource()))) {
+                replay++;
+            }
+        }
+        TmPushRecheckLogDO latest = logs.get(0);
+        summary.setDispatchBatchId(
+                firstNonBlank(summary.getDispatchBatchId(), trimToNull(latest.getDispatchBatchId())));
+        summary.setDispatchInstructionId(
+                firstNonBlank(summary.getDispatchInstructionId(), trimToNull(latest.getDispatchInstructionId())));
+        summary.setTriggerSource(trimToNull(latest.getTriggerSource()));
+        summary.setTotalCount(logs.size());
+        summary.setSuccessCount(success);
+        summary.setBlockingCount(blocking);
+        summary.setWaitingCount(waiting);
+        summary.setExpiredCount(expired);
+        summary.setReplayCount(replay);
+        summary.setLatestExecutionStatus(trimToNull(latest.getExecutionStatus()));
+        summary.setLatestExecutionTime(latest.getRecheckTime() != null ? latest.getRecheckTime() : latest.getCreateTime());
+        summary.setLatestErrorCode(trimToNull(latest.getExecutionErrorCode()));
+        summary.setHasError(summary.getLatestErrorCode() != null
+                || !"COMPLETED".equalsIgnoreCase(trimToNull(latest.getExecutionStatus())));
+        return summary;
+    }
+
+    @Override
+    public PushRecheckOpsOverviewVO getOpsOverview(String dispatchBatchId,
+                                                   String dispatchInstructionId,
+                                                   Integer auditLimit,
+                                                   Integer logLimit) {
+        int safeAuditLimit = safeLimit(auditLimit, 5, 50);
+        int safeLogLimit = safeLimit(logLimit, 10, 50);
+
+        PushRecheckOpsOverviewVO overview = new PushRecheckOpsOverviewVO();
+        overview.setConfig(buildConfigSummary(safeAuditLimit));
+        overview.setAuditSummary(buildAuditSummary(safeAuditLimit));
+        List<TmPushRecheckLogDO> recentRows = Optional.ofNullable(pushRecheckLogMapper.selectRecent(safeLogLimit))
+                .orElse(Collections.emptyList());
+        overview.setRecentLogs(recentRows.stream()
+                .map(this::toRecentLogSummary)
+                .collect(Collectors.toList()));
+
+        String resolvedInstructionId = trimToNull(dispatchInstructionId);
+        String resolvedBatchId = trimToNull(dispatchBatchId);
+        if (resolvedInstructionId == null && resolvedBatchId == null) {
+            TmPushRecheckLogDO latest = recentRows.isEmpty() ? null : recentRows.get(0);
+            if (latest != null) {
+                resolvedInstructionId = trimToNull(latest.getDispatchInstructionId());
+                resolvedBatchId = trimToNull(latest.getDispatchBatchId());
+            }
+        }
+        overview.setLatestReplaySummary(summarizeReplayByDispatch(resolvedBatchId, resolvedInstructionId));
+        return overview;
+    }
+
+    private PushRecheckLogItemVO toLogVo(TmPushRecheckLogDO row) {
+        PushRecheckLogItemVO vo = new PushRecheckLogItemVO();
+        vo.setLogId(row.getLogId());
+        vo.setPushId(row.getPushId());
+        vo.setDispatchBatchId(row.getDispatchBatchId());
+        vo.setDispatchInstructionId(row.getDispatchInstructionId());
+        vo.setTriggerSource(row.getTriggerSource());
+        vo.setRetryAttempt(row.getRetryAttempt());
+        vo.setMaxAttempts(row.getMaxAttempts());
+        vo.setRetryBackoffMinutes(row.getRetryBackoffMinutes());
+        vo.setReplayFromLogId(row.getReplayFromLogId());
+        vo.setExecutionStatus(row.getExecutionStatus());
+        vo.setExecutionErrorCode(row.getExecutionErrorCode());
+        vo.setExecutionErrorMessage(row.getExecutionErrorMessage());
+        vo.setRecheckTime(row.getRecheckTime());
+        vo.setRecheckStatus(row.getRecheckStatus());
+        vo.setCurrentPrice(row.getCurrentPrice());
+        vo.setPriceDriftRatio(row.getPriceDriftRatio());
+        vo.setCurrentSlippageEstimation(row.getCurrentSlippageEstimation());
+        vo.setCurrentDataQualityScore(row.getCurrentDataQualityScore());
+        vo.setCurrentConfusedScore(row.getCurrentConfusedScore());
+        vo.setCurrentAccountRiskAllowed(row.getCurrentAccountRiskAllowed());
+        vo.setFailReasonJson(row.getFailReasonJson());
+        vo.setTraceId(row.getTraceId());
+        vo.setCreateTime(row.getCreateTime());
+        return vo;
+    }
+
+    /** 从推送快照复用困惑分、数据质量分（Recheck 不重跑分析）。 */
+    private static void fillSnapshotSideMetrics(TmPushRecheckLogDO row, TmPushSnapshotDO snap) {
+        if (snap == null) {
+            return;
+        }
+        row.setCurrentConfusedScore(snap.getConfusedScoreSnapshot());
+        row.setCurrentDataQualityScore(snap.getDataQualityScoreSnapshot());
+    }
+
+    private static RecheckStatusEnum classifyPostPriceChecks(TmPushSnapshotDO snap, Boolean currentAccountRiskAllowed) {
+        if (Boolean.FALSE.equals(currentAccountRiskAllowed)) {
+            return RecheckStatusEnum.RISK_BLOCKED;
+        }
+        Integer confused = snap.getConfusedScoreSnapshot();
+        if (confused != null && confused >= CONFUSED_BLOCK_THRESHOLD) {
+            return RecheckStatusEnum.CONFUSED_BLOCKED;
+        }
+        if (confused != null && confused >= CONFUSED_WAIT_THRESHOLD) {
+            return RecheckStatusEnum.VALID_WAITING;
+        }
+        Integer execFeas = snap.getExecutionFeasibilitySnapshot();
+        if (execFeas != null && execFeas < EXEC_FEASIBILITY_WAIT_THRESHOLD) {
+            return RecheckStatusEnum.VALID_WAITING;
+        }
+        return RecheckStatusEnum.VALID_EXECUTABLE;
+    }
+
+    private static String statusMessage(RecheckStatusEnum status, Boolean currentAccountRiskAllowed) {
+        if (status == RecheckStatusEnum.RISK_BLOCKED) {
+            return "账户风险状态不允许执行，已阻断";
+        }
+        if (status == RecheckStatusEnum.CONFUSED_BLOCKED) {
+            return "快照困惑度过高，已阻断执行";
+        }
+        if (status == RecheckStatusEnum.VALID_WAITING) {
+            if (currentAccountRiskAllowed == null) {
+                return "计划仍有效，但账户风险状态未知，建议继续等待";
+            }
+            return "计划仍有效，但快照指标建议继续等待";
+        }
+        return "二次确认通过，可执行";
+    }
+
+    private static String failReasonForStatus(RecheckStatusEnum status,
+                                              Boolean currentAccountRiskAllowed,
+                                              TmPushSnapshotDO snap,
+                                              TmAccountRiskSnapshotDO accountRiskSnapshot) {
+        if (status == RecheckStatusEnum.RISK_BLOCKED) {
+            if (accountRiskSnapshot != null) {
+                String detail = "riskReasonCode=" + accountRiskSnapshot.getRiskReasonCode()
+                        + ",riskReasonText=" + accountRiskSnapshot.getRiskReasonText()
+                        + ",positionExposure=" + accountRiskSnapshot.getPositionExposure()
+                        + ",maxAllowedExposure=" + accountRiskSnapshot.getMaxAllowedExposure()
+                        + ",snapshotSource=" + accountRiskSnapshot.getSnapshotSource()
+                        + ",snapshotVersion=" + accountRiskSnapshot.getSnapshotVersion();
+                return failJson("RISK_BLOCKED", detail);
+            }
+            return failJson("RISK_BLOCKED", "currentAccountRiskAllowed=false");
+        }
+        if (status == RecheckStatusEnum.CONFUSED_BLOCKED) {
+            return failJson("CONFUSED_BLOCKED", "confusedScoreSnapshot=" + snap.getConfusedScoreSnapshot()
+                    + ",threshold=" + CONFUSED_BLOCK_THRESHOLD);
+        }
+        if (status == RecheckStatusEnum.VALID_WAITING && currentAccountRiskAllowed == null) {
+            return failJson("RISK_UNKNOWN_WAIT", "currentAccountRiskAllowed=null");
+        }
+        return null;
+    }
+
+    private TmAccountRiskSnapshotDO resolveAccountRiskSnapshot(TmPushSnapshotDO snap) {
+        if (snap == null || snap.getAccountRiskSnapshotId() == null) {
+            return null;
+        }
+        return accountRiskSnapshotMapper.selectById(snap.getAccountRiskSnapshotId());
+    }
+
+    /**
+     * 解析 {@code invalidation_condition_json}：支持与本机写入格式兼容的 {@code {"text":"..."}}（不自动判失效），
+     * 以及可选数值字段 {@code invalidPriceBelow} / {@code invalidPriceAbove}（命中则失效）。
+     *
+     * @return 非 null 表示命中失效条件，字符串为简要说明
+     */
+    private static String evaluateStructuredInvalidation(String invalidationJson, BigDecimal price) {
+        if (invalidationJson == null || invalidationJson.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = JSON.readTree(invalidationJson);
+            if (root == null || !root.isObject()) {
+                return null;
+            }
+            JsonNode below = root.get("invalidPriceBelow");
+            if (below != null && below.isNumber()) {
+                BigDecimal v = below.decimalValue();
+                if (price.compareTo(v) < 0) {
+                    return "price " + price + " < invalidPriceBelow " + v;
+                }
+            }
+            JsonNode above = root.get("invalidPriceAbove");
+            if (above != null && above.isNumber()) {
+                BigDecimal v = above.decimalValue();
+                if (price.compareTo(v) > 0) {
+                    return "price " + price + " > invalidPriceAbove " + v;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String failJson(String code, String detail) {
+        try {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("code", code);
+            m.put("detail", detail);
+            return JSON.writeValueAsString(m);
+        } catch (Exception e) {
+            return "{\"code\":\"" + code + "\"}";
+        }
+    }
+
+    private static String extractFailCode(String failReasonJson) {
+        if (failReasonJson == null || failReasonJson.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = JSON.readTree(failReasonJson);
+            JsonNode code = root.get("code");
+            return code != null && !code.isNull() ? code.asText() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private PushRecheckOpsOverviewVO.ConfigSummary buildConfigSummary(int auditLimit) {
+        Map<String, Integer> current = dispatchConfigService.getCurrentConfig();
+        PushRecheckOpsOverviewVO.ConfigSummary config = new PushRecheckOpsOverviewVO.ConfigSummary();
+        config.setLimit(current.get("limit"));
+        config.setMaxAttempts(current.get("maxAttempts"));
+        config.setMinRetryMinutes(current.get("minRetryMinutes"));
+
+        Optional.ofNullable(dispatchConfigService.listRecentAudit(auditLimit)).flatMap(rows -> rows.stream().findFirst())
+                .ifPresent(latest -> {
+                    config.setUpdatedBy(trimToNull(latest.getChangedBy()));
+                    config.setUpdatedTime(latest.getCreateTime());
+                });
+        return config;
+    }
+
+    private PushRecheckOpsOverviewVO.AuditSummary buildAuditSummary(int auditLimit) {
+        List<org.example.trademodel.entity.PushRecheckDispatchConfigAuditDO> audits =
+                dispatchConfigService.listRecentAudit(auditLimit);
+        PushRecheckOpsOverviewVO.AuditSummary summary = new PushRecheckOpsOverviewVO.AuditSummary();
+        int count = audits == null ? 0 : audits.size();
+        summary.setAuditCount(count);
+        if (count > 0) {
+            org.example.trademodel.entity.PushRecheckDispatchConfigAuditDO latest = audits.get(0);
+            summary.setLatestAuditTime(latest.getCreateTime());
+            summary.setLatestAuditOperator(trimToNull(latest.getChangedBy()));
+            summary.setLatestAuditSummary(buildAuditSummaryText(latest));
+        }
+        return summary;
+    }
+
+    private static String buildAuditSummaryText(org.example.trademodel.entity.PushRecheckDispatchConfigAuditDO latest) {
+        String operator = trimToNull(latest.getChangedBy());
+        if (operator == null) {
+            operator = "unknown";
+        }
+        return operator + " changed " + latest.getConfigKey() + " from "
+                + latest.getOldValue() + " to " + latest.getNewValue();
+    }
+
+    private PushRecheckOpsOverviewVO.RecentLogSummary toRecentLogSummary(TmPushRecheckLogDO row) {
+        PushRecheckOpsOverviewVO.RecentLogSummary summary = new PushRecheckOpsOverviewVO.RecentLogSummary();
+        summary.setLogId(row.getLogId());
+        summary.setDispatchBatchId(row.getDispatchBatchId());
+        summary.setDispatchInstructionId(row.getDispatchInstructionId());
+        summary.setTriggerSource(row.getTriggerSource());
+        summary.setExecutionStatus(row.getExecutionStatus());
+        summary.setExecutionErrorCode(row.getExecutionErrorCode());
+        summary.setCreateTime(row.getCreateTime());
+        return summary;
+    }
+
+    private static int safeLimit(Integer candidate, int fallback, int max) {
+        if (candidate == null || candidate <= 0) {
+            return fallback;
+        }
+        return Math.min(candidate, max);
+    }
+
+    private List<TmPushRecheckLogDO> selectReplaySource(String dispatchBatchId, String dispatchInstructionId) {
+        if (dispatchInstructionId != null && !dispatchInstructionId.isBlank()) {
+            return pushRecheckLogMapper.selectByInstructionId(dispatchInstructionId.trim());
+        }
+        if (dispatchBatchId != null && !dispatchBatchId.isBlank()) {
+            return pushRecheckLogMapper.selectByBatchId(dispatchBatchId.trim());
+        }
+        return Collections.emptyList();
+    }
+
+    private static String replayInstructionId(TmPushRecheckLogDO row, String fallbackInstructionId) {
+        String original = row.getDispatchInstructionId();
+        if (original != null && !original.isBlank()) {
+            return "REPLAY-" + original;
+        }
+        if (fallbackInstructionId != null && !fallbackInstructionId.isBlank()) {
+            return "REPLAY-" + fallbackInstructionId.trim();
+        }
+        return "REPLAY-LOG-" + row.getLogId();
+    }
+
+    private static boolean isBlockingStatus(String status) {
+        String v = trimToNull(status);
+        if (v == null) {
+            return false;
+        }
+        return "INVALIDATED".equalsIgnoreCase(v)
+                || "DRIFTED".equalsIgnoreCase(v)
+                || "RISK_BLOCKED".equalsIgnoreCase(v)
+                || "CONFUSED_BLOCKED".equalsIgnoreCase(v);
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String t = value.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return first != null ? first : second;
+    }
+
+    private static String blankToNull(String value) {
+        return trimToNull(value);
+    }
+
+}

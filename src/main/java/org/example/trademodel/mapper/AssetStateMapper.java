@@ -1,0 +1,40 @@
+package org.example.trademodel.mapper;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+import org.example.trademodel.entity.AssetStateDO;
+
+@Mapper
+public interface AssetStateMapper {
+
+    /**
+     * H2：按 symbol 合并写入核心权威字段（state / confused / trace），不触碰 hot_reset_*，
+     * 避免每次分析把「最近一次 Hot Reset」覆盖掉。
+     */
+    @org.apache.ibatis.annotations.Insert("MERGE INTO tm_asset_state (symbol, state, confused_score, last_update_time, trace_id) KEY (symbol) VALUES (#{symbol}, #{state}, #{confusedScore}, #{lastUpdateTime}, #{traceId})")
+    int mergeUpsertCore(AssetStateDO row);
+
+    @Select("SELECT * FROM tm_asset_state WHERE symbol = #{symbol}")
+    AssetStateDO selectBySymbol(@Param("symbol") String symbol);
+
+    /** 全库当前态：confused_score 大于 0 的 symbol 行数。 */
+    @Select("SELECT COUNT(*) FROM tm_asset_state WHERE confused_score > 0")
+    int countSymbolsWhereConfusedScorePositive();
+
+    /**
+     * 全库最近一次 Hot Reset（按 hot_reset_time 最大）。无记录或时间为空时返回 null。
+     */
+    @Select("SELECT * FROM tm_asset_state WHERE hot_reset_time IS NOT NULL ORDER BY hot_reset_time DESC LIMIT 1")
+    AssetStateDO selectLatestHotResetRow();
+
+    /**
+     * 仅更新 hot reset 与前后状态列；需已存在 symbol 行（可先 {@link #mergeUpsertCore}）。
+     */
+    @Update("UPDATE tm_asset_state SET hot_reset_flag = #{hotResetFlag}, hot_reset_trigger_type = #{hotResetTriggerType}, "
+            + "hot_reset_trigger_value = #{hotResetTriggerValue}, hot_reset_time = #{hotResetTime}, "
+            + "pre_reset_state = #{preResetState}, post_reset_state = #{postResetState}, last_update_time = #{lastUpdateTime} "
+            + "WHERE symbol = #{symbol}")
+    int updateHotResetColumns(AssetStateDO row);
+}

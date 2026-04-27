@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataSourceHealthDO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">trade-model-v1</a> &gt; <a href="index.source.html" class="el_package">org.example.trademodel.entity</a> &gt; <span class="el_source">DataSourceHealthDO.java</span></div><h1>DataSourceHealthDO.java</h1><pre class="source lang-java linenums">package org.example.trademodel.entity;
+
+public class DataSourceHealthDO {
+
+    private String id;
+    private String sourceName;
+    private String sourceStatus;
+    private Integer delaySeconds;
+    private Integer missingRate;
+    private String anomalyFlag;
+    private Integer qualityScore;
+    private String snapshotTime;
+    private String traceId;
+    private String ruleVersion;
+    private String createdBy;
+    private String updatedBy;
+    private String createdAt;
+    private String updatedAt;
+    private Integer isDeleted;
+    private Integer versionNo;
+
+<span class="nc" id="L22">    public DataSourceHealthDO() {</span>
+<span class="nc" id="L23">    }</span>
+
+    public String getId() {
+<span class="nc" id="L26">        return id;</span>
+    }
+
+    public void setId(String id) {
+<span class="nc" id="L30">        this.id = id;</span>
+<span class="nc" id="L31">    }</span>
+
+    public String getSourceName() {
+<span class="nc" id="L34">        return sourceName;</span>
+    }
+
+    public void setSourceName(String sourceName) {
+<span class="nc" id="L38">        this.sourceName = sourceName;</span>
+<span class="nc" id="L39">    }</span>
+
+    public String getSourceStatus() {
+<span class="nc" id="L42">        return sourceStatus;</span>
+    }
+
+    public void setSourceStatus(String sourceStatus) {
+<span class="nc" id="L46">        this.sourceStatus = sourceStatus;</span>
+<span class="nc" id="L47">    }</span>
+
+    public Integer getDelaySeconds() {
+<span class="nc" id="L50">        return delaySeconds;</span>
+    }
+
+    public void setDelaySeconds(Integer delaySeconds) {
+<span class="nc" id="L54">        this.delaySeconds = delaySeconds;</span>
+<span class="nc" id="L55">    }</span>
+
+    public Integer getMissingRate() {
+<span class="nc" id="L58">        return missingRate;</span>
+    }
+
+    public void setMissingRate(Integer missingRate) {
+<span class="nc" id="L62">        this.missingRate = missingRate;</span>
+<span class="nc" id="L63">    }</span>
+
+    public String getAnomalyFlag() {
+<span class="nc" id="L66">        return anomalyFlag;</span>
+    }
+
+    public void setAnomalyFlag(String anomalyFlag) {
+<span class="nc" id="L70">        this.anomalyFlag = anomalyFlag;</span>
+<span class="nc" id="L71">    }</span>
+
+    public Integer getQualityScore() {
+<span class="nc" id="L74">        return qualityScore;</span>
+    }
+
+    public void setQualityScore(Integer qualityScore) {
+<span class="nc" id="L78">        this.qualityScore = qualityScore;</span>
+<span class="nc" id="L79">    }</span>
+
+    public String getSnapshotTime() {
+<span class="nc" id="L82">        return snapshotTime;</span>
+    }
+
+    public void setSnapshotTime(String snapshotTime) {
+<span class="nc" id="L86">        this.snapshotTime = snapshotTime;</span>
+<span class="nc" id="L87">    }</span>
+
+    public String getTraceId() {
+<span class="nc" id="L90">        return traceId;</span>
+    }
+
+    public void setTraceId(String traceId) {
+<span class="nc" id="L94">        this.traceId = traceId;</span>
+<span class="nc" id="L95">    }</span>
+
+    public String getRuleVersion() {
+<span class="nc" id="L98">        return ruleVersion;</span>
+    }
+
+    public void setRuleVersion(String ruleVersion) {
+<span class="nc" id="L102">        this.ruleVersion = ruleVersion;</span>
+<span class="nc" id="L103">    }</span>
+
+    public String getCreatedBy() {
+<span class="nc" id="L106">        return createdBy;</span>
+    }
+
+    public void setCreatedBy(String createdBy) {
+<span class="nc" id="L110">        this.createdBy = createdBy;</span>
+<span class="nc" id="L111">    }</span>
+
+    public String getUpdatedBy() {
+<span class="nc" id="L114">        return updatedBy;</span>
+    }
+
+    public void setUpdatedBy(String updatedBy) {
+<span class="nc" id="L118">        this.updatedBy = updatedBy;</span>
+<span class="nc" id="L119">    }</span>
+
+    public String getCreatedAt() {
+<span class="nc" id="L122">        return createdAt;</span>
+    }
+
+    public void setCreatedAt(String createdAt) {
+<span class="nc" id="L126">        this.createdAt = createdAt;</span>
+<span class="nc" id="L127">    }</span>
+
+    public String getUpdatedAt() {
+<span class="nc" id="L130">        return updatedAt;</span>
+    }
+
+    public void setUpdatedAt(String updatedAt) {
+<span class="nc" id="L134">        this.updatedAt = updatedAt;</span>
+<span class="nc" id="L135">    }</span>
+
+    public Integer getIsDeleted() {
+<span class="nc" id="L138">        return isDeleted;</span>
+    }
+
+    public void setIsDeleted(Integer isDeleted) {
+<span class="nc" id="L142">        this.isDeleted = isDeleted;</span>
+<span class="nc" id="L143">    }</span>
+
+    public Integer getVersionNo() {
+<span class="nc" id="L146">        return versionNo;</span>
+    }
+
+    public void setVersionNo(Integer versionNo) {
+<span class="nc" id="L150">        this.versionNo = versionNo;</span>
+<span class="nc" id="L151">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>
