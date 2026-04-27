@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -684,6 +685,47 @@ class ScoreServiceImplTest {
         assertThat(eventImpact).isNotNull();
         assertThat(eventImpact.getScoreValue()).isEqualTo(50.0);
         assertThat(eventImpact.getDescription()).contains("eventFactHit:miss:+0");
+    }
+
+    @Test
+    void buildScoreList_keepsEventImpactDescriptionSnapshot_stableForInputContract() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        input.setEventFactCount(3);
+        input.setEventLatestTime(LocalDateTime.of(2026, 4, 27, 16, 21, 0));
+        input.setEventReasonCode("CONFUSED_HIGH_MTF_MISALIGNED");
+        input.setEventTriggerType("CIRCUIT_BREAKER");
+        input.setEventVersion(2);
+        input.setEventTraceId("trace-stable-001");
+        analysis.setEventImpactInput(input);
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getDescription()).isEqualTo(
+                "基于现有 event evidence 命中的轻规则评分（单项负向惩罚，不等于事件系统完成，也不改变当前 decision 主路径） | 命中: "
+                        + "eventFactHit:hit:-10; eventFactCount>=3:-5; eventTriggerType=SEVERE:-5; "
+                        + "eventFactCount=3; eventLatestTime=2026-04-27T16:21; "
+                        + "eventReasonCode=CONFUSED_HIGH_MTF_MISALIGNED; eventTriggerType=CIRCUIT_BREAKER; "
+                        + "eventVersion=2; eventTraceId=trace-stable-001");
+    }
+
+    @Test
+    void buildScoreList_keepsEventImpactDescriptionSnapshot_stableForEvidenceFallback() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EvidenceItemVO event = new EvidenceItemVO();
+        event.setEvidenceType("事件");
+        event.setDescription("trigger by fallback");
+        analysis.setEvidenceList(List.of(event));
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getDescription()).isEqualTo(
+                "基于现有 event evidence 命中的轻规则评分（单项负向惩罚，不等于事件系统完成，也不改变当前 decision 主路径） | 命中: eventEvidence=hit:-10");
     }
 
     @Test

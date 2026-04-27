@@ -54,6 +54,10 @@ public class ScoreServiceImpl implements ScoreService {
     private static final String EVENT_IMPACT_SCORE_TYPE = "事件冲击分";
     private static final String EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX =
             "基于现有 event evidence 命中的轻规则评分（单项负向惩罚，不等于事件系统完成，也不改变当前 decision 主路径）";
+    private static final String EVENT_IMPACT_DESCRIPTION_TEMPLATE_WITH_INPUT =
+            "%s | 命中: %s; eventFactCount=%d; eventLatestTime=%s; eventReasonCode=%s; eventTriggerType=%s; eventVersion=%s; eventTraceId=%s";
+    private static final String EVENT_IMPACT_DESCRIPTION_TEMPLATE_WITHOUT_INPUT =
+            "%s | 命中: eventEvidence=%s";
     private static final String PRICE_STRUCTURE_EVIDENCE_TYPE = "价格结构";
     private static final double FUNDING_BASE_SCORE = 50.0;
     private static final double FUNDING_LIGHT_BONUS = 5.0;
@@ -611,15 +615,33 @@ public class ScoreServiceImpl implements ScoreService {
         }
         double clamped = clampScore(score);
         String description = input != null
-                ? EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX + " | 命中: " + applied
-                + "; eventFactCount=" + safeInputCount(input.getEventFactCount())
-                + "; eventLatestTime=" + safeInputText(input.getEventLatestTime())
-                + "; eventReasonCode=" + safeInputText(input.getEventReasonCode())
-                + "; eventTriggerType=" + safeInputText(input.getEventTriggerType())
-                + "; eventVersion=" + safeInputText(input.getEventVersion())
-                + "; eventTraceId=" + safeInputText(input.getEventTraceId())
-                : EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX + " | 命中: eventEvidence=" + (hit ? "hit:-10" : "miss:+0");
+                ? buildEventImpactDescriptionWithInput(input, applied.toString())
+                : buildEventImpactDescriptionWithoutInput(hit);
         return new EventImpactEval(clamped, description);
+    }
+
+    private static String buildEventImpactDescriptionWithInput(EventImpactInputVO input, String applied) {
+        return String.format(
+                Locale.ROOT,
+                EVENT_IMPACT_DESCRIPTION_TEMPLATE_WITH_INPUT,
+                EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX,
+                applied,
+                safeInputCount(input.getEventFactCount()),
+                safeInputText(input.getEventLatestTime()),
+                safeInputText(input.getEventReasonCode()),
+                safeInputText(input.getEventTriggerType()),
+                safeInputText(input.getEventVersion()),
+                safeInputText(input.getEventTraceId())
+        );
+    }
+
+    private static String buildEventImpactDescriptionWithoutInput(boolean hit) {
+        return String.format(
+                Locale.ROOT,
+                EVENT_IMPACT_DESCRIPTION_TEMPLATE_WITHOUT_INPUT,
+                EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX,
+                hit ? "hit:-10" : "miss:+0"
+        );
     }
 
     private static boolean isSevereTriggerType(String triggerType) {
