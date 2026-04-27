@@ -97,6 +97,9 @@ public class ScoreServiceImpl implements ScoreService {
     private static final String EVENT_EVIDENCE_TYPE = "事件";
     private static final double EVENT_IMPACT_BASE_SCORE = 50.0;
     private static final double EVENT_IMPACT_HIT_PENALTY = 10.0;
+    private static final double EVENT_IMPACT_MULTI_HIT_EXTRA_PENALTY = 5.0;
+    private static final int EVENT_IMPACT_MULTI_HIT_THRESHOLD = 3;
+    private static final double EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY = 5.0;
 
     private final ScoreItemMapper scoreItemMapper;
 
@@ -594,13 +597,24 @@ public class ScoreServiceImpl implements ScoreService {
         boolean hit = input != null
                 ? Boolean.TRUE.equals(input.getEventFactHit())
                 : hasEventEvidence(assetAnalysis != null ? assetAnalysis.getEvidenceList() : null);
+        StringJoiner applied = new StringJoiner("; ");
         if (hit) {
             score -= EVENT_IMPACT_HIT_PENALTY;
+            applied.add("eventFactHit:hit:-10");
+            if (input != null && safeInputCount(input.getEventFactCount()) >= EVENT_IMPACT_MULTI_HIT_THRESHOLD) {
+                score -= EVENT_IMPACT_MULTI_HIT_EXTRA_PENALTY;
+                applied.add("eventFactCount>=3:-5");
+            }
+            if (input != null && isSevereTriggerType(input.getEventTriggerType())) {
+                score -= EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY;
+                applied.add("eventTriggerType=SEVERE:-5");
+            }
+        } else {
+            applied.add("eventFactHit:miss:+0");
         }
         double clamped = clampScore(score);
         String description = input != null
-                ? EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX + " | 命中: eventFactHit="
-                + (hit ? "hit:-10" : "miss:+0")
+                ? EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX + " | 命中: " + applied
                 + "; eventFactCount=" + safeInputCount(input.getEventFactCount())
                 + "; eventLatestTime=" + safeInputText(input.getEventLatestTime())
                 + "; eventReasonCode=" + safeInputText(input.getEventReasonCode())
@@ -609,6 +623,16 @@ public class ScoreServiceImpl implements ScoreService {
                 + "; eventTraceId=" + safeInputText(input.getEventTraceId())
                 : EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX + " | 命中: eventEvidence=" + (hit ? "hit:-10" : "miss:+0");
         return new EventImpactEval(clamped, description);
+    }
+
+    private static boolean isSevereTriggerType(String triggerType) {
+        if (triggerType == null || triggerType.isBlank()) {
+            return false;
+        }
+        String normalized = triggerType.trim().toUpperCase(Locale.ROOT);
+        return "CIRCUIT_BREAKER".equals(normalized)
+                || "EXCHANGE_OUTAGE".equals(normalized)
+                || "LIQUIDATION_CASCADE".equals(normalized);
     }
 
     private static int safeInputCount(Integer count) {

@@ -659,7 +659,7 @@ class ScoreServiceImplTest {
 
         assertThat(eventImpact).isNotNull();
         assertThat(eventImpact.getScoreValue()).isEqualTo(40.0);
-        assertThat(eventImpact.getDescription()).contains("eventFactHit=hit:-10");
+        assertThat(eventImpact.getDescription()).contains("eventFactHit:hit:-10");
         assertThat(eventImpact.getDescription()).contains("eventFactCount=2");
         assertThat(eventImpact.getDescription()).contains("eventReasonCode=CONFUSED_HIGH_MTF_MISALIGNED");
     }
@@ -682,7 +682,40 @@ class ScoreServiceImplTest {
 
         assertThat(eventImpact).isNotNull();
         assertThat(eventImpact.getScoreValue()).isEqualTo(50.0);
-        assertThat(eventImpact.getDescription()).contains("eventFactHit=miss:+0");
+        assertThat(eventImpact.getDescription()).contains("eventFactHit:miss:+0");
+    }
+
+    @Test
+    void buildScoreList_appliesExtraEventImpactPenalty_whenEventFactCountAtLeast3() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        input.setEventFactCount(3);
+        analysis.setEventImpactInput(input);
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(35.0);
+        assertThat(eventImpact.getDescription()).contains("eventFactCount>=3:-5");
+    }
+
+    @Test
+    void buildScoreList_appliesExtraEventImpactPenalty_whenTriggerTypeIsSevere() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        input.setEventFactCount(1);
+        input.setEventTriggerType("CIRCUIT_BREAKER");
+        analysis.setEventImpactInput(input);
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(35.0);
+        assertThat(eventImpact.getDescription()).contains("eventTriggerType=SEVERE:-5");
     }
 
     @Test
