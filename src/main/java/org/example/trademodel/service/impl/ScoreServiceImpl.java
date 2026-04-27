@@ -101,6 +101,9 @@ public class ScoreServiceImpl implements ScoreService {
     private static final String EVENT_EVIDENCE_TYPE = "事件";
     private static final double EVENT_IMPACT_BASE_SCORE = 50.0;
     private static final double EVENT_IMPACT_HIT_PENALTY = 10.0;
+    private static final double EVENT_IMPACT_HIGH_VOLATILITY_EXTRA_PENALTY = 5.0;
+    private static final double EVENT_IMPACT_ELEVATED_RISK_EXTRA_PENALTY = 5.0;
+    private static final double EVENT_IMPACT_CROWDING_EXTRA_PENALTY = 5.0;
 
     private final ScoreItemMapper scoreItemMapper;
 
@@ -162,7 +165,7 @@ public class ScoreServiceImpl implements ScoreService {
         macroEnvironmentScore.setDescription(macroEnvironmentEval.description);
         list.add(macroEnvironmentScore);
 
-        EventImpactEval eventImpactEval = evaluateEventImpactScore(assetAnalysis);
+        EventImpactEval eventImpactEval = evaluateEventImpactScore(assetAnalysis, marketEnv);
         ScoreItemVO eventImpactScore = new ScoreItemVO();
         eventImpactScore.setScoreType(EVENT_IMPACT_SCORE_TYPE);
         eventImpactScore.setScoreValue(eventImpactEval.score);
@@ -592,7 +595,7 @@ public class ScoreServiceImpl implements ScoreService {
         }
     }
 
-    private EventImpactEval evaluateEventImpactScore(AssetAnalysisVO assetAnalysis) {
+    private EventImpactEval evaluateEventImpactScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
         double score = EVENT_IMPACT_BASE_SCORE;
         EventImpactInputVO input = assetAnalysis != null ? assetAnalysis.getEventImpactInput() : null;
         boolean hit = input != null
@@ -609,6 +612,18 @@ public class ScoreServiceImpl implements ScoreService {
             if (input != null && isSevereTriggerType(input.getEventTriggerType())) {
                 score -= EvidenceTypeConstants.EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY;
                 applied.add("eventTriggerType=SEVERE:-5");
+            }
+            if (isHighVolatilityRegime(marketEnv)) {
+                score -= EVENT_IMPACT_HIGH_VOLATILITY_EXTRA_PENALTY;
+                applied.add("marketVolatility=高波动:-5");
+            }
+            if (isElevatedRiskMode(marketEnv)) {
+                score -= EVENT_IMPACT_ELEVATED_RISK_EXTRA_PENALTY;
+                applied.add("marketRiskMode=elevated:-5");
+            }
+            if (isDerivativesCrowdingState(marketEnv)) {
+                score -= EVENT_IMPACT_CROWDING_EXTRA_PENALTY;
+                applied.add("marketCrowding=CROWDED:-5");
             }
         } else {
             applied.add("eventFactHit:miss:+0");
@@ -650,6 +665,28 @@ public class ScoreServiceImpl implements ScoreService {
         }
         String normalized = triggerType.trim().toUpperCase(Locale.ROOT);
         return EvidenceTypeConstants.EVENT_IMPACT_SEVERE_TRIGGER_TYPES.contains(normalized);
+    }
+
+    private static boolean isHighVolatilityRegime(MarketEnvironmentVO marketEnv) {
+        if (marketEnv == null || marketEnv.getVolatilityRegime() == null) {
+            return false;
+        }
+        return "高波动".equals(marketEnv.getVolatilityRegime().trim());
+    }
+
+    private static boolean isElevatedRiskMode(MarketEnvironmentVO marketEnv) {
+        if (marketEnv == null || marketEnv.getRiskMode() == null) {
+            return false;
+        }
+        return "elevated".equalsIgnoreCase(marketEnv.getRiskMode().trim());
+    }
+
+    private static boolean isDerivativesCrowdingState(MarketEnvironmentVO marketEnv) {
+        if (marketEnv == null || marketEnv.getDerivativesCrowdingState() == null) {
+            return false;
+        }
+        String state = marketEnv.getDerivativesCrowdingState().trim();
+        return "CROWDED_LONG".equals(state) || "CROWDED_SHORT".equals(state);
     }
 
     private static int safeInputCount(Integer count) {

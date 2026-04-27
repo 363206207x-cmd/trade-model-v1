@@ -829,6 +829,48 @@ class ScoreServiceImplTest {
     }
 
     @Test
+    void buildScoreList_appliesMarketStatePenalties_whenEventHitAndMarketIsStressed() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        analysis.setEventImpactInput(input);
+        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        env.setVolatilityRegime("高波动");
+        env.setRiskMode("elevated");
+        env.setDerivativesCrowdingState("CROWDED_LONG");
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, env), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(25.0);
+        assertThat(eventImpact.getDescription()).contains("marketVolatility=高波动:-5");
+        assertThat(eventImpact.getDescription()).contains("marketRiskMode=elevated:-5");
+        assertThat(eventImpact.getDescription()).contains("marketCrowding=CROWDED:-5");
+    }
+
+    @Test
+    void buildScoreList_doesNotApplyMarketStatePenalties_whenEventMissEvenIfMarketIsStressed() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.FALSE);
+        analysis.setEventImpactInput(input);
+        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        env.setVolatilityRegime("高波动");
+        env.setRiskMode("elevated");
+        env.setDerivativesCrowdingState("CROWDED_SHORT");
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, env), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(50.0);
+        assertThat(eventImpact.getDescription()).doesNotContain("marketVolatility=高波动:-5");
+        assertThat(eventImpact.getDescription()).doesNotContain("marketRiskMode=elevated:-5");
+        assertThat(eventImpact.getDescription()).doesNotContain("marketCrowding=CROWDED:-5");
+    }
+
+    @Test
     void buildScoreList_sanitizesEventImpactInputFields_whenContractValuesMissingOrNonPositive() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
