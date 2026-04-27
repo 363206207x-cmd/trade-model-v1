@@ -1,5 +1,6 @@
 package org.example.trademodel.service.impl;
 
+import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.EvidenceItemVO;
@@ -691,7 +692,7 @@ class ScoreServiceImplTest {
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         EventImpactInputVO input = new EventImpactInputVO();
         input.setEventFactHit(Boolean.TRUE);
-        input.setEventFactCount(3);
+        input.setEventFactCount(EvidenceTypeConstants.EVENT_IMPACT_MULTI_HIT_THRESHOLD);
         analysis.setEventImpactInput(input);
 
         ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");

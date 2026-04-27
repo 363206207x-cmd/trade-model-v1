@@ -45,6 +45,9 @@ public final class EvidenceTypeConstants {
                     EVENT_TRIGGER_TYPE_LIQUIDATION_CASCADE
             ))
     );
+    public static final int EVENT_IMPACT_MULTI_HIT_THRESHOLD = 3;
+    public static final double EVENT_IMPACT_MULTI_HIT_EXTRA_PENALTY = 5.0;
+    public static final double EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY = 5.0;
 
     private EvidenceTypeConstants() {
     }

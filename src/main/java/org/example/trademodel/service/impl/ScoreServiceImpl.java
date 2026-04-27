@@ -97,9 +97,6 @@ public class ScoreServiceImpl implements ScoreService {
     private static final String EVENT_EVIDENCE_TYPE = "事件";
     private static final double EVENT_IMPACT_BASE_SCORE = 50.0;
     private static final double EVENT_IMPACT_HIT_PENALTY = 10.0;
-    private static final double EVENT_IMPACT_MULTI_HIT_EXTRA_PENALTY = 5.0;
-    private static final int EVENT_IMPACT_MULTI_HIT_THRESHOLD = 3;
-    private static final double EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY = 5.0;
 
     private final ScoreItemMapper scoreItemMapper;
 
@@ -601,12 +598,12 @@ public class ScoreServiceImpl implements ScoreService {
         if (hit) {
             score -= EVENT_IMPACT_HIT_PENALTY;
             applied.add("eventFactHit:hit:-10");
-            if (input != null && safeInputCount(input.getEventFactCount()) >= EVENT_IMPACT_MULTI_HIT_THRESHOLD) {
-                score -= EVENT_IMPACT_MULTI_HIT_EXTRA_PENALTY;
+            if (input != null && safeInputCount(input.getEventFactCount()) >= EvidenceTypeConstants.EVENT_IMPACT_MULTI_HIT_THRESHOLD) {
+                score -= EvidenceTypeConstants.EVENT_IMPACT_MULTI_HIT_EXTRA_PENALTY;
                 applied.add("eventFactCount>=3:-5");
             }
             if (input != null && isSevereTriggerType(input.getEventTriggerType())) {
-                score -= EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY;
+                score -= EvidenceTypeConstants.EVENT_IMPACT_SEVERE_TRIGGER_EXTRA_PENALTY;
                 applied.add("eventTriggerType=SEVERE:-5");
             }
         } else {
