@@ -719,6 +719,22 @@ class ScoreServiceImplTest {
     }
 
     @Test
+    void buildScoreList_appliesSevereTriggerPenalty_caseInsensitiveAndTrimmed() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        input.setEventTriggerType("  exchange_outage  ");
+        analysis.setEventImpactInput(input);
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(35.0);
+        assertThat(eventImpact.getDescription()).contains("eventTriggerType=SEVERE:-5");
+    }
+
+    @Test
     void buildScoreList_sanitizesEventImpactInputFields_whenContractValuesMissingOrNonPositive() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();

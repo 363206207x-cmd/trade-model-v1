@@ -630,9 +630,7 @@ public class ScoreServiceImpl implements ScoreService {
             return false;
         }
         String normalized = triggerType.trim().toUpperCase(Locale.ROOT);
-        return "CIRCUIT_BREAKER".equals(normalized)
-                || "EXCHANGE_OUTAGE".equals(normalized)
-                || "LIQUIDATION_CASCADE".equals(normalized);
+        return EvidenceTypeConstants.EVENT_IMPACT_SEVERE_TRIGGER_TYPES.contains(normalized);
     }
 
     private static int safeInputCount(Integer count) {

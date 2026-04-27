@@ -35,6 +35,16 @@ public final class EvidenceTypeConstants {
                     EVIDENCE_SOURCE_MANUAL_INPUT
             ))
     );
+    public static final String EVENT_TRIGGER_TYPE_CIRCUIT_BREAKER = "CIRCUIT_BREAKER";
+    public static final String EVENT_TRIGGER_TYPE_EXCHANGE_OUTAGE = "EXCHANGE_OUTAGE";
+    public static final String EVENT_TRIGGER_TYPE_LIQUIDATION_CASCADE = "LIQUIDATION_CASCADE";
+    public static final Set<String> EVENT_IMPACT_SEVERE_TRIGGER_TYPES = Collections.unmodifiableSet(
+            new LinkedHashSet<>(Set.of(
+                    EVENT_TRIGGER_TYPE_CIRCUIT_BREAKER,
+                    EVENT_TRIGGER_TYPE_EXCHANGE_OUTAGE,
+                    EVENT_TRIGGER_TYPE_LIQUIDATION_CASCADE
+            ))
+    );
 
     private EvidenceTypeConstants() {
     }
