@@ -566,6 +566,35 @@ class ScoreServiceImplTest {
     }
 
     @Test
+    void buildScoreList_keepsMacroEnvironmentRangeBoundaryStable_at2And6Percent() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        MarketEnvironmentVO at2 = new MarketEnvironmentVO();
+        at2.setRangePct24h(2.0);
+        MarketEnvironmentVO at6 = new MarketEnvironmentVO();
+        at6.setRangePct24h(6.0);
+
+        Double at2Score = pickByType(service.buildScoreList(new AssetAnalysisVO(), at2), "宏观环境分").getScoreValue();
+        Double at6Score = pickByType(service.buildScoreList(new AssetAnalysisVO(), at6), "宏观环境分").getScoreValue();
+
+        assertThat(at2Score).isEqualTo(50.0);
+        assertThat(at6Score).isEqualTo(45.0);
+    }
+
+    @Test
+    void buildScoreList_doesNotApplyMacroCrowdingPenalty_forUnknownCrowdingState() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        env.setVolatilityRegime("窄幅");
+        env.setRangePct24h(1.5);
+        env.setDerivativesCrowdingState("BALANCED");
+
+        ScoreItemVO macro = pickByType(service.buildScoreList(new AssetAnalysisVO(), env), "宏观环境分");
+
+        assertThat(macro).isNotNull();
+        assertThat(macro.getScoreValue()).isEqualTo(65.0);
+    }
+
+    @Test
     void buildScoreList_setsEventImpactScoreLower_whenEventEvidenceExists() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
@@ -654,6 +683,42 @@ class ScoreServiceImplTest {
         assertThat(eventImpact).isNotNull();
         assertThat(eventImpact.getScoreValue()).isEqualTo(50.0);
         assertThat(eventImpact.getDescription()).contains("eventFactHit=miss:+0");
+    }
+
+    @Test
+    void buildScoreList_sanitizesEventImpactInputFields_whenContractValuesMissingOrNonPositive() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        input.setEventFactCount(-3);
+        analysis.setEventImpactInput(input);
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(40.0);
+        assertThat(eventImpact.getDescription()).contains("eventFactCount=0");
+        assertThat(eventImpact.getDescription()).contains("eventLatestTime=NA");
+        assertThat(eventImpact.getDescription()).contains("eventReasonCode=NA");
+        assertThat(eventImpact.getDescription()).contains("eventTriggerType=NA");
+        assertThat(eventImpact.getDescription()).contains("eventVersion=NA");
+        assertThat(eventImpact.getDescription()).contains("eventTraceId=NA");
+    }
+
+    @Test
+    void buildScoreList_recognizesEventEvidenceType_withTrimmedWhitespace() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        EvidenceItemVO event = new EvidenceItemVO();
+        event.setEvidenceType("  事件  ");
+        event.setDescription("trimmed event evidence");
+        analysis.setEvidenceList(List.of(event));
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(40.0);
     }
 
     @Test
