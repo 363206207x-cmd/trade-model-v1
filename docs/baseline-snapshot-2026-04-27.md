@@ -20,6 +20,7 @@ Freeze the current stable repository baseline so future development and fixes ca
 
 ## Score-8 Rule Snapshot (Event Impact)
 
+- Rule card: `docs/score-8-event-impact-rule-card.md`
 - Base score: `50`.
 - Base penalty on event hit: `-10` (`eventFactHit=true` or event evidence fallback hit).
 - Extra penalty when `eventFactCount >= 3`: `-5`.
