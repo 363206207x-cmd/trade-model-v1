@@ -1,0 +1,19 @@
+# Maven/Java build output
+target/
+
+# Local Maven repositories/cache
+.m2-local/
+.m2/
+
+# IDE/editor metadata
+.idea/
+.vscode/
+*.iml
+
+# OS metadata
+.DS_Store
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
