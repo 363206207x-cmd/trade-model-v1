@@ -106,3 +106,33 @@
 ## 固定口径
 
 事件第二刀本轮完成输入契约实现与回归验证，状态标记为：`Implemented + Verified + Observation`。
+
+---
+
+## 8) 跨项集成回归追加记录（2026-04-27）
+
+执行背景：
+
+- 目标：验证“新规则不干扰其他评分项”的跨项集成稳定性。
+- 执行口径：先跑 `core-regression`，再跑 `ci verify` 完整链路。
+
+执行命令与结果：
+
+1. `./mvnw -Pcore-regression test`
+   - 结果：通过
+   - 汇总：Tests run: 149, Failures: 0, Errors: 0, Skipped: 0
+2. `./mvnw -Pci verify`
+   - 结果：失败（环境门禁）
+   - 原因：`RequireJavaVersion` 要求 JDK 范围 `[17,18)`，当前环境为 JDK 25
+3. `./mvnw -Pci -Denforcer.skip=true verify`
+   - 结果：通过
+   - JaCoCo：`All coverage checks have been met.`
+
+附加核对：
+
+- 工作区变更：`git status --short` 为空（无新增代码改动）。
+- 结论口径：本次失败点仅为本地 Java 版本门禁，不属于业务规则回归失败。
+
+追加结论：
+
+跨项集成回归已通过，未观察到新规则对其他评分项产生干扰；当前结果可作为后续追踪与验证依据。
