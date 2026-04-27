@@ -62,8 +62,11 @@ Darwin*)
   # See https://developer.apple.com/library/mac/qa/qa1170/_index.html
   if [ -z "$JAVA_HOME" ]; then
     if [ -x "/usr/libexec/java_home" ]; then
-      JAVA_HOME="$(/usr/libexec/java_home)"
-      export JAVA_HOME
+      # Suppress noisy stderr output from java_home when probing runtime.
+      JAVA_HOME="$(/usr/libexec/java_home 2>/dev/null || true)"
+      if [ -n "$JAVA_HOME" ]; then
+        export JAVA_HOME
+      fi
     else
       JAVA_HOME="/Library/Java/Home"
       export JAVA_HOME
