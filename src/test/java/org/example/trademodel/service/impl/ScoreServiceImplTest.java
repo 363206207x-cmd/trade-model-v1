@@ -729,6 +729,57 @@ class ScoreServiceImplTest {
     }
 
     @Test
+    void buildScoreList_keepsEventImpactSnapshot_stable_forRealisticAnalysisInputContractCase() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        analysis.setAnalysisId("analysis-btcusdt-20260427-1624-a");
+        analysis.setSymbol("BTCUSDT");
+        analysis.setTimeframe("1m");
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setEventFactHit(Boolean.TRUE);
+        input.setEventFactCount(4);
+        input.setEventLatestTime(LocalDateTime.of(2026, 4, 27, 16, 24, 0));
+        input.setEventReasonCode("CONFUSED_HIGH_MTF_MISALIGNED");
+        input.setEventTriggerType("LIQUIDATION_CASCADE");
+        input.setEventVersion(3);
+        input.setEventTraceId("trace-20260427-1624-a");
+        analysis.setEventImpactInput(input);
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(analysis.getAnalysisId()).isEqualTo("analysis-btcusdt-20260427-1624-a");
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(30.0);
+        assertThat(eventImpact.getDescription()).isEqualTo(
+                "基于现有 event evidence 命中的轻规则评分（单项负向惩罚，不等于事件系统完成，也不改变当前 decision 主路径） | 命中: "
+                        + "eventFactHit:hit:-10; eventFactCount>=3:-5; eventTriggerType=SEVERE:-5; "
+                        + "eventFactCount=4; eventLatestTime=2026-04-27T16:24; "
+                        + "eventReasonCode=CONFUSED_HIGH_MTF_MISALIGNED; eventTriggerType=LIQUIDATION_CASCADE; "
+                        + "eventVersion=3; eventTraceId=trace-20260427-1624-a");
+    }
+
+    @Test
+    void buildScoreList_keepsEventImpactSnapshot_stable_forRealisticAnalysisEvidenceFallbackCase() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        analysis.setAnalysisId("analysis-ethusdt-20260427-1624-b");
+        analysis.setSymbol("ETHUSDT");
+        analysis.setTimeframe("5m");
+        EvidenceItemVO event = new EvidenceItemVO();
+        event.setEvidenceType("  事件  ");
+        event.setDescription("fallback event hit for realistic snapshot");
+        analysis.setEvidenceList(List.of(event));
+
+        ScoreItemVO eventImpact = pickByType(service.buildScoreList(analysis, new MarketEnvironmentVO()), "事件冲击分");
+
+        assertThat(analysis.getAnalysisId()).isEqualTo("analysis-ethusdt-20260427-1624-b");
+        assertThat(eventImpact).isNotNull();
+        assertThat(eventImpact.getScoreValue()).isEqualTo(40.0);
+        assertThat(eventImpact.getDescription()).isEqualTo(
+                "基于现有 event evidence 命中的轻规则评分（单项负向惩罚，不等于事件系统完成，也不改变当前 decision 主路径） | 命中: eventEvidence=hit:-10");
+    }
+
+    @Test
     void buildScoreList_appliesExtraEventImpactPenalty_whenEventFactCountAtLeast3() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
