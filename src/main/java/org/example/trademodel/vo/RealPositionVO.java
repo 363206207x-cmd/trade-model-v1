@@ -5,7 +5,12 @@ import java.time.LocalDateTime;
 
 public class RealPositionVO {
 
+    // position_id: 对外关闭接口入参/响应使用
+    private String positionId;
+
     private String symbol;
+    private String sourceType;
+    private String sourceName;
     private String positionSide;
     private BigDecimal avgOpenPrice;
     private LocalDateTime positionOpenTime;
@@ -16,12 +21,38 @@ public class RealPositionVO {
     private BigDecimal breakEvenPrice;
     private BigDecimal liquidationPrice;
 
+    private LocalDateTime updateTime;
+
+    public String getPositionId() {
+        return positionId;
+    }
+
+    public void setPositionId(String positionId) {
+        this.positionId = positionId;
+    }
+
     public String getSymbol() {
         return symbol;
     }
 
     public void setSymbol(String symbol) {
         this.symbol = symbol;
+    }
+
+    public String getSourceType() {
+        return sourceType;
+    }
+
+    public void setSourceType(String sourceType) {
+        this.sourceType = sourceType;
+    }
+
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
     }
 
     public String getPositionSide() {
@@ -94,5 +125,13 @@ public class RealPositionVO {
 
     public void setLiquidationPrice(BigDecimal liquidationPrice) {
         this.liquidationPrice = liquidationPrice;
+    }
+
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(LocalDateTime updateTime) {
+        this.updateTime = updateTime;
     }
 }

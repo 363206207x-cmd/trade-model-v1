@@ -15,11 +15,18 @@ import java.util.List;
 public interface RealPositionMapper {
 
     @Select("SELECT symbol, position_side AS positionSide, avg_open_price AS avgOpenPrice, " +
+            "position_id AS positionId, source_type AS sourceType, source_name AS sourceName, " +
             "position_open_time AS positionOpenTime, position_quantity AS positionQuantity, " +
             "unrealized_pnl_pct AS unrealizedPnlPct, position_status AS positionStatus, mark_price AS markPrice, " +
-            "break_even_price AS breakEvenPrice, liquidation_price AS liquidationPrice " +
+            "break_even_price AS breakEvenPrice, liquidation_price AS liquidationPrice, " +
+            "update_time AS updateTime " +
             "FROM tm_real_position WHERE position_status = 'OPEN'")
     List<RealPositionVO> findOpenPositions();
+
+    @Select("SELECT COUNT(*) FROM tm_real_position " +
+            "WHERE position_status = 'OPEN' AND symbol = #{symbol} " +
+            "AND source_type = 'MANUAL_INPUT' AND source_name = 'USER_MANUAL'")
+    int countOpenManualPositionsBySymbol(@Param("symbol") String symbol);
 
     @Select("SELECT COUNT(*) FROM tm_real_position WHERE position_status = 'OPEN'")
     int countOpenPositions();
@@ -34,7 +41,8 @@ public interface RealPositionMapper {
             "position_quantity = #{positionQuantity}, unrealized_pnl_pct = #{unrealizedPnlPct}, " +
             "position_status = 'OPEN', mark_price = #{markPrice}, break_even_price = #{breakEvenPrice}, " +
             "liquidation_price = #{liquidationPrice}, update_time = #{updateTime} " +
-            "WHERE symbol = #{symbol} AND position_status = 'OPEN'")
+            "WHERE symbol = #{symbol} AND position_status = 'OPEN' " +
+            "AND NOT (source_type = 'MANUAL_INPUT' AND source_name = 'USER_MANUAL')")
     int updateOpenPositionBySymbol(@Param("symbol") String symbol,
                                    @Param("sourceType") String sourceType,
                                    @Param("sourceName") String sourceName,
@@ -73,6 +81,7 @@ public interface RealPositionMapper {
             "UPDATE tm_real_position " +
             "SET position_status = 'CLOSED', update_time = #{updateTime} " +
             "WHERE position_status = 'OPEN' " +
+            "AND NOT (source_type = 'MANUAL_INPUT' AND source_name = 'USER_MANUAL') " +
             "<if test='symbols != null and symbols.size() > 0'>" +
             "AND symbol NOT IN " +
             "<foreach collection='symbols' item='item' open='(' separator=',' close=')'>" +
@@ -82,4 +91,41 @@ public interface RealPositionMapper {
             "</script>")
     int closeMissingOpenPositions(@Param("symbols") List<String> symbols,
                                   @Param("updateTime") LocalDateTime updateTime);
+
+    @Update("UPDATE tm_real_position " +
+            "SET position_status = 'CLOSED', update_time = #{updateTime} " +
+            "WHERE position_id = #{positionId} " +
+            "AND position_status = 'OPEN' " +
+            "AND source_type = 'MANUAL_INPUT' " +
+            "AND source_name = 'USER_MANUAL'")
+    int closeManualPositionById(@Param("positionId") String positionId,
+                                  @Param("updateTime") LocalDateTime updateTime);
+
+    @Select("SELECT position_id AS positionId, symbol, source_type AS sourceType, source_name AS sourceName, " +
+            "position_side AS positionSide, avg_open_price AS avgOpenPrice, position_open_time AS positionOpenTime, " +
+            "position_quantity AS positionQuantity, unrealized_pnl_pct AS unrealizedPnlPct, " +
+            "position_status AS positionStatus, mark_price AS markPrice, break_even_price AS breakEvenPrice, " +
+            "liquidation_price AS liquidationPrice, update_time AS updateTime " +
+            "FROM tm_real_position WHERE position_id = #{positionId} AND position_status = 'OPEN'")
+    RealPositionVO selectOpenPositionById(@Param("positionId") String positionId);
+
+    @Select("SELECT position_id AS positionId, symbol, source_type AS sourceType, source_name AS sourceName, " +
+            "position_side AS positionSide, avg_open_price AS avgOpenPrice, position_open_time AS positionOpenTime, " +
+            "position_quantity AS positionQuantity, unrealized_pnl_pct AS unrealizedPnlPct, " +
+            "position_status AS positionStatus, mark_price AS markPrice, break_even_price AS breakEvenPrice, " +
+            "liquidation_price AS liquidationPrice, update_time AS updateTime " +
+            "FROM tm_real_position WHERE position_id = #{positionId} LIMIT 1")
+    RealPositionVO selectPositionById(@Param("positionId") String positionId);
+
+    @Select("SELECT position_id AS positionId, symbol, source_type AS sourceType, source_name AS sourceName, " +
+            "position_side AS positionSide, avg_open_price AS avgOpenPrice, position_open_time AS positionOpenTime, " +
+            "position_quantity AS positionQuantity, unrealized_pnl_pct AS unrealizedPnlPct, " +
+            "position_status AS positionStatus, mark_price AS markPrice, break_even_price AS breakEvenPrice, " +
+            "liquidation_price AS liquidationPrice, update_time AS updateTime " +
+            "FROM tm_real_position " +
+            "WHERE UPPER(TRIM(symbol)) = #{symbol} " +
+            "AND source_type = 'MANUAL_INPUT' " +
+            "AND source_name = 'USER_MANUAL' " +
+            "AND position_status = 'OPEN'")
+    List<RealPositionVO> selectOpenManualPositionsBySymbol(@Param("symbol") String symbol);
 }

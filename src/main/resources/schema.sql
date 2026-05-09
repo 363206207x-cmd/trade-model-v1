@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     position_suggestion VARCHAR(100),
     account_risk_json TEXT,
     invalid_condition TEXT,
+    plan_boundary_json TEXT,
     create_time TIMESTAMP
 );
 
@@ -368,3 +369,74 @@ CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_symbol_event_time ON tm_hot_re
 -- tm_asset_state 语义：每个 symbol 当前仅一行（会被后续分析覆盖更新）。
 -- hot_reset_* / pre_reset_state / post_reset_state 记录的是该行最近一次 Hot Reset 元数据，
 -- 不是按 analysis_id 归档的事件流水；review 仅做当前行解释展示。
+
+-- P-track manual position monitor records
+CREATE TABLE IF NOT EXISTS tm_position_monitor_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    position_id VARCHAR(64) NOT NULL,
+    symbol VARCHAR(32) NOT NULL,
+    position_side VARCHAR(16),
+    entry_price DECIMAL(20, 8),
+    mark_price DECIMAL(20, 8),
+    unrealized_pnl_pct DECIMAL(20, 8),
+    monitor_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    latest_analysis_id VARCHAR(64),
+    latest_decision_id VARCHAR(64),
+    latest_execution_plan_id VARCHAR(64),
+    market_bias_hierarchy VARCHAR(32),
+    confidence_level VARCHAR(32),
+    risk_level VARCHAR(32),
+    recommended_action VARCHAR(64),
+    plan_boundary_json CLOB,
+    plan_boundary_display_json CLOB,
+    review_entry_status VARCHAR(32),
+    risk_action_guard_status VARCHAR(32),
+    monitor_summary CLOB,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_record_position_id_monitor_time
+    ON tm_position_monitor_record(position_id, monitor_time DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_record_symbol_monitor_time
+    ON tm_position_monitor_record(symbol, monitor_time DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_record_review_entry_status
+    ON tm_position_monitor_record(review_entry_status);
+
+-- P-track manual position trade close results
+CREATE TABLE IF NOT EXISTS tm_position_trade_result (
+    result_id VARCHAR(64) PRIMARY KEY,
+    position_id VARCHAR(64) NOT NULL,
+    symbol VARCHAR(32) NOT NULL,
+    position_side VARCHAR(16),
+    source_type VARCHAR(32),
+    source_name VARCHAR(64),
+    open_time TIMESTAMP,
+    close_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    entry_price DECIMAL(20, 8),
+    close_price DECIMAL(20, 8),
+    quantity DECIMAL(20, 8),
+    realized_pnl_pct DECIMAL(20, 8),
+    realized_pnl_amount DECIMAL(20, 8),
+    close_reason VARCHAR(128),
+    close_note CLOB,
+    linked_analysis_id VARCHAR(64),
+    linked_decision_id VARCHAR(64),
+    linked_execution_plan_id VARCHAR(64),
+    review_status VARCHAR(32) DEFAULT 'PENDING',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_trade_result_position_id
+    ON tm_position_trade_result(position_id);
+
+CREATE INDEX IF NOT EXISTS idx_trade_result_symbol_close_time
+    ON tm_position_trade_result(symbol, close_time DESC);
+
+CREATE INDEX IF NOT EXISTS idx_trade_result_linked_analysis_id
+    ON tm_position_trade_result(linked_analysis_id);
+
+CREATE INDEX IF NOT EXISTS idx_trade_result_review_status
+    ON tm_position_trade_result(review_status);
+

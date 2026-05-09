@@ -61,6 +61,24 @@ public interface DecisionResultMapper {
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
+            NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(d.invalid_condition), '') <> '' THEN ' | ' ELSE '' END || COALESCE(d.invalid_condition, '')), '') AS executionPlanSummary
+            FROM tm_decision_result d
+            WHERE UPPER(TRIM(d.symbol)) = #{normalizedSymbol}
+            ORDER BY d.create_time DESC
+            LIMIT 1
+            """)
+    DecisionResultVO findLatestDecisionResultBaseBySymbol(@Param("normalizedSymbol") String normalizedSymbol);
+
+    @Select("""
+            SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
+            d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
+            d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
+            d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
+            d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
+            d.is_adopted AS isAdopted, d.valid_period AS validPeriod, d.invalid_condition AS invalidCondition,
+            d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
+            d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
             NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(d.invalid_condition), '') <> '' THEN ' | ' ELSE '' END || COALESCE(d.invalid_condition, '')), '') AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
             p.plan_mode AS planMode,
@@ -91,6 +109,15 @@ public interface DecisionResultMapper {
 
     @Select("SELECT * FROM tm_decision_result WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
     DecisionResult selectLatestByAnalysisId(String analysisId);
+
+    @Select("""
+            SELECT analysis_id
+            FROM tm_decision_result
+            WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol}
+            ORDER BY create_time DESC, decision_id DESC
+            LIMIT 1
+            """)
+    String selectLatestAnalysisIdBySymbol(@Param("normalizedSymbol") String normalizedSymbol);
 
     /**
      * OPEN 持仓（每 symbol 一条代表行，多条 OPEN 时按 position_id 取首条）与每 symbol 最新决策（create_time DESC，并列时 decision_id DESC）；

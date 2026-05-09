@@ -13,6 +13,7 @@ public class ExecutionPlanDO {
     private String positionSuggestion;
     private String accountRiskJson;
     private String invalidCondition;
+    private String planBoundaryJson;
     private LocalDateTime createTime;
 
     public String getPlanId() { return planId; }
@@ -37,6 +38,8 @@ public class ExecutionPlanDO {
     public void setAccountRiskJson(String accountRiskJson) { this.accountRiskJson = accountRiskJson; }
     public String getInvalidCondition() { return invalidCondition; }
     public void setInvalidCondition(String invalidCondition) { this.invalidCondition = invalidCondition; }
+    public String getPlanBoundaryJson() { return planBoundaryJson; }
+    public void setPlanBoundaryJson(String planBoundaryJson) { this.planBoundaryJson = planBoundaryJson; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }
