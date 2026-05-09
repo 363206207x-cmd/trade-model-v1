@@ -2,12 +2,15 @@ package org.example.trademodel.service.impl;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.math.BigDecimal;
 import java.util.StringJoiner;
 
 import org.example.trademodel.common.EvidenceTypeConstants;
+import org.example.trademodel.entity.ScoreItemDO;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -15,6 +18,7 @@ import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreBriefVO;
+import org.example.trademodel.vo.ScoreEightItemVO;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.springframework.stereotype.Service;
 
@@ -105,6 +109,30 @@ public class ScoreServiceImpl implements ScoreService {
     private static final double EVENT_IMPACT_ELEVATED_RISK_EXTRA_PENALTY = 5.0;
     private static final double EVENT_IMPACT_CROWDING_EXTRA_PENALTY = 5.0;
 
+    /**
+     * 八槽读模型固定顺序（与 {@link #buildScoreList} 的内存列表顺序无关）。
+     */
+    private static final ScoreEightSlotDef[] SCORE_EIGHT_SLOT_ORDER = {
+            new ScoreEightSlotDef("TREND_STRUCTURE", TREND_SCORE_TYPE),
+            new ScoreEightSlotDef("CAPITAL_PUSH", FUNDING_SCORE_TYPE),
+            new ScoreEightSlotDef("LEVERAGE_RISK", LEVERAGE_RISK_SCORE_TYPE),
+            new ScoreEightSlotDef("LIQUIDITY_QUALITY", LIQUIDITY_QUALITY_SCORE_TYPE),
+            new ScoreEightSlotDef("SENTIMENT_TEMPERATURE", SENTIMENT_TEMPERATURE_SCORE_TYPE),
+            new ScoreEightSlotDef("EVENT_IMPACT", EVENT_IMPACT_SCORE_TYPE),
+            new ScoreEightSlotDef("MACRO_ENVIRONMENT", MACRO_ENVIRONMENT_SCORE_TYPE),
+            new ScoreEightSlotDef("COMPOSITE_CREDIBILITY", CREDIBILITY_SCORE_TYPE),
+    };
+
+    private static final class ScoreEightSlotDef {
+        private final String slotKey;
+        private final String label;
+
+        private ScoreEightSlotDef(String slotKey, String label) {
+            this.slotKey = slotKey;
+            this.label = label;
+        }
+    }
+
     private final ScoreItemMapper scoreItemMapper;
 
     public ScoreServiceImpl(ScoreItemMapper scoreItemMapper) {
@@ -187,6 +215,79 @@ public class ScoreServiceImpl implements ScoreService {
         }
         List<ScoreBriefVO> rows = scoreItemMapper.selectTop3BriefByAnalysisId(analysisId.trim());
         return rows != null ? rows : Collections.emptyList();
+    }
+
+    @Override
+    public List<ScoreEightItemVO> listScoreEightItemsByAnalysisId(String analysisId) {
+        if (analysisId == null || analysisId.isBlank()) {
+            return buildEightSlotsAllMissing("无 analysisId");
+        }
+        String trimmed = analysisId.trim();
+        List<ScoreItemDO> rows = scoreItemMapper.selectAllByAnalysisId(trimmed);
+        if (rows == null) {
+            rows = Collections.emptyList();
+        }
+        /*
+         * 同一 score_type 多条时：当前表无 update_time，暂以 score_id 字符串比较保留字典序较大的一条，
+         * 仅作确定性去重，不代表业务时间顺序。
+         */
+        Map<String, ScoreItemDO> bestByScoreType = new HashMap<>();
+        for (ScoreItemDO row : rows) {
+            if (row == null || row.getScoreType() == null || row.getScoreType().isBlank()) {
+                continue;
+            }
+            String typeKey = row.getScoreType().trim();
+            ScoreItemDO existing = bestByScoreType.get(typeKey);
+            if (existing == null || compareScoreIdForDedup(row.getScoreId(), existing.getScoreId()) > 0) {
+                bestByScoreType.put(typeKey, row);
+            }
+        }
+        List<ScoreEightItemVO> out = new ArrayList<>(SCORE_EIGHT_SLOT_ORDER.length);
+        for (int i = 0; i < SCORE_EIGHT_SLOT_ORDER.length; i++) {
+            ScoreEightSlotDef def = SCORE_EIGHT_SLOT_ORDER[i];
+            ScoreEightItemVO vo = new ScoreEightItemVO();
+            vo.setSlotKey(def.slotKey);
+            vo.setDisplayName(def.label);
+            vo.setOrder(i + 1);
+            ScoreItemDO hit = bestByScoreType.get(def.label);
+            if (hit != null) {
+                vo.setStatus("present");
+                vo.setScoreType(hit.getScoreType());
+                vo.setScoreValue(hit.getScoreValue());
+                vo.setWeight(hit.getWeight());
+                vo.setDirection(hit.getDirection());
+                vo.setDescription(hit.getDescription());
+                vo.setMissingReason(null);
+            } else {
+                vo.setStatus("missing");
+                vo.setScoreType(def.label);
+                vo.setMissingReason("该 analysis 无此维度评分记录");
+            }
+            out.add(vo);
+        }
+        return out;
+    }
+
+    private static List<ScoreEightItemVO> buildEightSlotsAllMissing(String missingReason) {
+        List<ScoreEightItemVO> out = new ArrayList<>(SCORE_EIGHT_SLOT_ORDER.length);
+        for (int i = 0; i < SCORE_EIGHT_SLOT_ORDER.length; i++) {
+            ScoreEightSlotDef def = SCORE_EIGHT_SLOT_ORDER[i];
+            ScoreEightItemVO vo = new ScoreEightItemVO();
+            vo.setSlotKey(def.slotKey);
+            vo.setDisplayName(def.label);
+            vo.setOrder(i + 1);
+            vo.setStatus("missing");
+            vo.setScoreType(def.label);
+            vo.setMissingReason(missingReason);
+            out.add(vo);
+        }
+        return out;
+    }
+
+    private static int compareScoreIdForDedup(String a, String b) {
+        String sa = a != null ? a : "";
+        String sb = b != null ? b : "";
+        return sa.compareTo(sb);
     }
 
     private double computeTrendStructureScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {

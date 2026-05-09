@@ -8,6 +8,7 @@ public class DashboardDetailResponseVO {
     private MarketEnvironmentMiniVO marketEnvironmentMini;
     private List<EvidenceBriefVO> evidenceTopItems;
     private List<ScoreBriefVO> scoreTopItems;
+    private List<ScoreEightItemVO> scoreEightItems;
 
     public String getSymbol() {
         return symbol;
@@ -47,6 +48,14 @@ public class DashboardDetailResponseVO {
 
     public void setScoreTopItems(List<ScoreBriefVO> scoreTopItems) {
         this.scoreTopItems = scoreTopItems;
+    }
+
+    public List<ScoreEightItemVO> getScoreEightItems() {
+        return scoreEightItems;
+    }
+
+    public void setScoreEightItems(List<ScoreEightItemVO> scoreEightItems) {
+        this.scoreEightItems = scoreEightItems;
     }
 
     public static class MarketEnvironmentMiniVO {

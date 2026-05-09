@@ -8,6 +8,7 @@ import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreBriefVO;
+import org.example.trademodel.vo.ScoreEightItemVO;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.RuntimeMetricService;
@@ -130,6 +131,7 @@ public class DashboardController {
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
         body.setScoreTopItems(resolveScoreTopItems(body));
+        body.setScoreEightItems(resolveScoreEightItems(body));
         runtimeMetricService.recordDuration("dashboard.detail", System.currentTimeMillis() - methodStart);
         return body;
     }
@@ -155,6 +157,21 @@ public class DashboardController {
             return Collections.emptyList();
         }
         List<ScoreBriefVO> rows = scoreService.listTopScoreBriefByAnalysisId(analysisId);
+        return rows != null ? rows : Collections.emptyList();
+    }
+
+    private List<ScoreEightItemVO> resolveScoreEightItems(DashboardDetailResponseVO body) {
+        if (scoreService == null) {
+            return Collections.emptyList();
+        }
+        String analysisId = null;
+        if (body != null && body.getDecision() != null) {
+            String raw = body.getDecision().getAnalysisId();
+            if (raw != null && !raw.isBlank()) {
+                analysisId = raw.trim();
+            }
+        }
+        List<ScoreEightItemVO> rows = scoreService.listScoreEightItemsByAnalysisId(analysisId);
         return rows != null ? rows : Collections.emptyList();
     }
 
