@@ -531,6 +531,181 @@
             border-radius: 50%;
             background: var(--status-ok);
         }
+        .position-monitor-table-wrap {
+            width: 100%;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        /* Position monitor native table final style */
+        .position-monitor-table-native {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0 6px;
+        }
+
+        .position-monitor-table-native th,
+        .position-monitor-table-native td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-sizing: border-box;
+        }
+
+        .position-monitor-table-native th {
+            height: 24px;
+            padding: 0 8px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 18px;
+            text-align: left;
+        }
+
+        .position-monitor-table-native td {
+            height: 36px;
+            padding: 0 8px;
+            font-size: 12px;
+            line-height: 18px;
+            vertical-align: middle;
+            border-top: 1px solid rgba(148, 163, 184, 0.22);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+            background: #fff;
+        }
+
+        .position-monitor-table-native td:first-child {
+            border-left: 1px solid rgba(148, 163, 184, 0.22);
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+            position: relative;
+            padding-left: 12px;
+        }
+
+        .position-monitor-table-native td:first-child::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 7px;
+            bottom: 7px;
+            width: 3px;
+            border-radius: 999px;
+            background: #94a3b8;
+        }
+
+        .position-monitor-table-native tr.severity-danger td:first-child::before {
+            background: #ff3b30;
+        }
+
+        .position-monitor-table-native tr.severity-warning td:first-child::before {
+            background: #ff9500;
+        }
+
+        .position-monitor-table-native tr.severity-normal td:first-child::before {
+            background: #34c759;
+        }
+
+        .position-monitor-table-native tr.severity-neutral td:first-child::before {
+            background: #94a3b8;
+        }
+
+        .position-monitor-table-native td:last-child {
+            border-right: 1px solid rgba(148, 163, 184, 0.22);
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        .position-monitor-table-native .pm-symbol {
+            font-weight: 700;
+        }
+
+        .position-monitor-table-native th:nth-child(1),
+        .position-monitor-table-native td:nth-child(1) {
+            text-align: left;
+        }
+
+        .position-monitor-table-native th:nth-child(2),
+        .position-monitor-table-native td:nth-child(2),
+        .position-monitor-table-native th:nth-child(5),
+        .position-monitor-table-native td:nth-child(5),
+        .position-monitor-table-native th:nth-child(6),
+        .position-monitor-table-native td:nth-child(6),
+        .position-monitor-table-native th:nth-child(7),
+        .position-monitor-table-native td:nth-child(7),
+        .position-monitor-table-native th:nth-child(8),
+        .position-monitor-table-native td:nth-child(8),
+        .position-monitor-table-native th:nth-child(9),
+        .position-monitor-table-native td:nth-child(9),
+        .position-monitor-table-native th:nth-child(10),
+        .position-monitor-table-native td:nth-child(10),
+        .position-monitor-table-native th:nth-child(11),
+        .position-monitor-table-native td:nth-child(11) {
+            text-align: center;
+        }
+
+        .position-monitor-table-native th:nth-child(3),
+        .position-monitor-table-native td:nth-child(3),
+        .position-monitor-table-native th:nth-child(4),
+        .position-monitor-table-native td:nth-child(4) {
+            text-align: left;
+        }
+
+        .position-monitor-table-native th:nth-child(12),
+        .position-monitor-table-native td:nth-child(12) {
+            text-align: right;
+        }
+
+        .position-monitor-table-native .pm-boundary-cell {
+            padding-left: 4px;
+            padding-right: 4px;
+        }
+
+        .position-monitor-table-native .pm-boundary-tag {
+            display: inline-block;
+            max-width: 56px;
+            padding: 2px 5px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            background: rgba(248, 250, 252, 0.75);
+            color: var(--text-secondary);
+            cursor: default;
+        }
+
+        .position-monitor-table-native .pm-boundary-tag.pm-boundary-missing {
+            opacity: 0.85;
+        }
+
+        .position-monitor-table-native .pm-row-actions {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .position-monitor-table-native .pm-row-actions .btn,
+        .position-monitor-table-native .pm-row-actions button {
+            width: 48px;
+            height: 26px;
+            padding: 3px 6px;
+            font-size: 12px;
+            line-height: 18px;
+            white-space: nowrap;
+            margin-left: 4px;
+        }
+
+        .position-monitor-table-native .position-monitor-empty-row td {
+            text-align: left;
+            color: var(--text-secondary);
+            border: 1px dashed rgba(148, 163, 184, 0.28);
+            border-radius: 10px;
+            background: rgba(248, 250, 252, 0.68);
+            padding: 10px 12px;
+        }
+
     </style>
 </head>
 <body>
@@ -1555,9 +1730,410 @@
             '<p class="detail-p muted" style="margin-top:10px;">执行要点（由决策有效窗口 + 失效条件派生）：' + escapeHtml(d.executionPlanSummary || "—") + "</p>";
     }
 
+    // 手动 OPEN 持仓监控：首页“已开仓监控（手动录入）”唯一真值来源
+    var positionMonitorOpenRows = [];
+    var positionMonitorOpenRowsLoading = false;
+
+    function loadPositionMonitorOpenRows() {
+        if (positionMonitorOpenRowsLoading) return Promise.resolve(positionMonitorOpenRows);
+        positionMonitorOpenRowsLoading = true;
+        return fetch("/api/position-monitor/open")
+            .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+            .then(function (pack) {
+                if (!pack.ok || !pack.body || pack.body.code !== 200) {
+                    var msg = pack.body && pack.body.msg ? pack.body.msg : "position monitor open load failed";
+                    throw new Error(msg);
+                }
+                positionMonitorOpenRows = Array.isArray(pack.body.data) ? pack.body.data : [];
+                return positionMonitorOpenRows;
+            })
+            .catch(function (e) {
+                // 不伪造数据：失败时保留旧状态（初始为空）
+                alert("持仓监控列表加载失败，请稍后重试");
+                throw e;
+            })
+            .finally(function () {
+                positionMonitorOpenRowsLoading = false;
+            });
+    }
+
+    function refreshPositionMonitorOpenRowsUI() {
+        try {
+            if (selectedSymbol) {
+                requestDetailForSelectedSymbol();
+                return;
+            }
+            if (!window.__lastLayer1State) return;
+            var st = window.__lastLayer1State;
+            renderLayer1(st.systemStatus, st.systemHealth, st.alerts, st.decisions, st.openPositionCount);
+        } catch (e) {
+            // ignore UI refresh errors
+        }
+    }
+
+    function ensureManualPositionModal() {
+        if (document.getElementById("manualPositionModal")) return;
+        var style = document.createElement("style");
+        style.textContent = [
+            "#manualPositionModalOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;}",
+            "#manualPositionModal{width:min(560px,100%);background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 14px 16px 14px;box-shadow:0 12px 30px rgba(0,0,0,0.25);}",
+            "#manualPositionModal .mp-row{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center;margin:10px 0;}",
+            "#manualPositionModal .mp-row label{color:var(--text-secondary);font-size:0.82rem;}",
+            "#manualPositionModal input, #manualPositionModal select{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary);font-size:0.86rem;}",
+            "#manualPositionModal .mp-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;}",
+            "#manualPositionModal .mp-error{color:var(--status-error);font-size:0.82rem;min-height:18px;}"
+        ].join("");
+        document.head.appendChild(style);
+
+        var html = [
+            '<div id="manualPositionModalOverlay" style="display:none;">',
+            '  <div id="manualPositionModal" role="dialog" aria-modal="true" aria-label="手动录入持仓">',
+            '    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">',
+            '      <div style="font-weight:700;">手动录入持仓</div>',
+            '      <button type="button" class="btn" id="mpCloseBtn" style="padding:6px 10px;">关闭</button>',
+            '    </div>',
+            '    <div class="mp-row"><label>币种</label><input id="mpSymbol" type="text" disabled value=""/></div>',
+            '    <div class="mp-row"><label>持仓方向</label><select id="mpPositionSide"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></div>',
+            '    <div class="mp-row"><label>开仓价</label><input id="mpAvgOpenPrice" type="number" step="any" min="0" value=""/></div>',
+            '    <div class="mp-row"><label>持仓数量</label><input id="mpPositionQuantity" type="number" step="any" min="0" value=""/></div>',
+            '    <div class="mp-error" id="mpErrorMsg"></div>',
+            '    <div class="mp-actions">',
+            '      <button type="button" class="btn" id="mpSaveBtn">保存</button>',
+            '    </div>',
+            '  </div>',
+            '</div>'
+        ].join("");
+        document.body.insertAdjacentHTML("beforeend", html);
+
+        document.getElementById("mpCloseBtn").addEventListener("click", function () {
+            closeManualPositionModal();
+        });
+        document.getElementById("manualPositionModalOverlay").addEventListener("click", function (e) {
+            if (e.target && e.target.id === "manualPositionModalOverlay") {
+                closeManualPositionModal();
+            }
+        });
+    }
+
+    function openManualPositionModal() {
+        ensureManualPositionModal();
+        var overlay = document.getElementById("manualPositionModalOverlay");
+        var symbolEl = document.getElementById("mpSymbol");
+        var errEl = document.getElementById("mpErrorMsg");
+        var sideEl = document.getElementById("mpPositionSide");
+        if (errEl) errEl.textContent = "";
+        var sym = (selectedSymbol || "").toString().toUpperCase();
+        symbolEl.value = sym || "";
+        sideEl.value = "LONG";
+        document.getElementById("mpAvgOpenPrice").value = "";
+        document.getElementById("mpPositionQuantity").value = "";
+        if (overlay) overlay.style.display = "flex";
+        try {
+            document.getElementById("mpAvgOpenPrice").focus();
+        } catch (e) {}
+    }
+
+    function closeManualPositionModal() {
+        var overlay = document.getElementById("manualPositionModalOverlay");
+        if (overlay) overlay.style.display = "none";
+    }
+
+    function ensureClosePositionModal() {
+        if (document.getElementById("closePositionModal")) return;
+        var style = document.createElement("style");
+        style.textContent = [
+            "#closePositionModalOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;}",
+            "#closePositionModal{width:min(620px,100%);background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:14px 14px 16px 14px;box-shadow:0 12px 30px rgba(0,0,0,0.25);}",
+            "#closePositionModal .cp-row{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:flex-start;margin:10px 0;}",
+            "#closePositionModal .cp-row label{color:var(--text-secondary);font-size:0.82rem;line-height:32px;}",
+            "#closePositionModal .cp-static{padding:7px 0;color:var(--text-primary);font-size:0.86rem;word-break:break-all;}",
+            "#closePositionModal input,#closePositionModal select,#closePositionModal textarea{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-primary);font-size:0.86rem;}",
+            "#closePositionModal textarea{min-height:72px;resize:vertical;}",
+            "#closePositionModal .cp-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;}",
+            "#closePositionModal .cp-error{color:var(--status-error);font-size:0.82rem;min-height:18px;}"
+        ].join("");
+        document.head.appendChild(style);
+
+        var html = [
+            '<div id="closePositionModalOverlay" style="display:none;">',
+            '  <div id="closePositionModal" role="dialog" aria-modal="true" aria-label="记录平仓">',
+            '    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">',
+            '      <div style="font-weight:700;">记录平仓</div>',
+            '    </div>',
+            '    <div class="cp-row"><label>positionId</label><div class="cp-static" id="cpPositionId">—</div></div>',
+            '    <div class="cp-row"><label>标的</label><div class="cp-static" id="cpSymbol">—</div></div>',
+            '    <div class="cp-row"><label>方向</label><div class="cp-static" id="cpPositionSide">—</div></div>',
+            '    <div class="cp-row"><label>开仓价</label><div class="cp-static" id="cpAvgOpenPrice">—</div></div>',
+            '    <div class="cp-row"><label>当前价</label><div class="cp-static" id="cpMarkPrice">—</div></div>',
+            '    <div class="cp-row"><label for="cpExitPrice">记录平仓价</label><input id="cpExitPrice" type="number" step="any" min="0" value="" required/></div>',
+            '    <div class="cp-row"><label for="cpCloseReason">记录平仓原因</label><select id="cpCloseReason"><option value="MANUAL_CLOSE">手动记录平仓</option><option value="STOP_LOSS">止损</option><option value="TAKE_PROFIT">止盈</option><option value="SYSTEM_SUGGESTED">参考监控判断后平仓（自述）</option><option value="PLAN_INVALID">计划失效</option><option value="OTHER">其他</option></select></div>',
+            '    <div class="cp-row"><label for="cpUserActionType">用户动作</label><select id="cpUserActionType"><option value="CLOSE">记录全部平仓</option><option value="REDUCE">减仓</option><option value="TIGHTEN_STOP">收紧止损</option><option value="MOVE_STOP">移动止损</option><option value="PARTIAL_TAKE_PROFIT">分批止盈</option><option value="HOLD">继续持有</option><option value="OTHER">其他</option></select></div>',
+            '    <div class="cp-row"><label for="cpUserRemark">备注</label><textarea id="cpUserRemark" placeholder="可选"></textarea></div>',
+            '    <div class="cp-error" id="closePositionError"></div>',
+            '    <div class="cp-actions">',
+            '      <button type="button" class="btn" id="cpCancelBtn">取消</button>',
+            '      <button type="button" class="btn" id="cpSaveBtn">保存平仓记录</button>',
+            '    </div>',
+            '  </div>',
+            '</div>'
+        ].join("");
+        document.body.insertAdjacentHTML("beforeend", html);
+
+        document.getElementById("cpCancelBtn").addEventListener("click", function () {
+            closeClosePositionModal();
+        });
+        document.getElementById("closePositionModalOverlay").addEventListener("click", function (e) {
+            if (e.target && e.target.id === "closePositionModalOverlay") {
+                closeClosePositionModal();
+            }
+        });
+    }
+
+    function closeClosePositionModal() {
+        var overlay = document.getElementById("closePositionModalOverlay");
+        if (overlay) overlay.style.display = "none";
+    }
+
+    function getPositionRowByPositionId(positionId) {
+        var target = String(positionId || "");
+        var list = Array.isArray(positionMonitorOpenRows) ? positionMonitorOpenRows : [];
+        for (var i = 0; i < list.length; i++) {
+            var row = list[i];
+            if (!row) continue;
+            var rowPositionId = row.positionId != null ? row.positionId : (row.position_id != null ? row.position_id : (row.id != null ? row.id : ""));
+            if (String(rowPositionId || "") === target) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    function openClosePositionModal(row) {
+        if (!row) return;
+        ensureClosePositionModal();
+        window.__closePositionModalRow = row;
+
+        var positionId = row.positionId != null ? row.positionId : row.position_id;
+        var positionSide = row.positionSide != null ? row.positionSide : row.position_side;
+        var avgOpenPrice = row.avgOpenPrice != null ? row.avgOpenPrice : row.avg_open_price;
+        var markPrice = row.markPrice != null ? row.markPrice : row.mark_price;
+        var defaultExitPrice = markPrice != null && markPrice !== "" ? Number(markPrice) : Number(avgOpenPrice);
+        var positionSideText = "—";
+        var normalizedPositionSide = positionSide != null ? String(positionSide).trim().toUpperCase() : "";
+        if (normalizedPositionSide === "LONG") positionSideText = "多";
+        if (normalizedPositionSide === "SHORT") positionSideText = "空";
+
+        document.getElementById("cpPositionId").textContent = String(positionId || "—");
+        document.getElementById("cpSymbol").textContent = String(row.symbol || "—");
+        document.getElementById("cpPositionSide").textContent = positionSideText;
+        document.getElementById("cpAvgOpenPrice").textContent = formatPrice(avgOpenPrice);
+        document.getElementById("cpMarkPrice").textContent = formatPrice(markPrice);
+        document.getElementById("cpExitPrice").value = isFinite(defaultExitPrice) && defaultExitPrice > 0 ? String(defaultExitPrice) : "";
+        document.getElementById("cpCloseReason").value = "MANUAL_CLOSE";
+        document.getElementById("cpUserActionType").value = "CLOSE";
+        document.getElementById("cpUserRemark").value = "";
+        document.getElementById("closePositionError").textContent = "";
+
+        var overlay = document.getElementById("closePositionModalOverlay");
+        if (overlay) overlay.style.display = "flex";
+        try {
+            document.getElementById("cpExitPrice").focus();
+        } catch (e) {}
+    }
+
+    function saveManualPositionFromModal() {
+        var symbol = (document.getElementById("mpSymbol").value || "").toString().trim().toUpperCase();
+        var positionSide = (document.getElementById("mpPositionSide").value || "").toString().trim().toUpperCase();
+        var avgOpenPriceRaw = document.getElementById("mpAvgOpenPrice").value;
+        var positionQuantityRaw = document.getElementById("mpPositionQuantity").value;
+
+        var errEl = document.getElementById("mpErrorMsg");
+        if (errEl) errEl.textContent = "";
+
+        if (!symbol) {
+            if (errEl) errEl.textContent = "请先选择标的（selectedSymbol 为空）。";
+            return;
+        }
+        if (positionSide !== "LONG" && positionSide !== "SHORT") {
+            if (errEl) errEl.textContent = "持仓方向必须为 LONG/SHORT。";
+            return;
+        }
+
+        var avgOpenPrice = Number(avgOpenPriceRaw);
+        if (!isFinite(avgOpenPrice) || avgOpenPrice <= 0) {
+            if (errEl) errEl.textContent = "开仓价 avgOpenPrice 必须 > 0。";
+            return;
+        }
+
+        var payload = {
+            symbol: symbol,
+            positionSide: positionSide,
+            avgOpenPrice: avgOpenPrice
+        };
+
+        if (positionQuantityRaw != null && String(positionQuantityRaw).trim() !== "") {
+            var positionQuantity = Number(positionQuantityRaw);
+            if (!isFinite(positionQuantity) || positionQuantity <= 0) {
+                if (errEl) errEl.textContent = "持仓数量 positionQuantity 必须 > 0（如填写）。";
+                return;
+            }
+            payload.positionQuantity = positionQuantity;
+        }
+
+        fetch("/api/positions/manual", {
+            method: "POST",
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        })
+            .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+            .then(function (pack) {
+                if (!pack.ok || !pack.body || pack.body.code !== 200) {
+                    var msg = pack.body && pack.body.msg ? pack.body.msg : "保存失败";
+                    throw new Error(msg);
+                }
+                closeManualPositionModal();
+                return loadPositionMonitorOpenRows().then(function () {
+                    refreshPositionMonitorOpenRowsUI();
+                });
+            })
+            .catch(function (e) {
+                if (errEl) errEl.textContent = e && e.message ? e.message : "保存失败";
+            });
+    }
+
+    function saveClosePositionFromModal() {
+        var row = window.__closePositionModalRow;
+        if (!row) return;
+
+        var positionId = row.positionId != null ? row.positionId : row.position_id;
+        if (!positionId) return;
+
+        var errEl = document.getElementById("closePositionError");
+        if (errEl) errEl.textContent = "";
+
+        var exitPriceRaw = document.getElementById("cpExitPrice").value;
+        var closeReason = (document.getElementById("cpCloseReason").value || "").toString().trim();
+        var userActionType = (document.getElementById("cpUserActionType").value || "").toString().trim();
+        var userRemark = (document.getElementById("cpUserRemark").value || "").toString();
+        var exitPrice = Number(exitPriceRaw);
+
+        if (!isFinite(exitPrice) || String(exitPriceRaw || "").trim() === "") {
+            if (errEl) errEl.textContent = "请填写记录平仓价。";
+            return;
+        }
+        if (exitPrice <= 0) {
+            if (errEl) errEl.textContent = "记录平仓价必须大于 0。";
+            return;
+        }
+
+        fetch("/api/positions/" + encodeURIComponent(positionId) + "/close", {
+            method: "POST",
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({
+                exitPrice: Number(exitPrice),
+                closeReason: closeReason,
+                userActionType: userActionType,
+                userRemark: userRemark
+            })
+        })
+            .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+            .then(function (pack) {
+                if (!pack.ok || !pack.body || pack.body.code !== 200) {
+                    throw new Error(pack.body && pack.body.msg ? pack.body.msg : "保存平仓记录失败");
+                }
+                closeClosePositionModal();
+                window.__closePositionModalRow = null;
+                return loadPositionMonitorOpenRows().then(function () {
+                    refreshPositionMonitorOpenRowsUI();
+                    alert("已记录平仓。");
+                });
+            })
+            .catch(function (e) {
+                if (errEl) errEl.textContent = e && e.message ? e.message : "网络错误，请稍后重试";
+            });
+    }
+
+    function escapeHtmlSafe(v) {
+        return String(v == null ? "" : v)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function pickPositionField(row, camel, snake) {
+        if (!row) return "";
+        if (row[camel] != null) return row[camel];
+        if (snake && row[snake] != null) return row[snake];
+        return "";
+    }
+
+    function positionMonitorDisplayText(v, fallback) {
+        if (v == null || String(v).trim() === "") return fallback || "—";
+        return String(v).trim();
+    }
+
+    function renderPositionMonitorRowHtml(row) {
+        var positionId = pickPositionField(row, "positionId", "position_id") || pickPositionField(row, "id", "id");
+        var symbol = pickPositionField(row, "symbol", "symbol");
+        var side = pickPositionField(row, "positionSide", "position_side");
+        var avgOpenPrice = pickPositionField(row, "avgOpenPrice", "avg_open_price");
+        var markPrice = pickPositionField(row, "markPrice", "mark_price");
+        var unrealizedPnl = pickPositionField(row, "unrealizedPnlPct", "unrealized_pnl_pct");
+        var latest = pickPositionField(row, "latestMonitorRecord", "latest_monitor_record");
+        var hasMonitor = !!latest;
+        var boundaryLabel = hasMonitor ? pickPositionField(latest, "boundaryStateLabel", "boundary_state_label") : "未返回";
+        var actionText = hasMonitor
+            ? pickPositionField(latest, "systemSuggestedAction", "system_suggested_action")
+            : "点击复查生成";
+        var riskText = hasMonitor ? pickPositionField(latest, "positionRiskLevel", "position_risk_level") : "暂无监控记录";
+        var entryText = hasMonitor ? pickPositionField(latest, "entryLogicState", "entry_logic_state") : "暂无监控记录";
+        var directionText = hasMonitor ? pickPositionField(latest, "directionSupportState", "direction_support_state") : "暂无监控记录";
+        var reversalText = hasMonitor ? pickPositionField(latest, "reversalState", "reversal_state") : "暂无监控记录";
+        var sideText = typeof positionSideText === "function" ? positionSideText(side) : positionMonitorDisplayText(side, "—");
+
+        return '<tr class="position-monitor-row severity-neutral" data-symbol="' + escapeHtmlSafe(symbol) + '" data-position-id="' + escapeHtmlSafe(positionId) + '">' +
+            '<td class="pm-symbol">' + escapeHtmlSafe(positionMonitorDisplayText(symbol, "—")) + '</td>' +
+            '<td class="pm-side">' + escapeHtmlSafe(sideText) + '</td>' +
+            '<td class="pm-open">' + escapeHtmlSafe(typeof formatPrice === "function" ? formatPrice(avgOpenPrice) : positionMonitorDisplayText(avgOpenPrice, "—")) + '</td>' +
+            '<td class="pm-mark">' + escapeHtmlSafe(typeof formatPrice === "function" ? formatPrice(markPrice) : positionMonitorDisplayText(markPrice, "—")) + '</td>' +
+            '<td class="pm-pnl">' + escapeHtmlSafe(typeof formatPct === "function" ? formatPct(unrealizedPnl) : positionMonitorDisplayText(unrealizedPnl, "—")) + '</td>' +
+            '<td class="pm-logic">' + escapeHtmlSafe(positionMonitorDisplayText(entryText, "暂无监控记录")) + '</td>' +
+            '<td class="pm-direction">' + escapeHtmlSafe(positionMonitorDisplayText(directionText, "暂无监控记录")) + '</td>' +
+            '<td class="pm-reversal">' + escapeHtmlSafe(positionMonitorDisplayText(reversalText, "暂无监控记录")) + '</td>' +
+            '<td class="pm-risk">' + escapeHtmlSafe(positionMonitorDisplayText(riskText, "暂无监控记录")) + '</td>' +
+            '<td class="pm-boundary-cell"><span class="pm-boundary-tag">' + escapeHtmlSafe(positionMonitorDisplayText(boundaryLabel, "未返回")) + '</span></td>' +
+            '<td class="pm-action">' + escapeHtmlSafe(positionMonitorDisplayText(actionText, "点击复查生成")) + '</td>' +
+            '<td class="pm-row-actions">' +
+            '<button type="button" class="btn" data-action="manual-run-position-monitor" data-position-id="' + escapeHtmlSafe(positionId) + '">复查</button>' +
+            '<button type="button" class="btn manual-close-position-btn" data-action="manual-close-position" data-position-id="' + escapeHtmlSafe(positionId) + '">记录平仓</button>' +
+            '</td>' +
+            '</tr>';
+    }
+
+    function renderPositionMonitorTableHtml() {
+        var list = Array.isArray(positionMonitorOpenRows) ? positionMonitorOpenRows.filter(function (row) { return !!row; }).slice(0, 5) : [];
+        var tbodyHtml = !list.length
+            ? '<tbody><tr class="position-monitor-empty-row"><td colspan="12">暂无手动录入持仓，录入后将在这里显示监控行。</td></tr></tbody>'
+            : '<tbody>' + list.map(renderPositionMonitorRowHtml).join("") + '</tbody>';
+        return '<div class="position-monitor-table-wrap">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 10px 0;">' +
+            '<p class="detail-p muted" style="margin:0;">手动录入持仓后，本区展示持仓事实和监控判断。</p>' +
+            '<button type="button" class="btn manual-position-entry-btn">手动录入持仓</button>' +
+            '</div>' +
+            '<table class="position-monitor-table-native">' +
+            '<thead><tr>' +
+            '<th>标的</th><th>方向</th><th>开仓价</th><th>当前价</th><th>浮盈亏</th><th>入场状态</th>' +
+            '<th>方向支持</th><th>反转等级</th><th>风险等级</th><th>边界状态</th><th>人工处置参考</th><th>操作</th>' +
+            '</tr></thead>' + tbodyHtml + '</table></div>';
+    }
+
+
     function positionModule(d) {
+        var ptrackMonitorHtml = renderPositionMonitorTableHtml();
         if (!hasRealPositionDetail(d)) {
-            return '<p class="mod-title">持仓跟踪</p>' +
+            return '<p class="mod-title">持仓跟踪</p>' + ptrackMonitorHtml +
                 '<div class="side-note">当前无真实持仓记录。接入交易所实时持仓后，可在此持续跟踪开仓后逻辑是否反转、风险是否升高，以及是否仍支持继续持有。</div>' +
                 '<div class="detail-grid">' +
                 '<div class="kv"><span class="k">开仓方向</span><span class="v">—</span></div>' +
@@ -1577,7 +2153,7 @@
         var markPrice = d.markPrice != null ? d.markPrice : d.mark_price;
         var consistency = directionConsistencyText(d);
         var tag = positionHealthTag(d);
-        return '<p class="mod-title">持仓跟踪</p>' +
+        return '<p class="mod-title">持仓跟踪</p>' + ptrackMonitorHtml +
             '<div class="detail-grid">' +
             '<div class="kv"><span class="k">开仓方向</span><span class="v">' + escapeHtml(positionSideText(positionSide)) + "</span></div>" +
             '<div class="kv"><span class="k">开仓价格</span><span class="v">' + escapeHtml(formatPrice(openPrice)) + "</span></div>" +
@@ -1868,6 +2444,9 @@
                 requestDetailForSelectedSymbol();
                 document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchPositionProviderStatus();
+                loadPositionMonitorOpenRows()
+                    .then(function () { refreshPositionMonitorOpenRowsUI(); })
+                    .catch(function () {});
             })
             .catch(function () {
                 document.getElementById("lastUpdatedText").textContent = nowText();
@@ -1952,6 +2531,70 @@
         updateModeHint();
         buildDisplayList();
         renderTiles();
+    });
+
+    document.addEventListener("click", function (evt) {
+        var entryBtn = evt.target && evt.target.closest ? evt.target.closest(".manual-position-entry-btn") : null;
+        if (entryBtn) {
+            openManualPositionModal();
+            return;
+        }
+
+        var saveBtn = evt.target && evt.target.closest ? evt.target.closest("#mpSaveBtn") : null;
+        if (saveBtn) {
+            saveManualPositionFromModal();
+            return;
+        }
+
+        var closeSaveBtn = evt.target && evt.target.closest ? evt.target.closest("#cpSaveBtn") : null;
+        if (closeSaveBtn) {
+            saveClosePositionFromModal();
+            return;
+        }
+
+        var closeBtn = evt.target && evt.target.closest ? evt.target.closest("[data-action='manual-close-position']") : null;
+        if (closeBtn) {
+            evt.stopPropagation();
+            var positionId = closeBtn.getAttribute("data-position-id");
+            if (!positionId) {
+                var rowEl = closeBtn.closest(".position-monitor-row");
+                positionId = rowEl ? rowEl.getAttribute("data-position-id") : "";
+            }
+            var row = getPositionRowByPositionId(positionId);
+            if (!row) {
+                alert("未找到该持仓记录，请稍后刷新后重试。");
+                return;
+            }
+            openClosePositionModal(row);
+            return;
+        }
+
+        var monitorBtn = evt.target && evt.target.closest ? evt.target.closest("[data-action='manual-run-position-monitor']") : null;
+        if (monitorBtn) {
+            evt.stopPropagation();
+            var monitorPositionId = monitorBtn.getAttribute("data-position-id");
+            if (!monitorPositionId) {
+                var monitorRowEl = monitorBtn.closest(".position-monitor-row");
+                monitorPositionId = monitorRowEl ? monitorRowEl.getAttribute("data-position-id") : "";
+            }
+            if (!monitorPositionId) {
+                alert("无法识别该持仓ID，请刷新页面后重试。");
+                return;
+            }
+            fetch("/api/position-monitor/" + encodeURIComponent(monitorPositionId) + "/run", { method: "POST" })
+                .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+                .then(function (pack) {
+                    if (!pack.ok || !pack.body || pack.body.code !== 200) {
+                        throw new Error(pack.body && pack.body.msg ? pack.body.msg : "复查失败");
+                    }
+                    return loadPositionMonitorOpenRows().then(function () {
+                        refreshPositionMonitorOpenRowsUI();
+                    });
+                })
+                .catch(function (e) {
+                    alert(e && e.message ? e.message : "复查失败");
+                });
+        }
     });
 
     document.getElementById("helpBtn").addEventListener("click", function () {
