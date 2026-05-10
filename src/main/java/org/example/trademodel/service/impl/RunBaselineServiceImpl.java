@@ -63,6 +63,7 @@ public class RunBaselineServiceImpl implements RunBaselineService {
     public RunBaselineVO getRunBaseline(int windowMinutes) {
         long assembleStartMs = System.currentTimeMillis();
         int effectiveWindowMinutes = windowMinutes > 0 ? windowMinutes : DEFAULT_WINDOW_MINUTES;
+        LocalDateTime windowStartTime = LocalDateTime.now().minusMinutes(effectiveWindowMinutes);
 
         RunBaselineVO vo = new RunBaselineVO();
         vo.setGeneratedAt(LocalDateTime.now());
@@ -70,10 +71,10 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         vo.setSystemHealth(buildSystemHealthSnapshot());
         vo.setPositionSync(buildPositionSyncSnapshot());
         vo.setPerformance(buildPerformanceSummary(assembleStartMs));
-        vo.setAlertSummary(buildAlertSummary(effectiveWindowMinutes));
+        vo.setAlertSummary(buildAlertSummary(windowStartTime));
         vo.setDataQualitySummary(buildDataQualitySummary(effectiveWindowMinutes));
-        vo.setRecheckSummary(buildRecheckSummary(effectiveWindowMinutes));
-        vo.setHotResetSummary(buildHotResetSummary(effectiveWindowMinutes));
+        vo.setRecheckSummary(buildRecheckSummary(windowStartTime));
+        vo.setHotResetSummary(buildHotResetSummary(windowStartTime));
         return vo;
     }
 
@@ -141,13 +142,13 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.AlertSummary buildAlertSummary(int windowMinutes) {
-        int openCount = safeCount(monitorAlertMapper.countByStatusInWindow("OPEN", windowMinutes));
-        int suppressedCount = safeCount(monitorAlertMapper.countByStatusInWindow("SUPPRESSED", windowMinutes));
+    private RunBaselineVO.AlertSummary buildAlertSummary(LocalDateTime windowStartTime) {
+        int openCount = safeCount(monitorAlertMapper.countByStatusInWindow("OPEN", windowStartTime));
+        int suppressedCount = safeCount(monitorAlertMapper.countByStatusInWindow("SUPPRESSED", windowStartTime));
         int dataQualityOpenCount = safeCount(monitorAlertMapper.countByStatusAndTypeInWindow(
-                "OPEN", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, windowMinutes));
+                "OPEN", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, windowStartTime));
         int dataQualitySuppressedCount = safeCount(monitorAlertMapper.countByStatusAndTypeInWindow(
-                "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, windowMinutes));
+                "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, windowStartTime));
 
         RunBaselineVO.AlertSummary summary = new RunBaselineVO.AlertSummary();
         summary.setOpenCountWindow(openCount);
@@ -172,12 +173,12 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.RecheckSummary buildRecheckSummary(int windowMinutes) {
+    private RunBaselineVO.RecheckSummary buildRecheckSummary(LocalDateTime windowStartTime) {
         RunBaselineVO.RecheckSummary summary = new RunBaselineVO.RecheckSummary();
         LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
         int total = 0;
         for (RecheckStatusEnum statusEnum : RecheckStatusEnum.values()) {
-            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(statusEnum.name(), windowMinutes));
+            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(statusEnum.name(), windowStartTime));
             counts.put(statusEnum.name(), count);
             total += count;
         }
@@ -186,12 +187,12 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.HotResetSummary buildHotResetSummary(int windowMinutes) {
+    private RunBaselineVO.HotResetSummary buildHotResetSummary(LocalDateTime windowStartTime) {
         RunBaselineVO.HotResetSummary summary = new RunBaselineVO.HotResetSummary();
-        summary.setEventCountWindow(safeCount(hotResetEventMapper.countInWindow(windowMinutes)));
+        summary.setEventCountWindow(safeCount(hotResetEventMapper.countInWindow(windowStartTime)));
 
         LinkedHashMap<String, Integer> triggerTypeCounts = new LinkedHashMap<>();
-        List<KeyCountVO> rows = hotResetEventMapper.selectTriggerTypeCountsInWindow(windowMinutes);
+        List<KeyCountVO> rows = hotResetEventMapper.selectTriggerTypeCountsInWindow(windowStartTime);
         if (rows != null) {
             for (KeyCountVO row : rows) {
                 if (row == null || row.getKey() == null || row.getKey().trim().isEmpty()) {

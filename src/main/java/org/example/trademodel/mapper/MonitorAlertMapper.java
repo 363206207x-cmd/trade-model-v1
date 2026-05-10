@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.MonitorAlertDO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -26,22 +27,22 @@ public interface MonitorAlertMapper {
      */
     @Select("SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = 'OPEN' "
-            + "AND created_at >= DATEADD('MINUTE', -#{cooldownMinutes}, CURRENT_TIMESTAMP)")
+            + "AND created_at >= #{windowStartTime}")
     int countOpenInThrottleWindow(
             @Param("assetSymbol") String assetSymbol,
             @Param("alertType") String alertType,
-            @Param("cooldownMinutes") int cooldownMinutes);
+            @Param("windowStartTime") LocalDateTime windowStartTime);
 
     /**
      * 语义近似抑制：同一标的+同类告警在更长时间窗内出现过（无论 OPEN/SUPPRESSED），
      * 则本次可落 SUPPRESSED，减少短期同语义重复轰炸。
      */
     @Select("SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+            + "AND created_at >= #{semanticWindowStartTime}")
     int countAnyInSemanticWindow(
             @Param("assetSymbol") String assetSymbol,
             @Param("alertType") String alertType,
-            @Param("windowMinutes") int windowMinutes);
+            @Param("semanticWindowStartTime") LocalDateTime semanticWindowStartTime);
 
     /** 未删除记录按 created_at 倒序，最多 {@code limit} 条；时间列为格式化字符串。 */
     @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
@@ -75,15 +76,16 @@ public interface MonitorAlertMapper {
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    Integer countByStatusInWindow(@Param("status") String status, @Param("windowMinutes") int windowMinutes);
+            + "AND created_at >= #{windowStartTime}")
+    Integer countByStatusInWindow(@Param("status") String status,
+                                  @Param("windowStartTime") LocalDateTime windowStartTime);
 
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
             + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+            + "AND created_at >= #{windowStartTime}")
     Integer countByStatusAndTypeInWindow(@Param("status") String status,
                                          @Param("alertType") String alertType,
-                                         @Param("windowMinutes") int windowMinutes);
+                                         @Param("windowStartTime") LocalDateTime windowStartTime);
 }

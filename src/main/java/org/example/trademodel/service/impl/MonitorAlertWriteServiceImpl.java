@@ -161,8 +161,9 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime windowStartTime = now.minusMinutes(DEFAULT_ALERT_COOLDOWN_MINUTES);
         boolean windowHasOpen = monitorAlertMapper.countOpenInThrottleWindow(
-                symbol, alertType, DEFAULT_ALERT_COOLDOWN_MINUTES) > 0;
+                symbol, alertType, windowStartTime) > 0;
 
         if (windowHasOpen) {
             MonitorAlertDO suppressed = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);
@@ -175,8 +176,9 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
             return;
         }
 
+        LocalDateTime semanticWindowStartTime = now.minusMinutes(DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES);
         boolean semanticSimilarRecent = monitorAlertMapper.countAnyInSemanticWindow(
-                symbol, alertType, DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES) > 0;
+                symbol, alertType, semanticWindowStartTime) > 0;
         if (semanticSimilarRecent) {
             MonitorAlertDO suppressed = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);
             suppressed.setStatus("SUPPRESSED");

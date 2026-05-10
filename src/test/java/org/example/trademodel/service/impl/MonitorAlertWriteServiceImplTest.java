@@ -13,9 +13,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,8 +39,8 @@ class MonitorAlertWriteServiceImplTest {
     @Test
     void emitsOpenAlertWithCooldown_whenNoThrottleAndNoSemanticSuppress() {
         when(monitorAlertMapper.countByAnalysisIdAndAlertType(any(), any())).thenReturn(0);
-        when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), anyInt())).thenReturn(0);
-        when(monitorAlertMapper.countAnyInSemanticWindow(any(), any(), anyInt())).thenReturn(0);
+        when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), any(LocalDateTime.class))).thenReturn(0);
+        when(monitorAlertMapper.countAnyInSemanticWindow(any(), any(), any(LocalDateTime.class))).thenReturn(0);
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setRiskLevel("HIGH");
 
@@ -57,7 +58,7 @@ class MonitorAlertWriteServiceImplTest {
     @Test
     void emitsSuppressed_whenOpenExistsInThrottleWindow() {
         when(monitorAlertMapper.countByAnalysisIdAndAlertType(any(), any())).thenReturn(0);
-        when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), anyInt())).thenReturn(1);
+        when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), any(LocalDateTime.class))).thenReturn(1);
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setRiskLevel("HIGH");
 
@@ -74,8 +75,8 @@ class MonitorAlertWriteServiceImplTest {
     @Test
     void emitsConfluenceBreakdownAndSkipsOpenBlocked_familyDedup() {
         when(monitorAlertMapper.countByAnalysisIdAndAlertType(any(), any())).thenReturn(0);
-        when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), anyInt())).thenReturn(0);
-        when(monitorAlertMapper.countAnyInSemanticWindow(any(), any(), anyInt())).thenReturn(0);
+        when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), any(LocalDateTime.class))).thenReturn(0);
+        when(monitorAlertMapper.countAnyInSemanticWindow(any(), any(), any(LocalDateTime.class))).thenReturn(0);
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setAiConflictLevel("LEVEL_3");
         decision.setAiConflictScore(50);

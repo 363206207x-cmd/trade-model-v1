@@ -3,10 +3,13 @@ package org.example.trademodel.mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.vo.KeyCountVO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -26,13 +29,16 @@ public interface HotResetEventMapper {
     @Select("SELECT COUNT(*) FROM tm_hot_reset_event WHERE analysis_id = #{analysisId}")
     Integer countByAnalysisId(@Param("analysisId") String analysisId);
 
-    @Select("SELECT COUNT(*) FROM tm_hot_reset_event "
-            + "WHERE event_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    Integer countInWindow(@Param("windowMinutes") int windowMinutes);
+    @Select("SELECT COUNT(*) FROM tm_hot_reset_event WHERE event_time >= #{windowStartTime}")
+    Integer countInWindow(@Param("windowStartTime") LocalDateTime windowStartTime);
 
-    @Select("SELECT trigger_type AS key, COUNT(*) AS count "
+    @Select("SELECT trigger_type AS trig_key, COUNT(*) AS cnt "
             + "FROM tm_hot_reset_event "
-            + "WHERE event_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP) "
-            + "GROUP BY trigger_type ORDER BY COUNT(*) DESC, trigger_type ASC")
-    List<KeyCountVO> selectTriggerTypeCountsInWindow(@Param("windowMinutes") int windowMinutes);
+            + "WHERE event_time >= #{windowStartTime} "
+            + "GROUP BY trigger_type ORDER BY cnt DESC, trigger_type ASC")
+    @Results({
+            @Result(property = "key", column = "trig_key"),
+            @Result(property = "count", column = "cnt")
+    })
+    List<KeyCountVO> selectTriggerTypeCountsInWindow(@Param("windowStartTime") LocalDateTime windowStartTime);
 }
