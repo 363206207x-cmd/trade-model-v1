@@ -11,6 +11,7 @@ import org.example.trademodel.vo.ScoreBriefVO;
 import org.example.trademodel.vo.ScoreEightItemVO;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.PlanReadinessService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.SystemHealthService;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
@@ -49,6 +50,7 @@ public class DashboardController {
     private final MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
+    private final PlanReadinessService planReadinessService;
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -57,7 +59,8 @@ public class DashboardController {
                                RealMarketEnvironmentService realMarketEnvironmentService,
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
                                EvidenceService evidenceService,
-                               ScoreService scoreService) {
+                               ScoreService scoreService,
+                               PlanReadinessService planReadinessService) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -66,6 +69,7 @@ public class DashboardController {
         this.marketEnvironmentSnapshotMapper = marketEnvironmentSnapshotMapper;
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
+        this.planReadinessService = planReadinessService;
     }
 
     @GetMapping("/dashboard")
@@ -128,6 +132,7 @@ public class DashboardController {
         DashboardDetailResponseVO body = new DashboardDetailResponseVO();
         body.setSymbol(normalizedSymbol);
         body.setDecision(decisionService.getLatestDecisionResultBySymbol(normalizedSymbol));
+        body.setPlanReadiness(planReadinessService.derive(body.getDecision()));
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
         body.setScoreTopItems(resolveScoreTopItems(body));

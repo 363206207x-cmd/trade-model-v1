@@ -9,6 +9,7 @@ public class DashboardDetailResponseVO {
     private List<EvidenceBriefVO> evidenceTopItems;
     private List<ScoreBriefVO> scoreTopItems;
     private List<ScoreEightItemVO> scoreEightItems;
+    private PlanReadinessVO planReadiness;
 
     public String getSymbol() {
         return symbol;
@@ -56,6 +57,14 @@ public class DashboardDetailResponseVO {
 
     public void setScoreEightItems(List<ScoreEightItemVO> scoreEightItems) {
         this.scoreEightItems = scoreEightItems;
+    }
+
+    public PlanReadinessVO getPlanReadiness() {
+        return planReadiness;
+    }
+
+    public void setPlanReadiness(PlanReadinessVO planReadiness) {
+        this.planReadiness = planReadiness;
     }
 
     public static class MarketEnvironmentMiniVO {
