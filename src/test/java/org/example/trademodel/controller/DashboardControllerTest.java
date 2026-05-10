@@ -28,8 +28,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -38,6 +41,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.util.StreamUtils;
 
 @ExtendWith(MockitoExtension.class)
 @Tag("smoke")
@@ -321,6 +325,44 @@ class DashboardControllerTest {
 
         verify(decisionService).getLatestDecisionResults(12);
         verify(runtimeMetricService).recordDuration(eq("dashboard.refresh"), anyLong());
+    }
+
+    @Test
+    void dashboard_template_keeps_conflict_confused_display_guardrails() throws Exception {
+        String tpl;
+        try (var in = DashboardControllerTest.class.getResourceAsStream("/templates/dashboard.html")) {
+            assertTrue(in != null, "dashboard.html template must exist");
+            tpl = StreamUtils.copyToString(in, StandardCharsets.UTF_8);
+        }
+
+        assertFalse(tpl.contains(">= 80"));
+        assertFalse(tpl.contains(">=80"));
+        assertFalse(tpl.contains(">= 60"));
+        assertFalse(tpl.contains(">=60"));
+        assertFalse(tpl.contains(">= 35"));
+        assertFalse(tpl.contains(">=35"));
+        assertFalse(tpl.contains("isConfused: s > 0"));
+        assertTrue(tpl.contains("冲突等级未知") || tpl.contains("待后端确认"));
+        assertFalse(tpl.contains("可执行信号"));
+        assertFalse(tpl.contains("已下单"));
+        assertFalse(tpl.contains("自动执行"));
+        assertFalse(tpl.contains("系统自动反手"));
+        assertFalse(tpl.contains("触发自动反手"));
+        assertFalse(tpl.contains("自动执行反手"));
+        assertFalse(tpl.contains("自动反向开仓"));
+        assertFalse(tpl.contains("系统自动下单"));
+        assertFalse(tpl.contains("触发自动下单"));
+        assertFalse(tpl.contains("自动执行下单"));
+        assertFalse(tpl.contains("系统自动平仓"));
+        assertFalse(tpl.contains("系统触发自动平仓"));
+        assertFalse(tpl.contains("触发自动平仓操作"));
+        assertFalse(tpl.contains("触发自动平仓指令"));
+        assertFalse(tpl.contains("自动执行平仓"));
+
+        assertTrue(tpl.contains("不触发自动平仓"));
+        assertTrue(tpl.contains("不自动下单"));
+        assertTrue(tpl.contains("不自动平仓"));
+        assertTrue(tpl.contains("不自动反手"));
     }
 
     private void stubSummaryData() {
