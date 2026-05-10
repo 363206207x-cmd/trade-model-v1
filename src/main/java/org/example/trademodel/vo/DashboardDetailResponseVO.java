@@ -10,6 +10,7 @@ public class DashboardDetailResponseVO {
     private List<EvidenceBriefVO> evidenceTopItems;
     private List<ScoreBriefVO> scoreTopItems;
     private List<ScoreEightItemVO> scoreEightItems;
+    private AnalysisReviewSummaryVO reviewSummary;
     private PlanReadinessVO planReadiness;
     private List<AssetEventTimelineItemVO> assetEventTimeline = Collections.emptyList();
 
@@ -59,6 +60,14 @@ public class DashboardDetailResponseVO {
 
     public void setScoreEightItems(List<ScoreEightItemVO> scoreEightItems) {
         this.scoreEightItems = scoreEightItems;
+    }
+
+    public AnalysisReviewSummaryVO getReviewSummary() {
+        return reviewSummary;
+    }
+
+    public void setReviewSummary(AnalysisReviewSummaryVO reviewSummary) {
+        this.reviewSummary = reviewSummary;
     }
 
     public PlanReadinessVO getPlanReadiness() {

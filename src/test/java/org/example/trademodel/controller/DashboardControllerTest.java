@@ -7,6 +7,7 @@ import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PlanReadinessService;
+import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.SystemHealthService;
@@ -59,6 +60,8 @@ class DashboardControllerTest {
     @Mock
     private ScoreService scoreService;
     @Mock
+    private ReviewService reviewService;
+    @Mock
     private PlanReadinessService planReadinessService;
 
     private MockMvc mockMvc;
@@ -74,6 +77,7 @@ class DashboardControllerTest {
                 marketEnvironmentSnapshotMapper,
                 evidenceService,
                 scoreService,
+                reviewService,
                 planReadinessService
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();

@@ -9,6 +9,7 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.RuleVersionLogMapper;
 import org.example.trademodel.service.ReviewService;
+import org.example.trademodel.vo.AnalysisReviewSummaryVO;
 import org.example.trademodel.vo.ReviewStateVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,8 @@ public class ReviewServiceImpl implements ReviewService {
     private static final String OPERATOR_SYSTEM = "SYSTEM";
     private static final String CHANGE_CATEGORY_REVIEW_FEEDBACK_SAVED = "REVIEW_FEEDBACK_SAVED";
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String REVIEW_STATUS_EMPTY = "EMPTY";
+    private static final String REVIEW_STATUS_FILLED = "FILLED";
 
     private final ReviewResultMapper reviewResultMapper;
     private final AnalysisRunMapper analysisRunMapper;
@@ -80,6 +83,57 @@ public class ReviewServiceImpl implements ReviewService {
         }
         ReviewResultDO row = reviewResultMapper.selectByAnalysisId(analysisId.trim());
         return row == null ? null : toVo(row);
+    }
+
+    @Override
+    public AnalysisReviewSummaryVO getAnalysisReviewSummary(String analysisId) {
+        if (analysisId == null || analysisId.isBlank()) {
+            return null;
+        }
+        String id = analysisId.trim();
+        ReviewResultDO row = reviewResultMapper.selectByAnalysisId(id);
+        if (row == null) {
+            return buildEmptySummary(id, null);
+        }
+        if (!hasReviewContent(row)) {
+            return buildEmptySummary(id, row.getUpdateTime());
+        }
+        return buildFilledSummary(id, row.getUpdateTime());
+    }
+
+    private static AnalysisReviewSummaryVO buildEmptySummary(String analysisId, LocalDateTime updatedAt) {
+        AnalysisReviewSummaryVO vo = new AnalysisReviewSummaryVO();
+        vo.setReviewStatus(REVIEW_STATUS_EMPTY);
+        vo.setReviewStatusText("未复盘");
+        vo.setReviewCompleted(Boolean.FALSE);
+        vo.setReviewHasContent(Boolean.FALSE);
+        vo.setReviewUpdatedAt(updatedAt);
+        vo.setReviewEntryUrl("/review/" + analysisId);
+        return vo;
+    }
+
+    private static AnalysisReviewSummaryVO buildFilledSummary(String analysisId, LocalDateTime updatedAt) {
+        AnalysisReviewSummaryVO vo = new AnalysisReviewSummaryVO();
+        vo.setReviewStatus(REVIEW_STATUS_FILLED);
+        vo.setReviewStatusText("已复盘");
+        vo.setReviewCompleted(Boolean.TRUE);
+        vo.setReviewHasContent(Boolean.TRUE);
+        vo.setReviewUpdatedAt(updatedAt);
+        vo.setReviewEntryUrl("/review/" + analysisId);
+        return vo;
+    }
+
+    private static boolean hasReviewContent(ReviewResultDO row) {
+        return hasText(row.getErrorType())
+                || hasText(row.getActualOutcome())
+                || hasText(row.getAdjustmentSuggestion());
+    }
+
+    private static boolean hasText(String s) {
+        if (s == null) {
+            return false;
+        }
+        return !s.trim().isEmpty();
     }
 
     private static ReviewStateVO toVo(ReviewResultDO row) {

@@ -13,8 +13,10 @@ import org.example.trademodel.vo.AssetEventTimelineItemVO;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PlanReadinessService;
+import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.vo.AnalysisReviewSummaryVO;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DashboardSummaryResponseVO;
 import org.springframework.http.ResponseEntity;
@@ -52,6 +54,7 @@ public class DashboardController {
     private final MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
+    private final ReviewService reviewService;
     private final PlanReadinessService planReadinessService;
 
     public DashboardController(DecisionService decisionService,
@@ -62,6 +65,7 @@ public class DashboardController {
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
                                EvidenceService evidenceService,
                                ScoreService scoreService,
+                               ReviewService reviewService,
                                PlanReadinessService planReadinessService) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
@@ -71,6 +75,7 @@ public class DashboardController {
         this.marketEnvironmentSnapshotMapper = marketEnvironmentSnapshotMapper;
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
+        this.reviewService = reviewService;
         this.planReadinessService = planReadinessService;
     }
 
@@ -139,9 +144,21 @@ public class DashboardController {
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
         body.setScoreTopItems(resolveScoreTopItems(body));
         body.setScoreEightItems(resolveScoreEightItems(body));
+        body.setReviewSummary(resolveReviewSummary(body));
         body.setAssetEventTimeline(resolveAssetEventTimeline(body));
         runtimeMetricService.recordDuration("dashboard.detail", System.currentTimeMillis() - methodStart);
         return body;
+    }
+
+    private AnalysisReviewSummaryVO resolveReviewSummary(DashboardDetailResponseVO body) {
+        if (body == null || body.getDecision() == null || reviewService == null) {
+            return null;
+        }
+        String analysisId = body.getDecision().getAnalysisId();
+        if (analysisId == null || analysisId.isBlank()) {
+            return null;
+        }
+        return reviewService.getAnalysisReviewSummary(analysisId.trim());
     }
 
     private List<AssetEventTimelineItemVO> resolveAssetEventTimeline(DashboardDetailResponseVO body) {
