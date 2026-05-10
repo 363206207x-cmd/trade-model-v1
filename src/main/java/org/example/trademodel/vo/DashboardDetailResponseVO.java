@@ -1,5 +1,6 @@
 package org.example.trademodel.vo;
 
+import java.util.Collections;
 import java.util.List;
 
 public class DashboardDetailResponseVO {
@@ -10,6 +11,7 @@ public class DashboardDetailResponseVO {
     private List<ScoreBriefVO> scoreTopItems;
     private List<ScoreEightItemVO> scoreEightItems;
     private PlanReadinessVO planReadiness;
+    private List<AssetEventTimelineItemVO> assetEventTimeline = Collections.emptyList();
 
     public String getSymbol() {
         return symbol;
@@ -65,6 +67,14 @@ public class DashboardDetailResponseVO {
 
     public void setPlanReadiness(PlanReadinessVO planReadiness) {
         this.planReadiness = planReadiness;
+    }
+
+    public List<AssetEventTimelineItemVO> getAssetEventTimeline() {
+        return assetEventTimeline;
+    }
+
+    public void setAssetEventTimeline(List<AssetEventTimelineItemVO> assetEventTimeline) {
+        this.assetEventTimeline = assetEventTimeline != null ? assetEventTimeline : Collections.emptyList();
     }
 
     public static class MarketEnvironmentMiniVO {

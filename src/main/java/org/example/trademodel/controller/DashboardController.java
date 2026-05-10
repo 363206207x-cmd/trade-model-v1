@@ -9,6 +9,7 @@ import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreBriefVO;
 import org.example.trademodel.vo.ScoreEightItemVO;
+import org.example.trademodel.vo.AssetEventTimelineItemVO;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PlanReadinessService;
@@ -41,6 +42,7 @@ public class DashboardController {
             "</api/dashboard/summary>; rel=\"alternate\"; title=\"replacement\"";
     private static final String MARKET_ENV_SOURCE_HEURISTIC = "BINANCE_24H_HEURISTIC";
     private static final String MARKET_ENV_SOURCE_FALLBACK = "PLACEHOLDER_FALLBACK";
+    private static final int ASSET_EVENT_TIMELINE_LIMIT = 5;
 
     private final DecisionService decisionService;
     private final SystemHealthService systemHealthService;
@@ -137,8 +139,22 @@ public class DashboardController {
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
         body.setScoreTopItems(resolveScoreTopItems(body));
         body.setScoreEightItems(resolveScoreEightItems(body));
+        body.setAssetEventTimeline(resolveAssetEventTimeline(body));
         runtimeMetricService.recordDuration("dashboard.detail", System.currentTimeMillis() - methodStart);
         return body;
+    }
+
+    private List<AssetEventTimelineItemVO> resolveAssetEventTimeline(DashboardDetailResponseVO body) {
+        if (body == null || body.getDecision() == null || monitorService == null) {
+            return Collections.emptyList();
+        }
+        String analysisId = body.getDecision().getAnalysisId();
+        if (analysisId == null || analysisId.isBlank()) {
+            return Collections.emptyList();
+        }
+        List<AssetEventTimelineItemVO> rows =
+                monitorService.listAssetEventTimelineByAnalysisId(analysisId.trim(), ASSET_EVENT_TIMELINE_LIMIT);
+        return rows != null ? rows : Collections.emptyList();
     }
 
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {

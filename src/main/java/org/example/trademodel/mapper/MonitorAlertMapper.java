@@ -62,6 +62,16 @@ public interface MonitorAlertMapper {
             + "FROM tm_monitor_alert WHERE is_deleted = 0 AND analysis_id = #{analysisId} ORDER BY created_at DESC")
     List<MonitorAlertDO> listByAnalysisId(@Param("analysisId") String analysisId);
 
+    /** 指定 analysis 下未删除告警按 created_at 倒序，最多 {@code limit} 条；列结构与 {@link #selectRecent} 一致。 */
+    @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(cooldown_until, 'yyyy-MM-dd HH:mm:ss') END AS cooldown_until, "
+            + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
+            + "FORMATDATETIME(created_at, 'yyyy-MM-dd HH:mm:ss') AS created_at, "
+            + "FORMATDATETIME(updated_at, 'yyyy-MM-dd HH:mm:ss') AS updated_at, "
+            + "is_deleted, version_no "
+            + "FROM tm_monitor_alert WHERE is_deleted = 0 AND analysis_id = #{analysisId} ORDER BY created_at DESC LIMIT #{limit}")
+    List<MonitorAlertDO> selectRecentByAnalysisId(@Param("analysisId") String analysisId, @Param("limit") int limit);
+
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
