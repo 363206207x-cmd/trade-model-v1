@@ -88,7 +88,7 @@ public class DashboardController {
         System.out.println("[PERF] dashboard_system_status=" + systemStatusCostMs + " ms");
 
         long alertsStart = System.currentTimeMillis();
-        model.addAttribute("alerts", monitorService.getRecentAlerts(3));
+        model.addAttribute("alerts", monitorService.getRecentAlerts(2));
         long alertsCostMs = System.currentTimeMillis() - alertsStart;
         System.out.println("[PERF] dashboard_alerts=" + alertsCostMs + " ms");
 
@@ -97,7 +97,7 @@ public class DashboardController {
         long decisionsCostMs = System.currentTimeMillis() - decisionsStart;
         System.out.println("[PERF] dashboard_decisions=" + decisionsCostMs + " ms");
 
-        model.addAttribute("title", "TRINE LOGIC (V1)");
+        model.addAttribute("title", "Trade Model V1");
 
         long controllerCostMs = System.currentTimeMillis() - controllerStart;
         System.out.println("[PERF] dashboard_controller=" + controllerCostMs + " ms");
@@ -125,7 +125,7 @@ public class DashboardController {
         body.setSystemStatus(decisionService.getLightSystemStatus());
         body.setOpenPositionCount(decisionService.countOpenPositions());
         body.setSystemHealth(systemHealthService.getSystemHealth());
-        body.setAlerts(monitorService.getRecentAlerts(3));
+        body.setAlerts(monitorService.getRecentAlerts(2));
         body.setDecisions(decisionService.getLatestDecisionResults(summaryLimit));
         runtimeMetricService.recordDuration("dashboard.summary", System.currentTimeMillis() - methodStart);
         return body;

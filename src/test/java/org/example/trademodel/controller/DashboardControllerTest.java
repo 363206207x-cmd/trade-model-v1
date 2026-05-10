@@ -90,7 +90,7 @@ class DashboardControllerTest {
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
-        when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+        when(monitorService.getRecentAlerts(2)).thenReturn(Collections.emptyList());
         when(decisionService.getLatestDecisionResults(12)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/dashboard/summary"))
@@ -105,7 +105,7 @@ class DashboardControllerTest {
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
-        when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+        when(monitorService.getRecentAlerts(2)).thenReturn(Collections.emptyList());
         when(decisionService.getLatestDecisionResults(12)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/dashboard/summary"))
@@ -120,7 +120,7 @@ class DashboardControllerTest {
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
-        when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+        when(monitorService.getRecentAlerts(2)).thenReturn(Collections.emptyList());
         when(decisionService.getLatestDecisionResults(12)).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/dashboard/summary"))
@@ -327,7 +327,7 @@ class DashboardControllerTest {
         when(decisionService.getLightSystemStatus()).thenReturn(null);
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
-        when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+        when(monitorService.getRecentAlerts(2)).thenReturn(Collections.emptyList());
     }
 
     private static DecisionResultVO newDecisionWithCoreDashboardTruthFields() {
