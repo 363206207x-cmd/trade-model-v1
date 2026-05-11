@@ -78,6 +78,14 @@ class DecisionEngineServiceTest {
     }
 
     @Test
+    void makeDecision_marksAiRoleResultsAsSyntheticRuleComposed() {
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-synthetic", 80, 65);
+
+        assertThat(decision.getAiRoleResults()).contains("SYNTHETIC_RULE_COMPOSED");
+        assertThat(decision.getAiRoleResults()).contains("no external AI API call");
+    }
+
+    @Test
     void makeDecision_dataQualityGate_doesNotAffectConfidenceRiskOrMarketBias() {
         DecisionBundleVO normal = service.makeDecision("BTCUSDT", "1m", "analysis-4", 60, 65);
         DecisionBundleVO gated = service.makeDecision("BTCUSDT", "1m", "analysis-5", 59, 65);

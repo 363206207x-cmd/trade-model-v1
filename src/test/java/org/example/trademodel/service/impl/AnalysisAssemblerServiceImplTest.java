@@ -276,6 +276,15 @@ class AnalysisAssemblerServiceImplTest {
     }
 
     @Test
+    void marketEnvSourceType_preservesNonBinanceExplicitSource() {
+        MarketEnvironmentVO vo = new MarketEnvironmentVO();
+        vo.setSourceType("OKX_24H_FALLBACK");
+        vo.setPerpFundingApplied(true);
+        vo.setOiApplied(true);
+        assertEquals("OKX_24H_FALLBACK", AnalysisAssemblerServiceImpl.marketEnvSourceTypeForSuccessfulQuote(vo));
+    }
+
+    @Test
     void marketEnvSourceType_usdmOiMin_whenOiOnly() {
         MarketEnvironmentVO vo = new MarketEnvironmentVO();
         vo.setPerpFundingApplied(false);

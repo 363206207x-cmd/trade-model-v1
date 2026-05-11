@@ -61,6 +61,24 @@ class RealMarketEnvironmentServiceTest {
     }
 
     @Test
+    void okxFallbackQuote_mapsSourceTypeAndDoesNotUsePlaceholderFallback() {
+        MarketQuoteSnapshot q = baseSnap();
+        q.setProvider("okx-fallback");
+        q.setLastPrice(new BigDecimal("100"));
+        q.setHighPrice(new BigDecimal("101"));
+        q.setLowPrice(new BigDecimal("99"));
+        MarketQuoteClient client = s -> Optional.of(q);
+        RealMarketEnvironmentService svc =
+                new RealMarketEnvironmentService(client, __ -> Optional.empty(), NO_OI);
+
+        Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
+
+        assertTrue(env.isPresent());
+        assertEquals(RealMarketEnvironmentService.SOURCE_TYPE_OKX_24H_FALLBACK, env.get().getSourceType());
+        assertTrue(env.get().getSummary().contains("OKX fallback 24h"), env.get().getSummary());
+    }
+
+    @Test
     void summary_containsNarrowBand_whenRangeLow() {
         MarketQuoteSnapshot q = baseSnap();
         q.setLastPrice(new BigDecimal("100"));

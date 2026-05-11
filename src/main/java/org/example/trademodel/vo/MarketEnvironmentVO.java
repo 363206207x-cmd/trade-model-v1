@@ -9,10 +9,12 @@ public class MarketEnvironmentVO {
     private String leverageSuggestion;
     private String summary;
     /**
-     * Binance 24h ticker {@code priceChangePercent}（与 {@link org.example.trademodel.market.dto.MarketQuoteSnapshot} 同源，可为 null）；
+     * External 24h ticker {@code priceChangePercent}（与 {@link org.example.trademodel.market.dto.MarketQuoteSnapshot} 同源，可为 null）；
      * 仅由 {@link org.example.trademodel.market.RealMarketEnvironmentService} 从报价写入，不解析 {@link #summary} 反推。
      */
     private BigDecimal priceChangePercent24h;
+    /** Runtime provider source marker, e.g. BINANCE_24H_HEURISTIC or OKX_24H_FALLBACK. */
+    private String sourceType;
     /** 24h (high-low)/last * 100; set only when computable from quote (second dimension). */
     private Double rangePct24h;
     /** 窄幅 / 中等波动 / 高波动（与 RealMarketEnvironmentService.describeVolatilityRegime 同源分档）。 */
@@ -56,6 +58,8 @@ public class MarketEnvironmentVO {
     public void setPriceChangePercent24h(BigDecimal priceChangePercent24h) {
         this.priceChangePercent24h = priceChangePercent24h;
     }
+    public String getSourceType() { return sourceType; }
+    public void setSourceType(String sourceType) { this.sourceType = sourceType; }
     public Double getRangePct24h() { return rangePct24h; }
     public void setRangePct24h(Double rangePct24h) { this.rangePct24h = rangePct24h; }
     public String getVolatilityRegime() { return volatilityRegime; }

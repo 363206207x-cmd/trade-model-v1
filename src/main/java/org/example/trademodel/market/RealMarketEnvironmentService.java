@@ -29,6 +29,8 @@ public class RealMarketEnvironmentService {
     static final String DERIVATIVES_CROWDING_STATE_NEUTRAL = "NEUTRAL";
     static final String DERIVATIVES_CROWDING_STATE_CROWDED_LONG = "CROWDED_LONG";
     static final String DERIVATIVES_CROWDING_STATE_CROWDED_SHORT = "CROWDED_SHORT";
+    static final String SOURCE_TYPE_BINANCE_24H = "BINANCE_24H_HEURISTIC";
+    static final String SOURCE_TYPE_OKX_24H_FALLBACK = "OKX_24H_FALLBACK";
 
     private final MarketQuoteClient marketQuoteClient;
     private final PerpFundingRateClient perpFundingRateClient;
@@ -72,6 +74,7 @@ public class RealMarketEnvironmentService {
 
         MarketEnvironmentVO env = new MarketEnvironmentVO();
         env.setPriceChangePercent24h(q.getPriceChangePercent24h());
+        env.setSourceType(sourceTypeForProvider(q.getProvider()));
         env.setEnvironmentType(abs >= 2.0 ? "trend_market" : "range_market");
         env.setRiskMode(abs >= 8.0 ? "elevated" : "normal");
         int friendliness = (int) Math.round(Math.max(0, Math.min(100, 50 + pct * 2.5)));
@@ -91,7 +94,7 @@ public class RealMarketEnvironmentService {
         String price = q.getLastPrice() != null ? q.getLastPrice().toPlainString() : "?";
         String pctf = q.getPriceChangePercent24h() != null ? q.getPriceChangePercent24h().toPlainString() : "?";
         StringBuilder sb = new StringBuilder();
-        sb.append("Real feed (Binance 24h): ").append(q.getSymbolNormalized())
+        sb.append("Real feed (").append(providerLabel(q.getProvider())).append(" 24h): ").append(q.getSymbolNormalized())
                 .append(" last ").append(price).append(" USDT, 24h change ").append(pctf).append("%.");
         if (rangePct != null) {
             String regime = describeVolatilityRegime(rangePct);
@@ -101,6 +104,26 @@ public class RealMarketEnvironmentService {
         }
         sb.append(" Analysis timeframe: ").append(tf).append(". [V1 market-env]");
         return sb.toString();
+    }
+
+    static String sourceTypeForProvider(String provider) {
+        if (provider != null && provider.toLowerCase(Locale.ROOT).contains("okx")) {
+            return SOURCE_TYPE_OKX_24H_FALLBACK;
+        }
+        return SOURCE_TYPE_BINANCE_24H;
+    }
+
+    private static String providerLabel(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return "external";
+        }
+        if (provider.toLowerCase(Locale.ROOT).contains("okx")) {
+            return "OKX fallback";
+        }
+        if (provider.toLowerCase(Locale.ROOT).contains("binance")) {
+            return "Binance";
+        }
+        return provider.trim();
     }
 
     /**

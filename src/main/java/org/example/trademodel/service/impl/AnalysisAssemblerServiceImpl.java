@@ -65,6 +65,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     /** 现货 24h + Funding + OI 附录均成功（见 {@code OI_MINIMAL_ACCESS_CONTRACT.md}）。 */
     private static final String MARKET_ENV_SOURCE_SPOT_PERP_OI_MIN = "BINANCE_SPOT_PERP_OI_MIN_HEURISTIC";
     private static final String MARKET_ENV_SOURCE_FALLBACK = "PLACEHOLDER_FALLBACK";
+    private static final String MARKET_ENV_SOURCE_OKX_FALLBACK = "OKX_24H_FALLBACK";
 
     /**
      * 现货启发式已成功时写入快照的 {@code source_type}（Funding / OI 附录组合见 {@code OI_MINIMAL_ACCESS_CONTRACT.md} 组合表）。
@@ -72,6 +73,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     static String marketEnvSourceTypeForSuccessfulQuote(MarketEnvironmentVO quoteEnv) {
         if (quoteEnv == null) {
             return MARKET_ENV_SOURCE_HEURISTIC;
+        }
+        String explicitSourceType = quoteEnv.getSourceType();
+        if (explicitSourceType != null
+                && !explicitSourceType.isBlank()
+                && !explicitSourceType.startsWith("BINANCE_")) {
+            return explicitSourceType;
         }
         boolean funding = Boolean.TRUE.equals(quoteEnv.getPerpFundingApplied());
         boolean oi = Boolean.TRUE.equals(quoteEnv.getOiApplied());
@@ -145,7 +152,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     marketEnv.setDerivativesCrowdingState(
                             RealMarketEnvironmentService.computeDerivativesCrowdingState(marketEnv));
                     marketEnvSourceType = marketEnvSourceTypeForSuccessfulQuote(quoteEnv);
-                    log.info("[market-env] assemble uses Binance market-env heuristic symbol={} tf={} sourceType={}",
+                    log.info("[market-env] assemble uses market-env heuristic symbol={} tf={} sourceType={}",
                             symbol, timeframe, marketEnvSourceType);
                 } else {
                     log.info("[market-env] assemble fallback placeholder symbol={} tf={}", symbol, timeframe);

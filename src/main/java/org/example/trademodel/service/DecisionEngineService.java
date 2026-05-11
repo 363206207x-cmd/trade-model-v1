@@ -243,7 +243,9 @@ public class DecisionEngineService {
             decision.setIsWorthOpening(worthOpening);
             decision.setMultiTfConvergence(multiTfLabel);
             decision.setAiRoleResults(
-                "Grok: " + grokOpinion + " | Gemini: " + geminiReview + " | GPT-5.4: 最终裁决 " + finalBias + " (Score=" + finalScore + ")");
+                "SYNTHETIC_RULE_COMPOSED: no external AI API call | Grok: " + grokOpinion
+                        + " | Gemini: " + geminiReview
+                        + " | GPT-5.4: 最终裁决 " + finalBias + " (Score=" + finalScore + ")");
             decision.setReviewReasons(reviewJson);
             decision.setAiConflictLevel(conflict.getLevel() != null ? conflict.getLevel().name() : null);
             decision.setAiConflictScore(conflict.getAiConflictScore());
