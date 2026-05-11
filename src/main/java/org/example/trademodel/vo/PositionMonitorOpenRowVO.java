@@ -110,6 +110,7 @@ public class PositionMonitorOpenRowVO {
         private String systemSuggestedAction;
         private String monitorSummary;
         private String reviewEntryStatus;
+        private PositionMonitorActionAdviceVO actionAdvice;
 
         private String boundaryParseStatus;
         private String boundaryStateLabel;
@@ -217,6 +218,14 @@ public class PositionMonitorOpenRowVO {
             this.reviewEntryStatus = reviewEntryStatus;
         }
 
+        public PositionMonitorActionAdviceVO getActionAdvice() {
+            return actionAdvice;
+        }
+
+        public void setActionAdvice(PositionMonitorActionAdviceVO actionAdvice) {
+            this.actionAdvice = actionAdvice;
+        }
+
         public String getBoundaryParseStatus() {
             return boundaryParseStatus;
         }
@@ -282,4 +291,3 @@ public class PositionMonitorOpenRowVO {
         }
     }
 }
-

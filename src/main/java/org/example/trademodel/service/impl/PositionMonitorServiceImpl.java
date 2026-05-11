@@ -3,6 +3,8 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.PositionMonitorRecordDO;
+import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -10,6 +12,7 @@ import org.example.trademodel.mapper.PositionMonitorRecordMapper;
 import org.example.trademodel.mapper.RealPositionMapper;
 import org.example.trademodel.service.PositionMonitorService;
 import org.example.trademodel.vo.DecisionResultVO;
+import org.example.trademodel.vo.PositionMonitorActionAdviceVO;
 import org.example.trademodel.vo.PositionMonitorOpenRowVO;
 import org.example.trademodel.vo.RealPositionVO;
 import org.example.trademodel.vo.PositionMonitorOpenRowVO.LatestMonitorRecordVO;
@@ -21,11 +24,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -89,23 +93,36 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private static final String REVERSAL_HINT_WARNING = "反转预警";
     private static final String REVERSAL_HINT_STRONG_RISK = "强反转风险";
     private static final String REVERSAL_HINT_PLAN_INVALIDATED = "原计划失效型反转";
+    private static final String ACTION_ADVICE_DISCLAIMER =
+            "以下为持仓监控建议，仅用于人工复核，不会自动下单、不会自动平仓、不会自动反手。";
+    private static final String RISK_NOTE_NORMAL_LIQUIDITY =
+            "风险高但流动性正常时，只能提示人工考虑减仓或移动止损。";
+    private static final String RISK_NOTE_WORSENING_LIQUIDITY =
+            "风险高且流动性恶化时，不建议市价一次性砍仓。";
+    private static final String RISK_NOTE_STAMPEDE =
+            "风险高且踩踏时，禁止反手、禁止新开仓、禁止机会推送。";
+    private static final String RISK_NOTE_WICK =
+            "风险高但短线插针时，不直接判定趋势反转。";
 
     private final RealPositionMapper realPositionMapper;
     private final DecisionResultMapper decisionResultMapper;
     private final ExecutionPlanMapper executionPlanMapper;
     private final AnalysisRunMapper analysisRunMapper;
     private final PositionMonitorRecordMapper positionMonitorRecordMapper;
+    private final MarketQuoteClient marketQuoteClient;
 
     public PositionMonitorServiceImpl(RealPositionMapper realPositionMapper,
                                        DecisionResultMapper decisionResultMapper,
                                        ExecutionPlanMapper executionPlanMapper,
                                        AnalysisRunMapper analysisRunMapper,
-                                       PositionMonitorRecordMapper positionMonitorRecordMapper) {
+                                       PositionMonitorRecordMapper positionMonitorRecordMapper,
+                                       MarketQuoteClient marketQuoteClient) {
         this.realPositionMapper = realPositionMapper;
         this.decisionResultMapper = decisionResultMapper;
         this.executionPlanMapper = executionPlanMapper;
         this.analysisRunMapper = analysisRunMapper;
         this.positionMonitorRecordMapper = positionMonitorRecordMapper;
+        this.marketQuoteClient = marketQuoteClient;
     }
 
     @Override
@@ -132,11 +149,12 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         LocalDateTime now = LocalDateTime.now();
         PositionMonitorRecordDO candidate = buildCandidateRecord(position, now);
         PositionMonitorRecordDO previous = positionMonitorRecordMapper.selectLatestByPositionId(normalizedPositionId);
+        MonitorPriceSnapshot monitorPrice = resolveMonitorPrice(position);
         if (forcePersist || shouldPersist(previous, candidate, now)) {
             positionMonitorRecordMapper.insert(candidate);
-            return buildOpenRow(position, candidate);
+            return buildOpenRow(position, candidate, monitorPrice);
         }
-        return buildOpenRow(position, previous != null ? previous : candidate);
+        return buildOpenRow(position, previous != null ? previous : candidate, monitorPrice);
     }
 
     @Override
@@ -183,8 +201,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             row.setSymbol(p.getSymbol());
             row.setPositionSide(p.getPositionSide());
             row.setAvgOpenPrice(p.getAvgOpenPrice());
-            row.setMarkPrice(p.getMarkPrice());
-            row.setUnrealizedPnlPct(p.getUnrealizedPnlPct());
+            MonitorPriceSnapshot monitorPrice = MonitorPriceSnapshot.fromPosition(p);
+            row.setMarkPrice(monitorPrice.markPrice);
+            row.setUnrealizedPnlPct(monitorPrice.unrealizedPnlPct);
             row.setPositionQuantity(p.getPositionQuantity());
             row.setPositionOpenTime(p.getPositionOpenTime());
 
@@ -921,14 +940,17 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         return "人工确认";
     }
 
-    private PositionMonitorOpenRowVO buildOpenRow(RealPositionVO position, PositionMonitorRecordDO record) {
+    private PositionMonitorOpenRowVO buildOpenRow(RealPositionVO position,
+                                                  PositionMonitorRecordDO record,
+                                                  MonitorPriceSnapshot monitorPrice) {
         PositionMonitorOpenRowVO row = new PositionMonitorOpenRowVO();
         row.setPositionId(position.getPositionId());
         row.setSymbol(position.getSymbol());
         row.setPositionSide(position.getPositionSide());
         row.setAvgOpenPrice(position.getAvgOpenPrice());
-        row.setMarkPrice(position.getMarkPrice());
-        row.setUnrealizedPnlPct(position.getUnrealizedPnlPct());
+        MonitorPriceSnapshot price = monitorPrice != null ? monitorPrice : MonitorPriceSnapshot.fromPosition(position);
+        row.setMarkPrice(price.markPrice);
+        row.setUnrealizedPnlPct(price.unrealizedPnlPct);
         row.setPositionQuantity(position.getPositionQuantity());
         row.setPositionOpenTime(position.getPositionOpenTime());
 
@@ -971,6 +993,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         vo.setSystemSuggestedAction(record.getSystemSuggestedAction());
         vo.setMonitorSummary(record.getMonitorSummary());
         vo.setReviewEntryStatus(record.getReviewEntryStatus());
+        vo.setActionAdvice(buildActionAdvice(record));
         vo.setCreateTime(record.getCreateTime());
         vo.setUpdateTime(record.getUpdateTime());
 
@@ -985,5 +1008,105 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         vo.setInvalidPriceThreshold(bd.invalidPriceThreshold());
         return vo;
     }
-}
 
+    private PositionMonitorActionAdviceVO buildActionAdvice(PositionMonitorRecordDO record) {
+        PositionMonitorActionAdviceVO advice = new PositionMonitorActionAdviceVO();
+        String action = safeUpper(record.getSystemSuggestedAction());
+        advice.setActionCode(action);
+        advice.setActionText(mapSystemSuggestedActionZh(action));
+        advice.setReasonCodes(buildReasonCodes(record));
+        advice.setReasonText(record.getMonitorSummary());
+        advice.setManualOnly(Boolean.TRUE);
+        advice.setNotTradeInstruction(Boolean.TRUE);
+        advice.setRiskNotes(buildRiskNotes(action));
+        advice.setDisclaimerText(ACTION_ADVICE_DISCLAIMER);
+        return advice;
+    }
+
+    private static List<String> buildReasonCodes(PositionMonitorRecordDO record) {
+        List<String> out = new ArrayList<>();
+        addReasonCode(out, "ENTRY_", record.getEntryLogicState());
+        addReasonCode(out, "DIRECTION_", record.getDirectionSupportState());
+        addReasonCode(out, "REVERSAL_", record.getReversalState());
+        addReasonCode(out, "RISK_", record.getPositionRiskLevel());
+        addReasonCode(out, "AI_", record.getAiSupportState());
+        addReasonCode(out, "REVIEW_", record.getReviewEntryStatus());
+        addReasonCode(out, "ACTION_", record.getSystemSuggestedAction());
+        return out;
+    }
+
+    private static void addReasonCode(List<String> out, String prefix, String value) {
+        String s = safeUpper(value);
+        if (s != null) {
+            out.add(prefix + s);
+        }
+    }
+
+    private static List<String> buildRiskNotes(String action) {
+        List<String> notes = new ArrayList<>();
+        notes.add(ACTION_ADVICE_DISCLAIMER);
+        notes.add(RISK_NOTE_WORSENING_LIQUIDITY);
+        notes.add(RISK_NOTE_STAMPEDE);
+        notes.add(RISK_NOTE_WICK);
+        if (isStrongRiskAction(action)) {
+            notes.add(RISK_NOTE_NORMAL_LIQUIDITY);
+        }
+        return notes;
+    }
+
+    private MonitorPriceSnapshot resolveMonitorPrice(RealPositionVO position) {
+        MonitorPriceSnapshot fallback = MonitorPriceSnapshot.fromPosition(position);
+        if (position == null || marketQuoteClient == null || isBlank(position.getSymbol())) {
+            return fallback;
+        }
+        try {
+            Optional<MarketQuoteSnapshot> quote = marketQuoteClient.fetch24hTicker(position.getSymbol());
+            if (quote != null && quote.isPresent() && positiveOrNull(quote.get().getLastPrice()) != null) {
+                BigDecimal markPrice = quote.get().getLastPrice();
+                BigDecimal pnlPct = calcUnrealizedPnlPct(position.getPositionSide(), position.getAvgOpenPrice(), markPrice);
+                return new MonitorPriceSnapshot(markPrice, pnlPct);
+            }
+        } catch (Exception e) {
+            log.warn("[position-monitor] quote calibration skipped positionId={} symbol={} err={}",
+                    position.getPositionId(), position.getSymbol(), e.getMessage());
+        }
+        return fallback;
+    }
+
+    private static BigDecimal positiveOrNull(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0 ? value : null;
+    }
+
+    private static BigDecimal calcUnrealizedPnlPct(String positionSide, BigDecimal avgOpenPrice, BigDecimal markPrice) {
+        BigDecimal entry = positiveOrNull(avgOpenPrice);
+        BigDecimal mark = positiveOrNull(markPrice);
+        if (entry == null || mark == null) {
+            return null;
+        }
+        BigDecimal hundred = BigDecimal.valueOf(100);
+        BigDecimal numerator;
+        if ("SHORT".equalsIgnoreCase(positionSide)) {
+            numerator = entry.subtract(mark).multiply(hundred);
+        } else {
+            numerator = mark.subtract(entry).multiply(hundred);
+        }
+        return numerator.divide(entry, 6, RoundingMode.HALF_UP);
+    }
+
+    private static final class MonitorPriceSnapshot {
+        final BigDecimal markPrice;
+        final BigDecimal unrealizedPnlPct;
+
+        MonitorPriceSnapshot(BigDecimal markPrice, BigDecimal unrealizedPnlPct) {
+            this.markPrice = markPrice;
+            this.unrealizedPnlPct = unrealizedPnlPct;
+        }
+
+        static MonitorPriceSnapshot fromPosition(RealPositionVO position) {
+            if (position == null) {
+                return new MonitorPriceSnapshot(null, null);
+            }
+            return new MonitorPriceSnapshot(position.getMarkPrice(), position.getUnrealizedPnlPct());
+        }
+    }
+}

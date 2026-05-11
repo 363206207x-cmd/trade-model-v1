@@ -3,6 +3,8 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.PositionMonitorRecordDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -24,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.times;
@@ -46,6 +49,8 @@ class PositionMonitorServiceImplTest {
     private PositionMonitorRecordMapper positionMonitorRecordMapper;
     @Mock
     private AnalysisRunMapper analysisRunMapper;
+    @Mock
+    private MarketQuoteClient marketQuoteClient;
 
     private PositionMonitorServiceImpl service;
 
@@ -56,7 +61,8 @@ class PositionMonitorServiceImplTest {
                 decisionResultMapper,
                 executionPlanMapper,
                 analysisRunMapper,
-                positionMonitorRecordMapper
+                positionMonitorRecordMapper,
+                marketQuoteClient
         );
     }
 
@@ -91,11 +97,40 @@ class PositionMonitorServiceImplTest {
         when(realPositionMapper.selectOpenPositionById("pos-force")).thenReturn(manual);
         when(decisionResultMapper.findLatestDecisionResultBaseBySymbol("XRPUSDT")).thenReturn(null);
 
-        service.evaluateForPosition("pos-force", true);
+        PositionMonitorOpenRowVO row = service.evaluateForPosition("pos-force", true);
 
         ArgumentCaptor<PositionMonitorRecordDO> captor = ArgumentCaptor.forClass(PositionMonitorRecordDO.class);
         verify(positionMonitorRecordMapper).insert(captor.capture());
         assertThat(captor.getValue().getMonitorSummary()).contains("输入不足");
+        assertThat(row.getLatestMonitorRecord().getActionAdvice()).isNotNull();
+        assertThat(row.getLatestMonitorRecord().getActionAdvice().getActionCode()).isEqualTo("PLAN_INVALID_WAIT_CONFIRM");
+        assertThat(row.getLatestMonitorRecord().getActionAdvice().getManualOnly()).isTrue();
+        assertThat(row.getLatestMonitorRecord().getActionAdvice().getNotTradeInstruction()).isTrue();
+        assertThat(row.getLatestMonitorRecord().getActionAdvice().getDisclaimerText())
+                .contains("不会自动下单、不会自动平仓、不会自动反手");
+        assertThat(row.getLatestMonitorRecord().getActionAdvice().getReasonCodes())
+                .contains("ACTION_PLAN_INVALID_WAIT_CONFIRM", "REVIEW_NOT_ENTERED");
+    }
+
+    @Test
+    void evaluate_for_position_calibrates_mark_price_for_response_without_persisting_position() {
+        RealPositionVO manual = openPosition("pos-calibrate", "BTCUSDT", "MANUAL_INPUT", "USER_MANUAL", "LONG");
+        manual.setAvgOpenPrice(new BigDecimal("100"));
+        manual.setMarkPrice(new BigDecimal("100"));
+        manual.setUnrealizedPnlPct(BigDecimal.ZERO);
+        MarketQuoteSnapshot quote = new MarketQuoteSnapshot();
+        quote.setLastPrice(new BigDecimal("110"));
+
+        when(realPositionMapper.selectOpenPositionById("pos-calibrate")).thenReturn(manual);
+        when(decisionResultMapper.findLatestDecisionResultBaseBySymbol("BTCUSDT")).thenReturn(null);
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote));
+
+        PositionMonitorOpenRowVO row = service.evaluateForPosition("pos-calibrate", true);
+
+        assertThat(row.getMarkPrice()).isEqualByComparingTo(new BigDecimal("110"));
+        assertThat(row.getUnrealizedPnlPct()).isEqualByComparingTo(new BigDecimal("10.000000"));
+        assertThat(manual.getMarkPrice()).isEqualByComparingTo(new BigDecimal("100"));
+        verify(positionMonitorRecordMapper).insert(any(PositionMonitorRecordDO.class));
     }
 
     @Test

@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -123,6 +124,90 @@ class ManualPositionControllerTest {
                 positionId
         );
         org.assertj.core.api.Assertions.assertThat(cnt).isEqualTo(1);
+    }
+
+    @Test
+    void manual_position_monitor_run_open_and_close_smoke_keeps_action_advice_manual_only() throws Exception {
+        String createReq = """
+                {
+                  "symbol":"BTCUSDT",
+                  "positionSide":"LONG",
+                  "avgOpenPrice":50000,
+                  "positionQuantity":0.01
+                }
+                """;
+        String createRes = mockMvc.perform(post("/api/positions/manual")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createReq))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String positionId = objectMapper.readTree(createRes).path("data").path("positionId").asText();
+
+        String runRes = mockMvc.perform(post("/api/position-monitor/" + positionId + "/run"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.latestMonitorRecord.actionAdvice.manualOnly").value(true))
+                .andExpect(jsonPath("$.data.latestMonitorRecord.actionAdvice.notTradeInstruction").value(true))
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        JsonNode advice = objectMapper.readTree(runRes)
+                .path("data").path("latestMonitorRecord").path("actionAdvice");
+        org.assertj.core.api.Assertions.assertThat(advice.path("disclaimerText").asText())
+                .contains("不会自动下单、不会自动平仓、不会自动反手");
+        org.assertj.core.api.Assertions.assertThat(advice.path("actionCode").asText())
+                .isEqualTo("PLAN_INVALID_WAIT_CONFIRM");
+
+        String openRes = mockMvc.perform(get("/api/position-monitor/open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode openRows = objectMapper.readTree(openRes).path("data");
+        JsonNode monitorRow = null;
+        for (JsonNode row : openRows) {
+            if (positionId.equals(row.path("positionId").asText())) {
+                monitorRow = row;
+                break;
+            }
+        }
+        org.assertj.core.api.Assertions.assertThat(monitorRow).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(monitorRow.path("latestMonitorRecord").path("actionAdvice").path("manualOnly").asBoolean())
+                .isTrue();
+
+        String closeRes = mockMvc.perform(post("/api/positions/" + positionId + "/close"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.tradeResultId").exists())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String tradeResultId = objectMapper.readTree(closeRes).path("data").path("tradeResultId").asText();
+
+        Integer monitorCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tm_position_monitor_record WHERE position_id = ?",
+                Integer.class,
+                positionId
+        );
+        org.assertj.core.api.Assertions.assertThat(monitorCount).isGreaterThanOrEqualTo(1);
+
+        String latestMonitorRecordId = jdbcTemplate.queryForObject(
+                "SELECT latest_monitor_record_id FROM tm_position_trade_result WHERE trade_result_id = ?",
+                String.class,
+                tradeResultId
+        );
+        String suggestedActionAtClose = jdbcTemplate.queryForObject(
+                "SELECT system_suggested_action_at_close FROM tm_position_trade_result WHERE trade_result_id = ?",
+                String.class,
+                tradeResultId
+        );
+        org.assertj.core.api.Assertions.assertThat(latestMonitorRecordId).isNotBlank();
+        org.assertj.core.api.Assertions.assertThat(suggestedActionAtClose).isEqualTo("PLAN_INVALID_WAIT_CONFIRM");
     }
 
     @Test
@@ -416,4 +501,3 @@ class ManualPositionControllerTest {
         return root.path("data").path("positionId").asText();
     }
 }
-

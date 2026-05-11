@@ -18,8 +18,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.junit.jupiter.api.Tag;
 
-import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -93,6 +94,11 @@ class PositionMonitorControllerTest {
                 .andExpect(jsonPath("$.data.monitorRecordAvailable").value(true))
                 // NO_ADD means conservative "do not add now" advisory, not an execution instruction.
                 .andExpect(jsonPath("$.data.latestMonitorRecord.systemSuggestedAction").value("NO_ADD"))
+                .andExpect(jsonPath("$.data.latestMonitorRecord.actionAdvice.actionCode").value("NO_ADD"))
+                .andExpect(jsonPath("$.data.latestMonitorRecord.actionAdvice.manualOnly").value(true))
+                .andExpect(jsonPath("$.data.latestMonitorRecord.actionAdvice.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.data.latestMonitorRecord.actionAdvice.disclaimerText")
+                        .value("以下为持仓监控建议，仅用于人工复核，不会自动下单、不会自动平仓、不会自动反手。"))
                 .andExpect(jsonPath("$.data.latestMonitorRecord.monitorSummary").exists());
 
         String summary = jdbcTemplate.queryForObject(
@@ -209,6 +215,11 @@ class PositionMonitorControllerTest {
                 .isEqualTo(true);
         org.assertj.core.api.Assertions.assertThat(pos1Row.path("latestMonitorRecord").path("systemSuggestedAction").asText())
                 .isEqualTo("CONTINUE_HOLD");
+        JsonNode pos1Advice = pos1Row.path("latestMonitorRecord").path("actionAdvice");
+        org.assertj.core.api.Assertions.assertThat(pos1Advice.path("manualOnly").asBoolean()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(pos1Advice.path("notTradeInstruction").asBoolean()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(pos1Advice.path("reasonCodes").toString())
+                .contains("ACTION_CONTINUE_HOLD");
 
         JsonNode pos2Row = findRowByPositionId(data, pos2);
         org.assertj.core.api.Assertions.assertThat(pos2Row).isNotNull();
@@ -216,6 +227,9 @@ class PositionMonitorControllerTest {
                 .isEqualTo(true);
         org.assertj.core.api.Assertions.assertThat(pos2Row.path("latestMonitorRecord").path("systemSuggestedAction").asText())
                 .isEqualTo("PLAN_INVALID_WAIT_CONFIRM");
+        JsonNode pos2Advice = pos2Row.path("latestMonitorRecord").path("actionAdvice");
+        org.assertj.core.api.Assertions.assertThat(pos2Advice.path("manualOnly").asBoolean()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(pos2Advice.path("notTradeInstruction").asBoolean()).isTrue();
     }
 
     @Test
@@ -267,11 +281,16 @@ class PositionMonitorControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andReturn()
                 .getResponse()
-                .getContentAsString();
+                .getContentAsString(StandardCharsets.UTF_8);
 
         JsonNode root = objectMapper.readTree(res);
         String action = root.path("data").path("latestMonitorRecord").path("systemSuggestedAction").asText();
+        JsonNode advice = root.path("data").path("latestMonitorRecord").path("actionAdvice");
         org.assertj.core.api.Assertions.assertThat(action).doesNotStartWith("AUTO_");
+        org.assertj.core.api.Assertions.assertThat(advice.path("manualOnly").asBoolean()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(advice.path("notTradeInstruction").asBoolean()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(advice.path("disclaimerText").asText())
+                .contains("不会自动下单、不会自动平仓、不会自动反手");
     }
 
     private String createManualOpenPosition(String symbol,
@@ -439,4 +458,3 @@ class PositionMonitorControllerTest {
         return null;
     }
 }
-
