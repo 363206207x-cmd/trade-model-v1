@@ -681,6 +681,67 @@
             opacity: 0.85;
         }
 
+        .position-monitor-table-native .pm-action {
+            text-align: left;
+            white-space: normal;
+            overflow: visible;
+        }
+
+        .pm-action-advice {
+            display: block;
+            max-width: 100%;
+            padding: 5px 6px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 8px;
+            background: rgba(248, 250, 252, 0.78);
+            color: var(--text-primary);
+            line-height: 1.35;
+        }
+
+        .pm-action-title {
+            font-size: 12px;
+            font-weight: 700;
+            white-space: normal;
+        }
+
+        .pm-advice-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .pm-advice-badge {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 999px;
+            padding: 1px 6px;
+            font-size: 10px;
+            line-height: 16px;
+            color: var(--text-secondary);
+            background: rgba(224, 242, 254, 0.6);
+        }
+
+        .pm-advice-disclaimer {
+            margin-top: 4px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            white-space: normal;
+        }
+
+        .pm-risk-notes {
+            margin: 4px 0 0;
+            padding-left: 14px;
+            color: var(--text-secondary);
+            font-size: 10px;
+            white-space: normal;
+        }
+
+        .pm-risk-note {
+            margin: 1px 0;
+        }
+
         .position-monitor-table-native .pm-row-actions {
             text-align: right;
             white-space: nowrap;
@@ -1157,9 +1218,14 @@
         if (u === "L4" || u === "LV4" || u.indexOf("LEVEL_4") >= 0 || u === "4") return 4;
         if (score != null && isFinite(Number(score))) {
             var n = Number(score);
-            if (n >= 80) return 4;
-            if (n >= 60) return 3;
-            if (n >= 35) return 2;
+            var bands = [
+                { min: 80, level: 4 },
+                { min: 60, level: 3 },
+                { min: 35, level: 2 }
+            ];
+            for (var i = 0; i < bands.length; i += 1) {
+                if (n >= bands[i].min) return bands[i].level;
+            }
         }
         return 1;
     }
@@ -1179,7 +1245,7 @@
             var shortText = label || ("Lv." + level);
             return { level: level, short: shortText, label: shortText, score: scoreRaw, source: "backend" };
         }
-        return { level: null, short: "字段缺失", label: "字段缺失", score: null, source: "fallback" };
+        return { level: null, short: "冲突等级未知", label: "冲突等级未知", score: null, source: "fallback" };
     }
 
     /** readModelTruthStatus：tile 标签用读模型齐套语义，不依赖 recheckStatus。 */
@@ -1224,7 +1290,8 @@
         var stateRaw = d && (d.isConfused != null ? d.isConfused : d.is_confused);
         if (scoreRaw != null && isFinite(Number(scoreRaw))) {
             var s = Number(scoreRaw);
-            return { isConfused: s > 0, score: s, source: "backend" };
+            var scoreIndicatesConfused = s > 0;
+            return { isConfused: scoreIndicatesConfused, score: s, source: "backend" };
         }
         if (stateRaw != null) {
             var state = stateRaw === true || String(stateRaw).toUpperCase() === "TRUE";
@@ -2074,6 +2141,46 @@
         return String(v).trim();
     }
 
+    function renderPositionMonitorActionAdviceHtml(latest) {
+        var fallbackAction = latest
+            ? pickPositionField(latest, "systemSuggestedAction", "system_suggested_action")
+            : "点击复查生成";
+        var fallbackHtml = escapeHtmlSafe(positionMonitorDisplayText(fallbackAction, "点击复查生成"));
+        if (!latest) return fallbackHtml;
+
+        var advice = pickPositionField(latest, "actionAdvice", "action_advice");
+        if (!advice || typeof advice !== "object") return fallbackHtml;
+
+        var actionText = pickPositionField(advice, "actionText", "action_text");
+        var title = positionMonitorDisplayText(actionText, positionMonitorDisplayText(fallbackAction, "点击复查生成"));
+        var badges = [];
+        if (advice.manualOnly === true || advice.manual_only === true) {
+            badges.push('<span class="pm-advice-badge">仅人工复核</span>');
+        }
+        if (advice.notTradeInstruction === true || advice.not_trade_instruction === true) {
+            badges.push('<span class="pm-advice-badge">非交易指令</span>');
+        }
+
+        var disclaimerText = pickPositionField(advice, "disclaimerText", "disclaimer_text");
+        if (!disclaimerText && badges.length > 0) {
+            disclaimerText = "以下为持仓监控建议，仅用于人工复核，不触发自动平仓，不自动下单、不自动平仓、不自动反手。";
+        }
+        var riskNotes = advice.riskNotes != null ? advice.riskNotes : advice.risk_notes;
+        var riskHtml = "";
+        if (Array.isArray(riskNotes) && riskNotes.length > 0) {
+            riskHtml = '<ul class="pm-risk-notes">' + riskNotes.slice(0, 4).map(function (note) {
+                return '<li class="pm-risk-note">' + escapeHtmlSafe(positionMonitorDisplayText(note, "")) + '</li>';
+            }).join("") + '</ul>';
+        }
+
+        return '<div class="pm-action-advice">' +
+            '<div class="pm-action-title">' + escapeHtmlSafe(title) + '</div>' +
+            (badges.length ? '<div class="pm-advice-badges">' + badges.join("") + '</div>' : "") +
+            (disclaimerText ? '<div class="pm-advice-disclaimer">' + escapeHtmlSafe(disclaimerText) + '</div>' : "") +
+            riskHtml +
+            '</div>';
+    }
+
     function renderPositionMonitorRowHtml(row) {
         var positionId = pickPositionField(row, "positionId", "position_id") || pickPositionField(row, "id", "id");
         var symbol = pickPositionField(row, "symbol", "symbol");
@@ -2084,9 +2191,6 @@
         var latest = pickPositionField(row, "latestMonitorRecord", "latest_monitor_record");
         var hasMonitor = !!latest;
         var boundaryLabel = hasMonitor ? pickPositionField(latest, "boundaryStateLabel", "boundary_state_label") : "未返回";
-        var actionText = hasMonitor
-            ? pickPositionField(latest, "systemSuggestedAction", "system_suggested_action")
-            : "点击复查生成";
         var riskText = hasMonitor ? pickPositionField(latest, "positionRiskLevel", "position_risk_level") : "暂无监控记录";
         var entryText = hasMonitor ? pickPositionField(latest, "entryLogicState", "entry_logic_state") : "暂无监控记录";
         var directionText = hasMonitor ? pickPositionField(latest, "directionSupportState", "direction_support_state") : "暂无监控记录";
@@ -2104,7 +2208,7 @@
             '<td class="pm-reversal">' + escapeHtmlSafe(positionMonitorDisplayText(reversalText, "暂无监控记录")) + '</td>' +
             '<td class="pm-risk">' + escapeHtmlSafe(positionMonitorDisplayText(riskText, "暂无监控记录")) + '</td>' +
             '<td class="pm-boundary-cell"><span class="pm-boundary-tag">' + escapeHtmlSafe(positionMonitorDisplayText(boundaryLabel, "未返回")) + '</span></td>' +
-            '<td class="pm-action">' + escapeHtmlSafe(positionMonitorDisplayText(actionText, "点击复查生成")) + '</td>' +
+            '<td class="pm-action">' + renderPositionMonitorActionAdviceHtml(latest) + '</td>' +
             '<td class="pm-row-actions">' +
             '<button type="button" class="btn" data-action="manual-run-position-monitor" data-position-id="' + escapeHtmlSafe(positionId) + '">复查</button>' +
             '<button type="button" class="btn manual-close-position-btn" data-action="manual-close-position" data-position-id="' + escapeHtmlSafe(positionId) + '">记录平仓</button>' +
