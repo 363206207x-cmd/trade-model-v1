@@ -51,6 +51,10 @@ public interface DecisionResultMapper {
             """)
     List<DecisionResultVO> findLatestDecisionResultsJoined(int limit);
 
+    /**
+     * Global latest N decisions from {@code tm_decision_result} only (no plan/analysis_run JOIN, no window).
+     * Plan and {@code data_quality_score} are merged in {@link org.example.trademodel.service.impl.DecisionServiceImpl#getLatestDecisionResults}.
+     */
     @Select("""
             SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
             d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
@@ -61,7 +65,34 @@ public interface DecisionResultMapper {
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
-            NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(d.invalid_condition), '') <> '' THEN ' | ' ELSE '' END || COALESCE(d.invalid_condition, '')), '') AS executionPlanSummary
+            CONCAT_WS(' | ',
+                NULLIF(TRIM(COALESCE(d.valid_period, '')), ''),
+                NULLIF(TRIM(COALESCE(d.invalid_condition, '')), '')
+            ) AS executionPlanSummary
+            FROM tm_decision_result d
+            ORDER BY d.create_time DESC
+            LIMIT #{limit}
+            """)
+    List<DecisionResultVO> findLatestDecisionResultsBase(int limit);
+
+    /**
+     * Latest decision row for symbol only (no execution_plan / analysis_run JOIN, no window).
+     * Plan columns on {@link DecisionResultVO} are filled in {@link org.example.trademodel.service.impl.DecisionServiceImpl#getLatestDecisionResultBySymbol}.
+     */
+    @Select("""
+            SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
+            d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
+            d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
+            d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
+            d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
+            d.is_adopted AS isAdopted, d.valid_period AS validPeriod, d.invalid_condition AS invalidCondition,
+            d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
+            d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
+            CONCAT_WS(' | ',
+                NULLIF(TRIM(COALESCE(d.valid_period, '')), ''),
+                NULLIF(TRIM(COALESCE(d.invalid_condition, '')), '')
+            ) AS executionPlanSummary
             FROM tm_decision_result d
             WHERE UPPER(TRIM(d.symbol)) = #{normalizedSymbol}
             ORDER BY d.create_time DESC

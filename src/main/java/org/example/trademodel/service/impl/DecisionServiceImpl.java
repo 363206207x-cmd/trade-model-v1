@@ -3,16 +3,20 @@ package org.example.trademodel.service.impl;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.MissedOpportunityMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.RealPositionMapper;
@@ -29,6 +33,7 @@ public class DecisionServiceImpl implements DecisionService {
     private static final int MAX_DASHBOARD_SUMMARY_LIMIT = 24;
 
     private final DecisionResultMapper decisionResultMapper;
+    private final ExecutionPlanMapper executionPlanMapper;
     private final AnalysisRunMapper analysisRunMapper;
     private final MarketQuoteClient marketQuoteClient;
     private final RealPositionMapper realPositionMapper;
@@ -38,7 +43,9 @@ public class DecisionServiceImpl implements DecisionService {
     private final MissedOpportunityMapper missedOpportunityMapper;
     private final RuntimeMetricService runtimeMetricService;
 
-    public DecisionServiceImpl(DecisionResultMapper decisionResultMapper, AnalysisRunMapper analysisRunMapper,
+    public DecisionServiceImpl(DecisionResultMapper decisionResultMapper,
+                               ExecutionPlanMapper executionPlanMapper,
+                               AnalysisRunMapper analysisRunMapper,
                                MarketQuoteClient marketQuoteClient, RealPositionMapper realPositionMapper,
                                AssetStateService assetStateService,
                                AssetStateMapper assetStateMapper,
@@ -46,6 +53,7 @@ public class DecisionServiceImpl implements DecisionService {
                                MissedOpportunityMapper missedOpportunityMapper,
                                RuntimeMetricService runtimeMetricService) {
         this.decisionResultMapper = decisionResultMapper;
+        this.executionPlanMapper = executionPlanMapper;
         this.analysisRunMapper = analysisRunMapper;
         this.marketQuoteClient = marketQuoteClient;
         this.realPositionMapper = realPositionMapper;
@@ -111,15 +119,74 @@ public class DecisionServiceImpl implements DecisionService {
     public List<DecisionResultVO> getLatestDecisionResults(int limit) {
         long methodStart = System.currentTimeMillis();
         int safeLimit = normalizeDashboardSummaryLimit(limit);
-        long queryStart = System.currentTimeMillis();
-        List<DecisionResultVO> results = decisionResultMapper.findLatestDecisionResultsJoined(safeLimit);
-        long queryCostMs = System.currentTimeMillis() - queryStart;
-        System.out.println("[PERF] db_latest_decisions_joined=" + queryCostMs + " ms");
-        if (results == null) {
-            long methodCostMs = System.currentTimeMillis() - methodStart;
-            System.out.println("[PERF] service_get_latest_decision_results=" + methodCostMs + " ms");
-            return new ArrayList<>();
+        long baseStart = System.currentTimeMillis();
+        List<DecisionResultVO> results = decisionResultMapper.findLatestDecisionResultsBase(safeLimit);
+        long baseMs = System.currentTimeMillis() - baseStart;
+        System.out.println("[PERF] decision.summary.baseList=" + baseMs + " ms");
+        runtimeMetricService.recordDuration("decision.summary.baseList", baseMs);
+        if (results == null || results.isEmpty()) {
+            long totalMs = System.currentTimeMillis() - methodStart;
+            System.out.println("[PERF] decision.summary.total=" + totalMs + " ms");
+            runtimeMetricService.recordDuration("decision.summary.total", totalMs);
+            System.out.println("[PERF] service_get_latest_decision_results=" + totalMs + " ms");
+            return results == null ? new ArrayList<>() : results;
         }
+
+        LinkedHashSet<String> analysisIdSet = new LinkedHashSet<>();
+        for (DecisionResultVO item : results) {
+            if (item == null) {
+                continue;
+            }
+            String aid = item.getAnalysisId();
+            if (aid != null && !aid.isBlank()) {
+                analysisIdSet.add(aid.trim());
+            }
+        }
+        List<String> analysisIds = new ArrayList<>(analysisIdSet);
+
+        Map<String, ExecutionPlanDO> planByAnalysisId = new HashMap<>();
+        Map<String, AnalysisRunDO> runByAnalysisId = new HashMap<>();
+        if (!analysisIds.isEmpty()) {
+            long planStart = System.currentTimeMillis();
+            List<ExecutionPlanDO> plans = executionPlanMapper.selectLatestByAnalysisIdsTieBreak(analysisIds);
+            long planMs = System.currentTimeMillis() - planStart;
+            System.out.println("[PERF] decision.summary.batchPlan=" + planMs + " ms");
+            runtimeMetricService.recordDuration("decision.summary.batchPlan", planMs);
+
+            long runStart = System.currentTimeMillis();
+            List<AnalysisRunDO> runs = analysisRunMapper.selectByIds(analysisIds);
+            long runMs = System.currentTimeMillis() - runStart;
+            System.out.println("[PERF] decision.summary.batchAnalysisRun=" + runMs + " ms");
+            runtimeMetricService.recordDuration("decision.summary.batchAnalysisRun", runMs);
+
+            if (plans != null) {
+                for (ExecutionPlanDO p : plans) {
+                    if (p != null && p.getAnalysisId() != null && !p.getAnalysisId().isBlank()) {
+                        planByAnalysisId.put(p.getAnalysisId().trim(), p);
+                    }
+                }
+            }
+            if (runs != null) {
+                for (AnalysisRunDO ar : runs) {
+                    if (ar != null && ar.getAnalysisId() != null && !ar.getAnalysisId().isBlank()) {
+                        runByAnalysisId.put(ar.getAnalysisId().trim(), ar);
+                    }
+                }
+            }
+        }
+
+        for (DecisionResultVO item : results) {
+            if (item == null) {
+                continue;
+            }
+            String aid = item.getAnalysisId();
+            if (aid == null || aid.isBlank()) {
+                continue;
+            }
+            String key = aid.trim();
+            mergeExecutionPlanAndAnalysisRun(item, planByAnalysisId.get(key), runByAnalysisId.get(key));
+        }
+
         Map<String, MarketQuoteSnapshot> quoteCache = new HashMap<>();
         Map<String, RealPositionVO> openPositionMap = loadOpenPositionMap();
         for (DecisionResultVO item : results) {
@@ -154,8 +221,10 @@ public class DecisionServiceImpl implements DecisionService {
             }
             annotateReadModelFallback(item);
         }
-        long methodCostMs = System.currentTimeMillis() - methodStart;
-        System.out.println("[PERF] service_get_latest_decision_results=" + methodCostMs + " ms");
+        long totalMs = System.currentTimeMillis() - methodStart;
+        System.out.println("[PERF] decision.summary.total=" + totalMs + " ms");
+        runtimeMetricService.recordDuration("decision.summary.total", totalMs);
+        System.out.println("[PERF] service_get_latest_decision_results=" + totalMs + " ms");
         return results;
     }
 
@@ -166,10 +235,34 @@ public class DecisionServiceImpl implements DecisionService {
             return null;
         }
         long methodStart = System.currentTimeMillis();
-        DecisionResultVO row = decisionResultMapper.findLatestDecisionResultBySymbolJoined(normalized);
+        long baseStart = System.currentTimeMillis();
+        DecisionResultVO row = decisionResultMapper.findLatestDecisionResultBaseBySymbol(normalized);
+        long baseMs = System.currentTimeMillis() - baseStart;
+        System.out.println("[PERF] decision_detail_base_ms=" + baseMs);
+        runtimeMetricService.recordDuration("decision.detail.baseBySymbol", baseMs);
         if (row == null) {
-            runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", System.currentTimeMillis() - methodStart);
+            long totalMs = System.currentTimeMillis() - methodStart;
+            System.out.println("[PERF] decision_detail_total_ms=" + totalMs);
+            runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", totalMs);
             return null;
+        }
+
+        String analysisId = row.getAnalysisId();
+        if (analysisId != null && !analysisId.isBlank()) {
+            String aid = analysisId.trim();
+            long planStart = System.currentTimeMillis();
+            ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisIdTieBreak(aid);
+            long planMs = System.currentTimeMillis() - planStart;
+            System.out.println("[PERF] decision_detail_plan_ms=" + planMs);
+            runtimeMetricService.recordDuration("decision.detail.planTieBreak", planMs);
+
+            long runStart = System.currentTimeMillis();
+            AnalysisRunDO ar = analysisRunMapper.selectById(aid);
+            long runMs = System.currentTimeMillis() - runStart;
+            System.out.println("[PERF] decision_detail_analysis_run_ms=" + runMs);
+            runtimeMetricService.recordDuration("decision.detail.analysisRun", runMs);
+
+            mergeExecutionPlanAndAnalysisRun(row, plan, ar);
         }
 
         MarketQuoteSnapshot snapshot = safeFetchQuote(row.getSymbol());
@@ -197,8 +290,25 @@ public class DecisionServiceImpl implements DecisionService {
             row.setPositionStatus(null);
         }
         annotateReadModelFallback(row);
-        runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", System.currentTimeMillis() - methodStart);
+        long totalMs = System.currentTimeMillis() - methodStart;
+        System.out.println("[PERF] decision_detail_total_ms=" + totalMs);
+        runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", totalMs);
         return row;
+    }
+
+    private static void mergeExecutionPlanAndAnalysisRun(DecisionResultVO base, ExecutionPlanDO plan, AnalysisRunDO ar) {
+        if (plan != null) {
+            base.setRecommendedAction(plan.getRecommendedAction());
+            base.setPlanMode(plan.getPlanMode());
+            base.setEntryZone(plan.getEntryZone());
+            base.setStopLoss(plan.getStopLoss());
+            base.setTakeProfitRules(plan.getTakeProfitRules());
+            base.setLeverageSuggestion(plan.getLeverageSuggestion());
+            base.setPositionSuggestion(plan.getPositionSuggestion());
+        }
+        if (ar != null) {
+            base.setDataQualityScore(ar.getDataQualityScore());
+        }
     }
 
     @Override

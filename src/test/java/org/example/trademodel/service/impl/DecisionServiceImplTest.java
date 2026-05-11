@@ -1,9 +1,12 @@
 package org.example.trademodel.service.impl;
 
 import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.MissedOpportunityMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.RealPositionMapper;
@@ -25,6 +28,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,6 +38,8 @@ class DecisionServiceImplTest {
 
     @Mock
     private DecisionResultMapper decisionResultMapper;
+    @Mock
+    private ExecutionPlanMapper executionPlanMapper;
     @Mock
     private AnalysisRunMapper analysisRunMapper;
     @Mock
@@ -55,6 +61,7 @@ class DecisionServiceImplTest {
     void setUp() {
         service = new DecisionServiceImpl(
                 decisionResultMapper,
+                executionPlanMapper,
                 analysisRunMapper,
                 marketQuoteClient,
                 realPositionMapper,
@@ -70,8 +77,26 @@ class DecisionServiceImplTest {
     void getLatestDecisionResults_preservesCoreDashboardTruthFields() {
         DecisionResultVO row = new DecisionResultVO();
         row.setSymbol("BTCUSDT");
+        row.setAnalysisId("ana-dash-1");
         populateCoreDashboardTruthFields(row);
-        when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(row));
+
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setAnalysisId("ana-dash-1");
+        plan.setRecommendedAction("OPEN_LONG");
+        plan.setPlanMode("AGGRESSIVE");
+        plan.setEntryZone("62000–62500");
+        plan.setStopLoss("60500");
+        plan.setTakeProfitRules("TP1 65000 / TP2 68000");
+        plan.setLeverageSuggestion("3–5x");
+        plan.setPositionSuggestion("单笔≤2%");
+
+        AnalysisRunDO ar = new AnalysisRunDO();
+        ar.setAnalysisId("ana-dash-1");
+        ar.setDataQualityScore(91);
+
+        when(decisionResultMapper.findLatestDecisionResultsBase(10)).thenReturn(List.of(row));
+        when(executionPlanMapper.selectLatestByAnalysisIdsTieBreak(anyList())).thenReturn(List.of(plan));
+        when(analysisRunMapper.selectByIds(anyList())).thenReturn(List.of(ar));
         when(realPositionMapper.findOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
@@ -93,7 +118,7 @@ class DecisionServiceImplTest {
         row.setAiConflictScore(null);
         row.setConfusedScore(null);
         row.setAssetStateSnapshot(null);
-        when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(row));
+        when(decisionResultMapper.findLatestDecisionResultsBase(10)).thenReturn(List.of(row));
         when(realPositionMapper.findOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
@@ -119,7 +144,10 @@ class DecisionServiceImplTest {
         row.setAiConflictScore(10);
         row.setConfusedScore(5);
         row.setAssetStateSnapshot("{\"state\":\"ACTIVE\"}");
-        when(decisionResultMapper.findLatestDecisionResultsJoined(5)).thenReturn(List.of(row));
+        row.setAnalysisId("ana-dash-full");
+        when(decisionResultMapper.findLatestDecisionResultsBase(5)).thenReturn(List.of(row));
+        when(executionPlanMapper.selectLatestByAnalysisIdsTieBreak(anyList())).thenReturn(Collections.emptyList());
+        when(analysisRunMapper.selectByIds(anyList())).thenReturn(Collections.emptyList());
         when(realPositionMapper.findOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.empty());
 
@@ -133,21 +161,38 @@ class DecisionServiceImplTest {
 
     @Test
     void getLatestDecisionResults_clampsDashboardLimitForGuardrail() {
-        when(decisionResultMapper.findLatestDecisionResultsJoined(24)).thenReturn(Collections.emptyList());
-        when(realPositionMapper.findOpenPositions()).thenReturn(Collections.emptyList());
+        when(decisionResultMapper.findLatestDecisionResultsBase(24)).thenReturn(Collections.emptyList());
 
         List<DecisionResultVO> result = service.getLatestDecisionResults(200);
 
         assertThat(result).isEmpty();
-        verify(decisionResultMapper).findLatestDecisionResultsJoined(24);
+        verify(decisionResultMapper).findLatestDecisionResultsBase(24);
     }
 
     @Test
     void getLatestDecisionResultBySymbol_preservesCoreDashboardTruthFields() {
         DecisionResultVO row = new DecisionResultVO();
         row.setSymbol("BTCUSDT");
-        populateCoreDashboardTruthFields(row);
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
+        row.setAnalysisId("ana-1");
+        row.setMarketBiasHierarchy("H1>H4>D1");
+        row.setIsWorthOpening(Boolean.TRUE);
+        row.setAiConflictLevel("L2");
+        row.setAiConflictScore(42);
+        row.setAiPlanMode("AGGRESSIVE");
+        row.setConfusedScore(3);
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setRecommendedAction("OPEN_LONG");
+        plan.setPlanMode("AGGRESSIVE");
+        plan.setEntryZone("62000–62500");
+        plan.setStopLoss("60500");
+        plan.setTakeProfitRules("TP1 65000 / TP2 68000");
+        plan.setLeverageSuggestion("3–5x");
+        plan.setPositionSuggestion("单笔≤2%");
+        AnalysisRunDO ar = new AnalysisRunDO();
+        ar.setDataQualityScore(91);
+        when(decisionResultMapper.findLatestDecisionResultBaseBySymbol("BTCUSDT")).thenReturn(row);
+        when(executionPlanMapper.selectLatestByAnalysisIdTieBreak("ana-1")).thenReturn(plan);
+        when(analysisRunMapper.selectById("ana-1")).thenReturn(ar);
         when(realPositionMapper.findOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
@@ -175,7 +220,10 @@ class DecisionServiceImplTest {
         row.setAiConflictScore(null);
         row.setConfusedScore(null);
         row.setAssetStateSnapshot(null);
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
+        row.setAnalysisId("ana-1");
+        when(decisionResultMapper.findLatestDecisionResultBaseBySymbol("BTCUSDT")).thenReturn(row);
+        when(executionPlanMapper.selectLatestByAnalysisIdTieBreak("ana-1")).thenReturn(null);
+        when(analysisRunMapper.selectById("ana-1")).thenReturn(null);
         when(realPositionMapper.findOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
