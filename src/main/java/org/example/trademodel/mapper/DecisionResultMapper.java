@@ -30,7 +30,10 @@ public interface DecisionResultMapper {
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
-            NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(d.invalid_condition), '') <> '' THEN ' | ' ELSE '' END || COALESCE(d.invalid_condition, '')), '') AS executionPlanSummary,
+            CONCAT_WS(' | ',
+                NULLIF(TRIM(COALESCE(d.valid_period, '')), ''),
+                NULLIF(TRIM(COALESCE(d.invalid_condition, '')), '')
+            ) AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
             p.plan_mode AS planMode,
             p.entry_zone AS entryZone,
@@ -110,7 +113,10 @@ public interface DecisionResultMapper {
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
-            NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(d.invalid_condition), '') <> '' THEN ' | ' ELSE '' END || COALESCE(d.invalid_condition, '')), '') AS executionPlanSummary,
+            CONCAT_WS(' | ',
+                NULLIF(TRIM(COALESCE(d.valid_period, '')), ''),
+                NULLIF(TRIM(COALESCE(d.invalid_condition, '')), '')
+            ) AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
             p.plan_mode AS planMode,
             p.entry_zone AS entryZone,
