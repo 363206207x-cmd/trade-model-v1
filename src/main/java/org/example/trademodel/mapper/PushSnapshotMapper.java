@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -63,14 +64,14 @@ public interface PushSnapshotMapper {
             "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB}) " +
             "AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP) " +
             "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
-            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= DATEADD('MINUTE', -#{minRetryMinutes}, CURRENT_TIMESTAMP)) " +
+            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= #{retryBeforeTime}) " +
             "ORDER BY s.push_id ASC " +
             "LIMIT #{limit}")
     List<TmPushSnapshotDO> listPendingRecheckNext(
             @Param("statusA") String statusA,
             @Param("statusB") String statusB,
             @Param("maxAttempts") int maxAttempts,
-            @Param("minRetryMinutes") int minRetryMinutes,
+            @Param("retryBeforeTime") LocalDateTime retryBeforeTime,
             @Param("limit") int limit);
 
     @Update("UPDATE tm_push_snapshot SET push_status = #{pushStatus} WHERE push_id = #{pushId}")

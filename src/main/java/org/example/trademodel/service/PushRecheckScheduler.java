@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -70,11 +71,12 @@ public class PushRecheckScheduler {
                         PENDING_PUSH_STATUS_CAPTURED, PENDING_PUSH_STATUS_WAITING);
                 return;
             }
+            LocalDateTime retryBeforeTime = LocalDateTime.now().minusMinutes(minRetryMinutes);
             List<TmPushSnapshotDO> pending = pushSnapshotMapper.listPendingRecheckNext(
                     PENDING_PUSH_STATUS_CAPTURED,
                     PENDING_PUSH_STATUS_WAITING,
                     maxAttempts,
-                    minRetryMinutes,
+                    retryBeforeTime,
                     defaultLimit);
             if (pending == null || pending.isEmpty()) {
                 return;
