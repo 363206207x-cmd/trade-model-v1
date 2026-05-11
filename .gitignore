@@ -17,3 +17,15 @@ target/
 *.log
 *.tmp
 *.swp
+
+# H2 file database artifacts (local dev only)
+# NOTE: `data/` here only refers to local H2 file DB / local dev data.
+# It must not be treated as business data for repository submission.
+data/
+*.mv.db
+*.trace.db
+*.lock.db
+
+# Local temporary backup artifacts
+backups/
+docs/residual-backups/
