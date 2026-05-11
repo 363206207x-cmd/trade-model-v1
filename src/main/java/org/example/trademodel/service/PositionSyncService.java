@@ -88,6 +88,12 @@ public class PositionSyncService {
                         startTime
                 );
                 if (affected == 0) {
+                    // 手动录入持仓保护：如果已经存在同 symbol 的手动 OPEN，则不要插入同步来源行，避免覆盖/歧义
+                    // （updateOpenPositionBySymbol 已排除了 MANUAL_INPUT，但 affected==0 仍可能触发 insert）。
+                    int manualOpenCount = realPositionMapper.countOpenManualPositionsBySymbol(symbol);
+                    if (manualOpenCount > 0) {
+                        continue;
+                    }
                     realPositionMapper.insertOpenPosition(
                             UUID.randomUUID().toString(),
                             symbol,
