@@ -19,6 +19,9 @@ import java.util.UUID;
 public class MissedOpportunityServiceImpl implements MissedOpportunityService {
 
     private static final String MISSED_RULE_VERSION = "missed-v1";
+    private static final String GOVERNANCE_MISSED_RULE_VERSION = "governance-missed-v1";
+    /** 治理性错过归因/阻断阈值，不是 confused 真值阈值。 */
+    private static final int missedGovernanceBlockThreshold = 70;
     private static final ObjectMapper REASON_JSON = new ObjectMapper();
 
     private final MissedOpportunityMapper missedOpportunityMapper;
@@ -42,9 +45,6 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
         if (hotResetWouldFire) {
             return;
         }
-        if (decision.getAssetState() == AssetStateEnum.INVALIDATED) {
-            return;
-        }
         if (symbol == null || symbol.isBlank()) {
             return;
         }
@@ -58,6 +58,7 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
         if (!listByDecisionId(decisionId).isEmpty()) {
             return;
         }
+        GovernanceBlockSnapshot governanceBlock = resolveGovernanceBlock(decision);
 
         MissedOpportunityDO row = new MissedOpportunityDO();
         row.setMissedId("mo-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
@@ -65,11 +66,44 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
         row.setAnalysisId(analysisId);
         row.setSymbol(symbol.trim());
         row.setBizDate(LocalDate.now());
-        row.setReasonJson(buildReasonJsonV1(decision, analysisId, decisionId, symbol, hotResetWouldFire));
-        row.setRuleVersion(MISSED_RULE_VERSION);
+        row.setReasonJson(buildReasonJsonV1(
+                decision, analysisId, decisionId, symbol, hotResetWouldFire, governanceBlock));
+        row.setRuleVersion(governanceBlock.blocked() ? GOVERNANCE_MISSED_RULE_VERSION : MISSED_RULE_VERSION);
         row.setTraceId(traceId);
         row.setCreateTime(LocalDateTime.now());
         missedOpportunityMapper.insert(row);
+    }
+
+    static boolean shouldBlockOrdinaryMissedByGovernance(DecisionBundleVO decision) {
+        return resolveGovernanceBlock(decision).blocked();
+    }
+
+    /**
+     * 最小可审计治理方案：在不改 schema 的前提下，治理性错过与普通 missed 共用一张表，
+     * 通过 ruleVersion + reasonJson.category/reasonCode/sourceState 区分，避免 silent skip。
+     */
+    static GovernanceBlockSnapshot resolveGovernanceBlock(DecisionBundleVO decision) {
+        if (decision == null) {
+            return new GovernanceBlockSnapshot(true, "GOVERNANCE_DECISION_NULL", "");
+        }
+        Integer confusedScore = decision.getConfusedScore();
+        if (confusedScore != null && confusedScore >= missedGovernanceBlockThreshold) {
+            return new GovernanceBlockSnapshot(true, "GOVERNANCE_CONFUSED_SCORE_BLOCK", "");
+        }
+        AssetStateEnum state = decision.getAssetState();
+        if (state == AssetStateEnum.CONFUSED) {
+            return new GovernanceBlockSnapshot(true, "GOVERNANCE_ASSET_STATE_CONFUSED", state.name());
+        }
+        if (state == AssetStateEnum.HIGH_RISK) {
+            return new GovernanceBlockSnapshot(true, "GOVERNANCE_ASSET_STATE_HIGH_RISK", state.name());
+        }
+        if (state == AssetStateEnum.INVALIDATED) {
+            return new GovernanceBlockSnapshot(true, "GOVERNANCE_ASSET_STATE_INVALIDATED", state.name());
+        }
+        if (state == AssetStateEnum.COOLING) {
+            return new GovernanceBlockSnapshot(true, "GOVERNANCE_ASSET_STATE_COOLING", state.name());
+        }
+        return new GovernanceBlockSnapshot(false, "", state != null ? state.name() : "");
     }
 
     private boolean hasOpenPositionForSymbol(String symbol) {
@@ -93,12 +127,19 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
     }
 
     private String buildReasonJsonV1(DecisionBundleVO decision, String analysisId, String decisionId, String symbol,
-                                     boolean hotResetWouldFire) {
+                                     boolean hotResetWouldFire, GovernanceBlockSnapshot governanceBlock) {
+        boolean governanceMissed = governanceBlock != null && governanceBlock.blocked();
         ObjectNode root = REASON_JSON.createObjectNode();
         root.put("version", "1");
-        root.put("rule", "WORTH_OPENING_NO_OPEN_POSITION_NOT_INVALIDATED_NOT_HOT_RESET");
-        root.put("whyMissed",
-                "Worth opening and no open position on symbol, but trade not executed in this system scope (minimal rule v1).");
+        root.put("category", governanceMissed ? "governance_missed" : "ordinary_missed");
+        root.put("rule", governanceMissed
+                ? "GOVERNANCE_BLOCKED_WORTH_OPENING_NO_OPEN_POSITION_NOT_HOT_RESET"
+                : "WORTH_OPENING_NO_OPEN_POSITION_NOT_INVALIDATED_NOT_HOT_RESET");
+        root.put("whyMissed", governanceMissed
+                ? "Missed by governance guard; blocked by confused/high_risk/invalidated/cooling or governance threshold."
+                : "Worth opening and no open position on symbol, but trade not executed in this system scope (minimal rule v1).");
+        root.put("governanceReasonCode", governanceMissed ? governanceBlock.reasonCode() : "");
+        root.put("governanceSourceState", governanceMissed ? governanceBlock.sourceState() : "");
         ObjectNode facts = REASON_JSON.createObjectNode();
         facts.put("isWorthOpening", Boolean.TRUE.equals(decision.getIsWorthOpening()));
         facts.put("assetState", decision.getAssetState() != null ? decision.getAssetState().name() : "");
@@ -175,5 +216,8 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
         }
         String t = value.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    record GovernanceBlockSnapshot(boolean blocked, String reasonCode, String sourceState) {
     }
 }
