@@ -34,11 +34,14 @@ public class PushSnapshotService {
 
     private final PushSnapshotMapper pushSnapshotMapper;
     private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    private final WatchlistPushEligibilityService watchlistPushEligibilityService;
 
     public PushSnapshotService(PushSnapshotMapper pushSnapshotMapper,
-                               AccountRiskSnapshotMapper accountRiskSnapshotMapper) {
+                               AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+                               WatchlistPushEligibilityService watchlistPushEligibilityService) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
+        this.watchlistPushEligibilityService = watchlistPushEligibilityService;
     }
 
     /**
@@ -54,6 +57,9 @@ public class PushSnapshotService {
                                             DecisionBundleVO decision, ExecutionPlanVO plan,
                                             Long accountRiskSnapshotId) {
         if (run == null || analysis == null || decision == null || plan == null) {
+            return;
+        }
+        if (!isWatchlistEligible(analysis.getSymbol())) {
             return;
         }
         if (!Boolean.TRUE.equals(decision.getIsWorthOpening())) {
@@ -90,6 +96,17 @@ public class PushSnapshotService {
         row.setExpiresAt(decision.getPushExpiresAt());
 
         pushSnapshotMapper.insert(row);
+    }
+
+    private boolean isWatchlistEligible(String symbol) {
+        if (watchlistPushEligibilityService == null) {
+            return false;
+        }
+        try {
+            return watchlistPushEligibilityService.isEligibleForDirectionalPush(symbol);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

@@ -14,6 +14,7 @@ import org.example.trademodel.service.PushRecheckService;
 import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
+import org.example.trademodel.service.WatchlistPushEligibilityService;
 import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
@@ -52,15 +53,18 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final PushRecheckDispatchConfigService dispatchConfigService;
+    private final WatchlistPushEligibilityService watchlistPushEligibilityService;
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
                                   AccountRiskSnapshotMapper accountRiskSnapshotMapper,
                                   PushRecheckLogMapper pushRecheckLogMapper,
-                                  PushRecheckDispatchConfigService dispatchConfigService) {
+                                  PushRecheckDispatchConfigService dispatchConfigService,
+                                  WatchlistPushEligibilityService watchlistPushEligibilityService) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.dispatchConfigService = dispatchConfigService;
+        this.watchlistPushEligibilityService = watchlistPushEligibilityService;
     }
 
     @Override
@@ -96,43 +100,50 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.INVALIDATED;
             message = "未找到推送快照，无法二次校验";
             failReasonJson = failJson("SNAPSHOT_NOT_FOUND", "push_id=" + pushId);
-        } else if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
-            status = RecheckStatusEnum.INVALIDATED;
-            message = "当前价格无效，无法二次校验";
-            failReasonJson = failJson("PRICE_REQUIRED", "current_price null or non-positive");
-        } else if (snap.getExpiresAt() != null && now.isAfter(snap.getExpiresAt())) {
-            status = RecheckStatusEnum.EXPIRED;
-            message = "推送已过期";
-            failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
         } else {
-            accountRiskSnapshot = resolveAccountRiskSnapshot(snap);
-            currentAccountRiskAllowed = accountRiskSnapshot != null ? accountRiskSnapshot.getRiskAllowed() : null;
-            String invHit = evaluateStructuredInvalidation(snap.getInvalidationConditionJson(), currentPrice);
-            if (invHit != null) {
+            WatchlistGateResult watchlistGate = evaluateWatchlistGate(snap);
+            if (watchlistGate != null) {
+                status = watchlistGate.status;
+                message = watchlistGate.message;
+                failReasonJson = watchlistGate.failReasonJson;
+            } else if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 status = RecheckStatusEnum.INVALIDATED;
-                message = "命中快照中的失效条件";
-                failReasonJson = failJson("INVALIDATION_HIT", invHit);
-            } else if (snap.getTriggerPrice() != null
-                    && snap.getTriggerPrice().compareTo(BigDecimal.ZERO) > 0) {
-                priceDriftRatio = currentPrice.subtract(snap.getTriggerPrice()).abs()
-                        .divide(snap.getTriggerPrice(), 8, RoundingMode.HALF_UP);
-                if (priceDriftRatio.compareTo(DRIFT_RATIO_THRESHOLD) > 0) {
-                    status = RecheckStatusEnum.DRIFTED;
-                    message = "相对快照基准价漂移超过阈值";
-                    failReasonJson = failJson("DRIFT",
-                            "threshold=" + DRIFT_RATIO_THRESHOLD + ",ratio=" + priceDriftRatio);
+                message = "当前价格无效，无法二次校验";
+                failReasonJson = failJson("PRICE_REQUIRED", "current_price null or non-positive");
+            } else if (snap.getExpiresAt() != null && now.isAfter(snap.getExpiresAt())) {
+                status = RecheckStatusEnum.EXPIRED;
+                message = "推送已过期";
+                failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
+            } else {
+                accountRiskSnapshot = resolveAccountRiskSnapshot(snap);
+                currentAccountRiskAllowed = accountRiskSnapshot != null ? accountRiskSnapshot.getRiskAllowed() : null;
+                String invHit = evaluateStructuredInvalidation(snap.getInvalidationConditionJson(), currentPrice);
+                if (invHit != null) {
+                    status = RecheckStatusEnum.INVALIDATED;
+                    message = "命中快照中的失效条件";
+                    failReasonJson = failJson("INVALIDATION_HIT", invHit);
+                } else if (snap.getTriggerPrice() != null
+                        && snap.getTriggerPrice().compareTo(BigDecimal.ZERO) > 0) {
+                    priceDriftRatio = currentPrice.subtract(snap.getTriggerPrice()).abs()
+                            .divide(snap.getTriggerPrice(), 8, RoundingMode.HALF_UP);
+                    if (priceDriftRatio.compareTo(DRIFT_RATIO_THRESHOLD) > 0) {
+                        status = RecheckStatusEnum.DRIFTED;
+                        message = "相对快照基准价漂移超过阈值";
+                        failReasonJson = failJson("DRIFT",
+                                "threshold=" + DRIFT_RATIO_THRESHOLD + ",ratio=" + priceDriftRatio);
+                    } else {
+                        status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
+                        message = statusMessage(status, currentAccountRiskAllowed);
+                        failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
+                    }
                 } else {
+                    priceDriftRatio = null;
                     status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
-                    message = statusMessage(status, currentAccountRiskAllowed);
+                    message = status == RecheckStatusEnum.VALID_EXECUTABLE
+                            ? "二次确认通过，可执行（未配置 trigger_price，跳过漂移检测）"
+                            : statusMessage(status, currentAccountRiskAllowed);
                     failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
                 }
-            } else {
-                priceDriftRatio = null;
-                status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
-                message = status == RecheckStatusEnum.VALID_EXECUTABLE
-                        ? "二次确认通过，可执行（未配置 trigger_price，跳过漂移检测）"
-                        : statusMessage(status, currentAccountRiskAllowed);
-                failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
             }
         }
 
@@ -401,6 +412,32 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         return null;
     }
 
+    private WatchlistGateResult evaluateWatchlistGate(TmPushSnapshotDO snap) {
+        String symbol = trimToNull(snap != null ? snap.getSymbol() : null);
+        if (symbol == null) {
+            return new WatchlistGateResult(
+                    RecheckStatusEnum.INVALIDATED,
+                    "推送快照缺少 symbol，无法确认观察列表资格",
+                    failJson("WATCHLIST_SYMBOL_MISSING", "snapshot symbol blank"));
+        }
+        try {
+            boolean eligible = watchlistPushEligibilityService != null
+                    && watchlistPushEligibilityService.isEligibleForDirectionalPush(symbol);
+            if (!eligible) {
+                return new WatchlistGateResult(
+                        RecheckStatusEnum.INVALIDATED,
+                        "当前资产不在后端推送观察列表中，已阻断复核",
+                        failJson("WATCHLIST_NOT_ELIGIBLE", "symbol=" + symbol));
+            }
+            return null;
+        } catch (Exception e) {
+            return new WatchlistGateResult(
+                    RecheckStatusEnum.INVALIDATED,
+                    "观察列表资格读取失败，已阻断复核",
+                    failJson("WATCHLIST_ELIGIBILITY_ERROR", e.getClass().getSimpleName()));
+        }
+    }
+
     private TmAccountRiskSnapshotDO resolveAccountRiskSnapshot(TmPushSnapshotDO snap) {
         if (snap == null || snap.getAccountRiskSnapshotId() == null) {
             return null;
@@ -571,6 +608,18 @@ public class PushRecheckServiceImpl implements PushRecheckService {
 
     private static String blankToNull(String value) {
         return trimToNull(value);
+    }
+
+    private static final class WatchlistGateResult {
+        private final RecheckStatusEnum status;
+        private final String message;
+        private final String failReasonJson;
+
+        private WatchlistGateResult(RecheckStatusEnum status, String message, String failReasonJson) {
+            this.status = status;
+            this.message = message;
+            this.failReasonJson = failReasonJson;
+        }
     }
 
 }

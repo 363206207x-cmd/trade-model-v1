@@ -9,6 +9,7 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
+import org.example.trademodel.service.WatchlistPushEligibilityService;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,16 +43,20 @@ class PushRecheckServiceImplTest {
     private PushRecheckLogMapper pushRecheckLogMapper;
     @Mock
     private PushRecheckDispatchConfigService dispatchConfigService;
+    @Mock
+    private WatchlistPushEligibilityService watchlistPushEligibilityService;
 
     private PushRecheckServiceImpl service;
 
     @BeforeEach
     void setUp() {
+        lenient().when(watchlistPushEligibilityService.isEligibleForDirectionalPush("BTCUSDT")).thenReturn(true);
         service = new PushRecheckServiceImpl(
                 pushSnapshotMapper,
                 accountRiskSnapshotMapper,
                 pushRecheckLogMapper,
-                dispatchConfigService);
+                dispatchConfigService,
+                watchlistPushEligibilityService);
     }
 
     @Test
@@ -61,6 +67,59 @@ class PushRecheckServiceImplTest {
         assertThat(r.isValid()).isFalse();
         verify(pushRecheckLogMapper).insert(any());
         verify(pushSnapshotMapper).updatePushStatus(1L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void watchlistNotEligible_invalidatedAndLogsReason() {
+        TmPushSnapshotDO s = baseSnap();
+        when(pushSnapshotMapper.selectByPushId(12L)).thenReturn(s);
+        when(watchlistPushEligibilityService.isEligibleForDirectionalPush("BTCUSDT")).thenReturn(false);
+
+        RecheckResult r = service.recheck(12L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(r.isValid()).isFalse();
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getFailReasonJson()).contains("WATCHLIST_NOT_ELIGIBLE");
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("WATCHLIST_NOT_ELIGIBLE");
+        verify(pushSnapshotMapper).updatePushStatus(12L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void watchlistSymbolMissing_invalidatedAndLogsReason() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol(" ");
+        when(pushSnapshotMapper.selectByPushId(13L)).thenReturn(s);
+
+        RecheckResult r = service.recheck(13L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getFailReasonJson()).contains("WATCHLIST_SYMBOL_MISSING");
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("WATCHLIST_SYMBOL_MISSING");
+        verify(pushSnapshotMapper).updatePushStatus(13L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void watchlistEligibilityThrows_invalidatedAndLogsReason() {
+        TmPushSnapshotDO s = baseSnap();
+        when(pushSnapshotMapper.selectByPushId(14L)).thenReturn(s);
+        when(watchlistPushEligibilityService.isEligibleForDirectionalPush("BTCUSDT"))
+                .thenThrow(new IllegalStateException("rule config unavailable"));
+
+        RecheckResult r = service.recheck(14L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getFailReasonJson()).contains("WATCHLIST_ELIGIBILITY_ERROR");
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("WATCHLIST_ELIGIBILITY_ERROR");
+        verify(pushSnapshotMapper).updatePushStatus(14L, "RECHECK_INVALIDATED");
     }
 
     @Test
@@ -364,6 +423,7 @@ class PushRecheckServiceImplTest {
 
     private static TmPushSnapshotDO baseSnap() {
         TmPushSnapshotDO s = new TmPushSnapshotDO();
+        s.setSymbol("BTCUSDT");
         s.setExpiresAt(LocalDateTime.now().plusHours(1));
         return s;
     }
