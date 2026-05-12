@@ -133,6 +133,23 @@
         .provider-state.neutral { color: var(--text-secondary); }
         .provider-state.ok { color: var(--status-ok); font-weight: 600; }
         .provider-state.warn { color: var(--status-warn); font-weight: 600; }
+        .watchlist-status-panel {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-subtle);
+        }
+        .watchlist-status-panel .watchlist-title {
+            margin-bottom: 7px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .watchlist-status-panel .watchlist-note {
+            margin-top: 8px;
+            color: var(--text-secondary);
+            font-size: 0.76rem;
+            line-height: 1.45;
+        }
 
         .hot-block {
             margin-top: 8px;
@@ -799,6 +816,10 @@
             <div class="card" id="cardSystem">
                 <h3>系统摘要</h3>
                 <div id="layer1-system"></div>
+                <div id="watchlistStatusPanel" class="watchlist-status-panel" aria-live="polite">
+                    <div class="watchlist-title">重点观察推送范围</div>
+                    <div class="empty-hint">正在读取观察范围...</div>
+                </div>
             </div>
             <div class="card" id="cardPriority">
                 <h3>高优先级提醒</h3>
@@ -1452,6 +1473,86 @@
                 window.__providerStatusText = "状态待确认";
                 window.__providerStatusClass = "neutral";
                 updateProviderStatusDisplay();
+            });
+    }
+
+    function apiEnvelopeData(resp) {
+        return resp && typeof resp === "object" && Object.prototype.hasOwnProperty.call(resp, "data")
+            ? resp.data
+            : resp;
+    }
+
+    function normalizeWatchlistSymbols(symbols) {
+        if (!Array.isArray(symbols)) return [];
+        return symbols.map(function (s) {
+            return String(s || "").trim().toUpperCase();
+        }).filter(Boolean);
+    }
+
+    function formatWatchlistAudit(audit) {
+        if (!audit || typeof audit !== "object") return "—";
+        var who = audit.changedBy || audit.changed_by || "operator";
+        var when = audit.createTime || audit.create_time;
+        var whenText = when ? formatDateTime(when) : "";
+        return whenText ? (who + " / " + whenText) : who;
+    }
+
+    function renderWatchlistStatus(config, audit) {
+        var panel = document.getElementById("watchlistStatusPanel");
+        if (!panel) return;
+        var data = config || {};
+        var enabled = data.enabled === true;
+        var symbols = normalizeWatchlistSymbols(data.symbols);
+        var source = data.ruleKey || data.rule_key || "push.watchlist.symbols";
+        var ruleValue = data.ruleValue || data.rule_value || symbols.join(",");
+        var statusText = enabled ? "启用" : "禁用";
+        var symbolText = symbols.length ? symbols.join(", ") : "—";
+        var note = "";
+        if (!enabled) {
+            note = "观察推送已禁用。";
+        } else if (!symbols.length) {
+            note = "当前未配置观察资产，推送候选关闭。";
+        }
+        panel.innerHTML =
+            '<div class="watchlist-title">重点观察推送范围</div>' +
+            '<div class="kv"><span class="k">状态</span><span class="v">' + escapeHtml(statusText) + '</span></div>' +
+            '<div class="kv"><span class="k">观察资产</span><span class="v">' + escapeHtml(symbolText) + '</span></div>' +
+            '<div class="kv"><span class="k">数量</span><span class="v">' + symbols.length + '</span></div>' +
+            '<div class="kv"><span class="k">配置来源</span><span class="v">' + escapeHtml(source || "push.watchlist.symbols") + '</span></div>' +
+            '<div class="kv"><span class="k">ruleValue</span><span class="v">' + escapeHtml(ruleValue || "—") + '</span></div>' +
+            '<div class="kv"><span class="k">最近变更</span><span class="v">' + escapeHtml(formatWatchlistAudit(audit)) + '</span></div>' +
+            (note ? '<div class="watchlist-note">' + escapeHtml(note) + '</div>' : '') +
+            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非 watchlist 不进入推送候选。</div>';
+    }
+
+    function renderWatchlistStatusError() {
+        var panel = document.getElementById("watchlistStatusPanel");
+        if (!panel) return;
+        panel.innerHTML =
+            '<div class="watchlist-title">重点观察推送范围</div>' +
+            '<div class="watchlist-note">读取失败，按 fail-closed 处理。</div>' +
+            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非 watchlist 不进入推送候选。</div>';
+    }
+
+    function loadWatchlistStatus() {
+        var auditRequest = fetch("/api/rule/push-watchlist/audit?limit=1")
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (resp) {
+                var rows = apiEnvelopeData(resp);
+                return Array.isArray(rows) && rows.length ? rows[0] : null;
+            })
+            .catch(function () { return null; });
+
+        return fetch("/api/rule/push-watchlist")
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (resp) {
+                var config = apiEnvelopeData(resp);
+                return auditRequest.then(function (audit) {
+                    renderWatchlistStatus(config, audit);
+                });
+            })
+            .catch(function () {
+                renderWatchlistStatusError();
             });
     }
 
@@ -2536,6 +2637,7 @@
     }
 
     function refreshDashboard() {
+        loadWatchlistStatus();
         fetch("/api/dashboard/summary?limit=12")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (data) {
