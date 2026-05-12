@@ -177,6 +177,66 @@
             line-height: 1.4;
             word-break: break-word;
         }
+        .watchlist-editor-shell {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-subtle);
+        }
+        .watchlist-editor {
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px dashed var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .watchlist-editor[hidden] { display: none; }
+        .watchlist-editor-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 7px;
+        }
+        .watchlist-editor label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+        }
+        .watchlist-editor input[type="text"],
+        .watchlist-editor textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            padding: 6px 7px;
+            font: inherit;
+            font-size: 0.78rem;
+        }
+        .watchlist-editor textarea {
+            min-height: 54px;
+            resize: vertical;
+        }
+        .watchlist-editor .watchlist-check {
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+        }
+        .watchlist-editor-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .watchlist-editor-message {
+            margin-top: 6px;
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+            line-height: 1.4;
+        }
+        .watchlist-editor-message.error { color: var(--status-error); }
+        .watchlist-editor-message.ok { color: var(--status-ok); }
 
         .hot-block {
             margin-top: 8px;
@@ -969,6 +1029,8 @@
     var MODE_LS_KEY = "trine_dashboard_mode";
     var showNavSection = function () {};
     var positionProviderStatus = { text: "状态待确认", className: "neutral" };
+    var currentWatchlistConfig = null;
+    var watchlistEditorFlash = null;
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
@@ -1577,6 +1639,160 @@
             '</div>';
     }
 
+    function renderWatchlistEditor() {
+        var flash = watchlistEditorFlash || "";
+        var messageClass = flash ? " ok" : "";
+        return '<div class="watchlist-editor-shell">' +
+            '<button type="button" class="btn" id="watchlistEditBtn">编辑观察列表</button>' +
+            '<div id="watchlistEditorMessage" class="watchlist-editor-message' + messageClass + '">' + escapeHtml(flash) + '</div>' +
+            '<div class="watchlist-editor" id="watchlistEditor" hidden>' +
+            '<div class="watchlist-note">当前编辑的是观察库 Watchlist Pool；首页默认展示位 Display Slots 不等于推送全集，首页可默认展示 6 个资产。</div>' +
+            '<div class="watchlist-note">观察库可包含更多资产；非观察库资产不进入推送候选。低频扫描 / 机会提升为后续阶段，不在 P2C。</div>' +
+            '<div class="watchlist-note">仅人工配置，非交易指令，不自动下单。</div>' +
+            '<div class="watchlist-editor-grid">' +
+            '<label>观察库资产 symbols<textarea id="watchlistSymbolsInput" placeholder="BTCUSDT, ETHUSDT"></textarea></label>' +
+            '<label class="watchlist-check"><input type="checkbox" id="watchlistEnabledInput"> 启用观察推送</label>' +
+            '<label>操作人<input type="text" id="watchlistOperatorInput" autocomplete="off"></label>' +
+            '<label>配置变更原因<textarea id="watchlistReasonInput"></textarea></label>' +
+            '</div>' +
+            '<div class="watchlist-note">空列表将关闭推送候选；禁用后不会生成观察推送。</div>' +
+            '<div class="watchlist-editor-actions">' +
+            '<button type="button" class="btn" id="watchlistSaveBtn">保存配置</button>' +
+            '<button type="button" class="btn" id="watchlistCancelBtn">取消</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+    }
+
+    function bindWatchlistEditorControls() {
+        var editBtn = document.getElementById("watchlistEditBtn");
+        var saveBtn = document.getElementById("watchlistSaveBtn");
+        var cancelBtn = document.getElementById("watchlistCancelBtn");
+        if (editBtn) editBtn.addEventListener("click", openWatchlistEditor);
+        if (saveBtn) saveBtn.addEventListener("click", submitWatchlistConfig);
+        if (cancelBtn) cancelBtn.addEventListener("click", closeWatchlistEditor);
+    }
+
+    function setWatchlistEditorMessage(text, type) {
+        var el = document.getElementById("watchlistEditorMessage");
+        if (!el) return;
+        el.textContent = text || "";
+        el.className = "watchlist-editor-message" + (type ? " " + type : "");
+    }
+
+    function openWatchlistEditor() {
+        var editor = document.getElementById("watchlistEditor");
+        if (!editor) return;
+        var config = currentWatchlistConfig || {};
+        var symbols = normalizeWatchlistSymbols(config.symbols);
+        var symbolsInput = document.getElementById("watchlistSymbolsInput");
+        var enabledInput = document.getElementById("watchlistEnabledInput");
+        var operatorInput = document.getElementById("watchlistOperatorInput");
+        var reasonInput = document.getElementById("watchlistReasonInput");
+        var editBtn = document.getElementById("watchlistEditBtn");
+        if (symbolsInput) symbolsInput.value = symbols.join(", ");
+        if (enabledInput) enabledInput.checked = config.enabled === true;
+        if (operatorInput) operatorInput.value = "";
+        if (reasonInput) reasonInput.value = "";
+        setWatchlistEditorMessage("", "");
+        editor.hidden = false;
+        if (editBtn) editBtn.hidden = true;
+    }
+
+    function closeWatchlistEditor() {
+        var editor = document.getElementById("watchlistEditor");
+        var editBtn = document.getElementById("watchlistEditBtn");
+        if (editor) editor.hidden = true;
+        if (editBtn) editBtn.hidden = false;
+        setWatchlistEditorMessage("", "");
+    }
+
+    function parseWatchlistSymbols(input) {
+        if (!input) return [];
+        return String(input)
+            .split(/[\s,，]+/)
+            .map(function (s) { return String(s || "").trim().toUpperCase(); })
+            .filter(Boolean);
+    }
+
+    function validateWatchlistForm(draft) {
+        if (!draft.operator) return "操作人必填。";
+        if (!draft.reason) return "配置变更原因必填。";
+        return "";
+    }
+
+    function buildWatchlistConfirmText(beforeConfig, draft) {
+        var beforeSymbols = formatWatchlistSymbolValue((beforeConfig && beforeConfig.symbols) || []);
+        var afterSymbols = draft.symbols.length ? draft.symbols.join(", ") : "空";
+        var beforeEnabled = formatWatchlistEnabledValue(beforeConfig && beforeConfig.enabled);
+        var afterEnabled = draft.enabled ? "启用" : "禁用";
+        var lines = [
+            "保存前确认",
+            "原观察列表：" + beforeSymbols,
+            "新观察列表：" + afterSymbols,
+            "原启用状态：" + beforeEnabled,
+            "新启用状态：" + afterEnabled,
+            "操作人：" + draft.operator,
+            "变更原因：" + draft.reason,
+            "当前编辑的是观察库 Watchlist Pool，不是首页展示位 Display Slots。",
+            "首页默认展示位不等于推送全集；首页可默认展示 6 个资产。",
+            "观察库可包含更多资产；非观察库资产不进入推送候选。",
+            "低频扫描 / 机会提升为后续阶段，不在 P2C。",
+            "仅人工配置，非交易指令，不自动下单。"
+        ];
+        if (!draft.symbols.length) {
+            lines.push("空列表将关闭推送候选。");
+        }
+        if (!draft.enabled) {
+            lines.push("禁用后不会生成观察推送，继续 fail-closed。");
+        }
+        return lines.join("\n");
+    }
+
+    function submitWatchlistConfig() {
+        var symbolsInput = document.getElementById("watchlistSymbolsInput");
+        var enabledInput = document.getElementById("watchlistEnabledInput");
+        var operatorInput = document.getElementById("watchlistOperatorInput");
+        var reasonInput = document.getElementById("watchlistReasonInput");
+        var saveBtn = document.getElementById("watchlistSaveBtn");
+        var draft = {
+            symbols: parseWatchlistSymbols(symbolsInput ? symbolsInput.value : ""),
+            enabled: !!(enabledInput && enabledInput.checked),
+            operator: operatorInput ? operatorInput.value.trim() : "",
+            reason: reasonInput ? reasonInput.value.trim() : ""
+        };
+        var error = validateWatchlistForm(draft);
+        if (error) {
+            setWatchlistEditorMessage(error, "error");
+            return;
+        }
+        if (!window.confirm(buildWatchlistConfirmText(currentWatchlistConfig, draft))) {
+            return;
+        }
+        if (saveBtn) saveBtn.disabled = true;
+        setWatchlistEditorMessage("保存中...", "");
+        fetch("/api/rule/push-watchlist", {
+            method:"POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(draft)
+        })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("保存失败，配置未更新")); })
+            .then(function (resp) {
+                if (resp && typeof resp === "object" && resp.code && Number(resp.code) !== 200) {
+                    throw new Error(resp.msg || "保存失败，配置未更新");
+                }
+                watchlistEditorFlash = "保存成功，配置已更新";
+                return loadWatchlistStatus();
+            })
+            .catch(function (err) {
+                var message = err && err.message ? err.message : "保存失败，配置未更新";
+                setWatchlistEditorMessage(message, "error");
+            })
+            .finally(function () {
+                if (saveBtn) saveBtn.disabled = false;
+            });
+    }
+
     function renderWatchlistStatus(config, audits, auditFailed) {
         var panel = document.getElementById("watchlistStatusPanel");
         if (!panel) return;
@@ -1588,6 +1804,12 @@
         var statusText = enabled ? "启用" : "禁用";
         var symbolText = symbols.length ? symbols.join(", ") : "—";
         var note = "";
+        currentWatchlistConfig = {
+            symbols: symbols,
+            enabled: enabled,
+            ruleKey: source,
+            ruleValue: ruleValue || ""
+        };
         if (!enabled) {
             note = "观察推送已禁用。";
         } else if (!symbols.length) {
@@ -1603,16 +1825,19 @@
             '<div class="kv"><span class="k">最近变更</span><span class="v">只读记录</span></div>' +
             renderWatchlistAuditList(audits, auditFailed) +
             (note ? '<div class="watchlist-note">' + escapeHtml(note) + '</div>' : '') +
-            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非 watchlist 不进入推送候选。</div>';
+            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非观察库资产不进入推送候选。</div>' +
+            renderWatchlistEditor();
+        bindWatchlistEditorControls();
     }
 
     function renderWatchlistStatusError() {
         var panel = document.getElementById("watchlistStatusPanel");
         if (!panel) return;
+        currentWatchlistConfig = null;
         panel.innerHTML =
             '<div class="watchlist-title">重点观察推送范围</div>' +
             '<div class="watchlist-note">读取失败，按 fail-closed 处理。</div>' +
-            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非 watchlist 不进入推送候选。</div>';
+            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非观察库资产不进入推送候选。</div>';
     }
 
     function loadWatchlistStatus() {
