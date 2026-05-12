@@ -113,6 +113,26 @@ CREATE TABLE IF NOT EXISTS tm_rule_config (
     enabled BOOLEAN DEFAULT TRUE
 );
 
+CREATE TABLE IF NOT EXISTS tm_push_watchlist_config_audit (
+    audit_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    rule_key VARCHAR(100) NOT NULL,
+    before_symbols TEXT,
+    after_symbols TEXT,
+    before_enabled BOOLEAN,
+    after_enabled BOOLEAN,
+    changed_by VARCHAR(64),
+    change_reason VARCHAR(512),
+    source VARCHAR(64),
+    trace_id VARCHAR(64),
+    rule_version VARCHAR(20),
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_push_watchlist_config_audit_time
+    ON tm_push_watchlist_config_audit(create_time);
+CREATE INDEX IF NOT EXISTS idx_tm_push_watchlist_config_audit_rule_time
+    ON tm_push_watchlist_config_audit(rule_key, create_time);
+
 CREATE TABLE IF NOT EXISTS tm_user_config (
     user_id VARCHAR(64) PRIMARY KEY,
     risk_preference VARCHAR(50),
