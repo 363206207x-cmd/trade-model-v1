@@ -926,17 +926,17 @@
         <div class="layer2-head">
             <span class="module-title">市场机会与风险总览</span>
             <div class="ctl">
-                <label class="muted">模式
-                    <select id="modeSelect" class="btn" title="系统推荐：展示全部决策前 6 条；自定义监控：仅展示已加入本机列表的标的">
-                        <option value="system">系统推荐</option>
-                        <option value="custom">自定义监控</option>
+                <label class="muted">展示
+                    <select id="modeSelect" class="btn" title="首页展示位 Display Slots：最多 6 个资产，只影响首页显示">
+                        <option value="display">首页展示位</option>
                     </select>
                 </label>
                 <span id="modeHint" class="sort-hint" aria-live="polite"></span>
-                <input type="search" id="symbolSearch" placeholder="搜索币种，如 BTCUSDT" autocomplete="off">
+                <input type="search" id="symbolSearch" placeholder="搜索或添加首页展示位，如 BTCUSDT" autocomplete="off">
                 <button type="button" class="btn" id="btnAdd">添加</button>
                 <button type="button" class="btn" id="btnReset">恢复默认</button>
-                <span class="sort-hint">排序：按决策时间倒序 · 最多展示 6 个标的</span>
+                <span class="sort-hint">Display Slots · 最多 6 个 · 当前展示只影响首页，不代表推送候选</span>
+                <span class="sort-hint">观察库 / Watchlist Pool 决定推送候选；非观察库资产不进入推送候选</span>
             </div>
         </div>
         <div class="tiles-row" id="tilesRow"></div>
@@ -1024,9 +1024,9 @@
     var detailScoreTopItemsMap = {};
     var selectedSymbol = null;
     var searchQuery = "";
-    var modeValue = "system";
-    var CUSTOM_LS_KEY = "trine_dashboard_custom_symbols";
-    var MODE_LS_KEY = "trine_dashboard_mode";
+    var modeValue = "display";
+    var DISPLAY_SLOTS_LS_KEY = "tradeModel.displaySlots.v1";
+    var DEFAULT_DISPLAY_SLOTS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"];
     var showNavSection = function () {};
     var positionProviderStatus = { text: "状态待确认", className: "neutral" };
     var currentWatchlistConfig = null;
@@ -1035,20 +1035,74 @@
     window.__providerStatusClass = "neutral";
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
-    function loadCustomSymbols() {
+    function getDefaultDisplaySlots() {
+        return DEFAULT_DISPLAY_SLOTS.slice();
+    }
+
+    function normalizeDisplaySlots(symbols) {
+        var source = Array.isArray(symbols) ? symbols : [];
+        var seen = {};
+        var result = [];
+        source.forEach(function (s) {
+            var symbol = String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+            if (!symbol || seen[symbol] || result.length >= 6) return;
+            seen[symbol] = true;
+            result.push(symbol);
+        });
+        return result;
+    }
+
+    function loadDisplaySlots() {
         try {
-            var raw = localStorage.getItem(CUSTOM_LS_KEY);
-            if (!raw) return [];
+            var raw = localStorage.getItem(DISPLAY_SLOTS_LS_KEY);
+            if (!raw) return getDefaultDisplaySlots();
             var a = JSON.parse(raw);
-            if (!Array.isArray(a)) return [];
-            return a.map(function (s) { return String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""); }).filter(Boolean);
+            var normalized = normalizeDisplaySlots(a);
+            return normalized.length ? normalized : getDefaultDisplaySlots();
         } catch (e) {
-            return [];
+            return getDefaultDisplaySlots();
         }
     }
 
-    function saveCustomSymbols(arr) {
-        localStorage.setItem(CUSTOM_LS_KEY, JSON.stringify(arr || []));
+    function saveDisplaySlots(symbols) {
+        var normalized = normalizeDisplaySlots(symbols);
+        if (!normalized.length) normalized = getDefaultDisplaySlots();
+        localStorage.setItem(DISPLAY_SLOTS_LS_KEY, JSON.stringify(normalized));
+        return normalized;
+    }
+
+    function addDisplaySlot(symbol) {
+        var normalized = normalizeDisplaySlots([symbol]);
+        if (!normalized.length) {
+            return { ok: false, message: "请输入币种代码，例如 BTCUSDT" };
+        }
+        var target = normalized[0];
+        var slots = loadDisplaySlots();
+        if (slots.indexOf(target) >= 0) {
+            return { ok: true, slots: slots, message: target + " 已在首页展示位" };
+        }
+        if (slots.length >= 6) {
+            return { ok: false, message: "首页展示位最多 6 个，请先移除一个" };
+        }
+        slots.push(target);
+        return { ok: true, slots: saveDisplaySlots(slots), message: target + " 已加入首页展示位" };
+    }
+
+    function removeDisplaySlot(symbol) {
+        var target = normalizeDisplaySlots([symbol])[0];
+        if (!target) return loadDisplaySlots();
+        var next = loadDisplaySlots().filter(function (s) { return s !== target; });
+        return saveDisplaySlots(next);
+    }
+
+    function resetDisplaySlots() {
+        return saveDisplaySlots(getDefaultDisplaySlots());
+    }
+
+    function renderDisplaySlotMeta() {
+        var el = document.getElementById("modeHint");
+        if (!el) return;
+        el.textContent = "首页展示位 / Display Slots · 已保存 " + loadDisplaySlots().length + "/6 · 不是推送全集";
     }
 
     /**
@@ -1068,13 +1122,7 @@
     }
 
     function updateModeHint() {
-        var el = document.getElementById("modeHint");
-        if (!el) return;
-        if (modeValue === "system") {
-            el.textContent = "当前：系统推荐 · 决策时间倒序取前 6 条";
-        } else {
-            el.textContent = "当前：自定义监控 · 本机已保存 " + loadCustomSymbols().length + " 个标的（仅浏览器）";
-        }
+        renderDisplaySlotMeta();
     }
 
     function escapeHtml(value) {
@@ -1884,22 +1932,20 @@
         text.textContent = "系统运行中";
     }
 
-    /** 中层最多 6 条：list.slice(0, 6)，禁止渲染第 7、8 个币。 */
+    /** 中层最多 6 条：由 Display Slots 控制，缺少当前决策的资产跳过，不请求新后端。 */
     function buildDisplayList() {
         var list = allDecisions.slice();
-        if (modeValue === "custom") {
-            var want = loadCustomSymbols();
-            if (!want.length) {
-                list = [];
-            } else {
-                var set = {};
-                want.forEach(function (s) { set[s] = true; });
-                list = list.filter(function (d) {
-                    var key = (d.symbol || "").toUpperCase();
-                    return set[key];
-                });
-            }
-        }
+        var slots = loadDisplaySlots();
+        var slotOrder = {};
+        slots.forEach(function (s, idx) { slotOrder[s] = idx; });
+        list = list.filter(function (d) {
+            var key = (d.symbol || "").toUpperCase();
+            return Object.prototype.hasOwnProperty.call(slotOrder, key);
+        }).sort(function (a, b) {
+            var ak = (a.symbol || "").toUpperCase();
+            var bk = (b.symbol || "").toUpperCase();
+            return (slotOrder[ak] || 0) - (slotOrder[bk] || 0);
+        });
         var q = (searchQuery || "").trim().toUpperCase();
         if (q) {
             list = list.filter(function (d) {
@@ -2055,12 +2101,9 @@
     function renderTiles() {
         var box = document.getElementById("tilesRow");
         if (!displayDecisions.length) {
-            var emptyMsg = "暂无决策数据（等待首轮分析）";
-            if (modeValue === "custom") {
-                emptyMsg = loadCustomSymbols().length
-                    ? "自定义列表中的标的暂无决策记录，或已被搜索过滤。"
-                    : "自定义监控列表为空：请切换到本模式后在搜索框输入如 BTCUSDT 并点「添加」加入本机列表（仅存浏览器）。";
-            }
+            var emptyMsg = loadDisplaySlots().length
+                ? "首页展示位中的资产暂无决策记录，或已被搜索过滤。Display Slots 只影响首页显示。"
+                : "首页展示位为空，已恢复默认 6 个资产。";
             box.innerHTML = '<div class="card tile-full" style="text-align:center;padding:24px;"><span class="empty-hint">' + escapeHtml(emptyMsg) + "</span></div>";
             renderDetail(null);
             return;
@@ -2082,7 +2125,7 @@
                     escapeHtml(normalizeReadableText(conclusionTrim)) + "</div>"
                 : "";
             return '<div class="coin-tile bias-' + bcls + sel + '" data-symbol="' + escapeHtml(d.symbol || "") + '" data-idx="' + idx + '">' +
-                '<button type="button" class="tile-del" data-symbol="' + escapeHtml(d.symbol || "") + '" title="自定义模式下可从本机列表移除">×</button>' +
+                '<button type="button" class="tile-del" data-symbol="' + escapeHtml(d.symbol || "") + '" title="从首页展示位移除">×</button>' +
                 '<div class="sym"><span>' + escapeHtml(d.symbol || "—") + '</span>' +
                 (pos ? '<span class="mini-tag" style="color:var(--brand-accent);border-color:rgba(56,189,248,0.4);">持仓中' + (sideHint !== "—" ? " · " + sideHint : "") + '</span>' : "") + "</div>" +
                 conclusionHtml +
@@ -2107,15 +2150,11 @@
             btn.addEventListener("click", function (e) {
                 e.stopPropagation();
                 var sym = (btn.getAttribute("data-symbol") || "").toUpperCase();
-                if (modeValue === "custom" && sym) {
-                    var cur = loadCustomSymbols().filter(function (s) { return s !== sym; });
-                    saveCustomSymbols(cur);
-                    updateModeHint();
-                    buildDisplayList();
-                    renderTiles();
-                    return;
-                }
-                alert("系统推荐模式下不维护本机列表；切换到「自定义监控」后可移除本机标的。");
+                if (!sym) return;
+                removeDisplaySlot(sym);
+                updateModeHint();
+                buildDisplayList();
+                renderTiles();
             });
         });
 
@@ -3013,8 +3052,8 @@
     });
 
     document.getElementById("modeSelect").addEventListener("change", function () {
-        modeValue = this.value;
-        try { localStorage.setItem(MODE_LS_KEY, modeValue); } catch (e) {}
+        modeValue = "display";
+        this.value = "display";
         updateModeHint();
         buildDisplayList();
         renderTiles();
@@ -3023,9 +3062,9 @@
     document.getElementById("btnReset").addEventListener("click", function () {
         searchQuery = "";
         document.getElementById("symbolSearch").value = "";
-        modeValue = "system";
-        document.getElementById("modeSelect").value = "system";
-        try { localStorage.setItem(MODE_LS_KEY, "system"); } catch (e) {}
+        modeValue = "display";
+        document.getElementById("modeSelect").value = "display";
+        resetDisplaySlots();
         updateModeHint();
         buildDisplayList();
         renderTiles();
@@ -3033,17 +3072,14 @@
 
     document.getElementById("btnAdd").addEventListener("click", function () {
         var raw = (document.getElementById("symbolSearch").value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-        if (!raw) {
-            alert("请输入币种代码，例如 BTCUSDT");
+        var result = addDisplaySlot(raw);
+        if (!result.ok) {
+            alert(result.message);
             return;
         }
-        if (modeValue !== "custom") {
-            alert("请先切换到「自定义监控」，再将标的加入本机列表（仅存浏览器）。");
-            return;
+        if (result.message) {
+            alert(result.message + "。当前展示只影响首页，不代表推送候选；观察库 / Watchlist Pool 决定推送候选。");
         }
-        var cur = loadCustomSymbols();
-        if (cur.indexOf(raw) < 0) cur.push(raw);
-        saveCustomSymbols(cur);
         updateModeHint();
         buildDisplayList();
         renderTiles();
@@ -3114,7 +3150,7 @@
     });
 
     document.getElementById("helpBtn").addEventListener("click", function () {
-        alert("TRINE LOGIC (V1)\n\n· 系统推荐：中层展示决策时间倒序前 6 条\n· 自定义监控：仅展示已加入本机列表的标的（localStorage）\n· 点击币块查看下方详情 · 右上角可调自动刷新");
+        alert("TRINE LOGIC (V1)\n\n· 首页展示位 Display Slots：localStorage 保存，最多 6 个资产\n· 当前展示只影响首页，不代表推送候选\n· 观察库 / Watchlist Pool 决定推送候选，非观察库资产不进入推送候选\n· 点击币块查看下方详情 · 右上角可调自动刷新");
     });
 
     document.getElementById("themeBtn").addEventListener("click", function () {
@@ -3147,13 +3183,8 @@
             document.documentElement.setAttribute("data-theme", "dark");
             document.getElementById("themeBtn").textContent = "白天主题";
         }
-        try {
-            var sm = localStorage.getItem(MODE_LS_KEY);
-            if (sm === "system" || sm === "custom") {
-                modeValue = sm;
-                document.getElementById("modeSelect").value = modeValue;
-            }
-        } catch (e) {}
+        modeValue = "display";
+        document.getElementById("modeSelect").value = "display";
         updateModeHint();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
