@@ -150,6 +150,33 @@
             font-size: 0.76rem;
             line-height: 1.45;
         }
+        .watchlist-audit-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .watchlist-audit-item {
+            padding: 6px 7px;
+            border: 1px dashed var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .watchlist-audit-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 4px 8px;
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+        }
+        .watchlist-audit-line {
+            color: var(--text-primary);
+            font-size: 0.74rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
 
         .hot-block {
             margin-top: 8px;
@@ -1489,15 +1516,68 @@
         }).filter(Boolean);
     }
 
-    function formatWatchlistAudit(audit) {
-        if (!audit || typeof audit !== "object") return "—";
-        var who = audit.changedBy || audit.changed_by || "operator";
-        var when = audit.createTime || audit.create_time;
-        var whenText = when ? formatDateTime(when) : "";
-        return whenText ? (who + " / " + whenText) : who;
+    function watchlistField(row, camelKey, snakeKey) {
+        if (!row || typeof row !== "object") return null;
+        if (Object.prototype.hasOwnProperty.call(row, camelKey) && row[camelKey] != null) return row[camelKey];
+        if (Object.prototype.hasOwnProperty.call(row, snakeKey) && row[snakeKey] != null) return row[snakeKey];
+        return null;
     }
 
-    function renderWatchlistStatus(config, audit) {
+    function formatWatchlistSymbolValue(value) {
+        if (Array.isArray(value)) {
+            var normalized = normalizeWatchlistSymbols(value);
+            return normalized.length ? normalized.join(", ") : "空";
+        }
+        if (value == null) return "空";
+        var text = String(value).trim();
+        if (!text || text === "[]" || text.toLowerCase() === "null") return "空";
+        if (text.charAt(0) === "[" && text.charAt(text.length - 1) === "]") {
+            try {
+                var parsed = JSON.parse(text);
+                if (Array.isArray(parsed)) return formatWatchlistSymbolValue(parsed);
+            } catch (e) {}
+        }
+        return text;
+    }
+
+    function formatWatchlistEnabledValue(value) {
+        if (value === true || value === 1 || String(value).toLowerCase() === "true") return "启用";
+        if (value === false || value === 0 || String(value).toLowerCase() === "false") return "禁用";
+        return "未知";
+    }
+
+    function formatWatchlistAuditRow(audit) {
+        if (!audit || typeof audit !== "object") return "";
+        var who = watchlistField(audit, "changedBy", "changed_by") || "未知";
+        var when = watchlistField(audit, "createTime", "create_time");
+        var whenText = when ? formatDateTime(when) : "未知时间";
+        if (!whenText || whenText === "—") whenText = "未知时间";
+        var beforeSymbols = formatWatchlistSymbolValue(watchlistField(audit, "beforeSymbols", "before_symbols"));
+        var afterSymbols = formatWatchlistSymbolValue(watchlistField(audit, "afterSymbols", "after_symbols"));
+        var beforeEnabled = formatWatchlistEnabledValue(watchlistField(audit, "beforeEnabled", "before_enabled"));
+        var afterEnabled = formatWatchlistEnabledValue(watchlistField(audit, "afterEnabled", "after_enabled"));
+        var reason = watchlistField(audit, "changeReason", "change_reason") || "未填写";
+        return '<div class="watchlist-audit-item">' +
+            '<div class="watchlist-audit-meta"><span>变更人：' + escapeHtml(who) + '</span><span>时间：' + escapeHtml(whenText) + '</span></div>' +
+            '<div class="watchlist-audit-line">原观察：' + escapeHtml(beforeSymbols) + ' -> 新观察：' + escapeHtml(afterSymbols) + '</div>' +
+            '<div class="watchlist-audit-line">状态：' + escapeHtml(beforeEnabled) + ' -> ' + escapeHtml(afterEnabled) + '</div>' +
+            '<div class="watchlist-audit-line">原因：' + escapeHtml(reason) + '</div>' +
+            '</div>';
+    }
+
+    function renderWatchlistAuditList(audits, auditFailed) {
+        if (auditFailed) {
+            return '<div class="watchlist-note">最近变更读取失败，不影响当前观察范围</div>';
+        }
+        if (!Array.isArray(audits) || !audits.length) {
+            return '<div class="watchlist-note">暂无变更记录</div>';
+        }
+        return '<div class="watchlist-audit-list">' +
+            audits.slice(0, 5).map(formatWatchlistAuditRow).filter(Boolean).join("") +
+            '</div>';
+    }
+
+    function renderWatchlistStatus(config, audits, auditFailed) {
         var panel = document.getElementById("watchlistStatusPanel");
         if (!panel) return;
         var data = config || {};
@@ -1520,7 +1600,8 @@
             '<div class="kv"><span class="k">数量</span><span class="v">' + symbols.length + '</span></div>' +
             '<div class="kv"><span class="k">配置来源</span><span class="v">' + escapeHtml(source || "push.watchlist.symbols") + '</span></div>' +
             '<div class="kv"><span class="k">ruleValue</span><span class="v">' + escapeHtml(ruleValue || "—") + '</span></div>' +
-            '<div class="kv"><span class="k">最近变更</span><span class="v">' + escapeHtml(formatWatchlistAudit(audit)) + '</span></div>' +
+            '<div class="kv"><span class="k">最近变更</span><span class="v">只读记录</span></div>' +
+            renderWatchlistAuditList(audits, auditFailed) +
             (note ? '<div class="watchlist-note">' + escapeHtml(note) + '</div>' : '') +
             '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非 watchlist 不进入推送候选。</div>';
     }
@@ -1535,20 +1616,24 @@
     }
 
     function loadWatchlistStatus() {
-        var auditRequest = fetch("/api/rule/push-watchlist/audit?limit=1")
+        var auditFailed = false;
+        var auditRequest = fetch("/api/rule/push-watchlist/audit?limit=5")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (resp) {
                 var rows = apiEnvelopeData(resp);
-                return Array.isArray(rows) && rows.length ? rows[0] : null;
+                return Array.isArray(rows) ? rows : [];
             })
-            .catch(function () { return null; });
+            .catch(function () {
+                auditFailed = true;
+                return [];
+            });
 
         return fetch("/api/rule/push-watchlist")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (resp) {
                 var config = apiEnvelopeData(resp);
-                return auditRequest.then(function (audit) {
-                    renderWatchlistStatus(config, audit);
+                return auditRequest.then(function (audits) {
+                    renderWatchlistStatus(config, audits, auditFailed);
                 });
             })
             .catch(function () {
