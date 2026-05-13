@@ -290,6 +290,33 @@
             font-size: 0.82rem;
         }
         .sort-hint { font-size: 0.72rem; color: var(--text-secondary); margin-left: 4px; }
+        .compact-note {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .config-fold {
+            margin-top: 8px;
+            padding: 7px 8px;
+            border: 1px dashed var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .config-fold summary {
+            cursor: pointer;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            list-style-position: inside;
+        }
+        .config-fold[open] summary { margin-bottom: 7px; }
+        .management-section {
+            flex: 1 1 100%;
+            margin-top: 0;
+        }
+        .management-section .ctl {
+            margin-top: 7px;
+        }
 
         /* 第二层币方块：单行横向；窄屏 overflow-x 滚动；仅 6 个由 JS slice(0,6) 保证 */
         .tiles-row {
@@ -925,19 +952,22 @@
         <!-- 第二层 -->
         <div class="layer2-head">
             <span class="module-title">市场机会与风险总览</span>
-            <div class="ctl">
-                <label class="muted">展示
-                    <select id="modeSelect" class="btn" title="首页展示位 Display Slots：最多 6 个资产，只影响首页显示">
-                        <option value="display">首页展示位</option>
-                    </select>
-                </label>
-                <span id="modeHint" class="sort-hint" aria-live="polite"></span>
-                <input type="search" id="symbolSearch" placeholder="搜索或添加首页展示位，如 BTCUSDT" autocomplete="off">
-                <button type="button" class="btn" id="btnAdd">添加</button>
-                <button type="button" class="btn" id="btnReset">恢复默认</button>
-                <span class="sort-hint">Display Slots · 最多 6 个 · 当前展示只影响首页，不代表推送候选</span>
-                <span class="sort-hint">观察库 / Watchlist Pool 决定推送候选；非观察库资产不进入推送候选</span>
-            </div>
+            <span class="compact-note">Display Slots · 最多 6 个 · 当前展示只影响首页，不代表推送候选</span>
+            <details class="config-fold management-section">
+                <summary>首页展示位管理</summary>
+                <div class="ctl">
+                    <label class="muted">展示
+                        <select id="modeSelect" class="btn" title="首页展示位 Display Slots：最多 6 个资产，只影响首页显示">
+                            <option value="display">首页展示位</option>
+                        </select>
+                    </label>
+                    <span id="modeHint" class="sort-hint" aria-live="polite"></span>
+                    <input type="search" id="symbolSearch" placeholder="搜索或添加首页展示位，如 BTCUSDT" autocomplete="off">
+                    <button type="button" class="btn" id="btnAdd">添加</button>
+                    <button type="button" class="btn" id="btnReset">恢复默认</button>
+                    <span class="sort-hint">观察库 / Watchlist Pool 决定推送候选；非观察库资产不进入推送候选</span>
+                </div>
+            </details>
         </div>
         <div class="tiles-row" id="tilesRow"></div>
 
@@ -1682,15 +1712,21 @@
         if (!Array.isArray(audits) || !audits.length) {
             return '<div class="watchlist-note">暂无变更记录</div>';
         }
-        return '<div class="watchlist-audit-list">' +
-            audits.slice(0, 5).map(formatWatchlistAuditRow).filter(Boolean).join("") +
-            '</div>';
+        var rows = audits.slice(0, 5).map(formatWatchlistAuditRow).filter(Boolean);
+        if (!rows.length) {
+            return '<div class="watchlist-note">暂无变更记录</div>';
+        }
+        return '<details class="config-fold watchlist-audit-fold">' +
+            '<summary>查看最近变更记录（最近 ' + rows.length + ' 条）</summary>' +
+            '<div class="watchlist-audit-list">' + rows.join("") + '</div>' +
+            '</details>';
     }
 
     function renderWatchlistEditor() {
         var flash = watchlistEditorFlash || "";
         var messageClass = flash ? " ok" : "";
-        return '<div class="watchlist-editor-shell">' +
+        return '<details class="config-fold watchlist-editor-shell">' +
+            '<summary>编辑观察列表 / Watchlist Pool 配置</summary>' +
             '<button type="button" class="btn" id="watchlistEditBtn">编辑观察列表</button>' +
             '<div id="watchlistEditorMessage" class="watchlist-editor-message' + messageClass + '">' + escapeHtml(flash) + '</div>' +
             '<div class="watchlist-editor" id="watchlistEditor" hidden>' +
@@ -1709,7 +1745,7 @@
             '<button type="button" class="btn" id="watchlistCancelBtn">取消</button>' +
             '</div>' +
             '</div>' +
-            '</div>';
+            '</details>';
     }
 
     function bindWatchlistEditorControls() {
