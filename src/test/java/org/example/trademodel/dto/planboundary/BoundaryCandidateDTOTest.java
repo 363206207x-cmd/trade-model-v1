@@ -5,11 +5,13 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BoundaryCandidateDTOTest {
 
@@ -75,6 +77,138 @@ class BoundaryCandidateDTOTest {
         assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.INVALID);
         assertThat(candidate.isManualReviewRequired()).isTrue();
         assertThat(candidate.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void validFactoryCreatesCandidateWithSafeDefaults() {
+        BoundaryEntryDTO entry = sampleEntry();
+        BoundaryStopDTO stop = sampleStop();
+        BoundaryTakeProfitLevelDTO tp = sampleTakeProfitLevel();
+        BoundarySourceFieldsDTO sourceFields = sampleSourceFields();
+
+        BoundaryCandidateDTO candidate = BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                entry,
+                stop,
+                List.of(tp),
+                sourceFields,
+                new BigDecimal("88.50")
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.VALID);
+        assertThat(candidate.getSymbol()).isEqualTo("BTCUSDT");
+        assertThat(candidate.getTimeframe()).isEqualTo("1h");
+        assertThat(candidate.getEntry()).isSameAs(entry);
+        assertThat(candidate.getStop()).isSameAs(stop);
+        assertThat(candidate.getTakeProfitLevels()).containsExactly(tp);
+        assertThat(candidate.getSourceFields()).isSameAs(sourceFields);
+        assertThat(candidate.getDataQualityScore()).isEqualByComparingTo("88.50");
+        assertThat(candidate.getBlockingReasons()).isEmpty();
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void validFactoryDefensivelyCopiesTakeProfitLevels() {
+        List<BoundaryTakeProfitLevelDTO> takeProfitLevels = new ArrayList<>();
+        takeProfitLevels.add(sampleTakeProfitLevel());
+
+        BoundaryCandidateDTO candidate = BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                sampleEntry(),
+                sampleStop(),
+                takeProfitLevels,
+                sampleSourceFields(),
+                new BigDecimal("90.00")
+        );
+
+        takeProfitLevels.add(sampleTakeProfitLevel());
+
+        assertThat(candidate.getTakeProfitLevels()).hasSize(1);
+    }
+
+    @Test
+    void validFactoryRejectsMissingRequiredFields() {
+        BoundaryEntryDTO entry = sampleEntry();
+        BoundaryStopDTO stop = sampleStop();
+        List<BoundaryTakeProfitLevelDTO> takeProfitLevels = List.of(sampleTakeProfitLevel());
+        BoundarySourceFieldsDTO sourceFields = sampleSourceFields();
+        BigDecimal dataQualityScore = new BigDecimal("90.00");
+
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                " ",
+                "1h",
+                entry,
+                stop,
+                takeProfitLevels,
+                sourceFields,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                " ",
+                entry,
+                stop,
+                takeProfitLevels,
+                sourceFields,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                null,
+                stop,
+                takeProfitLevels,
+                sourceFields,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                entry,
+                null,
+                takeProfitLevels,
+                sourceFields,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                entry,
+                stop,
+                null,
+                sourceFields,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                entry,
+                stop,
+                List.of(),
+                sourceFields,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                entry,
+                stop,
+                takeProfitLevels,
+                null,
+                dataQualityScore
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> BoundaryCandidateDTO.valid(
+                "BTCUSDT",
+                "1h",
+                entry,
+                stop,
+                takeProfitLevels,
+                sourceFields,
+                null
+        )).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -213,5 +347,75 @@ class BoundaryCandidateDTOTest {
                 "auto" + "Close",
                 "auto" + "Reverse"
         );
+    }
+
+    @Test
+    void candidateFactoryMethodsDoNotExposeTradingActionNames() {
+        List<String> methodNames = Stream.of(BoundaryCandidateDTO.class.getDeclaredMethods())
+                .map(Method::getName)
+                .collect(Collectors.toList());
+
+        assertThat(methodNames).doesNotContain(
+                "execute" + "Order",
+                "place" + "Order",
+                "close" + "Position",
+                "reverse" + "Position",
+                "auto" + "Trade"
+        );
+    }
+
+    private BoundaryEntryDTO sampleEntry() {
+        BoundaryEntryDTO entry = new BoundaryEntryDTO();
+        entry.setEntryType(BoundaryEntryTypeEnum.PULLBACK);
+        entry.setEntryZoneLow(new BigDecimal("100.10"));
+        entry.setEntryZoneHigh(new BigDecimal("101.20"));
+        entry.setEntrySource("support");
+        entry.setEntryTimeframe("1h");
+        entry.setEntryReason("pullback into support");
+        entry.setEntrySourceFields(List.of("supportRef", "atrValue"));
+        return entry;
+    }
+
+    private BoundaryStopDTO sampleStop() {
+        BoundaryStopDTO stop = new BoundaryStopDTO();
+        stop.setStopType(BoundaryStopTypeEnum.STRUCTURE_INVALIDATION);
+        stop.setStopLoss(new BigDecimal("96.80"));
+        stop.setStopSource("swing_low");
+        stop.setStopTimeframe("1h");
+        stop.setStopReason("structure invalidation below swing low");
+        stop.setStopSourceFields(List.of("swingLowRef"));
+        return stop;
+    }
+
+    private BoundaryTakeProfitLevelDTO sampleTakeProfitLevel() {
+        BoundaryNumericSourceDTO numericSource = new BoundaryNumericSourceDTO();
+        numericSource.setSourceType("resistance");
+        numericSource.setSourceValue(new BigDecimal("108.00"));
+        numericSource.setSourceTimeframe("1h");
+        numericSource.setSourceReason("prior resistance target");
+        numericSource.setSourceField("resistanceRef");
+        numericSource.setSourceRef("source:resistance:1h");
+
+        BoundaryTakeProfitLevelDTO tp = new BoundaryTakeProfitLevelDTO();
+        tp.setLevel(1);
+        tp.setPrice(new BigDecimal("108.00"));
+        tp.setRr(new BigDecimal("2.00"));
+        tp.setSource("resistance");
+        tp.setReason("first target from resistance");
+        tp.setNumericSource(numericSource);
+        tp.setSourceTimeframe("1h");
+        tp.setSourceRef("source:resistance:1h");
+        tp.setPartialRatio(new BigDecimal("0.50"));
+        tp.setAllocationRatio(new BigDecimal("0.50"));
+        return tp;
+    }
+
+    private BoundarySourceFieldsDTO sampleSourceFields() {
+        BoundarySourceFieldsDTO sourceFields = new BoundarySourceFieldsDTO();
+        sourceFields.setTimeframe("1h");
+        sourceFields.setAtrValue(new BigDecimal("1.23"));
+        sourceFields.setDataQualityScore(new BigDecimal("88.50"));
+        sourceFields.setEvidenceRefs(List.of("kline:1h:last-48"));
+        return sourceFields;
     }
 }

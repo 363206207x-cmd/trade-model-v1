@@ -44,6 +44,37 @@ public class BoundaryCandidateDTO {
         return withStatus(symbol, timeframe, BoundaryStatusEnum.INVALID, "边界无效", reason);
     }
 
+    public static BoundaryCandidateDTO valid(String symbol,
+                                             String timeframe,
+                                             BoundaryEntryDTO entry,
+                                             BoundaryStopDTO stop,
+                                             List<BoundaryTakeProfitLevelDTO> takeProfitLevels,
+                                             BoundarySourceFieldsDTO sourceFields,
+                                             BigDecimal dataQualityScore) {
+        requireText(symbol, "symbol");
+        requireText(timeframe, "timeframe");
+        requireNonNull(entry, "entry");
+        requireNonNull(stop, "stop");
+        requireTakeProfitLevels(takeProfitLevels);
+        requireNonNull(sourceFields, "sourceFields");
+        requireNonNull(dataQualityScore, "dataQualityScore");
+
+        BoundaryCandidateDTO candidate = new BoundaryCandidateDTO();
+        candidate.setSymbol(symbol);
+        candidate.setTimeframe(timeframe);
+        candidate.setBoundaryStatus(BoundaryStatusEnum.VALID);
+        candidate.setBoundaryStatusText("边界有效");
+        candidate.setGeneratedAt(LocalDateTime.now());
+        candidate.setEntry(entry);
+        candidate.setStop(stop);
+        candidate.setTakeProfitLevels(new ArrayList<>(takeProfitLevels));
+        candidate.setSourceFields(sourceFields);
+        candidate.setDataQualityScore(dataQualityScore);
+        candidate.setManualReviewRequired(true);
+        candidate.setNotTradeInstruction(true);
+        return candidate;
+    }
+
     private static BoundaryCandidateDTO withStatus(String symbol,
                                                    String timeframe,
                                                    BoundaryStatusEnum status,
@@ -60,6 +91,24 @@ public class BoundaryCandidateDTO {
             candidate.getBlockingReasons().add(BoundaryBlockingReasonDTO.of(status.name(), reason));
         }
         return candidate;
+    }
+
+    private static void requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+    }
+
+    private static void requireNonNull(Object value, String fieldName) {
+        if (value == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+    }
+
+    private static void requireTakeProfitLevels(List<BoundaryTakeProfitLevelDTO> takeProfitLevels) {
+        if (takeProfitLevels == null || takeProfitLevels.isEmpty()) {
+            throw new IllegalArgumentException("takeProfitLevels is required");
+        }
     }
 
     public String getCandidateId() {
