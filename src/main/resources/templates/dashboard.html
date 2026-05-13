@@ -952,12 +952,12 @@
         <!-- 第二层 -->
         <div class="layer2-head">
             <span class="module-title">市场机会与风险总览</span>
-            <span class="compact-note">Display Slots · 最多 6 个 · 当前展示只影响首页，不代表推送候选</span>
+            <span class="compact-note">首页展示位（Display Slots）· 最多 6 个 · 只影响首页展示</span>
             <details class="config-fold management-section">
                 <summary>首页展示位管理</summary>
                 <div class="ctl">
                     <label class="muted">展示
-                        <select id="modeSelect" class="btn" title="首页展示位 Display Slots：最多 6 个资产，只影响首页显示">
+                        <select id="modeSelect" class="btn" title="首页展示位（Display Slots）：最多 6 个，只影响首页展示">
                             <option value="display">首页展示位</option>
                         </select>
                     </label>
@@ -965,7 +965,7 @@
                     <input type="search" id="symbolSearch" placeholder="搜索或添加首页展示位，如 BTCUSDT" autocomplete="off">
                     <button type="button" class="btn" id="btnAdd">添加</button>
                     <button type="button" class="btn" id="btnReset">恢复默认</button>
-                    <span class="sort-hint">观察库 / Watchlist Pool 决定推送候选；非观察库资产不进入推送候选</span>
+                    <span class="sort-hint">观察库（Watchlist Pool）决定推送候选</span>
                 </div>
             </details>
         </div>
@@ -1132,7 +1132,7 @@
     function renderDisplaySlotMeta() {
         var el = document.getElementById("modeHint");
         if (!el) return;
-        el.textContent = "首页展示位 / Display Slots · 已保存 " + loadDisplaySlots().length + "/6 · 不是推送全集";
+        el.textContent = "首页展示位（Display Slots）· 已保存 " + loadDisplaySlots().length + "/6 · 只影响首页展示";
     }
 
     /**
@@ -1730,8 +1730,7 @@
             '<button type="button" class="btn" id="watchlistEditBtn">编辑观察列表</button>' +
             '<div id="watchlistEditorMessage" class="watchlist-editor-message' + messageClass + '">' + escapeHtml(flash) + '</div>' +
             '<div class="watchlist-editor" id="watchlistEditor" hidden>' +
-            '<div class="watchlist-note">当前编辑的是观察库 Watchlist Pool；首页默认展示位 Display Slots 不等于推送全集，首页可默认展示 6 个资产。</div>' +
-            '<div class="watchlist-note">观察库可包含更多资产；非观察库资产不进入推送候选。低频扫描 / 机会提升为后续阶段，不在 P2C。</div>' +
+            '<div class="watchlist-note">观察库（Watchlist Pool）控制推送候选；首页展示位（Display Slots）只影响显示。</div>' +
             '<div class="watchlist-note">仅人工配置，非交易指令，不自动下单。</div>' +
             '<div class="watchlist-editor-grid">' +
             '<label>观察库资产 symbols<textarea id="watchlistSymbolsInput" placeholder="BTCUSDT, ETHUSDT"></textarea></label>' +
@@ -1818,10 +1817,8 @@
             "新启用状态：" + afterEnabled,
             "操作人：" + draft.operator,
             "变更原因：" + draft.reason,
-            "当前编辑的是观察库 Watchlist Pool，不是首页展示位 Display Slots。",
-            "首页默认展示位不等于推送全集；首页可默认展示 6 个资产。",
-            "观察库可包含更多资产；非观察库资产不进入推送候选。",
-            "低频扫描 / 机会提升为后续阶段，不在 P2C。",
+            "观察库（Watchlist Pool）控制推送候选。",
+            "首页展示位（Display Slots）只影响首页展示。",
             "仅人工配置，非交易指令，不自动下单。"
         ];
         if (!draft.symbols.length) {
@@ -1909,7 +1906,7 @@
             '<div class="kv"><span class="k">最近变更</span><span class="v">只读记录</span></div>' +
             renderWatchlistAuditList(audits, auditFailed) +
             (note ? '<div class="watchlist-note">' + escapeHtml(note) + '</div>' : '') +
-            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非观察库资产不进入推送候选。</div>' +
+            '<div class="watchlist-note">观察库决定推送候选，非交易指令，不自动下单。</div>' +
             renderWatchlistEditor();
         bindWatchlistEditorControls();
     }
@@ -1921,7 +1918,7 @@
         panel.innerHTML =
             '<div class="watchlist-title">重点观察推送范围</div>' +
             '<div class="watchlist-note">读取失败，按 fail-closed 处理。</div>' +
-            '<div class="watchlist-note">仅人工查看提醒，非交易指令，不自动下单；非观察库资产不进入推送候选。</div>';
+            '<div class="watchlist-note">读取失败，非交易指令，不自动下单。</div>';
     }
 
     function loadWatchlistStatus() {
@@ -2138,8 +2135,8 @@
         var box = document.getElementById("tilesRow");
         if (!displayDecisions.length) {
             var emptyMsg = loadDisplaySlots().length
-                ? "首页展示位中的资产暂无决策记录，或已被搜索过滤。Display Slots 只影响首页显示。"
-                : "首页展示位为空，已恢复默认 6 个资产。";
+                ? "首页展示位暂无可展示资产，或已被搜索过滤。"
+                : "首页展示位为空，已恢复默认 6 个首页展示位。";
             box.innerHTML = '<div class="card tile-full" style="text-align:center;padding:24px;"><span class="empty-hint">' + escapeHtml(emptyMsg) + "</span></div>";
             renderDetail(null);
             return;
@@ -3114,7 +3111,7 @@
             return;
         }
         if (result.message) {
-            alert(result.message + "。当前展示只影响首页，不代表推送候选；观察库 / Watchlist Pool 决定推送候选。");
+            alert(result.message + "。仅管理首页展示；观察库（Watchlist Pool）决定推送候选。");
         }
         updateModeHint();
         buildDisplayList();
@@ -3186,7 +3183,7 @@
     });
 
     document.getElementById("helpBtn").addEventListener("click", function () {
-        alert("TRINE LOGIC (V1)\n\n· 首页展示位 Display Slots：localStorage 保存，最多 6 个资产\n· 当前展示只影响首页，不代表推送候选\n· 观察库 / Watchlist Pool 决定推送候选，非观察库资产不进入推送候选\n· 点击币块查看下方详情 · 右上角可调自动刷新");
+        alert("TRINE LOGIC (V1)\n\n· 首页展示位（Display Slots）：localStorage 保存，默认 6 个首页展示位，最多 6 个\n· 只影响首页展示\n· 观察库（Watchlist Pool）决定推送候选，非观察库资产不进入推送候选\n· 点击币块查看下方详情 · 右上角可调自动刷新");
     });
 
     document.getElementById("themeBtn").addEventListener("click", function () {
