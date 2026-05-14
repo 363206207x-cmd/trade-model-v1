@@ -50,7 +50,7 @@ public class DefaultRiskActionGuardDisplayAdapter implements RiskActionGuardDisp
             return display;
         }
 
-        if (isHighRisk(decision) && isBlank(display.getLiquidityState())) {
+        if (isHighRisk(decision) && isLiquidityContextMissing(display)) {
             markManualReview(display, LIQUIDITY_CONTEXT_MISSING);
             return display;
         }
@@ -71,6 +71,12 @@ public class DefaultRiskActionGuardDisplayAdapter implements RiskActionGuardDisp
     private boolean isHighRisk(DecisionResultVO decision) {
         return "HIGH".equalsIgnoreCase(decision.getRiskLevel())
                 || "EXTREME".equalsIgnoreCase(decision.getRiskLevel());
+    }
+
+    private boolean isLiquidityContextMissing(DashboardDetailResponseVO.RiskActionGuardDisplayVO display) {
+        return display == null
+                || isBlank(display.getLiquidityState())
+                || BACKEND_PENDING.equalsIgnoreCase(display.getLiquidityState());
     }
 
     private void markManualReview(DashboardDetailResponseVO.RiskActionGuardDisplayVO display, String reason) {
