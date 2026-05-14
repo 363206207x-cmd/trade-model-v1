@@ -6,6 +6,7 @@ import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
+import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
 import org.example.trademodel.vo.EvidenceBriefVO;
@@ -54,6 +55,7 @@ public class DashboardController {
     private final PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter;
     private final ExecutionPlanDisplayAdapter executionPlanDisplayAdapter;
     private final RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter;
+    private final PaperObservationDisplayAdapter paperObservationDisplayAdapter;
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -65,7 +67,8 @@ public class DashboardController {
                                ScoreService scoreService,
                                PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
                                ExecutionPlanDisplayAdapter executionPlanDisplayAdapter,
-                               RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter) {
+                               RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter,
+                               PaperObservationDisplayAdapter paperObservationDisplayAdapter) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -77,6 +80,7 @@ public class DashboardController {
         this.planBoundaryDisplayAdapter = planBoundaryDisplayAdapter;
         this.executionPlanDisplayAdapter = executionPlanDisplayAdapter;
         this.riskActionGuardDisplayAdapter = riskActionGuardDisplayAdapter;
+        this.paperObservationDisplayAdapter = paperObservationDisplayAdapter;
     }
 
     @GetMapping("/dashboard")
@@ -154,6 +158,13 @@ public class DashboardController {
                 body.getPlanBoundaryDisplay(),
                 body.getExecutionPlanDisplay(),
                 body.getRiskActionGuardDisplay()
+        ));
+        body.setPaperObservationDisplay(paperObservationDisplayAdapter.build(
+                body.getDecision(),
+                body.getPlanBoundaryDisplay(),
+                body.getExecutionPlanDisplay(),
+                body.getRiskActionGuardDisplay(),
+                body.getPaperObservationDisplay()
         ));
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
