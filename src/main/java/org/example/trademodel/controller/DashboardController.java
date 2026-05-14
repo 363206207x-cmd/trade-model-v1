@@ -124,7 +124,7 @@ public class DashboardController {
     public DashboardDetailResponseVO dashboardDetail(@RequestParam("symbol") String symbol) {
         long methodStart = System.currentTimeMillis();
         String normalizedSymbol = normalizeSymbol(symbol);
-        DashboardDetailResponseVO body = new DashboardDetailResponseVO();
+        DashboardDetailResponseVO body = DashboardDetailResponseVO.withSafeDefaultDisplays();
         body.setSymbol(normalizedSymbol);
         body.setDecision(decisionService.getLatestDecisionResultBySymbol(normalizedSymbol));
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
