@@ -10,6 +10,7 @@ import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.SystemHealthService;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
+import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -68,6 +69,7 @@ class DashboardControllerTest {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
         RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> fallbackDisplay;
+        PaperObservationDisplayAdapter paperObservationDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay;
         DashboardController controller = new DashboardController(
                 decisionService,
                 systemHealthService,
@@ -79,7 +81,8 @@ class DashboardControllerTest {
                 scoreService,
                 planBoundaryDisplayAdapter,
                 executionPlanDisplayAdapter,
-                riskActionGuardDisplayAdapter
+                riskActionGuardDisplayAdapter,
+                paperObservationDisplayAdapter
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
