@@ -17,3 +17,8 @@ target/
 *.log
 *.tmp
 *.swp
+
+# Local H2 database runtime files
+data/*.mv.db
+data/*.trace.db
+data/*.lock.db
