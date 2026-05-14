@@ -33,6 +33,36 @@ class DashboardDetailResponseVOTest {
     }
 
     @Test
+    void shouldCreateResponseWithSafeDefaultDisplays() {
+        DashboardDetailResponseVO response = DashboardDetailResponseVO.withSafeDefaultDisplays();
+
+        assertNotNull(response.getPlanBoundaryDisplay());
+        assertNotNull(response.getExecutionPlanDisplay());
+        assertNotNull(response.getRiskActionGuardDisplay());
+        assertNotNull(response.getPaperObservationDisplay());
+        assertEquals("BACKEND_PENDING", response.getPlanBoundaryDisplay().getPlanBoundaryStatus());
+        assertEquals("BOUNDARY_PENDING", response.getExecutionPlanDisplay().getExecutionPlanStatus());
+        assertEquals("BACKEND_PENDING", response.getRiskActionGuardDisplay().getRiskActionGuardStatus());
+        assertEquals("BACKEND_PENDING", response.getPaperObservationDisplay().getPaperObservationStatus());
+    }
+
+    @Test
+    void shouldEnsureOnlyMissingSafeDefaultDisplaysWithoutOverwritingExistingOnes() {
+        DashboardDetailResponseVO response = new DashboardDetailResponseVO();
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO existing = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        existing.setPlanBoundaryStatus("INCOMPLETE");
+        response.setPlanBoundaryDisplay(existing);
+
+        response.ensureSafeDefaultDisplays();
+
+        assertSame(existing, response.getPlanBoundaryDisplay());
+        assertEquals("INCOMPLETE", response.getPlanBoundaryDisplay().getPlanBoundaryStatus());
+        assertNotNull(response.getExecutionPlanDisplay());
+        assertNotNull(response.getRiskActionGuardDisplay());
+        assertNotNull(response.getPaperObservationDisplay());
+    }
+
+    @Test
     void planBoundaryDisplayShouldUseSafeBackendPendingDefaults() {
         DashboardDetailResponseVO.PlanBoundaryDisplayVO display = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
 
