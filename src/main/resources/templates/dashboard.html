@@ -105,8 +105,22 @@
             gap: 10px;
             margin-bottom: 14px;
         }
+        .module-status-card { margin-bottom: 14px; }
+        .module-status-note { margin: 0 0 10px 0; font-size: 0.78rem; color: var(--text-secondary); }
+        .status-grid { display: grid; grid-template-columns: 1.2fr 0.8fr 1.4fr; gap: 8px; }
+        .status-head, .status-row { display: contents; }
+        .status-cell { padding: 8px 9px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-elevated); font-size: 0.78rem; }
+        .status-cell.head { font-weight: 600; color: var(--text-secondary); }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; border: 1px solid var(--border-subtle); }
+        .status-badge.ok { color: var(--status-ok); border-color: rgba(34, 197, 94, 0.45); }
+        .status-badge.partial { color: var(--status-warn); border-color: rgba(234, 179, 8, 0.5); }
+        .status-badge.pending { color: var(--status-error); border-color: rgba(239, 68, 68, 0.45); }
         @media (max-width: 1200px) {
             .layer1 { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 900px) {
+            .status-grid { grid-template-columns: 1fr; }
+            .status-cell.head { display: none; }
         }
         @media (max-width: 640px) {
             .layer1 { grid-template-columns: 1fr; }
@@ -577,6 +591,11 @@
                 <div id="layer1-missed"></div>
             </div>
         </div>
+        <div class="card module-status-card" id="moduleStatusCard">
+            <h3>模块接入状态（只读）</h3>
+            <p class="module-status-note">该区域仅用于展示首页 MVP 模块接入进度，非交易指令；涉及开仓与风控结论均需要人工复核。</p>
+            <div class="status-grid" id="moduleStatusGrid"></div>
+        </div>
 
         <!-- 第二层 -->
         <div class="layer2-head">
@@ -748,6 +767,32 @@
         var d = new Date();
         var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
         return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    }
+
+    function renderModuleStatusBoard() {
+        var grid = document.getElementById("moduleStatusGrid");
+        if (!grid) return;
+        var modules = [
+            { name: "Watchlist Pool / 观察库状态", status: "已接入", note: "首页已有观察标的展示与刷新。", badge: "ok" },
+            { name: "Display Slots / 首页展示位", status: "已接入", note: "第二层展示位可读渲染（最多 6 个）。", badge: "ok" },
+            { name: "当前决策状态", status: "已接入", note: "仅展示后端摘要结果，不输出交易指令。", badge: "ok" },
+            { name: "PlanBoundary 状态", status: "后端未接入", note: "当前仅做状态占位，不展示边界明细。", badge: "pending" },
+            { name: "Entry / Stop / TP 完整性", status: "仅占位", note: "禁止伪造 entry/stop/TP，等待后端字段。", badge: "pending" },
+            { name: "ExecutionPlan 摘要", status: "部分接入", note: "首页可读摘要，细节规则仍需后端补齐。", badge: "partial" },
+            { name: "Risk Action Guard", status: "部分接入", note: "仅显示风险提示语义，非自动交易动作。", badge: "partial" },
+            { name: "手动持仓监控", status: "部分接入", note: "仅展示持仓监控阅读信息，需人工判断。", badge: "partial" },
+            { name: "纸面交易 / 复盘入口", status: "已接入", note: "已有复盘入口语义，属于只读分析视图。", badge: "ok" },
+            { name: "推送边界", status: "需要人工复核", note: "推送阈值与触发边界需人工复核后使用。", badge: "pending" }
+        ];
+        var html = '<div class="status-head"><div class="status-cell head">模块</div><div class="status-cell head">状态</div><div class="status-cell head">说明（只读）</div></div>';
+        modules.forEach(function (m) {
+            html += '<div class="status-row">'
+                + '<div class="status-cell">' + escapeHtml(m.name) + '</div>'
+                + '<div class="status-cell"><span class="status-badge ' + m.badge + '">' + escapeHtml(m.status) + '</span></div>'
+                + '<div class="status-cell">' + escapeHtml(m.note) + '</div>'
+                + '</div>';
+        });
+        grid.innerHTML = html;
     }
 
     function formatDateTime(v) {
@@ -1996,6 +2041,7 @@
             }
         } catch (e) {}
         updateModeHint();
+        renderModuleStatusBoard();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();
