@@ -15,6 +15,35 @@ public class DashboardDetailResponseVO {
     private RiskActionGuardDisplayVO riskActionGuardDisplay;
     private PaperObservationDisplayVO paperObservationDisplay;
 
+    /**
+     * Creates a dashboard detail response with safe read-only display defaults.
+     * The defaults are fail-closed and do not represent executable trading signals.
+     */
+    public static DashboardDetailResponseVO withSafeDefaultDisplays() {
+        DashboardDetailResponseVO response = new DashboardDetailResponseVO();
+        response.ensureSafeDefaultDisplays();
+        return response;
+    }
+
+    /**
+     * Initializes missing display models with safe BACKEND_PENDING defaults without
+     * overwriting display models that were already populated by a caller.
+     */
+    public void ensureSafeDefaultDisplays() {
+        if (planBoundaryDisplay == null) {
+            planBoundaryDisplay = new PlanBoundaryDisplayVO();
+        }
+        if (executionPlanDisplay == null) {
+            executionPlanDisplay = new ExecutionPlanDisplayVO();
+        }
+        if (riskActionGuardDisplay == null) {
+            riskActionGuardDisplay = new RiskActionGuardDisplayVO();
+        }
+        if (paperObservationDisplay == null) {
+            paperObservationDisplay = new PaperObservationDisplayVO();
+        }
+    }
+
     public String getSymbol() {
         return symbol;
     }
