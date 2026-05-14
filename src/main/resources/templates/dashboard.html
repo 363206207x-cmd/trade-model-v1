@@ -607,6 +607,16 @@
             <div class="alert-line confused">安全提示：非交易指令，需要人工复核。</div>
             <div class="alert-line">说明：仅展示 PlanBoundary 接入状态占位，不生成 entry / stop / take profit 数值。</div>
         </div>
+        <div class="card module-status-card" id="riskActionGuardPlaceholderCard">
+            <h3>Risk Action Guard（占位）</h3>
+            <p class="module-status-note">只读风控动作分层（占位），后端未完全接入；非交易指令，需要人工复核。</p>
+            <div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge partial">READ_ONLY_PLACEHOLDER / 只读占位</span></span></div>
+            <div class="alert-line confused"><strong>通用约束：</strong>本区仅做风险提醒，不连接 order API，不触发自动交易动作。</div>
+            <div class="alert-line"><strong>风险高但流动性正常：</strong>可考虑减仓 / 移动止损 / 降低杠杆；仅为风险提醒，不是自动交易动作。</div>
+            <div class="alert-line hot"><strong>风险高且流动性恶化：</strong>不建议市价一次性砍仓，优先分批降风险 / 等待流动性恢复 / 只降杠杆，避免在流动性恶化时触发踩踏式错误执行。</div>
+            <div class="alert-line critical"><strong>风险高且存在踩踏：</strong>硬约束：禁止反手、禁止新开仓、禁止机会推送；第一优先级是保护本金。</div>
+            <div class="alert-line"><strong>风险高但仅短线插针：</strong>短线插针不等于趋势反转，不生成反向开仓计划，只做短线风险提醒和等待确认。</div>
+        </div>
 
         <!-- 第二层 -->
         <div class="layer2-head">
