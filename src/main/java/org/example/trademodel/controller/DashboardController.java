@@ -7,6 +7,7 @@ import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
+import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreBriefVO;
@@ -52,6 +53,7 @@ public class DashboardController {
     private final ScoreService scoreService;
     private final PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter;
     private final ExecutionPlanDisplayAdapter executionPlanDisplayAdapter;
+    private final RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter;
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -62,7 +64,8 @@ public class DashboardController {
                                EvidenceService evidenceService,
                                ScoreService scoreService,
                                PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
-                               ExecutionPlanDisplayAdapter executionPlanDisplayAdapter) {
+                               ExecutionPlanDisplayAdapter executionPlanDisplayAdapter,
+                               RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -73,6 +76,7 @@ public class DashboardController {
         this.scoreService = scoreService;
         this.planBoundaryDisplayAdapter = planBoundaryDisplayAdapter;
         this.executionPlanDisplayAdapter = executionPlanDisplayAdapter;
+        this.riskActionGuardDisplayAdapter = riskActionGuardDisplayAdapter;
     }
 
     @GetMapping("/dashboard")
@@ -144,6 +148,12 @@ public class DashboardController {
                 body.getDecision(),
                 body.getPlanBoundaryDisplay(),
                 body.getExecutionPlanDisplay()
+        ));
+        body.setRiskActionGuardDisplay(riskActionGuardDisplayAdapter.build(
+                body.getDecision(),
+                body.getPlanBoundaryDisplay(),
+                body.getExecutionPlanDisplay(),
+                body.getRiskActionGuardDisplay()
         ));
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
