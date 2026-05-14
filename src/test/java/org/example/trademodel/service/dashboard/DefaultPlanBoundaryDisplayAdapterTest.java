@@ -11,7 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DefaultPlanBoundaryDisplayAdapterTest {
-    private final DefaultPlanBoundaryDisplayAdapter adapter = new DefaultPlanBoundaryDisplayAdapter();
+    private final PlanBoundarySourceTraceAdapter passthroughSourceTraceAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
+    private final DefaultPlanBoundaryDisplayAdapter adapter = new DefaultPlanBoundaryDisplayAdapter(passthroughSourceTraceAdapter);
 
     @Test
     void shouldReturnBackendPendingWhenInputsAreMissing() {
@@ -98,6 +99,47 @@ class DefaultPlanBoundaryDisplayAdapterTest {
         assertEquals("BACKEND_PENDING", display.getPlanBoundaryStatus());
         assertNotNull(display.getIncompleteReasons());
         assertNotNull(display.getBlockingReasons());
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
+    void shouldInvokeSourceTraceAdapterWhenDecisionExists() {
+        PlanBoundarySourceTraceAdapter sourceTraceAdapter = (symbol, decision, fallbackDisplay) -> {
+            fallbackDisplay.setPlanBoundaryStatus("INCOMPLETE");
+            fallbackDisplay.setSourceTraceStatus("MISSING");
+            fallbackDisplay.getIncompleteReasons().add("SOURCE_TRACE_INPUT_NOT_AVAILABLE");
+            return fallbackDisplay;
+        };
+        DefaultPlanBoundaryDisplayAdapter localAdapter = new DefaultPlanBoundaryDisplayAdapter(sourceTraceAdapter);
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setAnalysisId("ana-1");
+
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO display = localAdapter.build("BTCUSDT", decision, null);
+
+        assertEquals("INCOMPLETE", display.getPlanBoundaryStatus());
+        assertEquals("MISSING", display.getSourceTraceStatus());
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_INPUT_NOT_AVAILABLE"));
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
+    void shouldPreventSourceTraceAdapterFromReturningValidInCurrentPhase() {
+        PlanBoundarySourceTraceAdapter sourceTraceAdapter = (symbol, decision, fallbackDisplay) -> {
+            fallbackDisplay.setPlanBoundaryStatus("VALID");
+            fallbackDisplay.setSourceTraceStatus("READY");
+            return fallbackDisplay;
+        };
+        DefaultPlanBoundaryDisplayAdapter localAdapter = new DefaultPlanBoundaryDisplayAdapter(sourceTraceAdapter);
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setAnalysisId("ana-1");
+
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO display = localAdapter.build("BTCUSDT", decision, null);
+
+        assertEquals("INCOMPLETE", display.getPlanBoundaryStatus());
+        assertFalse("VALID".equals(display.getPlanBoundaryStatus()));
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_PENDING"));
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
     }

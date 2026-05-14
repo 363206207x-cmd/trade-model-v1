@@ -26,6 +26,12 @@ public class DefaultPlanBoundaryDisplayAdapter implements PlanBoundaryDisplayAda
     private static final String READ_MODEL_PARTIAL = "READ_MODEL_PARTIAL";
     private static final String SOURCE_TRACE_PENDING = "SOURCE_TRACE_PENDING";
 
+    private final PlanBoundarySourceTraceAdapter sourceTraceAdapter;
+
+    public DefaultPlanBoundaryDisplayAdapter(PlanBoundarySourceTraceAdapter sourceTraceAdapter) {
+        this.sourceTraceAdapter = sourceTraceAdapter;
+    }
+
     @Override
     public DashboardDetailResponseVO.PlanBoundaryDisplayVO build(
             String symbol,
@@ -36,16 +42,17 @@ public class DefaultPlanBoundaryDisplayAdapter implements PlanBoundaryDisplayAda
                 ? fallbackDisplay
                 : new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
         enforceSafetyFlags(display);
+        ensureReasonLists(display);
 
         if (decision == null) {
             resetToBackendPending(display);
             addUnique(display.getBlockingReasons(), DECISION_MISSING);
-            return display;
+            return invokeSourceTraceAdapter(symbol, decision, display);
         }
 
         if (isBlank(decision.getAnalysisId())) {
             markIncomplete(display, ANALYSIS_ID_MISSING);
-            return display;
+            return invokeSourceTraceAdapter(symbol, decision, display);
         }
 
         if (PARTIAL.equalsIgnoreCase(decision.getReadModelTruthStatus())) {
@@ -53,16 +60,31 @@ public class DefaultPlanBoundaryDisplayAdapter implements PlanBoundaryDisplayAda
             if (!isBlank(decision.getReadModelFallbackReason())) {
                 addUnique(display.getBlockingReasons(), decision.getReadModelFallbackReason());
             }
-            return display;
+            return invokeSourceTraceAdapter(symbol, decision, display);
         }
 
         if (hasTextOnlyExecutionPlan(decision)) {
             markIncomplete(display, SOURCE_TRACE_PENDING);
-            return display;
+            return invokeSourceTraceAdapter(symbol, decision, display);
         }
 
         resetToBackendPending(display);
-        return display;
+        return invokeSourceTraceAdapter(symbol, decision, display);
+    }
+
+    private DashboardDetailResponseVO.PlanBoundaryDisplayVO invokeSourceTraceAdapter(
+            String symbol,
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO display
+    ) {
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO sourceTraceDisplay = sourceTraceAdapter.build(symbol, decision, display);
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO result = sourceTraceDisplay != null ? sourceTraceDisplay : display;
+        ensureReasonLists(result);
+        enforceSafetyFlags(result);
+        if ("VALID".equalsIgnoreCase(result.getPlanBoundaryStatus())) {
+            markIncomplete(result, SOURCE_TRACE_PENDING);
+        }
+        return result;
     }
 
     private void resetToBackendPending(DashboardDetailResponseVO.PlanBoundaryDisplayVO display) {
