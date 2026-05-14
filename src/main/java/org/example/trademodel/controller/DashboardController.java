@@ -5,6 +5,7 @@ import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.ScoreService;
+import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreBriefVO;
@@ -48,6 +49,7 @@ public class DashboardController {
     private final MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
+    private final PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter;
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -56,7 +58,8 @@ public class DashboardController {
                                RealMarketEnvironmentService realMarketEnvironmentService,
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
                                EvidenceService evidenceService,
-                               ScoreService scoreService) {
+                               ScoreService scoreService,
+                               PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -65,6 +68,7 @@ public class DashboardController {
         this.marketEnvironmentSnapshotMapper = marketEnvironmentSnapshotMapper;
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
+        this.planBoundaryDisplayAdapter = planBoundaryDisplayAdapter;
     }
 
     @GetMapping("/dashboard")
@@ -127,6 +131,11 @@ public class DashboardController {
         DashboardDetailResponseVO body = DashboardDetailResponseVO.withSafeDefaultDisplays();
         body.setSymbol(normalizedSymbol);
         body.setDecision(decisionService.getLatestDecisionResultBySymbol(normalizedSymbol));
+        body.setPlanBoundaryDisplay(planBoundaryDisplayAdapter.build(
+                normalizedSymbol,
+                body.getDecision(),
+                body.getPlanBoundaryDisplay()
+        ));
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
         body.setScoreTopItems(resolveScoreTopItems(body));
