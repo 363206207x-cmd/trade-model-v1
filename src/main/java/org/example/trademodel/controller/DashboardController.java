@@ -5,6 +5,7 @@ import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.ScoreService;
+import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
@@ -50,6 +51,7 @@ public class DashboardController {
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
     private final PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter;
+    private final ExecutionPlanDisplayAdapter executionPlanDisplayAdapter;
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -59,7 +61,8 @@ public class DashboardController {
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
                                EvidenceService evidenceService,
                                ScoreService scoreService,
-                               PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter) {
+                               PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
+                               ExecutionPlanDisplayAdapter executionPlanDisplayAdapter) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -69,6 +72,7 @@ public class DashboardController {
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
         this.planBoundaryDisplayAdapter = planBoundaryDisplayAdapter;
+        this.executionPlanDisplayAdapter = executionPlanDisplayAdapter;
     }
 
     @GetMapping("/dashboard")
@@ -135,6 +139,11 @@ public class DashboardController {
                 normalizedSymbol,
                 body.getDecision(),
                 body.getPlanBoundaryDisplay()
+        ));
+        body.setExecutionPlanDisplay(executionPlanDisplayAdapter.build(
+                body.getDecision(),
+                body.getPlanBoundaryDisplay(),
+                body.getExecutionPlanDisplay()
         ));
         body.setMarketEnvironmentMini(resolveMarketEnvironmentMini(normalizedSymbol, body));
         body.setEvidenceTopItems(resolveEvidenceTopItems(body));
