@@ -816,6 +816,79 @@
         grid.innerHTML = html;
     }
 
+
+    function isPresentValue(v) {
+        return v != null && String(v).trim() !== "";
+    }
+
+    function boolSemanticText(v, fallback) {
+        if (v === true) return "允许";
+        if (v === false) return "禁止";
+        return fallback;
+    }
+
+    function statusBadgeClass(rawStatus) {
+        var s = (rawStatus || "").toString().toUpperCase();
+        if (s === "READY" || s === "OK" || s === "VALID" || s === "ALIGNED") return "ok";
+        if (s === "WATCH_ONLY" || s === "INCOMPLETE" || s === "PARTIAL" || s === "READ_ONLY_PLACEHOLDER") return "partial";
+        return "pending";
+    }
+
+    function renderDisplayStatusCards(detail) {
+        var planBoundary = detail && detail.planBoundaryDisplay ? detail.planBoundaryDisplay : null;
+        var executionPlan = detail && detail.executionPlanDisplay ? detail.executionPlanDisplay : null;
+        var riskGuard = detail && detail.riskActionGuardDisplay ? detail.riskActionGuardDisplay : null;
+        var paperObs = detail && detail.paperObservationDisplay ? detail.paperObservationDisplay : null;
+
+        var planStatus = isPresentValue(planBoundary && planBoundary.planBoundaryStatus) ? String(planBoundary.planBoundaryStatus).trim() : "BACKEND_PENDING";
+        var planLabel = isPresentValue(planBoundary && planBoundary.planBoundaryStatusLabel) ? String(planBoundary.planBoundaryStatusLabel).trim() : "后端未接入";
+        var sourceTrace = isPresentValue(planBoundary && planBoundary.sourceTraceStatus) ? String(planBoundary.sourceTraceStatus).trim() : "INCOMPLETE / 后端未接入";
+        var backendConn = isPresentValue(planBoundary && planBoundary.backendConnectionStatus) ? String(planBoundary.backendConnectionStatus).trim() : "INCOMPLETE / 后端未接入";
+
+        var executionStatus = isPresentValue(executionPlan && executionPlan.executionPlanStatus) ? String(executionPlan.executionPlanStatus).trim() : "INCOMPLETE";
+        var executionLabel = isPresentValue(executionPlan && executionPlan.executionPlanStatusLabel) ? String(executionPlan.executionPlanStatusLabel).trim() : "仅占位";
+        var boundaryAligned = isPresentValue(executionPlan && executionPlan.executionPlanBoundaryAligned) ? String(executionPlan.executionPlanBoundaryAligned).trim() : "INCOMPLETE / 后端未接入";
+        var notExecReason = isPresentValue(executionPlan && executionPlan.notExecutableReason) ? String(executionPlan.notExecutableReason).trim() : "等待后端真实 BoundaryCandidate / source assembler / ExecutionPlan 接入";
+
+        var guardStatus = isPresentValue(riskGuard && riskGuard.riskActionGuardStatus) ? String(riskGuard.riskActionGuardStatus).trim() : "READ_ONLY_PLACEHOLDER";
+        var guardLabel = isPresentValue(riskGuard && riskGuard.riskActionGuardStatusLabel) ? String(riskGuard.riskActionGuardStatusLabel).trim() : "只读占位";
+        var allowPush = boolSemanticText(riskGuard && riskGuard.opportunityPushAllowed, "禁止（占位）");
+        var allowReverse = boolSemanticText(riskGuard && riskGuard.reverseTradeAllowed, "禁止（占位）");
+        var allowNewPos = boolSemanticText(riskGuard && riskGuard.newPositionAllowed, "禁止（占位）");
+
+        var paperStatus = isPresentValue(paperObs && paperObs.paperObservationStatus) ? String(paperObs.paperObservationStatus).trim() : "BACKEND_PENDING";
+        var paperLabel = isPresentValue(paperObs && paperObs.paperObservationStatusLabel) ? String(paperObs.paperObservationStatusLabel).trim() : "仅占位";
+        var notRealPosition = isPresentValue(paperObs && paperObs.notRealPosition) ? String(paperObs.notRealPosition).trim() : "不是实盘持仓 / 不是交易指令";
+
+        var planCard = document.getElementById("planBoundaryPlaceholderCard");
+        if (planCard) {
+            planCard.innerHTML = '<h3>PlanBoundary 状态（占位）</h3>' +
+                '<p class="module-status-note">当前区域仅为状态占位，不生成交易计划，不提供自动执行建议；非交易指令，必须人工复核。</p>' +
+                '<div class="kv"><span class="k">总状态</span><span class="v"><span class="status-badge ' + statusBadgeClass(planStatus) + '">' + escapeHtml(planStatus + ' / ' + planLabel) + '</span></span></div>' +
+                '<div class="kv"><span class="k">Source Trace</span><span class="v">' + escapeHtml(sourceTrace) + '</span></div>' +
+                '<div class="kv"><span class="k">Backend Connection</span><span class="v">' + escapeHtml(backendConn) + '</span></div>' +
+                '<div class="kv"><span class="k">ExecutionPlan 状态</span><span class="v">' + escapeHtml(executionStatus + ' / ' + executionLabel) + '</span></div>' +
+                '<div class="kv"><span class="k">Boundary 对齐</span><span class="v">' + escapeHtml(boundaryAligned) + '</span></div>' +
+                '<div class="kv"><span class="k">INCOMPLETE 原因</span><span class="v">' + escapeHtml(notExecReason) + '</span></div>' +
+                '<div class="alert-line confused">安全提示：非交易指令，需要人工复核。</div>' +
+                '<div class="alert-line">说明：仅展示 PlanBoundary / ExecutionPlan 接入状态，不生成 entry / stop / take profit 数值。</div>';
+        }
+
+        var riskCard = document.getElementById("riskActionGuardPlaceholderCard");
+        if (riskCard) {
+            riskCard.innerHTML = '<h3>Risk Action Guard（占位）</h3>' +
+                '<p class="module-status-note">只读风控动作分层（占位），后端未完全接入；非交易指令，需要人工复核。</p>' +
+                '<div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge ' + statusBadgeClass(guardStatus) + '">' + escapeHtml(guardStatus + ' / ' + guardLabel) + '</span></span></div>' +
+                '<div class="kv"><span class="k">机会推送</span><span class="v">' + escapeHtml(allowPush) + '</span></div>' +
+                '<div class="kv"><span class="k">反手动作</span><span class="v">' + escapeHtml(allowReverse) + '</span></div>' +
+                '<div class="kv"><span class="k">新开仓动作</span><span class="v">' + escapeHtml(allowNewPos) + '</span></div>' +
+                '<div class="kv"><span class="k">Paper Observation</span><span class="v">' + escapeHtml(paperStatus + ' / ' + paperLabel) + '</span></div>' +
+                '<div class="kv"><span class="k">持仓属性</span><span class="v">' + escapeHtml(notRealPosition) + '</span></div>' +
+                '<div class="alert-line confused"><strong>通用约束：</strong>本区仅做风险提醒，不连接 order API，不触发自动交易动作。</div>' +
+                '<div class="alert-line critical"><strong>硬约束：</strong>非交易指令，必须人工复核，不自动执行。</div>';
+        }
+    }
+
     function formatDateTime(v) {
         if (v == null) return "—";
         if (typeof v === "number") {
@@ -1950,6 +2023,7 @@
                 detailMarketEnvironmentMiniMap[symbol] = resp && resp.marketEnvironmentMini ? resp.marketEnvironmentMini : null;
                 detailEvidenceTopItemsMap[symbol] = Array.isArray(resp && resp.evidenceTopItems) ? resp.evidenceTopItems : [];
                 detailScoreTopItemsMap[symbol] = Array.isArray(resp && resp.scoreTopItems) ? resp.scoreTopItems : [];
+                renderDisplayStatusCards(detail);
                 if (!detail || !detail.symbol) return;
                 detailDecisionMap[detail.symbol] = detail;
                 if (selectedSymbol === detail.symbol) {
