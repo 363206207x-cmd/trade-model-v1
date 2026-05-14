@@ -596,6 +596,17 @@
             <p class="module-status-note">该区域仅用于展示首页 MVP 模块接入进度，非交易指令；涉及开仓与风控结论均需要人工复核。</p>
             <div class="status-grid" id="moduleStatusGrid"></div>
         </div>
+        <div class="card module-status-card" id="planBoundaryPlaceholderCard">
+            <h3>PlanBoundary 状态（占位）</h3>
+            <p class="module-status-note">当前区域仅为状态占位，不生成交易计划，不提供自动执行建议；非交易指令，必须人工复核。</p>
+            <div class="kv"><span class="k">总状态</span><span class="v"><span class="status-badge pending">BACKEND_PENDING / 后端未接入</span></span></div>
+            <div class="kv"><span class="k">Entry 状态</span><span class="v">INCOMPLETE / 后端未接入</span></div>
+            <div class="kv"><span class="k">Stop 状态</span><span class="v">INCOMPLETE / 后端未接入</span></div>
+            <div class="kv"><span class="k">Take Profit 状态</span><span class="v">INCOMPLETE / 后端未接入</span></div>
+            <div class="kv"><span class="k">INCOMPLETE 原因</span><span class="v">等待后端真实 BoundaryCandidate / source assembler / ExecutionPlan 接入</span></div>
+            <div class="alert-line confused">安全提示：非交易指令，需要人工复核。</div>
+            <div class="alert-line">说明：仅展示 PlanBoundary 接入状态占位，不生成 entry / stop / take profit 数值。</div>
+        </div>
 
         <!-- 第二层 -->
         <div class="layer2-head">
