@@ -4,10 +4,12 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SourceTraceDTO implements SourceCompletenessContract {
+public class RuntimeKlineContextDTO implements SourceCompletenessContract {
 
     private String symbol;
     private String timeframe;
+    private BigDecimal latestPrice;
+    private BigDecimal dataQualityScore;
     private BigDecimal entryPriceSource;
     private String entrySourceType;
     private String entrySourceTimeframe;
@@ -48,6 +50,22 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setTimeframe(String timeframe) {
         this.timeframe = timeframe;
+    }
+
+    public BigDecimal getLatestPrice() {
+        return latestPrice;
+    }
+
+    public void setLatestPrice(BigDecimal latestPrice) {
+        this.latestPrice = latestPrice;
+    }
+
+    public BigDecimal getDataQualityScore() {
+        return dataQualityScore;
+    }
+
+    public void setDataQualityScore(BigDecimal dataQualityScore) {
+        this.dataQualityScore = dataQualityScore;
     }
 
     public BigDecimal getEntryPriceSource() {
@@ -234,37 +252,6 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setMissingFields(List<String> missingFields) {
         this.missingFields = missingFields == null ? new ArrayList<>() : new ArrayList<>(missingFields);
-    }
-
-    public boolean hasRequiredBoundarySources() {
-        return isComplete()
-                && fallbackStatus == null
-                && entryPriceSource != null
-                && hasText(entrySourceType)
-                && hasText(entrySourceTimeframe)
-                && hasText(entrySourceReason)
-                && hasText(entrySourceRef)
-                && stopPriceSource != null
-                && hasText(stopSourceType)
-                && hasText(stopSourceTimeframe)
-                && hasText(stopSourceReason)
-                && hasText(stopSourceRef)
-                && tpPriceSources != null
-                && !tpPriceSources.isEmpty()
-                && hasText(tpSourceType)
-                && hasText(tpSourceTimeframe)
-                && hasText(tpSourceReason)
-                && hasText(tpSourceRef)
-                && rrSource != null
-                && hasText(rrRuleRef)
-                && hasText(liquiditySource)
-                && hasText(multiTimeframeSource)
-                && hasText(eventSource)
-                && hasText(wickSource);
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.trim().isEmpty();
     }
 
     public boolean isManualReviewRequired() {

@@ -6,9 +6,12 @@ import org.example.trademodel.dto.planboundary.BoundarySourceFieldsDTO;
 import org.example.trademodel.dto.planboundary.BoundaryStatusEnum;
 import org.example.trademodel.dto.planboundary.BoundaryStopDTO;
 import org.example.trademodel.dto.planboundary.BoundaryTakeProfitLevelDTO;
+import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.BoundaryCandidateService;
+import org.example.trademodel.service.SourceAssembler;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -17,6 +20,16 @@ import java.util.List;
 
 @Service
 public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
+
+    private final SourceAssembler sourceAssembler;
+
+    public BoundaryCandidateServiceImpl() {
+        this(new DefaultSourceAssembler());
+    }
+
+    public BoundaryCandidateServiceImpl(SourceAssembler sourceAssembler) {
+        this.sourceAssembler = sourceAssembler;
+    }
 
     @Override
     public BoundaryCandidateDTO evaluateBoundaryCandidate(
@@ -61,6 +74,31 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
         candidate.setManualReviewRequired(true);
         candidate.setNotTradeInstruction(true);
         return candidate;
+    }
+
+    @Override
+    public BoundaryCandidateDTO evaluateBoundaryCandidate(
+            String symbol,
+            String timeframe,
+            RuntimeKlineContextDTO runtimeKlineContext,
+            DerivativesRiskContextDTO derivativesRiskContext,
+            BoundaryEntryDTO entry,
+            BoundaryStopDTO stop,
+            List<BoundaryTakeProfitLevelDTO> takeProfitLevels,
+            BoundarySourceFieldsDTO sourceFields,
+            BigDecimal dataQualityScore
+    ) {
+        SourceTraceDTO sourceTrace = sourceAssembler.assembleSourceTrace(runtimeKlineContext, derivativesRiskContext);
+        return evaluateBoundaryCandidate(
+                symbol,
+                timeframe,
+                sourceTrace,
+                entry,
+                stop,
+                takeProfitLevels,
+                sourceFields,
+                dataQualityScore
+        );
     }
 
     private void addCandidateShapeBlockingReasons(

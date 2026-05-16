@@ -72,6 +72,38 @@ class SourceTraceDerivativesRiskContextDTOTest {
         assertFalse(trace.isComplete());
         assertTrue(trace.isManualReviewRequired());
         assertTrue(trace.isNotTradeInstruction());
+        assertFalse(trace.hasRequiredBoundarySources());
+    }
+
+    @Test
+    void sourceTraceShouldReportRequiredBoundarySourcesCompleteWhenNoFallbackOrMissingFields() {
+        SourceTraceDTO trace = new SourceTraceDTO();
+        trace.setSymbol("BTCUSDT");
+        trace.setTimeframe("1h");
+        trace.setEntryPriceSource(BigDecimal.valueOf(68000));
+        trace.setEntrySourceType("support");
+        trace.setEntrySourceTimeframe("1h");
+        trace.setEntrySourceReason("support retest");
+        trace.setEntrySourceRef("entry-ref");
+        trace.setStopPriceSource(BigDecimal.valueOf(66800));
+        trace.setStopSourceType("swing_low");
+        trace.setStopSourceTimeframe("1h");
+        trace.setStopSourceReason("recent swing low");
+        trace.setStopSourceRef("stop-ref");
+        trace.setTpPriceSources(List.of(BigDecimal.valueOf(70400)));
+        trace.setTpSourceType("rr_ladder");
+        trace.setTpSourceTimeframe("1h");
+        trace.setTpSourceReason("2R ladder");
+        trace.setTpSourceRef("tp-ref");
+        trace.setRrSource(BigDecimal.valueOf(2));
+        trace.setRrRuleRef("min_rr_2");
+        trace.setLiquiditySource("depth_snapshot");
+        trace.setMultiTimeframeSource("1h_4h_alignment");
+        trace.setEventSource("no_major_event_window");
+        trace.setWickSource("wick_confirmed");
+
+        assertTrue(trace.isComplete());
+        assertTrue(trace.hasRequiredBoundarySources());
     }
 
     @Test

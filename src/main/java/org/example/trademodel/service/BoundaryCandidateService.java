@@ -5,6 +5,8 @@ import org.example.trademodel.dto.planboundary.BoundaryEntryDTO;
 import org.example.trademodel.dto.planboundary.BoundarySourceFieldsDTO;
 import org.example.trademodel.dto.planboundary.BoundaryStopDTO;
 import org.example.trademodel.dto.planboundary.BoundaryTakeProfitLevelDTO;
+import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 
 import java.math.BigDecimal;
@@ -16,6 +18,18 @@ public interface BoundaryCandidateService {
             String symbol,
             String timeframe,
             SourceTraceDTO sourceTrace,
+            BoundaryEntryDTO entry,
+            BoundaryStopDTO stop,
+            List<BoundaryTakeProfitLevelDTO> takeProfitLevels,
+            BoundarySourceFieldsDTO sourceFields,
+            BigDecimal dataQualityScore
+    );
+
+    BoundaryCandidateDTO evaluateBoundaryCandidate(
+            String symbol,
+            String timeframe,
+            RuntimeKlineContextDTO runtimeKlineContext,
+            DerivativesRiskContextDTO derivativesRiskContext,
             BoundaryEntryDTO entry,
             BoundaryStopDTO stop,
             List<BoundaryTakeProfitLevelDTO> takeProfitLevels,

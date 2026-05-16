@@ -6,6 +6,8 @@ import org.example.trademodel.dto.planboundary.BoundarySourceFieldsDTO;
 import org.example.trademodel.dto.planboundary.BoundaryStatusEnum;
 import org.example.trademodel.dto.planboundary.BoundaryStopDTO;
 import org.example.trademodel.dto.planboundary.BoundaryTakeProfitLevelDTO;
+import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -114,6 +116,55 @@ class BoundaryCandidateServiceImplTest {
     }
 
     @Test
+    void evaluateBoundaryCandidateUsesAssemblerAndReturnsFallbackWhenRuntimeSourceIsMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = validRuntimeKlineContext();
+        runtimeKlineContext.setEntryPriceSource(null);
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                runtimeKlineContext,
+                validDerivativesRiskContext(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90)
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.INCOMPLETE);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).contains("sourceTrace fallbackStatus=INCOMPLETE");
+    }
+
+    @Test
+    void evaluateBoundaryCandidateUsesAssemblerAndReturnsValidWhenRuntimeSourcesAreComplete() {
+        BoundaryEntryDTO entry = validEntry();
+        BoundaryStopDTO stop = validStop();
+        BoundaryTakeProfitLevelDTO takeProfit = validTakeProfitLevel();
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                validRuntimeKlineContext(),
+                validDerivativesRiskContext(),
+                entry,
+                stop,
+                List.of(takeProfit),
+                validSourceFields(),
+                BigDecimal.valueOf(90)
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.VALID);
+        assertThat(candidate.getEntry()).isEqualTo(entry);
+        assertThat(candidate.getStop()).isEqualTo(stop);
+        assertThat(candidate.getTakeProfitLevels()).containsExactly(takeProfit);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
     void serviceShouldNotExposeTradingExecutionMethods() {
         List<String> methodNames = List.of(BoundaryCandidateServiceImpl.class.getDeclaredMethods())
                 .stream()
@@ -153,6 +204,52 @@ class BoundaryCandidateServiceImplTest {
         sourceTrace.setEventSource("no-event-window");
         sourceTrace.setWickSource("wick-confirmed");
         return sourceTrace;
+    }
+
+    private RuntimeKlineContextDTO validRuntimeKlineContext() {
+        RuntimeKlineContextDTO context = new RuntimeKlineContextDTO();
+        context.setSymbol("BTCUSDT");
+        context.setTimeframe("1h");
+        context.setLatestPrice(BigDecimal.valueOf(68100));
+        context.setDataQualityScore(BigDecimal.valueOf(90));
+        context.setEntryPriceSource(BigDecimal.valueOf(68000));
+        context.setEntrySourceType("support");
+        context.setEntrySourceTimeframe("1h");
+        context.setEntrySourceReason("support retest");
+        context.setEntrySourceRef("entry-1");
+        context.setStopPriceSource(BigDecimal.valueOf(66800));
+        context.setStopSourceType("swing_low");
+        context.setStopSourceTimeframe("1h");
+        context.setStopSourceReason("recent swing low");
+        context.setStopSourceRef("stop-1");
+        context.setTpPriceSources(List.of(BigDecimal.valueOf(70400)));
+        context.setTpSourceType("rr_ladder");
+        context.setTpSourceTimeframe("1h");
+        context.setTpSourceReason("2R target");
+        context.setTpSourceRef("tp-1");
+        context.setRrSource(BigDecimal.valueOf(2));
+        context.setRrRuleRef("min_rr_2");
+        context.setLiquiditySource("liquidity-ok");
+        context.setMultiTimeframeSource("multi-timeframe-aligned");
+        context.setEventSource("no-event-window");
+        context.setWickSource("wick-confirmed");
+        return context;
+    }
+
+    private DerivativesRiskContextDTO validDerivativesRiskContext() {
+        DerivativesRiskContextDTO context = new DerivativesRiskContextDTO();
+        context.setSymbol("BTCUSDT");
+        context.setTimeframe("1h");
+        context.setOpenInterestHistory(List.of(BigDecimal.valueOf(1000), BigDecimal.valueOf(1020)));
+        context.setFundingHistory(List.of(new BigDecimal("0.0001"), new BigDecimal("0.0002")));
+        context.setLiquidationCluster(List.of(BigDecimal.valueOf(66500)));
+        context.setLeverageDistribution(java.util.Map.of("1-5x", BigDecimal.valueOf(0.6)));
+        context.setLongShortRatio(BigDecimal.valueOf(1.1));
+        context.setLiquidityStress("LOW");
+        context.setEventWindowBlockers(List.of("none"));
+        context.setWickConfirmationSources(List.of("wick-confirmed"));
+        context.setDataQualityScore(BigDecimal.valueOf(90));
+        return context;
     }
 
     private BoundaryEntryDTO validEntry() {
