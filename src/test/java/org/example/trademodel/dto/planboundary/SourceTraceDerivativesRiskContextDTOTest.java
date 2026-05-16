@@ -1,0 +1,175 @@
+package org.example.trademodel.dto.planboundary;
+
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class SourceTraceDerivativesRiskContextDTOTest {
+
+    @Test
+    void sourceTraceShouldCarryTraceableBoundarySourcesAndFallbackState() {
+        SourceTraceDTO trace = new SourceTraceDTO();
+        trace.setSymbol("BTCUSDT");
+        trace.setTimeframe("1h");
+        trace.setEntryPriceSource(BigDecimal.valueOf(68000));
+        trace.setEntrySourceType("support");
+        trace.setEntrySourceTimeframe("1h");
+        trace.setEntrySourceReason("support retest");
+        trace.setEntrySourceRef("entry-ref");
+        trace.setStopPriceSource(BigDecimal.valueOf(66800));
+        trace.setStopSourceType("swing_low");
+        trace.setStopSourceTimeframe("1h");
+        trace.setStopSourceReason("recent swing low");
+        trace.setStopSourceRef("stop-ref");
+        trace.setTpPriceSources(List.of(BigDecimal.valueOf(70400), BigDecimal.valueOf(71600)));
+        trace.setTpSourceType("rr_ladder");
+        trace.setTpSourceTimeframe("1h");
+        trace.setTpSourceReason("2R and 3R ladder");
+        trace.setTpSourceRef("tp-ref");
+        trace.setRrSource(BigDecimal.valueOf(2));
+        trace.setRrRuleRef("min_rr_2");
+        trace.setLiquiditySource("depth_snapshot");
+        trace.setMultiTimeframeSource("1h_4h_alignment");
+        trace.setEventSource("no_major_event_window");
+        trace.setWickSource("wick_confirmed");
+        trace.setFallbackStatus(SourceTraceFallbackStatusEnum.WATCH_ONLY);
+        trace.setMissingFields(List.of("liquiditySource"));
+
+        assertEquals("BTCUSDT", trace.getSymbol());
+        assertEquals("1h", trace.getTimeframe());
+        assertEquals(BigDecimal.valueOf(68000), trace.getEntryPriceSource());
+        assertEquals("support", trace.getEntrySourceType());
+        assertEquals("1h", trace.getEntrySourceTimeframe());
+        assertEquals("support retest", trace.getEntrySourceReason());
+        assertEquals("entry-ref", trace.getEntrySourceRef());
+        assertEquals(BigDecimal.valueOf(66800), trace.getStopPriceSource());
+        assertEquals("swing_low", trace.getStopSourceType());
+        assertEquals("1h", trace.getStopSourceTimeframe());
+        assertEquals("recent swing low", trace.getStopSourceReason());
+        assertEquals("stop-ref", trace.getStopSourceRef());
+        assertEquals(List.of(BigDecimal.valueOf(70400), BigDecimal.valueOf(71600)), trace.getTpPriceSources());
+        assertEquals("rr_ladder", trace.getTpSourceType());
+        assertEquals("1h", trace.getTpSourceTimeframe());
+        assertEquals("2R and 3R ladder", trace.getTpSourceReason());
+        assertEquals("tp-ref", trace.getTpSourceRef());
+        assertEquals(BigDecimal.valueOf(2), trace.getRrSource());
+        assertEquals("min_rr_2", trace.getRrRuleRef());
+        assertEquals("depth_snapshot", trace.getLiquiditySource());
+        assertEquals("1h_4h_alignment", trace.getMultiTimeframeSource());
+        assertEquals("no_major_event_window", trace.getEventSource());
+        assertEquals("wick_confirmed", trace.getWickSource());
+        assertEquals(SourceTraceFallbackStatusEnum.WATCH_ONLY, trace.getFallbackStatus());
+        assertEquals(List.of("liquiditySource"), trace.getMissingFields());
+        assertFalse(trace.isComplete());
+        assertTrue(trace.isManualReviewRequired());
+        assertTrue(trace.isNotTradeInstruction());
+    }
+
+    @Test
+    void derivativesRiskContextShouldCarryRiskEvidenceAndFallbackState() {
+        DerivativesRiskContextDTO context = new DerivativesRiskContextDTO();
+        LocalDateTime contextTime = LocalDateTime.of(2026, 5, 16, 10, 0);
+        Map<String, BigDecimal> leverageDistribution = new LinkedHashMap<>();
+        leverageDistribution.put("1-5x", BigDecimal.valueOf(0.55));
+        leverageDistribution.put("20x+", BigDecimal.valueOf(0.12));
+
+        context.setSymbol("BTCUSDT");
+        context.setTimeframe("1h");
+        context.setContextTime(contextTime);
+        context.setOpenInterestHistory(List.of(BigDecimal.valueOf(100), BigDecimal.valueOf(120)));
+        context.setOpenInterestDelta(BigDecimal.valueOf(20));
+        context.setLastFundingRate(new BigDecimal("0.0001"));
+        context.setFundingHistory(List.of(new BigDecimal("0.00008"), new BigDecimal("0.0001")));
+        context.setLiquidationCluster(List.of(BigDecimal.valueOf(66000), BigDecimal.valueOf(72000)));
+        context.setLeverageDistribution(leverageDistribution);
+        context.setLongShortRatio(BigDecimal.valueOf(1.2));
+        context.setLiquidityStress("MEDIUM");
+        context.setLiquidityStressReason("spread elevated");
+        context.setEventWindowBlockers(List.of("macro_event"));
+        context.setWickConfirmationSources(List.of("wick_source_ref"));
+        context.setDataQualityScore(BigDecimal.valueOf(85));
+        context.setFallbackStatus(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY);
+        context.setMissingFields(List.of("liquidationCluster"));
+
+        assertEquals("BTCUSDT", context.getSymbol());
+        assertEquals("1h", context.getTimeframe());
+        assertEquals(contextTime, context.getContextTime());
+        assertEquals(List.of(BigDecimal.valueOf(100), BigDecimal.valueOf(120)), context.getOpenInterestHistory());
+        assertEquals(BigDecimal.valueOf(20), context.getOpenInterestDelta());
+        assertEquals(new BigDecimal("0.0001"), context.getLastFundingRate());
+        assertEquals(List.of(new BigDecimal("0.00008"), new BigDecimal("0.0001")), context.getFundingHistory());
+        assertEquals(List.of(BigDecimal.valueOf(66000), BigDecimal.valueOf(72000)), context.getLiquidationCluster());
+        assertEquals(leverageDistribution, context.getLeverageDistribution());
+        assertEquals(BigDecimal.valueOf(1.2), context.getLongShortRatio());
+        assertEquals("MEDIUM", context.getLiquidityStress());
+        assertEquals("spread elevated", context.getLiquidityStressReason());
+        assertEquals(List.of("macro_event"), context.getEventWindowBlockers());
+        assertEquals(List.of("wick_source_ref"), context.getWickConfirmationSources());
+        assertEquals(BigDecimal.valueOf(85), context.getDataQualityScore());
+        assertEquals(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY, context.getFallbackStatus());
+        assertEquals(List.of("liquidationCluster"), context.getMissingFields());
+        assertFalse(context.isComplete());
+        assertTrue(context.isManualReviewRequired());
+        assertTrue(context.isNotTradeInstruction());
+    }
+
+    @Test
+    void listAndMapFieldsShouldBeDefensivelyCopied() {
+        SourceTraceDTO trace = new SourceTraceDTO();
+        List<BigDecimal> tpSources = new java.util.ArrayList<>();
+        tpSources.add(BigDecimal.ONE);
+        trace.setTpPriceSources(tpSources);
+        tpSources.add(BigDecimal.TEN);
+
+        DerivativesRiskContextDTO context = new DerivativesRiskContextDTO();
+        List<BigDecimal> oiHistory = new java.util.ArrayList<>();
+        oiHistory.add(BigDecimal.ONE);
+        Map<String, BigDecimal> leverageDistribution = new LinkedHashMap<>();
+        leverageDistribution.put("1-5x", BigDecimal.ONE);
+        context.setOpenInterestHistory(oiHistory);
+        context.setLeverageDistribution(leverageDistribution);
+        oiHistory.add(BigDecimal.TEN);
+        leverageDistribution.put("20x+", BigDecimal.TEN);
+
+        assertEquals(List.of(BigDecimal.ONE), trace.getTpPriceSources());
+        assertEquals(List.of(BigDecimal.ONE), context.getOpenInterestHistory());
+        assertEquals(Map.of("1-5x", BigDecimal.ONE), context.getLeverageDistribution());
+    }
+
+    @Test
+    void contractObjectsShouldNotExposeTradingExecutionMethods() {
+        List<Class<?>> types = List.of(
+                SourceTraceDTO.class,
+                DerivativesRiskContextDTO.class,
+                SourceCompletenessContract.class
+        );
+        List<String> forbiddenFragments = Arrays.asList(
+                "executeorder",
+                "placeorder",
+                "closeposition",
+                "reverseposition",
+                "autotrade",
+                "orderid",
+                "orderside",
+                "executionid"
+        );
+
+        for (Class<?> type : types) {
+            for (Method method : type.getMethods()) {
+                String name = method.getName().toLowerCase(Locale.ROOT);
+                for (String forbidden : forbiddenFragments) {
+                    assertFalse(name.contains(forbidden), type.getSimpleName() + "." + method.getName());
+                }
+            }
+        }
+    }
+}
