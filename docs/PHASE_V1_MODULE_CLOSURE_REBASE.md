@@ -4,9 +4,17 @@
 
 This document records the Trade Model V1 module closure rebase baseline.
 
-Review baseline HEAD:
+Original review baseline HEAD:
 
 - `860c754 feat(dto): add BoundaryCandidateDTO + related DTOs and unit test with BoundaryStatusEnum`
+
+Baseline finalization HEAD:
+
+- `a6183d9 docs(plan): add P10 source assembler small-scale production verification`
+
+Baseline status:
+
+- FORMAL BASELINE
 
 This is a documentation-only baseline.
 
@@ -60,6 +68,28 @@ When Coinglass, OI history, Funding history, liquidation, and leverage risk data
 | P1 | schema / config | Basic fields exist | `CLOSED_BASIC_DERIVATIVES_PENDING` | No Coinglass, OI history, Funding history, liquidation cluster, or leverage distribution contract exists. |
 | P2 | Dashboard static UI / safe defaults | Safe display defaults exist | `CLOSED` | Static safe display and non-trading labels do not depend on derivatives risk sources. |
 | P2 | DTO getter / setter / unit tests | Structural tests exist | `CLOSED` | Pure DTO structure and safety defaults do not require external risk data. |
+
+## PlanBoundary / SourceTrace Status Rebase
+
+| Priority | Module | Current Closure State | Rebased Label | Fallback State | Reason |
+|---|---|---|---|---|---|
+| P0 | BoundaryCandidateDTO | DTO exists. Static `valid(...)` factory exists. Basic entry / stop / TP fields exist. | `CLOSED_BASIC` | N/A | DTO can express a VALID candidate structurally, but it does not prove Service integration, RuntimeKlineContext, source assembler, or derivatives risk completeness. |
+| P0 | BoundaryEntryDTO / BoundaryStopDTO / BoundaryTakeProfitLevelDTO | DTOs exist and can carry numeric source fields. | `CLOSED_BASIC` | N/A | Field carriers are available for candidate structure, but production numeric source generation is not complete. |
+| P0 | BoundarySourceFieldsDTO | DTO exists and can carry source field summaries. | `CLOSED_BASIC` | N/A | Source summary carrier exists, but it is not a source assembler and does not produce traceability by itself. |
+| P0 | RuntimeKlineContext | No complete RuntimeKlineContext production chain is confirmed in current HEAD. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` | VALID requires fresh OHLCV, kline window, latest price, data quality, stale status, and traceable runtime source context. These are not fully wired. |
+| P0 | BoundaryCandidateService VALID integration | No confirmed Service path that assembles `BoundaryCandidateDTO.valid(...)` from RuntimeKlineContext and traceable entry / stop / TP sources. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` / `WATCH_ONLY` | Service must not output VALID unless entry / stop / TP numeric sources are complete and traceable. Missing sources must remain INCOMPLETE or WATCH_ONLY. |
+| P0 | Entry Source Assembler | No confirmed production assembler for entry numeric source. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` / `WATCH_ONLY` | Service must not forge entry price, source timeframe, source reason, or source value. |
+| P0 | Stop Source Assembler | No confirmed production assembler for stop numeric source. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` / `WATCH_ONLY` | Service must not forge stop price, invalidation level, source timeframe, source reason, or source value. |
+| P0 | TP Source Assembler | No confirmed production assembler for TP numeric source. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` / `WATCH_ONLY` | Service must not forge TP price, RR ladder, source timeframe, source reason, or source value. |
+| P0 | RR Source / Rule Assembler | No confirmed production assembler for RR rule and RR inputs. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` / `WATCH_ONLY` | RR must be calculated from traceable entry / stop / TP sources. Missing RR inputs cannot be inferred. |
+| P0 | Liquidity Source | No confirmed production liquidity state source. | `INCOMPLETE_RISK_LOGIC` | `SAFE_FAIL_CLOSED_ONLY` | RiskActionGuard cannot evaluate liquidity worsening without source data. High-risk display must remain manual-review only. |
+| P0 | Multi-Timeframe Source | No confirmed production multi-timeframe source for boundary validation. | `INCOMPLETE_RISK_LOGIC` | `INCOMPLETE` / `WATCH_ONLY` | Multi-timeframe conflict or convergence cannot be assumed when source is missing. |
+| P0 | Event Window Blocker | No confirmed production event window blocker for PlanBoundary VALID gating. | `INCOMPLETE_RISK_LOGIC` | `WATCH_ONLY` / `SAFE_FAIL_CLOSED_ONLY` | Major event windows must block or downgrade VALID when event source is unavailable. |
+| P0 | Wick Confirmation Source | No confirmed production wick-only confirmation source. | `INCOMPLETE_RISK_LOGIC` | `WATCH_ONLY` / `SAFE_FAIL_CLOSED_ONLY` | Wick-only risk cannot be interpreted as trend reversal. Missing confirmation must not produce execution semantics. |
+| P0 | PlanBoundary SourceTrace Adapter | Fail-closed adapter exists, but real source trace is not connected. | `SAFE_FAIL_CLOSED_ONLY` | `SAFE_FAIL_CLOSED_ONLY` | Adapter should report missing or incomplete source trace. It must not imply BoundaryCandidateService or RuntimeKlineContext is complete. |
+| P0 | PlanBoundary Display Adapter | Safe display exists and enforces `manualReviewRequired` / `notTradeInstruction`. | `SAFE_FAIL_CLOSED_ONLY` | `SAFE_FAIL_CLOSED_ONLY` | Display layer is safe, but it is not a production PlanBoundary generator. |
+| P0 | ExecutionPlan Display Adapter | Review-only display mapping exists. | `SAFE_FAIL_CLOSED_ONLY` | `SAFE_FAIL_CLOSED_ONLY` | Even when PlanBoundary is VALID, ExecutionPlan display remains review-only and must not become executable. |
+| P0 | RiskActionGuard Display Adapter | Fail-closed action guard exists. | `SAFE_FAIL_CLOSED_ONLY` | `SAFE_FAIL_CLOSED_ONLY` | All trading action flags remain false unless future verified risk sources and review gates are explicitly implemented. |
 
 ## 4. Directly Affected Modules
 
@@ -323,17 +353,32 @@ Therefore:
 
 ## 9. Fallback Rules
 
-When derivatives risk sources are missing:
+### PlanBoundary / SourceTrace Fallback Rules
 
-| Module | Required fallback |
+When required PlanBoundary or SourceTrace inputs are missing:
+
+| Missing Area | Required Fallback |
 |---|---|
-| BoundaryCandidateService | `INCOMPLETE` or `WATCH_ONLY` |
-| PlanBoundary SourceTrace | `SAFE_FAIL_CLOSED` / source trace missing |
-| ExecutionPlan display | `BOUNDARY_PENDING`, `INCOMPLETE`, or review-only |
-| RiskActionGuard | manual review required, all trading action flags false |
-| Push / Watchlist | no opportunity push when risk source is required but missing |
-| Score / Evidence | label as heuristic / derivatives pending |
-| Review | record evidence missing, do not infer missing risk state |
+| RuntimeKlineContext missing | `INCOMPLETE` |
+| OHLCV / kline window missing | `INCOMPLETE` |
+| entry source missing | `INCOMPLETE` / `WATCH_ONLY` |
+| stop source missing | `INCOMPLETE` / `WATCH_ONLY` |
+| TP source missing | `INCOMPLETE` / `WATCH_ONLY` |
+| RR inputs missing | `INCOMPLETE` / `WATCH_ONLY` |
+| liquidity source missing | `SAFE_FAIL_CLOSED_ONLY` |
+| multi-timeframe source missing | `WATCH_ONLY` |
+| event window blocker missing | `WATCH_ONLY` / `SAFE_FAIL_CLOSED_ONLY` |
+| wick confirmation source missing | `WATCH_ONLY` / `SAFE_FAIL_CLOSED_ONLY` |
+| source trace adapter not connected to production source | `SAFE_FAIL_CLOSED_ONLY` |
+| display-only module without source backing | `SAFE_FAIL_CLOSED_ONLY` |
+
+Only DTOs and safe defaults may remain `CLOSED` or `CLOSED_BASIC`.
+
+All modules that require missing production data must remain `INCOMPLETE_RISK_LOGIC`, `CLOSED_BASIC_DERIVATIVES_PENDING`, or `SAFE_FAIL_CLOSED_ONLY`.
+
+BoundaryCandidate `VALID` must not be inferred from missing source data.
+
+ExecutionPlan must not become executable from display-only or DTO-only state.
 
 ## 10. Risk Action Guard Principles
 
