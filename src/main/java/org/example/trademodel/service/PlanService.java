@@ -24,4 +24,12 @@ public interface PlanService {
             MarketEnvironmentVO marketEnvironment,
             AssetAnalysisVO analysisContext,
             SourceTraceDTO sourceTrace);
+
+    ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decision,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnvironment,
+            AssetAnalysisVO analysisContext,
+            SourceTraceDTO sourceTrace,
+            org.example.trademodel.vo.DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay);
 }

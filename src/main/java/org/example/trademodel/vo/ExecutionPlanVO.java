@@ -15,6 +15,9 @@ public class ExecutionPlanVO {
     private String notExecutableReason = "SOURCE_TRACE_NOT_EVALUATED";
     private Boolean manualReviewRequired = true;
     private Boolean notTradeInstruction = true;
+    private String riskActionGuardStatus = "BACKEND_PENDING";
+    private String riskActionGuardBlockingReason;
+    private Boolean riskActionGuardReady = false;
     private String recommendedAction;
     private String entryZone;
     private String stopLoss;
@@ -42,6 +45,12 @@ public class ExecutionPlanVO {
     public void setManualReviewRequired(Boolean manualReviewRequired) { this.manualReviewRequired = manualReviewRequired; }
     public Boolean getNotTradeInstruction() { return notTradeInstruction; }
     public void setNotTradeInstruction(Boolean notTradeInstruction) { this.notTradeInstruction = notTradeInstruction; }
+    public String getRiskActionGuardStatus() { return riskActionGuardStatus; }
+    public void setRiskActionGuardStatus(String riskActionGuardStatus) { this.riskActionGuardStatus = riskActionGuardStatus; }
+    public String getRiskActionGuardBlockingReason() { return riskActionGuardBlockingReason; }
+    public void setRiskActionGuardBlockingReason(String riskActionGuardBlockingReason) { this.riskActionGuardBlockingReason = riskActionGuardBlockingReason; }
+    public Boolean getRiskActionGuardReady() { return riskActionGuardReady; }
+    public void setRiskActionGuardReady(Boolean riskActionGuardReady) { this.riskActionGuardReady = riskActionGuardReady; }
     public String getRecommendedAction() { return recommendedAction; }
     public void setRecommendedAction(String recommendedAction) { this.recommendedAction = recommendedAction; }
     public String getEntryZone() { return entryZone; }

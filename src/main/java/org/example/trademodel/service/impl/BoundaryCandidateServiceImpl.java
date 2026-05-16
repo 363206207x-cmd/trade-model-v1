@@ -12,6 +12,7 @@ import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.BoundaryCandidateService;
 import org.example.trademodel.service.SourceAssembler;
+import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -42,6 +43,31 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
             BoundarySourceFieldsDTO sourceFields,
             BigDecimal dataQualityScore
     ) {
+        return evaluateBoundaryCandidate(
+                symbol,
+                timeframe,
+                sourceTrace,
+                entry,
+                stop,
+                takeProfitLevels,
+                sourceFields,
+                dataQualityScore,
+                null
+        );
+    }
+
+    @Override
+    public BoundaryCandidateDTO evaluateBoundaryCandidate(
+            String symbol,
+            String timeframe,
+            SourceTraceDTO sourceTrace,
+            BoundaryEntryDTO entry,
+            BoundaryStopDTO stop,
+            List<BoundaryTakeProfitLevelDTO> takeProfitLevels,
+            BoundarySourceFieldsDTO sourceFields,
+            BigDecimal dataQualityScore,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
         List<String> blockingReasons = new ArrayList<>();
 
         addCandidateShapeBlockingReasons(
@@ -56,9 +82,10 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
         );
         addSourceTraceBlockingReasons(sourceTrace, blockingReasons);
         addBoundarySourceBlockingReasons(entry, stop, takeProfitLevels, sourceFields, blockingReasons);
+        addRiskActionGuardBlockingReasons(riskActionGuardDisplay, blockingReasons);
 
         if (!blockingReasons.isEmpty()) {
-            BoundaryStatusEnum fallbackStatus = resolveFallbackStatus(sourceTrace);
+            BoundaryStatusEnum fallbackStatus = resolveFallbackStatus(sourceTrace, riskActionGuardDisplay);
             return fallbackCandidate(symbol, timeframe, fallbackStatus, blockingReasons, sourceFields, dataQualityScore);
         }
 
@@ -203,7 +230,44 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
         }
     }
 
-    private BoundaryStatusEnum resolveFallbackStatus(SourceTraceDTO sourceTrace) {
+    private void addRiskActionGuardBlockingReasons(
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay,
+            List<String> blockingReasons
+    ) {
+        if (riskActionGuardDisplay == null) {
+            return;
+        }
+        if (isBlank(riskActionGuardDisplay.getRiskActionGuardStatus())
+                || "BACKEND_PENDING".equalsIgnoreCase(riskActionGuardDisplay.getRiskActionGuardStatus())) {
+            blockingReasons.add("riskActionGuard backend pending");
+        }
+        if (isBlank(riskActionGuardDisplay.getLiquidityState())
+                || "BACKEND_PENDING".equalsIgnoreCase(riskActionGuardDisplay.getLiquidityState())) {
+            blockingReasons.add("liquidity source missing");
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getStampedeDetected())) {
+            blockingReasons.add("stampede risk detected");
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())) {
+            blockingReasons.add("wick-only risk detected");
+        }
+        String blockingReason = riskActionGuardDisplay.getRiskActionBlockingReason();
+        if (!isBlank(blockingReason) && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(blockingReason)) {
+            blockingReasons.add("riskActionGuard blocked:" + blockingReason);
+        }
+    }
+
+    private BoundaryStatusEnum resolveFallbackStatus(
+            SourceTraceDTO sourceTrace,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        if (riskActionGuardDisplay != null
+                && (Boolean.TRUE.equals(riskActionGuardDisplay.getStampedeDetected())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())
+                || (!isBlank(riskActionGuardDisplay.getRiskActionBlockingReason())
+                && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(riskActionGuardDisplay.getRiskActionBlockingReason())))) {
+            return BoundaryStatusEnum.WATCH_ONLY;
+        }
         if (sourceTrace == null) {
             return BoundaryStatusEnum.INCOMPLETE;
         }
@@ -245,5 +309,9 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
         if (value == null || value.trim().isEmpty()) {
             blockingReasons.add(reason);
         }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

@@ -2,6 +2,7 @@ package org.example.trademodel.service;
 
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +52,31 @@ class RuleEngineServiceSourceTraceTest {
         assertThat(output.getMarketBias()).isEqualTo("BULLISH");
     }
 
+    @Test
+    void executeWithStampedeRiskGuardFailsClosed() {
+        RuleEngineService service = executableRuleEngine();
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setStampedeDetected(true);
+
+        RuleBaseOutput output = service.execute(new DecisionContext(), validSourceTrace(), risk);
+
+        assertThat(output.isCanExecute()).isFalse();
+        assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(output.getConfidenceLevel()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(output.getRiskLevel()).isEqualTo("STAMPEDE_RISK_REVIEW_ONLY");
+    }
+
+    @Test
+    void executeWithReadyRiskGuardAndCompleteSourceTraceStillStaysReviewOnly() {
+        RuleEngineService service = executableRuleEngine();
+
+        RuleBaseOutput output = service.execute(new DecisionContext(), validSourceTrace(), readyRiskActionGuard());
+
+        assertThat(output.isCanExecute()).isFalse();
+        assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(output.getMarketBias()).isEqualTo("BULLISH");
+    }
+
     private RuleEngineService executableRuleEngine() {
         return ctx -> {
             RuleBaseOutput output = new RuleBaseOutput();
@@ -61,6 +87,22 @@ class RuleEngineServiceSourceTraceTest {
             output.setCanExecute(true);
             return output;
         };
+    }
+
+    private DashboardDetailResponseVO.RiskActionGuardDisplayVO readyRiskActionGuard() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
+        risk.setRiskActionGuardStatus("MANUAL_REVIEW_REQUIRED");
+        risk.setRiskActionBlockingReason("MANUAL_REVIEW_REQUIRED");
+        risk.setLiquidityState("NORMAL");
+        risk.setStampedeDetected(false);
+        risk.setWickOnlyRisk(false);
+        risk.setOpportunityPushAllowed(false);
+        risk.setReverseTradeAllowed(false);
+        risk.setNewPositionAllowed(false);
+        risk.setMarketOrderExitAllowed(false);
+        risk.setManualRiskReviewRequired(true);
+        risk.setNotTradeInstruction(true);
+        return risk;
     }
 
     private SourceTraceDTO validSourceTrace() {

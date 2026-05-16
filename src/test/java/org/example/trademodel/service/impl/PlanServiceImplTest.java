@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.junit.jupiter.api.Test;
@@ -78,6 +79,52 @@ class PlanServiceImplTest {
         assertThat(plan.getNotTradeInstruction()).isTrue();
     }
 
+    @Test
+    void generateExecutionPlan_withCompleteSourceTraceAndReadyRiskGuardStaysReviewOnly() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(
+                decision,
+                null,
+                null,
+                null,
+                validSourceTrace(),
+                readyRiskActionGuard()
+        );
+
+        assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_READY_REVIEW_ONLY);
+        assertThat(plan.getRiskActionGuardReady()).isTrue();
+        assertThat(plan.getRiskActionGuardBlockingReason()).isNull();
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void generateExecutionPlan_withStampedeRiskGuardFallsBackToWatchOnly() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setStampedeDetected(true);
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(
+                decision,
+                null,
+                null,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(plan.getRiskActionGuardReady()).isFalse();
+        assertThat(plan.getNotExecutableReason()).isEqualTo("STAMPEDE_RISK_REVIEW_ONLY");
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
     private SourceTraceDTO validSourceTrace() {
         SourceTraceDTO sourceTrace = new SourceTraceDTO();
         sourceTrace.setSymbol("BTCUSDT");
@@ -104,5 +151,21 @@ class PlanServiceImplTest {
         sourceTrace.setEventSource("no-event-window");
         sourceTrace.setWickSource("wick-confirmed");
         return sourceTrace;
+    }
+
+    private DashboardDetailResponseVO.RiskActionGuardDisplayVO readyRiskActionGuard() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
+        risk.setRiskActionGuardStatus("MANUAL_REVIEW_REQUIRED");
+        risk.setRiskActionBlockingReason("MANUAL_REVIEW_REQUIRED");
+        risk.setLiquidityState("NORMAL");
+        risk.setStampedeDetected(false);
+        risk.setWickOnlyRisk(false);
+        risk.setOpportunityPushAllowed(false);
+        risk.setReverseTradeAllowed(false);
+        risk.setNewPositionAllowed(false);
+        risk.setMarketOrderExitAllowed(false);
+        risk.setManualRiskReviewRequired(true);
+        risk.setNotTradeInstruction(true);
+        return risk;
     }
 }

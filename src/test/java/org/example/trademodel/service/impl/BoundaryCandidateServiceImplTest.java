@@ -10,6 +10,7 @@ import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -165,6 +166,49 @@ class BoundaryCandidateServiceImplTest {
     }
 
     @Test
+    void evaluateBoundaryCandidateReturnsWatchOnlyWhenRiskActionGuardFailsClosed() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setStampedeDetected(true);
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                validSourceTrace(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90),
+                risk
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.WATCH_ONLY);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).contains("stampede risk detected");
+    }
+
+    @Test
+    void evaluateBoundaryCandidateReturnsValidWhenRiskActionGuardIsReviewOnlyReady() {
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                validSourceTrace(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90),
+                readyRiskActionGuard()
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.VALID);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).isEmpty();
+    }
+
+    @Test
     void serviceShouldNotExposeTradingExecutionMethods() {
         List<String> methodNames = List.of(BoundaryCandidateServiceImpl.class.getDeclaredMethods())
                 .stream()
@@ -250,6 +294,22 @@ class BoundaryCandidateServiceImplTest {
         context.setWickConfirmationSources(List.of("wick-confirmed"));
         context.setDataQualityScore(BigDecimal.valueOf(90));
         return context;
+    }
+
+    private DashboardDetailResponseVO.RiskActionGuardDisplayVO readyRiskActionGuard() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
+        risk.setRiskActionGuardStatus("MANUAL_REVIEW_REQUIRED");
+        risk.setRiskActionBlockingReason("MANUAL_REVIEW_REQUIRED");
+        risk.setLiquidityState("NORMAL");
+        risk.setStampedeDetected(false);
+        risk.setWickOnlyRisk(false);
+        risk.setOpportunityPushAllowed(false);
+        risk.setReverseTradeAllowed(false);
+        risk.setNewPositionAllowed(false);
+        risk.setMarketOrderExitAllowed(false);
+        risk.setManualRiskReviewRequired(true);
+        risk.setNotTradeInstruction(true);
+        return risk;
     }
 
     private BoundaryEntryDTO validEntry() {

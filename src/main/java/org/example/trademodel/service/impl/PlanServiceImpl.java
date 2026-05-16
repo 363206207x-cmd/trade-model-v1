@@ -4,6 +4,7 @@ import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
@@ -21,6 +22,12 @@ public class PlanServiceImpl implements PlanService {
     private static final String SOURCE_TRACE_WATCH_ONLY = "SOURCE_TRACE_WATCH_ONLY";
     private static final String SOURCE_TRACE_SAFE_FAIL_CLOSED = "SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY";
     private static final String MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED";
+    private static final String RISK_ACTION_GUARD_MISSING = "RISK_ACTION_GUARD_MISSING";
+    private static final String RISK_ACTION_GUARD_BACKEND_PENDING = "RISK_ACTION_GUARD_BACKEND_PENDING";
+    private static final String LIQUIDITY_CONTEXT_MISSING = "LIQUIDITY_CONTEXT_MISSING";
+    private static final String STAMPEDE_RISK_REVIEW_ONLY = "STAMPEDE_RISK_REVIEW_ONLY";
+    private static final String WICK_ONLY_RISK_REVIEW_ONLY = "WICK_ONLY_RISK_REVIEW_ONLY";
+    private static final String RISK_ACTION_GUARD_BLOCKED = "RISK_ACTION_GUARD_BLOCKED";
 
     @Override
     public ExecutionPlanVO generateExecutionPlan(DecisionBundleVO decisionBundle, List<ScoreItemVO> scoreList,
@@ -36,6 +43,18 @@ public class PlanServiceImpl implements PlanService {
             AssetAnalysisVO assetAnalysis,
             SourceTraceDTO sourceTrace
     ) {
+        return generateExecutionPlan(decisionBundle, scoreList, marketEnv, assetAnalysis, sourceTrace, null);
+    }
+
+    @Override
+    public ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decisionBundle,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnv,
+            AssetAnalysisVO assetAnalysis,
+            SourceTraceDTO sourceTrace,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
         ExecutionPlanVO plan = new ExecutionPlanVO();
         plan.setPlanId("plan-" + UUID.randomUUID().toString().substring(0, 8));
         plan.setRecommendedAction(DEFAULT_OBSERVE_ACTION);
@@ -49,6 +68,7 @@ public class PlanServiceImpl implements PlanService {
         }
         plan.setPlanMode(resolvePlanMode(plan, decisionBundle));
         applySourceTraceReadiness(plan, sourceTrace);
+        applyRiskActionGuardReadiness(plan, riskActionGuardDisplay);
         return plan;
     }
 
@@ -103,11 +123,73 @@ public class PlanServiceImpl implements PlanService {
         plan.setNotExecutableReason(SOURCE_TRACE_INCOMPLETE);
     }
 
+    private static void applyRiskActionGuardReadiness(
+            ExecutionPlanVO plan,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        plan.setRiskActionGuardReady(false);
+        if (riskActionGuardDisplay == null) {
+            return;
+        }
+        plan.setRiskActionGuardStatus(riskActionGuardDisplay.getRiskActionGuardStatus());
+        String reason = resolveRiskActionGuardReason(riskActionGuardDisplay);
+        plan.setRiskActionGuardBlockingReason(reason);
+        if (reason == null) {
+            plan.setRiskActionGuardReady(true);
+            return;
+        }
+        plan.setPlanMode(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        plan.setSourceTraceComplete(false);
+        if (RISK_ACTION_GUARD_MISSING.equals(reason) || RISK_ACTION_GUARD_BACKEND_PENDING.equals(reason)) {
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_INCOMPLETE);
+        } else {
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        }
+        plan.setNotExecutableReason(reason);
+    }
+
+    private static String resolveRiskActionGuardReason(
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        if (riskActionGuardDisplay == null) {
+            return RISK_ACTION_GUARD_MISSING;
+        }
+        if (isBlankStatic(riskActionGuardDisplay.getRiskActionGuardStatus())
+                || "BACKEND_PENDING".equalsIgnoreCase(riskActionGuardDisplay.getRiskActionGuardStatus())) {
+            return RISK_ACTION_GUARD_BACKEND_PENDING;
+        }
+        if (isBlankStatic(riskActionGuardDisplay.getLiquidityState())
+                || "BACKEND_PENDING".equalsIgnoreCase(riskActionGuardDisplay.getLiquidityState())) {
+            return LIQUIDITY_CONTEXT_MISSING;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getStampedeDetected())) {
+            return STAMPEDE_RISK_REVIEW_ONLY;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())) {
+            return WICK_ONLY_RISK_REVIEW_ONLY;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getOpportunityPushAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getReverseTradeAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getNewPositionAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getMarketOrderExitAllowed())) {
+            return RISK_ACTION_GUARD_BLOCKED;
+        }
+        String blockingReason = riskActionGuardDisplay.getRiskActionBlockingReason();
+        if (!isBlankStatic(blockingReason) && !MANUAL_REVIEW_REQUIRED.equalsIgnoreCase(blockingReason)) {
+            return blockingReason;
+        }
+        return null;
+    }
+
     private static boolean hasConcrete(String value) {
         if (value == null) {
             return false;
         }
         String trimmed = value.trim();
         return !trimmed.isEmpty() && !PLACEHOLDER_NOT_AVAILABLE.equals(trimmed);
+    }
+
+    private static boolean isBlankStatic(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

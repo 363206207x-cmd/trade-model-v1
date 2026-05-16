@@ -168,6 +168,72 @@ class DefaultExecutionPlanDisplayAdapterTest {
     }
 
     @Test
+    void shouldFallbackToWatchOnlyWhenRiskActionGuardDetectsHighRisk() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("HIGH");
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(
+                decision,
+                boundary,
+                null,
+                validSourceTrace(),
+                readyRiskActionGuard()
+        );
+
+        assertEquals("WATCH_ONLY", display.getExecutionPlanStatus());
+        assertFalse(display.getExecutionPlanBoundaryAligned());
+        assertEquals("HIGH_RISK_REVIEW_ONLY", display.getNotExecutableReason());
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
+    void shouldFallbackToWatchOnlyWhenRiskActionGuardDetectsStampede() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("LOW");
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setStampedeDetected(true);
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(
+                decision,
+                boundary,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertEquals("WATCH_ONLY", display.getExecutionPlanStatus());
+        assertFalse(display.getExecutionPlanBoundaryAligned());
+        assertEquals("STAMPEDE_RISK_REVIEW_ONLY", display.getNotExecutableReason());
+    }
+
+    @Test
+    void shouldStayReadyReviewOnlyWhenSourceTraceAndRiskActionGuardAreReady() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("LOW");
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(
+                decision,
+                boundary,
+                null,
+                validSourceTrace(),
+                readyRiskActionGuard()
+        );
+
+        assertEquals("READY_REVIEW_ONLY", display.getExecutionPlanStatus());
+        assertTrue(display.getExecutionPlanBoundaryAligned());
+        assertEquals("MANUAL_REVIEW_REQUIRED", display.getNotExecutableReason());
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
     void textExecutionSummaryShouldNotMakeBoundaryAlignedWhenBoundaryIsPending() {
         DecisionResultVO decision = new DecisionResultVO();
         decision.setExecutionPlanSummary("观察摘要");
@@ -219,5 +285,21 @@ class DefaultExecutionPlanDisplayAdapterTest {
         sourceTrace.setEventSource("no-event-window");
         sourceTrace.setWickSource("wick-confirmed");
         return sourceTrace;
+    }
+
+    private DashboardDetailResponseVO.RiskActionGuardDisplayVO readyRiskActionGuard() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
+        risk.setRiskActionGuardStatus("MANUAL_REVIEW_REQUIRED");
+        risk.setRiskActionBlockingReason("MANUAL_REVIEW_REQUIRED");
+        risk.setLiquidityState("NORMAL");
+        risk.setStampedeDetected(false);
+        risk.setWickOnlyRisk(false);
+        risk.setOpportunityPushAllowed(false);
+        risk.setReverseTradeAllowed(false);
+        risk.setNewPositionAllowed(false);
+        risk.setMarketOrderExitAllowed(false);
+        risk.setManualRiskReviewRequired(true);
+        risk.setNotTradeInstruction(true);
+        return risk;
     }
 }

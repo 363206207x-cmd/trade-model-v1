@@ -24,4 +24,14 @@ public interface ExecutionPlanDisplayAdapter {
     ) {
         return build(decision, planBoundaryDisplay, fallbackDisplay);
     }
+
+    default DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay,
+            SourceTraceDTO sourceTrace,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        return build(decision, planBoundaryDisplay, fallbackDisplay, sourceTrace);
+    }
 }

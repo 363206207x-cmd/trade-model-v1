@@ -38,6 +38,13 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
     private static final String REASON_SOURCE_TRACE_INCOMPLETE = "SOURCE_TRACE_INCOMPLETE";
     private static final String REASON_SOURCE_TRACE_WATCH_ONLY = "SOURCE_TRACE_WATCH_ONLY";
     private static final String REASON_SOURCE_TRACE_SAFE_FAIL_CLOSED = "SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY";
+    private static final String REASON_RISK_ACTION_GUARD_MISSING = "RISK_ACTION_GUARD_MISSING";
+    private static final String REASON_RISK_ACTION_GUARD_BACKEND_PENDING = "RISK_ACTION_GUARD_BACKEND_PENDING";
+    private static final String REASON_HIGH_RISK_REVIEW_ONLY = "HIGH_RISK_REVIEW_ONLY";
+    private static final String REASON_LIQUIDITY_CONTEXT_MISSING = "LIQUIDITY_CONTEXT_MISSING";
+    private static final String REASON_STAMPEDE_REVIEW_ONLY = "STAMPEDE_RISK_REVIEW_ONLY";
+    private static final String REASON_WICK_ONLY_REVIEW_ONLY = "WICK_ONLY_RISK_REVIEW_ONLY";
+    private static final String REASON_RISK_ACTION_GUARD_BLOCKED = "RISK_ACTION_GUARD_BLOCKED";
 
     @Override
     public DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
@@ -115,6 +122,31 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
         return display;
     }
 
+    @Override
+    public DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay,
+            SourceTraceDTO sourceTrace,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = buildInternal(
+                decision,
+                planBoundaryDisplay,
+                fallbackDisplay,
+                sourceTrace,
+                true
+        );
+        if (!READY_REVIEW_ONLY.equalsIgnoreCase(display.getExecutionPlanStatus())) {
+            return display;
+        }
+        if (isRiskActionGuardReady(decision, riskActionGuardDisplay)) {
+            return display;
+        }
+        markRiskActionGuardNotReady(display, decision, riskActionGuardDisplay);
+        return display;
+    }
+
     private void markSourceTraceNotReady(
             DashboardDetailResponseVO.ExecutionPlanDisplayVO display,
             SourceTraceDTO sourceTrace
@@ -154,6 +186,70 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
             return REASON_SOURCE_TRACE_SAFE_FAIL_CLOSED;
         }
         return REASON_SOURCE_TRACE_INCOMPLETE;
+    }
+
+    private boolean isRiskActionGuardReady(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        return resolveRiskActionGuardReason(decision, riskActionGuardDisplay) == null;
+    }
+
+    private void markRiskActionGuardNotReady(
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO display,
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        String reason = resolveRiskActionGuardReason(decision, riskActionGuardDisplay);
+        String status = REASON_RISK_ACTION_GUARD_MISSING.equals(reason)
+                || REASON_RISK_ACTION_GUARD_BACKEND_PENDING.equals(reason)
+                ? INCOMPLETE
+                : WATCH_ONLY;
+        String label = WATCH_ONLY.equals(status) ? LABEL_WATCH_ONLY : LABEL_INCOMPLETE;
+        markNotAligned(display, VALID, status, label, reason);
+    }
+
+    private String resolveRiskActionGuardReason(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        if (riskActionGuardDisplay == null) {
+            return REASON_RISK_ACTION_GUARD_MISSING;
+        }
+        if (isBlank(riskActionGuardDisplay.getRiskActionGuardStatus())
+                || BACKEND_PENDING.equalsIgnoreCase(riskActionGuardDisplay.getRiskActionGuardStatus())) {
+            return REASON_RISK_ACTION_GUARD_BACKEND_PENDING;
+        }
+        if (isHighRisk(decision)) {
+            return REASON_HIGH_RISK_REVIEW_ONLY;
+        }
+        if (isBlank(riskActionGuardDisplay.getLiquidityState())
+                || BACKEND_PENDING.equalsIgnoreCase(riskActionGuardDisplay.getLiquidityState())) {
+            return REASON_LIQUIDITY_CONTEXT_MISSING;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getStampedeDetected())) {
+            return REASON_STAMPEDE_REVIEW_ONLY;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())) {
+            return REASON_WICK_ONLY_REVIEW_ONLY;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getOpportunityPushAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getReverseTradeAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getNewPositionAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getMarketOrderExitAllowed())) {
+            return REASON_RISK_ACTION_GUARD_BLOCKED;
+        }
+        String blockingReason = riskActionGuardDisplay.getRiskActionBlockingReason();
+        if (!isBlank(blockingReason) && !REASON_MANUAL_REVIEW_REQUIRED.equalsIgnoreCase(blockingReason)) {
+            return blockingReason;
+        }
+        return null;
+    }
+
+    private boolean isHighRisk(DecisionResultVO decision) {
+        return decision != null
+                && ("HIGH".equalsIgnoreCase(decision.getRiskLevel())
+                || "EXTREME".equalsIgnoreCase(decision.getRiskLevel()));
     }
 
     private void markNotAligned(
