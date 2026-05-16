@@ -96,6 +96,15 @@ class DefaultSourceAssemblerTest {
     }
 
     @Test
+    void assembleSourceTraceMarksMissingDerivativesRiskContextAsWatchOnly() {
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(validRuntimeKlineContext(), null);
+
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.WATCH_ONLY);
+        assertThat(sourceTrace.getMissingFields()).contains("derivativesRiskContext");
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+    }
+
+    @Test
     void assemblerShouldNotExposeTradingExecutionMethods() {
         List<String> methodNames = List.of(DefaultSourceAssembler.class.getDeclaredMethods())
                 .stream()

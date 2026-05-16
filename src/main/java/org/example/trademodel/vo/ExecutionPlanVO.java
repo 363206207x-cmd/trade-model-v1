@@ -3,9 +3,18 @@ package org.example.trademodel.vo;
 public class ExecutionPlanVO {
     public static final String PLAN_MODE_ADVISORY = "ADVISORY";
     public static final String PLAN_MODE_SEMI_STRUCTURED = "SEMI_STRUCTURED";
+    public static final String READINESS_INCOMPLETE = "INCOMPLETE";
+    public static final String READINESS_WATCH_ONLY = "WATCH_ONLY";
+    public static final String READINESS_READY_REVIEW_ONLY = "READY_REVIEW_ONLY";
 
     private String planId;
     private String planMode;
+    private String readinessStatus = READINESS_INCOMPLETE;
+    private String sourceTraceStatus = "BACKEND_PENDING";
+    private Boolean sourceTraceComplete = false;
+    private String notExecutableReason = "SOURCE_TRACE_NOT_EVALUATED";
+    private Boolean manualReviewRequired = true;
+    private Boolean notTradeInstruction = true;
     private String recommendedAction;
     private String entryZone;
     private String stopLoss;
@@ -21,6 +30,18 @@ public class ExecutionPlanVO {
     public void setPlanId(String planId) { this.planId = planId; }
     public String getPlanMode() { return planMode; }
     public void setPlanMode(String planMode) { this.planMode = planMode; }
+    public String getReadinessStatus() { return readinessStatus; }
+    public void setReadinessStatus(String readinessStatus) { this.readinessStatus = readinessStatus; }
+    public String getSourceTraceStatus() { return sourceTraceStatus; }
+    public void setSourceTraceStatus(String sourceTraceStatus) { this.sourceTraceStatus = sourceTraceStatus; }
+    public Boolean getSourceTraceComplete() { return sourceTraceComplete; }
+    public void setSourceTraceComplete(Boolean sourceTraceComplete) { this.sourceTraceComplete = sourceTraceComplete; }
+    public String getNotExecutableReason() { return notExecutableReason; }
+    public void setNotExecutableReason(String notExecutableReason) { this.notExecutableReason = notExecutableReason; }
+    public Boolean getManualReviewRequired() { return manualReviewRequired; }
+    public void setManualReviewRequired(Boolean manualReviewRequired) { this.manualReviewRequired = manualReviewRequired; }
+    public Boolean getNotTradeInstruction() { return notTradeInstruction; }
+    public void setNotTradeInstruction(Boolean notTradeInstruction) { this.notTradeInstruction = notTradeInstruction; }
     public String getRecommendedAction() { return recommendedAction; }
     public void setRecommendedAction(String recommendedAction) { this.recommendedAction = recommendedAction; }
     public String getEntryZone() { return entryZone; }

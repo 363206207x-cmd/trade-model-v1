@@ -1,5 +1,6 @@
 package org.example.trademodel.service.dashboard;
 
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DecisionResultVO;
 
@@ -14,4 +15,13 @@ public interface ExecutionPlanDisplayAdapter {
             DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
             DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay
     );
+
+    default DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay,
+            SourceTraceDTO sourceTrace
+    ) {
+        return build(decision, planBoundaryDisplay, fallbackDisplay);
+    }
 }

@@ -1,5 +1,7 @@
 package org.example.trademodel.service.dashboard;
 
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.springframework.stereotype.Component;
@@ -32,12 +34,36 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
     private static final String REASON_BOUNDARY_WATCH_ONLY = "PLAN_BOUNDARY_WATCH_ONLY";
     private static final String REASON_BOUNDARY_INVALID = "PLAN_BOUNDARY_INVALID";
     private static final String REASON_MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED";
+    private static final String REASON_SOURCE_TRACE_MISSING = "SOURCE_TRACE_MISSING";
+    private static final String REASON_SOURCE_TRACE_INCOMPLETE = "SOURCE_TRACE_INCOMPLETE";
+    private static final String REASON_SOURCE_TRACE_WATCH_ONLY = "SOURCE_TRACE_WATCH_ONLY";
+    private static final String REASON_SOURCE_TRACE_SAFE_FAIL_CLOSED = "SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY";
 
     @Override
     public DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
             DecisionResultVO decision,
             DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
             DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay
+    ) {
+        return buildInternal(decision, planBoundaryDisplay, fallbackDisplay, null, false);
+    }
+
+    @Override
+    public DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay,
+            SourceTraceDTO sourceTrace
+    ) {
+        return buildInternal(decision, planBoundaryDisplay, fallbackDisplay, sourceTrace, true);
+    }
+
+    private DashboardDetailResponseVO.ExecutionPlanDisplayVO buildInternal(
+            DecisionResultVO decision,
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundaryDisplay,
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO fallbackDisplay,
+            SourceTraceDTO sourceTrace,
+            boolean sourceTraceRequired
     ) {
         DashboardDetailResponseVO.ExecutionPlanDisplayVO display = fallbackDisplay != null
                 ? fallbackDisplay
@@ -55,6 +81,10 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
 
         String boundaryStatus = planBoundaryDisplay.getPlanBoundaryStatus().trim().toUpperCase();
         if (VALID.equals(boundaryStatus)) {
+            if (sourceTraceRequired && (sourceTrace == null || !sourceTrace.hasRequiredBoundarySources())) {
+                markSourceTraceNotReady(display, sourceTrace);
+                return display;
+            }
             display.setExecutionPlanStatus(READY_REVIEW_ONLY);
             display.setExecutionPlanStatusLabel(LABEL_READY_REVIEW_ONLY);
             display.setExecutionPlanBoundaryAligned(true);
@@ -83,6 +113,47 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
 
         markNotAligned(display, boundaryStatus, BOUNDARY_PENDING, LABEL_BOUNDARY_PENDING, REASON_BOUNDARY_PENDING);
         return display;
+    }
+
+    private void markSourceTraceNotReady(
+            DashboardDetailResponseVO.ExecutionPlanDisplayVO display,
+            SourceTraceDTO sourceTrace
+    ) {
+        String status = resolveSourceTraceExecutionStatus(sourceTrace);
+        String label = WATCH_ONLY.equals(status) ? LABEL_WATCH_ONLY : LABEL_INCOMPLETE;
+        String reason = resolveSourceTraceReason(sourceTrace);
+        markNotAligned(display, VALID, status, label, reason);
+        if (sourceTrace != null && sourceTrace.getMissingFields() != null) {
+            for (String missingField : sourceTrace.getMissingFields()) {
+                addUnique(display.getIncompleteReasons(), "SOURCE_TRACE_MISSING_FIELD:" + missingField);
+            }
+        }
+    }
+
+    private String resolveSourceTraceExecutionStatus(SourceTraceDTO sourceTrace) {
+        if (sourceTrace == null) {
+            return INCOMPLETE;
+        }
+        SourceTraceFallbackStatusEnum fallbackStatus = sourceTrace.getFallbackStatus();
+        if (fallbackStatus == SourceTraceFallbackStatusEnum.WATCH_ONLY
+                || fallbackStatus == SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY) {
+            return WATCH_ONLY;
+        }
+        return INCOMPLETE;
+    }
+
+    private String resolveSourceTraceReason(SourceTraceDTO sourceTrace) {
+        if (sourceTrace == null) {
+            return REASON_SOURCE_TRACE_MISSING;
+        }
+        SourceTraceFallbackStatusEnum fallbackStatus = sourceTrace.getFallbackStatus();
+        if (fallbackStatus == SourceTraceFallbackStatusEnum.WATCH_ONLY) {
+            return REASON_SOURCE_TRACE_WATCH_ONLY;
+        }
+        if (fallbackStatus == SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY) {
+            return REASON_SOURCE_TRACE_SAFE_FAIL_CLOSED;
+        }
+        return REASON_SOURCE_TRACE_INCOMPLETE;
     }
 
     private void markNotAligned(

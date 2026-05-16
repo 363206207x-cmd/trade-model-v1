@@ -1,5 +1,6 @@
 package org.example.trademodel.service;
 
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
@@ -16,4 +17,11 @@ public interface PlanService {
             List<ScoreItemVO> scoreList,
             MarketEnvironmentVO marketEnvironment,
             AssetAnalysisVO analysisContext);
+
+    ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decision,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnvironment,
+            AssetAnalysisVO analysisContext,
+            SourceTraceDTO sourceTrace);
 }

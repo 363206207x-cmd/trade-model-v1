@@ -106,7 +106,11 @@ public class DefaultSourceAssembler implements SourceAssembler {
             String prefix,
             List<String> missingFields
     ) {
-        if (contract == null || contract.getMissingFields() == null) {
+        if (contract == null) {
+            missingFields.add(prefix);
+            return;
+        }
+        if (contract.getMissingFields() == null) {
             return;
         }
         for (String missingField : contract.getMissingFields()) {
