@@ -153,6 +153,26 @@ class DefaultExecutionPlanDisplayAdapterTest {
     }
 
     @Test
+    void shouldKeepExecutionPlanWatchOnlyWhenSourceTraceSafeFailsClosed() {
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+        SourceTraceDTO sourceTrace = validSourceTrace();
+        sourceTrace.setLiquiditySource(null);
+        sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY);
+        sourceTrace.setMissingFields(List.of("liquiditySource"));
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(null, boundary, null, sourceTrace);
+
+        assertEquals("WATCH_ONLY", display.getExecutionPlanStatus());
+        assertEquals("VALID", display.getPlanBoundaryStatus());
+        assertFalse(display.getExecutionPlanBoundaryAligned());
+        assertEquals("SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY", display.getNotExecutableReason());
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:liquiditySource"));
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
     void shouldMapValidBoundaryAndCompleteSourceTraceOnlyToReadyReviewOnly() {
         DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
         boundary.setPlanBoundaryStatus("VALID");
@@ -209,6 +229,54 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertEquals("WATCH_ONLY", display.getExecutionPlanStatus());
         assertFalse(display.getExecutionPlanBoundaryAligned());
         assertEquals("STAMPEDE_RISK_REVIEW_ONLY", display.getNotExecutableReason());
+    }
+
+    @Test
+    void shouldFallbackToWatchOnlyWhenRiskActionGuardLiquidityContextIsMissing() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("LOW");
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setLiquidityState("BACKEND_PENDING");
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(
+                decision,
+                boundary,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertEquals("WATCH_ONLY", display.getExecutionPlanStatus());
+        assertFalse(display.getExecutionPlanBoundaryAligned());
+        assertEquals("LIQUIDITY_CONTEXT_MISSING", display.getNotExecutableReason());
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
+    void shouldFallbackToWatchOnlyWhenRiskActionGuardDetectsWickOnlyRisk() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("LOW");
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setWickOnlyRisk(true);
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(
+                decision,
+                boundary,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertEquals("WATCH_ONLY", display.getExecutionPlanStatus());
+        assertFalse(display.getExecutionPlanBoundaryAligned());
+        assertEquals("WICK_ONLY_RISK_REVIEW_ONLY", display.getNotExecutableReason());
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
     }
 
     @Test

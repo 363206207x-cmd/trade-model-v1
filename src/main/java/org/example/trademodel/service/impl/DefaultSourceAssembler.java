@@ -144,14 +144,28 @@ public class DefaultSourceAssembler implements SourceAssembler {
     }
 
     private boolean containsStructuralMissingField(List<String> missingFields) {
-        return containsField(missingFields, "symbol")
-                || containsField(missingFields, "timeframe")
-                || containsField(missingFields, "latestPrice")
-                || containsField(missingFields, "dataQualityScore")
+        return containsExactField(missingFields, "symbol")
+                || containsExactField(missingFields, "timeframe")
+                || containsExactField(missingFields, "latestPrice")
+                || containsExactField(missingFields, "dataQualityScore")
                 || containsField(missingFields, "entry")
                 || containsField(missingFields, "stop")
                 || containsField(missingFields, "tp")
                 || containsField(missingFields, "rr");
+    }
+
+    private boolean containsExactField(List<String> missingFields, String fieldName) {
+        for (String missingField : missingFields) {
+            if (missingField == null) {
+                continue;
+            }
+            String normalized = missingField.trim();
+            if (normalized.equalsIgnoreCase(fieldName)
+                    || normalized.toLowerCase().endsWith("." + fieldName.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean containsField(List<String> missingFields, String fieldFragment) {

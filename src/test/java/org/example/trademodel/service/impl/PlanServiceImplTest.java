@@ -125,6 +125,78 @@ class PlanServiceImplTest {
         assertThat(plan.getNotTradeInstruction()).isTrue();
     }
 
+    @Test
+    void generateExecutionPlan_withLiquidityContextMissingFallsBackToWatchOnly() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setLiquidityState("BACKEND_PENDING");
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(
+                decision,
+                null,
+                null,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(plan.getRiskActionGuardReady()).isFalse();
+        assertThat(plan.getNotExecutableReason()).isEqualTo("LIQUIDITY_CONTEXT_MISSING");
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void generateExecutionPlan_withWickOnlyRiskFallsBackToWatchOnly() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setWickOnlyRisk(true);
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(
+                decision,
+                null,
+                null,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(plan.getRiskActionGuardReady()).isFalse();
+        assertThat(plan.getNotExecutableReason()).isEqualTo("WICK_ONLY_RISK_REVIEW_ONLY");
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void generateExecutionPlan_withRiskActionGuardActionFlagFallsBackToWatchOnly() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setOpportunityPushAllowed(true);
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(
+                decision,
+                null,
+                null,
+                null,
+                validSourceTrace(),
+                risk
+        );
+
+        assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(plan.getRiskActionGuardReady()).isFalse();
+        assertThat(plan.getNotExecutableReason()).isEqualTo("RISK_ACTION_GUARD_BLOCKED");
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
     private SourceTraceDTO validSourceTrace() {
         SourceTraceDTO sourceTrace = new SourceTraceDTO();
         sourceTrace.setSymbol("BTCUSDT");

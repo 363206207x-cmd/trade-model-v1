@@ -42,6 +42,22 @@ class RuleEngineServiceSourceTraceTest {
     }
 
     @Test
+    void executeWithSafeFailClosedSourceTraceFailsClosed() {
+        RuleEngineService service = executableRuleEngine();
+        SourceTraceDTO sourceTrace = validSourceTrace();
+        sourceTrace.setLiquiditySource(null);
+        sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY);
+        sourceTrace.setMissingFields(List.of("liquiditySource"));
+
+        RuleBaseOutput output = service.execute(new DecisionContext(), sourceTrace);
+
+        assertThat(output.isCanExecute()).isFalse();
+        assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(output.getConfidenceLevel()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(output.getRiskLevel()).isEqualTo("SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY");
+    }
+
+    @Test
     void executeWithCompleteSourceTraceStillReturnsReviewOnlyNoExecutionGate() {
         RuleEngineService service = executableRuleEngine();
 
@@ -64,6 +80,48 @@ class RuleEngineServiceSourceTraceTest {
         assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
         assertThat(output.getConfidenceLevel()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
         assertThat(output.getRiskLevel()).isEqualTo("STAMPEDE_RISK_REVIEW_ONLY");
+    }
+
+    @Test
+    void executeWithLiquidityContextMissingFailsClosed() {
+        RuleEngineService service = executableRuleEngine();
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setLiquidityState("BACKEND_PENDING");
+
+        RuleBaseOutput output = service.execute(new DecisionContext(), validSourceTrace(), risk);
+
+        assertThat(output.isCanExecute()).isFalse();
+        assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(output.getConfidenceLevel()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(output.getRiskLevel()).isEqualTo("LIQUIDITY_CONTEXT_MISSING");
+    }
+
+    @Test
+    void executeWithWickOnlyRiskFailsClosed() {
+        RuleEngineService service = executableRuleEngine();
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setWickOnlyRisk(true);
+
+        RuleBaseOutput output = service.execute(new DecisionContext(), validSourceTrace(), risk);
+
+        assertThat(output.isCanExecute()).isFalse();
+        assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(output.getConfidenceLevel()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(output.getRiskLevel()).isEqualTo("WICK_ONLY_RISK_REVIEW_ONLY");
+    }
+
+    @Test
+    void executeWithRiskActionGuardActionFlagFailsClosed() {
+        RuleEngineService service = executableRuleEngine();
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setReverseTradeAllowed(true);
+
+        RuleBaseOutput output = service.execute(new DecisionContext(), validSourceTrace(), risk);
+
+        assertThat(output.isCanExecute()).isFalse();
+        assertThat(output.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        assertThat(output.getConfidenceLevel()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        assertThat(output.getRiskLevel()).isEqualTo("RISK_ACTION_GUARD_BLOCKED");
     }
 
     @Test

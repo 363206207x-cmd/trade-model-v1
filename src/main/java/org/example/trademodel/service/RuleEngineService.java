@@ -75,6 +75,12 @@ public interface RuleEngineService {
         if (Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())) {
             return "WICK_ONLY_RISK_REVIEW_ONLY";
         }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getOpportunityPushAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getReverseTradeAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getNewPositionAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getMarketOrderExitAllowed())) {
+            return "RISK_ACTION_GUARD_BLOCKED";
+        }
         String blockingReason = riskActionGuardDisplay.getRiskActionBlockingReason();
         if (blockingReason != null
                 && !blockingReason.trim().isEmpty()

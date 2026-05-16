@@ -41,6 +41,18 @@ class DefaultSourceAssemblerTest {
     }
 
     @Test
+    void assembleSourceTraceReturnsIncompleteWhenRiskRewardSourceIsMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = validRuntimeKlineContext();
+        runtimeKlineContext.setRrSource(null);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getMissingFields()).contains("rrSource");
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+    }
+
+    @Test
     void assembleSourceTraceReturnsSafeFailWhenLiquiditySourceIsMissing() {
         RuntimeKlineContextDTO runtimeKlineContext = validRuntimeKlineContext();
         runtimeKlineContext.setLiquiditySource(null);
@@ -61,6 +73,30 @@ class DefaultSourceAssemblerTest {
 
         assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.WATCH_ONLY);
         assertThat(sourceTrace.getMissingFields()).contains("eventSource");
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+    }
+
+    @Test
+    void assembleSourceTraceReturnsWatchOnlyWhenMultiTimeframeSourceIsMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = validRuntimeKlineContext();
+        runtimeKlineContext.setMultiTimeframeSource(null);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.WATCH_ONLY);
+        assertThat(sourceTrace.getMissingFields()).contains("multiTimeframeSource");
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+    }
+
+    @Test
+    void assembleSourceTraceReturnsWatchOnlyWhenWickSourceIsMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = validRuntimeKlineContext();
+        runtimeKlineContext.setWickSource(null);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.WATCH_ONLY);
+        assertThat(sourceTrace.getMissingFields()).contains("wickSource");
         assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
     }
 

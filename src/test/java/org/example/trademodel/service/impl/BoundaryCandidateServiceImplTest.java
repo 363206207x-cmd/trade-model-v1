@@ -189,6 +189,75 @@ class BoundaryCandidateServiceImplTest {
     }
 
     @Test
+    void evaluateBoundaryCandidateReturnsWatchOnlyWhenRiskActionGuardLiquiditySourceIsMissing() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setLiquidityState("BACKEND_PENDING");
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                validSourceTrace(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90),
+                risk
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.WATCH_ONLY);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).contains("liquidity source missing");
+    }
+
+    @Test
+    void evaluateBoundaryCandidateReturnsWatchOnlyWhenRiskActionGuardDetectsWickOnlyRisk() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setWickOnlyRisk(true);
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                validSourceTrace(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90),
+                risk
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.WATCH_ONLY);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).contains("wick-only risk detected");
+    }
+
+    @Test
+    void evaluateBoundaryCandidateReturnsWatchOnlyWhenRiskActionGuardActionFlagWouldAllowTrading() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO risk = readyRiskActionGuard();
+        risk.setNewPositionAllowed(true);
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1h",
+                validSourceTrace(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90),
+                risk
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.WATCH_ONLY);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).contains("riskActionGuard action flag allowed");
+    }
+
+    @Test
     void evaluateBoundaryCandidateReturnsValidWhenRiskActionGuardIsReviewOnlyReady() {
         BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
                 "BTCUSDT",

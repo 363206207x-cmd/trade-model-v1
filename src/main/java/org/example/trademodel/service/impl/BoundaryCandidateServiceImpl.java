@@ -251,6 +251,12 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
         if (Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())) {
             blockingReasons.add("wick-only risk detected");
         }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getOpportunityPushAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getReverseTradeAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getNewPositionAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getMarketOrderExitAllowed())) {
+            blockingReasons.add("riskActionGuard action flag allowed");
+        }
         String blockingReason = riskActionGuardDisplay.getRiskActionBlockingReason();
         if (!isBlank(blockingReason) && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(blockingReason)) {
             blockingReasons.add("riskActionGuard blocked:" + blockingReason);
@@ -261,11 +267,7 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
             SourceTraceDTO sourceTrace,
             DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
     ) {
-        if (riskActionGuardDisplay != null
-                && (Boolean.TRUE.equals(riskActionGuardDisplay.getStampedeDetected())
-                || Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())
-                || (!isBlank(riskActionGuardDisplay.getRiskActionBlockingReason())
-                && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(riskActionGuardDisplay.getRiskActionBlockingReason())))) {
+        if (isRiskActionGuardBlockedForFallback(riskActionGuardDisplay)) {
             return BoundaryStatusEnum.WATCH_ONLY;
         }
         if (sourceTrace == null) {
@@ -277,6 +279,33 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
             return BoundaryStatusEnum.WATCH_ONLY;
         }
         return BoundaryStatusEnum.INCOMPLETE;
+    }
+
+    private boolean isRiskActionGuardBlockedForFallback(
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        if (riskActionGuardDisplay == null) {
+            return false;
+        }
+        if (isBlank(riskActionGuardDisplay.getRiskActionGuardStatus())
+                || "BACKEND_PENDING".equalsIgnoreCase(riskActionGuardDisplay.getRiskActionGuardStatus())) {
+            return true;
+        }
+        if (isBlank(riskActionGuardDisplay.getLiquidityState())
+                || "BACKEND_PENDING".equalsIgnoreCase(riskActionGuardDisplay.getLiquidityState())) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(riskActionGuardDisplay.getStampedeDetected())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getWickOnlyRisk())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getOpportunityPushAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getReverseTradeAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getNewPositionAllowed())
+                || Boolean.TRUE.equals(riskActionGuardDisplay.getMarketOrderExitAllowed())) {
+            return true;
+        }
+        String blockingReason = riskActionGuardDisplay.getRiskActionBlockingReason();
+        return !isBlank(blockingReason)
+                && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(blockingReason);
     }
 
     private BoundaryCandidateDTO fallbackCandidate(
