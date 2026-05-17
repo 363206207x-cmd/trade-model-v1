@@ -17,8 +17,13 @@ import java.util.List;
 @Component
 public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSourceTraceDetailAdapter {
     private static final String TIMEFRAME = "timeframe";
+    private static final String DASHBOARD_REQUEST_SYMBOL_SOURCE = "dashboardDetail.requestSymbol";
     private static final String RUNTIME_KLINE_UNAVAILABLE = "UNAVAILABLE";
     private static final String RUNTIME_KLINE_UNAVAILABLE_SOURCE = "dashboardDetail.noRuntimeKlineContext";
+    private static final String DECISION_ID_SOURCE = "DecisionResultVO.decisionId";
+    private static final String DECISION_ANALYSIS_ID_SOURCE = "DecisionResultVO.analysisId";
+    private static final String DECISION_SYMBOL_SOURCE = "DecisionResultVO.symbol";
+    private static final String DECISION_CREATE_TIME_SOURCE = "DecisionResultVO.createTime";
     private static final String DECISION_TIMEFRAME_SOURCE = "DecisionResultVO.timeframe";
     private static final String DECISION_LATEST_PRICE_SOURCE = "DecisionResultVO.latestPrice";
     private static final String DECISION_PRICE_UPDATE_TIME_SOURCE = "DecisionResultVO.priceUpdateTimeMs";
@@ -36,6 +41,9 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
     private SourceTraceDTO buildSourceTrace(String symbol, DecisionResultVO decision) {
         SourceTraceDTO sourceTrace = new SourceTraceDTO();
         sourceTrace.setSymbol(symbol);
+        if (hasText(symbol)) {
+            sourceTrace.setSymbolSource(DASHBOARD_REQUEST_SYMBOL_SOURCE);
+        }
         wireProductionBackedSourceTraceFields(decision, sourceTrace);
         sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
         sourceTrace.setMissingFields(sourceTraceMissingFields(decision));
@@ -59,6 +67,7 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (decision == null || sourceTrace == null) {
             return;
         }
+        wireAnalysisAnchorFields(decision, sourceTrace);
         sourceTrace.setRuntimeKlineContextStatus(RUNTIME_KLINE_UNAVAILABLE);
         sourceTrace.setRuntimeKlineContextSource(RUNTIME_KLINE_UNAVAILABLE_SOURCE);
         if (hasText(decision.getTimeframe())) {
@@ -80,6 +89,25 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         }
         if (hasText(decision.getMultiTfConvergence())) {
             sourceTrace.setMultiTimeframeSource(DECISION_MULTI_TIMEFRAME_SOURCE);
+        }
+    }
+
+    private void wireAnalysisAnchorFields(DecisionResultVO decision, SourceTraceDTO sourceTrace) {
+        if (hasText(decision.getDecisionId())) {
+            sourceTrace.setDecisionId(decision.getDecisionId());
+            sourceTrace.setDecisionIdSource(DECISION_ID_SOURCE);
+        }
+        if (hasText(decision.getAnalysisId())) {
+            sourceTrace.setAnalysisId(decision.getAnalysisId());
+            sourceTrace.setAnalysisIdSource(DECISION_ANALYSIS_ID_SOURCE);
+        }
+        if (hasText(decision.getSymbol())) {
+            sourceTrace.setSymbol(decision.getSymbol());
+            sourceTrace.setSymbolSource(DECISION_SYMBOL_SOURCE);
+        }
+        if (decision.getCreateTime() != null) {
+            sourceTrace.setDecisionCreateTime(decision.getCreateTime());
+            sourceTrace.setDecisionCreateTimeSource(DECISION_CREATE_TIME_SOURCE);
         }
     }
 

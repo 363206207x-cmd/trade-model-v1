@@ -7,6 +7,7 @@ import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -74,7 +75,10 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
     @Test
     void shouldWireOnlyProductionBackedDecisionFieldsAndKeepBoundarySourcesMissing() {
         DecisionResultVO decision = new DecisionResultVO();
+        decision.setDecisionId("dec-btc-production-backed");
         decision.setAnalysisId("ana-btc-production-backed");
+        decision.setSymbol("BTCUSDT");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 10, 30));
         decision.setTimeframe("1h");
         decision.setMultiTfConvergence("STRONG");
         decision.setDataQualityScore(88);
@@ -91,6 +95,14 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         SourceTraceDTO sourceTrace = context.getSourceTrace();
         DerivativesRiskContextDTO derivativesRiskContext = context.getDerivativesRiskContext();
 
+        assertEquals("dec-btc-production-backed", sourceTrace.getDecisionId());
+        assertEquals("DecisionResultVO.decisionId", sourceTrace.getDecisionIdSource());
+        assertEquals("ana-btc-production-backed", sourceTrace.getAnalysisId());
+        assertEquals("DecisionResultVO.analysisId", sourceTrace.getAnalysisIdSource());
+        assertEquals("BTCUSDT", sourceTrace.getSymbol());
+        assertEquals("DecisionResultVO.symbol", sourceTrace.getSymbolSource());
+        assertEquals(LocalDateTime.of(2026, 5, 17, 10, 30), sourceTrace.getDecisionCreateTime());
+        assertEquals("DecisionResultVO.createTime", sourceTrace.getDecisionCreateTimeSource());
         assertEquals("1h", sourceTrace.getTimeframe());
         assertEquals("DecisionResultVO.timeframe", sourceTrace.getTimeframeSource());
         assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
@@ -134,6 +146,10 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
     @Test
     void shouldKeepQuoteAndDataQualityMetadataFromCompletingSourceTrace() {
         DecisionResultVO decision = new DecisionResultVO();
+        decision.setDecisionId("dec-anchor-safe");
+        decision.setAnalysisId("ana-anchor-safe");
+        decision.setSymbol("BTCUSDT");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 11, 0));
         decision.setTimeframe("1h");
         decision.setLatestPrice(BigDecimal.valueOf(68100));
         decision.setPriceUpdateTimeMs(1710000000000L);
@@ -149,6 +165,13 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
 
         SourceTraceDTO sourceTrace = context.getSourceTrace();
 
+        assertEquals("dec-anchor-safe", sourceTrace.getDecisionId());
+        assertEquals("DecisionResultVO.decisionId", sourceTrace.getDecisionIdSource());
+        assertEquals("ana-anchor-safe", sourceTrace.getAnalysisId());
+        assertEquals("DecisionResultVO.analysisId", sourceTrace.getAnalysisIdSource());
+        assertEquals("DecisionResultVO.symbol", sourceTrace.getSymbolSource());
+        assertEquals(LocalDateTime.of(2026, 5, 17, 11, 0), sourceTrace.getDecisionCreateTime());
+        assertEquals("DecisionResultVO.createTime", sourceTrace.getDecisionCreateTimeSource());
         assertEquals("1h", sourceTrace.getTimeframe());
         assertEquals("DecisionResultVO.timeframe", sourceTrace.getTimeframeSource());
         assertEquals(BigDecimal.valueOf(68100), sourceTrace.getQuoteLatestPrice());
@@ -192,5 +215,32 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("QUOTE_UPDATE_TIME_ONLY", sourceTrace.getQuoteFreshnessStatus());
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
         assertFalse(sourceTrace.hasRequiredBoundarySources());
+    }
+
+    @Test
+    void shouldKeepAnalysisAnchorMetadataOptionalAndFailClosedWhenUnavailable() {
+        DecisionResultVO decision = new DecisionResultVO();
+
+        DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext context =
+                adapter.build("BTCUSDT", decision);
+
+        SourceTraceDTO sourceTrace = context.getSourceTrace();
+
+        assertEquals("BTCUSDT", sourceTrace.getSymbol());
+        assertEquals("dashboardDetail.requestSymbol", sourceTrace.getSymbolSource());
+        assertNull(sourceTrace.getDecisionId());
+        assertNull(sourceTrace.getDecisionIdSource());
+        assertNull(sourceTrace.getAnalysisId());
+        assertNull(sourceTrace.getAnalysisIdSource());
+        assertNull(sourceTrace.getDecisionCreateTime());
+        assertNull(sourceTrace.getDecisionCreateTimeSource());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
+        assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("stopPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("tpPriceSources"));
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
+        assertTrue(sourceTrace.isManualReviewRequired());
+        assertTrue(sourceTrace.isNotTradeInstruction());
     }
 }
