@@ -1096,6 +1096,14 @@
             <p class="module-status-note">该区域仅用于展示首页 MVP 模块接入进度，非交易指令；涉及开仓与风控结论均需要人工复核。</p>
             <div class="status-grid" id="moduleStatusGrid"></div>
         </div>
+        <div class="card module-status-card" id="runtimeKlineContextCard">
+            <h3>RuntimeKlineContext 诊断（只读）</h3>
+            <p class="module-status-note">仅展示 /api/dashboard/detail.runtimeKlineContext 已返回字段；运行时 K 线不是交易信号，不补全 SourceTrace。</p>
+            <div class="kv"><span class="k">Fallback</span><span class="v">等待选择标的</span></div>
+            <div class="kv"><span class="k">最新已闭合持久化收盘价（运行时元数据）</span><span class="v">—</span></div>
+            <div class="kv"><span class="k">KlineItems</span><span class="v">—</span></div>
+            <div class="alert-line confused">latestPrice 仅为运行时元数据，不是 entry source；klineItems 不作为 entry / stop / TP / RR 来源。</div>
+        </div>
         <div class="card module-status-card" id="planBoundaryPlaceholderCard">
             <h3>PlanBoundary 状态（占位）</h3>
             <p class="module-status-note">当前区域仅为状态占位，不生成交易计划，不提供自动执行建议；非交易指令，必须人工复核。</p>
@@ -1348,6 +1356,66 @@
             + '</div>';
     }
 
+    function runtimeBooleanDiagnostic(value, trueText, falseText) {
+        if (value === true) return "true / " + trueText;
+        if (value === false) return "false / " + falseText;
+        return "未返回 / 前端按只读诊断处理";
+    }
+
+    function runtimeKlineItemsCount(items) {
+        if (!Array.isArray(items)) return "未返回 klineItems";
+        return items.length + " 项";
+    }
+
+    function runtimeKlineLatestCloseSummary(items) {
+        if (!Array.isArray(items) || !items.length) return "—";
+        var latest = null;
+        items.forEach(function (item) {
+            if (!item || typeof item !== "object") return;
+            if (!latest) {
+                latest = item;
+                return;
+            }
+            var itemCloseTime = item.closeTimeMs != null ? item.closeTimeMs : item.close_time_ms;
+            var latestCloseTime = latest.closeTimeMs != null ? latest.closeTimeMs : latest.close_time_ms;
+            if (itemCloseTime != null && (latestCloseTime == null || Number(itemCloseTime) > Number(latestCloseTime))) {
+                latest = item;
+            }
+        });
+        if (!latest) return "—";
+        var closePrice = latest.closePrice != null ? latest.closePrice : latest.close_price;
+        var closeTime = latest.closeTimeMs != null ? latest.closeTimeMs : latest.close_time_ms;
+        var qualityStatus = firstNonEmpty(latest.qualityStatus, latest.quality_status, "");
+        var provider = firstNonEmpty(latest.provider, latest.providerMarketType, latest.provider_market_type, "");
+        var parts = ["close=" + formatPrice(closePrice)];
+        if (closeTime != null && String(closeTime).trim() !== "") parts.push("closeTime=" + formatDateTime(Number(closeTime)));
+        if (qualityStatus) parts.push("quality=" + qualityStatus);
+        if (provider) parts.push("source=" + provider);
+        return parts.join(" · ");
+    }
+
+    function renderRuntimeKlineContextVisibility(runtimeKlineContext) {
+        var rk = runtimeKlineContext || {};
+        var items = rk.klineItems != null ? rk.klineItems : rk.kline_items;
+        var latestPrice = rk.latestPrice != null ? rk.latestPrice : rk.latest_price;
+        return '<div class="source-trace-readonly">'
+            + '<h4>RuntimeKlineContext 运行时诊断（只读）</h4>'
+            + sourceMetric("Fallback", rk.fallbackStatus, "")
+            + sourceMetric("最新已闭合持久化收盘价（运行时元数据）", formatPrice(latestPrice), "")
+            + sourceMetric("KlineItems 数量", runtimeKlineItemsCount(items), "")
+            + sourceMetric("最新 close 摘要", runtimeKlineLatestCloseSummary(items), "")
+            + sourceMetric("Persisted OHLCV readiness", rk.persistedOhlcvReadinessStatus, "")
+            + sourceMetric("Persisted OHLCV stale code", rk.persistedOhlcvStaleReasonCode, "")
+            + sourceMetric("Persisted OHLCV stale text", rk.persistedOhlcvStaleReasonText, "")
+            + sourceMetric("Persisted OHLCV missing", missingFieldsSummary(rk.persistedOhlcvMissingFields), "")
+            + sourceMetric("Runtime missing", missingFieldsSummary(rk.missingFields), "")
+            + sourceMetric("Manual review required", runtimeBooleanDiagnostic(rk.manualReviewRequired, "必须人工复核", "字段为 false，前端仍不授予交易权限"), "")
+            + sourceMetric("Not trade instruction", runtimeBooleanDiagnostic(rk.notTradeInstruction, "非交易指令", "字段为 false，前端仍按非交易指令处理"), "")
+            + '<div class="alert-line confused">latestPrice 仅标注为 latest closed persisted close price / runtime metadata only，不作为 entry source。</div>'
+            + '<div class="alert-line">klineItems 仅显示 compact count 与 latest close summary，不作为 entry / stop / TP / RR 来源，也不代表 SourceTrace 完成。</div>'
+            + '</div>';
+    }
+
     function statusBadgeClass(rawStatus) {
         var s = (rawStatus || "").toString().toUpperCase();
         if (s === "READY" || s === "OK" || s === "VALID" || s === "ALIGNED") return "ok";
@@ -1361,6 +1429,7 @@
         var riskGuard = detail && detail.riskActionGuardDisplay ? detail.riskActionGuardDisplay : null;
         var paperObs = detail && detail.paperObservationDisplay ? detail.paperObservationDisplay : null;
         var sourceTraceDetail = detail && detail.sourceTrace ? detail.sourceTrace : null;
+        var runtimeKlineContext = detail && detail.runtimeKlineContext ? detail.runtimeKlineContext : null;
         var derivativesRiskContext = detail && detail.derivativesRiskContext ? detail.derivativesRiskContext : null;
 
         var planStatus = isPresentValue(planBoundary && planBoundary.planBoundaryStatus) ? String(planBoundary.planBoundaryStatus).trim() : "BACKEND_PENDING";
@@ -1382,6 +1451,13 @@
         var paperStatus = isPresentValue(paperObs && paperObs.paperObservationStatus) ? String(paperObs.paperObservationStatus).trim() : "BACKEND_PENDING";
         var paperLabel = isPresentValue(paperObs && paperObs.paperObservationStatusLabel) ? String(paperObs.paperObservationStatusLabel).trim() : "仅占位";
         var notRealPosition = isPresentValue(paperObs && paperObs.notRealPosition) ? String(paperObs.notRealPosition).trim() : "不是实盘持仓 / 不是交易指令";
+
+        var runtimeCard = document.getElementById("runtimeKlineContextCard");
+        if (runtimeCard) {
+            runtimeCard.innerHTML = '<h3>RuntimeKlineContext 诊断（只读）</h3>' +
+                '<p class="module-status-note">仅展示 /api/dashboard/detail.runtimeKlineContext 已返回字段；运行时 K 线不是交易信号，不补全 SourceTrace。</p>' +
+                renderRuntimeKlineContextVisibility(runtimeKlineContext);
+        }
 
         var planCard = document.getElementById("planBoundaryPlaceholderCard");
         if (planCard) {
@@ -1428,6 +1504,7 @@
         detail.riskActionGuardDisplay = resp.riskActionGuardDisplay || null;
         detail.paperObservationDisplay = resp.paperObservationDisplay || null;
         detail.sourceTrace = resp.sourceTrace || null;
+        detail.runtimeKlineContext = resp.runtimeKlineContext || null;
         detail.derivativesRiskContext = resp.derivativesRiskContext || null;
         return detail;
     }
