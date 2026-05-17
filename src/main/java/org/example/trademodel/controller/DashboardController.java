@@ -1,10 +1,12 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.ScoreService;
+import org.example.trademodel.service.dashboard.DashboardSourceTraceDetailAdapter;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
@@ -52,6 +54,7 @@ public class DashboardController {
     private final MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
+    private final DashboardSourceTraceDetailAdapter dashboardSourceTraceDetailAdapter;
     private final PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter;
     private final ExecutionPlanDisplayAdapter executionPlanDisplayAdapter;
     private final RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter;
@@ -65,6 +68,7 @@ public class DashboardController {
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
                                EvidenceService evidenceService,
                                ScoreService scoreService,
+                               DashboardSourceTraceDetailAdapter dashboardSourceTraceDetailAdapter,
                                PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
                                ExecutionPlanDisplayAdapter executionPlanDisplayAdapter,
                                RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter,
@@ -77,6 +81,7 @@ public class DashboardController {
         this.marketEnvironmentSnapshotMapper = marketEnvironmentSnapshotMapper;
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
+        this.dashboardSourceTraceDetailAdapter = dashboardSourceTraceDetailAdapter;
         this.planBoundaryDisplayAdapter = planBoundaryDisplayAdapter;
         this.executionPlanDisplayAdapter = executionPlanDisplayAdapter;
         this.riskActionGuardDisplayAdapter = riskActionGuardDisplayAdapter;
@@ -143,6 +148,15 @@ public class DashboardController {
         DashboardDetailResponseVO body = DashboardDetailResponseVO.withSafeDefaultDisplays();
         body.setSymbol(normalizedSymbol);
         body.setDecision(decisionService.getLatestDecisionResultBySymbol(normalizedSymbol));
+        DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext sourceTraceContext =
+                dashboardSourceTraceDetailAdapter != null
+                        ? dashboardSourceTraceDetailAdapter.build(normalizedSymbol, body.getDecision())
+                        : null;
+        SourceTraceDTO sourceTrace = sourceTraceContext != null ? sourceTraceContext.getSourceTrace() : null;
+        body.setSourceTrace(sourceTrace);
+        body.setDerivativesRiskContext(
+                sourceTraceContext != null ? sourceTraceContext.getDerivativesRiskContext() : null
+        );
         body.setPlanBoundaryDisplay(planBoundaryDisplayAdapter.build(
                 normalizedSymbol,
                 body.getDecision(),
@@ -151,7 +165,8 @@ public class DashboardController {
         body.setExecutionPlanDisplay(executionPlanDisplayAdapter.build(
                 body.getDecision(),
                 body.getPlanBoundaryDisplay(),
-                body.getExecutionPlanDisplay()
+                body.getExecutionPlanDisplay(),
+                sourceTrace
         ));
         body.setRiskActionGuardDisplay(riskActionGuardDisplayAdapter.build(
                 body.getDecision(),

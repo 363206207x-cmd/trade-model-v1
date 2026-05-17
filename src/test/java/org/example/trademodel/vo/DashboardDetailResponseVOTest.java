@@ -1,5 +1,7 @@
 package org.example.trademodel.vo;
 
+import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,16 +22,22 @@ class DashboardDetailResponseVOTest {
         DashboardDetailResponseVO.ExecutionPlanDisplayVO executionPlan = new DashboardDetailResponseVO.ExecutionPlanDisplayVO();
         DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuard = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
         DashboardDetailResponseVO.PaperObservationDisplayVO paperObservation = new DashboardDetailResponseVO.PaperObservationDisplayVO();
+        SourceTraceDTO sourceTrace = new SourceTraceDTO();
+        DerivativesRiskContextDTO derivativesRiskContext = new DerivativesRiskContextDTO();
 
         response.setPlanBoundaryDisplay(planBoundary);
         response.setExecutionPlanDisplay(executionPlan);
         response.setRiskActionGuardDisplay(riskActionGuard);
         response.setPaperObservationDisplay(paperObservation);
+        response.setSourceTrace(sourceTrace);
+        response.setDerivativesRiskContext(derivativesRiskContext);
 
         assertSame(planBoundary, response.getPlanBoundaryDisplay());
         assertSame(executionPlan, response.getExecutionPlanDisplay());
         assertSame(riskActionGuard, response.getRiskActionGuardDisplay());
         assertSame(paperObservation, response.getPaperObservationDisplay());
+        assertSame(sourceTrace, response.getSourceTrace());
+        assertSame(derivativesRiskContext, response.getDerivativesRiskContext());
     }
 
     @Test

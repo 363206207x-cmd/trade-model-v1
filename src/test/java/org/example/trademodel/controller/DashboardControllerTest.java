@@ -9,6 +9,7 @@ import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.dashboard.DefaultDashboardSourceTraceDetailAdapter;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
@@ -79,6 +80,7 @@ class DashboardControllerTest {
                 marketEnvironmentSnapshotMapper,
                 evidenceService,
                 scoreService,
+                new DefaultDashboardSourceTraceDetailAdapter(),
                 planBoundaryDisplayAdapter,
                 executionPlanDisplayAdapter,
                 riskActionGuardDisplayAdapter,
@@ -173,7 +175,31 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.evidenceTopItems").isArray())
                 .andExpect(jsonPath("$.scoreTopItems").isArray())
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreType").value("综合评分"))
-                .andExpect(jsonPath("$.scoreTopItems[0].scoreValue").value(81.5));
+                .andExpect(jsonPath("$.scoreTopItems[0].scoreValue").value(81.5))
+                .andExpect(jsonPath("$.sourceTrace.fallbackStatus").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.sourceTrace.manualReviewRequired").value(true))
+                .andExpect(jsonPath("$.sourceTrace.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.sourceTrace.missingFields").isArray())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'runtimeKlineContext')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'entryPriceSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'stopPriceSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'tpPriceSources')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'rrSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'liquiditySource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'multiTimeframeSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'eventSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'wickSource')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.fallbackStatus").value("SAFE_FAIL_CLOSED_ONLY"))
+                .andExpect(jsonPath("$.derivativesRiskContext.manualReviewRequired").value(true))
+                .andExpect(jsonPath("$.derivativesRiskContext.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'openInterestHistory')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'fundingHistory')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'liquidationCluster')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'leverageDistribution')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'longShortRatio')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'liquidityStress')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'eventWindowBlockers')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'wickConfirmationSources')]").exists());
     }
 
     @Test
