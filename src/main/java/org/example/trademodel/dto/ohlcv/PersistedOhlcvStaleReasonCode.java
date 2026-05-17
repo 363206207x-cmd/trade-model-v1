@@ -1,0 +1,15 @@
+package org.example.trademodel.dto.ohlcv;
+
+public enum PersistedOhlcvStaleReasonCode {
+    NONE,
+    NO_BARS_FOR_SYMBOL_TIMEFRAME,
+    WINDOW_TOO_SHORT,
+    WINDOW_NOT_CONTIGUOUS,
+    LATEST_BAR_TOO_OLD,
+    QUALITY_STATUS_NOT_OK,
+    SOURCE_OWNER_MISSING,
+    PRICE_FIELD_MISSING,
+    PRICE_FIELD_INVALID,
+    VOLUME_FIELD_MISSING,
+    POLICY_NOT_CONFIGURED
+}
