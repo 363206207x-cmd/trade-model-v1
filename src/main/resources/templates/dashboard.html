@@ -177,12 +177,13 @@
             margin-bottom: 12px;
         }
         .kpi-card {
-            padding: 10px 11px;
-            min-height: 98px;
+            padding: 10px 12px 11px;
+            min-height: 88px;
             border-radius: 8px;
             box-shadow: none;
             position: relative;
             overflow: hidden;
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.035) 0%, var(--bg-surface) 68%);
         }
         .kpi-card::before {
             content: "";
@@ -192,7 +193,7 @@
             background: var(--brand-accent);
             opacity: 0.65;
         }
-        .kpi-card h3 { margin-bottom: 6px; }
+        .kpi-card h3 { margin-bottom: 7px; color: var(--text-secondary); }
         .kpi-anchor {
             display: flex;
             align-items: flex-start;
@@ -208,14 +209,14 @@
             margin-top: 4px;
         }
         .kpi-value {
-            font-size: 1rem;
+            font-size: 1.08rem;
             line-height: 1.25;
-            font-weight: 750;
+            font-weight: 780;
             color: var(--text-primary);
             word-break: break-word;
         }
         .kpi-note {
-            margin-top: 5px;
+            margin-top: 4px;
             padding-left: 14px;
             font-size: 0.68rem;
             color: var(--text-secondary);
@@ -342,13 +343,13 @@
 
         .coin-tile {
             border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            padding: 9px 9px 10px;
+            border-radius: 10px;
+            padding: 8px 9px;
             background: var(--bg-elevated);
             cursor: pointer;
             transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s, background 0.15s;
             position: relative;
-            min-height: 162px;
+            min-height: 138px;
         }
         .coin-tile:hover {
             border-color: var(--brand-accent);
@@ -360,31 +361,31 @@
             left: 0;
             top: 0;
             width: 100%;
-            height: 3px;
-            border-radius: 12px 12px 0 0;
+            height: 2px;
+            border-radius: 10px 10px 0 0;
             background: rgba(100, 116, 139, 0.35);
         }
         .coin-tile.bias-bull {
-            border-color: rgba(34, 197, 94, 0.35);
-            background: linear-gradient(180deg, rgba(34, 197, 94, 0.08) 0%, var(--bg-elevated) 48%);
+            border-color: rgba(34, 197, 94, 0.24);
+            background: linear-gradient(180deg, rgba(34, 197, 94, 0.045) 0%, var(--bg-elevated) 42%);
         }
         .coin-tile.bias-bear {
-            border-color: rgba(239, 68, 68, 0.34);
-            background: linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, var(--bg-elevated) 48%);
+            border-color: rgba(239, 68, 68, 0.22);
+            background: linear-gradient(180deg, rgba(239, 68, 68, 0.04) 0%, var(--bg-elevated) 42%);
         }
         .coin-tile.bias-neu {
             border-color: rgba(100, 116, 139, 0.34);
         }
-        .coin-tile.bias-bull::before { background: rgba(22, 163, 74, 0.58); }
-        .coin-tile.bias-bear::before { background: rgba(220, 38, 38, 0.58); }
-        .coin-tile.bias-neu::before { background: rgba(100, 116, 139, 0.45); }
+        .coin-tile.bias-bull::before { background: rgba(22, 163, 74, 0.42); }
+        .coin-tile.bias-bear::before { background: rgba(220, 38, 38, 0.34); }
+        .coin-tile.bias-neu::before { background: rgba(100, 116, 139, 0.36); }
         .coin-tile.selected {
             border-color: var(--brand-accent);
             background: linear-gradient(180deg, rgba(37, 99, 235, 0.12) 0%, var(--bg-elevated) 42%);
             box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.3), 0 10px 20px -14px rgba(37, 99, 235, 0.45);
             transform: translateY(-1px);
         }
-        .coin-tile.selected::before { height: 4px; background: var(--brand-accent); }
+        .coin-tile.selected::before { height: 3px; background: var(--brand-accent); }
         .coin-tile.placeholder {
             cursor: default;
             border-style: dashed;
@@ -441,17 +442,17 @@
         .tile-risk-low { color: var(--status-ok); }
         .coin-tile .sym {
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: 0.86rem;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             gap: 4px;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
         .coin-tile .price {
-            font-size: 0.69rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
-            margin: 6px 0 0;
+            margin: 5px 0 0;
             opacity: 0.62;
             line-height: 1.3;
         }
@@ -463,7 +464,7 @@
             margin-bottom: 5px;
         }
         .tile-bias {
-            font-size: 1.02rem;
+            font-size: 0.98rem;
             font-weight: 700;
             letter-spacing: 0.01em;
         }
@@ -482,15 +483,15 @@
         .tile-primary {
             display: flex;
             flex-direction: column;
-            gap: 5px;
-            margin-bottom: 6px;
+            gap: 4px;
+            margin-bottom: 5px;
         }
         .tile-tags-compact {
             margin-top: 0;
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
-            min-height: 22px;
+            gap: 3px;
+            min-height: 20px;
         }
         .tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .mini-tag {
@@ -693,7 +694,7 @@
         }
 
         .main-workbench-card {
-            margin: 12px 0 14px;
+            margin: 10px 0 12px;
         }
         .workbench-head {
             display: flex;
@@ -723,7 +724,7 @@
         }
         .workbench-grid {
             display: grid;
-            grid-template-columns: minmax(260px, 1.35fr) minmax(240px, 1fr) minmax(240px, 1fr);
+            grid-template-columns: minmax(280px, 1.18fr) minmax(230px, 0.92fr) minmax(230px, 0.92fr);
             gap: 10px;
             align-items: stretch;
         }
@@ -748,6 +749,29 @@
             font-weight: 600;
             line-height: 1.48;
             color: var(--text-primary);
+            word-break: break-word;
+        }
+        .workbench-review-strip {
+            border: 1px solid rgba(37, 99, 235, 0.22);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.06) 0%, var(--bg-elevated) 100%);
+            padding: 9px 10px;
+            margin-bottom: 10px;
+            display: grid;
+            gap: 6px;
+        }
+        .workbench-review-strip .label {
+            color: var(--brand-accent);
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .workbench-review-strip .value {
+            color: var(--text-primary);
+            font-size: 0.88rem;
+            font-weight: 650;
+            line-height: 1.45;
             word-break: break-word;
         }
         .workbench-metrics {
@@ -803,7 +827,9 @@
             background: var(--bg-elevated);
             padding: 10px;
             min-width: 0;
+            box-shadow: none;
         }
+        .decision-shell-card .status-badge { background: var(--bg-surface); }
         .decision-shell-head {
             display: flex;
             align-items: flex-start;
@@ -1338,6 +1364,10 @@
         return '<div class="workbench-metric"><span class="label">' + escapeHtml(label) + '</span><span class="value">' + escapeHtml(value || "—") + '</span></div>';
     }
 
+    function workbenchReviewStrip(label, value) {
+        return '<div class="workbench-review-strip"><span class="label">' + escapeHtml(label || "Manual Review Focus") + '</span><span class="value">' + escapeHtml(value || "等待后端字段") + '</span></div>';
+    }
+
     function decisionShellRow(label, value) {
         return '<div class="decision-shell-row"><span class="label">' + escapeHtml(label) + '</span><span class="value">' + escapeHtml(value || "—") + '</span></div>';
     }
@@ -1514,6 +1544,7 @@
         var symbol = DEFAULT_DISPLAY_SLOT_SYMBOLS[0];
         return '<div class="workbench-grid">'
             + '<div class="workbench-panel"><h4>结构化空态</h4><p class="workbench-lead">等待首轮分析生成后显示当前标的结论。</p>'
+            + workbenchReviewStrip("Manual Review Focus", "等待首轮分析；不展示价格、评分、机会或 AI 结果。")
             + '<div class="workbench-metrics">'
             + workbenchMetric("当前标的", symbol)
             + workbenchMetric("状态", "等待首轮分析")
@@ -1605,9 +1636,11 @@
         var focusHtml = focusItems.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("");
         var priceText = formatPrice(d.latestPrice != null ? d.latestPrice : d.latest_price);
         var safetyLine = "BoundaryCandidate VALID 仍为人工复核候选；ExecutionPlan readiness 不是自动执行；缺失 SourceTrace / 风险上下文时必须 fail-closed。";
+        var primaryReviewFocus = focusItems.length ? focusItems[0] : "检查证据、评分、边界与人工复核记录是否一致";
 
         box.innerHTML = '<div class="workbench-grid">'
-            + '<div class="workbench-panel"><h4>结论与人工注意力</h4>'
+            + '<div class="workbench-panel"><h4>人工复核重点</h4>'
+            + workbenchReviewStrip("Primary Focus", primaryReviewFocus)
             + '<p class="workbench-lead">' + escapeHtml(conclusionLead) + '</p>'
             + '<div class="workbench-metrics">'
             + workbenchMetric("标的", d.symbol || "—")
@@ -1616,25 +1649,24 @@
             + workbenchMetric("建议摘要", formatWithSource(ra.text, ra.source))
             + workbenchMetric("置信度", confidenceText(d.confidenceLevel))
             + workbenchMetric("风险", riskLevelText(d.riskLevel))
-            + workbenchMetric("当前价格", priceText)
-            + workbenchMetric("市场环境", miniSummary)
             + '</div></div>'
-            + '<div class="workbench-panel"><h4>边界与执行只读状态</h4>'
+            + '<div class="workbench-panel"><h4>只读状态摘要</h4>'
             + '<div class="workbench-metrics">'
             + workbenchMetric("PlanBoundary", planStatus + " / " + planLabel)
             + workbenchMetric("SourceTrace", sourceTrace)
-            + workbenchMetric("Backend", backendConnection)
             + workbenchMetric("ExecutionPlan", executionStatus + " / " + executionLabel)
             + workbenchMetric("不可执行原因", notExecutableReason)
             + workbenchMetric("数据质量", firstNonEmpty(d.dataQualityScore, d.data_quality_score, "—"))
+            + workbenchMetric("当前价格", priceText)
             + '</div></div>'
-            + '<div class="workbench-panel"><h4>Risk Guard 与下一步复核</h4>'
+            + '<div class="workbench-panel"><h4>Risk Guard</h4>'
             + '<div class="workbench-metrics">'
             + workbenchMetric("RiskActionGuard", guardStatus + " / " + guardLabel)
             + workbenchMetric("Liquidity", liquidityState)
             + workbenchMetric("人工复核", manualReview ? "必须人工复核" : "未声明关闭，仍按人工复核处理")
             + workbenchMetric("交易语义", notTradeInstruction ? "非交易指令" : "缺省按非交易指令处理")
-            + workbenchMetric("市场风险模式", miniRiskMode)
+            + workbenchMetric("市场环境", miniSummary)
+            + workbenchMetric("风险模式", miniRiskMode)
             + workbenchMetric("机会推送", boolSafetyText(riskGuard.opportunityPushAllowed, "允许展示", "禁止", "禁止 / 未确认"))
             + '</div><ul class="workbench-focus-list">' + focusHtml + '</ul></div>'
             + '</div>'
