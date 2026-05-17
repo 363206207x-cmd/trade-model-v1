@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -155,7 +156,9 @@ class DashboardControllerTest {
     @Test
     void detail_json_exposesCoreFieldsOnDecision() throws Exception {
         DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-btc");
         decision.setAnalysisId("ana-btc");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
         decision.setTimeframe("1h");
         decision.setMultiTfConvergence("STRONG");
         decision.setDataQualityScore(91);
@@ -183,6 +186,14 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreType").value("综合评分"))
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreValue").value(81.5))
                 .andExpect(jsonPath("$.sourceTrace.fallbackStatus").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.sourceTrace.decisionId").value("dec-btc"))
+                .andExpect(jsonPath("$.sourceTrace.decisionIdSource").value("DecisionResultVO.decisionId"))
+                .andExpect(jsonPath("$.sourceTrace.analysisId").value("ana-btc"))
+                .andExpect(jsonPath("$.sourceTrace.analysisIdSource").value("DecisionResultVO.analysisId"))
+                .andExpect(jsonPath("$.sourceTrace.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.sourceTrace.symbolSource").value("DecisionResultVO.symbol"))
+                .andExpect(jsonPath("$.sourceTrace.decisionCreateTime").exists())
+                .andExpect(jsonPath("$.sourceTrace.decisionCreateTimeSource").value("DecisionResultVO.createTime"))
                 .andExpect(jsonPath("$.sourceTrace.timeframe").value("1h"))
                 .andExpect(jsonPath("$.sourceTrace.timeframeSource").value("DecisionResultVO.timeframe"))
                 .andExpect(jsonPath("$.sourceTrace.runtimeKlineContextStatus").value("UNAVAILABLE"))

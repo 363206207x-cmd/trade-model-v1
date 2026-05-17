@@ -1,12 +1,20 @@
 package org.example.trademodel.dto.planboundary;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SourceTraceDTO implements SourceCompletenessContract {
 
     private String symbol;
+    private String symbolSource;
+    private String decisionId;
+    private String decisionIdSource;
+    private String analysisId;
+    private String analysisIdSource;
+    private LocalDateTime decisionCreateTime;
+    private String decisionCreateTimeSource;
     private String timeframe;
     private String timeframeSource;
     private String runtimeKlineContextStatus;
@@ -50,6 +58,62 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setSymbol(String symbol) {
         this.symbol = symbol;
+    }
+
+    public String getSymbolSource() {
+        return symbolSource;
+    }
+
+    public void setSymbolSource(String symbolSource) {
+        this.symbolSource = symbolSource;
+    }
+
+    public String getDecisionId() {
+        return decisionId;
+    }
+
+    public void setDecisionId(String decisionId) {
+        this.decisionId = decisionId;
+    }
+
+    public String getDecisionIdSource() {
+        return decisionIdSource;
+    }
+
+    public void setDecisionIdSource(String decisionIdSource) {
+        this.decisionIdSource = decisionIdSource;
+    }
+
+    public String getAnalysisId() {
+        return analysisId;
+    }
+
+    public void setAnalysisId(String analysisId) {
+        this.analysisId = analysisId;
+    }
+
+    public String getAnalysisIdSource() {
+        return analysisIdSource;
+    }
+
+    public void setAnalysisIdSource(String analysisIdSource) {
+        this.analysisIdSource = analysisIdSource;
+    }
+
+    public LocalDateTime getDecisionCreateTime() {
+        return decisionCreateTime;
+    }
+
+    public void setDecisionCreateTime(LocalDateTime decisionCreateTime) {
+        this.decisionCreateTime = decisionCreateTime;
+    }
+
+    public String getDecisionCreateTimeSource() {
+        return decisionCreateTimeSource;
+    }
+
+    public void setDecisionCreateTimeSource(String decisionCreateTimeSource) {
+        this.decisionCreateTimeSource = decisionCreateTimeSource;
     }
 
     public String getTimeframe() {
