@@ -8,6 +8,7 @@ import org.example.trademodel.dto.planboundary.BoundaryStopDTO;
 import org.example.trademodel.dto.planboundary.BoundaryTakeProfitLevelDTO;
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineItemDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
@@ -137,6 +138,42 @@ class BoundaryCandidateServiceImplTest {
         assertThat(candidate.isManualReviewRequired()).isTrue();
         assertThat(candidate.isNotTradeInstruction()).isTrue();
         assertThat(candidate.getBlockingReasons()).contains("sourceTrace fallbackStatus=INCOMPLETE");
+    }
+
+    @Test
+    void evaluateBoundaryCandidateDoesNotTreatRuntimeKlineVisibilityAsValidSources() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(BigDecimal.valueOf(68100));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30")));
+        runtimeKlineContext.setManualReviewRequired(true);
+        runtimeKlineContext.setNotTradeInstruction(true);
+
+        BoundaryCandidateDTO candidate = service.evaluateBoundaryCandidate(
+                "BTCUSDT",
+                "1m",
+                runtimeKlineContext,
+                validDerivativesRiskContext(),
+                validEntry(),
+                validStop(),
+                List.of(validTakeProfitLevel()),
+                validSourceFields(),
+                BigDecimal.valueOf(90)
+        );
+
+        assertThat(candidate.getBoundaryStatus()).isEqualTo(BoundaryStatusEnum.INCOMPLETE);
+        assertThat(candidate.isManualReviewRequired()).isTrue();
+        assertThat(candidate.isNotTradeInstruction()).isTrue();
+        assertThat(candidate.getBlockingReasons()).contains(
+                "sourceTrace fallbackStatus=INCOMPLETE",
+                "sourceTrace missingFields present",
+                "entry source missing",
+                "stop source missing",
+                "TP source missing",
+                "RR source missing"
+        );
     }
 
     @Test
@@ -433,5 +470,11 @@ class BoundaryCandidateServiceImplTest {
         sourceFields.setDataQualityScore(BigDecimal.valueOf(90));
         sourceFields.setEvidenceRefs(List.of("source-trace-1"));
         return sourceFields;
+    }
+
+    private RuntimeKlineItemDTO klineItem(String closePrice) {
+        RuntimeKlineItemDTO item = new RuntimeKlineItemDTO();
+        item.setClosePrice(new BigDecimal(closePrice));
+        return item;
     }
 }

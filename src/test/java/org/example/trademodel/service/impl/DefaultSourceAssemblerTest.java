@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineItemDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -120,6 +121,52 @@ class DefaultSourceAssemblerTest {
     }
 
     @Test
+    void runtimeLatestPriceAndKlineItemsAloneShouldNotPopulateBoundarySources() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(BigDecimal.valueOf(68100));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30")));
+        runtimeKlineContext.setManualReviewRequired(true);
+        runtimeKlineContext.setNotTradeInstruction(true);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getEntryPriceSource()).isNull();
+        assertThat(sourceTrace.getStopPriceSource()).isNull();
+        assertThat(sourceTrace.getTpPriceSources()).isEmpty();
+        assertThat(sourceTrace.getRrSource()).isNull();
+        assertThat(sourceTrace.getMissingFields()).contains(
+                "entryPriceSource",
+                "entrySourceType",
+                "entrySourceTimeframe",
+                "entrySourceReason",
+                "entrySourceRef",
+                "stopPriceSource",
+                "stopSourceType",
+                "stopSourceTimeframe",
+                "stopSourceReason",
+                "stopSourceRef",
+                "tpPriceSources",
+                "tpSourceType",
+                "tpSourceTimeframe",
+                "tpSourceReason",
+                "tpSourceRef",
+                "rrSource",
+                "rrRuleRef",
+                "liquiditySource",
+                "multiTimeframeSource",
+                "eventSource",
+                "wickSource"
+        );
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+        assertThat(sourceTrace.isManualReviewRequired()).isTrue();
+        assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
     void assembleSourceTracePropagatesDerivativesRiskMissingFields() {
         DerivativesRiskContextDTO derivativesRiskContext = validDerivativesRiskContext();
         derivativesRiskContext.setMissingFields(List.of("openInterestHistory"));
@@ -198,5 +245,11 @@ class DefaultSourceAssemblerTest {
         context.setWickConfirmationSources(List.of("wick-confirmed"));
         context.setDataQualityScore(BigDecimal.valueOf(90));
         return context;
+    }
+
+    private RuntimeKlineItemDTO klineItem(String closePrice) {
+        RuntimeKlineItemDTO item = new RuntimeKlineItemDTO();
+        item.setClosePrice(new BigDecimal(closePrice));
+        return item;
     }
 }
