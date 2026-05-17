@@ -6,16 +6,18 @@ import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * BACKEND-P2 read-only dashboard detail adapter.
+ * BACKEND-P2/BACKEND-P3 read-only dashboard detail adapter.
  * It exposes explicit missing SourceTrace / derivatives-risk context instead of fabricating values.
  */
 @Component
 public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSourceTraceDetailAdapter {
     private static final String TIMEFRAME = "timeframe";
+    private static final String DECISION_MULTI_TIMEFRAME_SOURCE = "DecisionResultVO.multiTfConvergence";
 
     @Override
     public DashboardSourceTraceDetailContext build(String symbol, DecisionResultVO decision) {
@@ -27,6 +29,7 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
     private SourceTraceDTO buildSourceTrace(String symbol, DecisionResultVO decision) {
         SourceTraceDTO sourceTrace = new SourceTraceDTO();
         sourceTrace.setSymbol(symbol);
+        wireProductionBackedSourceTraceFields(decision, sourceTrace);
         sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
         sourceTrace.setMissingFields(sourceTraceMissingFields(decision));
         sourceTrace.setManualReviewRequired(true);
@@ -37,11 +40,33 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
     private DerivativesRiskContextDTO buildDerivativesRiskContext(String symbol, DecisionResultVO decision) {
         DerivativesRiskContextDTO context = new DerivativesRiskContextDTO();
         context.setSymbol(symbol);
+        wireProductionBackedDerivativesFields(decision, context);
         context.setFallbackStatus(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY);
         context.setMissingFields(derivativesRiskMissingFields(decision));
         context.setManualReviewRequired(true);
         context.setNotTradeInstruction(true);
         return context;
+    }
+
+    private void wireProductionBackedSourceTraceFields(DecisionResultVO decision, SourceTraceDTO sourceTrace) {
+        if (decision == null || sourceTrace == null) {
+            return;
+        }
+        if (hasText(decision.getMultiTfConvergence())) {
+            sourceTrace.setMultiTimeframeSource(DECISION_MULTI_TIMEFRAME_SOURCE);
+        }
+    }
+
+    private void wireProductionBackedDerivativesFields(
+            DecisionResultVO decision,
+            DerivativesRiskContextDTO context
+    ) {
+        if (decision == null || context == null) {
+            return;
+        }
+        if (decision.getDataQualityScore() != null) {
+            context.setDataQualityScore(BigDecimal.valueOf(decision.getDataQualityScore()));
+        }
     }
 
     private List<String> sourceTraceMissingFields(DecisionResultVO decision) {
@@ -71,7 +96,9 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         fields.add("rrSource");
         fields.add("rrRuleRef");
         fields.add("liquiditySource");
-        fields.add("multiTimeframeSource");
+        if (decision == null || !hasText(decision.getMultiTfConvergence())) {
+            fields.add("multiTimeframeSource");
+        }
         fields.add("eventSource");
         fields.add("wickSource");
         fields.add("derivativesRiskContext");
@@ -94,7 +121,13 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         fields.add("liquidityStressReason");
         fields.add("eventWindowBlockers");
         fields.add("wickConfirmationSources");
-        fields.add("dataQualityScore");
+        if (decision == null || decision.getDataQualityScore() == null) {
+            fields.add("dataQualityScore");
+        }
         return fields;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

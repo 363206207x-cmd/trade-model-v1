@@ -155,6 +155,8 @@ class DashboardControllerTest {
     void detail_json_exposesCoreFieldsOnDecision() throws Exception {
         DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
         decision.setAnalysisId("ana-btc");
+        decision.setMultiTfConvergence("STRONG");
+        decision.setDataQualityScore(91);
         when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
         when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
         when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-btc")).thenReturn(Collections.emptyList());
@@ -186,10 +188,12 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'tpPriceSources')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'rrSource')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'liquiditySource')]").exists())
-                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'multiTimeframeSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.multiTimeframeSource").value("DecisionResultVO.multiTfConvergence"))
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'multiTimeframeSource')]").doesNotExist())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'eventSource')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'wickSource')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.fallbackStatus").value("SAFE_FAIL_CLOSED_ONLY"))
+                .andExpect(jsonPath("$.derivativesRiskContext.dataQualityScore").value(91))
                 .andExpect(jsonPath("$.derivativesRiskContext.manualReviewRequired").value(true))
                 .andExpect(jsonPath("$.derivativesRiskContext.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'openInterestHistory')]").exists())
@@ -199,7 +203,8 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'longShortRatio')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'liquidityStress')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'eventWindowBlockers')]").exists())
-                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'wickConfirmationSources')]").exists());
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'wickConfirmationSources')]").exists())
+                .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'dataQualityScore')]").doesNotExist());
     }
 
     @Test
