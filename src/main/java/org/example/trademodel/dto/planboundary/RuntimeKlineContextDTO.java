@@ -31,6 +31,7 @@ public class RuntimeKlineContextDTO implements SourceCompletenessContract {
     private String multiTimeframeSource;
     private String eventSource;
     private String wickSource;
+    private List<RuntimeKlineItemDTO> klineItems = new ArrayList<>();
     private String persistedOhlcvReadinessStatus;
     private String persistedOhlcvStaleReasonCode;
     private String persistedOhlcvStaleReasonText;
@@ -238,6 +239,14 @@ public class RuntimeKlineContextDTO implements SourceCompletenessContract {
 
     public void setWickSource(String wickSource) {
         this.wickSource = wickSource;
+    }
+
+    public List<RuntimeKlineItemDTO> getKlineItems() {
+        return klineItems;
+    }
+
+    public void setKlineItems(List<RuntimeKlineItemDTO> klineItems) {
+        this.klineItems = klineItems == null ? new ArrayList<>() : new ArrayList<>(klineItems);
     }
 
     public String getPersistedOhlcvReadinessStatus() {
