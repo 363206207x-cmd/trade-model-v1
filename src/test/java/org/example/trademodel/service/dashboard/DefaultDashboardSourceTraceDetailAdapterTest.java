@@ -6,7 +6,9 @@ import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.PersistedOhlcvQueryService;
+import org.example.trademodel.service.impl.RuntimeKlineContextAssemblyServiceImpl;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Test;
 
@@ -295,6 +297,47 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
     }
 
     @Test
+    void shouldKeepSourceTraceIncompleteWhenRuntimeKlineAssemblyIsAvailable() {
+        DefaultDashboardSourceTraceDetailAdapter adapterWithReadiness =
+                new DefaultDashboardSourceTraceDetailAdapter(
+                        new DefaultDashboardRuntimeKlineContextAdapter(
+                                readinessService(freshReadiness(List.of(
+                                        bar(60_000L, 119_999L, "101.10", "130.00", "100.50", "102.30"),
+                                        bar(0L, 59_999L, "100.00", "105.00", "98.00", "101.10")
+                                ))),
+                                new RuntimeKlineContextAssemblyServiceImpl()
+                        )
+                );
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setSymbol("BTCUSDT");
+        decision.setTimeframe("1m");
+
+        DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext context =
+                adapterWithReadiness.build("BTCUSDT", decision);
+
+        SourceTraceDTO sourceTrace = context.getSourceTrace();
+
+        assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
+        assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
+        assertEquals("FRESH", sourceTrace.getRuntimeKlineReadinessStatus());
+        assertEquals("NONE", sourceTrace.getRuntimeKlineStaleReasonCode());
+        assertTrue(sourceTrace.getRuntimeKlineReadinessMissingFields().isEmpty());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
+        assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("stopPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("tpPriceSources"));
+        assertTrue(sourceTrace.getMissingFields().contains("rrSource"));
+        assertNull(sourceTrace.getEntryPriceSource());
+        assertNull(sourceTrace.getStopPriceSource());
+        assertTrue(sourceTrace.getTpPriceSources().isEmpty());
+        assertNull(sourceTrace.getRrSource());
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
+        assertTrue(sourceTrace.isManualReviewRequired());
+        assertTrue(sourceTrace.isNotTradeInstruction());
+    }
+
+    @Test
     void shouldExposeNonFreshReadinessAsFailClosedMetadata() {
         DefaultDashboardSourceTraceDetailAdapter adapterWithReadiness =
                 new DefaultDashboardSourceTraceDetailAdapter(
@@ -342,5 +385,56 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         result.setManualReviewRequired(true);
         result.setNotTradeInstruction(true);
         return result;
+    }
+
+    private PersistedOhlcvReadinessResult freshReadiness(List<PersistedOhlcvBarDO> bars) {
+        PersistedOhlcvReadinessResult result = readiness(
+                PersistedOhlcvReadinessStatus.FRESH,
+                PersistedOhlcvStaleReasonCode.NONE,
+                "Persisted OHLCV window is fresh.",
+                List.of()
+        );
+        result.setSymbol("BTCUSDT");
+        result.setTimeframe("1m");
+        result.setRequiredWindowSize(2);
+        result.setBars(bars);
+        result.setLatestCloseTimeMs(bars.stream()
+                .filter(bar -> bar.getCloseTimeMs() != null)
+                .map(PersistedOhlcvBarDO::getCloseTimeMs)
+                .max(Long::compareTo)
+                .orElse(null));
+        result.setLatestIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
+        return result;
+    }
+
+    private PersistedOhlcvBarDO bar(
+            Long openTimeMs,
+            Long closeTimeMs,
+            String openPrice,
+            String highPrice,
+            String lowPrice,
+            String closePrice
+    ) {
+        PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
+        bar.setSymbol("BTCUSDT");
+        bar.setTimeframe("1m");
+        bar.setOpenTimeMs(openTimeMs);
+        bar.setCloseTimeMs(closeTimeMs);
+        bar.setOpenPrice(new BigDecimal(openPrice));
+        bar.setHighPrice(new BigDecimal(highPrice));
+        bar.setLowPrice(new BigDecimal(lowPrice));
+        bar.setClosePrice(new BigDecimal(closePrice));
+        bar.setVolume(new BigDecimal("123.45"));
+        bar.setClosed(true);
+        bar.setProvider("LOCAL_FIXTURE");
+        bar.setProviderMarketType("USDT_PERP");
+        bar.setSourceEndpoint("persisted-ohlcv-fixture");
+        bar.setSourceBatchId("batch-1");
+        bar.setSourceTraceId("trace-1");
+        bar.setSourceVersion(1);
+        bar.setIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
+        bar.setQualityStatus("OK");
+        bar.setIsDeleted(0);
+        return bar;
     }
 }

@@ -6,6 +6,8 @@ import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.PersistedOhlcvQueryService;
+import org.example.trademodel.service.RuntimeKlineContextAssemblyService;
+import org.example.trademodel.service.impl.RuntimeKlineContextAssemblyServiceImpl;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -23,14 +25,25 @@ public class DefaultDashboardRuntimeKlineContextAdapter implements DashboardRunt
     private static final long FALLBACK_MAX_READ_LAG_MS = 15L * 60_000L;
 
     private final PersistedOhlcvQueryService persistedOhlcvQueryService;
+    private final RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService;
 
     public DefaultDashboardRuntimeKlineContextAdapter() {
-        this(null);
+        this(null, new RuntimeKlineContextAssemblyServiceImpl());
+    }
+
+    public DefaultDashboardRuntimeKlineContextAdapter(PersistedOhlcvQueryService persistedOhlcvQueryService) {
+        this(persistedOhlcvQueryService, new RuntimeKlineContextAssemblyServiceImpl());
     }
 
     @Autowired
-    public DefaultDashboardRuntimeKlineContextAdapter(PersistedOhlcvQueryService persistedOhlcvQueryService) {
+    public DefaultDashboardRuntimeKlineContextAdapter(
+            PersistedOhlcvQueryService persistedOhlcvQueryService,
+            RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService
+    ) {
         this.persistedOhlcvQueryService = persistedOhlcvQueryService;
+        this.runtimeKlineContextAssemblyService = runtimeKlineContextAssemblyService == null
+                ? new RuntimeKlineContextAssemblyServiceImpl()
+                : runtimeKlineContextAssemblyService;
     }
 
     @Override
@@ -43,58 +56,92 @@ public class DefaultDashboardRuntimeKlineContextAdapter implements DashboardRunt
         if (hasText(decisionTimeframe)) {
         context.setTimeframe(decisionTimeframe);
         }
-        wireReadinessMetadata(context);
-        context.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
-        context.setMissingFields(missingFields(context.getSymbol(), context.getTimeframe(), decision));
+        RuntimeKlineContextDTO assembled = assembleReadiness(evaluateReadiness(context));
+        copySafeRuntimeAssembly(context, assembled);
+        if (isSafeRuntimeAssembly(assembled)) {
+            context.setFallbackStatus(null);
+            context.setMissingFields(List.of());
+        } else {
+            context.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
+            context.setMissingFields(mergedMissingFields(
+                    missingFields(context.getSymbol(), context.getTimeframe(), decision),
+                    assembled
+            ));
+        }
         context.setManualReviewRequired(true);
         context.setNotTradeInstruction(true);
         return context;
     }
 
-    private void wireReadinessMetadata(RuntimeKlineContextDTO context) {
+    private PersistedOhlcvReadinessResult evaluateReadiness(RuntimeKlineContextDTO context) {
         if (context == null) {
-            return;
+            return null;
         }
         if (persistedOhlcvQueryService == null) {
-            applyReadinessMetadata(context, fallbackUnknownReadiness(
+            return fallbackUnknownReadiness(
                     context.getSymbol(),
                     context.getTimeframe(),
                     "Persisted OHLCV readiness query service is not available.",
                     List.of("persistedOhlcvReadinessService")
-            ));
-            return;
+            );
         }
-        PersistedOhlcvReadinessResult readiness;
         try {
-            readiness = persistedOhlcvQueryService.evaluateReadiness(
+            return persistedOhlcvQueryService.evaluateReadiness(
                     context.getSymbol(),
                     context.getTimeframe(),
                     DEFAULT_REQUIRED_WINDOW_SIZE,
                     maxReadLagMs(context.getTimeframe())
             );
         } catch (RuntimeException e) {
-            readiness = fallbackUnknownReadiness(
+            return fallbackUnknownReadiness(
                     context.getSymbol(),
                     context.getTimeframe(),
                     "Persisted OHLCV readiness query failed closed.",
                     List.of("persistedOhlcvReadinessQuery")
             );
         }
-        applyReadinessMetadata(context, readiness);
     }
 
-    private void applyReadinessMetadata(RuntimeKlineContextDTO context, PersistedOhlcvReadinessResult readiness) {
-        if (readiness == null) {
+    private RuntimeKlineContextDTO assembleReadiness(PersistedOhlcvReadinessResult readiness) {
+        if (runtimeKlineContextAssemblyService == null) {
+            return null;
+        }
+        return runtimeKlineContextAssemblyService.assemble(readiness);
+    }
+
+    private void copySafeRuntimeAssembly(RuntimeKlineContextDTO context, RuntimeKlineContextDTO assembled) {
+        if (context == null || assembled == null) {
             return;
         }
-        if (readiness.getStatus() != null) {
-            context.setPersistedOhlcvReadinessStatus(readiness.getStatus().name());
+        context.setPersistedOhlcvReadinessStatus(assembled.getPersistedOhlcvReadinessStatus());
+        context.setPersistedOhlcvStaleReasonCode(assembled.getPersistedOhlcvStaleReasonCode());
+        context.setPersistedOhlcvStaleReasonText(assembled.getPersistedOhlcvStaleReasonText());
+        context.setPersistedOhlcvMissingFields(assembled.getPersistedOhlcvMissingFields());
+        if (isSafeRuntimeAssembly(assembled)) {
+            context.setLatestPrice(assembled.getLatestPrice());
+            context.setKlineItems(assembled.getKlineItems());
         }
-        if (readiness.getStaleReasonCode() != null) {
-            context.setPersistedOhlcvStaleReasonCode(readiness.getStaleReasonCode().name());
+    }
+
+    private boolean isSafeRuntimeAssembly(RuntimeKlineContextDTO assembled) {
+        return assembled != null
+                && assembled.getFallbackStatus() == null
+                && assembled.getMissingFields().isEmpty()
+                && assembled.getLatestPrice() != null
+                && !assembled.getKlineItems().isEmpty();
+    }
+
+    private List<String> mergedMissingFields(List<String> baseFields, RuntimeKlineContextDTO assembled) {
+        List<String> fields = new ArrayList<>(baseFields);
+        if (assembled != null) {
+            for (String field : assembled.getMissingFields()) {
+                addUnique(field, fields);
+            }
+            for (String field : assembled.getPersistedOhlcvMissingFields()) {
+                addUnique(field, fields);
+            }
         }
-        context.setPersistedOhlcvStaleReasonText(readiness.getStaleReasonText());
-        context.setPersistedOhlcvMissingFields(readiness.getMissingFields());
+        return fields;
     }
 
     private PersistedOhlcvReadinessResult fallbackUnknownReadiness(
@@ -178,5 +225,11 @@ public class DefaultDashboardRuntimeKlineContextAdapter implements DashboardRunt
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private void addUnique(String field, List<String> fields) {
+        if (!fields.contains(field)) {
+            fields.add(field);
+        }
     }
 }
