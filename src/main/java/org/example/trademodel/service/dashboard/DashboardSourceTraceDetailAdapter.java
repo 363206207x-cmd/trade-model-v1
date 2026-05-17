@@ -1,6 +1,7 @@
 package org.example.trademodel.service.dashboard;
 
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.vo.DecisionResultVO;
 
@@ -14,18 +15,32 @@ public interface DashboardSourceTraceDetailAdapter {
 
     class DashboardSourceTraceDetailContext {
         private final SourceTraceDTO sourceTrace;
+        private final RuntimeKlineContextDTO runtimeKlineContext;
         private final DerivativesRiskContextDTO derivativesRiskContext;
 
         public DashboardSourceTraceDetailContext(
                 SourceTraceDTO sourceTrace,
                 DerivativesRiskContextDTO derivativesRiskContext
         ) {
+            this(sourceTrace, null, derivativesRiskContext);
+        }
+
+        public DashboardSourceTraceDetailContext(
+                SourceTraceDTO sourceTrace,
+                RuntimeKlineContextDTO runtimeKlineContext,
+                DerivativesRiskContextDTO derivativesRiskContext
+        ) {
             this.sourceTrace = sourceTrace;
+            this.runtimeKlineContext = runtimeKlineContext;
             this.derivativesRiskContext = derivativesRiskContext;
         }
 
         public SourceTraceDTO getSourceTrace() {
             return sourceTrace;
+        }
+
+        public RuntimeKlineContextDTO getRuntimeKlineContext() {
+            return runtimeKlineContext;
         }
 
         public DerivativesRiskContextDTO getDerivativesRiskContext() {

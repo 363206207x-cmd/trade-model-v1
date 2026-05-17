@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ public class DashboardDetailResponseVO {
     private RiskActionGuardDisplayVO riskActionGuardDisplay;
     private PaperObservationDisplayVO paperObservationDisplay;
     private SourceTraceDTO sourceTrace;
+    private RuntimeKlineContextDTO runtimeKlineContext;
     private DerivativesRiskContextDTO derivativesRiskContext;
 
     /**
@@ -127,6 +129,14 @@ public class DashboardDetailResponseVO {
 
     public void setSourceTrace(SourceTraceDTO sourceTrace) {
         this.sourceTrace = sourceTrace;
+    }
+
+    public RuntimeKlineContextDTO getRuntimeKlineContext() {
+        return runtimeKlineContext;
+    }
+
+    public void setRuntimeKlineContext(RuntimeKlineContextDTO runtimeKlineContext) {
+        this.runtimeKlineContext = runtimeKlineContext;
     }
 
     public DerivativesRiskContextDTO getDerivativesRiskContext() {

@@ -154,6 +154,9 @@ public class DashboardController {
                         : null;
         SourceTraceDTO sourceTrace = sourceTraceContext != null ? sourceTraceContext.getSourceTrace() : null;
         body.setSourceTrace(sourceTrace);
+        body.setRuntimeKlineContext(
+                sourceTraceContext != null ? sourceTraceContext.getRuntimeKlineContext() : null
+        );
         body.setDerivativesRiskContext(
                 sourceTraceContext != null ? sourceTraceContext.getDerivativesRiskContext() : null
         );

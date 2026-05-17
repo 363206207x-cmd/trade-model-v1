@@ -4,6 +4,7 @@ import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
@@ -34,9 +35,11 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
                 adapter.build("BTCUSDT", decision);
 
         SourceTraceDTO sourceTrace = context.getSourceTrace();
+        RuntimeKlineContextDTO runtimeKlineContext = context.getRuntimeKlineContext();
         DerivativesRiskContextDTO derivativesRiskContext = context.getDerivativesRiskContext();
 
         assertNotNull(sourceTrace);
+        assertNotNull(runtimeKlineContext);
         assertNotNull(derivativesRiskContext);
         assertEquals("BTCUSDT", sourceTrace.getSymbol());
         assertEquals("BTCUSDT", derivativesRiskContext.getSymbol());
@@ -63,6 +66,9 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertTrue(sourceTrace.isNotTradeInstruction());
         assertTrue(derivativesRiskContext.isManualReviewRequired());
         assertTrue(derivativesRiskContext.isNotTradeInstruction());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, runtimeKlineContext.getFallbackStatus());
+        assertTrue(runtimeKlineContext.isManualReviewRequired());
+        assertTrue(runtimeKlineContext.isNotTradeInstruction());
         assertFalse(sourceTrace.hasRequiredBoundarySources());
     }
 
@@ -316,12 +322,18 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
                 adapterWithReadiness.build("BTCUSDT", decision);
 
         SourceTraceDTO sourceTrace = context.getSourceTrace();
+        RuntimeKlineContextDTO runtimeKlineContext = context.getRuntimeKlineContext();
 
         assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
         assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
         assertEquals("FRESH", sourceTrace.getRuntimeKlineReadinessStatus());
         assertEquals("NONE", sourceTrace.getRuntimeKlineStaleReasonCode());
         assertTrue(sourceTrace.getRuntimeKlineReadinessMissingFields().isEmpty());
+        assertNotNull(runtimeKlineContext);
+        assertNull(runtimeKlineContext.getFallbackStatus());
+        assertTrue(runtimeKlineContext.getMissingFields().isEmpty());
+        assertEquals(0, runtimeKlineContext.getLatestPrice().compareTo(new BigDecimal("102.30")));
+        assertEquals(2, runtimeKlineContext.getKlineItems().size());
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
         assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
         assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
