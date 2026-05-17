@@ -66,6 +66,8 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
 
         assertTrue(context.getSourceTrace().getMissingFields().contains("decision"));
         assertTrue(context.getDerivativesRiskContext().getMissingFields().contains("decision"));
+        assertEquals("UNAVAILABLE", context.getSourceTrace().getRuntimeKlineContextStatus());
+        assertEquals("dashboardDetail.noRuntimeKlineContext", context.getSourceTrace().getRuntimeKlineContextSource());
         assertTrue(context.getSourceTrace().isManualReviewRequired());
         assertTrue(context.getSourceTrace().isNotTradeInstruction());
         assertTrue(context.getDerivativesRiskContext().isManualReviewRequired());

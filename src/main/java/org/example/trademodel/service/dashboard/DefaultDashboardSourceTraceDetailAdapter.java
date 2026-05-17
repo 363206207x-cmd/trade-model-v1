@@ -1,6 +1,7 @@
 package org.example.trademodel.service.dashboard;
 
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -31,6 +32,20 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
     private static final String DECISION_DATA_QUALITY_SOURCE = "DecisionResultVO.dataQualityScore";
     private static final String DECISION_MULTI_TIMEFRAME_SOURCE = "DecisionResultVO.multiTfConvergence";
 
+    private final DashboardRuntimeKlineContextAdapter runtimeKlineContextAdapter;
+
+    public DefaultDashboardSourceTraceDetailAdapter() {
+        this(new DefaultDashboardRuntimeKlineContextAdapter());
+    }
+
+    public DefaultDashboardSourceTraceDetailAdapter(
+            DashboardRuntimeKlineContextAdapter runtimeKlineContextAdapter
+    ) {
+        this.runtimeKlineContextAdapter = runtimeKlineContextAdapter == null
+                ? new DefaultDashboardRuntimeKlineContextAdapter()
+                : runtimeKlineContextAdapter;
+    }
+
     @Override
     public DashboardSourceTraceDetailContext build(String symbol, DecisionResultVO decision) {
         SourceTraceDTO sourceTrace = buildSourceTrace(symbol, decision);
@@ -44,6 +59,9 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (hasText(symbol)) {
             sourceTrace.setSymbolSource(DASHBOARD_REQUEST_SYMBOL_SOURCE);
         }
+        RuntimeKlineContextDTO runtimeKlineContext =
+                runtimeKlineContextAdapter.buildUnavailableContext(symbol, decision);
+        wireRuntimeKlineBoundary(sourceTrace, runtimeKlineContext);
         wireProductionBackedSourceTraceFields(decision, sourceTrace);
         sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
         sourceTrace.setMissingFields(sourceTraceMissingFields(decision));
@@ -63,13 +81,22 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         return context;
     }
 
+    private void wireRuntimeKlineBoundary(
+            SourceTraceDTO sourceTrace,
+            RuntimeKlineContextDTO runtimeKlineContext
+    ) {
+        if (sourceTrace == null || runtimeKlineContext == null) {
+            return;
+        }
+        sourceTrace.setRuntimeKlineContextStatus(RUNTIME_KLINE_UNAVAILABLE);
+        sourceTrace.setRuntimeKlineContextSource(RUNTIME_KLINE_UNAVAILABLE_SOURCE);
+    }
+
     private void wireProductionBackedSourceTraceFields(DecisionResultVO decision, SourceTraceDTO sourceTrace) {
         if (decision == null || sourceTrace == null) {
             return;
         }
         wireAnalysisAnchorFields(decision, sourceTrace);
-        sourceTrace.setRuntimeKlineContextStatus(RUNTIME_KLINE_UNAVAILABLE);
-        sourceTrace.setRuntimeKlineContextSource(RUNTIME_KLINE_UNAVAILABLE_SOURCE);
         if (hasText(decision.getTimeframe())) {
             sourceTrace.setTimeframe(decision.getTimeframe());
             sourceTrace.setTimeframeSource(DECISION_TIMEFRAME_SOURCE);
