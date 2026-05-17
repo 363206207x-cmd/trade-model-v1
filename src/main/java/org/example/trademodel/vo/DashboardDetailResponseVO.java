@@ -1,5 +1,8 @@
 package org.example.trademodel.vo;
 
+import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +17,8 @@ public class DashboardDetailResponseVO {
     private ExecutionPlanDisplayVO executionPlanDisplay;
     private RiskActionGuardDisplayVO riskActionGuardDisplay;
     private PaperObservationDisplayVO paperObservationDisplay;
+    private SourceTraceDTO sourceTrace;
+    private DerivativesRiskContextDTO derivativesRiskContext;
 
     /**
      * Creates a dashboard detail response with safe read-only display defaults.
@@ -114,6 +119,22 @@ public class DashboardDetailResponseVO {
 
     public void setPaperObservationDisplay(PaperObservationDisplayVO paperObservationDisplay) {
         this.paperObservationDisplay = paperObservationDisplay;
+    }
+
+    public SourceTraceDTO getSourceTrace() {
+        return sourceTrace;
+    }
+
+    public void setSourceTrace(SourceTraceDTO sourceTrace) {
+        this.sourceTrace = sourceTrace;
+    }
+
+    public DerivativesRiskContextDTO getDerivativesRiskContext() {
+        return derivativesRiskContext;
+    }
+
+    public void setDerivativesRiskContext(DerivativesRiskContextDTO derivativesRiskContext) {
+        this.derivativesRiskContext = derivativesRiskContext;
     }
 
     public static class MarketEnvironmentMiniVO {
