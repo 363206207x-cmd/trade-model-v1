@@ -102,6 +102,49 @@ CREATE INDEX IF NOT EXISTS idx_tm_market_env_snapshot_symbol_create_time
 CREATE INDEX IF NOT EXISTS idx_tm_market_env_snapshot_source_type
     ON tm_market_environment_snapshot(source_type);
 
+-- Persisted OHLCV skeleton (BACKEND-P11): local read-model source contract only.
+-- This table does not complete RuntimeKlineContext or SourceTrace by itself.
+CREATE TABLE IF NOT EXISTS tm_persisted_ohlcv_bar (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    symbol VARCHAR(20) NOT NULL,
+    timeframe VARCHAR(10) NOT NULL,
+    open_time_ms BIGINT NOT NULL,
+    close_time_ms BIGINT NOT NULL,
+    open_price DECIMAL(20, 8) NOT NULL,
+    high_price DECIMAL(20, 8) NOT NULL,
+    low_price DECIMAL(20, 8) NOT NULL,
+    close_price DECIMAL(20, 8) NOT NULL,
+    volume DECIMAL(28, 8) NOT NULL,
+    quote_volume DECIMAL(28, 8),
+    trade_count BIGINT,
+    taker_buy_base_volume DECIMAL(28, 8),
+    taker_buy_quote_volume DECIMAL(28, 8),
+    is_closed BOOLEAN NOT NULL,
+    provider VARCHAR(64) NOT NULL,
+    provider_market_type VARCHAR(32) NOT NULL,
+    source_endpoint VARCHAR(256) NOT NULL,
+    source_batch_id VARCHAR(64) NOT NULL,
+    source_trace_id VARCHAR(64) NOT NULL,
+    source_version INT NOT NULL,
+    ingested_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    quality_status VARCHAR(32) NOT NULL,
+    quality_reason VARCHAR(512),
+    raw_payload_hash VARCHAR(128),
+    is_deleted INT NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_persisted_ohlcv_bar_source
+    ON tm_persisted_ohlcv_bar(symbol, timeframe, open_time_ms, provider, provider_market_type);
+CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_window
+    ON tm_persisted_ohlcv_bar(symbol, timeframe, close_time_ms);
+CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_ingested
+    ON tm_persisted_ohlcv_bar(symbol, timeframe, ingested_at);
+CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_source_batch
+    ON tm_persisted_ohlcv_bar(source_batch_id);
+CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_source_trace
+    ON tm_persisted_ohlcv_bar(source_trace_id);
+
 CREATE TABLE IF NOT EXISTS tm_rule_config (
     rule_id VARCHAR(64) PRIMARY KEY,
     rule_type VARCHAR(50),
