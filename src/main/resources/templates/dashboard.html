@@ -529,6 +529,135 @@
             background: transparent;
         }
 
+        .main-workbench-card {
+            margin: 12px 0 14px;
+        }
+        .workbench-head {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .workbench-title {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .workbench-subtitle {
+            margin: 3px 0 0 0;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            max-width: 680px;
+        }
+        .workbench-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            justify-content: flex-end;
+        }
+        .workbench-grid {
+            display: grid;
+            grid-template-columns: minmax(260px, 1.35fr) minmax(240px, 1fr) minmax(240px, 1fr);
+            gap: 10px;
+            align-items: stretch;
+        }
+        .workbench-panel {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            padding: 10px;
+            min-width: 0;
+        }
+        .workbench-panel h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--brand-accent);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .workbench-lead {
+            margin: 0 0 8px 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            line-height: 1.48;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+        .workbench-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+        .workbench-metric {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 7px 8px;
+            background: var(--bg-surface);
+            min-width: 0;
+        }
+        .workbench-metric .label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            margin-bottom: 3px;
+        }
+        .workbench-metric .value {
+            display: block;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+            font-weight: 600;
+            word-break: break-word;
+        }
+        .workbench-focus-list {
+            margin: 0;
+            padding-left: 17px;
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            line-height: 1.55;
+        }
+        .workbench-focus-list li { margin-bottom: 4px; }
+        .workbench-safety {
+            margin-top: 8px;
+            padding: 8px 9px;
+            border-radius: 8px;
+            border: 1px dashed var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+        }
+        .diagnostics-panel {
+            margin-top: 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-soft);
+            padding: 10px 12px;
+        }
+        .diagnostics-panel summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.84rem;
+        }
+        .diagnostics-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        @media (max-width: 1100px) {
+            .workbench-grid { grid-template-columns: 1fr 1fr; }
+            .workbench-grid .workbench-panel:first-child { grid-column: 1 / -1; }
+        }
+        @media (max-width: 700px) {
+            .workbench-grid { grid-template-columns: 1fr; }
+            .workbench-metrics { grid-template-columns: 1fr; }
+            .workbench-badges { justify-content: flex-start; }
+        }
+
         .runtime-pill {
             display: inline-flex;
             align-items: center;
@@ -591,6 +720,70 @@
                 <div id="layer1-missed"></div>
             </div>
         </div>
+
+        <!-- 第二层 -->
+        <div class="layer2-head">
+            <span class="module-title">Display Slots / 首页展示位</span>
+            <div class="ctl">
+                <label class="muted">模式
+                    <select id="modeSelect" class="btn" title="系统推荐：展示全部决策前 6 条；自定义监控：仅展示已加入本机列表的标的">
+                        <option value="system">系统推荐</option>
+                        <option value="custom">自定义监控</option>
+                    </select>
+                </label>
+                <span id="modeHint" class="sort-hint" aria-live="polite"></span>
+                <input type="search" id="symbolSearch" placeholder="搜索币种，如 BTCUSDT" autocomplete="off">
+                <button type="button" class="btn" id="btnAdd">添加</button>
+                <button type="button" class="btn" id="btnReset">恢复默认</button>
+                <span class="sort-hint">首页展示位最多 6 个 · Watchlist Pool / 观察库仍是推送候选边界</span>
+            </div>
+        </div>
+        <div class="tiles-row" id="tilesRow"></div>
+
+        <p class="muted" style="margin:10px 0 12px 0;max-width:64rem;">Display Slots / 首页展示位只决定首页优先阅读顺序；Watchlist Pool / 观察库仍是推送候选边界。下方详情按当前标的展示最新分析，复盘页固定为某次 analysis_id，二者请勿混为同一轮。</p>
+
+        <div class="card main-workbench-card" id="mainWorkbenchCard">
+            <div class="workbench-head">
+                <div>
+                    <p class="workbench-title">当前标的主工作台</p>
+                    <p class="workbench-subtitle">基于现有 summary/detail 字段整理人工复核视图：结论、风险、PlanBoundary、ExecutionPlan、RiskActionGuard 与数据完整性。</p>
+                </div>
+                <div class="workbench-badges" aria-label="安全边界">
+                    <span class="status-badge partial">Review-only</span>
+                    <span class="status-badge pending">非交易指令</span>
+                </div>
+            </div>
+            <div id="mainWorkbenchContent">
+                <p class="empty-hint">请选择一个首页展示位标的。</p>
+            </div>
+        </div>
+
+
+        <!-- 第三层 -->
+        <div class="layer3">
+            <aside class="nav-panel" id="navPanel">
+                <div class="coin-head" id="navCoinHead">—</div>
+                <div id="navOpenBadge" class="tag-row" style="margin-bottom:10px;"></div>
+                <button type="button" class="nav-btn active" data-section="s1">当前结论</button>
+                <button type="button" class="nav-btn" data-section="s2">决策原因</button>
+                <button type="button" class="nav-btn" data-section="s3">AI 角色意见</button>
+                <button type="button" class="nav-btn" data-section="s4">执行建议</button>
+                <button type="button" class="nav-btn" data-section="s5">API 关键信息</button>
+                <button type="button" class="nav-btn" data-section="s6">持仓跟踪</button>
+            </aside>
+            <div class="detail-panel" id="detailPanel">
+                <section class="visible" id="sec-s1"></section>
+                <section id="sec-s2"></section>
+                <section id="sec-s3"></section>
+                <section id="sec-s4"></section>
+                <section id="sec-s5"></section>
+                <section id="sec-s6"></section>
+            </div>
+        </div>
+
+        <details class="diagnostics-panel" id="diagnosticsPanel">
+            <summary>诊断与接入状态（技术占位，下沉阅读）</summary>
+            <div class="diagnostics-grid">
         <div class="card module-status-card" id="moduleStatusCard">
             <h3>模块接入状态（只读）</h3>
             <p class="module-status-note">该区域仅用于展示首页 MVP 模块接入进度，非交易指令；涉及开仓与风控结论均需要人工复核。</p>
@@ -618,48 +811,8 @@
             <div class="alert-line"><strong>风险高但仅短线插针：</strong>短线插针不等于趋势反转，不生成反向开仓计划，只做短线风险提醒和等待确认。</div>
         </div>
 
-        <!-- 第二层 -->
-        <div class="layer2-head">
-            <span class="module-title">市场机会与风险总览</span>
-            <div class="ctl">
-                <label class="muted">模式
-                    <select id="modeSelect" class="btn" title="系统推荐：展示全部决策前 6 条；自定义监控：仅展示已加入本机列表的标的">
-                        <option value="system">系统推荐</option>
-                        <option value="custom">自定义监控</option>
-                    </select>
-                </label>
-                <span id="modeHint" class="sort-hint" aria-live="polite"></span>
-                <input type="search" id="symbolSearch" placeholder="搜索币种，如 BTCUSDT" autocomplete="off">
-                <button type="button" class="btn" id="btnAdd">添加</button>
-                <button type="button" class="btn" id="btnReset">恢复默认</button>
-                <span class="sort-hint">排序：按决策时间倒序 · 最多展示 6 个标的</span>
             </div>
-        </div>
-        <div class="tiles-row" id="tilesRow"></div>
-
-        <p class="muted" style="margin:10px 0 12px 0;max-width:56rem;">下方详情按当前标的展示读取到的最新分析；复盘页固定为某次 analysis_id，二者请勿混为同一轮。</p>
-
-        <!-- 第三层 -->
-        <div class="layer3">
-            <aside class="nav-panel" id="navPanel">
-                <div class="coin-head" id="navCoinHead">—</div>
-                <div id="navOpenBadge" class="tag-row" style="margin-bottom:10px;"></div>
-                <button type="button" class="nav-btn active" data-section="s1">当前结论</button>
-                <button type="button" class="nav-btn" data-section="s2">决策原因</button>
-                <button type="button" class="nav-btn" data-section="s3">AI 角色意见</button>
-                <button type="button" class="nav-btn" data-section="s4">执行建议</button>
-                <button type="button" class="nav-btn" data-section="s5">API 关键信息</button>
-                <button type="button" class="nav-btn" data-section="s6">持仓跟踪</button>
-            </aside>
-            <div class="detail-panel" id="detailPanel">
-                <section class="visible" id="sec-s1"></section>
-                <section id="sec-s2"></section>
-                <section id="sec-s3"></section>
-                <section id="sec-s4"></section>
-                <section id="sec-s5"></section>
-                <section id="sec-s6"></section>
-            </div>
-        </div>
+        </details>
     </div>
 
     <script src="/js/alert-explain.js"></script>
@@ -668,10 +821,12 @@
  * =============================================================================
  * TRINE LOGIC (V1) dashboard — 数据说明（供审核）
  * =============================================================================
- * 页面结构（固定三层，勿改为长列表堆叠）：
+ * 页面结构（主阅读三层，勿改为长列表堆叠）：
  *   第一层 .layer1：系统摘要 | 高优先级提醒 | 行情警告 | 今日遗漏但正确机会
- *   第二层 .layer2-head + #tilesRow：市场机会与风险总览；仅渲染最多 6 个币方块（见 buildDisplayList）
+ *   第二层 .layer2-head + #tilesRow：Display Slots / 首页展示位；仅渲染最多 6 个币方块（见 buildDisplayList）
+ *   当前标的主工作台 #mainWorkbenchCard：聚合当前选中标的的结论、边界、执行只读状态和下一步人工复核重点
  *   第三层 .layer3：左侧 #navPanel 导航 + 右侧 #detailPanel 详情（点击第二层方块切换，不跳转）
+ *   诊断区 #diagnosticsPanel：技术接入状态下沉展示，不参与交易语义
  *
  * 中层 6 币约束：displayDecisions = 过滤后的 list.slice(0, 6)，不会出现第 7、8 个币。
  * 布局：.tiles-row 为 flex + nowrap + overflow-x:auto，单行横向排列；窄屏横向滚动。
@@ -887,6 +1042,143 @@
                 '<div class="alert-line confused"><strong>通用约束：</strong>本区仅做风险提醒，不连接 order API，不触发自动交易动作。</div>' +
                 '<div class="alert-line critical"><strong>硬约束：</strong>非交易指令，必须人工复核，不自动执行。</div>';
         }
+    }
+
+    function firstNonEmpty() {
+        for (var i = 0; i < arguments.length; i++) {
+            var v = arguments[i];
+            if (v != null && String(v).trim() !== "") return String(v).trim();
+        }
+        return "";
+    }
+
+    function attachDashboardDisplays(detail, resp) {
+        if (!detail || !resp) return detail;
+        detail.planBoundaryDisplay = resp.planBoundaryDisplay || null;
+        detail.executionPlanDisplay = resp.executionPlanDisplay || null;
+        detail.riskActionGuardDisplay = resp.riskActionGuardDisplay || null;
+        detail.paperObservationDisplay = resp.paperObservationDisplay || null;
+        return detail;
+    }
+
+    function boolSafetyText(v, trueText, falseText, fallback) {
+        if (v === true) return trueText;
+        if (v === false) return falseText;
+        return fallback;
+    }
+
+    function workbenchMetric(label, value) {
+        return '<div class="workbench-metric"><span class="label">' + escapeHtml(label) + '</span><span class="value">' + escapeHtml(value || "—") + '</span></div>';
+    }
+
+    function manualAttentionText(d) {
+        var worth = pickIsWorthOpening(d);
+        if (worth === true) return "值得人工复核";
+        if (worth === false) return "暂不值得，继续观察";
+        return "等待后端判断";
+    }
+
+    function workbenchSourceFocus(planBoundary, executionPlan, riskGuard, d) {
+        var focus = [];
+        var planStatus = firstNonEmpty(planBoundary && planBoundary.planBoundaryStatus, "BACKEND_PENDING").toUpperCase();
+        var sourceTrace = firstNonEmpty(planBoundary && planBoundary.sourceTraceStatus, "BACKEND_PENDING").toUpperCase();
+        var execStatus = firstNonEmpty(executionPlan && executionPlan.executionPlanStatus, "BOUNDARY_PENDING").toUpperCase();
+        var guardStatus = firstNonEmpty(riskGuard && riskGuard.riskActionGuardStatus, "BACKEND_PENDING").toUpperCase();
+        if (sourceTrace.indexOf("READY") < 0 && sourceTrace.indexOf("VALID") < 0) {
+            focus.push("补齐 SourceTrace / derivatives-risk context 后再判断边界完整性");
+        }
+        if (planStatus !== "VALID") {
+            focus.push("PlanBoundary 未达到 VALID 时继续 INCOMPLETE / WATCH_ONLY 阅读");
+        }
+        if (execStatus.indexOf("READY") < 0) {
+            focus.push("ExecutionPlan 仅作 review-only / advisory 展示，不产生执行权限");
+        }
+        if (guardStatus.indexOf("READY") < 0 && guardStatus.indexOf("OK") < 0) {
+            focus.push("复核 RiskActionGuard：踩踏、流动性恶化、插针风险均需 fail-closed");
+        }
+        if (isHighRisk(d)) {
+            focus.push("高风险不等于直接止损或反手，优先人工复核风险来源");
+        }
+        if (!focus.length) {
+            focus.push("检查证据、评分、边界与人工复核记录是否一致");
+        }
+        return focus.slice(0, 4);
+    }
+
+    function renderMainWorkbench(d, marketEnvironmentMini) {
+        var box = document.getElementById("mainWorkbenchContent");
+        if (!box) return;
+        if (!d) {
+            box.innerHTML = '<p class="empty-hint">请选择一个首页展示位标的。</p>';
+            return;
+        }
+        var planBoundary = d.planBoundaryDisplay || {};
+        var executionPlan = d.executionPlanDisplay || {};
+        var riskGuard = d.riskActionGuardDisplay || {};
+        var paperObs = d.paperObservationDisplay || {};
+        var worth = resolveWorthOpeningPresentation(d);
+        var ra = resolveRecommendedActionPresentation(d);
+        var planStatus = firstNonEmpty(planBoundary.planBoundaryStatus, "BACKEND_PENDING");
+        var planLabel = firstNonEmpty(planBoundary.planBoundaryStatusLabel, "后端未接入");
+        var sourceTrace = firstNonEmpty(planBoundary.sourceTraceStatus, "BACKEND_PENDING");
+        var backendConnection = firstNonEmpty(planBoundary.backendConnectionStatus, "BACKEND_PENDING");
+        var executionStatus = firstNonEmpty(executionPlan.executionPlanStatus, "BOUNDARY_PENDING");
+        var executionLabel = firstNonEmpty(executionPlan.executionPlanStatusLabel, "等待边界接入");
+        var notExecutableReason = firstNonEmpty(executionPlan.notExecutableReason, "PLAN_BOUNDARY_BACKEND_PENDING");
+        var guardStatus = firstNonEmpty(riskGuard.riskActionGuardStatus, "BACKEND_PENDING");
+        var guardLabel = firstNonEmpty(riskGuard.riskActionGuardStatusLabel, "后端未接入");
+        var liquidityState = firstNonEmpty(riskGuard.liquidityState, "BACKEND_PENDING");
+        var manualReview = (planBoundary.manualReviewRequired !== false)
+            || (executionPlan.manualReviewRequired !== false)
+            || (riskGuard.manualRiskReviewRequired !== false)
+            || (paperObs.manualReviewRequired !== false);
+        var notTradeInstruction = (planBoundary.notTradeInstruction !== false)
+            || (executionPlan.notTradeInstruction !== false)
+            || (riskGuard.notTradeInstruction !== false)
+            || (paperObs.notTradeInstruction !== false);
+        var conclusionSummaryRaw = d.conclusionSummary != null ? d.conclusionSummary : d.conclusion_summary;
+        var conclusionLead = conclusionSummaryRaw != null && String(conclusionSummaryRaw).trim()
+            ? normalizeReadableText(String(conclusionSummaryRaw).trim())
+            : "暂无结论摘要";
+        var miniSummary = displayMiniField(marketEnvironmentMini && marketEnvironmentMini.summary);
+        var miniRiskMode = displayMiniField(marketEnvironmentMini && marketEnvironmentMini.riskMode);
+        var focusItems = workbenchSourceFocus(planBoundary, executionPlan, riskGuard, d);
+        var focusHtml = focusItems.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("");
+        var priceText = formatPrice(d.latestPrice != null ? d.latestPrice : d.latest_price);
+        var safetyLine = "BoundaryCandidate VALID 仍为人工复核候选；ExecutionPlan readiness 不是自动执行；缺失 SourceTrace / 风险上下文时必须 fail-closed。";
+
+        box.innerHTML = '<div class="workbench-grid">'
+            + '<div class="workbench-panel"><h4>结论与人工注意力</h4>'
+            + '<p class="workbench-lead">' + escapeHtml(conclusionLead) + '</p>'
+            + '<div class="workbench-metrics">'
+            + workbenchMetric("标的", d.symbol || "—")
+            + workbenchMetric("方向", biasText(d.marketBiasHierarchy))
+            + workbenchMetric("人工注意", manualAttentionText(d))
+            + workbenchMetric("建议摘要", formatWithSource(ra.text, ra.source))
+            + workbenchMetric("置信度", confidenceText(d.confidenceLevel))
+            + workbenchMetric("风险", riskLevelText(d.riskLevel))
+            + workbenchMetric("当前价格", priceText)
+            + workbenchMetric("市场环境", miniSummary)
+            + '</div></div>'
+            + '<div class="workbench-panel"><h4>边界与执行只读状态</h4>'
+            + '<div class="workbench-metrics">'
+            + workbenchMetric("PlanBoundary", planStatus + " / " + planLabel)
+            + workbenchMetric("SourceTrace", sourceTrace)
+            + workbenchMetric("Backend", backendConnection)
+            + workbenchMetric("ExecutionPlan", executionStatus + " / " + executionLabel)
+            + workbenchMetric("不可执行原因", notExecutableReason)
+            + workbenchMetric("数据质量", firstNonEmpty(d.dataQualityScore, d.data_quality_score, "—"))
+            + '</div></div>'
+            + '<div class="workbench-panel"><h4>Risk Guard 与下一步复核</h4>'
+            + '<div class="workbench-metrics">'
+            + workbenchMetric("RiskActionGuard", guardStatus + " / " + guardLabel)
+            + workbenchMetric("Liquidity", liquidityState)
+            + workbenchMetric("人工复核", manualReview ? "必须人工复核" : "未声明关闭，仍按人工复核处理")
+            + workbenchMetric("交易语义", notTradeInstruction ? "非交易指令" : "缺省按非交易指令处理")
+            + workbenchMetric("市场风险模式", miniRiskMode)
+            + workbenchMetric("机会推送", boolSafetyText(riskGuard.opportunityPushAllowed, "允许展示", "禁止", "禁止 / 未确认"))
+            + '</div><ul class="workbench-focus-list">' + focusHtml + '</ul></div>'
+            + '</div><div class="workbench-safety">' + escapeHtml(safetyLine) + '</div>';
     }
 
     function formatDateTime(v) {
@@ -1548,6 +1840,7 @@
                     : "自定义监控列表为空：请切换到本模式后在搜索框输入如 BTCUSDT 并点「添加」加入本机列表（仅存浏览器）。";
             }
             box.innerHTML = '<div class="card tile-full" style="text-align:center;padding:24px;"><span class="empty-hint">' + escapeHtml(emptyMsg) + "</span></div>";
+            renderMainWorkbench(null, null);
             renderDetail(null);
             return;
         }
@@ -1609,6 +1902,7 @@
         var marketEnvironmentMini = selectedSymbol ? detailMarketEnvironmentMiniMap[selectedSymbol] : null;
         var topItems = selectedSymbol ? detailEvidenceTopItemsMap[selectedSymbol] : [];
         var scoreItems = selectedSymbol ? detailScoreTopItemsMap[selectedSymbol] : [];
+        renderMainWorkbench(cur || displayDecisions[0], marketEnvironmentMini);
         renderDetail(cur || displayDecisions[0], marketEnvironmentMini, topItems, scoreItems);
     }
 
@@ -2020,13 +2314,18 @@
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (resp) {
                 var detail = resp && resp.decision ? resp.decision : null;
+                detail = attachDashboardDisplays(detail, resp);
                 detailMarketEnvironmentMiniMap[symbol] = resp && resp.marketEnvironmentMini ? resp.marketEnvironmentMini : null;
                 detailEvidenceTopItemsMap[symbol] = Array.isArray(resp && resp.evidenceTopItems) ? resp.evidenceTopItems : [];
                 detailScoreTopItemsMap[symbol] = Array.isArray(resp && resp.scoreTopItems) ? resp.scoreTopItems : [];
                 renderDisplayStatusCards(detail);
-                if (!detail || !detail.symbol) return;
+                if (!detail || !detail.symbol) {
+                    renderMainWorkbench(null, null);
+                    return;
+                }
                 detailDecisionMap[detail.symbol] = detail;
                 if (selectedSymbol === detail.symbol) {
+                    renderMainWorkbench(detail, detailMarketEnvironmentMiniMap[detail.symbol]);
                     renderDetail(
                         detail,
                         detailMarketEnvironmentMiniMap[detail.symbol],
