@@ -26,7 +26,7 @@ P17 does not connect Coinglass, order API, or any external derivatives API.
 - `docs/PHASE_P17_LOCAL_FIXTURE_FAIL_CLOSED_TEST_PACK.md`
 - `docs/PHASE_P17_LOCAL_FIXTURE_FAIL_CLOSED_TEST_RESULT.md`
 
-The existing PR trigger file remains unchanged.
+No Codex Cloud trigger artifact is included in this final P17 package.
 
 ## 4. Local Fixture Coverage
 
