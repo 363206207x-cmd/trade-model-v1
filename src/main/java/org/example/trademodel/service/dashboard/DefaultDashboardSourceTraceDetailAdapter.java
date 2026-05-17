@@ -17,6 +17,9 @@ import java.util.List;
 @Component
 public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSourceTraceDetailAdapter {
     private static final String TIMEFRAME = "timeframe";
+    private static final String DECISION_LATEST_PRICE_SOURCE = "DecisionResultVO.latestPrice";
+    private static final String DECISION_PRICE_UPDATE_TIME_SOURCE = "DecisionResultVO.priceUpdateTimeMs";
+    private static final String DECISION_DATA_QUALITY_SOURCE = "DecisionResultVO.dataQualityScore";
     private static final String DECISION_MULTI_TIMEFRAME_SOURCE = "DecisionResultVO.multiTfConvergence";
 
     @Override
@@ -52,6 +55,18 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (decision == null || sourceTrace == null) {
             return;
         }
+        if (decision.getLatestPrice() != null) {
+            sourceTrace.setQuoteLatestPrice(decision.getLatestPrice());
+            sourceTrace.setQuoteLatestPriceSource(DECISION_LATEST_PRICE_SOURCE);
+        }
+        if (decision.getPriceUpdateTimeMs() != null) {
+            sourceTrace.setQuotePriceUpdateTimeMs(decision.getPriceUpdateTimeMs());
+            sourceTrace.setQuotePriceUpdateTimeSource(DECISION_PRICE_UPDATE_TIME_SOURCE);
+        }
+        if (decision.getDataQualityScore() != null) {
+            sourceTrace.setDataQualityScore(BigDecimal.valueOf(decision.getDataQualityScore()));
+            sourceTrace.setDataQualityScoreSource(DECISION_DATA_QUALITY_SOURCE);
+        }
         if (hasText(decision.getMultiTfConvergence())) {
             sourceTrace.setMultiTimeframeSource(DECISION_MULTI_TIMEFRAME_SOURCE);
         }
@@ -66,6 +81,7 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         }
         if (decision.getDataQualityScore() != null) {
             context.setDataQualityScore(BigDecimal.valueOf(decision.getDataQualityScore()));
+            context.setDataQualityScoreSource(DECISION_DATA_QUALITY_SOURCE);
         }
     }
 

@@ -8,6 +8,12 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     private String symbol;
     private String timeframe;
+    private BigDecimal quoteLatestPrice;
+    private String quoteLatestPriceSource;
+    private Long quotePriceUpdateTimeMs;
+    private String quotePriceUpdateTimeSource;
+    private BigDecimal dataQualityScore;
+    private String dataQualityScoreSource;
     private BigDecimal entryPriceSource;
     private String entrySourceType;
     private String entrySourceTimeframe;
@@ -48,6 +54,54 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setTimeframe(String timeframe) {
         this.timeframe = timeframe;
+    }
+
+    public BigDecimal getQuoteLatestPrice() {
+        return quoteLatestPrice;
+    }
+
+    public void setQuoteLatestPrice(BigDecimal quoteLatestPrice) {
+        this.quoteLatestPrice = quoteLatestPrice;
+    }
+
+    public String getQuoteLatestPriceSource() {
+        return quoteLatestPriceSource;
+    }
+
+    public void setQuoteLatestPriceSource(String quoteLatestPriceSource) {
+        this.quoteLatestPriceSource = quoteLatestPriceSource;
+    }
+
+    public Long getQuotePriceUpdateTimeMs() {
+        return quotePriceUpdateTimeMs;
+    }
+
+    public void setQuotePriceUpdateTimeMs(Long quotePriceUpdateTimeMs) {
+        this.quotePriceUpdateTimeMs = quotePriceUpdateTimeMs;
+    }
+
+    public String getQuotePriceUpdateTimeSource() {
+        return quotePriceUpdateTimeSource;
+    }
+
+    public void setQuotePriceUpdateTimeSource(String quotePriceUpdateTimeSource) {
+        this.quotePriceUpdateTimeSource = quotePriceUpdateTimeSource;
+    }
+
+    public BigDecimal getDataQualityScore() {
+        return dataQualityScore;
+    }
+
+    public void setDataQualityScore(BigDecimal dataQualityScore) {
+        this.dataQualityScore = dataQualityScore;
+    }
+
+    public String getDataQualityScoreSource() {
+        return dataQualityScoreSource;
+    }
+
+    public void setDataQualityScoreSource(String dataQualityScoreSource) {
+        this.dataQualityScoreSource = dataQualityScoreSource;
     }
 
     public BigDecimal getEntryPriceSource() {

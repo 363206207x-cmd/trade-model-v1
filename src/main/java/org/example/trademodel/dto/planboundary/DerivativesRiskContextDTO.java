@@ -24,6 +24,7 @@ public class DerivativesRiskContextDTO implements SourceCompletenessContract {
     private List<String> eventWindowBlockers = new ArrayList<>();
     private List<String> wickConfirmationSources = new ArrayList<>();
     private BigDecimal dataQualityScore;
+    private String dataQualityScoreSource;
     private SourceTraceFallbackStatusEnum fallbackStatus;
     private List<String> missingFields = new ArrayList<>();
     private boolean manualReviewRequired = true;
@@ -157,6 +158,14 @@ public class DerivativesRiskContextDTO implements SourceCompletenessContract {
 
     public void setDataQualityScore(BigDecimal dataQualityScore) {
         this.dataQualityScore = dataQualityScore;
+    }
+
+    public String getDataQualityScoreSource() {
+        return dataQualityScoreSource;
+    }
+
+    public void setDataQualityScoreSource(String dataQualityScoreSource) {
+        this.dataQualityScoreSource = dataQualityScoreSource;
     }
 
     @Override
