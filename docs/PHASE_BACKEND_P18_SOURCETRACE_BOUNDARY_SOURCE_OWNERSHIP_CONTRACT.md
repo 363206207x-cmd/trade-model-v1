@@ -1,0 +1,401 @@
+# PHASE_BACKEND_P18_SOURCETRACE_BOUNDARY_SOURCE_OWNERSHIP_CONTRACT
+
+## 1. Document Purpose
+
+This document records the BACKEND-P18 SourceTrace Boundary Source Ownership Contract Pack.
+
+Issue context:
+
+- `#125 BACKEND-P18 SourceTrace Boundary Source Ownership Contract Pack`
+
+PR context:
+
+- `#126 BACKEND-P18 trigger: SourceTrace boundary ownership contract`
+
+Baseline:
+
+- `403dc87 docs(home): freeze RuntimeKline detail visibility`
+
+BACKEND-P18 is documentation-only.
+
+It defines the ownership contract required before SourceTrace can move beyond incomplete.
+
+It does not complete SourceTrace, generate entry / stop / TP / RR values, wire BoundaryCandidateService VALID, upgrade ExecutionPlan readiness, add external data integrations, add Coinglass, add order API, add auto-trading, change schema, or modify `dashboard.html`.
+
+## 2. Current Boundary State
+
+RuntimeKline detail visibility is frozen as read-only diagnostics.
+
+SourceTrace remains incomplete until real boundary source ownership exists for:
+
+- entry,
+- stop,
+- TP,
+- RR,
+- liquidity,
+- multi-timeframe,
+- event,
+- wick.
+
+The current `SourceTraceDTO.hasRequiredBoundarySources()` shape already requires all of these source families to be present before SourceTrace can be considered to have required boundary sources.
+
+BACKEND-P18 does not change that code path.
+
+## 3. Required Ownership Dimensions
+
+Every SourceTrace boundary source must be traceable to a deterministic source owner.
+
+At minimum, each boundary source must carry enough ownership to answer:
+
+- what source type produced it,
+- what timeframe or window it belongs to,
+- why the value or signal is selected,
+- which persisted record, rule output, adapter output, or analysis reference produced it,
+- whether the source is fresh enough for the current decision,
+- whether the source conflicts with any sibling boundary source,
+- whether manual review is still required,
+- whether the output remains not a trade instruction.
+
+If future implementation keeps some fields as strings, those strings must be structured enough to preserve these ownership dimensions.
+
+If future implementation introduces typed source records, that must happen in a separate schema / DTO / adapter package, not in this contract pack.
+
+## 4. Entry Source Ownership Contract
+
+Entry source completion requires all current SourceTrace fields below:
+
+| Field | Required Meaning |
+|---|---|
+| `entryPriceSource` | Numeric candidate entry boundary value. |
+| `entrySourceType` | Deterministic source type, for example support, pullback zone, breakout retest, or rule-owned derived boundary. |
+| `entrySourceTimeframe` | Source timeframe or source window that produced the entry boundary. |
+| `entrySourceReason` | Human-readable reason explaining why this source is eligible. |
+| `entrySourceRef` | Stable reference to the persisted input, rule output, adapter output, or analysis artifact. |
+
+Entry source must not be copied from RuntimeKline `latestPrice`.
+
+Entry source must be selected by a boundary-source algorithm or reviewed adapter that explicitly owns entry semantics.
+
+Entry source must fail closed if it is missing, stale, partial, conflicting, outside the decision timeframe, or unsupported by source ownership metadata.
+
+## 5. Stop Source Ownership Contract
+
+Stop source completion requires all current SourceTrace fields below:
+
+| Field | Required Meaning |
+|---|---|
+| `stopPriceSource` | Numeric candidate stop boundary value. |
+| `stopSourceType` | Deterministic source type, for example swing-low, swing-high, invalidation level, volatility guard, or rule-owned derived boundary. |
+| `stopSourceTimeframe` | Source timeframe or source window that produced the stop boundary. |
+| `stopSourceReason` | Human-readable reason explaining why this stop is eligible. |
+| `stopSourceRef` | Stable reference to the persisted input, rule output, adapter output, or analysis artifact. |
+
+Stop source must be independently owned.
+
+It must not be inferred from entry alone.
+
+It must not be inferred from RuntimeKline `klineItems` unless a future implementation explicitly selects and validates a stop source from those inputs with source type, timeframe, reason, and reference.
+
+## 6. TP Source Ownership Contract
+
+TP source completion requires all current SourceTrace fields below:
+
+| Field | Required Meaning |
+|---|---|
+| `tpPriceSources` | Non-empty numeric candidate take-profit boundary values. |
+| `tpSourceType` | Deterministic TP source type, for example resistance ladder, measured move, liquidity band, or rule-owned derived targets. |
+| `tpSourceTimeframe` | Source timeframe or source window that produced the TP boundaries. |
+| `tpSourceReason` | Human-readable reason explaining why these TP values are eligible. |
+| `tpSourceRef` | Stable reference to the persisted input, rule output, adapter output, or analysis artifact. |
+
+TP source must preserve ordering and intent.
+
+Multiple TP values must be generated by the same owned TP rule family or carry enough reference detail to explain mixed source ownership.
+
+Raw RuntimeKline bars are not TP sources by themselves.
+
+## 7. RR Source Ownership Contract
+
+RR source completion requires all current SourceTrace fields below:
+
+| Field | Required Meaning |
+|---|---|
+| `rrSource` | Numeric risk-reward value computed from owned entry, stop, and TP sources. |
+| `rrRuleRef` | Stable reference to the rule that computed RR and the source bundle it consumed. |
+
+RR must be recomputed from completed entry, stop, and TP ownership.
+
+RR must fail closed if entry, stop, or TP is missing, stale, partial, conflicting, or uses mixed unapproved source ownership.
+
+RR must not be copied from AI text, dashboard display text, RuntimeKline latest price, or raw kline item values.
+
+## 8. Liquidity Source Ownership Contract
+
+Liquidity source completion requires:
+
+- `liquiditySource` present,
+- deterministic liquidity source owner,
+- source timeframe or observation window,
+- source freshness status,
+- reason for liquidity state,
+- stable source reference,
+- explicit conflict state when liquidity evidence disagrees with entry / stop / TP assumptions.
+
+Liquidity source must fail closed when missing, stale, partial, or conflicting.
+
+Liquidity stress must block opportunity push and require review.
+
+Liquidity stress must not automatically mean close, reverse, or open.
+
+## 9. Multi-Timeframe Source Ownership Contract
+
+Multi-timeframe source completion requires:
+
+- `multiTimeframeSource` present,
+- deterministic owner for timeframe aggregation,
+- list or reference of participating timeframes,
+- convergence / conflict state,
+- source freshness status,
+- stable source reference,
+- reason explaining why the current decision timeframe can use the aggregation.
+
+Multi-timeframe source must fail closed if participating timeframes are missing, stale, partial, conflicting, or not aligned with the decision timeframe.
+
+Multi-timeframe agreement is not enough to complete SourceTrace unless every other required source family is also complete.
+
+## 10. Event Source Ownership Contract
+
+Event source completion requires:
+
+- `eventSource` present,
+- deterministic event source owner,
+- event category,
+- event observation window,
+- freshness / staleness status,
+- source reference,
+- explicit statement that no blocking event is known, or a fail-closed blocking reason if event data is incomplete.
+
+Event source must fail closed when missing, stale, partial, conflicting, or untrusted.
+
+Event source absence cannot be treated as "no event risk".
+
+## 11. Wick Source Ownership Contract
+
+Wick source completion requires:
+
+- `wickSource` present,
+- deterministic wick or pin-bar source owner,
+- candle timeframe or detection window,
+- source freshness status,
+- source reference,
+- directionality / rejection interpretation,
+- conflict state versus trend, liquidity, event, and multi-timeframe sources.
+
+Wick / pin-bar evidence does not confirm trend reversal by itself.
+
+Wick source must fail closed if it is stale, partial, conflicting, or used without liquidity and multi-timeframe context.
+
+## 12. RuntimeKline Is Not Boundary Source Completion
+
+RuntimeKlineContext is diagnostic context.
+
+`RuntimeKline.latestPrice` is not entry source because:
+
+- it is the latest selected closed persisted bar close price,
+- it is observed runtime metadata, not a selected boundary candidate,
+- it has no entry source type,
+- it has no entry source reason,
+- it has no entry source reference proving entry ownership,
+- it does not prove stop, TP, or RR relationship,
+- it does not prove liquidity, event, wick, or multi-timeframe safety.
+
+`RuntimeKline.klineItems` are not entry / stop / TP / RR sources by themselves because:
+
+- they are raw persisted OHLCV context items,
+- they are not selected boundary outputs,
+- they do not identify which bar or rule owns entry, stop, TP, or RR semantics,
+- they do not provide source type, reason, and reference for each boundary role,
+- they do not prove freshness or conflict resolution across liquidity, event, wick, and multi-timeframe sources,
+- they do not complete SourceTrace.
+
+A future implementation may consume RuntimeKlineContext as one input to a boundary-source algorithm.
+
+That future implementation must still produce explicit SourceTrace ownership fields and pass all gates in this contract.
+
+## 13. SourceTrace Completion Gates
+
+SourceTrace can move beyond incomplete only when all gates pass:
+
+1. Anchor gate: symbol, decision id, analysis id, decision create time, timeframe, and their source labels are present and aligned.
+2. Runtime diagnostics gate: RuntimeKline readiness metadata is present only as diagnostics and does not override boundary-source gates.
+3. Entry gate: entry price, source type, timeframe, reason, and ref are present and fresh.
+4. Stop gate: stop price, source type, timeframe, reason, and ref are present and fresh.
+5. TP gate: TP prices, source type, timeframe, reason, and ref are present and fresh.
+6. RR gate: RR value and RR rule ref are computed from owned entry / stop / TP sources.
+7. Liquidity gate: liquidity source ownership is present and not blocking.
+8. Multi-timeframe gate: multi-timeframe source ownership is present and not conflicting.
+9. Event gate: event source ownership is present and not blocking.
+10. Wick gate: wick source ownership is present and not conflicting.
+11. Conflict gate: no required source family reports unresolved conflict.
+12. Safety gate: `manualReviewRequired=true` and `notTradeInstruction=true`.
+13. Missing-fields gate: `missingFields` is empty only after every required family is complete.
+14. Fallback gate: `fallbackStatus` is null only after every required family is complete.
+
+Until every gate passes, SourceTrace must remain incomplete.
+
+## 14. Fail-Closed Behavior
+
+SourceTrace must fail closed for:
+
+- missing source fields,
+- stale source fields,
+- partial source fields,
+- conflicting source fields,
+- unsupported source type,
+- missing source timeframe,
+- missing source reason,
+- missing source ref,
+- mixed source ownership without explicit conflict resolution,
+- RuntimeKline-only source attempts,
+- quote-only source attempts,
+- liquidity stress,
+- event uncertainty,
+- wick-only reversal claims,
+- unsafe `manualReviewRequired=false`,
+- unsafe `notTradeInstruction=false`.
+
+Fail-closed output must preserve:
+
+- `fallbackStatus=INCOMPLETE`,
+- populated `missingFields` for every missing or unsafe source family,
+- `hasRequiredBoundarySources() == false`,
+- `manualReviewRequired=true`,
+- `notTradeInstruction=true`.
+
+Fail-closed SourceTrace must not upgrade BoundaryCandidateService VALID.
+
+Fail-closed SourceTrace must not upgrade ExecutionPlan readiness.
+
+Fail-closed SourceTrace must not allow order, reverse, close, opportunity push, or auto-trading behavior.
+
+## 15. Risk Action Guard Reminder
+
+Risk Action Guard interpretation remains separate from SourceTrace completion.
+
+High risk does not directly mean close, reverse, or open.
+
+Wick / pin-bar evidence does not confirm trend reversal.
+
+Stampede or liquidity stress must:
+
+- block opportunity push,
+- require manual review,
+- keep outputs non-trade-instruction,
+- avoid automatic close / reverse / open semantics.
+
+Risk Action Guard can block or downgrade behavior, but it must not manufacture missing SourceTrace source ownership.
+
+## 16. Tests Required Before Implementation
+
+Before any implementation package completes SourceTrace source ownership, focused tests must cover:
+
+### SourceTrace DTO / Assembler Tests
+
+- all required fields present makes `hasRequiredBoundarySources()` true only when safety flags are true and no missing fields remain,
+- missing entry fields fail closed,
+- missing stop fields fail closed,
+- missing TP fields fail closed,
+- missing RR fields fail closed,
+- missing liquidity source fails closed,
+- missing multi-timeframe source fails closed,
+- missing event source fails closed,
+- missing wick source fails closed,
+- stale source family fails closed,
+- partial source family fails closed,
+- conflicting source family fails closed,
+- RuntimeKline `latestPrice` alone cannot populate entry,
+- RuntimeKline `klineItems` alone cannot populate entry / stop / TP / RR,
+- unsafe `manualReviewRequired=false` fails closed,
+- unsafe `notTradeInstruction=false` fails closed.
+
+### Dashboard Detail Tests
+
+- `/api/dashboard/detail.sourceTrace` remains incomplete when RuntimeKlineContext is present but boundary sources are missing,
+- RuntimeKline detail visibility remains read-only diagnostics,
+- missing fields include incomplete source families,
+- no SourceTrace completion is implied by RuntimeKline readiness.
+
+### BoundaryCandidate / ExecutionPlan Tests
+
+- BoundaryCandidateService does not emit production VALID when SourceTrace is incomplete,
+- ExecutionPlan readiness remains review-only when SourceTrace is incomplete,
+- VALID remains manual-review / not-trade-instruction.
+
+### Risk Action Guard Tests
+
+- liquidity stress blocks opportunity push,
+- stampede blocks opportunity push,
+- high risk alone does not directly trigger close / reverse / open,
+- wick-only evidence does not confirm trend reversal,
+- risk blocking does not complete missing SourceTrace ownership.
+
+## 17. Next Implementation Boundary
+
+The next implementation package should be a narrow SourceTrace source ownership adapter package.
+
+It should:
+
+- choose one source family or one vertical slice first,
+- preserve current DTO and schema unless a separate schema package is approved,
+- produce deterministic ownership fields,
+- keep missing, stale, partial, and conflicting sources fail-closed,
+- prove RuntimeKline latest price and kline items are inputs only, not boundary source completion,
+- keep `manualReviewRequired=true`,
+- keep `notTradeInstruction=true`,
+- leave BoundaryCandidateService VALID blocked unless every required SourceTrace family is complete,
+- leave ExecutionPlan readiness review-only,
+- avoid dashboard redesign,
+- avoid external data integration and Coinglass,
+- avoid order API and auto-trading.
+
+## 18. Tests Run
+
+No tests were run for BACKEND-P18.
+
+Reason:
+
+- documentation-only change,
+- no Java production code changed,
+- no Java test code changed,
+- no `dashboard.html` change,
+- no schema change,
+- no backend logic change.
+
+## 19. Boundary Confirmation
+
+BACKEND-P18 confirms:
+
+- documentation-only final package,
+- no temporary trigger artifact included in the final package,
+- no SourceTrace completion,
+- no entry / stop / TP / RR generation,
+- no BoundaryCandidateService VALID wiring,
+- no ExecutionPlan readiness upgrade,
+- no external data integration,
+- no Coinglass integration,
+- no order API,
+- no auto-trading,
+- no schema change,
+- no `dashboard.html` change,
+- RuntimeKline remains diagnostic context,
+- `latestPrice` is not entry source,
+- `klineItems` are not entry / stop / TP / RR sources by themselves,
+- VALID remains manual-review / not-trade-instruction.
+
+## 20. Current Conclusion
+
+BACKEND-P18 defines the SourceTrace boundary source ownership contract without implementing source completion.
+
+RuntimeKline remains read-only diagnostic context.
+
+SourceTrace remains incomplete until entry, stop, TP, RR, liquidity, multi-timeframe, event, and wick source ownership are all implemented, fresh, non-conflicting, and tested.
