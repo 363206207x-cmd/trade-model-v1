@@ -815,6 +815,24 @@
             color: var(--text-secondary);
             font-size: 0.78rem;
         }
+        .source-trace-readonly {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px dashed var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-surface);
+        }
+        .source-trace-readonly h4 {
+            margin: 0 0 7px 0;
+            color: var(--brand-accent);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .source-trace-readonly h4:not(:first-child) {
+            margin-top: 10px;
+        }
         .decision-shells {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1275,6 +1293,49 @@
         return fallback;
     }
 
+    function compactSourceValue(v) {
+        if (v == null || v === "") return "—";
+        if (Array.isArray(v)) return formatDateTime(v);
+        if (typeof v === "object") return JSON.stringify(v);
+        return String(v);
+    }
+
+    function sourceMetric(label, value, source) {
+        var text = compactSourceValue(value);
+        var src = isPresentValue(source) ? " · " + source : "";
+        return '<div class="kv"><span class="k">' + escapeHtml(label) + '</span><span class="v">' + escapeHtml(text + src) + '</span></div>';
+    }
+
+    function missingFieldsSummary(fields) {
+        if (!Array.isArray(fields)) return "未返回 missingFields";
+        if (!fields.length) return "0 项";
+        var head = fields.slice(0, 8).join(", ");
+        return fields.length + " 项：" + head + (fields.length > 8 ? " …" : "");
+    }
+
+    function renderSourceTraceVisibility(sourceTraceDetail, derivativesRiskContext) {
+        var st = sourceTraceDetail || {};
+        var dr = derivativesRiskContext || {};
+        return '<div class="source-trace-readonly">'
+            + '<h4>SourceTrace 元数据（只读）</h4>'
+            + sourceMetric("Fallback", st.fallbackStatus, "")
+            + sourceMetric("Decision Anchor", st.decisionId, st.decisionIdSource)
+            + sourceMetric("Analysis Anchor", st.analysisId, st.analysisIdSource)
+            + sourceMetric("Decision Time", st.decisionCreateTime, st.decisionCreateTimeSource)
+            + sourceMetric("Timeframe", st.timeframe, st.timeframeSource)
+            + sourceMetric("Quote Latest", st.quoteLatestPrice, st.quoteLatestPriceSource)
+            + sourceMetric("Quote Freshness", st.quoteFreshnessStatus, st.quotePriceUpdateTimeSource)
+            + sourceMetric("RuntimeKline", st.runtimeKlineContextStatus, st.runtimeKlineContextSource)
+            + sourceMetric("Missing", missingFieldsSummary(st.missingFields), "")
+            + '<div class="alert-line confused">Quote latest 只作为行情元数据展示，不是 entry source；quote freshness 不是 kline stale status。</div>'
+            + '<h4>DerivativesRiskContext（fail-closed）</h4>'
+            + sourceMetric("Fallback", dr.fallbackStatus, "")
+            + sourceMetric("Timeframe", dr.timeframe, dr.timeframeSource)
+            + sourceMetric("Missing", missingFieldsSummary(dr.missingFields), "")
+            + '<div class="alert-line">SourceTrace / RuntimeKline 仍未完成；缺失 derivatives-risk context 时保持 fail-closed。</div>'
+            + '</div>';
+    }
+
     function statusBadgeClass(rawStatus) {
         var s = (rawStatus || "").toString().toUpperCase();
         if (s === "READY" || s === "OK" || s === "VALID" || s === "ALIGNED") return "ok";
@@ -1287,6 +1348,8 @@
         var executionPlan = detail && detail.executionPlanDisplay ? detail.executionPlanDisplay : null;
         var riskGuard = detail && detail.riskActionGuardDisplay ? detail.riskActionGuardDisplay : null;
         var paperObs = detail && detail.paperObservationDisplay ? detail.paperObservationDisplay : null;
+        var sourceTraceDetail = detail && detail.sourceTrace ? detail.sourceTrace : null;
+        var derivativesRiskContext = detail && detail.derivativesRiskContext ? detail.derivativesRiskContext : null;
 
         var planStatus = isPresentValue(planBoundary && planBoundary.planBoundaryStatus) ? String(planBoundary.planBoundaryStatus).trim() : "BACKEND_PENDING";
         var planLabel = isPresentValue(planBoundary && planBoundary.planBoundaryStatusLabel) ? String(planBoundary.planBoundaryStatusLabel).trim() : "后端未接入";
@@ -1318,6 +1381,7 @@
                 '<div class="kv"><span class="k">ExecutionPlan 状态</span><span class="v">' + escapeHtml(executionStatus + ' / ' + executionLabel) + '</span></div>' +
                 '<div class="kv"><span class="k">Boundary 对齐</span><span class="v">' + escapeHtml(boundaryAligned) + '</span></div>' +
                 '<div class="kv"><span class="k">INCOMPLETE 原因</span><span class="v">' + escapeHtml(notExecReason) + '</span></div>' +
+                renderSourceTraceVisibility(sourceTraceDetail, derivativesRiskContext) +
                 '<div class="alert-line confused">安全提示：非交易指令，需要人工复核。</div>' +
                 '<div class="alert-line">说明：仅展示 PlanBoundary / ExecutionPlan 接入状态，不生成 entry / stop / take profit 数值。</div>';
         }
@@ -1351,6 +1415,8 @@
         detail.executionPlanDisplay = resp.executionPlanDisplay || null;
         detail.riskActionGuardDisplay = resp.riskActionGuardDisplay || null;
         detail.paperObservationDisplay = resp.paperObservationDisplay || null;
+        detail.sourceTrace = resp.sourceTrace || null;
+        detail.derivativesRiskContext = resp.derivativesRiskContext || null;
         return detail;
     }
 
@@ -1605,12 +1671,16 @@
         var executionPlan = d.executionPlanDisplay || {};
         var riskGuard = d.riskActionGuardDisplay || {};
         var paperObs = d.paperObservationDisplay || {};
+        var sourceTraceDetail = d.sourceTrace || {};
+        var derivativesRiskContext = d.derivativesRiskContext || {};
         var worth = resolveWorthOpeningPresentation(d);
         var ra = resolveRecommendedActionPresentation(d);
         var planStatus = firstNonEmpty(planBoundary.planBoundaryStatus, "BACKEND_PENDING");
         var planLabel = firstNonEmpty(planBoundary.planBoundaryStatusLabel, "后端未接入");
-        var sourceTrace = firstNonEmpty(planBoundary.sourceTraceStatus, "BACKEND_PENDING");
+        var sourceTrace = firstNonEmpty(sourceTraceDetail.fallbackStatus, planBoundary.sourceTraceStatus, "BACKEND_PENDING");
         var backendConnection = firstNonEmpty(planBoundary.backendConnectionStatus, "BACKEND_PENDING");
+        var runtimeKlineStatus = firstNonEmpty(sourceTraceDetail.runtimeKlineContextStatus, "UNAVAILABLE");
+        var derivativesFallback = firstNonEmpty(derivativesRiskContext.fallbackStatus, "SAFE_FAIL_CLOSED_ONLY");
         var executionStatus = firstNonEmpty(executionPlan.executionPlanStatus, "BOUNDARY_PENDING");
         var executionLabel = firstNonEmpty(executionPlan.executionPlanStatusLabel, "等待边界接入");
         var notExecutableReason = firstNonEmpty(executionPlan.notExecutableReason, "PLAN_BOUNDARY_BACKEND_PENDING");
@@ -1654,6 +1724,8 @@
             + '<div class="workbench-metrics">'
             + workbenchMetric("PlanBoundary", planStatus + " / " + planLabel)
             + workbenchMetric("SourceTrace", sourceTrace)
+            + workbenchMetric("RuntimeKline", runtimeKlineStatus)
+            + workbenchMetric("DerivativesRisk", derivativesFallback)
             + workbenchMetric("ExecutionPlan", executionStatus + " / " + executionLabel)
             + workbenchMetric("不可执行原因", notExecutableReason)
             + workbenchMetric("数据质量", firstNonEmpty(d.dataQualityScore, d.data_quality_score, "—"))
