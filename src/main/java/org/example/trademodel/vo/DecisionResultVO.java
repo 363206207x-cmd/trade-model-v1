@@ -8,6 +8,7 @@ public class DecisionResultVO {
     private String decisionId;
     private String analysisId;
     private String symbol;
+    private String timeframe;
     private String marketBiasHierarchy;
     private String tradeType;
     private String confidenceLevel;
@@ -86,6 +87,14 @@ public class DecisionResultVO {
 
     public void setSymbol(String symbol) {
         this.symbol = symbol;
+    }
+
+    public String getTimeframe() {
+        return timeframe;
+    }
+
+    public void setTimeframe(String timeframe) {
+        this.timeframe = timeframe;
     }
 
     public String getMarketBiasHierarchy() {

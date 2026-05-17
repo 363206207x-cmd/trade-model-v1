@@ -22,6 +22,7 @@ public interface DecisionResultMapper {
 
     @Select("""
             SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
+            ar.timeframe AS timeframe,
             d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
             d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
@@ -53,6 +54,7 @@ public interface DecisionResultMapper {
 
     @Select("""
             SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
+            ar.timeframe AS timeframe,
             d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
             d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,

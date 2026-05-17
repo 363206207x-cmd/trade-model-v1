@@ -17,8 +17,12 @@ import java.util.List;
 @Component
 public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSourceTraceDetailAdapter {
     private static final String TIMEFRAME = "timeframe";
+    private static final String RUNTIME_KLINE_UNAVAILABLE = "UNAVAILABLE";
+    private static final String RUNTIME_KLINE_UNAVAILABLE_SOURCE = "dashboardDetail.noRuntimeKlineContext";
+    private static final String DECISION_TIMEFRAME_SOURCE = "DecisionResultVO.timeframe";
     private static final String DECISION_LATEST_PRICE_SOURCE = "DecisionResultVO.latestPrice";
     private static final String DECISION_PRICE_UPDATE_TIME_SOURCE = "DecisionResultVO.priceUpdateTimeMs";
+    private static final String QUOTE_UPDATE_TIME_ONLY = "QUOTE_UPDATE_TIME_ONLY";
     private static final String DECISION_DATA_QUALITY_SOURCE = "DecisionResultVO.dataQualityScore";
     private static final String DECISION_MULTI_TIMEFRAME_SOURCE = "DecisionResultVO.multiTfConvergence";
 
@@ -55,6 +59,12 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (decision == null || sourceTrace == null) {
             return;
         }
+        sourceTrace.setRuntimeKlineContextStatus(RUNTIME_KLINE_UNAVAILABLE);
+        sourceTrace.setRuntimeKlineContextSource(RUNTIME_KLINE_UNAVAILABLE_SOURCE);
+        if (hasText(decision.getTimeframe())) {
+            sourceTrace.setTimeframe(decision.getTimeframe());
+            sourceTrace.setTimeframeSource(DECISION_TIMEFRAME_SOURCE);
+        }
         if (decision.getLatestPrice() != null) {
             sourceTrace.setQuoteLatestPrice(decision.getLatestPrice());
             sourceTrace.setQuoteLatestPriceSource(DECISION_LATEST_PRICE_SOURCE);
@@ -62,6 +72,7 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (decision.getPriceUpdateTimeMs() != null) {
             sourceTrace.setQuotePriceUpdateTimeMs(decision.getPriceUpdateTimeMs());
             sourceTrace.setQuotePriceUpdateTimeSource(DECISION_PRICE_UPDATE_TIME_SOURCE);
+            sourceTrace.setQuoteFreshnessStatus(QUOTE_UPDATE_TIME_ONLY);
         }
         if (decision.getDataQualityScore() != null) {
             sourceTrace.setDataQualityScore(BigDecimal.valueOf(decision.getDataQualityScore()));
@@ -79,6 +90,10 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (decision == null || context == null) {
             return;
         }
+        if (hasText(decision.getTimeframe())) {
+            context.setTimeframe(decision.getTimeframe());
+            context.setTimeframeSource(DECISION_TIMEFRAME_SOURCE);
+        }
         if (decision.getDataQualityScore() != null) {
             context.setDataQualityScore(BigDecimal.valueOf(decision.getDataQualityScore()));
             context.setDataQualityScoreSource(DECISION_DATA_QUALITY_SOURCE);
@@ -91,7 +106,9 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
             fields.add("decision");
         }
         fields.add("runtimeKlineContext");
-        fields.add(TIMEFRAME);
+        if (decision == null || !hasText(decision.getTimeframe())) {
+            fields.add(TIMEFRAME);
+        }
         fields.add("latestPrice");
         fields.add("dataQualityScore");
         fields.add("entryPriceSource");
@@ -126,7 +143,9 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (decision == null) {
             fields.add("decision");
         }
-        fields.add(TIMEFRAME);
+        if (decision == null || !hasText(decision.getTimeframe())) {
+            fields.add(TIMEFRAME);
+        }
         fields.add("contextTime");
         fields.add("openInterestHistory");
         fields.add("fundingHistory");

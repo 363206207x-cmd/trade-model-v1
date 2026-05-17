@@ -11,6 +11,7 @@ public class DerivativesRiskContextDTO implements SourceCompletenessContract {
 
     private String symbol;
     private String timeframe;
+    private String timeframeSource;
     private LocalDateTime contextTime;
     private List<BigDecimal> openInterestHistory = new ArrayList<>();
     private BigDecimal openInterestDelta;
@@ -44,6 +45,14 @@ public class DerivativesRiskContextDTO implements SourceCompletenessContract {
 
     public void setTimeframe(String timeframe) {
         this.timeframe = timeframe;
+    }
+
+    public String getTimeframeSource() {
+        return timeframeSource;
+    }
+
+    public void setTimeframeSource(String timeframeSource) {
+        this.timeframeSource = timeframeSource;
     }
 
     public LocalDateTime getContextTime() {
