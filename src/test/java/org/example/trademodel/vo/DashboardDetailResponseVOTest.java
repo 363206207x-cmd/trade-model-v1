@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +24,7 @@ class DashboardDetailResponseVOTest {
         DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuard = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
         DashboardDetailResponseVO.PaperObservationDisplayVO paperObservation = new DashboardDetailResponseVO.PaperObservationDisplayVO();
         SourceTraceDTO sourceTrace = new SourceTraceDTO();
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
         DerivativesRiskContextDTO derivativesRiskContext = new DerivativesRiskContextDTO();
 
         response.setPlanBoundaryDisplay(planBoundary);
@@ -30,6 +32,7 @@ class DashboardDetailResponseVOTest {
         response.setRiskActionGuardDisplay(riskActionGuard);
         response.setPaperObservationDisplay(paperObservation);
         response.setSourceTrace(sourceTrace);
+        response.setRuntimeKlineContext(runtimeKlineContext);
         response.setDerivativesRiskContext(derivativesRiskContext);
 
         assertSame(planBoundary, response.getPlanBoundaryDisplay());
@@ -37,6 +40,7 @@ class DashboardDetailResponseVOTest {
         assertSame(riskActionGuard, response.getRiskActionGuardDisplay());
         assertSame(paperObservation, response.getPaperObservationDisplay());
         assertSame(sourceTrace, response.getSourceTrace());
+        assertSame(runtimeKlineContext, response.getRuntimeKlineContext());
         assertSame(derivativesRiskContext, response.getDerivativesRiskContext());
     }
 

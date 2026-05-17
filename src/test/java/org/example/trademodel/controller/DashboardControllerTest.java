@@ -3,6 +3,7 @@ package org.example.trademodel.controller;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
@@ -14,10 +15,12 @@ import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.SystemHealthService;
 import org.example.trademodel.service.dashboard.DefaultDashboardRuntimeKlineContextAdapter;
 import org.example.trademodel.service.dashboard.DefaultDashboardSourceTraceDetailAdapter;
+import org.example.trademodel.service.dashboard.DashboardSourceTraceDetailAdapter;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
+import org.example.trademodel.service.impl.RuntimeKlineContextAssemblyServiceImpl;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
@@ -73,19 +76,7 @@ class DashboardControllerTest {
 
     @BeforeEach
     void setUp() {
-        PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
-        ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
-        RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> fallbackDisplay;
-        PaperObservationDisplayAdapter paperObservationDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay;
-        DashboardController controller = new DashboardController(
-                decisionService,
-                systemHealthService,
-                monitorService,
-                runtimeMetricService,
-                realMarketEnvironmentService,
-                marketEnvironmentSnapshotMapper,
-                evidenceService,
-                scoreService,
+        mockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
                 new DefaultDashboardSourceTraceDetailAdapter(
                         new DefaultDashboardRuntimeKlineContextAdapter((symbol, timeframe, requiredWindowSize, maxReadLagMs) ->
                                 readiness(
@@ -95,13 +86,30 @@ class DashboardControllerTest {
                                         List.of("persistedOhlcvWindow", "klineItems")
                                 )
                         )
-                ),
+                )
+        )).build();
+    }
+
+    private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
+        PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
+        ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
+        RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> fallbackDisplay;
+        PaperObservationDisplayAdapter paperObservationDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay;
+        return new DashboardController(
+                decisionService,
+                systemHealthService,
+                monitorService,
+                runtimeMetricService,
+                realMarketEnvironmentService,
+                marketEnvironmentSnapshotMapper,
+                evidenceService,
+                scoreService,
+                sourceTraceDetailAdapter,
                 planBoundaryDisplayAdapter,
                 executionPlanDisplayAdapter,
                 riskActionGuardDisplayAdapter,
                 paperObservationDisplayAdapter
         );
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
     @Test
@@ -216,6 +224,25 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.sourceTrace.runtimeKlineStaleReasonText").value("No closed persisted OHLCV bars exist for symbol/timeframe."))
                 .andExpect(jsonPath("$.sourceTrace.runtimeKlineReadinessMissingFields[?(@ == 'persistedOhlcvWindow')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.runtimeKlineReadinessMissingFields[?(@ == 'klineItems')]").exists())
+                .andExpect(jsonPath("$.runtimeKlineContext.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.runtimeKlineContext.timeframe").value("1h"))
+                .andExpect(jsonPath("$.runtimeKlineContext.fallbackStatus").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.runtimeKlineContext.latestPrice").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.klineItems").isEmpty())
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvReadinessStatus").value("MISSING"))
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvStaleReasonCode").value("NO_BARS_FOR_SYMBOL_TIMEFRAME"))
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvStaleReasonText").value("No closed persisted OHLCV bars exist for symbol/timeframe."))
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvMissingFields[?(@ == 'persistedOhlcvWindow')]").exists())
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvMissingFields[?(@ == 'klineItems')]").exists())
+                .andExpect(jsonPath("$.runtimeKlineContext.entryPriceSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.stopPriceSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.tpPriceSources").isEmpty())
+                .andExpect(jsonPath("$.runtimeKlineContext.rrSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.liquiditySource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.eventSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.wickSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.manualReviewRequired").value(true))
+                .andExpect(jsonPath("$.runtimeKlineContext.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.sourceTrace.quoteLatestPrice").value(68100))
                 .andExpect(jsonPath("$.sourceTrace.quoteLatestPriceSource").value("DecisionResultVO.latestPrice"))
                 .andExpect(jsonPath("$.sourceTrace.quotePriceUpdateTimeMs").value(1710000000000L))
@@ -254,6 +281,59 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'eventWindowBlockers')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'wickConfirmationSources')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'dataQualityScore')]").doesNotExist());
+    }
+
+    @Test
+    void detail_json_exposesRuntimeKlineContextAsSeparateReadOnlyBoundaryWhenAssemblyIsSafe() throws Exception {
+        MockMvc runtimeKlineMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                new DefaultDashboardSourceTraceDetailAdapter(
+                        new DefaultDashboardRuntimeKlineContextAdapter(
+                                (symbol, timeframe, requiredWindowSize, maxReadLagMs) -> freshReadiness(List.of(
+                                        bar(60_000L, 119_999L, "101.10", "130.00", "100.50", "102.30"),
+                                        bar(0L, 59_999L, "100.00", "105.00", "98.00", "101.10")
+                                )),
+                                new RuntimeKlineContextAssemblyServiceImpl()
+                        )
+                )
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setSymbol("BTCUSDT");
+        decision.setAnalysisId("ana-runtime");
+        decision.setTimeframe("1m");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-runtime")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-runtime")).thenReturn(Collections.emptyList());
+
+        runtimeKlineMockMvc.perform(get("/api/dashboard/detail").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runtimeKlineContext.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.runtimeKlineContext.timeframe").value("1m"))
+                .andExpect(jsonPath("$.runtimeKlineContext.fallbackStatus").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.latestPrice").value(102.3))
+                .andExpect(jsonPath("$.runtimeKlineContext.klineItems.length()").value(2))
+                .andExpect(jsonPath("$.runtimeKlineContext.klineItems[0].closePrice").value(102.3))
+                .andExpect(jsonPath("$.runtimeKlineContext.klineItems[0].provider").value("LOCAL_FIXTURE"))
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvReadinessStatus").value("FRESH"))
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvStaleReasonCode").value("NONE"))
+                .andExpect(jsonPath("$.runtimeKlineContext.persistedOhlcvMissingFields").isEmpty())
+                .andExpect(jsonPath("$.runtimeKlineContext.missingFields").isEmpty())
+                .andExpect(jsonPath("$.runtimeKlineContext.entryPriceSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.stopPriceSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.tpPriceSources").isEmpty())
+                .andExpect(jsonPath("$.runtimeKlineContext.rrSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.liquiditySource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.eventSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.wickSource").value(nullValue()))
+                .andExpect(jsonPath("$.runtimeKlineContext.manualReviewRequired").value(true))
+                .andExpect(jsonPath("$.runtimeKlineContext.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.sourceTrace.fallbackStatus").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'runtimeKlineContext')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'entryPriceSource')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.entryPriceSource").value(nullValue()))
+                .andExpect(jsonPath("$.sourceTrace.stopPriceSource").value(nullValue()))
+                .andExpect(jsonPath("$.sourceTrace.tpPriceSources").isEmpty())
+                .andExpect(jsonPath("$.sourceTrace.rrSource").value(nullValue()));
     }
 
     @Test
@@ -441,5 +521,56 @@ class DashboardControllerTest {
         result.setManualReviewRequired(true);
         result.setNotTradeInstruction(true);
         return result;
+    }
+
+    private static PersistedOhlcvReadinessResult freshReadiness(List<PersistedOhlcvBarDO> bars) {
+        PersistedOhlcvReadinessResult result = readiness(
+                PersistedOhlcvReadinessStatus.FRESH,
+                PersistedOhlcvStaleReasonCode.NONE,
+                "Persisted OHLCV window is fresh.",
+                List.of()
+        );
+        result.setSymbol("BTCUSDT");
+        result.setTimeframe("1m");
+        result.setRequiredWindowSize(2);
+        result.setBars(bars);
+        result.setLatestCloseTimeMs(bars.stream()
+                .filter(bar -> bar.getCloseTimeMs() != null)
+                .map(PersistedOhlcvBarDO::getCloseTimeMs)
+                .max(Long::compareTo)
+                .orElse(null));
+        result.setLatestIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
+        return result;
+    }
+
+    private static PersistedOhlcvBarDO bar(
+            Long openTimeMs,
+            Long closeTimeMs,
+            String openPrice,
+            String highPrice,
+            String lowPrice,
+            String closePrice
+    ) {
+        PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
+        bar.setSymbol("BTCUSDT");
+        bar.setTimeframe("1m");
+        bar.setOpenTimeMs(openTimeMs);
+        bar.setCloseTimeMs(closeTimeMs);
+        bar.setOpenPrice(new BigDecimal(openPrice));
+        bar.setHighPrice(new BigDecimal(highPrice));
+        bar.setLowPrice(new BigDecimal(lowPrice));
+        bar.setClosePrice(new BigDecimal(closePrice));
+        bar.setVolume(new BigDecimal("123.45"));
+        bar.setClosed(true);
+        bar.setProvider("LOCAL_FIXTURE");
+        bar.setProviderMarketType("USDT_PERP");
+        bar.setSourceEndpoint("persisted-ohlcv-fixture");
+        bar.setSourceBatchId("batch-1");
+        bar.setSourceTraceId("trace-1");
+        bar.setSourceVersion(1);
+        bar.setIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
+        bar.setQualityStatus("OK");
+        bar.setIsDeleted(0);
+        return bar;
     }
 }

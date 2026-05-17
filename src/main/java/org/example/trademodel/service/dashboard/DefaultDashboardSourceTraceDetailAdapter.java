@@ -50,19 +50,23 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
 
     @Override
     public DashboardSourceTraceDetailContext build(String symbol, DecisionResultVO decision) {
-        SourceTraceDTO sourceTrace = buildSourceTrace(symbol, decision);
+        RuntimeKlineContextDTO runtimeKlineContext =
+                runtimeKlineContextAdapter.buildUnavailableContext(symbol, decision);
+        SourceTraceDTO sourceTrace = buildSourceTrace(symbol, decision, runtimeKlineContext);
         DerivativesRiskContextDTO derivativesRiskContext = buildDerivativesRiskContext(symbol, decision);
-        return new DashboardSourceTraceDetailContext(sourceTrace, derivativesRiskContext);
+        return new DashboardSourceTraceDetailContext(sourceTrace, runtimeKlineContext, derivativesRiskContext);
     }
 
-    private SourceTraceDTO buildSourceTrace(String symbol, DecisionResultVO decision) {
+    private SourceTraceDTO buildSourceTrace(
+            String symbol,
+            DecisionResultVO decision,
+            RuntimeKlineContextDTO runtimeKlineContext
+    ) {
         SourceTraceDTO sourceTrace = new SourceTraceDTO();
         sourceTrace.setSymbol(symbol);
         if (hasText(symbol)) {
             sourceTrace.setSymbolSource(DASHBOARD_REQUEST_SYMBOL_SOURCE);
         }
-        RuntimeKlineContextDTO runtimeKlineContext =
-                runtimeKlineContextAdapter.buildUnavailableContext(symbol, decision);
         wireRuntimeKlineBoundary(sourceTrace, runtimeKlineContext);
         wireProductionBackedSourceTraceFields(decision, sourceTrace);
         sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
