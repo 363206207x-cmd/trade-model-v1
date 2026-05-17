@@ -1313,6 +1313,13 @@
         return fields.length + " 项：" + head + (fields.length > 8 ? " …" : "");
     }
 
+    function runtimeKlineReadinessLabel(sourceTraceDetail) {
+        var st = sourceTraceDetail || {};
+        var status = firstNonEmpty(st.runtimeKlineReadinessStatus, "UNKNOWN").toUpperCase();
+        if (status === "FRESH") return "FRESH / metadata only";
+        return status + " / fail-closed";
+    }
+
     function renderSourceTraceVisibility(sourceTraceDetail, derivativesRiskContext) {
         var st = sourceTraceDetail || {};
         var dr = derivativesRiskContext || {};
@@ -1326,8 +1333,13 @@
             + sourceMetric("Quote Latest", st.quoteLatestPrice, st.quoteLatestPriceSource)
             + sourceMetric("Quote Freshness", st.quoteFreshnessStatus, st.quotePriceUpdateTimeSource)
             + sourceMetric("RuntimeKline", st.runtimeKlineContextStatus, st.runtimeKlineContextSource)
+            + sourceMetric("Runtime Readiness", runtimeKlineReadinessLabel(st), "")
+            + sourceMetric("Stale Reason", st.runtimeKlineStaleReasonCode, "")
+            + sourceMetric("Reason Text", st.runtimeKlineStaleReasonText, "")
+            + sourceMetric("Readiness Missing", missingFieldsSummary(st.runtimeKlineReadinessMissingFields), "")
             + sourceMetric("Missing", missingFieldsSummary(st.missingFields), "")
             + '<div class="alert-line confused">Quote latest 只作为行情元数据展示，不是 entry source；quote freshness 不是 kline stale status。</div>'
+            + '<div class="alert-line">RuntimeKline readiness 仅为 persisted OHLCV 诊断元数据；FRESH 不代表 RuntimeKline / SourceTrace 完成。</div>'
             + '<h4>DerivativesRiskContext（fail-closed）</h4>'
             + sourceMetric("Fallback", dr.fallbackStatus, "")
             + sourceMetric("Timeframe", dr.timeframe, dr.timeframeSource)
@@ -1680,6 +1692,8 @@
         var sourceTrace = firstNonEmpty(sourceTraceDetail.fallbackStatus, planBoundary.sourceTraceStatus, "BACKEND_PENDING");
         var backendConnection = firstNonEmpty(planBoundary.backendConnectionStatus, "BACKEND_PENDING");
         var runtimeKlineStatus = firstNonEmpty(sourceTraceDetail.runtimeKlineContextStatus, "UNAVAILABLE");
+        var runtimeReadiness = runtimeKlineReadinessLabel(sourceTraceDetail);
+        var runtimeReadinessMissing = missingFieldsSummary(sourceTraceDetail.runtimeKlineReadinessMissingFields);
         var derivativesFallback = firstNonEmpty(derivativesRiskContext.fallbackStatus, "SAFE_FAIL_CLOSED_ONLY");
         var executionStatus = firstNonEmpty(executionPlan.executionPlanStatus, "BOUNDARY_PENDING");
         var executionLabel = firstNonEmpty(executionPlan.executionPlanStatusLabel, "等待边界接入");
@@ -1725,6 +1739,8 @@
             + workbenchMetric("PlanBoundary", planStatus + " / " + planLabel)
             + workbenchMetric("SourceTrace", sourceTrace)
             + workbenchMetric("RuntimeKline", runtimeKlineStatus)
+            + workbenchMetric("Runtime readiness", runtimeReadiness)
+            + workbenchMetric("Readiness missing", runtimeReadinessMissing)
             + workbenchMetric("DerivativesRisk", derivativesFallback)
             + workbenchMetric("ExecutionPlan", executionStatus + " / " + executionLabel)
             + workbenchMetric("不可执行原因", notExecutableReason)
