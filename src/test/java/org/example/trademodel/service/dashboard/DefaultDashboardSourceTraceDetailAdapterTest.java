@@ -1,13 +1,18 @@
 package org.example.trademodel.service.dashboard;
 
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -244,5 +249,98 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertFalse(sourceTrace.hasRequiredBoundarySources());
         assertTrue(sourceTrace.isManualReviewRequired());
         assertTrue(sourceTrace.isNotTradeInstruction());
+    }
+
+    @Test
+    void shouldExposePersistedOhlcvReadinessMetadataWithoutCompletingSourceTrace() {
+        DefaultDashboardSourceTraceDetailAdapter adapterWithReadiness =
+                new DefaultDashboardSourceTraceDetailAdapter(
+                        new DefaultDashboardRuntimeKlineContextAdapter(readinessService(
+                                readiness(
+                                        PersistedOhlcvReadinessStatus.FRESH,
+                                        PersistedOhlcvStaleReasonCode.NONE,
+                                        "Persisted OHLCV window is fresh.",
+                                        List.of()
+                                )
+                        ))
+                );
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setSymbol("BTCUSDT");
+        decision.setTimeframe("1m");
+
+        DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext context =
+                adapterWithReadiness.build("BTCUSDT", decision);
+
+        SourceTraceDTO sourceTrace = context.getSourceTrace();
+
+        assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
+        assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
+        assertEquals("FRESH", sourceTrace.getRuntimeKlineReadinessStatus());
+        assertEquals("NONE", sourceTrace.getRuntimeKlineStaleReasonCode());
+        assertEquals("Persisted OHLCV window is fresh.", sourceTrace.getRuntimeKlineStaleReasonText());
+        assertTrue(sourceTrace.getRuntimeKlineReadinessMissingFields().isEmpty());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
+        assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("stopPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("tpPriceSources"));
+        assertTrue(sourceTrace.getMissingFields().contains("rrSource"));
+        assertNull(sourceTrace.getEntryPriceSource());
+        assertNull(sourceTrace.getStopPriceSource());
+        assertTrue(sourceTrace.getTpPriceSources().isEmpty());
+        assertNull(sourceTrace.getRrSource());
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
+        assertTrue(sourceTrace.isManualReviewRequired());
+        assertTrue(sourceTrace.isNotTradeInstruction());
+    }
+
+    @Test
+    void shouldExposeNonFreshReadinessAsFailClosedMetadata() {
+        DefaultDashboardSourceTraceDetailAdapter adapterWithReadiness =
+                new DefaultDashboardSourceTraceDetailAdapter(
+                        new DefaultDashboardRuntimeKlineContextAdapter(readinessService(
+                                readiness(
+                                        PersistedOhlcvReadinessStatus.PARTIAL,
+                                        PersistedOhlcvStaleReasonCode.WINDOW_TOO_SHORT,
+                                        "Persisted OHLCV window is shorter than required.",
+                                        List.of("persistedOhlcvWindow", "requiredClosedBars")
+                                )
+                        ))
+                );
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setSymbol("BTCUSDT");
+        decision.setTimeframe("1m");
+
+        SourceTraceDTO sourceTrace = adapterWithReadiness.build("BTCUSDT", decision).getSourceTrace();
+
+        assertEquals("PARTIAL", sourceTrace.getRuntimeKlineReadinessStatus());
+        assertEquals("WINDOW_TOO_SHORT", sourceTrace.getRuntimeKlineStaleReasonCode());
+        assertEquals(List.of("persistedOhlcvWindow", "requiredClosedBars"),
+                sourceTrace.getRuntimeKlineReadinessMissingFields());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
+        assertTrue(sourceTrace.isManualReviewRequired());
+        assertTrue(sourceTrace.isNotTradeInstruction());
+    }
+
+    private PersistedOhlcvQueryService readinessService(PersistedOhlcvReadinessResult result) {
+        return (symbol, timeframe, requiredWindowSize, maxReadLagMs) -> result;
+    }
+
+    private PersistedOhlcvReadinessResult readiness(
+            PersistedOhlcvReadinessStatus status,
+            PersistedOhlcvStaleReasonCode reasonCode,
+            String reasonText,
+            List<String> missingFields
+    ) {
+        PersistedOhlcvReadinessResult result = new PersistedOhlcvReadinessResult();
+        result.setStatus(status);
+        result.setStaleReasonCode(reasonCode);
+        result.setStaleReasonText(reasonText);
+        result.setMissingFields(missingFields);
+        result.setManualReviewRequired(true);
+        result.setNotTradeInstruction(true);
+        return result;
     }
 }

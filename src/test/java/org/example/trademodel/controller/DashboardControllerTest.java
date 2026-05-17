@@ -1,5 +1,8 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
@@ -9,6 +12,7 @@ import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.dashboard.DefaultDashboardRuntimeKlineContextAdapter;
 import org.example.trademodel.service.dashboard.DefaultDashboardSourceTraceDetailAdapter;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
@@ -82,7 +86,16 @@ class DashboardControllerTest {
                 marketEnvironmentSnapshotMapper,
                 evidenceService,
                 scoreService,
-                new DefaultDashboardSourceTraceDetailAdapter(),
+                new DefaultDashboardSourceTraceDetailAdapter(
+                        new DefaultDashboardRuntimeKlineContextAdapter((symbol, timeframe, requiredWindowSize, maxReadLagMs) ->
+                                readiness(
+                                        PersistedOhlcvReadinessStatus.MISSING,
+                                        PersistedOhlcvStaleReasonCode.NO_BARS_FOR_SYMBOL_TIMEFRAME,
+                                        "No closed persisted OHLCV bars exist for symbol/timeframe.",
+                                        List.of("persistedOhlcvWindow", "klineItems")
+                                )
+                        )
+                ),
                 planBoundaryDisplayAdapter,
                 executionPlanDisplayAdapter,
                 riskActionGuardDisplayAdapter,
@@ -198,6 +211,11 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.sourceTrace.timeframeSource").value("DecisionResultVO.timeframe"))
                 .andExpect(jsonPath("$.sourceTrace.runtimeKlineContextStatus").value("UNAVAILABLE"))
                 .andExpect(jsonPath("$.sourceTrace.runtimeKlineContextSource").value("dashboardDetail.noRuntimeKlineContext"))
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineReadinessStatus").value("MISSING"))
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineStaleReasonCode").value("NO_BARS_FOR_SYMBOL_TIMEFRAME"))
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineStaleReasonText").value("No closed persisted OHLCV bars exist for symbol/timeframe."))
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineReadinessMissingFields[?(@ == 'persistedOhlcvWindow')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineReadinessMissingFields[?(@ == 'klineItems')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.quoteLatestPrice").value(68100))
                 .andExpect(jsonPath("$.sourceTrace.quoteLatestPriceSource").value("DecisionResultVO.latestPrice"))
                 .andExpect(jsonPath("$.sourceTrace.quotePriceUpdateTimeMs").value(1710000000000L))
@@ -407,5 +425,21 @@ class DashboardControllerTest {
         row.setAiPlanMode("AGGRESSIVE");
         row.setConfusedScore(3);
         return row;
+    }
+
+    private static PersistedOhlcvReadinessResult readiness(
+            PersistedOhlcvReadinessStatus status,
+            PersistedOhlcvStaleReasonCode reasonCode,
+            String reasonText,
+            List<String> missingFields
+    ) {
+        PersistedOhlcvReadinessResult result = new PersistedOhlcvReadinessResult();
+        result.setStatus(status);
+        result.setStaleReasonCode(reasonCode);
+        result.setStaleReasonText(reasonText);
+        result.setMissingFields(missingFields);
+        result.setManualReviewRequired(true);
+        result.setNotTradeInstruction(true);
+        return result;
     }
 }

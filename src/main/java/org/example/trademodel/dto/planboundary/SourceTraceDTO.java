@@ -19,6 +19,10 @@ public class SourceTraceDTO implements SourceCompletenessContract {
     private String timeframeSource;
     private String runtimeKlineContextStatus;
     private String runtimeKlineContextSource;
+    private String runtimeKlineReadinessStatus;
+    private String runtimeKlineStaleReasonCode;
+    private String runtimeKlineStaleReasonText;
+    private List<String> runtimeKlineReadinessMissingFields = new ArrayList<>();
     private BigDecimal quoteLatestPrice;
     private String quoteLatestPriceSource;
     private Long quotePriceUpdateTimeMs;
@@ -146,6 +150,40 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setRuntimeKlineContextSource(String runtimeKlineContextSource) {
         this.runtimeKlineContextSource = runtimeKlineContextSource;
+    }
+
+    public String getRuntimeKlineReadinessStatus() {
+        return runtimeKlineReadinessStatus;
+    }
+
+    public void setRuntimeKlineReadinessStatus(String runtimeKlineReadinessStatus) {
+        this.runtimeKlineReadinessStatus = runtimeKlineReadinessStatus;
+    }
+
+    public String getRuntimeKlineStaleReasonCode() {
+        return runtimeKlineStaleReasonCode;
+    }
+
+    public void setRuntimeKlineStaleReasonCode(String runtimeKlineStaleReasonCode) {
+        this.runtimeKlineStaleReasonCode = runtimeKlineStaleReasonCode;
+    }
+
+    public String getRuntimeKlineStaleReasonText() {
+        return runtimeKlineStaleReasonText;
+    }
+
+    public void setRuntimeKlineStaleReasonText(String runtimeKlineStaleReasonText) {
+        this.runtimeKlineStaleReasonText = runtimeKlineStaleReasonText;
+    }
+
+    public List<String> getRuntimeKlineReadinessMissingFields() {
+        return runtimeKlineReadinessMissingFields;
+    }
+
+    public void setRuntimeKlineReadinessMissingFields(List<String> runtimeKlineReadinessMissingFields) {
+        this.runtimeKlineReadinessMissingFields = runtimeKlineReadinessMissingFields == null
+                ? new ArrayList<>()
+                : new ArrayList<>(runtimeKlineReadinessMissingFields);
     }
 
     public BigDecimal getQuoteLatestPrice() {

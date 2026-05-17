@@ -31,6 +31,10 @@ public class RuntimeKlineContextDTO implements SourceCompletenessContract {
     private String multiTimeframeSource;
     private String eventSource;
     private String wickSource;
+    private String persistedOhlcvReadinessStatus;
+    private String persistedOhlcvStaleReasonCode;
+    private String persistedOhlcvStaleReasonText;
+    private List<String> persistedOhlcvMissingFields = new ArrayList<>();
     private SourceTraceFallbackStatusEnum fallbackStatus;
     private List<String> missingFields = new ArrayList<>();
     private boolean manualReviewRequired = true;
@@ -234,6 +238,40 @@ public class RuntimeKlineContextDTO implements SourceCompletenessContract {
 
     public void setWickSource(String wickSource) {
         this.wickSource = wickSource;
+    }
+
+    public String getPersistedOhlcvReadinessStatus() {
+        return persistedOhlcvReadinessStatus;
+    }
+
+    public void setPersistedOhlcvReadinessStatus(String persistedOhlcvReadinessStatus) {
+        this.persistedOhlcvReadinessStatus = persistedOhlcvReadinessStatus;
+    }
+
+    public String getPersistedOhlcvStaleReasonCode() {
+        return persistedOhlcvStaleReasonCode;
+    }
+
+    public void setPersistedOhlcvStaleReasonCode(String persistedOhlcvStaleReasonCode) {
+        this.persistedOhlcvStaleReasonCode = persistedOhlcvStaleReasonCode;
+    }
+
+    public String getPersistedOhlcvStaleReasonText() {
+        return persistedOhlcvStaleReasonText;
+    }
+
+    public void setPersistedOhlcvStaleReasonText(String persistedOhlcvStaleReasonText) {
+        this.persistedOhlcvStaleReasonText = persistedOhlcvStaleReasonText;
+    }
+
+    public List<String> getPersistedOhlcvMissingFields() {
+        return persistedOhlcvMissingFields;
+    }
+
+    public void setPersistedOhlcvMissingFields(List<String> persistedOhlcvMissingFields) {
+        this.persistedOhlcvMissingFields = persistedOhlcvMissingFields == null
+                ? new ArrayList<>()
+                : new ArrayList<>(persistedOhlcvMissingFields);
     }
 
     @Override

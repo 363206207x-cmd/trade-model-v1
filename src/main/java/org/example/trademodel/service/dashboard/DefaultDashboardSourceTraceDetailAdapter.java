@@ -5,6 +5,7 @@ import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.vo.DecisionResultVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -38,6 +39,7 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         this(new DefaultDashboardRuntimeKlineContextAdapter());
     }
 
+    @Autowired
     public DefaultDashboardSourceTraceDetailAdapter(
             DashboardRuntimeKlineContextAdapter runtimeKlineContextAdapter
     ) {
@@ -90,6 +92,10 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         }
         sourceTrace.setRuntimeKlineContextStatus(RUNTIME_KLINE_UNAVAILABLE);
         sourceTrace.setRuntimeKlineContextSource(RUNTIME_KLINE_UNAVAILABLE_SOURCE);
+        sourceTrace.setRuntimeKlineReadinessStatus(runtimeKlineContext.getPersistedOhlcvReadinessStatus());
+        sourceTrace.setRuntimeKlineStaleReasonCode(runtimeKlineContext.getPersistedOhlcvStaleReasonCode());
+        sourceTrace.setRuntimeKlineStaleReasonText(runtimeKlineContext.getPersistedOhlcvStaleReasonText());
+        sourceTrace.setRuntimeKlineReadinessMissingFields(runtimeKlineContext.getPersistedOhlcvMissingFields());
     }
 
     private void wireProductionBackedSourceTraceFields(DecisionResultVO decision, SourceTraceDTO sourceTrace) {
