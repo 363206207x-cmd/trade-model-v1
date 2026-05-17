@@ -3,6 +3,10 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.dto.planboundary.DerivativesRiskContextDTO;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.RuntimeKlineItemDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceMissingReasonEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceOwnershipResult;
+import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceOwnershipStatusEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceReviewModeEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -160,6 +164,44 @@ class DefaultSourceAssemblerTest {
                 "multiTimeframeSource",
                 "eventSource",
                 "wickSource"
+        );
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+        assertThat(sourceTrace.isManualReviewRequired()).isTrue();
+        assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void entryOwnershipSkeletonDefaultShouldLeaveSourceTraceEntryMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(new BigDecimal("102.30"));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30"), klineItem("101.10")));
+        SourceTraceEntrySourceOwnershipResult entryOwnership =
+                new FailClosedSourceTraceEntrySourceOwnershipService()
+                        .resolveEntrySourceOwnership(runtimeKlineContext);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(entryOwnership.getOwnershipStatus()).isEqualTo(SourceTraceEntrySourceOwnershipStatusEnum.INCOMPLETE);
+        assertThat(entryOwnership.getMissingReason()).isEqualTo(SourceTraceEntrySourceMissingReasonEnum.MISSING_SOURCE);
+        assertThat(entryOwnership.getReviewMode()).isEqualTo(SourceTraceEntrySourceReviewModeEnum.REVIEW_ONLY);
+        assertThat(entryOwnership.getEntryPriceSource()).isNull();
+        assertThat(entryOwnership.isManualReviewRequired()).isTrue();
+        assertThat(entryOwnership.isNotTradeInstruction()).isTrue();
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getEntryPriceSource()).isNull();
+        assertThat(sourceTrace.getEntrySourceType()).isNull();
+        assertThat(sourceTrace.getEntrySourceTimeframe()).isNull();
+        assertThat(sourceTrace.getEntrySourceReason()).isNull();
+        assertThat(sourceTrace.getEntrySourceRef()).isNull();
+        assertThat(sourceTrace.getMissingFields()).contains(
+                "entryPriceSource",
+                "entrySourceType",
+                "entrySourceTimeframe",
+                "entrySourceReason",
+                "entrySourceRef"
         );
         assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
         assertThat(sourceTrace.isManualReviewRequired()).isTrue();
