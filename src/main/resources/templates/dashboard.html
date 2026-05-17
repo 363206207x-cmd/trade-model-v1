@@ -181,8 +181,32 @@
             min-height: 98px;
             border-radius: 8px;
             box-shadow: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: var(--brand-accent);
+            opacity: 0.65;
         }
         .kpi-card h3 { margin-bottom: 6px; }
+        .kpi-anchor {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            min-width: 0;
+        }
+        .kpi-mark {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--brand-accent);
+            flex: 0 0 auto;
+            margin-top: 4px;
+        }
         .kpi-value {
             font-size: 1rem;
             line-height: 1.25;
@@ -192,6 +216,7 @@
         }
         .kpi-note {
             margin-top: 5px;
+            padding-left: 14px;
             font-size: 0.68rem;
             color: var(--text-secondary);
             line-height: 1.35;
@@ -385,6 +410,35 @@
             max-width: 100%;
             min-width: 0;
         }
+        .tile-compact-grid {
+            display: grid;
+            gap: 5px;
+            margin: 6px 0 3px;
+        }
+        .tile-compact-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.71rem;
+            line-height: 1.32;
+            min-width: 0;
+        }
+        .tile-compact-row .label {
+            color: var(--text-secondary);
+            flex: 0 0 auto;
+        }
+        .tile-compact-row .value {
+            color: var(--text-primary);
+            text-align: right;
+            font-weight: 600;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tile-risk-high { color: var(--status-error); }
+        .tile-risk-medium { color: var(--status-warn); }
+        .tile-risk-low { color: var(--status-ok); }
         .coin-tile .sym {
             font-weight: 700;
             font-size: 0.9rem;
@@ -737,6 +791,68 @@
             color: var(--text-secondary);
             font-size: 0.78rem;
         }
+        .decision-shells {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .decision-shell-card {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            padding: 10px;
+            min-width: 0;
+        }
+        .decision-shell-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .decision-shell-title {
+            margin: 0;
+            font-size: 0.73rem;
+            color: var(--brand-accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .decision-shell-body {
+            margin: 0 0 8px;
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        .decision-shell-rows {
+            display: grid;
+            gap: 5px;
+        }
+        .decision-shell-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.72rem;
+            line-height: 1.35;
+        }
+        .decision-shell-row .label {
+            color: var(--text-secondary);
+            flex: 0 0 auto;
+        }
+        .decision-shell-row .value {
+            color: var(--text-primary);
+            text-align: right;
+            min-width: 0;
+            word-break: break-word;
+        }
+        .decision-shell-note {
+            margin-top: 8px;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            line-height: 1.4;
+        }
         .diagnostics-panel {
             margin-top: 14px;
             border: 1px solid var(--border-subtle);
@@ -760,6 +876,7 @@
         @media (max-width: 1100px) {
             .workbench-grid { grid-template-columns: 1fr 1fr; }
             .workbench-grid .workbench-panel:first-child { grid-column: 1 / -1; }
+            .decision-shells { grid-template-columns: 1fr; }
         }
         @media (max-width: 700px) {
             .workbench-grid { grid-template-columns: 1fr; }
@@ -969,11 +1086,11 @@
  * =============================================================================
  * TRINE LOGIC (V1) dashboard — 数据说明（供审核）
  * =============================================================================
- * 页面结构（HOME-P2 主阅读结构，勿改为长列表堆叠）：
+ * 页面结构（HOME-P2A 主阅读结构，勿改为长列表堆叠）：
  *   左侧 .home-sidebar：My Watch / 搜索 / Display Slots 列表 / 系统状态 / 告警中心 / 复盘入口
- *   第一层 .layer1：紧凑 KPI（趋势、系统风险、数据质量、AI 冲突、可复核机会、Confused、Hot Reset）
- *   第二层 .layer2-head + #tilesRow：Display Slots / 首页展示位；仅渲染最多 6 个币方块（见 buildDisplayList）
- *   当前标的主工作台 #mainWorkbenchCard：聚合当前选中标的的结论、边界、执行只读状态和下一步人工复核重点
+ *   第一层 .layer1：紧凑 KPI（趋势、系统风险、数据质量、AI 冲突、可复核机会、Confused、Hot Reset），主值/次说明分层展示
+ *   第二层 .layer2-head + #tilesRow：Display Slots / 首页展示位；仅渲染最多 6 个币方块（见 buildDisplayList），asset tile 保持短字段
+ *   当前标的主工作台 #mainWorkbenchCard：聚合当前选中标的的结论、边界、执行只读状态、决策壳和下一步人工复核重点
  *   第三层 .layer3：左侧 #navPanel 导航 + 右侧 #detailPanel 详情（点击第二层方块切换，不跳转）
  *   诊断区 #diagnosticsPanel：技术接入状态下沉展示，不参与交易语义
  *
@@ -1221,6 +1338,19 @@
         return '<div class="workbench-metric"><span class="label">' + escapeHtml(label) + '</span><span class="value">' + escapeHtml(value || "—") + '</span></div>';
     }
 
+    function decisionShellRow(label, value) {
+        return '<div class="decision-shell-row"><span class="label">' + escapeHtml(label) + '</span><span class="value">' + escapeHtml(value || "—") + '</span></div>';
+    }
+
+    function decisionShellCard(title, statusText, statusClass, body, rows, note) {
+        return '<div class="decision-shell-card">'
+            + '<div class="decision-shell-head"><p class="decision-shell-title">' + escapeHtml(title) + '</p><span class="status-badge ' + statusClass + '">' + escapeHtml(statusText || "READ_ONLY") + '</span></div>'
+            + '<p class="decision-shell-body">' + escapeHtml(body || "等待后端字段") + '</p>'
+            + '<div class="decision-shell-rows">' + (rows || []).join("") + '</div>'
+            + '<div class="decision-shell-note">' + escapeHtml(note || "仅作人工复核展示，不产生交易执行权限。") + '</div>'
+            + '</div>';
+    }
+
     function manualAttentionText(d) {
         var worth = pickIsWorthOpening(d);
         if (worth === true) return "值得人工复核";
@@ -1229,7 +1359,7 @@
     }
 
     function kpiHtml(value, note) {
-        return '<div class="kpi-value">' + escapeHtml(value || "—") + '</div><div class="kpi-note">' + escapeHtml(note || "") + '</div>';
+        return '<div class="kpi-anchor"><span class="kpi-mark"></span><div class="kpi-value">' + escapeHtml(value || "—") + '</div></div><div class="kpi-note">' + escapeHtml(note || "") + '</div>';
     }
 
     function averageDataQuality(decisions) {
@@ -1307,14 +1437,77 @@
         return DEFAULT_DISPLAY_SLOT_SYMBOLS.map(function (sym) {
             return '<div class="coin-tile bias-neu placeholder">'
                 + '<div class="sym"><span>' + escapeHtml(sym) + '</span><span class="mini-tag sg-wait">等待首轮分析</span></div>'
+                + '<div class="tile-compact-grid">'
+                + '<div class="tile-compact-row"><span class="label">人工注意</span><span class="value">等待首轮分析</span></div>'
+                + '<div class="tile-compact-row"><span class="label">风险</span><span class="value">—</span></div>'
+                + '<div class="tile-compact-row"><span class="label">状态</span><span class="value">暂无真实决策</span></div>'
+                + '</div>'
                 + '<div class="placeholder-copy">'
-                + '<span>暂无真实决策</span>'
                 + '<span>非交易指令</span>'
                 + '<span>不伪造价格 / 评分 / 机会</span>'
                 + '</div>'
                 + '<div class="price">当前价格：— · 涨跌：—</div>'
                 + '</div>';
         }).join("");
+    }
+
+    function renderDecisionSectionShells(d, executionPlan, riskGuard, paperObs, aiConflict) {
+        if (!d) {
+            return '<div class="decision-shells">'
+                + decisionShellCard("已开仓监控", "READ_ONLY", "partial", "暂无真实持仓。等待后端持仓快照后仅做人工复核展示。", [
+                    decisionShellRow("持仓状态", "暂无真实持仓"),
+                    decisionShellRow("方向一致性", "—"),
+                    decisionShellRow("风险提示", "等待后端字段")
+                ], "无真实持仓时不生成平仓、反手或新开仓建议。")
+                + decisionShellCard("执行建议", "BOUNDARY_PENDING", "pending", "等待后端 ExecutionPlan / PlanBoundary 字段。", [
+                    decisionShellRow("ExecutionPlan", "BOUNDARY_PENDING"),
+                    decisionShellRow("SourceTrace", "INCOMPLETE"),
+                    decisionShellRow("交易语义", "非交易指令")
+                ], "缺失 SourceTrace / 风险上下文时保持 fail-closed。")
+                + decisionShellCard("AI 三方裁决", "PENDING", "partial", "AI role results pending or unavailable.", [
+                    decisionShellRow("冲突等级", "—"),
+                    decisionShellRow("角色输出", "暂无"),
+                    decisionShellRow("人工复核", "必须")
+                ], "AI 结果缺失时不推导机会、价格、评分或交易动作。")
+                + '</div>';
+        }
+
+        var hasPosition = hasRealPositionDetail(d);
+        var positionBody = hasPosition ? "检测到现有持仓字段，继续按只读监控展示。" : "暂无真实持仓。";
+        var positionStatus = hasPosition ? positionHealthTag(d) : "NO_POSITION";
+        var positionBadge = hasPosition ? "partial" : "pending";
+        var executionStatus = firstNonEmpty(executionPlan && executionPlan.executionPlanStatus, "BOUNDARY_PENDING");
+        var executionLabel = firstNonEmpty(executionPlan && executionPlan.executionPlanStatusLabel, "等待后端 ExecutionPlan");
+        var notExecutableReason = firstNonEmpty(executionPlan && executionPlan.notExecutableReason, "SourceTrace / PlanBoundary 未齐套");
+        var guardStatus = firstNonEmpty(riskGuard && riskGuard.riskActionGuardStatus, "READ_ONLY_PLACEHOLDER");
+        var guardLabel = firstNonEmpty(riskGuard && riskGuard.riskActionGuardStatusLabel, "只读占位");
+        var ai = aiConflict || resolveAiConflict(d);
+        var aiRoleRaw = d.aiRoleResults != null ? d.aiRoleResults : d.ai_role_results;
+        var aiRoleAvailable = aiRoleRaw != null && String(aiRoleRaw).trim();
+        var aiMode = d.aiPlanMode != null ? d.aiPlanMode : d.ai_plan_mode;
+        var paperStatus = firstNonEmpty(paperObs && paperObs.paperObservationStatus, "BACKEND_PENDING");
+        var paperLabel = firstNonEmpty(paperObs && paperObs.paperObservationStatusLabel, "仅占位");
+
+        return '<div class="decision-shells">'
+            + decisionShellCard("已开仓监控", positionStatus, positionBadge, positionBody, [
+                decisionShellRow("开仓方向", positionSideText(d.positionSide != null ? d.positionSide : d.position_side)),
+                decisionShellRow("方向一致性", directionConsistencyText(d)),
+                decisionShellRow("当前盈亏", formatPct(d.unrealizedPnlPct != null ? d.unrealizedPnlPct : d.unrealized_pnl_pct)),
+                decisionShellRow("Paper Observation", paperStatus + " / " + paperLabel)
+            ], "持仓监控只描述已有字段；高风险不等于直接止损或反手。")
+            + decisionShellCard("执行建议", executionStatus, statusBadgeClass(executionStatus), "ExecutionPlan 仅作为 review-only / advisory 壳展示。", [
+                decisionShellRow("状态标签", executionLabel),
+                decisionShellRow("不可执行原因", notExecutableReason),
+                decisionShellRow("建议摘要", formatWithSource(resolveRecommendedActionPresentation(d).text, resolveRecommendedActionPresentation(d).source)),
+                decisionShellRow("RiskActionGuard", guardStatus + " / " + guardLabel)
+            ], "不生成真实 entry / stop / take-profit 数值，不连接 order API。")
+            + decisionShellCard("AI 三方裁决", ai.level != null && ai.level <= 2 ? "REVIEW_READY" : "REVIEW_REQUIRED", ai.level != null && ai.level <= 2 ? "partial" : "pending", aiRoleAvailable ? "AI 原始角色输出已存在，详情在下方 tab 查看。" : "AI role results pending or unavailable.", [
+                decisionShellRow("冲突等级", formatWithSource(ai.label, ai.source)),
+                decisionShellRow("AI 计划模式", aiMode || "—"),
+                decisionShellRow("角色输出", aiRoleAvailable ? "已返回" : "暂无"),
+                decisionShellRow("人工复核", "必须")
+            ], "AI 收敛状态不能绕过 SourceTrace、RiskActionGuard 或人工复核。")
+            + '</div>';
     }
 
     function structuredWorkbenchEmptyState() {
@@ -1338,7 +1531,9 @@
             + '<li>首轮分析前不展示价格、评分、机会或 AI 结果</li>'
             + '<li>缺失 SourceTrace / 风险上下文时保持 fail-closed</li>'
             + '</ul></div>'
-            + '</div><div class="workbench-safety">BoundaryCandidate VALID 不等于交易动作；ExecutionPlan readiness 不自动执行。</div>';
+            + '</div>'
+            + renderDecisionSectionShells(null, {}, {}, {}, {})
+            + '<div class="workbench-safety">BoundaryCandidate VALID 不等于交易动作；ExecutionPlan readiness 不自动执行。</div>';
     }
 
     function workbenchSourceFocus(planBoundary, executionPlan, riskGuard, d) {
@@ -1405,6 +1600,7 @@
             : "暂无结论摘要";
         var miniSummary = displayMiniField(marketEnvironmentMini && marketEnvironmentMini.summary);
         var miniRiskMode = displayMiniField(marketEnvironmentMini && marketEnvironmentMini.riskMode);
+        var aiConflict = resolveAiConflict(d);
         var focusItems = workbenchSourceFocus(planBoundary, executionPlan, riskGuard, d);
         var focusHtml = focusItems.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("");
         var priceText = formatPrice(d.latestPrice != null ? d.latestPrice : d.latest_price);
@@ -1441,7 +1637,9 @@
             + workbenchMetric("市场风险模式", miniRiskMode)
             + workbenchMetric("机会推送", boolSafetyText(riskGuard.opportunityPushAllowed, "允许展示", "禁止", "禁止 / 未确认"))
             + '</div><ul class="workbench-focus-list">' + focusHtml + '</ul></div>'
-            + '</div><div class="workbench-safety">' + escapeHtml(safetyLine) + '</div>';
+            + '</div>'
+            + renderDecisionSectionShells(d, executionPlan, riskGuard, paperObs, aiConflict)
+            + '<div class="workbench-safety">' + escapeHtml(safetyLine) + '</div>';
     }
 
     function formatDateTime(v) {
@@ -2041,21 +2239,21 @@
             var ra = resolveRecommendedActionPresentation(d);
             var pos = hasRealPositionDetail(d);
             var sideHint = positionSideText(d.positionSide != null ? d.positionSide : d.position_side);
-            var conclusionRaw = d.conclusionSummary != null ? d.conclusionSummary : d.conclusion_summary;
-            var conclusionTrim = conclusionRaw != null ? String(conclusionRaw).trim() : "";
-            var conclusionHtml = conclusionTrim
-                ? '<div class="tile-conclusion-line" title="' + escapeHtml(normalizeReadableText(conclusionTrim)) + '">' +
-                    escapeHtml(normalizeReadableText(conclusionTrim)) + "</div>"
-                : "";
+            var riskText = riskLevelText(d.riskLevel);
+            var riskCls = riskText === "高" ? "tile-risk-high" : (riskText === "中" ? "tile-risk-medium" : (riskText === "低" ? "tile-risk-low" : ""));
+            var attentionText = manualAttentionText(d);
             return '<div class="coin-tile bias-' + bcls + sel + '" data-symbol="' + escapeHtml(d.symbol || "") + '" data-idx="' + idx + '">' +
                 '<button type="button" class="tile-del" data-symbol="' + escapeHtml(d.symbol || "") + '" title="自定义模式下可从本机列表移除">×</button>' +
                 '<div class="sym"><span>' + escapeHtml(d.symbol || "—") + '</span>' +
                 (pos ? '<span class="mini-tag" style="color:var(--brand-accent);border-color:rgba(56,189,248,0.4);">持仓中' + (sideHint !== "—" ? " · " + sideHint : "") + '</span>' : "") + "</div>" +
-                conclusionHtml +
                 '<div class="tile-primary">' +
                 '<div class="tile-mainline"><span class="tile-bias ' + bcls + '">' + bias + '</span><span class="conf-badge">' + confidenceBadge(d.confidenceLevel) + "</span></div>" +
+                '<div class="tile-compact-grid">' +
+                '<div class="tile-compact-row"><span class="label">风险</span><span class="value ' + riskCls + '">' + escapeHtml(riskText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">人工注意</span><span class="value">' + escapeHtml(attentionText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">建议</span><span class="value">' + escapeHtml(formatWithSource(ra.text, ra.source)) + '</span></div>' +
+                '</div>' +
                 '<div class="tile-tags-compact"><span class="mini-tag ' + worth.cls + '">' + escapeHtml(formatWithSource(worth.text, worth.source)) + '</span>' +
-                '<span class="mini-tag ' + ra.cls + '">' + escapeHtml(formatWithSource(ra.text, ra.source)) + '</span>' +
                 '<span class="mini-tag conflict">' + escapeHtml(formatWithSource(ac.short, ac.source)) + "</span>" +
                 '<span class="mini-tag ' + rmTile.cls + '">' + escapeHtml(formatWithSource(rmTile.text, rmTile.source)) + "</span></div></div>" +
                 '<div class="price">' + escapeHtml(formatPriceLine(d)) + '</div></div>';
