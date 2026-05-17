@@ -156,6 +156,7 @@ class DashboardControllerTest {
     void detail_json_exposesCoreFieldsOnDecision() throws Exception {
         DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
         decision.setAnalysisId("ana-btc");
+        decision.setTimeframe("1h");
         decision.setMultiTfConvergence("STRONG");
         decision.setDataQualityScore(91);
         decision.setLatestPrice(BigDecimal.valueOf(68100));
@@ -182,16 +183,22 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreType").value("综合评分"))
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreValue").value(81.5))
                 .andExpect(jsonPath("$.sourceTrace.fallbackStatus").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.sourceTrace.timeframe").value("1h"))
+                .andExpect(jsonPath("$.sourceTrace.timeframeSource").value("DecisionResultVO.timeframe"))
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineContextStatus").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.sourceTrace.runtimeKlineContextSource").value("dashboardDetail.noRuntimeKlineContext"))
                 .andExpect(jsonPath("$.sourceTrace.quoteLatestPrice").value(68100))
                 .andExpect(jsonPath("$.sourceTrace.quoteLatestPriceSource").value("DecisionResultVO.latestPrice"))
                 .andExpect(jsonPath("$.sourceTrace.quotePriceUpdateTimeMs").value(1710000000000L))
                 .andExpect(jsonPath("$.sourceTrace.quotePriceUpdateTimeSource").value("DecisionResultVO.priceUpdateTimeMs"))
+                .andExpect(jsonPath("$.sourceTrace.quoteFreshnessStatus").value("QUOTE_UPDATE_TIME_ONLY"))
                 .andExpect(jsonPath("$.sourceTrace.dataQualityScore").value(91))
                 .andExpect(jsonPath("$.sourceTrace.dataQualityScoreSource").value("DecisionResultVO.dataQualityScore"))
                 .andExpect(jsonPath("$.sourceTrace.manualReviewRequired").value(true))
                 .andExpect(jsonPath("$.sourceTrace.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.sourceTrace.missingFields").isArray())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'runtimeKlineContext')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'timeframe')]").doesNotExist())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'latestPrice')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'entryPriceSource')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'stopPriceSource')]").exists())
@@ -203,6 +210,8 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'eventSource')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'wickSource')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.fallbackStatus").value("SAFE_FAIL_CLOSED_ONLY"))
+                .andExpect(jsonPath("$.derivativesRiskContext.timeframe").value("1h"))
+                .andExpect(jsonPath("$.derivativesRiskContext.timeframeSource").value("DecisionResultVO.timeframe"))
                 .andExpect(jsonPath("$.derivativesRiskContext.dataQualityScore").value(91))
                 .andExpect(jsonPath("$.derivativesRiskContext.dataQualityScoreSource").value("DecisionResultVO.dataQualityScore"))
                 .andExpect(jsonPath("$.derivativesRiskContext.manualReviewRequired").value(true))

@@ -52,6 +52,7 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getLeverageSuggestion()).isEqualTo("5x");
         assertThat(row.getPositionSuggestion()).isEqualTo("pos-new");
         assertThat(row.getDataQualityScore()).isEqualTo(87);
+        assertThat(row.getTimeframe()).isEqualTo("1h");
     }
 
     @Test
@@ -81,5 +82,6 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getLeverageSuggestion()).isEqualTo("lev-z");
         assertThat(row.getPositionSuggestion()).isEqualTo("pos-z");
         assertThat(row.getDataQualityScore()).isEqualTo(73);
+        assertThat(row.getTimeframe()).isEqualTo("1h");
     }
 }

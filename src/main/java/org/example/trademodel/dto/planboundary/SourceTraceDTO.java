@@ -8,10 +8,14 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     private String symbol;
     private String timeframe;
+    private String timeframeSource;
+    private String runtimeKlineContextStatus;
+    private String runtimeKlineContextSource;
     private BigDecimal quoteLatestPrice;
     private String quoteLatestPriceSource;
     private Long quotePriceUpdateTimeMs;
     private String quotePriceUpdateTimeSource;
+    private String quoteFreshnessStatus;
     private BigDecimal dataQualityScore;
     private String dataQualityScoreSource;
     private BigDecimal entryPriceSource;
@@ -56,6 +60,30 @@ public class SourceTraceDTO implements SourceCompletenessContract {
         this.timeframe = timeframe;
     }
 
+    public String getTimeframeSource() {
+        return timeframeSource;
+    }
+
+    public void setTimeframeSource(String timeframeSource) {
+        this.timeframeSource = timeframeSource;
+    }
+
+    public String getRuntimeKlineContextStatus() {
+        return runtimeKlineContextStatus;
+    }
+
+    public void setRuntimeKlineContextStatus(String runtimeKlineContextStatus) {
+        this.runtimeKlineContextStatus = runtimeKlineContextStatus;
+    }
+
+    public String getRuntimeKlineContextSource() {
+        return runtimeKlineContextSource;
+    }
+
+    public void setRuntimeKlineContextSource(String runtimeKlineContextSource) {
+        this.runtimeKlineContextSource = runtimeKlineContextSource;
+    }
+
     public BigDecimal getQuoteLatestPrice() {
         return quoteLatestPrice;
     }
@@ -86,6 +114,14 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setQuotePriceUpdateTimeSource(String quotePriceUpdateTimeSource) {
         this.quotePriceUpdateTimeSource = quotePriceUpdateTimeSource;
+    }
+
+    public String getQuoteFreshnessStatus() {
+        return quoteFreshnessStatus;
+    }
+
+    public void setQuoteFreshnessStatus(String quoteFreshnessStatus) {
+        this.quoteFreshnessStatus = quoteFreshnessStatus;
     }
 
     public BigDecimal getDataQualityScore() {

@@ -75,6 +75,7 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
     void shouldWireOnlyProductionBackedDecisionFieldsAndKeepBoundarySourcesMissing() {
         DecisionResultVO decision = new DecisionResultVO();
         decision.setAnalysisId("ana-btc-production-backed");
+        decision.setTimeframe("1h");
         decision.setMultiTfConvergence("STRONG");
         decision.setDataQualityScore(88);
         decision.setLatestPrice(BigDecimal.valueOf(68100));
@@ -90,16 +91,25 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         SourceTraceDTO sourceTrace = context.getSourceTrace();
         DerivativesRiskContextDTO derivativesRiskContext = context.getDerivativesRiskContext();
 
+        assertEquals("1h", sourceTrace.getTimeframe());
+        assertEquals("DecisionResultVO.timeframe", sourceTrace.getTimeframeSource());
+        assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
+        assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
         assertEquals(BigDecimal.valueOf(68100), sourceTrace.getQuoteLatestPrice());
         assertEquals("DecisionResultVO.latestPrice", sourceTrace.getQuoteLatestPriceSource());
         assertEquals(1710000000000L, sourceTrace.getQuotePriceUpdateTimeMs());
         assertEquals("DecisionResultVO.priceUpdateTimeMs", sourceTrace.getQuotePriceUpdateTimeSource());
+        assertEquals("QUOTE_UPDATE_TIME_ONLY", sourceTrace.getQuoteFreshnessStatus());
         assertEquals(BigDecimal.valueOf(88), sourceTrace.getDataQualityScore());
         assertEquals("DecisionResultVO.dataQualityScore", sourceTrace.getDataQualityScoreSource());
         assertEquals("DecisionResultVO.multiTfConvergence", sourceTrace.getMultiTimeframeSource());
+        assertFalse(sourceTrace.getMissingFields().contains("timeframe"));
         assertFalse(sourceTrace.getMissingFields().contains("multiTimeframeSource"));
+        assertEquals("1h", derivativesRiskContext.getTimeframe());
+        assertEquals("DecisionResultVO.timeframe", derivativesRiskContext.getTimeframeSource());
         assertEquals(BigDecimal.valueOf(88), derivativesRiskContext.getDataQualityScore());
         assertEquals("DecisionResultVO.dataQualityScore", derivativesRiskContext.getDataQualityScoreSource());
+        assertFalse(derivativesRiskContext.getMissingFields().contains("timeframe"));
         assertFalse(derivativesRiskContext.getMissingFields().contains("dataQualityScore"));
 
         assertNull(sourceTrace.getEntryPriceSource());
@@ -124,6 +134,7 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
     @Test
     void shouldKeepQuoteAndDataQualityMetadataFromCompletingSourceTrace() {
         DecisionResultVO decision = new DecisionResultVO();
+        decision.setTimeframe("1h");
         decision.setLatestPrice(BigDecimal.valueOf(68100));
         decision.setPriceUpdateTimeMs(1710000000000L);
         decision.setDataQualityScore(88);
@@ -138,8 +149,11 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
 
         SourceTraceDTO sourceTrace = context.getSourceTrace();
 
+        assertEquals("1h", sourceTrace.getTimeframe());
+        assertEquals("DecisionResultVO.timeframe", sourceTrace.getTimeframeSource());
         assertEquals(BigDecimal.valueOf(68100), sourceTrace.getQuoteLatestPrice());
         assertEquals("DecisionResultVO.latestPrice", sourceTrace.getQuoteLatestPriceSource());
+        assertEquals("QUOTE_UPDATE_TIME_ONLY", sourceTrace.getQuoteFreshnessStatus());
         assertEquals(BigDecimal.valueOf(88), sourceTrace.getDataQualityScore());
         assertNull(sourceTrace.getEntryPriceSource());
         assertNull(sourceTrace.getStopPriceSource());
@@ -155,5 +169,28 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertFalse(sourceTrace.hasRequiredBoundarySources());
         assertTrue(sourceTrace.isManualReviewRequired());
         assertTrue(sourceTrace.isNotTradeInstruction());
+    }
+
+    @Test
+    void shouldKeepTimeframeMissingWhenDecisionDoesNotOwnTimeframeSource() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setLatestPrice(BigDecimal.valueOf(68100));
+        decision.setPriceUpdateTimeMs(1710000000000L);
+
+        DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext context =
+                adapter.build("BTCUSDT", decision);
+
+        SourceTraceDTO sourceTrace = context.getSourceTrace();
+        DerivativesRiskContextDTO derivativesRiskContext = context.getDerivativesRiskContext();
+
+        assertNull(sourceTrace.getTimeframe());
+        assertNull(sourceTrace.getTimeframeSource());
+        assertTrue(sourceTrace.getMissingFields().contains("timeframe"));
+        assertTrue(derivativesRiskContext.getMissingFields().contains("timeframe"));
+        assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
+        assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
+        assertEquals("QUOTE_UPDATE_TIME_ONLY", sourceTrace.getQuoteFreshnessStatus());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
     }
 }
