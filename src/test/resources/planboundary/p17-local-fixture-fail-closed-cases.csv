@@ -1,0 +1,8 @@
+fixtureId,symbol,timeframe,runtimeSource,derivativesRiskContext,riskActionGuard,expectedBoundaryStatus,expectedExecutionPlanStatus,expectedAudit
+P17-COMPLETE-REVIEW-ONLY,BTCUSDT,1h,complete,complete,manual-review-safe,VALID,READY_REVIEW_ONLY,BOUNDARY_VALID_REVIEW_ONLY
+P17-MISSING-SOURCE-TRACE,BTCUSDT,1h,missing-entry-source,complete,manual-review-safe,INCOMPLETE,INCOMPLETE,SOURCE_TRACE_INCOMPLETE
+P17-MISSING-DERIVATIVES-CONTEXT,BTCUSDT,1h,complete,missing,manual-review-safe,WATCH_ONLY,WATCH_ONLY,DERIVATIVES_CONTEXT_WATCH_ONLY
+P17-STAMPEDE-RISK,BTCUSDT,1h,complete,complete,stampede-detected,WATCH_ONLY,WATCH_ONLY,RISK_GUARD_STAMPEDE_REVIEW_ONLY
+P17-LIQUIDITY-MISSING,BTCUSDT,1h,complete,complete,liquidity-backend-pending,WATCH_ONLY,WATCH_ONLY,RISK_GUARD_LIQUIDITY_CONTEXT_MISSING
+P17-WICK-ONLY-RISK,BTCUSDT,1h,complete,complete,wick-only-detected,WATCH_ONLY,WATCH_ONLY,RISK_GUARD_WICK_ONLY_REVIEW_ONLY
+P17-PUSH-RECHECK-NAMING,BTCUSDT,1h,complete,complete,manual-review-safe,VALID,READY_REVIEW_ONLY,PUSH_RECHECK_REVIEW_ONLY_NAMING
