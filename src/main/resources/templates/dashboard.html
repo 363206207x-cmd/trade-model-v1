@@ -97,13 +97,105 @@
         select.btn { cursor: pointer; }
 
         .wrap { padding: 14px 18px 28px; max-width: 1680px; margin: 0 auto; }
+        .dashboard-shell {
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr);
+            gap: 14px;
+            align-items: start;
+        }
+        .dashboard-main { min-width: 0; }
+        .home-sidebar {
+            position: sticky;
+            top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+        .sidebar-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 11px;
+            box-shadow: var(--shadow-soft);
+        }
+        .sidebar-title {
+            margin: 0 0 8px 0;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--brand-accent);
+        }
+        .sidebar-search {
+            width: 100%;
+            padding: 7px 9px;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            font-size: 0.82rem;
+            margin-bottom: 8px;
+        }
+        .sidebar-slot-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .sidebar-slot {
+            width: 100%;
+            text-align: left;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            padding: 8px;
+            font-size: 0.78rem;
+            cursor: pointer;
+        }
+        .sidebar-slot:hover { border-color: var(--brand-accent); }
+        .sidebar-slot.active { border-color: var(--brand-accent); box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18); }
+        .sidebar-slot.placeholder { cursor: default; color: var(--text-secondary); }
+        .sidebar-slot-symbol { display: block; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+        .sidebar-slot-note { display: block; color: var(--text-secondary); font-size: 0.7rem; line-height: 1.35; }
+        .sidebar-link-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .sidebar-alert-list { display: grid; gap: 6px; }
+        @media (max-width: 1180px) {
+            .dashboard-shell { grid-template-columns: 1fr; }
+            .home-sidebar { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .home-sidebar .sidebar-card:first-child { grid-column: 1 / -1; }
+        }
+        @media (max-width: 700px) {
+            .home-sidebar { display: flex; }
+        }
 
-        /* Layer 1: compact row */
+        /* Layer 1: compact KPI row */
         .layer1 {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 14px;
+            grid-template-columns: repeat(7, minmax(132px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .kpi-card {
+            padding: 10px 11px;
+            min-height: 98px;
+            border-radius: 8px;
+            box-shadow: none;
+        }
+        .kpi-card h3 { margin-bottom: 6px; }
+        .kpi-value {
+            font-size: 1rem;
+            line-height: 1.25;
+            font-weight: 750;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+        .kpi-note {
+            margin-top: 5px;
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+            word-break: break-word;
         }
         .module-status-card { margin-bottom: 14px; }
         .module-status-note { margin: 0 0 10px 0; font-size: 0.78rem; color: var(--text-secondary); }
@@ -115,8 +207,11 @@
         .status-badge.ok { color: var(--status-ok); border-color: rgba(34, 197, 94, 0.45); }
         .status-badge.partial { color: var(--status-warn); border-color: rgba(234, 179, 8, 0.5); }
         .status-badge.pending { color: var(--status-error); border-color: rgba(239, 68, 68, 0.45); }
-        @media (max-width: 1200px) {
-            .layer1 { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: 1320px) {
+            .layer1 { grid-template-columns: repeat(4, minmax(132px, 1fr)); }
+        }
+        @media (max-width: 900px) {
+            .layer1 { grid-template-columns: repeat(2, minmax(132px, 1fr)); }
         }
         @media (max-width: 900px) {
             .status-grid { grid-template-columns: 1fr; }
@@ -265,6 +360,20 @@
             transform: translateY(-1px);
         }
         .coin-tile.selected::before { height: 4px; background: var(--brand-accent); }
+        .coin-tile.placeholder {
+            cursor: default;
+            border-style: dashed;
+            background: var(--bg-elevated);
+        }
+        .coin-tile.placeholder:hover { transform: none; border-color: var(--border-subtle); }
+        .placeholder-copy {
+            display: grid;
+            gap: 5px;
+            margin-top: 8px;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            line-height: 1.35;
+        }
         .tile-conclusion-line {
             font-size: 0.72rem;
             color: var(--text-secondary);
@@ -701,23 +810,60 @@
     </header>
 
     <div class="wrap">
+        <div class="dashboard-shell">
+            <aside class="home-sidebar" id="homeSidebar">
+                <div class="sidebar-card">
+                    <p class="sidebar-title">My Watch / 我的关注</p>
+                    <input type="search" id="sidebarSymbolSearch" class="sidebar-search" placeholder="搜索币种，如 BTCUSDT" autocomplete="off">
+                    <div class="sidebar-slot-list" id="sidebarSlotList"></div>
+                    <p class="module-status-note" style="margin-top:8px;">Display Slots 是首页展示位；Watchlist Pool / 观察库才是推送候选边界。</p>
+                </div>
+                <div class="sidebar-card">
+                    <p class="sidebar-title">系统运行状态</p>
+                    <div id="sidebarSystemStatus"><p class="empty-hint">等待摘要数据</p></div>
+                </div>
+                <div class="sidebar-card">
+                    <p class="sidebar-title">告警中心</p>
+                    <div class="sidebar-alert-list" id="sidebarAlertList"><p class="empty-hint">暂无告警</p></div>
+                </div>
+                <div class="sidebar-card">
+                    <p class="sidebar-title">Review Center</p>
+                    <div class="sidebar-link-row">
+                        <a class="btn" href="/review" target="_blank" rel="noopener">进入复盘中心</a>
+                    </div>
+                    <p class="module-status-note" style="margin-top:8px;">复盘中心仅用于人工复核，不产生交易执行权限。</p>
+                </div>
+            </aside>
+            <main class="dashboard-main">
         <!-- 第一层 -->
         <div class="layer1">
-            <div class="card" id="cardSystem">
-                <h3>系统摘要</h3>
-                <div id="layer1-system"></div>
+            <div class="card kpi-card" id="cardTrend">
+                <h3>市场趋势</h3>
+                <div id="kpi-trend"></div>
             </div>
-            <div class="card" id="cardPriority">
-                <h3>高优先级提醒</h3>
-                <div id="layer1-priority"></div>
+            <div class="card kpi-card" id="cardRisk">
+                <h3>系统风险等级</h3>
+                <div id="kpi-risk"></div>
             </div>
-            <div class="card" id="cardMarket">
-                <h3>行情警告</h3>
-                <div id="layer1-market"></div>
+            <div class="card kpi-card" id="cardDataQuality">
+                <h3>数据质量分</h3>
+                <div id="kpi-data-quality"></div>
             </div>
-            <div class="card" id="cardMissed">
-                <h3>今日遗漏但正确机会</h3>
-                <div id="layer1-missed"></div>
+            <div class="card kpi-card" id="cardAiConflict">
+                <h3>AI 冲突等级</h3>
+                <div id="kpi-ai-conflict"></div>
+            </div>
+            <div class="card kpi-card" id="cardOpportunity">
+                <h3>可复核机会</h3>
+                <div id="kpi-opportunity"></div>
+            </div>
+            <div class="card kpi-card" id="cardConfused">
+                <h3>Confused</h3>
+                <div id="kpi-confused"></div>
+            </div>
+            <div class="card kpi-card" id="cardHotReset">
+                <h3>Hot Reset</h3>
+                <div id="kpi-hot-reset"></div>
             </div>
         </div>
 
@@ -813,6 +959,8 @@
 
             </div>
         </details>
+            </main>
+        </div>
     </div>
 
     <script src="/js/alert-explain.js"></script>
@@ -821,8 +969,9 @@
  * =============================================================================
  * TRINE LOGIC (V1) dashboard — 数据说明（供审核）
  * =============================================================================
- * 页面结构（主阅读三层，勿改为长列表堆叠）：
- *   第一层 .layer1：系统摘要 | 高优先级提醒 | 行情警告 | 今日遗漏但正确机会
+ * 页面结构（HOME-P2 主阅读结构，勿改为长列表堆叠）：
+ *   左侧 .home-sidebar：My Watch / 搜索 / Display Slots 列表 / 系统状态 / 告警中心 / 复盘入口
+ *   第一层 .layer1：紧凑 KPI（趋势、系统风险、数据质量、AI 冲突、可复核机会、Confused、Hot Reset）
  *   第二层 .layer2-head + #tilesRow：Display Slots / 首页展示位；仅渲染最多 6 个币方块（见 buildDisplayList）
  *   当前标的主工作台 #mainWorkbenchCard：聚合当前选中标的的结论、边界、执行只读状态和下一步人工复核重点
  *   第三层 .layer3：左侧 #navPanel 导航 + 右侧 #detailPanel 详情（点击第二层方块切换，不跳转）
@@ -873,6 +1022,7 @@
     var detailMarketEnvironmentMiniMap = {};
     var detailEvidenceTopItemsMap = {};
     var detailScoreTopItemsMap = {};
+    var DEFAULT_DISPLAY_SLOT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"];
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1078,6 +1228,119 @@
         return "等待后端判断";
     }
 
+    function kpiHtml(value, note) {
+        return '<div class="kpi-value">' + escapeHtml(value || "—") + '</div><div class="kpi-note">' + escapeHtml(note || "") + '</div>';
+    }
+
+    function averageDataQuality(decisions) {
+        var vals = (decisions || []).map(function (d) {
+            var raw = d.dataQualityScore != null ? d.dataQualityScore : d.data_quality_score;
+            var n = Number(raw);
+            return isFinite(n) ? n : null;
+        }).filter(function (v) { return v != null; });
+        if (!vals.length) return null;
+        var sum = vals.reduce(function (a, b) { return a + b; }, 0);
+        return (sum / vals.length).toFixed(1);
+    }
+
+    function decisionTrendSummary(decisions) {
+        var list = decisions || [];
+        if (!list.length) return { value: "暂无", note: "等待首轮分析" };
+        var bull = 0, bear = 0, neutral = 0;
+        list.forEach(function (d) {
+            var cls = biasClass(d.marketBiasHierarchy);
+            if (cls === "bull") bull += 1;
+            else if (cls === "bear") bear += 1;
+            else neutral += 1;
+        });
+        var main = "中性";
+        if (bull > bear && bull >= neutral) main = "偏多";
+        else if (bear > bull && bear >= neutral) main = "偏空";
+        return { value: main, note: "偏多 " + bull + " · 偏空 " + bear + " · 中性 " + neutral };
+    }
+
+    function renderSidebarPanel(systemStatus, alerts, openPositionCount) {
+        var sysBox = document.getElementById("sidebarSystemStatus");
+        var alertBox = document.getElementById("sidebarAlertList");
+        var sys = systemStatus || {};
+        if (sysBox) {
+            sysBox.innerHTML = '<div class="kv"><span class="k">状态</span><span class="v">' + escapeHtml((sys.status || "OK") === "OK" ? "正常" : (sys.status || "—")) + '</span></div>'
+                + '<div class="kv"><span class="k">监控币种</span><span class="v">' + escapeHtml(sys.monitoredCoins != null ? sys.monitoredCoins : "—") + '</span></div>'
+                + '<div class="kv"><span class="k">真实持仓</span><span class="v">' + Number(openPositionCount || 0) + '</span></div>'
+                + '<div class="kv"><span class="k">最后决策</span><span class="v">' + escapeHtml(formatDateTime(sys.lastDecisionTime)) + '</span></div>';
+        }
+        if (alertBox) {
+            var list = (alerts || []).slice(0, 3);
+            alertBox.innerHTML = list.length
+                ? list.map(function (a) {
+                    return '<div class="alert-line"><strong>' + escapeHtml(alertLevelText(a.alertLevel)) + '</strong> · ' + escapeHtml(a.alertMessage || "—") + '</div>';
+                }).join("")
+                : '<p class="empty-hint">暂无告警</p>';
+        }
+    }
+
+    function renderSidebarSlots() {
+        var box = document.getElementById("sidebarSlotList");
+        if (!box) return;
+        if (!displayDecisions.length) {
+            box.innerHTML = DEFAULT_DISPLAY_SLOT_SYMBOLS.map(function (sym) {
+                return '<div class="sidebar-slot placeholder"><span class="sidebar-slot-symbol">' + escapeHtml(sym) + '</span><span class="sidebar-slot-note">等待首轮分析 · 暂无真实决策</span></div>';
+            }).join("");
+            return;
+        }
+        box.innerHTML = displayDecisions.map(function (d) {
+            var active = d.symbol === selectedSymbol ? " active" : "";
+            return '<button type="button" class="sidebar-slot' + active + '" data-symbol="' + escapeHtml(d.symbol || "") + '"><span class="sidebar-slot-symbol">' + escapeHtml(d.symbol || "—") + '</span><span class="sidebar-slot-note">' + escapeHtml(biasText(d.marketBiasHierarchy)) + ' · ' + escapeHtml(confidenceBadge(d.confidenceLevel)) + '</span></button>';
+        }).join("");
+        Array.prototype.forEach.call(box.querySelectorAll(".sidebar-slot"), function (el) {
+            el.addEventListener("click", function () {
+                var sym = el.getAttribute("data-symbol");
+                if (!sym) return;
+                selectedSymbol = sym;
+                renderTiles();
+                requestDetailForSelectedSymbol();
+            });
+        });
+    }
+
+    function renderPlaceholderTiles() {
+        return DEFAULT_DISPLAY_SLOT_SYMBOLS.map(function (sym) {
+            return '<div class="coin-tile bias-neu placeholder">'
+                + '<div class="sym"><span>' + escapeHtml(sym) + '</span><span class="mini-tag sg-wait">等待首轮分析</span></div>'
+                + '<div class="placeholder-copy">'
+                + '<span>暂无真实决策</span>'
+                + '<span>非交易指令</span>'
+                + '<span>不伪造价格 / 评分 / 机会</span>'
+                + '</div>'
+                + '<div class="price">当前价格：— · 涨跌：—</div>'
+                + '</div>';
+        }).join("");
+    }
+
+    function structuredWorkbenchEmptyState() {
+        var symbol = DEFAULT_DISPLAY_SLOT_SYMBOLS[0];
+        return '<div class="workbench-grid">'
+            + '<div class="workbench-panel"><h4>结构化空态</h4><p class="workbench-lead">等待首轮分析生成后显示当前标的结论。</p>'
+            + '<div class="workbench-metrics">'
+            + workbenchMetric("当前标的", symbol)
+            + workbenchMetric("状态", "等待首轮分析")
+            + workbenchMetric("真实决策", "暂无")
+            + workbenchMetric("交易语义", "非交易指令")
+            + '</div></div>'
+            + '<div class="workbench-panel"><h4>边界占位</h4><div class="workbench-metrics">'
+            + workbenchMetric("PlanBoundary", "BACKEND_PENDING")
+            + workbenchMetric("ExecutionPlan", "BOUNDARY_PENDING")
+            + workbenchMetric("RiskActionGuard", "READ_ONLY_PLACEHOLDER")
+            + workbenchMetric("SourceTrace", "INCOMPLETE")
+            + '</div></div>'
+            + '<div class="workbench-panel"><h4>下一步人工复核</h4><ul class="workbench-focus-list">'
+            + '<li>等待后端生成最新 analysis</li>'
+            + '<li>首轮分析前不展示价格、评分、机会或 AI 结果</li>'
+            + '<li>缺失 SourceTrace / 风险上下文时保持 fail-closed</li>'
+            + '</ul></div>'
+            + '</div><div class="workbench-safety">BoundaryCandidate VALID 不等于交易动作；ExecutionPlan readiness 不自动执行。</div>';
+    }
+
     function workbenchSourceFocus(planBoundary, executionPlan, riskGuard, d) {
         var focus = [];
         var planStatus = firstNonEmpty(planBoundary && planBoundary.planBoundaryStatus, "BACKEND_PENDING").toUpperCase();
@@ -1109,7 +1372,7 @@
         var box = document.getElementById("mainWorkbenchContent");
         if (!box) return;
         if (!d) {
-            box.innerHTML = '<p class="empty-hint">请选择一个首页展示位标的。</p>';
+            box.innerHTML = structuredWorkbenchEmptyState();
             return;
         }
         var planBoundary = d.planBoundaryDisplay || {};
@@ -1726,108 +1989,31 @@
             hotHtml = '<div class="hot-block"><div class="hot-title" style="color:var(--text-secondary);font-weight:500;">Hot Reset：未触发</div></div>';
         }
 
-        document.getElementById("layer1-system").innerHTML =
-            '<div class="kv"><span class="k">系统运行状态</span><span class="v">' + escapeHtml((sys.status || "OK") === "OK" ? "正常" : (sys.status || "—")) + '</span></div>' +
-            '<div class="kv"><span class="k">最后更新时间</span><span class="v">' + escapeHtml(lastU) + '</span></div>' +
-            '<div class="kv"><span class="k">当前监控币种数</span><span class="v">' + escapeHtml(mon) + '</span></div>' +
-            '<div class="kv"><span class="k">已采纳数（本批摘要）</span><span class="v">' + adoptedN + '</span></div>' +
-            '<div class="kv"><span class="k">真实持仓记录</span><span class="v">' + Number(openPositionCount || 0) + '</span></div>' +
-            '<div class="kv"><span class="k">持仓来源</span><span id="providerStatusValue" class="v provider-state ' + escapeHtml(providerClassName) + '">' + escapeHtml(providerText) + '</span></div>' +
-            '<div class="kv"><span class="k">高风险数（本批摘要）</span><span class="v">' + highRiskN + '</span></div>' +
-            '<div class="kv"><span class="k">当前冲突状态数</span><span class="v">' + escapeHtml(ccDisplay) + '</span></div>' +
-            '<div class="kv"><span class="k">数据库连接</span><span class="v">' + escapeHtml(apiStatusLine(health)) + '</span></div>' +
-            '<div class="kv"><span class="k">持仓同步状态</span><span class="v">' + escapeHtml(mapSchedulerStatusDisplay(health)) + '</span></div>' +
-            '<div class="kv"><span class="k">Hot Reset 状态</span><span class="v">' + (hot.fired ? '<span style="color:var(--hot-reset);font-weight:600;">已触发</span>' : '未触发') + '</span></div>' +
-            hotHtml;
-
-        /* 高优先级提醒：黑天鹅 > Hot > Confused > 持仓反转 */
-        var lines = [];
-        var alertList = (alerts || []).slice();
-        alertList.sort(function (a, b) {
-            function rank(x) {
-                var L = (x.alertLevel || "").toUpperCase();
-                if (L === "CRITICAL" || L === "BLACKSWAN") return 0;
-                if (L === "HIGH") return 1;
-                if (L === "MEDIUM") return 2;
-                return 3;
-            }
-            return rank(a) - rank(b);
-        });
-        var a0 = alertList[0];
-        if (a0 && ((a0.alertLevel || "").toUpperCase() === "CRITICAL" || (a0.alertMessage || "").indexOf("黑天鹅") >= 0)) {
-            lines.push({ cls: "critical", html: '<strong>极端风险</strong> · ' + escapeHtml(a0.alertMessage || "") });
-        }
-        if (hot.fired) {
-            lines.push({ cls: "hot", html: '<strong>Hot Reset</strong> · 已触发 · ' + escapeHtml(hot.trigger || "原因待同步") });
-        }
-        if (confusedAggregateEmphasis) {
-            var ccNum = ccMetric.value;
-            var sample = (decisions || []).find(isConfusedState);
-            var info = sample ? confusedExplain(sample) : { source: "多周期与执行冲突", action: "暂缓方向性执行，等待二次确认", recovery: confusedRecoverySummary() };
-            lines.push({
-                cls: "confused",
-                html: '<strong>当前处于冲突状态</strong> · ' + ccNum + ' 个 · 原因：' + escapeHtml(info.source) +
-                    '<br><span style="color:var(--text-secondary);font-size:0.72rem;">建议：' + escapeHtml(info.action) + "；恢复条件：" + escapeHtml(info.recovery) + "</span>"
-            });
-        }
-        for (var i = 0; i < alertList.length && lines.length < 3; i++) {
-            var a = alertList[i];
-            var msg = a.alertMessage || "";
-            if (msg.indexOf("反转") >= 0 || msg.indexOf("趋势反转") >= 0) {
-                lines.push({ cls: "", html: '<strong>持仓逻辑反转风险</strong> · ' + escapeHtml(msg) });
-            }
-        }
-        if (lines.length < 2) {
-            for (var j = 0; j < alertList.length && lines.length < 3; j++) {
-                var aj = alertList[j];
-                var explain = (window.AlertExplain && window.AlertExplain.explainAlert)
-                    ? window.AlertExplain.explainAlert(aj)
-                    : null;
-                var typeLabel = explain ? explain.alertTypeLabel : (aj.alertType || "—");
-                var why = explain ? explain.why : (aj.alertMessage || "—");
-                var statusLabel = (aj.status == null || String(aj.status).trim() === "") ? "UNKNOWN" : String(aj.status);
-                lines.push({
-                    cls: "",
-                    html: escapeHtml("[" + statusLabel + "] " + alertLevelText(aj.alertLevel) + " · " + typeLabel + " · " + why)
-                });
-            }
-        }
-        if (!lines.length) {
-            lines.push({ cls: "", html: '<span class="empty-hint">暂无高优先级事项</span>' });
-        }
-        document.getElementById("layer1-priority").innerHTML = lines.slice(0, 3).map(function (L) {
-            return '<div class="alert-line ' + L.cls + '">' + L.html + "</div>";
-        }).join("");
-
+        var trend = decisionTrendSummary(decisions);
+        var dqAvg = averageDataQuality(decisions);
         var revMetric = countReverseSignals(decisions);
         var pendMetric = countPending(decisions);
         var rev = revMetric.value;
         var pend = pendMetric.value;
-        var keyRem = [];
-        if (confusedAggregateEmphasis) {
-            var s0 = (decisions || []).find(isConfusedState);
-            if (s0) keyRem.push("冲突中：" + confusedSourceSummary(s0));
-        }
-        if (highRiskN > 0) keyRem.push("本批摘要内高风险标的 " + highRiskN + " 个");
-        if (typeof pend === "number" && pend > 0) keyRem.push("待确认 " + pend + " 个");
-        document.getElementById("layer1-market").innerHTML =
-            '<div class="kv"><span class="k">反转数量</span><span class="v">' + escapeHtml(formatNumberWithSource(rev, revMetric.source)) + '</span></div>' +
-            '<div class="kv"><span class="k">高风险数（本批摘要）</span><span class="v">' + highRiskN + '</span></div>' +
-            '<div class="kv"><span class="k">待确认数量</span><span class="v">' + escapeHtml(formatNumberWithSource(pend, pendMetric.source)) + '</span></div>' +
-            ((rev == null || pend == null || ccMetric.value == null)
-                ? '<div class="side-note" style="margin-top:8px;">部分统计字段待后端聚合字段（reverse/pending/confused）补齐后展示。</div>'
-                : '') +
-            '<div style="margin-top:8px;font-size:0.76rem;color:var(--text-secondary);">重点提醒</div>' +
-            (keyRem.length ? keyRem.slice(0, 3).map(function (t) {
-                return '<div class="alert-line">' + escapeHtml(t) + "</div>";
-            }).join("") : '<div class="empty-hint">暂无</div>');
-
         var missed = missedOpportunityCount(decisions);
-        var missedLink = "/api/missed-opportunity/query?bizDate=" + encodeURIComponent(todayDateText()) + "&limit=50";
-        document.getElementById("layer1-missed").innerHTML =
-            '<div class="kv"><span class="k">今日可复盘机会</span><span class="v">' + missed + '</span></div>' +
-            '<p class="detail-p" style="margin-top:8px;color:var(--text-secondary);font-size:0.78rem;">系统已记录，可用于复盘检查。</p>' +
-            '<p style="margin:8px 0 0;"><a class="btn" href="' + missedLink + '" target="_blank" rel="noopener">查看详情</a></p>';
+        var riskValue = highRiskN > 0 ? (highRiskN + " 高风险") : "暂无高风险";
+        var riskNote = (alerts || []).length ? "告警 " + (alerts || []).length + " 条 · 仅提示" : "无高优先级告警";
+        var conflictValue = rev != null ? ("反转 " + rev) : "待后端字段";
+        var conflictNote = "待确认 " + formatNumberWithSource(pend, pendMetric.source);
+        var confusedValue = ccMetric.value != null ? formatNumberWithSource(ccMetric.value, ccMetric.source) : "待后端字段";
+        var opportunityValue = missed > 0 ? (missed + " 可复盘") : "暂无";
+        var opportunityNote = "review-only，不产生执行权限";
+        var hotValue = hot.fired ? "已触发" : "未触发";
+        var hotNote = hot.fired ? (hot.trigger || "原因待同步") : "无 Hot Reset";
+
+        document.getElementById("kpi-trend").innerHTML = kpiHtml(trend.value, trend.note);
+        document.getElementById("kpi-risk").innerHTML = kpiHtml(riskValue, riskNote);
+        document.getElementById("kpi-data-quality").innerHTML = kpiHtml(dqAvg != null ? dqAvg : "待后端字段", dqAvg != null ? "本批摘要均值" : "不前端推断数据质量");
+        document.getElementById("kpi-ai-conflict").innerHTML = kpiHtml(conflictValue, conflictNote);
+        document.getElementById("kpi-opportunity").innerHTML = kpiHtml(opportunityValue, opportunityNote);
+        document.getElementById("kpi-confused").innerHTML = kpiHtml(confusedValue, ccMetric.source === "backend" ? "后端聚合字段" : "字段缺失显示待补齐");
+        document.getElementById("kpi-hot-reset").innerHTML = kpiHtml(hotValue, hotNote);
+        renderSidebarPanel(systemStatus, alerts, openPositionCount);
     }
 
     function renderTiles() {
@@ -1839,7 +2025,8 @@
                     ? "自定义列表中的标的暂无决策记录，或已被搜索过滤。"
                     : "自定义监控列表为空：请切换到本模式后在搜索框输入如 BTCUSDT 并点「添加」加入本机列表（仅存浏览器）。";
             }
-            box.innerHTML = '<div class="card tile-full" style="text-align:center;padding:24px;"><span class="empty-hint">' + escapeHtml(emptyMsg) + "</span></div>";
+            box.innerHTML = '<div class="card tile-full" style="text-align:center;padding:14px;"><span class="empty-hint">' + escapeHtml(emptyMsg) + "</span></div>" + renderPlaceholderTiles();
+            renderSidebarSlots();
             renderMainWorkbench(null, null);
             renderDetail(null);
             return;
@@ -1898,6 +2085,7 @@
             });
         });
 
+        renderSidebarSlots();
         var cur = detailDecisionMap[selectedSymbol] || displayDecisions.find(function (x) { return x.symbol === selectedSymbol; });
         var marketEnvironmentMini = selectedSymbol ? detailMarketEnvironmentMiniMap[selectedSymbol] : null;
         var topItems = selectedSymbol ? detailEvidenceTopItemsMap[selectedSymbol] : [];
@@ -2352,9 +2540,22 @@
 
     document.getElementById("symbolSearch").addEventListener("input", function () {
         searchQuery = this.value;
+        var sideSearch = document.getElementById("sidebarSymbolSearch");
+        if (sideSearch && sideSearch.value !== this.value) sideSearch.value = this.value;
         buildDisplayList();
         renderTiles();
     });
+
+    var sidebarSearchInput = document.getElementById("sidebarSymbolSearch");
+    if (sidebarSearchInput) {
+        sidebarSearchInput.addEventListener("input", function () {
+            searchQuery = this.value;
+            var topSearch = document.getElementById("symbolSearch");
+            if (topSearch && topSearch.value !== this.value) topSearch.value = this.value;
+            buildDisplayList();
+            renderTiles();
+        });
+    }
 
     document.getElementById("modeSelect").addEventListener("change", function () {
         modeValue = this.value;
@@ -2367,6 +2568,8 @@
     document.getElementById("btnReset").addEventListener("click", function () {
         searchQuery = "";
         document.getElementById("symbolSearch").value = "";
+        var sideSearch = document.getElementById("sidebarSymbolSearch");
+        if (sideSearch) sideSearch.value = "";
         modeValue = "system";
         document.getElementById("modeSelect").value = "system";
         try { localStorage.setItem(MODE_LS_KEY, "system"); } catch (e) {}
