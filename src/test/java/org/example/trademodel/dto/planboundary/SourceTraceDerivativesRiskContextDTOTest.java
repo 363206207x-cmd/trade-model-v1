@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -77,33 +78,48 @@ class SourceTraceDerivativesRiskContextDTOTest {
 
     @Test
     void sourceTraceShouldReportRequiredBoundarySourcesCompleteWhenNoFallbackOrMissingFields() {
-        SourceTraceDTO trace = new SourceTraceDTO();
-        trace.setSymbol("BTCUSDT");
-        trace.setTimeframe("1h");
-        trace.setEntryPriceSource(BigDecimal.valueOf(68000));
-        trace.setEntrySourceType("support");
-        trace.setEntrySourceTimeframe("1h");
-        trace.setEntrySourceReason("support retest");
-        trace.setEntrySourceRef("entry-ref");
-        trace.setStopPriceSource(BigDecimal.valueOf(66800));
-        trace.setStopSourceType("swing_low");
-        trace.setStopSourceTimeframe("1h");
-        trace.setStopSourceReason("recent swing low");
-        trace.setStopSourceRef("stop-ref");
-        trace.setTpPriceSources(List.of(BigDecimal.valueOf(70400)));
-        trace.setTpSourceType("rr_ladder");
-        trace.setTpSourceTimeframe("1h");
-        trace.setTpSourceReason("2R ladder");
-        trace.setTpSourceRef("tp-ref");
-        trace.setRrSource(BigDecimal.valueOf(2));
-        trace.setRrRuleRef("min_rr_2");
-        trace.setLiquiditySource("depth_snapshot");
-        trace.setMultiTimeframeSource("1h_4h_alignment");
-        trace.setEventSource("no_major_event_window");
-        trace.setWickSource("wick_confirmed");
+        SourceTraceDTO trace = completeSourceTrace();
 
         assertTrue(trace.isComplete());
         assertTrue(trace.hasRequiredBoundarySources());
+    }
+
+    @Test
+    void hasRequiredBoundarySourcesShouldStayFalseUnlessEveryOwnershipFieldExists() {
+        List<SourceTraceFieldMutation> mutations = List.of(
+                new SourceTraceFieldMutation("missingFields", trace -> trace.setMissingFields(List.of("entryPriceSource"))),
+                new SourceTraceFieldMutation("fallbackStatus", trace -> trace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE)),
+                new SourceTraceFieldMutation("entryPriceSource", trace -> trace.setEntryPriceSource(null)),
+                new SourceTraceFieldMutation("entrySourceType", trace -> trace.setEntrySourceType(null)),
+                new SourceTraceFieldMutation("entrySourceTimeframe", trace -> trace.setEntrySourceTimeframe(null)),
+                new SourceTraceFieldMutation("entrySourceReason", trace -> trace.setEntrySourceReason(null)),
+                new SourceTraceFieldMutation("entrySourceRef", trace -> trace.setEntrySourceRef(null)),
+                new SourceTraceFieldMutation("stopPriceSource", trace -> trace.setStopPriceSource(null)),
+                new SourceTraceFieldMutation("stopSourceType", trace -> trace.setStopSourceType(null)),
+                new SourceTraceFieldMutation("stopSourceTimeframe", trace -> trace.setStopSourceTimeframe(null)),
+                new SourceTraceFieldMutation("stopSourceReason", trace -> trace.setStopSourceReason(null)),
+                new SourceTraceFieldMutation("stopSourceRef", trace -> trace.setStopSourceRef(null)),
+                new SourceTraceFieldMutation("tpPriceSources", trace -> trace.setTpPriceSources(List.of())),
+                new SourceTraceFieldMutation("tpSourceType", trace -> trace.setTpSourceType(null)),
+                new SourceTraceFieldMutation("tpSourceTimeframe", trace -> trace.setTpSourceTimeframe(null)),
+                new SourceTraceFieldMutation("tpSourceReason", trace -> trace.setTpSourceReason(null)),
+                new SourceTraceFieldMutation("tpSourceRef", trace -> trace.setTpSourceRef(null)),
+                new SourceTraceFieldMutation("rrSource", trace -> trace.setRrSource(null)),
+                new SourceTraceFieldMutation("rrRuleRef", trace -> trace.setRrRuleRef(null)),
+                new SourceTraceFieldMutation("liquiditySource", trace -> trace.setLiquiditySource(null)),
+                new SourceTraceFieldMutation("multiTimeframeSource", trace -> trace.setMultiTimeframeSource(null)),
+                new SourceTraceFieldMutation("eventSource", trace -> trace.setEventSource(null)),
+                new SourceTraceFieldMutation("wickSource", trace -> trace.setWickSource(null))
+        );
+
+        for (SourceTraceFieldMutation mutation : mutations) {
+            SourceTraceDTO trace = completeSourceTrace();
+            mutation.apply(trace);
+
+            assertFalse(trace.hasRequiredBoundarySources(), mutation.fieldName());
+            assertTrue(trace.isManualReviewRequired(), mutation.fieldName());
+            assertTrue(trace.isNotTradeInstruction(), mutation.fieldName());
+        }
     }
 
     @Test
@@ -202,6 +218,40 @@ class SourceTraceDerivativesRiskContextDTOTest {
                     assertFalse(name.contains(forbidden), type.getSimpleName() + "." + method.getName());
                 }
             }
+        }
+    }
+
+    private SourceTraceDTO completeSourceTrace() {
+        SourceTraceDTO trace = new SourceTraceDTO();
+        trace.setSymbol("BTCUSDT");
+        trace.setTimeframe("1h");
+        trace.setEntryPriceSource(BigDecimal.valueOf(68000));
+        trace.setEntrySourceType("support");
+        trace.setEntrySourceTimeframe("1h");
+        trace.setEntrySourceReason("support retest");
+        trace.setEntrySourceRef("entry-ref");
+        trace.setStopPriceSource(BigDecimal.valueOf(66800));
+        trace.setStopSourceType("swing_low");
+        trace.setStopSourceTimeframe("1h");
+        trace.setStopSourceReason("recent swing low");
+        trace.setStopSourceRef("stop-ref");
+        trace.setTpPriceSources(List.of(BigDecimal.valueOf(70400)));
+        trace.setTpSourceType("rr_ladder");
+        trace.setTpSourceTimeframe("1h");
+        trace.setTpSourceReason("2R ladder");
+        trace.setTpSourceRef("tp-ref");
+        trace.setRrSource(BigDecimal.valueOf(2));
+        trace.setRrRuleRef("min_rr_2");
+        trace.setLiquiditySource("depth_snapshot");
+        trace.setMultiTimeframeSource("1h_4h_alignment");
+        trace.setEventSource("no_major_event_window");
+        trace.setWickSource("wick_confirmed");
+        return trace;
+    }
+
+    private record SourceTraceFieldMutation(String fieldName, Consumer<SourceTraceDTO> mutation) {
+        private void apply(SourceTraceDTO trace) {
+            mutation.accept(trace);
         }
     }
 }

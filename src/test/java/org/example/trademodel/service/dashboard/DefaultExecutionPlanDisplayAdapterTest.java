@@ -188,6 +188,39 @@ class DefaultExecutionPlanDisplayAdapterTest {
     }
 
     @Test
+    void runtimeKlineOnlySourceTraceShouldNotUpgradeExecutionPlanReadiness() {
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+        SourceTraceDTO sourceTrace = new SourceTraceDTO();
+        sourceTrace.setSymbol("BTCUSDT");
+        sourceTrace.setTimeframe("1m");
+        sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        sourceTrace.setMissingFields(List.of(
+                "runtimeKlineContext",
+                "entryPriceSource",
+                "stopPriceSource",
+                "tpPriceSources",
+                "rrSource",
+                "liquiditySource",
+                "eventSource",
+                "wickSource"
+        ));
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(null, boundary, null, sourceTrace);
+
+        assertEquals("INCOMPLETE", display.getExecutionPlanStatus());
+        assertEquals("VALID", display.getPlanBoundaryStatus());
+        assertFalse(display.getExecutionPlanBoundaryAligned());
+        assertEquals("SOURCE_TRACE_INCOMPLETE", display.getNotExecutableReason());
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:entryPriceSource"));
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:stopPriceSource"));
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:tpPriceSources"));
+        assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:rrSource"));
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+    }
+
+    @Test
     void shouldFallbackToWatchOnlyWhenRiskActionGuardDetectsHighRisk() {
         DecisionResultVO decision = new DecisionResultVO();
         decision.setRiskLevel("HIGH");
