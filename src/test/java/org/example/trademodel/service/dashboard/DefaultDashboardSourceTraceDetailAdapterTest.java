@@ -78,6 +78,7 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         decision.setMultiTfConvergence("STRONG");
         decision.setDataQualityScore(88);
         decision.setLatestPrice(BigDecimal.valueOf(68100));
+        decision.setPriceUpdateTimeMs(1710000000000L);
         decision.setEntryZone("68000-68200");
         decision.setStopLoss("67400");
         decision.setTakeProfitRules("TP1 69000");
@@ -89,9 +90,16 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         SourceTraceDTO sourceTrace = context.getSourceTrace();
         DerivativesRiskContextDTO derivativesRiskContext = context.getDerivativesRiskContext();
 
+        assertEquals(BigDecimal.valueOf(68100), sourceTrace.getQuoteLatestPrice());
+        assertEquals("DecisionResultVO.latestPrice", sourceTrace.getQuoteLatestPriceSource());
+        assertEquals(1710000000000L, sourceTrace.getQuotePriceUpdateTimeMs());
+        assertEquals("DecisionResultVO.priceUpdateTimeMs", sourceTrace.getQuotePriceUpdateTimeSource());
+        assertEquals(BigDecimal.valueOf(88), sourceTrace.getDataQualityScore());
+        assertEquals("DecisionResultVO.dataQualityScore", sourceTrace.getDataQualityScoreSource());
         assertEquals("DecisionResultVO.multiTfConvergence", sourceTrace.getMultiTimeframeSource());
         assertFalse(sourceTrace.getMissingFields().contains("multiTimeframeSource"));
         assertEquals(BigDecimal.valueOf(88), derivativesRiskContext.getDataQualityScore());
+        assertEquals("DecisionResultVO.dataQualityScore", derivativesRiskContext.getDataQualityScoreSource());
         assertFalse(derivativesRiskContext.getMissingFields().contains("dataQualityScore"));
 
         assertNull(sourceTrace.getEntryPriceSource());
@@ -111,5 +119,41 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
         assertEquals(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY, derivativesRiskContext.getFallbackStatus());
         assertFalse(sourceTrace.hasRequiredBoundarySources());
+    }
+
+    @Test
+    void shouldKeepQuoteAndDataQualityMetadataFromCompletingSourceTrace() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setLatestPrice(BigDecimal.valueOf(68100));
+        decision.setPriceUpdateTimeMs(1710000000000L);
+        decision.setDataQualityScore(88);
+        decision.setEntryZone("68000-68200");
+        decision.setStopLoss("67400");
+        decision.setTakeProfitRules("TP1 69000");
+        decision.setExecutionPlanSummary("Entry 68000, stop 67400, TP1 69000");
+        decision.setRecommendedAction("OPEN_LONG");
+
+        DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext context =
+                adapter.build("BTCUSDT", decision);
+
+        SourceTraceDTO sourceTrace = context.getSourceTrace();
+
+        assertEquals(BigDecimal.valueOf(68100), sourceTrace.getQuoteLatestPrice());
+        assertEquals("DecisionResultVO.latestPrice", sourceTrace.getQuoteLatestPriceSource());
+        assertEquals(BigDecimal.valueOf(88), sourceTrace.getDataQualityScore());
+        assertNull(sourceTrace.getEntryPriceSource());
+        assertNull(sourceTrace.getStopPriceSource());
+        assertTrue(sourceTrace.getTpPriceSources().isEmpty());
+        assertNull(sourceTrace.getRrSource());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
+        assertTrue(sourceTrace.getMissingFields().contains("latestPrice"));
+        assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("stopPriceSource"));
+        assertTrue(sourceTrace.getMissingFields().contains("tpPriceSources"));
+        assertTrue(sourceTrace.getMissingFields().contains("rrSource"));
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
+        assertTrue(sourceTrace.isManualReviewRequired());
+        assertTrue(sourceTrace.isNotTradeInstruction());
     }
 }

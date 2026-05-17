@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -157,6 +158,8 @@ class DashboardControllerTest {
         decision.setAnalysisId("ana-btc");
         decision.setMultiTfConvergence("STRONG");
         decision.setDataQualityScore(91);
+        decision.setLatestPrice(BigDecimal.valueOf(68100));
+        decision.setPriceUpdateTimeMs(1710000000000L);
         when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
         when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
         when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-btc")).thenReturn(Collections.emptyList());
@@ -179,10 +182,17 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreType").value("综合评分"))
                 .andExpect(jsonPath("$.scoreTopItems[0].scoreValue").value(81.5))
                 .andExpect(jsonPath("$.sourceTrace.fallbackStatus").value("INCOMPLETE"))
+                .andExpect(jsonPath("$.sourceTrace.quoteLatestPrice").value(68100))
+                .andExpect(jsonPath("$.sourceTrace.quoteLatestPriceSource").value("DecisionResultVO.latestPrice"))
+                .andExpect(jsonPath("$.sourceTrace.quotePriceUpdateTimeMs").value(1710000000000L))
+                .andExpect(jsonPath("$.sourceTrace.quotePriceUpdateTimeSource").value("DecisionResultVO.priceUpdateTimeMs"))
+                .andExpect(jsonPath("$.sourceTrace.dataQualityScore").value(91))
+                .andExpect(jsonPath("$.sourceTrace.dataQualityScoreSource").value("DecisionResultVO.dataQualityScore"))
                 .andExpect(jsonPath("$.sourceTrace.manualReviewRequired").value(true))
                 .andExpect(jsonPath("$.sourceTrace.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.sourceTrace.missingFields").isArray())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'runtimeKlineContext')]").exists())
+                .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'latestPrice')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'entryPriceSource')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'stopPriceSource')]").exists())
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'tpPriceSources')]").exists())
@@ -194,6 +204,7 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.sourceTrace.missingFields[?(@ == 'wickSource')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.fallbackStatus").value("SAFE_FAIL_CLOSED_ONLY"))
                 .andExpect(jsonPath("$.derivativesRiskContext.dataQualityScore").value(91))
+                .andExpect(jsonPath("$.derivativesRiskContext.dataQualityScoreSource").value("DecisionResultVO.dataQualityScore"))
                 .andExpect(jsonPath("$.derivativesRiskContext.manualReviewRequired").value(true))
                 .andExpect(jsonPath("$.derivativesRiskContext.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'openInterestHistory')]").exists())
