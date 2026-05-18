@@ -68,6 +68,106 @@ class EntryCompletionValidationContextAssemblerTest {
     }
 
     @Test
+    void nullValidationAndNullCompletionFailClosedTogether() {
+        EntryOwnershipValidationCompletionContext context =
+                assembler.assemble(null, null);
+
+        assertFailClosedValidation(context.getValidationResult());
+        assertFailClosedContext(context);
+        assertThat(context.getValidationResult().getMissingFields())
+                .containsExactly("entryOwnershipValidationResult");
+        assertThat(context.getCompletionResult().getMissingReason())
+                .isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.MISSING_COMPLETION);
+        assertThat(context.getCompletionResult().getMissingFields())
+                .containsExactly("sourceTraceEntryCompletionResult");
+    }
+
+    @Test
+    void emptyValidationMissingFieldsDoNotMakeCompletionReady() {
+        EntryOwnershipValidationResult validationResult = new EntryOwnershipValidationResult() {
+            @Override
+            public List<String> getMissingFields() {
+                return List.of();
+            }
+        };
+        validationResult.setSymbol("BTCUSDT");
+        validationResult.setTimeframe("15m");
+        SourceTraceEntryCompletionResult completionResult =
+                SourceTraceEntryCompletionResult.unwired("BTCUSDT", "15m");
+
+        EntryOwnershipValidationCompletionContext context =
+                assembler.assemble(validationResult, completionResult);
+
+        assertFailClosedValidation(context.getValidationResult());
+        assertFailClosedContext(context);
+        assertThat(context.getMissingFields()).contains(
+                "sourceTraceEntryCompletionPath",
+                "entryPriceSource",
+                "entrySourceType",
+                "entrySourceTimeframe",
+                "entrySourceReason",
+                "entrySourceRef"
+        );
+    }
+
+    @Test
+    void emptyCompletionMissingFieldsDoNotMakeCompletionReady() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource("BTCUSDT", "15m", List.of("validation"));
+        SourceTraceEntryCompletionResult completionResult =
+                SourceTraceEntryCompletionResult.incomplete(
+                        "BTCUSDT",
+                        "15m",
+                        SourceTraceEntryCompletionMissingReasonEnum.UNSAFE_COMPLETION,
+                        List.of()
+                );
+
+        EntryOwnershipValidationCompletionContext context =
+                assembler.assemble(validationResult, completionResult);
+
+        assertFailClosedContext(context);
+        assertThat(context.getCompletionResult().getMissingReason())
+                .isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.UNSAFE_COMPLETION);
+        assertThat(context.getMissingFields()).contains(
+                "validation",
+                "sourceTraceEntryCompletionPath",
+                "entryPriceSource",
+                "entrySourceType",
+                "entrySourceTimeframe",
+                "entrySourceReason",
+                "entrySourceRef"
+        );
+    }
+
+    @Test
+    void duplicateMissingFieldsDoNotMakeCompletionReady() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource(
+                        "BTCUSDT",
+                        "15m",
+                        List.of("validation", "validation")
+                );
+        SourceTraceEntryCompletionResult completionResult =
+                SourceTraceEntryCompletionResult.incomplete(
+                        "BTCUSDT",
+                        "15m",
+                        SourceTraceEntryCompletionMissingReasonEnum.COMPLETION_UNWIRED,
+                        List.of("sourceTraceEntryOwnershipCompletionPath", "sourceTraceEntryOwnershipCompletionPath")
+                );
+
+        EntryOwnershipValidationCompletionContext context =
+                assembler.assemble(validationResult, completionResult);
+
+        assertFailClosedContext(context);
+        assertThat(context.getMissingFields()).containsExactly(
+                "validation",
+                "validation",
+                "sourceTraceEntryOwnershipCompletionPath",
+                "sourceTraceEntryOwnershipCompletionPath"
+        );
+    }
+
+    @Test
     void incompleteValidationResultFailsClosed() {
         EntryOwnershipValidationResult validationResult =
                 EntryOwnershipValidationResult.missingSource("BTCUSDT", "15m");
@@ -140,6 +240,48 @@ class EntryCompletionValidationContextAssemblerTest {
                 "sourceTraceEntryOwnershipCompletionPath",
                 "freshness.observedAtMs"
         );
+    }
+
+    @Test
+    void metadataOnlySymbolAndTimeframeDoNotBecomeReadiness() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource(
+                        "ETHUSDT",
+                        "1h",
+                        List.of("sourceTraceEntryOwnershipCompletionPath")
+                );
+        SourceTraceEntryCompletionResult completionResult =
+                SourceTraceEntryCompletionResult.unwired("ETHUSDT", "1h");
+
+        EntryOwnershipValidationCompletionContext context =
+                assembler.assemble(validationResult, completionResult);
+
+        assertFailClosedContext(context);
+        assertThat(context.getValidationResult().getSymbol()).isEqualTo("ETHUSDT");
+        assertThat(context.getValidationResult().getTimeframe()).isEqualTo("1h");
+        assertThat(context.getCompletionResult().getSymbol()).isEqualTo("ETHUSDT");
+        assertThat(context.getCompletionResult().getTimeframe()).isEqualTo("1h");
+    }
+
+    @Test
+    void malformedCompletionReasonStillRemainsReviewOnlyAndNonInstructional() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource("BTCUSDT", "15m", List.of("validation"));
+        SourceTraceEntryCompletionResult completionResult =
+                SourceTraceEntryCompletionResult.incomplete(
+                        "BTCUSDT",
+                        "15m",
+                        null,
+                        List.of("completion")
+                );
+
+        EntryOwnershipValidationCompletionContext context =
+                assembler.assemble(validationResult, completionResult);
+
+        assertFailClosedContext(context);
+        assertThat(context.getCompletionResult().getMissingReason())
+                .isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.UNSAFE_COMPLETION);
+        assertThat(context.getMissingFields()).contains("validation", "completion");
     }
 
     @Test
