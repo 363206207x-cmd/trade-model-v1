@@ -1,5 +1,0 @@
-BACKEND-P38 marker
-Issue: #171
-Task: Entry Completion Validation Context Assembler Skeleton
-
-This marker exists only to open the P38 draft PR. Codex must remove it in the final implementation PR.
