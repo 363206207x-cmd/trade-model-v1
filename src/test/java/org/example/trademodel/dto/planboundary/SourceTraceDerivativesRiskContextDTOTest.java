@@ -234,6 +234,22 @@ class SourceTraceDerivativesRiskContextDTOTest {
     }
 
     @Test
+    void multiTimeframeSourceOwnershipResultShouldCarryFailClosedDefaults() {
+        SourceTraceMultiTimeframeSourceOwnershipResult result =
+                SourceTraceMultiTimeframeSourceOwnershipResult.missingSource("BTCUSDT", "1m");
+
+        assertEquals("BTCUSDT", result.getSymbol());
+        assertEquals("1m", result.getTimeframe());
+        assertEquals(SourceTraceMultiTimeframeSourceOwnershipStatusEnum.INCOMPLETE, result.getOwnershipStatus());
+        assertEquals(SourceTraceMultiTimeframeSourceMissingReasonEnum.MISSING_SOURCE, result.getMissingReason());
+        assertEquals(SourceTraceMultiTimeframeSourceReviewModeEnum.REVIEW_ONLY, result.getReviewMode());
+        assertNull(result.getMultiTimeframeSource());
+        assertEquals(List.of("multiTimeframeSource"), result.getMissingFields());
+        assertTrue(result.isManualReviewRequired());
+        assertTrue(result.isNotTradeInstruction());
+    }
+
+    @Test
     void derivativesRiskContextShouldCarryRiskEvidenceAndFallbackState() {
         DerivativesRiskContextDTO context = new DerivativesRiskContextDTO();
         LocalDateTime contextTime = LocalDateTime.of(2026, 5, 16, 10, 0);
@@ -314,6 +330,7 @@ class SourceTraceDerivativesRiskContextDTOTest {
                 SourceTraceTakeProfitSourceOwnershipResult.class,
                 SourceTraceRiskRewardSourceOwnershipResult.class,
                 SourceTraceLiquiditySourceOwnershipResult.class,
+                SourceTraceMultiTimeframeSourceOwnershipResult.class,
                 SourceCompletenessContract.class
         );
         List<String> forbiddenFragments = Arrays.asList(
