@@ -1,5 +1,0 @@
-BACKEND-P41 marker
-Issue: #177
-Task: Entry Completion Pre-Wiring Readiness Checklist
-
-This marker exists only to open the P41 draft PR. Codex must remove it in the final documentation PR.
