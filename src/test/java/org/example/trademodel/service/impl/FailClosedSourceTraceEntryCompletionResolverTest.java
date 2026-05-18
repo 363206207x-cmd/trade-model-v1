@@ -49,6 +49,27 @@ class FailClosedSourceTraceEntryCompletionResolverTest {
     }
 
     @Test
+    void emptyMissingFieldsFailClosedAsUnsafeCompletion() {
+        EntryOwnershipValidationResult validationResult = new EntryOwnershipValidationResult() {
+            @Override
+            public List<String> getMissingFields() {
+                return List.of();
+            }
+        };
+        validationResult.setSymbol("BTCUSDT");
+        validationResult.setTimeframe("15m");
+
+        SourceTraceEntryCompletionResult result = resolver.resolveEntryCompletion(validationResult);
+
+        assertFailClosedValidation(validationResult);
+        assertFailClosedCompletion(result);
+        assertThat(result.getMissingReason()).isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.UNSAFE_COMPLETION);
+        assertThat(result.getMissingFields()).containsExactly("entryOwnershipValidationResult.missingFields");
+        assertThat(result.getSymbol()).isEqualTo("BTCUSDT");
+        assertThat(result.getTimeframe()).isEqualTo("15m");
+    }
+
+    @Test
     void missingValidationFieldsFailClosedAsMissingCompletion() {
         EntryOwnershipValidationResult validationResult =
                 EntryOwnershipValidationResult.missingSource(
@@ -79,6 +100,69 @@ class FailClosedSourceTraceEntryCompletionResolverTest {
         assertThat(result.getEntrySourceTimeframe()).isNull();
         assertThat(result.getEntrySourceReason()).isNull();
         assertThat(result.getEntrySourceRef()).isNull();
+    }
+
+    @Test
+    void mixedMissingFieldsIncludingUnwiredCompletionPathFailClosedAsUnwired() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource(
+                        "BTCUSDT",
+                        "15m",
+                        List.of(
+                                "ruleOwnedEntryCandidate.entrySourceType",
+                                "sourceTraceEntryOwnershipCompletionPath",
+                                "freshness.observedAtMs"
+                        )
+                );
+
+        SourceTraceEntryCompletionResult result = resolver.resolveEntryCompletion(validationResult);
+
+        assertFailClosedCompletion(result);
+        assertThat(result.getMissingReason()).isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.COMPLETION_UNWIRED);
+        assertThat(result.getMissingFields()).containsExactly(
+                "ruleOwnedEntryCandidate.entrySourceType",
+                "sourceTraceEntryOwnershipCompletionPath",
+                "freshness.observedAtMs"
+        );
+    }
+
+    @Test
+    void duplicateMissingFieldsDoNotMakeCompletionReady() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource(
+                        "BTCUSDT",
+                        "15m",
+                        List.of(
+                                "sourceTraceEntryOwnershipCompletionPath",
+                                "sourceTraceEntryOwnershipCompletionPath"
+                        )
+                );
+
+        SourceTraceEntryCompletionResult result = resolver.resolveEntryCompletion(validationResult);
+
+        assertFailClosedCompletion(result);
+        assertThat(result.getMissingReason()).isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.COMPLETION_UNWIRED);
+        assertThat(result.getMissingFields()).containsExactly(
+                "sourceTraceEntryOwnershipCompletionPath",
+                "sourceTraceEntryOwnershipCompletionPath"
+        );
+    }
+
+    @Test
+    void symbolAndTimeframeAreMetadataOnlyNotReadinessSignal() {
+        EntryOwnershipValidationResult validationResult =
+                EntryOwnershipValidationResult.missingSource(
+                        "ETHUSDT",
+                        "1h",
+                        List.of("sourceTraceEntryOwnershipCompletionPath")
+                );
+
+        SourceTraceEntryCompletionResult result = resolver.resolveEntryCompletion(validationResult);
+
+        assertFailClosedCompletion(result);
+        assertThat(result.getSymbol()).isEqualTo("ETHUSDT");
+        assertThat(result.getTimeframe()).isEqualTo("1h");
+        assertThat(result.getMissingReason()).isEqualTo(SourceTraceEntryCompletionMissingReasonEnum.COMPLETION_UNWIRED);
     }
 
     @Test
@@ -154,6 +238,11 @@ class FailClosedSourceTraceEntryCompletionResolverTest {
         assertThat(result.isCompletionReady()).isFalse();
         assertThat(result.isManualReviewRequired()).isTrue();
         assertThat(result.isNotTradeInstruction()).isTrue();
+        assertThat(result.getEntryPriceSource()).isNull();
+        assertThat(result.getEntrySourceType()).isNull();
+        assertThat(result.getEntrySourceTimeframe()).isNull();
+        assertThat(result.getEntrySourceReason()).isNull();
+        assertThat(result.getEntrySourceRef()).isNull();
     }
 
     private void assertNoForbiddenMethodNames(Class<?> type) {

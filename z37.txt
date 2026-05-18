@@ -1,5 +1,0 @@
-BACKEND-P37 marker
-Issue: #169
-Task: Entry SourceTrace Completion Resolver Guard Expansion
-
-This marker exists only to open the P37 draft PR. Codex must remove it in the final implementation PR.
