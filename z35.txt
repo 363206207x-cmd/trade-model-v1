@@ -1,0 +1,17 @@
+BACKEND-P35 Entry SourceTrace Completion Validator Integration Skeleton
+
+Issue: #163
+Base main HEAD: c5bbba635f6a7883b2152ef41779950bda262c1c
+Branch: backend-p35-entry-completion-validator
+
+Marker only. This file marks the branch for the P35 Codex implementation workflow.
+
+Strict boundary:
+- no real entry price generation
+- no production adapter implementation
+- no DefaultSourceTraceEntryOwnershipAdapter
+- no full SourceTrace completion
+- no BoundaryCandidateService VALID production wiring
+- no ExecutionPlan readiness upgrade
+- no schema/dashboard/external API/order API/auto-trading changes
+- completion skeleton integration must remain fail-closed and review-only
