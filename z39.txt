@@ -1,5 +1,0 @@
-BACKEND-P39 marker
-Issue: #173
-Task: Entry Completion Validation Context Assembler Guard Expansion
-
-This marker exists only to open the P39 draft PR. Codex must remove it in the final implementation PR.
