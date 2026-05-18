@@ -7,6 +7,10 @@ import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceMissingReas
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceOwnershipStatusEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceReviewModeEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceStopSourceMissingReasonEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceStopSourceOwnershipResult;
+import org.example.trademodel.dto.planboundary.SourceTraceStopSourceOwnershipStatusEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceStopSourceReviewModeEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -202,6 +206,48 @@ class DefaultSourceAssemblerTest {
                 "entrySourceTimeframe",
                 "entrySourceReason",
                 "entrySourceRef"
+        );
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+        assertThat(sourceTrace.isManualReviewRequired()).isTrue();
+        assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void stopOwnershipSkeletonDefaultShouldLeaveSourceTraceStopMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(new BigDecimal("102.30"));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30"), klineItem("101.10")));
+        SourceTraceEntrySourceOwnershipResult entryOwnership =
+                new FailClosedSourceTraceEntrySourceOwnershipService()
+                        .resolveEntrySourceOwnership(runtimeKlineContext);
+        SourceTraceStopSourceOwnershipResult stopOwnership =
+                new FailClosedSourceTraceStopSourceOwnershipService()
+                        .resolveStopSourceOwnership(runtimeKlineContext);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(entryOwnership.getEntryPriceSource()).isNull();
+        assertThat(stopOwnership.getOwnershipStatus()).isEqualTo(SourceTraceStopSourceOwnershipStatusEnum.INCOMPLETE);
+        assertThat(stopOwnership.getMissingReason()).isEqualTo(SourceTraceStopSourceMissingReasonEnum.MISSING_SOURCE);
+        assertThat(stopOwnership.getReviewMode()).isEqualTo(SourceTraceStopSourceReviewModeEnum.REVIEW_ONLY);
+        assertThat(stopOwnership.getStopPriceSource()).isNull();
+        assertThat(stopOwnership.isManualReviewRequired()).isTrue();
+        assertThat(stopOwnership.isNotTradeInstruction()).isTrue();
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getStopPriceSource()).isNull();
+        assertThat(sourceTrace.getStopSourceType()).isNull();
+        assertThat(sourceTrace.getStopSourceTimeframe()).isNull();
+        assertThat(sourceTrace.getStopSourceReason()).isNull();
+        assertThat(sourceTrace.getStopSourceRef()).isNull();
+        assertThat(sourceTrace.getMissingFields()).contains(
+                "stopPriceSource",
+                "stopSourceType",
+                "stopSourceTimeframe",
+                "stopSourceReason",
+                "stopSourceRef"
         );
         assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
         assertThat(sourceTrace.isManualReviewRequired()).isTrue();
