@@ -1,0 +1,5 @@
+BACKEND-P36 marker
+Issue: #167
+Task: Entry SourceTrace Completion Fail-Closed Resolver Skeleton
+
+This marker exists only to open the P36 draft PR. Codex must remove it in the final implementation PR.
