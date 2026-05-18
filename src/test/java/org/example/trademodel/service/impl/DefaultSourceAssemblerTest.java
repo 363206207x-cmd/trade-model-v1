@@ -7,6 +7,10 @@ import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceMissingReas
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceOwnershipStatusEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceReviewModeEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceMissingReasonEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceOwnershipResult;
+import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceOwnershipStatusEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceReviewModeEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceStopSourceMissingReasonEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceStopSourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceStopSourceOwnershipStatusEnum;
@@ -302,6 +306,51 @@ class DefaultSourceAssemblerTest {
                 "tpSourceReason",
                 "tpSourceRef"
         );
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+        assertThat(sourceTrace.isManualReviewRequired()).isTrue();
+        assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void riskRewardOwnershipSkeletonDefaultShouldLeaveSourceTraceRiskRewardMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(new BigDecimal("102.30"));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30"), klineItem("101.10")));
+        SourceTraceEntrySourceOwnershipResult entryOwnership =
+                new FailClosedSourceTraceEntrySourceOwnershipService()
+                        .resolveEntrySourceOwnership(runtimeKlineContext);
+        SourceTraceStopSourceOwnershipResult stopOwnership =
+                new FailClosedSourceTraceStopSourceOwnershipService()
+                        .resolveStopSourceOwnership(runtimeKlineContext);
+        SourceTraceTakeProfitSourceOwnershipResult takeProfitOwnership =
+                new FailClosedSourceTraceTakeProfitSourceOwnershipService()
+                        .resolveTakeProfitSourceOwnership(runtimeKlineContext);
+        SourceTraceRiskRewardSourceOwnershipResult riskRewardOwnership =
+                new FailClosedSourceTraceRiskRewardSourceOwnershipService()
+                        .resolveRiskRewardSourceOwnership(runtimeKlineContext);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(entryOwnership.getEntryPriceSource()).isNull();
+        assertThat(stopOwnership.getStopPriceSource()).isNull();
+        assertThat(takeProfitOwnership.getTpPriceSources()).isEmpty();
+        assertThat(riskRewardOwnership.getOwnershipStatus())
+                .isEqualTo(SourceTraceRiskRewardSourceOwnershipStatusEnum.INCOMPLETE);
+        assertThat(riskRewardOwnership.getMissingReason())
+                .isEqualTo(SourceTraceRiskRewardSourceMissingReasonEnum.MISSING_SOURCE);
+        assertThat(riskRewardOwnership.getReviewMode())
+                .isEqualTo(SourceTraceRiskRewardSourceReviewModeEnum.REVIEW_ONLY);
+        assertThat(riskRewardOwnership.getRrSource()).isNull();
+        assertThat(riskRewardOwnership.getRrRuleRef()).isNull();
+        assertThat(riskRewardOwnership.isManualReviewRequired()).isTrue();
+        assertThat(riskRewardOwnership.isNotTradeInstruction()).isTrue();
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getRrSource()).isNull();
+        assertThat(sourceTrace.getRrRuleRef()).isNull();
+        assertThat(sourceTrace.getMissingFields()).contains("rrSource", "rrRuleRef");
         assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
         assertThat(sourceTrace.isManualReviewRequired()).isTrue();
         assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
