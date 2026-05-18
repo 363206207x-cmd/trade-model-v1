@@ -11,6 +11,10 @@ import org.example.trademodel.dto.planboundary.SourceTraceLiquiditySourceMissing
 import org.example.trademodel.dto.planboundary.SourceTraceLiquiditySourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceLiquiditySourceOwnershipStatusEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceLiquiditySourceReviewModeEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceMultiTimeframeSourceMissingReasonEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceMultiTimeframeSourceOwnershipResult;
+import org.example.trademodel.dto.planboundary.SourceTraceMultiTimeframeSourceOwnershipStatusEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceMultiTimeframeSourceReviewModeEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceMissingReasonEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceRiskRewardSourceOwnershipStatusEnum;
@@ -403,6 +407,58 @@ class DefaultSourceAssemblerTest {
         assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
         assertThat(sourceTrace.getLiquiditySource()).isNull();
         assertThat(sourceTrace.getMissingFields()).contains("liquiditySource");
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+        assertThat(sourceTrace.isManualReviewRequired()).isTrue();
+        assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void multiTimeframeOwnershipSkeletonDefaultShouldLeaveSourceTraceMultiTimeframeMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(new BigDecimal("102.30"));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30"), klineItem("101.10")));
+        SourceTraceEntrySourceOwnershipResult entryOwnership =
+                new FailClosedSourceTraceEntrySourceOwnershipService()
+                        .resolveEntrySourceOwnership(runtimeKlineContext);
+        SourceTraceStopSourceOwnershipResult stopOwnership =
+                new FailClosedSourceTraceStopSourceOwnershipService()
+                        .resolveStopSourceOwnership(runtimeKlineContext);
+        SourceTraceTakeProfitSourceOwnershipResult takeProfitOwnership =
+                new FailClosedSourceTraceTakeProfitSourceOwnershipService()
+                        .resolveTakeProfitSourceOwnership(runtimeKlineContext);
+        SourceTraceRiskRewardSourceOwnershipResult riskRewardOwnership =
+                new FailClosedSourceTraceRiskRewardSourceOwnershipService()
+                        .resolveRiskRewardSourceOwnership(runtimeKlineContext);
+        SourceTraceLiquiditySourceOwnershipResult liquidityOwnership =
+                new FailClosedSourceTraceLiquiditySourceOwnershipService()
+                        .resolveLiquiditySourceOwnership(runtimeKlineContext);
+        SourceTraceMultiTimeframeSourceOwnershipResult multiTimeframeOwnership =
+                new FailClosedSourceTraceMultiTimeframeSourceOwnershipService()
+                        .resolveMultiTimeframeSourceOwnership(runtimeKlineContext);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(entryOwnership.getEntryPriceSource()).isNull();
+        assertThat(stopOwnership.getStopPriceSource()).isNull();
+        assertThat(takeProfitOwnership.getTpPriceSources()).isEmpty();
+        assertThat(riskRewardOwnership.getRrSource()).isNull();
+        assertThat(riskRewardOwnership.getRrRuleRef()).isNull();
+        assertThat(liquidityOwnership.getLiquiditySource()).isNull();
+        assertThat(multiTimeframeOwnership.getOwnershipStatus())
+                .isEqualTo(SourceTraceMultiTimeframeSourceOwnershipStatusEnum.INCOMPLETE);
+        assertThat(multiTimeframeOwnership.getMissingReason())
+                .isEqualTo(SourceTraceMultiTimeframeSourceMissingReasonEnum.MISSING_SOURCE);
+        assertThat(multiTimeframeOwnership.getReviewMode())
+                .isEqualTo(SourceTraceMultiTimeframeSourceReviewModeEnum.REVIEW_ONLY);
+        assertThat(multiTimeframeOwnership.getMultiTimeframeSource()).isNull();
+        assertThat(multiTimeframeOwnership.isManualReviewRequired()).isTrue();
+        assertThat(multiTimeframeOwnership.isNotTradeInstruction()).isTrue();
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getMultiTimeframeSource()).isNull();
+        assertThat(sourceTrace.getMissingFields()).contains("multiTimeframeSource");
         assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
         assertThat(sourceTrace.isManualReviewRequired()).isTrue();
         assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
