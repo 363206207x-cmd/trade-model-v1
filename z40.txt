@@ -1,0 +1,5 @@
+BACKEND-P40 marker
+Issue: #175
+Task: Entry Completion Safety Chain Freeze
+
+This marker exists only to open the P40 draft PR. Codex must remove it in the final documentation PR.
