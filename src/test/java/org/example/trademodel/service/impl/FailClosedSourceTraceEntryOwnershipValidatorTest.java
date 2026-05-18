@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import org.example.trademodel.dto.planboundary.EntryOwnershipRequest;
 import org.example.trademodel.dto.planboundary.EntryOwnershipValidationMissingReasonEnum;
@@ -14,6 +16,7 @@ import org.example.trademodel.dto.planboundary.EntrySourceConflictDTO;
 import org.example.trademodel.dto.planboundary.EntrySourceFreshnessDTO;
 import org.example.trademodel.dto.planboundary.RuleOwnedEntryCandidateDTO;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
+import org.example.trademodel.dto.planboundary.RuntimeKlineItemDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceReviewModeEnum;
 import org.example.trademodel.service.SourceTraceEntryOwnershipValidator;
 import org.junit.jupiter.api.Test;
@@ -67,6 +70,46 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
     }
 
     @Test
+    void missingCandidateBoundaryFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getRuleOwnedEntryCandidate().setCandidateEntryBoundary(null);
+
+        assertMissingField(request, "ruleOwnedEntryCandidate.candidateEntryBoundary");
+    }
+
+    @Test
+    void missingEntrySourceTypeFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getRuleOwnedEntryCandidate().setEntrySourceType(null);
+
+        assertMissingField(request, "ruleOwnedEntryCandidate.entrySourceType");
+    }
+
+    @Test
+    void missingEntrySourceTimeframeFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getRuleOwnedEntryCandidate().setEntrySourceTimeframe(null);
+
+        assertMissingField(request, "ruleOwnedEntryCandidate.entrySourceTimeframe");
+    }
+
+    @Test
+    void missingEntrySourceReasonFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getRuleOwnedEntryCandidate().setEntrySourceReason(null);
+
+        assertMissingField(request, "ruleOwnedEntryCandidate.entrySourceReason");
+    }
+
+    @Test
+    void missingEntrySourceRefFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getRuleOwnedEntryCandidate().setEntrySourceRef(null);
+
+        assertMissingField(request, "ruleOwnedEntryCandidate.entrySourceRef");
+    }
+
+    @Test
     void missingFreshnessMetadataFailsClosed() {
         EntryOwnershipRequest request = completeRequest();
         request.setFreshness(null);
@@ -75,6 +118,30 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
 
         assertFailClosed(result);
         assertThat(result.getMissingFields()).containsExactly("freshness");
+    }
+
+    @Test
+    void missingFreshnessStatusFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getFreshness().setFreshnessStatus(null);
+
+        assertMissingField(request, "freshness.freshnessStatus");
+    }
+
+    @Test
+    void missingObservedAtMsFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getFreshness().setObservedAtMs(null);
+
+        assertMissingField(request, "freshness.observedAtMs");
+    }
+
+    @Test
+    void missingDecisionCreateTimeMsFailsClosedWithNamedField() {
+        EntryOwnershipRequest request = completeRequest();
+        request.getFreshness().setDecisionCreateTimeMs(null);
+
+        assertMissingField(request, "freshness.decisionCreateTimeMs");
     }
 
     @Test
@@ -139,6 +206,32 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
     }
 
     @Test
+    void runtimeLatestPriceAloneIsNotSufficientToPassValidation() {
+        EntryOwnershipRequest request = new EntryOwnershipRequest();
+        RuntimeKlineContextDTO runtimeKlineContext = runtimeKlineContext();
+        runtimeKlineContext.setLatestPrice(BigDecimal.ONE);
+        request.setRuntimeKlineContext(runtimeKlineContext);
+
+        EntryOwnershipValidationResult result = validator.validateEntryOwnership(request);
+
+        assertFailClosed(result);
+        assertThat(result.getMissingFields()).containsExactly("ruleOwnedEntryCandidate");
+    }
+
+    @Test
+    void runtimeKlineItemsAloneAreNotSufficientToPassValidation() {
+        EntryOwnershipRequest request = new EntryOwnershipRequest();
+        RuntimeKlineContextDTO runtimeKlineContext = runtimeKlineContext();
+        runtimeKlineContext.setKlineItems(List.of(new RuntimeKlineItemDTO()));
+        request.setRuntimeKlineContext(runtimeKlineContext);
+
+        EntryOwnershipValidationResult result = validator.validateEntryOwnership(request);
+
+        assertFailClosed(result);
+        assertThat(result.getMissingFields()).containsExactly("ruleOwnedEntryCandidate");
+    }
+
+    @Test
     void completeRequestStillFailsClosedBecauseSourceTraceCompletionRemainsUnwired() {
         EntryOwnershipValidationResult result = validator.validateEntryOwnership(completeRequest());
 
@@ -169,11 +262,18 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
         assertThat(result.isNotTradeInstruction()).isTrue();
     }
 
+    private void assertMissingField(EntryOwnershipRequest request, String field) {
+        EntryOwnershipValidationResult result = validator.validateEntryOwnership(request);
+
+        assertFailClosed(result);
+        assertThat(result.getMissingFields()).containsExactly(field);
+    }
+
     private EntryOwnershipRequest completeRequest() {
         EntryOwnershipRequest request = new EntryOwnershipRequest();
         request.setRuntimeKlineContext(runtimeKlineContext());
         request.setRuleOwnedEntryCandidate(ruleOwnedEntryCandidate());
-        request.setFreshness(new EntrySourceFreshnessDTO());
+        request.setFreshness(freshness());
         request.setConflict(nonConflictingMetadata());
         return request;
     }
@@ -187,7 +287,7 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
         };
         request.setRuntimeKlineContext(runtimeKlineContext());
         request.setRuleOwnedEntryCandidate(ruleOwnedEntryCandidate());
-        request.setFreshness(new EntrySourceFreshnessDTO());
+        request.setFreshness(freshness());
         request.setConflict(nonConflictingMetadata());
         return request;
     }
@@ -201,7 +301,7 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
         };
         request.setRuntimeKlineContext(runtimeKlineContext());
         request.setRuleOwnedEntryCandidate(ruleOwnedEntryCandidate());
-        request.setFreshness(new EntrySourceFreshnessDTO());
+        request.setFreshness(freshness());
         request.setConflict(nonConflictingMetadata());
         return request;
     }
@@ -217,6 +317,7 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
         RuleOwnedEntryCandidateDTO candidate = new RuleOwnedEntryCandidateDTO();
         candidate.setSymbol("BTCUSDT");
         candidate.setDecisionTimeframe("15m");
+        candidate.setCandidateEntryBoundary(BigDecimal.ONE);
         candidate.setEntrySourceType("rule-owned-boundary");
         candidate.setEntrySourceTimeframe("15m");
         candidate.setEntrySourceReason("fixture-only");
@@ -225,6 +326,14 @@ class FailClosedSourceTraceEntryOwnershipValidatorTest {
         candidate.setRuleVersion("v1");
         candidate.setSourceWindow("fixture-window");
         return candidate;
+    }
+
+    private EntrySourceFreshnessDTO freshness() {
+        EntrySourceFreshnessDTO freshness = new EntrySourceFreshnessDTO();
+        freshness.setFreshnessStatus("FRESH");
+        freshness.setObservedAtMs(100L);
+        freshness.setDecisionCreateTimeMs(200L);
+        return freshness;
     }
 
     private EntrySourceConflictDTO nonConflictingMetadata() {
