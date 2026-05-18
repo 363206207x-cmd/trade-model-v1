@@ -31,6 +31,10 @@ import org.example.trademodel.dto.planboundary.SourceTraceTakeProfitSourceMissin
 import org.example.trademodel.dto.planboundary.SourceTraceTakeProfitSourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceTakeProfitSourceOwnershipStatusEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceTakeProfitSourceReviewModeEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceWickSourceMissingReasonEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceWickSourceOwnershipResult;
+import org.example.trademodel.dto.planboundary.SourceTraceWickSourceOwnershipStatusEnum;
+import org.example.trademodel.dto.planboundary.SourceTraceWickSourceReviewModeEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -519,6 +523,66 @@ class DefaultSourceAssemblerTest {
         assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
         assertThat(sourceTrace.getEventSource()).isNull();
         assertThat(sourceTrace.getMissingFields()).contains("eventSource");
+        assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
+        assertThat(sourceTrace.isManualReviewRequired()).isTrue();
+        assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void wickOwnershipSkeletonDefaultShouldLeaveSourceTraceWickMissing() {
+        RuntimeKlineContextDTO runtimeKlineContext = new RuntimeKlineContextDTO();
+        runtimeKlineContext.setSymbol("BTCUSDT");
+        runtimeKlineContext.setTimeframe("1m");
+        runtimeKlineContext.setLatestPrice(new BigDecimal("102.30"));
+        runtimeKlineContext.setDataQualityScore(BigDecimal.valueOf(90));
+        runtimeKlineContext.setKlineItems(List.of(klineItem("102.30"), klineItem("101.10")));
+        SourceTraceEntrySourceOwnershipResult entryOwnership =
+                new FailClosedSourceTraceEntrySourceOwnershipService()
+                        .resolveEntrySourceOwnership(runtimeKlineContext);
+        SourceTraceStopSourceOwnershipResult stopOwnership =
+                new FailClosedSourceTraceStopSourceOwnershipService()
+                        .resolveStopSourceOwnership(runtimeKlineContext);
+        SourceTraceTakeProfitSourceOwnershipResult takeProfitOwnership =
+                new FailClosedSourceTraceTakeProfitSourceOwnershipService()
+                        .resolveTakeProfitSourceOwnership(runtimeKlineContext);
+        SourceTraceRiskRewardSourceOwnershipResult riskRewardOwnership =
+                new FailClosedSourceTraceRiskRewardSourceOwnershipService()
+                        .resolveRiskRewardSourceOwnership(runtimeKlineContext);
+        SourceTraceLiquiditySourceOwnershipResult liquidityOwnership =
+                new FailClosedSourceTraceLiquiditySourceOwnershipService()
+                        .resolveLiquiditySourceOwnership(runtimeKlineContext);
+        SourceTraceMultiTimeframeSourceOwnershipResult multiTimeframeOwnership =
+                new FailClosedSourceTraceMultiTimeframeSourceOwnershipService()
+                        .resolveMultiTimeframeSourceOwnership(runtimeKlineContext);
+        SourceTraceEventSourceOwnershipResult eventOwnership =
+                new FailClosedSourceTraceEventSourceOwnershipService()
+                        .resolveEventSourceOwnership(runtimeKlineContext);
+        SourceTraceWickSourceOwnershipResult wickOwnership =
+                new FailClosedSourceTraceWickSourceOwnershipService()
+                        .resolveWickSourceOwnership(runtimeKlineContext);
+
+        SourceTraceDTO sourceTrace = assembler.assembleSourceTrace(runtimeKlineContext, validDerivativesRiskContext());
+
+        assertThat(entryOwnership.getEntryPriceSource()).isNull();
+        assertThat(stopOwnership.getStopPriceSource()).isNull();
+        assertThat(takeProfitOwnership.getTpPriceSources()).isEmpty();
+        assertThat(riskRewardOwnership.getRrSource()).isNull();
+        assertThat(riskRewardOwnership.getRrRuleRef()).isNull();
+        assertThat(liquidityOwnership.getLiquiditySource()).isNull();
+        assertThat(multiTimeframeOwnership.getMultiTimeframeSource()).isNull();
+        assertThat(eventOwnership.getEventSource()).isNull();
+        assertThat(wickOwnership.getOwnershipStatus())
+                .isEqualTo(SourceTraceWickSourceOwnershipStatusEnum.INCOMPLETE);
+        assertThat(wickOwnership.getMissingReason())
+                .isEqualTo(SourceTraceWickSourceMissingReasonEnum.MISSING_SOURCE);
+        assertThat(wickOwnership.getReviewMode())
+                .isEqualTo(SourceTraceWickSourceReviewModeEnum.REVIEW_ONLY);
+        assertThat(wickOwnership.getWickSource()).isNull();
+        assertThat(wickOwnership.isManualReviewRequired()).isTrue();
+        assertThat(wickOwnership.isNotTradeInstruction()).isTrue();
+        assertThat(sourceTrace.getFallbackStatus()).isEqualTo(SourceTraceFallbackStatusEnum.INCOMPLETE);
+        assertThat(sourceTrace.getWickSource()).isNull();
+        assertThat(sourceTrace.getMissingFields()).contains("wickSource");
         assertThat(sourceTrace.hasRequiredBoundarySources()).isFalse();
         assertThat(sourceTrace.isManualReviewRequired()).isTrue();
         assertThat(sourceTrace.isNotTradeInstruction()).isTrue();
