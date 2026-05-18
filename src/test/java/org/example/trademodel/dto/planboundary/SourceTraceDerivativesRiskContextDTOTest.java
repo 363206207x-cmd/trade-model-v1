@@ -250,6 +250,22 @@ class SourceTraceDerivativesRiskContextDTOTest {
     }
 
     @Test
+    void eventSourceOwnershipResultShouldCarryFailClosedDefaults() {
+        SourceTraceEventSourceOwnershipResult result =
+                SourceTraceEventSourceOwnershipResult.missingSource("BTCUSDT", "1m");
+
+        assertEquals("BTCUSDT", result.getSymbol());
+        assertEquals("1m", result.getTimeframe());
+        assertEquals(SourceTraceEventSourceOwnershipStatusEnum.INCOMPLETE, result.getOwnershipStatus());
+        assertEquals(SourceTraceEventSourceMissingReasonEnum.MISSING_SOURCE, result.getMissingReason());
+        assertEquals(SourceTraceEventSourceReviewModeEnum.REVIEW_ONLY, result.getReviewMode());
+        assertNull(result.getEventSource());
+        assertEquals(List.of("eventSource"), result.getMissingFields());
+        assertTrue(result.isManualReviewRequired());
+        assertTrue(result.isNotTradeInstruction());
+    }
+
+    @Test
     void derivativesRiskContextShouldCarryRiskEvidenceAndFallbackState() {
         DerivativesRiskContextDTO context = new DerivativesRiskContextDTO();
         LocalDateTime contextTime = LocalDateTime.of(2026, 5, 16, 10, 0);
@@ -331,6 +347,7 @@ class SourceTraceDerivativesRiskContextDTOTest {
                 SourceTraceRiskRewardSourceOwnershipResult.class,
                 SourceTraceLiquiditySourceOwnershipResult.class,
                 SourceTraceMultiTimeframeSourceOwnershipResult.class,
+                SourceTraceEventSourceOwnershipResult.class,
                 SourceCompletenessContract.class
         );
         List<String> forbiddenFragments = Arrays.asList(
