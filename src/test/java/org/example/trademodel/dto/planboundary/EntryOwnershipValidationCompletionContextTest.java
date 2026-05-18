@@ -155,6 +155,9 @@ class EntryOwnershipValidationCompletionContextTest {
         candidate.setEntrySourceTimeframe("15m");
         candidate.setEntrySourceReason("fixture-only");
         candidate.setEntrySourceRef("source-ref");
+        candidate.setRuleId("entry-rule");
+        candidate.setRuleVersion("v1");
+        candidate.setSourceWindow("fixture-window");
         return candidate;
     }
 
