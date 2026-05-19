@@ -204,6 +204,123 @@ class SourceTraceEntryPositiveCompletionFixtureFactoryMapperTest {
     }
 
     @Test
+    void blankFixtureOnlyEvidenceShapeDoesNotCreateMisleadingMarker() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "   ",
+                        List.of("fixture-only-ref-a")
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceRef:fixture-only-ref-a"
+        );
+        assertThat(dto.getMissingFields())
+                .noneMatch(missingField -> missingField.startsWith("fixtureOnlyEvidenceShape:"));
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void nullFixtureOnlyEvidenceRefsAreSafeAndDefensivelyHandled() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "fixture-only-null-ref-shape",
+                        null
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+
+        assertThat(input.getFixtureOnlyEvidenceRefs()).isEmpty();
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:fixture-only-null-ref-shape"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void emptyFixtureOnlyEvidenceRefsAreSafeAndNonProduction() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "fixture-only-empty-ref-shape",
+                        List.of()
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+
+        assertThat(input.getFixtureOnlyEvidenceRefs()).isEmpty();
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:fixture-only-empty-ref-shape"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void duplicateFixtureOnlyEvidenceRefsRemainFixtureOnlyWithoutOwnershipCompletion() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "fixture-only-duplicate-ref-shape",
+                        List.of("fixture-only-ref-a", "fixture-only-ref-a")
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:fixture-only-duplicate-ref-shape",
+                "fixtureOnlyEvidenceRef:fixture-only-ref-a",
+                "fixtureOnlyEvidenceRef:fixture-only-ref-a"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void mixedFixtureOnlyEvidenceRefsAndRuntimeLikeSourceTagsDowngradeFailClosed() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.builder()
+                        .fixtureOnlyEvidenceShape("fixture-only-safe-shape")
+                        .fixtureOnlyEvidenceRefs(List.of("fixture-only-ref-a"))
+                        .sourceTags(List.of("LATEST_PRICE_ONLY"))
+                        .build();
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+
+        assertThat(dto.getCompletionStatus())
+                .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.INCOMPLETE);
+        assertThat(dto.getDowngradeReason())
+                .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION);
+        assertThat(dto.getMissingFields()).containsExactly("LATEST_PRICE_ONLY");
+        assertThat(dto.getSourceTraceEntryOwnershipCompletionPath()).isNull();
+        assertThat(dto.getEntryPriceSource()).isNull();
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void runtimeLookingFixtureOnlyEvidenceShapeRemainsNonProductionMetadataOnly() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "PRODUCTION_READY_ORDER_EXECUTION_RUNTIME_VALID",
+                        List.of("fixture-only-ref-a")
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+
+        assertThat(dto.getCompletionStatus())
+                .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+        assertThat(dto.getDowngradeReason())
+                .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.FIXTURE_ONLY_NOT_PRODUCTION_READY);
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:PRODUCTION_READY_ORDER_EXECUTION_RUNTIME_VALID",
+                "fixtureOnlyEvidenceRef:fixture-only-ref-a"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
     void fixtureOnlyEvidenceRefsAreDefensivelyCopied() {
         List<String> mutableEvidenceRefs = new ArrayList<>();
         mutableEvidenceRefs.add("fixture-only-ref-a");
@@ -222,6 +339,48 @@ class SourceTraceEntryPositiveCompletionFixtureFactoryMapperTest {
                 "fixture-only-not-runtime-ready",
                 "fixtureOnlyEvidenceShape:fixture-only-event-gap-shape",
                 "fixtureOnlyEvidenceRef:fixture-only-ref-a"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void mappedMissingFieldsFromFixtureEvidenceRemainDefensiveCopies() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                mapper.fromFixture(SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "fixture-only-copy-shape",
+                        List.of("fixture-only-ref-a")
+                ));
+
+        List<String> returnedMissingFields = dto.getMissingFields();
+        returnedMissingFields.add("mutated-outside-dto");
+
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:fixture-only-copy-shape",
+                "fixtureOnlyEvidenceRef:fixture-only-ref-a"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void syntheticEvidenceOutputDoesNotImplyRuntimeCompletionValidityOrReadiness() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                mapper.fromFixture(SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "fixture-only-readiness-proof-shape",
+                        List.of("fixture-only-ref-a")
+                ));
+
+        assertThat(dto.getCompletionStatus())
+                .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+        assertThat(dto.isSourceTraceEntryCompleted()).isFalse();
+        assertThat(dto.isCompletionReady()).isFalse();
+        assertNoMethodNameFragments(
+                SourceTraceEntryPositiveCompletionFixtureFactory.class,
+                List.of("boundarycandidateservice", "valid", "executionplan", "readiness", "ready")
+        );
+        assertNoMethodNameFragments(
+                SourceTraceEntryPositiveCompletionFixtureMapper.class,
+                List.of("boundarycandidateservice", "valid", "executionplan", "readiness", "ready")
         );
         assertStillNonProduction(dto);
     }
