@@ -65,6 +65,46 @@ class SourceTraceEntryReadOnlyApiResponseMapperTest {
     }
 
     @Test
+    void unsafeStatusTransitionAndDowngradeMetadataFailClosedIndependently() {
+        assertDisplaySafetyGap("completionStatus", display -> display.setCompletionStatus("POSITIVE_FIXTURE_READY"));
+        assertDisplaySafetyGap(
+                "completionTransition",
+                display -> display.setCompletionTransition("INCOMPLETE_TO_POSITIVE_FIXTURE_READY")
+        );
+        assertDisplaySafetyGap("downgradeReason", display -> display.setDowngradeReason(null));
+        assertDisplaySafetyGap("downgradeReason", display -> display.setDowngradeReason("DEFAULT_FAIL_CLOSED"));
+        assertDisplaySafetyGap("downgradeReason", display -> display.setDowngradeReason("READY_TO_TRADE"));
+    }
+
+    @Test
+    void emptyMissingFieldsDoesNotImplyCompletion() {
+        SourceTraceEntryReadOnlyDisplayDTO display = completeDisplay();
+        display.setMissingFields(List.of());
+
+        SourceTraceEntryReadOnlyApiResponseDTO response = mapper.map(display);
+
+        assertBaseApiSafety(response);
+        assertThat(response.getDowngradeReason()).isEqualTo("MISSING_REQUIRED_FIELD");
+        assertThat(response.getMissingFields()).contains("missingFields");
+        assertThat(response.getCompletionStatus()).isEqualTo("INCOMPLETE");
+        assertThat(response.getCompletionTransition()).isEqualTo("NONE");
+    }
+
+    @Test
+    void emptyBlockingFieldsDoesNotImplyCompletion() {
+        SourceTraceEntryReadOnlyDisplayDTO display = completeDisplay();
+        display.setBlockingFields(List.of());
+
+        SourceTraceEntryReadOnlyApiResponseDTO response = mapper.map(display);
+
+        assertBaseApiSafety(response);
+        assertThat(response.getDowngradeReason()).isEqualTo("MISSING_REQUIRED_FIELD");
+        assertThat(response.getMissingFields()).contains("blockingFields");
+        assertThat(response.getCompletionStatus()).isEqualTo("INCOMPLETE");
+        assertThat(response.getCompletionTransition()).isEqualTo("NONE");
+    }
+
+    @Test
     void missingOrEmptyBlockerListsDoNotImplyCompletion() {
         SourceTraceEntryReadOnlyDisplayDTO display = completeDisplay();
         display.setMissingFields(List.of());
@@ -99,6 +139,60 @@ class SourceTraceEntryReadOnlyApiResponseMapperTest {
                 "BOUNDARYCANDIDATESERVICE_VALID",
                 "readOnlyIntegrationSeamUnwired"
         );
+    }
+
+    @Test
+    void runtimeLikeFieldsSerializeOnlyAsBlockers() {
+        String[] runtimeLikeValues = {
+                "LATEST_PRICE_ONLY",
+                "RAW_KLINE_ONLY",
+                "AI_TEXT",
+                "DASHBOARD_TEXT",
+                "EXTERNAL_DATA",
+                "ORDER_DATA",
+                "EXECUTION_DATA"
+        };
+
+        for (String unsafeValue : runtimeLikeValues) {
+            assertUnsafeValueSerializesOnlyAsBlocker(unsafeValue);
+        }
+    }
+
+    @Test
+    void productionLikeFieldsSerializeOnlyAsBlockers() {
+        String[] productionLikeValues = {
+                "BOUNDARYCANDIDATESERVICE_VALID",
+                "EXECUTIONPLAN_READY",
+                "SOURCETRACE_RUNTIME_COMPLETION",
+                "PRODUCTION_COMPLETION"
+        };
+
+        for (String unsafeValue : productionLikeValues) {
+            assertUnsafeValueSerializesOnlyAsBlocker(unsafeValue);
+        }
+    }
+
+    @Test
+    void tradeReadyLookingValuesSerializeOnlyAsBlockers() {
+        String[] tradeReadyLookingValues = {
+                "tradeReady",
+                "readyToTrade",
+                "entryReady",
+                "executionReady",
+                "Valid",
+                "Completed",
+                "Signal",
+                "Buy",
+                "Sell",
+                "Open",
+                "Close",
+                "Reverse",
+                "trade advice"
+        };
+
+        for (String unsafeValue : tradeReadyLookingValues) {
+            assertUnsafeValueSerializesOnlyAsBlocker(unsafeValue);
+        }
     }
 
     @Test
@@ -152,15 +246,18 @@ class SourceTraceEntryReadOnlyApiResponseMapperTest {
     void requiredDowngradeStatesArePreserved() {
         assertDowngrade(
                 SourceTraceEntryPositiveCompletionDowngradeReasonEnum.MISSING_REQUIRED_FIELD,
-                "Missing required source evidence"
+                "Missing required source evidence",
+                "Required display evidence is missing or malformed."
         );
         assertDowngrade(
                 SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION,
-                "Unsafe completion evidence"
+                "Unsafe completion evidence",
+                "Unsafe or runtime-like evidence blocks completion and requires review."
         );
         assertDowngrade(
                 SourceTraceEntryPositiveCompletionDowngradeReasonEnum.COMPLETION_UNWIRED,
-                "Completion path unwired"
+                "Completion path unwired",
+                "The read-only response is present, but completion wiring is not active."
         );
     }
 
@@ -222,6 +319,15 @@ class SourceTraceEntryReadOnlyApiResponseMapperTest {
                     assertThat(name).doesNotContain("takeprofit");
                     assertThat(name).doesNotContain("riskreward");
                 });
+        assertThat(Arrays.stream(SourceTraceEntryReadOnlyApiResponseDTO.class.getDeclaredFields())
+                        .map(Field::getName)
+                        .map(name -> name.toLowerCase(Locale.ROOT)))
+                .allSatisfy(name -> {
+                    assertThat(name).doesNotContain("entryprice");
+                    assertThat(name).doesNotContain("stopprice");
+                    assertThat(name).doesNotContain("takeprofit");
+                    assertThat(name).doesNotContain("riskreward");
+                });
     }
 
     @Test
@@ -270,7 +376,8 @@ class SourceTraceEntryReadOnlyApiResponseMapperTest {
 
     private void assertDowngrade(
             SourceTraceEntryPositiveCompletionDowngradeReasonEnum downgradeReason,
-            String expectedLabel
+            String expectedLabel,
+            String expectedHelperCopy
     ) {
         SourceTraceEntryReadOnlyDisplayDTO display = downgradeReason == SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION
                 ? displayWith(
@@ -291,6 +398,25 @@ class SourceTraceEntryReadOnlyApiResponseMapperTest {
         assertBaseApiSafety(response);
         assertThat(response.getDowngradeReason()).isEqualTo(downgradeReason.name());
         assertThat(response.getDowngradeLabel()).isEqualTo(expectedLabel);
+        assertThat(response.getHelperCopy()).isEqualTo(expectedHelperCopy);
+    }
+
+    private void assertUnsafeValueSerializesOnlyAsBlocker(String unsafeValue) {
+        SourceTraceEntryReadOnlyDisplayDTO display = displayWith(
+                SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION,
+                List.of(unsafeValue, "readOnlyIntegrationSeamUnwired"),
+                List.of(unsafeValue),
+                List.of(unsafeValue, "readOnlyIntegrationSeamUnwired")
+        );
+
+        SourceTraceEntryReadOnlyApiResponseDTO response = mapper.map(display);
+
+        assertBaseApiSafety(response);
+        assertThat(response.getDowngradeReason()).isEqualTo("UNSAFE_COMPLETION");
+        assertThat(response.getUnsafeFields()).containsExactly(unsafeValue);
+        assertThat(response.getBlockingFields()).contains(unsafeValue);
+        assertThat(response.getMissingFields()).contains(unsafeValue);
+        assertNoForbiddenPositiveLabels(response);
     }
 
     private SourceTraceEntryReadOnlyDisplayDTO completeDisplay() {
