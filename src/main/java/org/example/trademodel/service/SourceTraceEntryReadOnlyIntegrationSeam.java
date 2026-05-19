@@ -67,7 +67,7 @@ public class SourceTraceEntryReadOnlyIntegrationSeam {
         SourceTraceEntryPositiveCompletionContractDTO dto =
                 new SourceTraceEntryPositiveCompletionContractDTO();
         dto.setDowngradeReason(downgradeReason);
-        dto.setMissingFields(missingFields);
+        dto.setMissingFields(withSeamUnwired(missingFields));
         return dto;
     }
 
@@ -92,5 +92,14 @@ public class SourceTraceEntryReadOnlyIntegrationSeam {
         missingFields.addAll(assembled.getMissingFields());
         missingFields.add(SEAM_UNWIRED_FIELD);
         return new ArrayList<>(missingFields);
+    }
+
+    private List<String> withSeamUnwired(List<String> missingFields) {
+        Set<String> safeMissingFields = new LinkedHashSet<>();
+        if (missingFields != null) {
+            safeMissingFields.addAll(missingFields);
+        }
+        safeMissingFields.add(SEAM_UNWIRED_FIELD);
+        return new ArrayList<>(safeMissingFields);
     }
 }
