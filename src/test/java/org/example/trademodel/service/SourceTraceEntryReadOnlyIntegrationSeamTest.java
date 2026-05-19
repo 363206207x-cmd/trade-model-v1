@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import org.example.trademodel.dto.planboundary.EntryOwnershipValidationCompletionContext;
 import org.example.trademodel.dto.planboundary.EntryOwnershipValidationResult;
+import org.example.trademodel.dto.planboundary.SourceTraceEntryCompletionMissingReasonEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceEntryCompletionResult;
 import org.example.trademodel.dto.planboundary.SourceTraceEntryPositiveCompletionContractDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceEntryPositiveCompletionDowngradeReasonEnum;
@@ -35,7 +36,8 @@ class SourceTraceEntryReadOnlyIntegrationSeamTest {
                 .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.MISSING_REQUIRED_FIELD);
         assertThat(dto.getMissingFields()).containsExactly(
                 "entryOwnershipValidationCompletionContext",
-                "sourceTraceEntryReadOnlyCompletionRequest"
+                "sourceTraceEntryReadOnlyCompletionRequest",
+                "readOnlyIntegrationSeamUnwired"
         );
         assertStillNonProduction(dto);
     }
@@ -49,6 +51,90 @@ class SourceTraceEntryReadOnlyIntegrationSeamTest {
 
         assertMissing(missingContext, "entryOwnershipValidationCompletionContext");
         assertMissing(missingReadOnlyInput, "sourceTraceEntryReadOnlyCompletionRequest");
+    }
+
+    @Test
+    void failClosedValidationContextMissingFieldsArePreserved() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                seam.combine(
+                        contextWithMissingFields(List.of("validation-a", "validation-b")),
+                        completeRequest()
+                );
+
+        assertThat(dto.getMissingFields()).startsWith(
+                "validation-a",
+                "validation-b"
+        );
+        assertThat(dto.getMissingFields()).contains(
+                "sourceTraceEntryCompletionPath",
+                "entryPriceSource",
+                "readOnlyCompletionProductionPathUnwired",
+                "readOnlyIntegrationSeamUnwired"
+        );
+        assertThat(dto.getMissingFields()).endsWith("readOnlyIntegrationSeamUnwired");
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void assemblerMissingFieldsArePreserved() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                seam.combine(failClosedContext(), SourceTraceEntryReadOnlyCompletionRequest.builder().build());
+
+        assertThat(dto.getDowngradeReason())
+                .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.MISSING_REQUIRED_FIELD);
+        assertThat(dto.getMissingFields()).contains(
+                "entryOwnershipValidationResult",
+                "sourceTraceEntryOwnershipCompletionPath",
+                "entrySourceType",
+                "entrySourceTimeframe",
+                "entrySourceReason",
+                "entrySourceRef",
+                "ruleId",
+                "ruleVersion",
+                "sourceWindow",
+                "freshnessStatus",
+                "observedAtMs",
+                "decisionCreateTimeMs",
+                "conflictsWithStop",
+                "conflictsWithTakeProfit",
+                "conflictsWithRiskReward",
+                "conflictsWithLiquidity",
+                "conflictsWithMultiTimeframe",
+                "conflictsWithEvent",
+                "conflictsWithWick",
+                "readOnlyIntegrationSeamUnwired"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void duplicateMissingFieldsAreDeduplicatedWhilePreservingOrder() {
+        EntryOwnershipValidationCompletionContext context =
+                EntryOwnershipValidationCompletionContext.from(
+                        EntryOwnershipValidationResult.missingSource(
+                                "BTCUSDT",
+                                "15m",
+                                List.of("duplicate", "context-only", "duplicate")
+                        ),
+                        SourceTraceEntryCompletionResult.incomplete(
+                                "BTCUSDT",
+                                "15m",
+                                SourceTraceEntryCompletionMissingReasonEnum.COMPLETION_UNWIRED,
+                                List.of("duplicate", "completion-only", "context-only")
+                        )
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = seam.combine(context, completeRequest());
+
+        assertThat(dto.getMissingFields()).containsExactly(
+                "duplicate",
+                "context-only",
+                "completion-only",
+                "readOnlyCompletionProductionPathUnwired",
+                "entryPriceSource",
+                "readOnlyIntegrationSeamUnwired"
+        );
+        assertStillNonProduction(dto);
     }
 
     @Test
@@ -111,6 +197,63 @@ class SourceTraceEntryReadOnlyIntegrationSeamTest {
     }
 
     @Test
+    void assemblerUnsafeFieldsArePreservedOneAtATime() {
+        String[][] unsafeTags = {
+                {"latest-price-only", "LATEST_PRICE_ONLY"},
+                {"raw-kline-only", "RAW_KLINE_ONLY"},
+                {"AI text", "AI_TEXT"},
+                {"dashboard text", "DASHBOARD_TEXT"},
+                {"external", "EXTERNAL"},
+                {"order", "ORDER"},
+                {"execution", "EXECUTION"}
+        };
+
+        for (String[] unsafeTag : unsafeTags) {
+            SourceTraceEntryPositiveCompletionContractDTO dto =
+                    seam.combine(
+                            failClosedContext(),
+                            completeRequestBuilder().sourceTags(List.of(unsafeTag[0])).build()
+                    );
+
+            assertThat(dto.getDowngradeReason())
+                    .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION);
+            assertThat(dto.getMissingFields()).contains(
+                    unsafeTag[1],
+                    "readOnlyIntegrationSeamUnwired"
+            );
+            assertStillNonProduction(dto);
+        }
+    }
+
+    @Test
+    void productionLikeInputsDoNotImplyCompletionReadinessOrTradeInstruction() {
+        String[][] productionLikeTags = {
+                {"BoundaryCandidateService VALID", "BOUNDARYCANDIDATESERVICE_VALID"},
+                {"ExecutionPlan ready", "EXECUTIONPLAN_READY"},
+                {"SourceTrace runtime completion", "SOURCETRACE_RUNTIME_COMPLETION"},
+                {"trade-ready", "TRADE_READY"}
+        };
+
+        for (String[] productionLikeTag : productionLikeTags) {
+            SourceTraceEntryPositiveCompletionContractDTO dto =
+                    seam.combine(
+                            failClosedContext(),
+                            completeRequestBuilder().sourceTags(List.of(productionLikeTag[0])).build()
+                    );
+
+            assertThat(dto.getCompletionStatus()).isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.INCOMPLETE);
+            assertThat(dto.getCompletionTransition()).isEqualTo(SourceTraceEntryPositiveCompletionTransitionEnum.NONE);
+            assertThat(dto.getDowngradeReason())
+                    .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION);
+            assertThat(dto.getMissingFields()).contains(
+                    productionLikeTag[1],
+                    "readOnlyIntegrationSeamUnwired"
+            );
+            assertStillNonProduction(dto);
+        }
+    }
+
+    @Test
     void seamDoesNotImplyRuntimeCompletionBoundaryCandidateValidReadinessOrTradeInstruction() {
         SourceTraceEntryPositiveCompletionContractDTO dto =
                 seam.combine(failClosedContext(), completeRequest());
@@ -160,6 +303,13 @@ class SourceTraceEntryReadOnlyIntegrationSeamTest {
         );
     }
 
+    private EntryOwnershipValidationCompletionContext contextWithMissingFields(List<String> missingFields) {
+        return EntryOwnershipValidationCompletionContext.from(
+                EntryOwnershipValidationResult.missingSource("BTCUSDT", "15m", missingFields),
+                SourceTraceEntryCompletionResult.unwired("BTCUSDT", "15m")
+        );
+    }
+
     private SourceTraceEntryReadOnlyCompletionRequest completeRequest() {
         return completeRequestBuilder().build();
     }
@@ -195,7 +345,7 @@ class SourceTraceEntryReadOnlyIntegrationSeamTest {
         assertThat(dto.getCompletionTransition()).isEqualTo(SourceTraceEntryPositiveCompletionTransitionEnum.NONE);
         assertThat(dto.getDowngradeReason())
                 .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.MISSING_REQUIRED_FIELD);
-        assertThat(dto.getMissingFields()).containsExactly(expectedMissingField);
+        assertThat(dto.getMissingFields()).containsExactly(expectedMissingField, "readOnlyIntegrationSeamUnwired");
         assertStillNonProduction(dto);
     }
 
