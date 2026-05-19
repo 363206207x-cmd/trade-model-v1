@@ -1,5 +1,6 @@
 package org.example.trademodel.dto.planboundary;
 
+import java.util.ArrayList;
 import java.util.List;
 
 final class SourceTraceEntryPositiveCompletionFixtureMapper {
@@ -50,7 +51,21 @@ final class SourceTraceEntryPositiveCompletionFixtureMapper {
         dto.setDowngradeReason(
                 SourceTraceEntryPositiveCompletionDowngradeReasonEnum.FIXTURE_ONLY_NOT_PRODUCTION_READY
         );
-        dto.setMissingFields(fixtureInput.getMissingFields());
+        dto.setMissingFields(missingFieldsWithFixtureEvidence(fixtureInput));
         return dto;
+    }
+
+    private List<String> missingFieldsWithFixtureEvidence(
+            SourceTraceEntryPositiveCompletionFixtureInput fixtureInput
+    ) {
+        List<String> missingFields = new ArrayList<>(fixtureInput.getMissingFields());
+        String fixtureOnlyEvidenceShape = fixtureInput.getFixtureOnlyEvidenceShape();
+        if (fixtureOnlyEvidenceShape != null && !fixtureOnlyEvidenceShape.isBlank()) {
+            missingFields.add("fixtureOnlyEvidenceShape:" + fixtureOnlyEvidenceShape);
+        }
+        fixtureInput.getFixtureOnlyEvidenceRefs().forEach(
+                fixtureOnlyEvidenceRef -> missingFields.add("fixtureOnlyEvidenceRef:" + fixtureOnlyEvidenceRef)
+        );
+        return missingFields;
     }
 }

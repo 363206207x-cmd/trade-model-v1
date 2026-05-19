@@ -181,6 +181,79 @@ class SourceTraceEntryPositiveCompletionFixtureFactoryMapperTest {
     }
 
     @Test
+    void syntheticEvidenceShapeAddsFixtureOnlyMarkersWithoutRuntimeCompletion() {
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.withFixtureOnlyEvidence(
+                        "fixture-only-liquidity-review-shape",
+                        List.of("fixture-only-source-ref-a", "fixture-only-source-ref-b")
+                );
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = factory.syntheticEvidenceFixture(input);
+
+        assertThat(dto.getCompletionStatus())
+                .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+        assertThat(dto.getDowngradeReason())
+                .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.FIXTURE_ONLY_NOT_PRODUCTION_READY);
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:fixture-only-liquidity-review-shape",
+                "fixtureOnlyEvidenceRef:fixture-only-source-ref-a",
+                "fixtureOnlyEvidenceRef:fixture-only-source-ref-b"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void fixtureOnlyEvidenceRefsAreDefensivelyCopied() {
+        List<String> mutableEvidenceRefs = new ArrayList<>();
+        mutableEvidenceRefs.add("fixture-only-ref-a");
+        SourceTraceEntryPositiveCompletionFixtureInput input =
+                SourceTraceEntryPositiveCompletionFixtureInput.builder()
+                        .fixtureOnlyEvidenceShape("fixture-only-event-gap-shape")
+                        .fixtureOnlyEvidenceRefs(mutableEvidenceRefs)
+                        .build();
+        mutableEvidenceRefs.add("mutated-after-input-build");
+
+        SourceTraceEntryPositiveCompletionContractDTO dto = mapper.fromFixture(input);
+        mutableEvidenceRefs.add("mutated-after-map");
+
+        assertThat(input.getFixtureOnlyEvidenceRefs()).containsExactly("fixture-only-ref-a");
+        assertThat(dto.getMissingFields()).containsExactly(
+                "fixture-only-not-runtime-ready",
+                "fixtureOnlyEvidenceShape:fixture-only-event-gap-shape",
+                "fixtureOnlyEvidenceRef:fixture-only-ref-a"
+        );
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void newRuntimeLikeSourceTagsStillDowngradeFailClosed() {
+        List<String> runtimeLikeTags = List.of(
+                "REAL_ENTRY_PRICE_RUNTIME",
+                "STOP_TP_RUNTIME",
+                "RISK_REWARD_RUNTIME",
+                "BOUNDARY_CANDIDATE_VALID_RUNTIME",
+                "EXECUTION_PLAN_RUNTIME"
+        );
+
+        for (String runtimeLikeTag : runtimeLikeTags) {
+            SourceTraceEntryPositiveCompletionContractDTO dto =
+                    mapper.fromFixture(SourceTraceEntryPositiveCompletionFixtureInput.withSourceTags(
+                            List.of(runtimeLikeTag)
+                    ));
+
+            assertThat(dto.getCompletionStatus())
+                    .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.INCOMPLETE);
+            assertThat(dto.getDowngradeReason())
+                    .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION);
+            assertThat(dto.getMissingFields()).containsExactly(runtimeLikeTag);
+            assertThat(dto.getSourceTraceEntryOwnershipCompletionPath()).isNull();
+            assertThat(dto.getEntryPriceSource()).isNull();
+            assertStillNonProduction(dto);
+        }
+    }
+
+    @Test
     void mutableInputEvidenceIsDefensivelyCopied() {
         List<String> mutableMissingFields = new ArrayList<>();
         mutableMissingFields.add("fixture-only-not-runtime-ready");
@@ -279,14 +352,17 @@ class SourceTraceEntryPositiveCompletionFixtureFactoryMapperTest {
 
     @Test
     void factoryMapperExposeNoOrderExecutionCloseReverseAutoTradingOrTradeReadyMethodNames() {
+        assertNoForbiddenMethodNames(SourceTraceEntryPositiveCompletionFixtureInput.class);
         assertNoForbiddenMethodNames(SourceTraceEntryPositiveCompletionFixtureFactory.class);
         assertNoForbiddenMethodNames(SourceTraceEntryPositiveCompletionFixtureMapper.class);
     }
 
     @Test
     void factoryMapperHaveNoSpringAnnotationsAndNoProductionBoundaryInterfaces() {
+        assertNoSpringAnnotations(SourceTraceEntryPositiveCompletionFixtureInput.class);
         assertNoSpringAnnotations(SourceTraceEntryPositiveCompletionFixtureFactory.class);
         assertNoSpringAnnotations(SourceTraceEntryPositiveCompletionFixtureMapper.class);
+        assertNoProductionBoundaryInterfaces(SourceTraceEntryPositiveCompletionFixtureInput.class);
         assertNoProductionBoundaryInterfaces(SourceTraceEntryPositiveCompletionFixtureFactory.class);
         assertNoProductionBoundaryInterfaces(SourceTraceEntryPositiveCompletionFixtureMapper.class);
     }

@@ -29,6 +29,8 @@ final class SourceTraceEntryPositiveCompletionFixtureInput {
     private final Boolean conflictsWithWick;
     private final List<String> missingFields;
     private final List<String> sourceTags;
+    private final String fixtureOnlyEvidenceShape;
+    private final List<String> fixtureOnlyEvidenceRefs;
 
     private SourceTraceEntryPositiveCompletionFixtureInput(Builder builder) {
         this.symbol = builder.symbol;
@@ -54,6 +56,8 @@ final class SourceTraceEntryPositiveCompletionFixtureInput {
         this.conflictsWithWick = builder.conflictsWithWick;
         this.missingFields = new ArrayList<>(builder.missingFields);
         this.sourceTags = new ArrayList<>(builder.sourceTags);
+        this.fixtureOnlyEvidenceShape = builder.fixtureOnlyEvidenceShape;
+        this.fixtureOnlyEvidenceRefs = new ArrayList<>(builder.fixtureOnlyEvidenceRefs);
     }
 
     static SourceTraceEntryPositiveCompletionFixtureInput syntheticFixture() {
@@ -62,6 +66,16 @@ final class SourceTraceEntryPositiveCompletionFixtureInput {
 
     static SourceTraceEntryPositiveCompletionFixtureInput withSourceTags(List<String> sourceTags) {
         return builder().sourceTags(sourceTags).build();
+    }
+
+    static SourceTraceEntryPositiveCompletionFixtureInput withFixtureOnlyEvidence(
+            String fixtureOnlyEvidenceShape,
+            List<String> fixtureOnlyEvidenceRefs
+    ) {
+        return builder()
+                .fixtureOnlyEvidenceShape(fixtureOnlyEvidenceShape)
+                .fixtureOnlyEvidenceRefs(fixtureOnlyEvidenceRefs)
+                .build();
     }
 
     static Builder builder() {
@@ -164,6 +178,14 @@ final class SourceTraceEntryPositiveCompletionFixtureInput {
         return new ArrayList<>(sourceTags);
     }
 
+    String getFixtureOnlyEvidenceShape() {
+        return fixtureOnlyEvidenceShape;
+    }
+
+    List<String> getFixtureOnlyEvidenceRefs() {
+        return new ArrayList<>(fixtureOnlyEvidenceRefs);
+    }
+
     static final class Builder {
 
         private String symbol = "BTCUSDT";
@@ -189,6 +211,8 @@ final class SourceTraceEntryPositiveCompletionFixtureInput {
         private Boolean conflictsWithWick = Boolean.FALSE;
         private List<String> missingFields = List.of("fixture-only-not-runtime-ready");
         private List<String> sourceTags = List.of();
+        private String fixtureOnlyEvidenceShape;
+        private List<String> fixtureOnlyEvidenceRefs = List.of();
 
         Builder missingFields(List<String> missingFields) {
             this.missingFields = missingFields == null ? List.of() : new ArrayList<>(missingFields);
@@ -197,6 +221,18 @@ final class SourceTraceEntryPositiveCompletionFixtureInput {
 
         Builder sourceTags(List<String> sourceTags) {
             this.sourceTags = sourceTags == null ? List.of() : new ArrayList<>(sourceTags);
+            return this;
+        }
+
+        Builder fixtureOnlyEvidenceShape(String fixtureOnlyEvidenceShape) {
+            this.fixtureOnlyEvidenceShape = fixtureOnlyEvidenceShape;
+            return this;
+        }
+
+        Builder fixtureOnlyEvidenceRefs(List<String> fixtureOnlyEvidenceRefs) {
+            this.fixtureOnlyEvidenceRefs = fixtureOnlyEvidenceRefs == null
+                    ? List.of()
+                    : new ArrayList<>(fixtureOnlyEvidenceRefs);
             return this;
         }
 

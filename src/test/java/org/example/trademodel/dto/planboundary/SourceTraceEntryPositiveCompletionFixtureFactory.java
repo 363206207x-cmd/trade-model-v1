@@ -14,4 +14,10 @@ final class SourceTraceEntryPositiveCompletionFixtureFactory {
     ) {
         return mapper.fromFixture(fixtureInput);
     }
+
+    SourceTraceEntryPositiveCompletionContractDTO syntheticEvidenceFixture(
+            SourceTraceEntryPositiveCompletionFixtureInput fixtureInput
+    ) {
+        return mapper.fromFixture(fixtureInput);
+    }
 }
