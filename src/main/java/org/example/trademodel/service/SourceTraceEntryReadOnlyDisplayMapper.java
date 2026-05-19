@@ -41,6 +41,30 @@ public class SourceTraceEntryReadOnlyDisplayMapper {
             "SOURCETRACE_RUNTIME_COMPLETION",
             "PRODUCTION_COMPLETION",
             "TRADE_READY",
+            "TRADEREADY",
+            "READY_TO_TRADE",
+            "READYTOTRADE",
+            "ENTRY_READY",
+            "ENTRYREADY",
+            "EXECUTION_READY",
+            "EXECUTIONREADY",
+            "VALID",
+            "COMPLETED",
+            "SIGNAL",
+            "BUY",
+            "SELL",
+            "OPEN",
+            "CLOSE",
+            "REVERSE",
+            "ADVICE",
+            "TRADE_ADVICE",
+            "TRADEADVICE",
+            "ENTRY_INSTRUCTION",
+            "ENTRYINSTRUCTION",
+            "TRADE_INSTRUCTION",
+            "TRADEINSTRUCTION",
+            "ORDER_INSTRUCTION",
+            "ORDERINSTRUCTION",
             "UNSAFE_COMPLETION",
             "LIQUIDITYSTRESSREQUIRESREVIEW",
             "LIQUIDITYSTAMPEDEREQUIRESREVIEW",
@@ -209,7 +233,7 @@ public class SourceTraceEntryReadOnlyDisplayMapper {
     private boolean isUnsafeField(String field) {
         String normalized = normalize(field);
         for (String marker : UNSAFE_FIELD_MARKERS) {
-            if (normalized.equals(marker) || normalized.contains(marker)) {
+            if (normalized.equals(marker)) {
                 return true;
             }
         }

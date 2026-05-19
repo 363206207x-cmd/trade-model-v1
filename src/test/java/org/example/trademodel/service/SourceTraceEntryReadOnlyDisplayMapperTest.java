@@ -3,6 +3,7 @@ package org.example.trademodel.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -122,6 +123,60 @@ class SourceTraceEntryReadOnlyDisplayMapperTest {
     }
 
     @Test
+    void unsafeCompletionStatusOtherThanIncompleteFailsClosed() {
+        SourceTraceEntryPositiveCompletionContractDTO seamOutput =
+                seamOutput(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.COMPLETION_UNWIRED);
+        seamOutput.setCompletionStatus(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+
+        SourceTraceEntryReadOnlyDisplayDTO display = mapper.map(seamOutput);
+
+        assertBaseDisplaySafety(display);
+        assertThat(display.getCompletionStatus()).isEqualTo("INCOMPLETE");
+        assertThat(display.getDowngradeReason()).isEqualTo("MISSING_REQUIRED_FIELD");
+        assertThat(display.getMissingFields()).contains("completionStatus");
+    }
+
+    @Test
+    void unsafeCompletionTransitionOtherThanNoneFailsClosed() {
+        SourceTraceEntryPositiveCompletionContractDTO seamOutput =
+                seamOutput(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.COMPLETION_UNWIRED);
+        seamOutput.setCompletionTransition(
+                SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_FIXTURE_READY
+        );
+
+        SourceTraceEntryReadOnlyDisplayDTO display = mapper.map(seamOutput);
+
+        assertBaseDisplaySafety(display);
+        assertThat(display.getCompletionTransition()).isEqualTo("NONE");
+        assertThat(display.getDowngradeReason()).isEqualTo("MISSING_REQUIRED_FIELD");
+        assertThat(display.getMissingFields()).contains("completionTransition");
+    }
+
+    @Test
+    void unsafeNullDowngradeReasonFailsClosed() {
+        SourceTraceEntryPositiveCompletionContractDTO seamOutput =
+                seamOutput(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.COMPLETION_UNWIRED);
+        SourceTraceEntryPositiveCompletionContractDTO unsafe = new SourceTraceEntryPositiveCompletionContractDTO() {
+            @Override
+            public SourceTraceEntryPositiveCompletionDowngradeReasonEnum getDowngradeReason() {
+                return null;
+            }
+
+            @Override
+            public List<String> getMissingFields() {
+                return seamOutput.getMissingFields();
+            }
+        };
+
+        SourceTraceEntryReadOnlyDisplayDTO display = mapper.map(unsafe);
+
+        assertBaseDisplaySafety(display);
+        assertThat(display.getDowngradeReason()).isEqualTo("MISSING_REQUIRED_FIELD");
+        assertThat(display.getMissingFields()).contains("downgradeReason");
+        assertThat(display.getDowngradeLabel()).isEqualTo("Missing required source evidence");
+    }
+
+    @Test
     void missingOrEmptyMissingFieldListDoesNotImplyCompletion() {
         SourceTraceEntryReadOnlyDisplayDTO display = mapper.map(new SourceTraceEntryPositiveCompletionContractDTO() {
             @Override
@@ -135,6 +190,25 @@ class SourceTraceEntryReadOnlyDisplayMapperTest {
         assertThat(display.getMissingFields()).containsExactly(
                 "missingFields",
                 "readOnlyIntegrationSeamUnwired"
+        );
+    }
+
+    @Test
+    void requiredDowngradeLabelsAndHelperCopyArePreserved() {
+        assertDowngradeCopy(
+                SourceTraceEntryPositiveCompletionDowngradeReasonEnum.MISSING_REQUIRED_FIELD,
+                "Missing required source evidence",
+                "Required ownership/source/freshness/conflict evidence is missing."
+        );
+        assertDowngradeCopy(
+                SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION,
+                "Unsafe completion evidence",
+                "Unsafe or runtime-like evidence blocks completion and requires review."
+        );
+        assertDowngradeCopy(
+                SourceTraceEntryPositiveCompletionDowngradeReasonEnum.COMPLETION_UNWIRED,
+                "Completion path unwired",
+                "The read-only seam is present, but completion wiring is not active."
         );
     }
 
@@ -181,6 +255,39 @@ class SourceTraceEntryReadOnlyDisplayMapperTest {
             assertBaseDisplaySafety(display);
             assertThat(display.getDowngradeReason()).isEqualTo("UNSAFE_COMPLETION");
             assertThat(display.getUnsafeFields()).containsExactly(unsafeField);
+        }
+    }
+
+    @Test
+    void tradeReadyLookingFieldsRemainUnsafeBlockers() {
+        String[] tradeReadyLookingFields = {
+                "tradeReady",
+                "readyToTrade",
+                "entryReady",
+                "executionReady",
+                "Valid",
+                "Completed",
+                "Signal",
+                "Buy",
+                "Sell",
+                "Open",
+                "Close",
+                "Reverse",
+                "trade advice",
+                "entryInstruction",
+                "orderInstruction"
+        };
+
+        for (String field : tradeReadyLookingFields) {
+            SourceTraceEntryReadOnlyDisplayDTO display = mapper.map(seamOutput(
+                    SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION,
+                    List.of(field, "readOnlyIntegrationSeamUnwired")
+            ));
+
+            assertBaseDisplaySafety(display);
+            assertThat(display.getDowngradeReason()).isEqualTo("UNSAFE_COMPLETION");
+            assertThat(display.getUnsafeFields()).containsExactly(field);
+            assertThat(display.getBlockingFields()).contains(field);
         }
     }
 
@@ -290,6 +397,8 @@ class SourceTraceEntryReadOnlyDisplayMapperTest {
     void displayDtoAndMapperExposeNoTradingOrSpringWiringSurface() {
         assertNoForbiddenMethodNames(SourceTraceEntryReadOnlyDisplayDTO.class);
         assertNoForbiddenMethodNames(SourceTraceEntryReadOnlyDisplayMapper.class);
+        assertNoForbiddenDisplayFieldNames(SourceTraceEntryReadOnlyDisplayDTO.class);
+        assertNoForbiddenDisplayFieldNames(SourceTraceEntryReadOnlyDisplayMapper.class);
         assertNoSpringAnnotations(SourceTraceEntryReadOnlyDisplayDTO.class);
         assertNoSpringAnnotations(SourceTraceEntryReadOnlyDisplayMapper.class);
         assertThat(SourceTraceEntryCompletionContract.class
@@ -323,6 +432,20 @@ class SourceTraceEntryReadOnlyDisplayMapperTest {
         assertBaseDisplaySafety(display);
         assertThat(display.getMissingFields()).contains(expectedMissingField);
         assertThat(display.getDowngradeReason()).isEqualTo("MISSING_REQUIRED_FIELD");
+    }
+
+    private void assertDowngradeCopy(
+            SourceTraceEntryPositiveCompletionDowngradeReasonEnum downgradeReason,
+            String expectedLabel,
+            String expectedHelperCopy
+    ) {
+        SourceTraceEntryReadOnlyDisplayDTO display =
+                mapper.map(seamOutput(downgradeReason));
+
+        assertBaseDisplaySafety(display);
+        assertThat(display.getDowngradeReason()).isEqualTo(downgradeReason.name());
+        assertThat(display.getDowngradeLabel()).isEqualTo(expectedLabel);
+        assertThat(display.getDowngradeHelperCopy()).isEqualTo(expectedHelperCopy);
     }
 
     private SourceTraceEntryPositiveCompletionContractDTO seamOutput(
@@ -409,6 +532,25 @@ class SourceTraceEntryReadOnlyDisplayMapperTest {
                     assertThat(name).doesNotContain("readytotrade");
                     assertThat(name).doesNotContain("entryready");
                     assertThat(name).doesNotContain("executionready");
+                });
+    }
+
+    private void assertNoForbiddenDisplayFieldNames(Class<?> type) {
+        assertThat(Arrays.stream(type.getDeclaredFields())
+                        .map(Field::getName)
+                        .map(name -> name.toLowerCase(Locale.ROOT)))
+                .allSatisfy(name -> {
+                    assertThat(name).doesNotContain("tradeready");
+                    assertThat(name).doesNotContain("readytotrade");
+                    assertThat(name).doesNotContain("entryready");
+                    assertThat(name).doesNotContain("executionready");
+                    assertThat(name).doesNotContain("valid");
+                    assertThat(name).doesNotContain("signal");
+                    assertThat(name).doesNotContain("buy");
+                    assertThat(name).doesNotContain("sell");
+                    assertThat(name).doesNotContain("open");
+                    assertThat(name).doesNotContain("close");
+                    assertThat(name).doesNotContain("reverse");
                 });
     }
 
