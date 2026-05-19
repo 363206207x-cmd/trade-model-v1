@@ -121,6 +121,25 @@ class SourceTraceEntryReadOnlyCompletionAssemblerTest {
     }
 
     @Test
+    void blankRequiredStringsFailClosedIndependently() {
+        assertMissing(
+                assembler.assemble(completeRequestBuilder().sourceTraceEntryOwnershipCompletionPath(" ").build()),
+                "sourceTraceEntryOwnershipCompletionPath"
+        );
+        assertMissing(assembler.assemble(completeRequestBuilder().entrySourceType(" ").build()), "entrySourceType");
+        assertMissing(
+                assembler.assemble(completeRequestBuilder().entrySourceTimeframe(" ").build()),
+                "entrySourceTimeframe"
+        );
+        assertMissing(assembler.assemble(completeRequestBuilder().entrySourceReason(" ").build()), "entrySourceReason");
+        assertMissing(assembler.assemble(completeRequestBuilder().entrySourceRef(" ").build()), "entrySourceRef");
+        assertMissing(assembler.assemble(completeRequestBuilder().ruleId(" ").build()), "ruleId");
+        assertMissing(assembler.assemble(completeRequestBuilder().ruleVersion(" ").build()), "ruleVersion");
+        assertMissing(assembler.assemble(completeRequestBuilder().sourceWindow(" ").build()), "sourceWindow");
+        assertMissing(assembler.assemble(completeRequestBuilder().freshnessStatus(" ").build()), "freshnessStatus");
+    }
+
+    @Test
     void missingProvenanceFreshnessAndConflictEvidenceFailClosedIndependently() {
         assertMissing(assembler.assemble(completeRequestBuilder().ruleId(null).build()), "ruleId");
         assertMissing(assembler.assemble(completeRequestBuilder().ruleVersion(null).build()), "ruleVersion");
@@ -162,15 +181,19 @@ class SourceTraceEntryReadOnlyCompletionAssemblerTest {
     }
 
     @Test
-    void staleFutureAndClockInversionFailClosed() {
+    void staleUnknownFutureAndClockInversionFailClosed() {
         SourceTraceEntryPositiveCompletionContractDTO stale = assembler.assemble(
                 completeRequestBuilder().freshnessStatus("STALE").build()
+        );
+        SourceTraceEntryPositiveCompletionContractDTO unknown = assembler.assemble(
+                completeRequestBuilder().freshnessStatus("UNKNOWN").build()
         );
         SourceTraceEntryPositiveCompletionContractDTO future = assembler.assemble(
                 completeRequestBuilder().observedAtMs(300L).decisionCreateTimeMs(200L).build()
         );
 
         assertUnsafe(stale, "freshnessStatus");
+        assertUnsafe(unknown, "freshnessStatus");
         assertUnsafe(future, "observedAtMsFuture", "clockInversion");
     }
 
@@ -185,8 +208,16 @@ class SourceTraceEntryReadOnlyCompletionAssemblerTest {
                 {"AI_TEXT", "AI_TEXT"},
                 {"DASHBOARD_TEXT", "DASHBOARD_TEXT"},
                 {"EXTERNAL_DATA", "EXTERNAL_DATA"},
+                {"external", "EXTERNAL"},
                 {"ORDER_DATA", "ORDER_DATA"},
-                {"EXECUTION_DATA", "EXECUTION_DATA"}
+                {"order", "ORDER"},
+                {"EXECUTION_DATA", "EXECUTION_DATA"},
+                {"execution", "EXECUTION"},
+                {"BoundaryCandidateService VALID", "BOUNDARYCANDIDATESERVICE_VALID"},
+                {"ExecutionPlan ready", "EXECUTIONPLAN_READY"},
+                {"SourceTrace runtime completion", "SOURCETRACE_RUNTIME_COMPLETION"},
+                {"production completion", "PRODUCTION_COMPLETION"},
+                {"trade-ready", "TRADE_READY"}
         };
 
         for (String[] runtimeLikeTag : runtimeLikeTags) {
@@ -199,15 +230,34 @@ class SourceTraceEntryReadOnlyCompletionAssemblerTest {
     }
 
     @Test
-    void duplicateOrAmbiguousSourceRefsFailClosed() {
+    void mixedSafeAndRuntimeLikeSourceTagsFailClosed() {
+        SourceTraceEntryPositiveCompletionContractDTO dto = assembler.assemble(
+                completeRequestBuilder()
+                        .sourceTags(List.of("READ_ONLY_INTERNAL", "latest-price-only", "FIXTURE_ONLY"))
+                        .build()
+        );
+
+        assertUnsafe(dto, "LATEST_PRICE_ONLY");
+    }
+
+    @Test
+    void emptyDuplicateBlankOrAmbiguousSourceRefsFailClosed() {
+        SourceTraceEntryPositiveCompletionContractDTO empty = assembler.assemble(
+                completeRequestBuilder().sourceRefs(List.of()).build()
+        );
         SourceTraceEntryPositiveCompletionContractDTO duplicate = assembler.assemble(
                 completeRequestBuilder().sourceRefs(List.of("ref-a", "ref-a")).build()
+        );
+        SourceTraceEntryPositiveCompletionContractDTO blank = assembler.assemble(
+                completeRequestBuilder().sourceRefs(List.of(" ")).build()
         );
         SourceTraceEntryPositiveCompletionContractDTO ambiguous = assembler.assemble(
                 completeRequestBuilder().sourceRefs(List.of("ref-a", "ref-b")).build()
         );
 
+        assertUnsafe(empty, "emptySourceRefs");
         assertUnsafe(duplicate, "ambiguousSourceRefs", "duplicateSourceRefs");
+        assertUnsafe(blank, "blankSourceRefs");
         assertUnsafe(ambiguous, "ambiguousSourceRefs");
     }
 
