@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -167,6 +168,108 @@ class SourceTraceEntryPositiveCompletionContractDTOTest {
     }
 
     @Test
+    void missingFieldsGetterReturnsDefensiveCopy() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                new SourceTraceEntryPositiveCompletionContractDTO();
+        dto.setMissingFields(List.of("sourceTraceEntryOwnershipCompletionPath"));
+
+        List<String> returnedMissingFields = dto.getMissingFields();
+        returnedMissingFields.add("mutated-outside-dto");
+
+        assertThat(dto.getMissingFields())
+                .containsExactly("sourceTraceEntryOwnershipCompletionPath");
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void settingMissingFieldsFromMutableListDoesNotRetainExternalMutation() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                new SourceTraceEntryPositiveCompletionContractDTO();
+        List<String> mutableMissingFields = new ArrayList<>();
+        mutableMissingFields.add("sourceTraceEntryOwnershipCompletionPath");
+
+        dto.setMissingFields(mutableMissingFields);
+        mutableMissingFields.add("entryPriceSource");
+
+        assertThat(dto.getMissingFields())
+                .containsExactly("sourceTraceEntryOwnershipCompletionPath");
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void transitionStatusMismatchDoesNotImplyReadiness() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                syntheticFixtureDto();
+        dto.setCompletionStatus(SourceTraceEntryPositiveCompletionStatusEnum.INCOMPLETE);
+        dto.setCompletionTransition(
+                SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_FIXTURE_READY
+        );
+        dto.setMissingFields(List.of("transitionStatusMismatch"));
+
+        assertThat(dto.getCompletionStatus())
+                .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.INCOMPLETE);
+        assertThat(dto.getCompletionTransition())
+                .isEqualTo(SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_FIXTURE_READY);
+        assertThat(dto.getMissingFields()).containsExactly("transitionStatusMismatch");
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void unsafeDowngradeReasonDoesNotChangeReviewOnlySafetyFlags() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                syntheticFixtureDto();
+        dto.setDowngradeReason(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION);
+
+        assertThat(dto.getDowngradeReason())
+                .isEqualTo(SourceTraceEntryPositiveCompletionDowngradeReasonEnum.UNSAFE_COMPLETION);
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void sourceTraceEntryCompletedRemainsFalseEvenWithPositiveStatus() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                syntheticFixtureDto();
+        dto.setCompletionStatus(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+
+        assertThat(dto.getCompletionStatus())
+                .isEqualTo(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+        assertThat(dto.isSourceTraceEntryCompleted()).isFalse();
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void completionReadyRemainsFalseEvenWithPositiveTransition() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                syntheticFixtureDto();
+        dto.setCompletionTransition(
+                SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_FIXTURE_READY
+        );
+
+        assertThat(dto.getCompletionTransition())
+                .isEqualTo(SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_FIXTURE_READY);
+        assertThat(dto.isCompletionReady()).isFalse();
+        assertStillNonProduction(dto);
+    }
+
+    @Test
+    void dtoAcceptsSyntheticFixtureValuesButDoesNotInferRealEntryReadiness() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                syntheticFixtureDto();
+        dto.setCompletionStatus(SourceTraceEntryPositiveCompletionStatusEnum.POSITIVE_FIXTURE_READY);
+        dto.setCompletionTransition(
+                SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_FIXTURE_READY
+        );
+
+        assertThat(dto.getSourceTraceEntryOwnershipCompletionPath())
+                .isEqualTo("fixture-only-completion-path");
+        assertThat(dto.getEntryPriceSource()).isEqualByComparingTo("1.00");
+        assertThat(dto.getEntrySourceReason()).isEqualTo("fixture-only-source-reason");
+        assertThat(dto.getEntrySourceRef()).isEqualTo("fixture-source-ref");
+        assertThat(dto.getMissingFields()).containsExactly("fixture-only-not-runtime-ready");
+        assertStillNonProduction(dto);
+    }
+
+    @Test
     void dtoExposesNoOrderExecutionCloseReverseAutoTradingOrTradeReadyMethodNames() {
         assertNoForbiddenMethodNames(SourceTraceEntryPositiveCompletionContractDTO.class);
     }
@@ -213,6 +316,37 @@ class SourceTraceEntryPositiveCompletionContractDTOTest {
                         SourceTraceEntryPositiveCompletionTransitionEnum.INCOMPLETE_TO_POSITIVE_DESIGN_REVIEW_ONLY,
                         SourceTraceEntryPositiveCompletionTransitionEnum.POSITIVE_DESIGN_REVIEW_ONLY_TO_INCOMPLETE
                 );
+    }
+
+    private SourceTraceEntryPositiveCompletionContractDTO syntheticFixtureDto() {
+        SourceTraceEntryPositiveCompletionContractDTO dto =
+                new SourceTraceEntryPositiveCompletionContractDTO();
+        dto.setSymbol("BTCUSDT");
+        dto.setTimeframe("15m");
+        dto.setSourceTraceEntryOwnershipCompletionPath("fixture-only-completion-path");
+        dto.setEntryPriceSource(new BigDecimal("1.00"));
+        dto.setEntrySourceType("rule-owned-boundary");
+        dto.setEntrySourceTimeframe("15m");
+        dto.setEntrySourceReason("fixture-only-source-reason");
+        dto.setEntrySourceRef("fixture-source-ref");
+        dto.setRuleId("fixture-entry-rule");
+        dto.setRuleVersion("fixture-v1");
+        dto.setSourceWindow("fixture-window");
+        dto.setFreshnessStatus("FRESH");
+        dto.setObservedAtMs(100L);
+        dto.setDecisionCreateTimeMs(200L);
+        dto.setConflictsWithStop(Boolean.FALSE);
+        dto.setConflictsWithTakeProfit(Boolean.FALSE);
+        dto.setConflictsWithRiskReward(Boolean.FALSE);
+        dto.setConflictsWithLiquidity(Boolean.FALSE);
+        dto.setConflictsWithMultiTimeframe(Boolean.FALSE);
+        dto.setConflictsWithEvent(Boolean.FALSE);
+        dto.setConflictsWithWick(Boolean.FALSE);
+        dto.setDowngradeReason(
+                SourceTraceEntryPositiveCompletionDowngradeReasonEnum.FIXTURE_ONLY_NOT_PRODUCTION_READY
+        );
+        dto.setMissingFields(List.of("fixture-only-not-runtime-ready"));
+        return dto;
     }
 
     private void assertStillNonProduction(SourceTraceEntryPositiveCompletionContractDTO dto) {
