@@ -27,9 +27,20 @@ public class SourceTraceEntryReadOnlyCompletionAssembler {
             "RAW_KLINE_ONLY",
             "AI_TEXT",
             "DASHBOARD_TEXT",
+            "EXTERNAL",
             "EXTERNAL_DATA",
+            "ORDER",
             "ORDER_DATA",
-            "EXECUTION_DATA"
+            "EXECUTION",
+            "EXECUTION_DATA",
+            "BOUNDARY_CANDIDATE_VALID",
+            "BOUNDARYCANDIDATESERVICE_VALID",
+            "EXECUTION_PLAN_READY",
+            "EXECUTIONPLAN_READY",
+            "SOURCE_TRACE_RUNTIME_COMPLETION",
+            "SOURCETRACE_RUNTIME_COMPLETION",
+            "PRODUCTION_COMPLETION",
+            "TRADE_READY"
     );
 
     public SourceTraceEntryPositiveCompletionContractDTO assemble(
@@ -210,6 +221,12 @@ public class SourceTraceEntryReadOnlyCompletionAssembler {
     }
 
     private void addAmbiguousSourceRefs(List<String> unsafeFields, List<String> sourceRefs) {
+        if (sourceRefs.isEmpty()) {
+            unsafeFields.add("emptySourceRefs");
+        }
+        if (sourceRefs.stream().anyMatch(this::isBlank)) {
+            unsafeFields.add("blankSourceRefs");
+        }
         if (sourceRefs.size() > 1) {
             unsafeFields.add("ambiguousSourceRefs");
         }
