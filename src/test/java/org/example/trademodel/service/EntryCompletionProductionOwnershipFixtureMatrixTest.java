@@ -33,6 +33,12 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
             "missingEventDataNotNoRisk",
             "multiTimeframeAgreementNotSourceTraceCompletion"
     );
+    private static final List<String> POSITIVE_LOOKING_MARKERS = List.of(
+            "positiveFixtureName",
+            "validLookingValue",
+            "completedLookingValue",
+            "readyLookingValue"
+    );
     private static final List<String> FORBIDDEN_METHOD_TOKENS = List.of(
             "order",
             "execution",
@@ -119,6 +125,36 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
     }
 
     @Test
+    void latestPriceOnlySubstitutionFailsClosedForEveryOwnershipField() {
+        assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource.LATEST_PRICE_ONLY);
+    }
+
+    @Test
+    void rawKlineOnlySubstitutionFailsClosedForEveryOwnershipField() {
+        assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource.RAW_KLINE_ONLY);
+    }
+
+    @Test
+    void aiTextSubstitutionFailsClosedForEveryOwnershipField() {
+        assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource.AI_TEXT);
+    }
+
+    @Test
+    void dashboardTextSubstitutionFailsClosedForEveryOwnershipField() {
+        assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource.DASHBOARD_TEXT);
+    }
+
+    @Test
+    void externalDataSubstitutionFailsClosedForEveryOwnershipField() {
+        assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource.EXTERNAL_DATA);
+    }
+
+    @Test
+    void orderExecutionDataSubstitutionFailsClosedForEveryOwnershipField() {
+        assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource.ORDER_EXECUTION_DATA);
+    }
+
+    @Test
     void downgradeRequiredFixturesRemainFailClosed() {
         assertThat(fixturesFor(OwnershipDimension.DOWNGRADE_REQUIRED))
                 .allSatisfy(fixture -> {
@@ -154,6 +190,18 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
     }
 
     @Test
+    void missingAuditMetadataFailsClosedForEveryOwnerPresentFixture() {
+        assertThat(ownerPresentFixturesWithMissingAuditMetadata())
+                .hasSize(OwnershipField.values().length)
+                .allSatisfy(fixture -> {
+                    assertCoreSafety(fixture);
+                    assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.AUDIT_BLOCKED);
+                    assertThat(fixture.blockingFields())
+                            .contains("auditMetadataMissing", fixture.field().fieldKey() + ".auditMetadata");
+                });
+    }
+
+    @Test
     void consumerIsolationRequiredFixturesBlockReadinessValidMutationAndRuntimeConsumers() {
         assertThat(fixturesFor(OwnershipDimension.CONSUMER_ISOLATION_REQUIRED))
                 .allSatisfy(fixture -> {
@@ -164,12 +212,38 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
     }
 
     @Test
+    void missingConsumerIsolationFailsClosedForEveryOwnerPresentFixture() {
+        assertThat(ownerPresentFixturesWithMissingConsumerIsolation())
+                .hasSize(OwnershipField.values().length)
+                .allSatisfy(fixture -> {
+                    assertCoreSafety(fixture);
+                    assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.CONSUMER_ISOLATION_BLOCKED);
+                    assertThat(fixture.blockingFields())
+                            .contains("consumerIsolationMissing")
+                            .containsAll(PRODUCTION_CONSUMER_BLOCKERS);
+                });
+    }
+
+    @Test
     void authenticationVisibilityRequiredFixturesBlockOrWithholdPayload() {
         assertThat(fixturesFor(OwnershipDimension.AUTHENTICATION_VISIBILITY_REQUIRED))
                 .allSatisfy(fixture -> {
                     assertCoreSafety(fixture);
                     assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.VISIBILITY_BLOCKED);
                     assertThat(fixture.blockingFields()).contains("authenticationVisibilityRequired");
+                    assertThat(fixture.payloadWithheld()).isTrue();
+                });
+    }
+
+    @Test
+    void missingAuthenticationVisibilityFailsClosedOrWithholdsEveryOwnerPresentPayload() {
+        assertThat(ownerPresentFixturesWithMissingAuthenticationVisibility())
+                .hasSize(OwnershipField.values().length)
+                .allSatisfy(fixture -> {
+                    assertCoreSafety(fixture);
+                    assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.VISIBILITY_BLOCKED);
+                    assertThat(fixture.blockingFields())
+                            .contains("authenticationMissing", "visibilityMissing");
                     assertThat(fixture.payloadWithheld()).isTrue();
                 });
     }
@@ -186,8 +260,35 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
     }
 
     @Test
+    void riskActionGuardCasesStayReviewOnlyAndBlockCompletion() {
+        assertThat(riskActionGuardFixtures())
+                .hasSize(RISK_ACTION_GUARD_BLOCKERS.size())
+                .allSatisfy(fixture -> {
+                    assertCoreSafety(fixture);
+                    assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.RISK_GUARD_BLOCKED);
+                    assertThat(fixture.reviewMode()).isEqualTo("REVIEW_ONLY");
+                    assertThat(fixture.manualReviewRequired()).isTrue();
+                    assertThat(fixture.notTradeInstruction()).isTrue();
+                    assertThat(fixture.blockingFields()).contains("riskActionGuardRequired");
+                });
+    }
+
+    @Test
+    void positiveLookingFixtureNamesOrValuesDoNotBecomeReadinessValidOrderOrExecutionBehavior() {
+        assertThat(positiveLookingFixtures())
+                .hasSize(OwnershipField.values().length)
+                .allSatisfy(fixture -> {
+                    assertCoreSafety(fixture);
+                    assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.UNSAFE_COMPLETION);
+                    assertThat(fixture.blockingFields()).containsAll(POSITIVE_LOOKING_MARKERS);
+                    assertThat(fixture.unsafeFields())
+                            .contains(fixture.field().fieldKey() + ".positiveLookingRuntimeInterpretation");
+                });
+    }
+
+    @Test
     void noFixtureCanGenerateRealEntryStopTakeProfitOrRiskRewardValues() {
-        assertThat(allFixtures())
+        assertThat(allGuardFixtures())
                 .allSatisfy(fixture -> {
                     assertThat(fixture.generatedEntryValue()).isNull();
                     assertThat(fixture.generatedStopValue()).isNull();
@@ -211,7 +312,8 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
                 OwnershipFixture.class,
                 OwnershipField.class,
                 OwnershipDimension.class,
-                FixtureOutcome.class
+                FixtureOutcome.class,
+                RuntimeSubstitutionSource.class
         );
         for (Class<?> fixtureType : fixtureTypes) {
             assertThat(fixtureType.getAnnotation(Service.class)).isNull();
@@ -222,6 +324,24 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
             assertThat(Arrays.stream(fixtureType.getDeclaredMethods()).map(Method::getName))
                     .noneMatch(this::containsForbiddenMethodToken);
         }
+    }
+
+    private void assertSubstitutionSourceFailsClosedForEveryField(RuntimeSubstitutionSource source) {
+        List<OwnershipFixture> fixtures = substitutionFixturesFor(source);
+
+        assertThat(fixtures)
+                .hasSize(OwnershipField.values().length)
+                .allSatisfy(fixture -> {
+                    assertCoreSafety(fixture);
+                    assertThat(fixture.outcome()).isEqualTo(FixtureOutcome.UNSAFE_COMPLETION);
+                    assertThat(fixture.unsafeFields())
+                            .contains(
+                                    fixture.field().fieldKey() + ".forbiddenSubstitution",
+                                    source.blocker()
+                            );
+                    assertThat(fixture.blockingFields())
+                            .contains("forbiddenSubstitution", source.blocker());
+                });
     }
 
     private void assertUnsafeDimension(OwnershipDimension dimension, String blocker) {
@@ -255,6 +375,42 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
                 .toList();
     }
 
+    private List<OwnershipFixture> substitutionFixturesFor(RuntimeSubstitutionSource source) {
+        return Arrays.stream(OwnershipField.values())
+                .map(field -> fixtureWithSingleSubstitution(field, source))
+                .toList();
+    }
+
+    private List<OwnershipFixture> ownerPresentFixturesWithMissingAuditMetadata() {
+        return Arrays.stream(OwnershipField.values())
+                .map(this::ownerPresentFixtureWithMissingAuditMetadata)
+                .toList();
+    }
+
+    private List<OwnershipFixture> ownerPresentFixturesWithMissingConsumerIsolation() {
+        return Arrays.stream(OwnershipField.values())
+                .map(this::ownerPresentFixtureWithMissingConsumerIsolation)
+                .toList();
+    }
+
+    private List<OwnershipFixture> ownerPresentFixturesWithMissingAuthenticationVisibility() {
+        return Arrays.stream(OwnershipField.values())
+                .map(this::ownerPresentFixtureWithMissingAuthenticationVisibility)
+                .toList();
+    }
+
+    private List<OwnershipFixture> riskActionGuardFixtures() {
+        return RISK_ACTION_GUARD_BLOCKERS.stream()
+                .map(this::riskActionGuardFixture)
+                .toList();
+    }
+
+    private List<OwnershipFixture> positiveLookingFixtures() {
+        return Arrays.stream(OwnershipField.values())
+                .map(this::positiveLookingFixture)
+                .toList();
+    }
+
     private List<OwnershipFixture> allFixtures() {
         List<OwnershipFixture> fixtures = new ArrayList<>();
         for (OwnershipField field : OwnershipField.values()) {
@@ -263,6 +419,96 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
             }
         }
         return fixtures;
+    }
+
+    private List<OwnershipFixture> allGuardFixtures() {
+        List<OwnershipFixture> fixtures = new ArrayList<>(allFixtures());
+        for (RuntimeSubstitutionSource source : RuntimeSubstitutionSource.values()) {
+            fixtures.addAll(substitutionFixturesFor(source));
+        }
+        fixtures.addAll(ownerPresentFixturesWithMissingAuditMetadata());
+        fixtures.addAll(ownerPresentFixturesWithMissingConsumerIsolation());
+        fixtures.addAll(ownerPresentFixturesWithMissingAuthenticationVisibility());
+        fixtures.addAll(riskActionGuardFixtures());
+        fixtures.addAll(positiveLookingFixtures());
+        return fixtures;
+    }
+
+    private OwnershipFixture fixtureWithSingleSubstitution(OwnershipField field, RuntimeSubstitutionSource source) {
+        return failClosedFixture(
+                field,
+                OwnershipDimension.FORBIDDEN_SUBSTITUTION,
+                FixtureOutcome.UNSAFE_COMPLETION,
+                List.of(),
+                List.of(field.fieldKey() + ".forbiddenSubstitution", source.blocker()),
+                List.of("forbiddenSubstitution", source.blocker()),
+                false
+        );
+    }
+
+    private OwnershipFixture ownerPresentFixtureWithMissingAuditMetadata(OwnershipField field) {
+        return failClosedFixture(
+                field,
+                OwnershipDimension.AUDIT_REQUIRED,
+                FixtureOutcome.AUDIT_BLOCKED,
+                List.of(),
+                List.of(),
+                List.of("auditMetadataMissing", field.fieldKey() + ".auditMetadata"),
+                false
+        );
+    }
+
+    private OwnershipFixture ownerPresentFixtureWithMissingConsumerIsolation(OwnershipField field) {
+        List<String> blockers = new ArrayList<>();
+        blockers.add("consumerIsolationMissing");
+        blockers.addAll(PRODUCTION_CONSUMER_BLOCKERS);
+        return failClosedFixture(
+                field,
+                OwnershipDimension.CONSUMER_ISOLATION_REQUIRED,
+                FixtureOutcome.CONSUMER_ISOLATION_BLOCKED,
+                List.of(),
+                List.of(),
+                blockers,
+                false
+        );
+    }
+
+    private OwnershipFixture ownerPresentFixtureWithMissingAuthenticationVisibility(OwnershipField field) {
+        return failClosedFixture(
+                field,
+                OwnershipDimension.AUTHENTICATION_VISIBILITY_REQUIRED,
+                FixtureOutcome.VISIBILITY_BLOCKED,
+                List.of(),
+                List.of(),
+                List.of("authenticationMissing", "visibilityMissing", field.fieldKey() + ".visibility"),
+                true
+        );
+    }
+
+    private OwnershipFixture riskActionGuardFixture(String blocker) {
+        return failClosedFixture(
+                OwnershipField.CONFLICT_FAMILY,
+                OwnershipDimension.RISK_ACTION_GUARD_REQUIRED,
+                FixtureOutcome.RISK_GUARD_BLOCKED,
+                List.of(),
+                List.of(),
+                List.of("riskActionGuardRequired", blocker),
+                false
+        );
+    }
+
+    private OwnershipFixture positiveLookingFixture(OwnershipField field) {
+        List<String> blockers = new ArrayList<>(POSITIVE_LOOKING_MARKERS);
+        blockers.add("productionWiringStillBlocked");
+        return failClosedFixture(
+                field,
+                OwnershipDimension.FORBIDDEN_SUBSTITUTION,
+                FixtureOutcome.UNSAFE_COMPLETION,
+                List.of(),
+                List.of(field.fieldKey() + ".positiveLookingRuntimeInterpretation"),
+                blockers,
+                false
+        );
     }
 
     private OwnershipFixture fixture(OwnershipField field, OwnershipDimension dimension) {
@@ -367,6 +613,42 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
         );
     }
 
+    private OwnershipFixture failClosedFixture(
+            OwnershipField field,
+            OwnershipDimension dimension,
+            FixtureOutcome outcome,
+            List<String> missingFields,
+            List<String> unsafeFields,
+            List<String> blockingFields,
+            boolean payloadWithheld
+    ) {
+        return new OwnershipFixture(
+                field,
+                dimension,
+                outcome,
+                "INCOMPLETE",
+                "NONE",
+                "REVIEW_ONLY",
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                missingFields,
+                unsafeFields,
+                blockingFields,
+                payloadWithheld,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
     private boolean containsForbiddenMethodToken(String methodName) {
         String lowerMethodName = methodName.toLowerCase(Locale.ROOT);
         return FORBIDDEN_METHOD_TOKENS.stream()
@@ -422,6 +704,25 @@ class EntryCompletionProductionOwnershipFixtureMatrixTest {
         CONSUMER_ISOLATION_BLOCKED,
         VISIBILITY_BLOCKED,
         RISK_GUARD_BLOCKED
+    }
+
+    private enum RuntimeSubstitutionSource {
+        LATEST_PRICE_ONLY("latestPriceOnly"),
+        RAW_KLINE_ONLY("rawKlineOnly"),
+        AI_TEXT("aiText"),
+        DASHBOARD_TEXT("dashboardText"),
+        EXTERNAL_DATA("externalData"),
+        ORDER_EXECUTION_DATA("orderExecutionData");
+
+        private final String blocker;
+
+        RuntimeSubstitutionSource(String blocker) {
+            this.blocker = blocker;
+        }
+
+        private String blocker() {
+            return blocker;
+        }
     }
 
     private record OwnershipFixture(
