@@ -86,6 +86,9 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
             "automationPathIsolation",
             "externalDataPathIsolation"
     );
+    private static final String RUNTIME_SUBSTITUTION_TOKEN_PREFIX = "runtimeSubstitutionToken:";
+    private static final String RISK_ACTION_GUARD_TOKEN_PREFIX = "riskActionGuardToken:";
+    private static final String POSITIVE_LOOKING_LABEL_TOKEN_PREFIX = "positiveLookingLabelToken:";
 
     @Override
     public SourceTraceEntryProductionOwnershipReviewResult reviewEntryOwnership(
@@ -118,7 +121,7 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
         addOwnerEvidenceGuards(request, unsafeFields, blockingFields);
         addRuntimeSubstitutionGuards(request, unsafeFields, blockingFields);
         addAuditGuards(request.getAuditEnvelope(), missingFields, blockingFields);
-        addVisibilityGuards(request, missingFields, blockingFields);
+        addVisibilityGuards(request, missingFields, unsafeFields, blockingFields);
         addConsumerIsolationGuards(request.getConsumerIsolationEnvelope(), missingFields, blockingFields);
         addRiskActionGuardBlockers(request, unsafeFields, blockingFields);
         addPositiveLookingLabelBlockers(request, unsafeFields, blockingFields);
@@ -167,6 +170,25 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
             Set<String> unsafeFields,
             Set<String> blockingFields
     ) {
+        List<String> ownerEvidenceFields = request.getOwnerEvidenceFields();
+        if (!ownerEvidenceFields.isEmpty()) {
+            if (ownerEvidenceFields.stream().anyMatch(this::isBlank)) {
+                unsafeFields.add("malformedOwnerEvidence");
+                blockingFields.add("malformedOwnerEvidence");
+            }
+            if (ownerEvidenceFields.stream().allMatch(this::isBlank)) {
+                blockingFields.add("ownerEvidenceMissing");
+            }
+            ownerEvidenceFields.stream()
+                    .filter(field -> !isBlank(field))
+                    .map(String::trim)
+                    .filter(field -> !REQUIRED_OWNER_FIELDS.contains(field))
+                    .forEach(field -> {
+                        unsafeFields.add("unsupportedOwnerEvidenceField");
+                        blockingFields.add("unsupportedOwnerEvidenceField");
+                        blockingFields.add("unsupportedOwnerEvidenceField:" + field);
+                    });
+        }
         if (hasDuplicate(request.getOwnerEvidenceFields()) || hasDuplicate(request.getSourceRefs())) {
             unsafeFields.add("duplicateOwnerEvidence");
             blockingFields.add("duplicateOwnerEvidence");
@@ -186,10 +208,14 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
             Set<String> unsafeFields,
             Set<String> blockingFields
     ) {
-        if (containsAnyToken(allRequestText(request), RUNTIME_SUBSTITUTION_TOKENS)) {
-            unsafeFields.add("runtimeLikeSubstitution");
-            blockingFields.add("runtimeLikeSubstitution");
-        }
+        addTokenizedBlockers(
+                allRequestText(request),
+                RUNTIME_SUBSTITUTION_TOKENS,
+                "runtimeLikeSubstitution",
+                RUNTIME_SUBSTITUTION_TOKEN_PREFIX,
+                unsafeFields,
+                blockingFields
+        );
     }
 
     private void addAuditGuards(
@@ -201,17 +227,34 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
                 || !auditEnvelope.getMissingAuditFields().isEmpty()) {
             missingFields.add("auditEnvelope");
             blockingFields.add("auditMetadataMissing");
+            if (auditEnvelope != null) {
+                blockingFields.addAll(auditEnvelope.getMissingAuditFields());
+            }
         }
     }
 
     private void addVisibilityGuards(
             SourceTraceEntryProductionOwnershipReviewRequest request,
             Set<String> missingFields,
+            Set<String> unsafeFields,
             Set<String> blockingFields
     ) {
         if (isBlank(request.getAuthenticationVisibility())) {
             missingFields.add("authenticationVisibility");
             blockingFields.add("authenticationVisibilityMissing");
+            blockingFields.add("payloadWithheldForReview");
+        }
+        List<String> visibilityValues = new ArrayList<>();
+        visibilityValues.add(request.getAuthenticationVisibility());
+        visibilityValues.add(request.getAuditEnvelope().getVisibilityState());
+        if (containsAnyToken(visibilityValues, List.of("unauthorized", "forbidden", "denied"))) {
+            unsafeFields.add("unauthorizedVisibility");
+            blockingFields.add("unauthorizedVisibility");
+            blockingFields.add("payloadWithheldForReview");
+        }
+        if (containsAnyToken(visibilityValues, List.of("ambiguous", "unknown"))) {
+            unsafeFields.add("ambiguousVisibility");
+            blockingFields.add("ambiguousVisibility");
             blockingFields.add("payloadWithheldForReview");
         }
     }
@@ -226,6 +269,10 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
             missingFields.add("consumerIsolationEnvelope");
             blockingFields.add("consumerIsolationMissing");
             blockingFields.addAll(CONSUMER_BLOCKERS);
+            if (isolationEnvelope != null) {
+                blockingFields.addAll(isolationEnvelope.getMissingIsolationFields());
+                blockingFields.addAll(isolationEnvelope.getBlockedConsumerFamilies());
+            }
         }
     }
 
@@ -234,10 +281,14 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
             Set<String> unsafeFields,
             Set<String> blockingFields
     ) {
-        if (containsAnyToken(allRequestText(request), RISK_ACTION_GUARD_TOKENS)) {
-            unsafeFields.add("riskActionGuardReviewRequired");
-            blockingFields.add("riskActionGuardReviewRequired");
-        }
+        addTokenizedBlockers(
+                allRequestText(request),
+                RISK_ACTION_GUARD_TOKENS,
+                "riskActionGuardReviewRequired",
+                RISK_ACTION_GUARD_TOKEN_PREFIX,
+                unsafeFields,
+                blockingFields
+        );
     }
 
     private void addPositiveLookingLabelBlockers(
@@ -245,10 +296,31 @@ public class FailClosedSourceTraceEntryProductionOwnershipReviewBoundary
             Set<String> unsafeFields,
             Set<String> blockingFields
     ) {
-        if (containsAnyToken(allRequestText(request), POSITIVE_LOOKING_TOKENS)) {
-            unsafeFields.add("positiveLookingLabel");
-            blockingFields.add("positiveLookingLabel");
-        }
+        addTokenizedBlockers(
+                allRequestText(request),
+                POSITIVE_LOOKING_TOKENS,
+                "positiveLookingLabel",
+                POSITIVE_LOOKING_LABEL_TOKEN_PREFIX,
+                unsafeFields,
+                blockingFields
+        );
+    }
+
+    private void addTokenizedBlockers(
+            List<String> values,
+            List<String> tokens,
+            String genericBlocker,
+            String tokenPrefix,
+            Set<String> unsafeFields,
+            Set<String> blockingFields
+    ) {
+        tokens.stream()
+                .filter(token -> values.stream().anyMatch(value -> containsToken(value, token)))
+                .forEach(token -> {
+                    unsafeFields.add(genericBlocker);
+                    blockingFields.add(genericBlocker);
+                    blockingFields.add(tokenPrefix + token);
+                });
     }
 
     private void apply(
