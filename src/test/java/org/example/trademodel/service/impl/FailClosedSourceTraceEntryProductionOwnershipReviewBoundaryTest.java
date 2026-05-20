@@ -3,6 +3,7 @@ package org.example.trademodel.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -49,6 +50,44 @@ class FailClosedSourceTraceEntryProductionOwnershipReviewBoundaryTest {
             "stopValue",
             "takeProfitValue",
             "riskRewardValue"
+    );
+    private static final List<String> UNSAFE_SUBSTITUTION_TOKENS = List.of(
+            "latestprice",
+            "latest-price",
+            "rawkline",
+            "raw-kline",
+            "klineitem",
+            "ai text",
+            "aitext",
+            "dashboard",
+            "external",
+            "coinglass",
+            "order",
+            "execution"
+    );
+    private static final List<String> RISK_ACTION_GUARD_TOKENS = List.of(
+            "highrisk",
+            "high-risk",
+            "wick",
+            "pinbar",
+            "pin-bar",
+            "liquiditystress",
+            "liquidity-stress",
+            "stampede",
+            "missingevent",
+            "missing-event",
+            "multitimeframe",
+            "multi-timeframe"
+    );
+    private static final List<String> POSITIVE_LOOKING_TOKENS = List.of(
+            "valid",
+            "completed",
+            "complete",
+            "signal",
+            "buy",
+            "sell",
+            "open",
+            "ready"
     );
 
     private final FailClosedSourceTraceEntryProductionOwnershipReviewBoundary boundary =
@@ -106,6 +145,64 @@ class FailClosedSourceTraceEntryProductionOwnershipReviewBoundaryTest {
     }
 
     @Test
+    void malformedOwnerEvidenceFailsClosed() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setOwnerEvidenceFields(Arrays.asList("entryPriceSource", null, " "));
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getUnsafeFields()).contains("malformedOwnerEvidence");
+        assertThat(result.getBlockingFields()).contains("malformedOwnerEvidence");
+    }
+
+    @Test
+    void unsupportedOwnerFieldFailsClosed() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setOwnerEvidenceFields(List.of("entryPriceSource", "runtimePriceOwner"));
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getUnsafeFields()).contains("unsupportedOwnerEvidenceField");
+        assertThat(result.getBlockingFields()).contains(
+                "unsupportedOwnerEvidenceField",
+                "unsupportedOwnerEvidenceField:runtimePriceOwner"
+        );
+    }
+
+    @Test
+    void emptyButPresentOwnerEvidenceFailsClosed() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setOwnerEvidenceFields(List.of(" ", "\t"));
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getUnsafeFields()).contains("malformedOwnerEvidence");
+        assertThat(result.getBlockingFields()).contains("ownerEvidenceMissing", "malformedOwnerEvidence");
+    }
+
+    @Test
+    void mixedSafeAndUnsafeOwnerEvidenceFailsClosed() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setOwnerEvidenceFields(List.of("entryPriceSource", "dashboard", "unsupportedOwnerField"));
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getUnsafeFields()).contains(
+                "unsupportedOwnerEvidenceField",
+                "runtimeLikeSubstitution"
+        );
+        assertThat(result.getBlockingFields()).contains(
+                "unsupportedOwnerEvidenceField:dashboard",
+                "unsupportedOwnerEvidenceField:unsupportedOwnerField",
+                "runtimeSubstitutionToken:dashboard"
+        );
+    }
+
+    @Test
     void duplicateAmbiguousAndStaleOwnerEvidenceFailClosed() {
         SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
         request.setOwnerEvidenceFields(List.of("entryPriceSource", "entryPriceSource"));
@@ -129,24 +226,81 @@ class FailClosedSourceTraceEntryProductionOwnershipReviewBoundaryTest {
 
     @Test
     void runtimeLikeSubstitutionsFailClosedOneAtATime() {
-        for (String source : List.of(
-                "latest-price-only",
-                "raw-kline-only",
-                "AI text substitution",
-                "dashboard text substitution",
-                "external data substitution",
-                "order data substitution",
-                "execution data substitution"
-        )) {
+        for (String source : UNSAFE_SUBSTITUTION_TOKENS) {
             SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
-            request.setEntryPriceSource(source);
+            request.setEntryPriceSource("fixture " + source + " substitution");
 
             SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
 
             assertFailClosedReviewOnly(result);
             assertThat(result.getUnsafeFields()).contains("runtimeLikeSubstitution");
-            assertThat(result.getBlockingFields()).contains("runtimeLikeSubstitution");
+            assertThat(result.getBlockingFields()).contains(
+                    "runtimeLikeSubstitution",
+                    "runtimeSubstitutionToken:" + source
+            );
         }
+    }
+
+    @Test
+    void missingAuditEnvelopeFailsClosed() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setAuditEnvelope(null);
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getMissingFields()).contains("auditEnvelope");
+        assertThat(result.getBlockingFields()).contains("auditMetadataMissing");
+    }
+
+    @Test
+    void incompleteAuditFieldsFailClosedAndPreserveMissingAuditEvidence() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        SourceTraceEntryProductionOwnershipAuditEnvelope auditEnvelope =
+                new SourceTraceEntryProductionOwnershipAuditEnvelope();
+        auditEnvelope.setMissingAuditFields(List.of("ownerId", "consumerIsolationProof"));
+        request.setAuditEnvelope(auditEnvelope);
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getMissingFields()).contains("auditEnvelope");
+        assertThat(result.getBlockingFields()).contains(
+                "auditMetadataMissing",
+                "ownerId",
+                "consumerIsolationProof"
+        );
+    }
+
+    @Test
+    void missingVisibilityFailsClosedAndWithholdsPayload() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setAuthenticationVisibility(" ");
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getMissingFields()).contains("authenticationVisibility");
+        assertThat(result.getBlockingFields()).contains(
+                "authenticationVisibilityMissing",
+                "payloadWithheldForReview"
+        );
+    }
+
+    @Test
+    void unauthorizedAndAmbiguousVisibilityFailsClosedAndWithholdsPayload() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setAuthenticationVisibility("unauthorized ambiguous visibility");
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getUnsafeFields()).contains("unauthorizedVisibility", "ambiguousVisibility");
+        assertThat(result.getBlockingFields()).contains(
+                "unauthorizedVisibility",
+                "ambiguousVisibility",
+                "payloadWithheldForReview"
+        );
     }
 
     @Test
@@ -173,29 +327,81 @@ class FailClosedSourceTraceEntryProductionOwnershipReviewBoundaryTest {
     }
 
     @Test
+    void missingConsumerIsolationFailsClosed() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        request.setConsumerIsolationEnvelope(null);
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getMissingFields()).contains("consumerIsolationEnvelope");
+        assertThat(result.getBlockingFields()).contains(
+                "consumerIsolationMissing",
+                "boundaryCandidateServiceValidIsolation",
+                "executionPlanReadinessIsolation",
+                "dashboardMutationIsolation",
+                "schemaPersistenceIsolation",
+                "resolverIsolation",
+                "validatorReadinessIsolation",
+                "orderPathIsolation",
+                "executionPathIsolation",
+                "automationPathIsolation",
+                "externalDataPathIsolation"
+        );
+    }
+
+    @Test
+    void partialConsumerIsolationFailsClosedAndPreservesBlockedConsumerEvidence() {
+        SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
+        SourceTraceEntryProductionOwnershipConsumerIsolationEnvelope isolationEnvelope =
+                new SourceTraceEntryProductionOwnershipConsumerIsolationEnvelope();
+        isolationEnvelope.setIsolatedConsumerFamilies(List.of("dashboardMutationIsolation"));
+        isolationEnvelope.setMissingIsolationFields(List.of("orderPathIsolation", "executionPathIsolation"));
+        isolationEnvelope.setBlockedConsumerFamilies(List.of("automationPathIsolation"));
+        request.setConsumerIsolationEnvelope(isolationEnvelope);
+
+        SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
+
+        assertFailClosedReviewOnly(result);
+        assertThat(result.getMissingFields()).contains("consumerIsolationEnvelope");
+        assertThat(result.getBlockingFields()).contains(
+                "consumerIsolationMissing",
+                "orderPathIsolation",
+                "executionPathIsolation",
+                "automationPathIsolation"
+        );
+    }
+
+    @Test
     void riskActionGuardBlockersRemainReviewOnlyAndBlockCompletion() {
         SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
-        request.setConflictFamilyOwnership(
-                "high-risk wick pin-bar liquidity-stress stampede missing-event multi-timeframe"
-        );
+        request.setConflictFamilyOwnership(String.join(" ", RISK_ACTION_GUARD_TOKENS));
 
         SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
 
         assertFailClosedReviewOnly(result);
         assertThat(result.getUnsafeFields()).contains("riskActionGuardReviewRequired");
         assertThat(result.getBlockingFields()).contains("riskActionGuardReviewRequired");
+        assertThat(result.getBlockingFields())
+                .containsAll(RISK_ACTION_GUARD_TOKENS.stream()
+                        .map(token -> "riskActionGuardToken:" + token)
+                        .toList());
     }
 
     @Test
     void positiveLookingLabelsDoNotImplyCompletionReadinessValidDashboardOrderExecutionAutomationOrExternalPaths() {
         SourceTraceEntryProductionOwnershipReviewRequest request = completeLookingRequest();
-        request.setEntrySourceReason("valid completed signal buy sell open ready-looking review label");
+        request.setEntrySourceReason(String.join(" ", POSITIVE_LOOKING_TOKENS));
 
         SourceTraceEntryProductionOwnershipReviewResult result = boundary.reviewEntryOwnership(request);
 
         assertFailClosedReviewOnly(result);
         assertThat(result.getUnsafeFields()).contains("positiveLookingLabel");
         assertThat(result.getBlockingFields()).contains("positiveLookingLabel");
+        assertThat(result.getBlockingFields())
+                .containsAll(POSITIVE_LOOKING_TOKENS.stream()
+                        .map(token -> "positiveLookingLabelToken:" + token)
+                        .toList());
         assertThat(result.getBlockingFields()).contains(
                 "boundaryCandidateServiceValidIsolation",
                 "executionPlanReadinessIsolation",
@@ -240,6 +446,11 @@ class FailClosedSourceTraceEntryProductionOwnershipReviewBoundaryTest {
                 .map(Method::getName))
                 .noneMatch(this::containsForbiddenMethodToken)
                 .noneMatch(this::containsGeneratedTradingValueToken);
+        assertThat(Arrays.stream(FailClosedSourceTraceEntryProductionOwnershipReviewBoundary.class
+                        .getDeclaredFields())
+                .map(Field::getName))
+                .noneMatch(this::containsForbiddenMethodToken)
+                .noneMatch(this::containsGeneratedTradingValueToken);
     }
 
     @Test
@@ -266,6 +477,10 @@ class FailClosedSourceTraceEntryProductionOwnershipReviewBoundaryTest {
                 .isInstanceOf(ClassNotFoundException.class);
         assertThatThrownBy(() -> Class.forName(
                         "org.example.trademodel.service.impl.DefaultSourceTraceEntryCompletionContract"
+                ))
+                .isInstanceOf(ClassNotFoundException.class);
+        assertThatThrownBy(() -> Class.forName(
+                        "org.example.trademodel.service.impl.DefaultSourceTraceEntryProductionOwnershipReviewBoundary"
                 ))
                 .isInstanceOf(ClassNotFoundException.class);
     }
