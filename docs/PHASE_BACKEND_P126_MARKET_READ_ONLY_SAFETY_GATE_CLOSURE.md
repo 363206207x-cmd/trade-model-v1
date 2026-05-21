@@ -7,12 +7,11 @@
 - PR title note: PR #362 uses a shortened title as a platform workaround; Issue #361 and this document preserve the formal mainline title.
 - Baseline commit: `2a6e09c` (`chore: add P126 placeholder`), based on `afc75ab` (`P125 Dashboard Display Plan (#360)`).
 - Scope: documentation-only final closure for the D line, Production Authorization Preparation / Safety Gate.
-- Placeholder removed: `docs/P126.md`.
+- Trace correction: the final merged P126 diff added this closure document only; placeholder removal occurred outside the final merged diff and was not part of that final diff.
 
 ## Files Changed
 
 - `docs/PHASE_BACKEND_P126_MARKET_READ_ONLY_SAFETY_GATE_CLOSURE.md`
-- Removed `docs/P126.md`
 
 No production Java, test source, runtime, dashboard HTML, dashboard UI code, schema, config, controller, endpoint, API wiring, service registration, readiness, order, execution, scheduler, automation, auto-trading, exchange-client, or external-data files are changed.
 
@@ -169,7 +168,7 @@ The following paths remain blocked after P126:
 ## Boundary Confirmations
 
 - P126 is documentation-only final closure.
-- P126 removes the placeholder `docs/P126.md`.
+- Trace correction: the final merged P126 diff added the closure document only; `docs/P126.md` removal was not part of that final diff.
 - P126 adds one final closure document.
 - P126 closes the D line, Production Authorization Preparation / Safety Gate.
 - P126 does not authorize production wiring.
@@ -200,4 +199,4 @@ The following paths remain blocked after P126:
 
 ## Validation
 
-P126 is documentation-only, so Maven was skipped. Validation is limited to git diff checks confirming the placeholder removal and final closure document only.
+P126 is documentation-only, so Maven was skipped. Validation is limited to git diff checks confirming the final closure document only. P126A corrects the trace wording for that validation statement and does not change the D line closure meaning or any blocked path.
