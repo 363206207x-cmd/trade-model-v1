@@ -1065,6 +1065,24 @@
             </div>
         </div>
 
+        <section class="card module-status-card review-display-card" id="candidateReviewDisplay" aria-label="Read-only candidate display">
+            <h3>Read-only candidate display</h3>
+            <p class="module-status-note">Review-only candidate context</p>
+            <div class="workbench-badges" aria-label="Read-only safety labels" style="justify-content:flex-start;margin-bottom:8px;">
+                <span class="status-badge partial">Review-only</span>
+                <span class="status-badge pending">Manual review required</span>
+                <span class="status-badge pending">Not a trade instruction</span>
+            </div>
+            <p class="module-status-note">Future read-only candidate context will appear here only after separate authorization.</p>
+            <div class="alert-line">Missing evidence remains incomplete</div>
+            <div class="alert-line confused">Blocked guard evidence remains non-actionable</div>
+            <div class="alert-line">Risk Action Guard: stampede / wick-only / liquidity stress never become direct action</div>
+            <div class="alert-line confused">INCOMPLETE = missing evidence</div>
+            <div class="alert-line confused">BLOCKED = no-go / Risk Action Guard blocked</div>
+            <div class="alert-line">No order, execution, reverse, signal, or auto-trading action is available here.</div>
+            <div class="kv"><span class="k">Source boundary</span><span class="v">source-owned context</span></div>
+            <div class="kv"><span class="k">Display boundary</span><span class="v">review-only / manual review required / not trade instruction</span></div>
+        </section>
 
         <!-- 第三层 -->
         <div class="layer3">
