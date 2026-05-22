@@ -17,6 +17,11 @@ public class SourceTraceDTO implements SourceCompletenessContract {
     private String decisionCreateTimeSource;
     private String timeframe;
     private String timeframeSource;
+    private String sourceOwner;
+    private String sourceRef;
+    private String sourceTimeframe;
+    private String sourceWindow;
+    private String freshnessStatus;
     private String runtimeKlineContextStatus;
     private String runtimeKlineContextSource;
     private String runtimeKlineReadinessStatus;
@@ -53,6 +58,8 @@ public class SourceTraceDTO implements SourceCompletenessContract {
     private String wickSource;
     private SourceTraceFallbackStatusEnum fallbackStatus;
     private List<String> missingFields = new ArrayList<>();
+    private List<String> blockingReasons = new ArrayList<>();
+    private String reviewMode = SourceTraceEntrySourceReviewModeEnum.REVIEW_ONLY.name();
     private boolean manualReviewRequired = true;
     private boolean notTradeInstruction = true;
 
@@ -134,6 +141,46 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setTimeframeSource(String timeframeSource) {
         this.timeframeSource = timeframeSource;
+    }
+
+    public String getSourceOwner() {
+        return sourceOwner;
+    }
+
+    public void setSourceOwner(String sourceOwner) {
+        this.sourceOwner = sourceOwner;
+    }
+
+    public String getSourceRef() {
+        return sourceRef;
+    }
+
+    public void setSourceRef(String sourceRef) {
+        this.sourceRef = sourceRef;
+    }
+
+    public String getSourceTimeframe() {
+        return sourceTimeframe;
+    }
+
+    public void setSourceTimeframe(String sourceTimeframe) {
+        this.sourceTimeframe = sourceTimeframe;
+    }
+
+    public String getSourceWindow() {
+        return sourceWindow;
+    }
+
+    public void setSourceWindow(String sourceWindow) {
+        this.sourceWindow = sourceWindow;
+    }
+
+    public String getFreshnessStatus() {
+        return freshnessStatus;
+    }
+
+    public void setFreshnessStatus(String freshnessStatus) {
+        this.freshnessStatus = freshnessStatus;
     }
 
     public String getRuntimeKlineContextStatus() {
@@ -426,6 +473,22 @@ public class SourceTraceDTO implements SourceCompletenessContract {
 
     public void setMissingFields(List<String> missingFields) {
         this.missingFields = missingFields == null ? new ArrayList<>() : new ArrayList<>(missingFields);
+    }
+
+    public List<String> getBlockingReasons() {
+        return blockingReasons;
+    }
+
+    public void setBlockingReasons(List<String> blockingReasons) {
+        this.blockingReasons = blockingReasons == null ? new ArrayList<>() : new ArrayList<>(blockingReasons);
+    }
+
+    public String getReviewMode() {
+        return reviewMode;
+    }
+
+    public void setReviewMode(String reviewMode) {
+        this.reviewMode = reviewMode;
     }
 
     public boolean hasRequiredBoundarySources() {
