@@ -1339,6 +1339,16 @@
         return fields.length + " 项：" + head + (fields.length > 8 ? " …" : "");
     }
 
+    function sourceTraceScopeNote(sourceTraceDetail) {
+        var st = sourceTraceDetail || {};
+        var fallback = firstNonEmpty(st.fallbackStatus, "UNKNOWN").toUpperCase();
+        var blockers = Array.isArray(st.blockingReasons) ? st.blockingReasons : [];
+        var stateNote = (fallback.indexOf("INCOMPLETE") >= 0 || fallback.indexOf("BLOCKED") >= 0 || blockers.length > 0)
+            ? "INCOMPLETE / BLOCKED 表示不能推进，不是交易机会。"
+            : "前端仍按只读诊断处理，不转成交易计划。";
+        return "只读证据来源追踪；不是交易指令；需要人工复核。" + stateNote;
+    }
+
     function runtimeKlineReadinessLabel(sourceTraceDetail) {
         var st = sourceTraceDetail || {};
         var status = firstNonEmpty(st.runtimeKlineReadinessStatus, "UNKNOWN").toUpperCase();
@@ -1350,8 +1360,16 @@
         var st = sourceTraceDetail || {};
         var dr = derivativesRiskContext || {};
         return '<div class="source-trace-readonly">'
-            + '<h4>SourceTrace 元数据（只读）</h4>'
+            + '<h4>SourceTrace 只读证据来源追踪</h4>'
+            + '<p class="module-status-note">' + escapeHtml(sourceTraceScopeNote(st)) + '</p>'
+            + sourceMetric("Source Owner", st.sourceOwner, "")
+            + sourceMetric("Source Ref", st.sourceRef, "")
+            + sourceMetric("Source Timeframe", st.sourceTimeframe, "")
+            + sourceMetric("Freshness Status", st.freshnessStatus, "")
             + sourceMetric("Fallback", st.fallbackStatus, "")
+            + sourceMetric("Review Mode", st.reviewMode, "")
+            + sourceMetric("Manual Review", runtimeBooleanDiagnostic(st.manualReviewRequired, "必须人工复核", "字段为 false，前端仍按需复核"), "")
+            + sourceMetric("Not Trade Instruction", runtimeBooleanDiagnostic(st.notTradeInstruction, "不是交易指令", "字段为 false，前端仍按非交易指令处理"), "")
             + sourceMetric("Decision Anchor", st.decisionId, st.decisionIdSource)
             + sourceMetric("Analysis Anchor", st.analysisId, st.analysisIdSource)
             + sourceMetric("Decision Time", st.decisionCreateTime, st.decisionCreateTimeSource)
@@ -1364,6 +1382,7 @@
             + sourceMetric("Reason Text", st.runtimeKlineStaleReasonText, "")
             + sourceMetric("Readiness Missing", missingFieldsSummary(st.runtimeKlineReadinessMissingFields), "")
             + sourceMetric("Missing", missingFieldsSummary(st.missingFields), "")
+            + sourceMetric("Blocking Reasons", missingFieldsSummary(st.blockingReasons), "")
             + '<div class="alert-line confused">Quote latest 只作为行情元数据展示，不是 entry source；quote freshness 不是 kline stale status。</div>'
             + '<div class="alert-line">RuntimeKline readiness 仅为 persisted OHLCV 诊断元数据；FRESH 不代表 RuntimeKline / SourceTrace 完成。</div>'
             + '<h4>DerivativesRiskContext（fail-closed）</h4>'
