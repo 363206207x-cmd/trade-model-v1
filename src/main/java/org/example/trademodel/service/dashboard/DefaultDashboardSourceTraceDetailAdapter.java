@@ -32,6 +32,17 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
     private static final String QUOTE_UPDATE_TIME_ONLY = "QUOTE_UPDATE_TIME_ONLY";
     private static final String DECISION_DATA_QUALITY_SOURCE = "DecisionResultVO.dataQualityScore";
     private static final String DECISION_MULTI_TIMEFRAME_SOURCE = "DecisionResultVO.multiTfConvergence";
+    private static final String REVIEW_ONLY = "REVIEW_ONLY";
+    private static final String READ_MODEL_SOURCE_OWNER = "dashboardDetail.sourceTraceReadModel";
+    private static final String READ_MODEL_SOURCE_REF_MISSING_DECISION = "dashboardDetail.decision:missing";
+    private static final String READ_MODEL_SOURCE_REF_MISSING = "dashboardDetail.sourceRef:missing";
+    private static final String SOURCE_TRACE_FRESHNESS_READ_ONLY = "READ_ONLY_METADATA_ONLY";
+    private static final String BLOCK_READ_ONLY_SOURCE_TRACE = "READ_ONLY_SOURCE_TRACE";
+    private static final String BLOCK_BOUNDARY_SOURCES_MISSING = "BOUNDARY_SOURCES_MISSING";
+    private static final String BLOCK_RUNTIME_KLINE_CONTEXT_UNAVAILABLE = "RUNTIME_KLINE_CONTEXT_UNAVAILABLE";
+    private static final String BLOCK_TRADE_POINT_GENERATION_DISABLED = "TRADE_POINT_GENERATION_DISABLED";
+    private static final String BLOCK_DECISION_MISSING = "DECISION_MISSING";
+    private static final String BLOCK_RUNTIME_KLINE_READINESS_NOT_FRESH = "RUNTIME_KLINE_READINESS_NOT_FRESH";
 
     private final DashboardRuntimeKlineContextAdapter runtimeKlineContextAdapter;
 
@@ -69,6 +80,7 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         }
         wireRuntimeKlineBoundary(sourceTrace, runtimeKlineContext);
         wireProductionBackedSourceTraceFields(decision, sourceTrace);
+        wireReadOnlyOutputBoundary(symbol, decision, runtimeKlineContext, sourceTrace);
         sourceTrace.setFallbackStatus(SourceTraceFallbackStatusEnum.INCOMPLETE);
         sourceTrace.setMissingFields(sourceTraceMissingFields(decision));
         sourceTrace.setManualReviewRequired(true);
@@ -127,6 +139,64 @@ public class DefaultDashboardSourceTraceDetailAdapter implements DashboardSource
         if (hasText(decision.getMultiTfConvergence())) {
             sourceTrace.setMultiTimeframeSource(DECISION_MULTI_TIMEFRAME_SOURCE);
         }
+    }
+
+    private void wireReadOnlyOutputBoundary(
+            String symbol,
+            DecisionResultVO decision,
+            RuntimeKlineContextDTO runtimeKlineContext,
+            SourceTraceDTO sourceTrace
+    ) {
+        if (sourceTrace == null) {
+            return;
+        }
+        sourceTrace.setSourceOwner(READ_MODEL_SOURCE_OWNER);
+        sourceTrace.setSourceRef(readOnlySourceRef(symbol, decision));
+        if (hasText(sourceTrace.getTimeframe())) {
+            sourceTrace.setSourceTimeframe(sourceTrace.getTimeframe());
+        }
+        sourceTrace.setFreshnessStatus(SOURCE_TRACE_FRESHNESS_READ_ONLY);
+        sourceTrace.setReviewMode(REVIEW_ONLY);
+        sourceTrace.setBlockingReasons(readOnlyBlockingReasons(decision, runtimeKlineContext));
+    }
+
+    private String readOnlySourceRef(String symbol, DecisionResultVO decision) {
+        if (decision == null) {
+            return READ_MODEL_SOURCE_REF_MISSING_DECISION;
+        }
+        if (hasText(decision.getDecisionId())) {
+            return DECISION_ID_SOURCE + ":" + decision.getDecisionId();
+        }
+        if (hasText(decision.getAnalysisId())) {
+            return DECISION_ANALYSIS_ID_SOURCE + ":" + decision.getAnalysisId();
+        }
+        if (hasText(decision.getSymbol())) {
+            return DECISION_SYMBOL_SOURCE + ":" + decision.getSymbol();
+        }
+        if (hasText(symbol)) {
+            return DASHBOARD_REQUEST_SYMBOL_SOURCE + ":" + symbol;
+        }
+        return READ_MODEL_SOURCE_REF_MISSING;
+    }
+
+    private List<String> readOnlyBlockingReasons(
+            DecisionResultVO decision,
+            RuntimeKlineContextDTO runtimeKlineContext
+    ) {
+        List<String> reasons = new ArrayList<>();
+        reasons.add(BLOCK_READ_ONLY_SOURCE_TRACE);
+        reasons.add(BLOCK_BOUNDARY_SOURCES_MISSING);
+        reasons.add(BLOCK_RUNTIME_KLINE_CONTEXT_UNAVAILABLE);
+        reasons.add(BLOCK_TRADE_POINT_GENERATION_DISABLED);
+        if (decision == null) {
+            reasons.add(BLOCK_DECISION_MISSING);
+        }
+        if (runtimeKlineContext != null
+                && hasText(runtimeKlineContext.getPersistedOhlcvReadinessStatus())
+                && !"FRESH".equalsIgnoreCase(runtimeKlineContext.getPersistedOhlcvReadinessStatus())) {
+            reasons.add(BLOCK_RUNTIME_KLINE_READINESS_NOT_FRESH);
+        }
+        return reasons;
     }
 
     private void wireAnalysisAnchorFields(DecisionResultVO decision, SourceTraceDTO sourceTrace) {

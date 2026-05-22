@@ -14,8 +14,12 @@ import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,6 +48,14 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("BTCUSDT", sourceTrace.getSymbol());
         assertEquals("BTCUSDT", derivativesRiskContext.getSymbol());
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertEquals("REVIEW_ONLY", sourceTrace.getReviewMode());
+        assertEquals("dashboardDetail.sourceTraceReadModel", sourceTrace.getSourceOwner());
+        assertEquals("DecisionResultVO.analysisId:ana-btc", sourceTrace.getSourceRef());
+        assertEquals("READ_ONLY_METADATA_ONLY", sourceTrace.getFreshnessStatus());
+        assertTrue(sourceTrace.getBlockingReasons().contains("READ_ONLY_SOURCE_TRACE"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("BOUNDARY_SOURCES_MISSING"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("RUNTIME_KLINE_CONTEXT_UNAVAILABLE"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("TRADE_POINT_GENERATION_DISABLED"));
         assertEquals(SourceTraceFallbackStatusEnum.SAFE_FAIL_CLOSED_ONLY, derivativesRiskContext.getFallbackStatus());
         assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
         assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
@@ -79,6 +91,8 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
 
         assertTrue(context.getSourceTrace().getMissingFields().contains("decision"));
         assertTrue(context.getDerivativesRiskContext().getMissingFields().contains("decision"));
+        assertEquals("dashboardDetail.decision:missing", context.getSourceTrace().getSourceRef());
+        assertTrue(context.getSourceTrace().getBlockingReasons().contains("DECISION_MISSING"));
         assertEquals("UNAVAILABLE", context.getSourceTrace().getRuntimeKlineContextStatus());
         assertEquals("dashboardDetail.noRuntimeKlineContext", context.getSourceTrace().getRuntimeKlineContextSource());
         assertTrue(context.getSourceTrace().isManualReviewRequired());
@@ -120,6 +134,8 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("DecisionResultVO.createTime", sourceTrace.getDecisionCreateTimeSource());
         assertEquals("1h", sourceTrace.getTimeframe());
         assertEquals("DecisionResultVO.timeframe", sourceTrace.getTimeframeSource());
+        assertEquals("1h", sourceTrace.getSourceTimeframe());
+        assertEquals("DecisionResultVO.decisionId:dec-btc-production-backed", sourceTrace.getSourceRef());
         assertEquals("UNAVAILABLE", sourceTrace.getRuntimeKlineContextStatus());
         assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
         assertEquals(BigDecimal.valueOf(68100), sourceTrace.getQuoteLatestPrice());
@@ -193,6 +209,13 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("DecisionResultVO.latestPrice", sourceTrace.getQuoteLatestPriceSource());
         assertEquals("QUOTE_UPDATE_TIME_ONLY", sourceTrace.getQuoteFreshnessStatus());
         assertEquals(BigDecimal.valueOf(88), sourceTrace.getDataQualityScore());
+        assertEquals("REVIEW_ONLY", sourceTrace.getReviewMode());
+        assertEquals("dashboardDetail.sourceTraceReadModel", sourceTrace.getSourceOwner());
+        assertEquals("DecisionResultVO.decisionId:dec-anchor-safe", sourceTrace.getSourceRef());
+        assertEquals("READ_ONLY_METADATA_ONLY", sourceTrace.getFreshnessStatus());
+        assertTrue(sourceTrace.getBlockingReasons().contains("READ_ONLY_SOURCE_TRACE"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("BOUNDARY_SOURCES_MISSING"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("TRADE_POINT_GENERATION_DISABLED"));
         assertNull(sourceTrace.getEntryPriceSource());
         assertNull(sourceTrace.getStopPriceSource());
         assertTrue(sourceTrace.getTpPriceSources().isEmpty());
@@ -229,6 +252,8 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("dashboardDetail.noRuntimeKlineContext", sourceTrace.getRuntimeKlineContextSource());
         assertEquals("QUOTE_UPDATE_TIME_ONLY", sourceTrace.getQuoteFreshnessStatus());
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertEquals("dashboardDetail.requestSymbol:BTCUSDT", sourceTrace.getSourceRef());
+        assertEquals("READ_ONLY_METADATA_ONLY", sourceTrace.getFreshnessStatus());
         assertFalse(sourceTrace.hasRequiredBoundarySources());
     }
 
@@ -243,6 +268,8 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
 
         assertEquals("BTCUSDT", sourceTrace.getSymbol());
         assertEquals("dashboardDetail.requestSymbol", sourceTrace.getSymbolSource());
+        assertEquals("dashboardDetail.sourceTraceReadModel", sourceTrace.getSourceOwner());
+        assertEquals("dashboardDetail.requestSymbol:BTCUSDT", sourceTrace.getSourceRef());
         assertNull(sourceTrace.getDecisionId());
         assertNull(sourceTrace.getDecisionIdSource());
         assertNull(sourceTrace.getAnalysisId());
@@ -287,6 +314,11 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("NONE", sourceTrace.getRuntimeKlineStaleReasonCode());
         assertEquals("Persisted OHLCV window is fresh.", sourceTrace.getRuntimeKlineStaleReasonText());
         assertTrue(sourceTrace.getRuntimeKlineReadinessMissingFields().isEmpty());
+        assertEquals("REVIEW_ONLY", sourceTrace.getReviewMode());
+        assertEquals("READ_ONLY_METADATA_ONLY", sourceTrace.getFreshnessStatus());
+        assertTrue(sourceTrace.getBlockingReasons().contains("READ_ONLY_SOURCE_TRACE"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("BOUNDARY_SOURCES_MISSING"));
+        assertFalse(sourceTrace.getBlockingReasons().contains("RUNTIME_KLINE_READINESS_NOT_FRESH"));
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
         assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
         assertTrue(sourceTrace.getMissingFields().contains("entryPriceSource"));
@@ -395,6 +427,8 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertEquals("WINDOW_TOO_SHORT", sourceTrace.getRuntimeKlineStaleReasonCode());
         assertEquals(List.of("persistedOhlcvWindow", "requiredClosedBars"),
                 sourceTrace.getRuntimeKlineReadinessMissingFields());
+        assertEquals("REVIEW_ONLY", sourceTrace.getReviewMode());
+        assertTrue(sourceTrace.getBlockingReasons().contains("RUNTIME_KLINE_READINESS_NOT_FRESH"));
         assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
         assertTrue(sourceTrace.getMissingFields().contains("runtimeKlineContext"));
         assertFalse(sourceTrace.hasRequiredBoundarySources());
@@ -402,8 +436,74 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         assertTrue(sourceTrace.isNotTradeInstruction());
     }
 
+    @Test
+    void shouldKeepReadOnlyOutputFromValidReadinessTradePointsAndActionSurfaces() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setDecisionId("dec-no-action");
+        decision.setAnalysisId("ana-no-action");
+        decision.setSymbol("BTCUSDT");
+        decision.setTimeframe("1h");
+        decision.setLatestPrice(BigDecimal.valueOf(68100));
+        decision.setPriceUpdateTimeMs(1710000000000L);
+        decision.setEntryZone("68000-68200");
+        decision.setStopLoss("67400");
+        decision.setTakeProfitRules("TP1 69000");
+        decision.setExecutionPlanSummary("Entry 68000, stop 67400, TP1 69000");
+        decision.setRecommendedAction("OPEN_LONG");
+
+        SourceTraceDTO sourceTrace = adapter.build("BTCUSDT", decision).getSourceTrace();
+
+        assertNotNull(sourceTrace);
+        assertEquals("REVIEW_ONLY", sourceTrace.getReviewMode());
+        assertEquals(SourceTraceFallbackStatusEnum.INCOMPLETE, sourceTrace.getFallbackStatus());
+        assertTrue(sourceTrace.getBlockingReasons().contains("READ_ONLY_SOURCE_TRACE"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("BOUNDARY_SOURCES_MISSING"));
+        assertTrue(sourceTrace.getBlockingReasons().contains("TRADE_POINT_GENERATION_DISABLED"));
+        assertFalse(sourceTrace.hasRequiredBoundarySources());
+        assertNull(sourceTrace.getEntryPriceSource());
+        assertNull(sourceTrace.getEntrySourceType());
+        assertNull(sourceTrace.getEntrySourceTimeframe());
+        assertNull(sourceTrace.getEntrySourceReason());
+        assertNull(sourceTrace.getEntrySourceRef());
+        assertNull(sourceTrace.getStopPriceSource());
+        assertNull(sourceTrace.getStopSourceType());
+        assertNull(sourceTrace.getStopSourceTimeframe());
+        assertNull(sourceTrace.getStopSourceReason());
+        assertNull(sourceTrace.getStopSourceRef());
+        assertTrue(sourceTrace.getTpPriceSources().isEmpty());
+        assertNull(sourceTrace.getTpSourceType());
+        assertNull(sourceTrace.getTpSourceTimeframe());
+        assertNull(sourceTrace.getTpSourceReason());
+        assertNull(sourceTrace.getTpSourceRef());
+        assertNull(sourceTrace.getRrSource());
+        assertNull(sourceTrace.getRrRuleRef());
+        assertFalse(sourceTrace.getBlockingReasons().contains("VALID"));
+        assertAdapterDoesNotExposeBoundaryCandidateValidOrActionSurface();
+    }
+
     private PersistedOhlcvQueryService readinessService(PersistedOhlcvReadinessResult result) {
         return (symbol, timeframe, requiredWindowSize, maxReadLagMs) -> result;
+    }
+
+    private void assertAdapterDoesNotExposeBoundaryCandidateValidOrActionSurface() {
+        Stream<String> reflectedNames = Stream.concat(
+                Arrays.stream(DefaultDashboardSourceTraceDetailAdapter.class.getDeclaredFields())
+                        .map(Field::getName),
+                Arrays.stream(DefaultDashboardSourceTraceDetailAdapter.class.getDeclaredMethods())
+                        .map(Method::getName)
+        );
+
+        reflectedNames
+                .map(String::toLowerCase)
+                .forEach(name -> {
+                    assertFalse(name.contains("boundarycandidate"));
+                    assertFalse(name.contains("valid"));
+                    assertFalse(name.contains("order"));
+                    assertFalse(name.contains("execution"));
+                    assertFalse(name.contains("scheduler"));
+                    assertFalse(name.contains("automation"));
+                    assertFalse(name.contains("autotrading"));
+                });
     }
 
     private PersistedOhlcvReadinessResult readiness(
