@@ -27,7 +27,7 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
     private static final String LABEL_INCOMPLETE = "执行计划不完整";
     private static final String LABEL_WATCH_ONLY = "仅观察";
     private static final String LABEL_INVALID = "计划已失效";
-    private static final String LABEL_READY_REVIEW_ONLY = "可复核摘要";
+    private static final String LABEL_READY_REVIEW_ONLY = "只允许复核摘要";
 
     private static final String REASON_BOUNDARY_PENDING = "PLAN_BOUNDARY_BACKEND_PENDING";
     private static final String REASON_BOUNDARY_INCOMPLETE = "PLAN_BOUNDARY_INCOMPLETE";
@@ -45,6 +45,10 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
     private static final String REASON_STAMPEDE_REVIEW_ONLY = "STAMPEDE_RISK_REVIEW_ONLY";
     private static final String REASON_WICK_ONLY_REVIEW_ONLY = "WICK_ONLY_RISK_REVIEW_ONLY";
     private static final String REASON_RISK_ACTION_GUARD_BLOCKED = "RISK_ACTION_GUARD_BLOCKED";
+    private static final String REASON_REVIEW_ONLY_DISPLAY = "EXECUTION_PLAN_REVIEW_ONLY_DISPLAY";
+    private static final String REASON_NOT_EXECUTABLE = "EXECUTION_PLAN_NOT_EXECUTABLE";
+    private static final String REASON_NOT_TRADE_INSTRUCTION = "NOT_TRADE_INSTRUCTION";
+    private static final String REASON_ENTRY_STOP_TP_RR_NOT_GENERATED = "ENTRY_STOP_TP_RR_NOT_GENERATED";
 
     @Override
     public DashboardDetailResponseVO.ExecutionPlanDisplayVO build(
@@ -98,7 +102,7 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
             display.setPlanBoundaryStatus(VALID);
             display.setNotExecutableReason(REASON_MANUAL_REVIEW_REQUIRED);
             addUnique(display.getIncompleteReasons(), REASON_MANUAL_REVIEW_REQUIRED);
-            enforceSafetyFlags(display);
+            addReviewOnlyGuardrails(display);
             return display;
         }
 
@@ -266,7 +270,7 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
         display.setNotExecutableReason(reason);
         ensureReasonList(display);
         addUnique(display.getIncompleteReasons(), reason);
-        enforceSafetyFlags(display);
+        addReviewOnlyGuardrails(display);
     }
 
     private void inheritBoundaryReasons(
@@ -290,6 +294,15 @@ public class DefaultExecutionPlanDisplayAdapter implements ExecutionPlanDisplayA
     private void enforceSafetyFlags(DashboardDetailResponseVO.ExecutionPlanDisplayVO display) {
         display.setManualReviewRequired(true);
         display.setNotTradeInstruction(true);
+    }
+
+    private void addReviewOnlyGuardrails(DashboardDetailResponseVO.ExecutionPlanDisplayVO display) {
+        ensureReasonList(display);
+        addUnique(display.getIncompleteReasons(), REASON_REVIEW_ONLY_DISPLAY);
+        addUnique(display.getIncompleteReasons(), REASON_NOT_EXECUTABLE);
+        addUnique(display.getIncompleteReasons(), REASON_NOT_TRADE_INSTRUCTION);
+        addUnique(display.getIncompleteReasons(), REASON_ENTRY_STOP_TP_RR_NOT_GENERATED);
+        enforceSafetyFlags(display);
     }
 
     private void addUnique(List<String> reasons, String reason) {
