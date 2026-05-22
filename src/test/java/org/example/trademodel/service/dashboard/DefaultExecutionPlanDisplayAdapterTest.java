@@ -73,6 +73,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertEquals("PLAN_BOUNDARY_INCOMPLETE", display.getNotExecutableReason());
         assertTrue(display.getIncompleteReasons().contains("PLAN_BOUNDARY_INCOMPLETE"));
         assertTrue(display.getIncompleteReasons().contains("READ_MODEL_PARTIAL"));
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -86,6 +87,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertEquals("WATCH_ONLY", display.getPlanBoundaryStatus());
         assertFalse(display.getExecutionPlanBoundaryAligned());
         assertEquals("PLAN_BOUNDARY_WATCH_ONLY", display.getNotExecutableReason());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -109,11 +111,13 @@ class DefaultExecutionPlanDisplayAdapterTest {
         DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(null, boundary, null);
 
         assertEquals("READY_REVIEW_ONLY", display.getExecutionPlanStatus());
+        assertEquals("只允许复核摘要", display.getExecutionPlanStatusLabel());
         assertEquals("VALID", display.getPlanBoundaryStatus());
         assertTrue(display.getExecutionPlanBoundaryAligned());
         assertEquals("MANUAL_REVIEW_REQUIRED", display.getNotExecutableReason());
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -130,6 +134,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING"));
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -150,6 +155,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:eventSource"));
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -170,6 +176,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:liquiditySource"));
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -180,11 +187,13 @@ class DefaultExecutionPlanDisplayAdapterTest {
         DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(null, boundary, null, validSourceTrace());
 
         assertEquals("READY_REVIEW_ONLY", display.getExecutionPlanStatus());
+        assertEquals("只允许复核摘要", display.getExecutionPlanStatusLabel());
         assertEquals("VALID", display.getPlanBoundaryStatus());
         assertTrue(display.getExecutionPlanBoundaryAligned());
         assertEquals("MANUAL_REVIEW_REQUIRED", display.getNotExecutableReason());
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -218,6 +227,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertTrue(display.getIncompleteReasons().contains("SOURCE_TRACE_MISSING_FIELD:rrSource"));
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -240,6 +250,7 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertEquals("HIGH_RISK_REVIEW_ONLY", display.getNotExecutableReason());
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -328,10 +339,12 @@ class DefaultExecutionPlanDisplayAdapterTest {
         );
 
         assertEquals("READY_REVIEW_ONLY", display.getExecutionPlanStatus());
+        assertEquals("只允许复核摘要", display.getExecutionPlanStatusLabel());
         assertTrue(display.getExecutionPlanBoundaryAligned());
         assertEquals("MANUAL_REVIEW_REQUIRED", display.getNotExecutableReason());
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
     }
 
     @Test
@@ -349,6 +362,50 @@ class DefaultExecutionPlanDisplayAdapterTest {
     }
 
     @Test
+    void readyReviewOnlyShouldRemainReviewOnlyAndNotExecutable() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("LOW");
+        decision.setExecutionPlanSummary("只读计划摘要");
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        boundary.setPlanBoundaryStatus("VALID");
+
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = adapter.build(
+                decision,
+                boundary,
+                null,
+                validSourceTrace(),
+                readyRiskActionGuard()
+        );
+
+        assertEquals("READY_REVIEW_ONLY", display.getExecutionPlanStatus());
+        assertEquals("只允许复核摘要", display.getExecutionPlanStatusLabel());
+        assertEquals("只读计划摘要", display.getExecutionPlanSummary());
+        assertEquals("MANUAL_REVIEW_REQUIRED", display.getNotExecutableReason());
+        assertReviewOnlyGuardrails(display);
+    }
+
+    @Test
+    void adapterShouldNotExposeTradingActionAutomationOrValidFactorySurface() {
+        for (java.lang.reflect.Method method : DefaultExecutionPlanDisplayAdapter.class.getDeclaredMethods()) {
+            String methodName = method.getName().toLowerCase();
+            assertFalse(methodName.contains("order"));
+            assertFalse(methodName.contains("scheduler"));
+            assertFalse(methodName.contains("automation"));
+            assertFalse(methodName.contains("autotrading"));
+            assertFalse(methodName.contains("boundarycandidate"));
+            assertFalse("valid".equals(methodName));
+        }
+        for (java.lang.reflect.Field field : DefaultExecutionPlanDisplayAdapter.class.getDeclaredFields()) {
+            String fieldName = field.getName().toLowerCase();
+            assertFalse(fieldName.contains("order"));
+            assertFalse(fieldName.contains("scheduler"));
+            assertFalse(fieldName.contains("automation"));
+            assertFalse(fieldName.contains("autotrading"));
+            assertFalse(fieldName.contains("boundarycandidate"));
+        }
+    }
+
+    @Test
     void shouldKeepSafetyFlagsForEveryMapping() {
         DashboardDetailResponseVO.PlanBoundaryDisplayVO boundary = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
         boundary.setPlanBoundaryStatus("INCOMPLETE");
@@ -358,6 +415,17 @@ class DefaultExecutionPlanDisplayAdapterTest {
         assertNotNull(display.getIncompleteReasons());
         assertTrue(display.getManualReviewRequired());
         assertTrue(display.getNotTradeInstruction());
+        assertReviewOnlyGuardrails(display);
+    }
+
+    private void assertReviewOnlyGuardrails(DashboardDetailResponseVO.ExecutionPlanDisplayVO display) {
+        assertNotNull(display.getIncompleteReasons());
+        assertTrue(display.getManualReviewRequired());
+        assertTrue(display.getNotTradeInstruction());
+        assertTrue(display.getIncompleteReasons().contains("EXECUTION_PLAN_REVIEW_ONLY_DISPLAY"));
+        assertTrue(display.getIncompleteReasons().contains("EXECUTION_PLAN_NOT_EXECUTABLE"));
+        assertTrue(display.getIncompleteReasons().contains("NOT_TRADE_INSTRUCTION"));
+        assertTrue(display.getIncompleteReasons().contains("ENTRY_STOP_TP_RR_NOT_GENERATED"));
     }
 
     private SourceTraceDTO validSourceTrace() {
