@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-550f743 BACKEND-P203 Low-Frequency Scan Scheduler Authorization Gate (#523)
+72724c9 BACKEND-P204 Low-Frequency Scan Scheduler Minimal Skeleton (#525)
 ```
 
-说明：本文件创建于 WORKFLOW-P1 分支，主线基准为 P203 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并。当前主线基准为 P204 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -24,6 +24,7 @@ P200：Watchlist Low-Frequency Scan / Opportunity Promote Closure（观察库低
 P201：Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）
 P202：Low-Frequency Scan Scheduler Scope Audit（低频扫描定时器范围审计）
 P203：Low-Frequency Scan Scheduler Authorization Gate（低频扫描定时器授权门）
+P204：Low-Frequency Scan Scheduler Minimal Skeleton（低频扫描定时器最小骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -40,6 +41,7 @@ P203：Low-Frequency Scan Scheduler Authorization Gate（低频扫描定时器�
 - Dashboard Risk Reminder（首页风险提醒）只读展示。
 - Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界。
 - Low-Frequency Scan Scheduler（低频扫描定时器）范围审计和授权门。
+- Low-Frequency Scan Scheduler（低频扫描定时器）disabled-by-default skeleton（默认关闭骨架）。
 
 当前仍未完成：
 
@@ -58,19 +60,19 @@ P203：Low-Frequency Scan Scheduler Authorization Gate（低频扫描定时器�
 
 ## 4. 当前 open PR（未合并请求）
 
-当前已创建但尚未完成的功能 PR：
+当前已创建但尚未完成的文档 PR：
 
 ```text
-PR #525：BACKEND-P204 Low-Frequency Scan Scheduler Minimal Skeleton（低频扫描定时器最小骨架）
-Branch：p204
-Issue：#524
-风险档位：B 档偏低风险
+PR #529：BACKEND-P205 Max Safe Docs Pack After P204 Scheduler Skeleton（P204 定时器骨架后的最大安全文档包）
+Branch：p205
+Issue：#528
+风险档位：A 档 docs-only（只改文档）
 状态：Draft PR（草稿合并请求）
 ```
 
-P204 预期只允许新增 disabled-by-default（默认关闭）、dry-run（空跑）、no-op（不执行实际动作）的 scheduler skeleton（定时器骨架）和测试。
+P205 只允许补齐最大安全文档包：更新 `V1_CURRENT_STATE.md`、`PROJECT_PROGRESS_INDEX.md`、`V1_OPERATOR_WORKFLOW_CONTRACT.md`、`V1_CODEX_TASK_TEMPLATE.md`。
 
-P204 禁止：
+P205 禁止：
 
 - 接 MarketQuoteClient（行情客户端）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
@@ -86,22 +88,20 @@ P204 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#524：BACKEND-P204 Low-Frequency Scan Scheduler Minimal Skeleton
-#526：WORKFLOW-P1 固化 V1 Operator Workflow Contract
+#528：BACKEND-P205 Max Safe Docs Pack After P204 Scheduler Skeleton
 ```
 
-注意：若本文件合并后，#526 会关闭。
+P204 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-先完成 WORKFLOW-P1：固化工作流契约文件。
-然后回到 P204：审查 / 推进 Low-Frequency Scan Scheduler Minimal Skeleton。
+完成 P205 最大安全文档包。
 ```
 
-P204 属于 B 档偏低风险，因为它会新增 Java scheduler skeleton（定时器骨架），但默认关闭，不接行情，不扫真实资产，不交易。
+P205 属于 A 档 docs-only（只改文档），只补齐工作流 / 状态 / 进度索引文档，不写 Java，不改测试，不改 dashboard，不接任何运行时能力。
 
 ## 7. 当前禁止越界
 
