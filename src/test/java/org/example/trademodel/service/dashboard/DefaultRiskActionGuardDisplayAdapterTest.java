@@ -189,19 +189,54 @@ class DefaultRiskActionGuardDisplayAdapterTest {
     }
 
     @Test
+    void shouldExposeStrongReversalAndMovingStopAsReviewOnlyWithoutActions() {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setRiskLevel("HIGH");
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO fallback = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
+        fallback.setLiquidityState("NORMAL");
+
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO display = adapter.build(
+                decision,
+                validBoundary(),
+                readyReviewExecutionPlan(),
+                fallback
+        );
+
+        assertEquals("MANUAL_REVIEW_REQUIRED", display.getRiskActionGuardStatus());
+        assertEquals("HIGH_RISK_REVIEW_ONLY", display.getRiskActionBlockingReason());
+        assertAdviceContains(display,
+                "强反转待确认",
+                "原入场逻辑疑似失效",
+                "移动止损需要人工复核",
+                "强反转不等于反手",
+                "自动平仓",
+                "移动止损不等于自动改止损",
+                "自动平仓 / 自动反手 / 自动修改止损均关闭",
+                "不生成真实 entry / stop / TP / RR",
+                "不升级 Readiness"
+        );
+        assertFailClosed(display);
+    }
+
+    @Test
     void shouldNotExposePointGenerationReadinessOrProductionActionMethods() {
         for (java.lang.reflect.Method method : DashboardDetailResponseVO.RiskActionGuardDisplayVO.class.getMethods()) {
             String name = method.getName().toLowerCase();
             assertFalse(name.contains("entry"));
+            assertFalse(name.contains("stoploss"));
+            assertFalse(name.contains("modifystop"));
             assertFalse(name.contains("takeprofit"));
             assertFalse(name.contains("tp"));
             assertFalse(name.contains("rr"));
             assertFalse(name.contains("readiness"));
+            assertFalse(name.contains("execution"));
             assertFalse(name.contains("autotrading"));
             assertFalse(name.contains("automation"));
             assertFalse(name.contains("placeorder"));
             assertFalse(name.contains("closeposition"));
             assertFalse(name.contains("reverseposition"));
+            assertFalse(name.contains("buybutton"));
+            assertFalse(name.contains("sellbutton"));
             assertFalse(name.equals("buy"));
             assertFalse(name.equals("sell"));
         }

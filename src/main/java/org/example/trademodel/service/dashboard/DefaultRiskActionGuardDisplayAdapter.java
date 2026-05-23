@@ -40,7 +40,13 @@ public class DefaultRiskActionGuardDisplayAdapter implements RiskActionGuardDisp
     private static final String ADVICE_WICK_ONLY =
             "仅插针风险不等于趋势反转，不生成反向开仓计划，只能等待确认。";
     private static final String ADVICE_STRONG_REVERSAL_MOVING_STOP_REVIEW_ONLY =
-            "强反转 / 移动止损仍未自动化，只能人工复核。";
+            "强反转 / 移动止损仍未自动化，只能人工复核；"
+                    + "强反转待确认，原入场逻辑疑似失效也只能进入复核；"
+                    + "移动止损需要人工复核；"
+                    + "强反转不等于反手或自动平仓；"
+                    + "移动止损不等于自动改止损；"
+                    + "自动平仓 / 自动反手 / 自动修改止损均关闭；"
+                    + "不生成真实 entry / stop / TP / RR，不升级 Readiness。";
 
     @Override
     public DashboardDetailResponseVO.RiskActionGuardDisplayVO build(
