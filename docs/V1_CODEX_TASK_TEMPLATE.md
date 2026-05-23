@@ -7,7 +7,9 @@
 ```text
 继续 Trade Model V1 当前分支任务：<TASK_TITLE>。
 
-你必须只完成一个最小交付物：<MINIMAL_DELIVERABLE>。
+你必须只完成一个明确交付包：<DELIVERABLE_SCOPE>。
+
+任务模式：<TASK_MODE>
 
 当前 GitHub 信息：
 - Issue: #<ISSUE_NUMBER>
@@ -16,6 +18,8 @@
 - Base main commit: <BASE_COMMIT>
 - 当前 placeholder: <PLACEHOLDER_PATH>
 ```
+
+`<TASK_MODE>` 可为 `MINIMAL_DELIVERABLE`（单点交付模式）或 `MAX_SAFE_PACK`（最大安全任务包）。默认优先使用 `MAX_SAFE_PACK`。`MINIMAL_DELIVERABLE` 只在任务确实需要单点收口、风险边界不清，或 Authorization Gate（授权门）前需要暂停时使用。`MAX_SAFE_PACK` 不能跨越 A/B/C 授权边界。
 
 ## 2. 执行前命令
 
@@ -39,6 +43,9 @@ git status
    <ALLOWED_FILE_1>
    <ALLOWED_FILE_2>
    <ALLOWED_FILE_3>
+
+本轮最大安全任务包文件组：
+   <GROUPED_ALLOWED_FILES>
 ```
 
 ## 4. 必须读取文件
@@ -60,7 +67,10 @@ git status
 - <ALLOWED_FILE_1>
 - <ALLOWED_FILE_2>
 - <ALLOWED_FILE_3>
+- <GROUPED_ALLOWED_FILES>
 ```
+
+`<GROUPED_ALLOWED_FILES>` 表示同一风险档位、同一模块 / 同一业务轨道、同一验证方式且不会跨越授权门的一组允许文件。
 
 ## 6. 禁止修改文件
 
@@ -111,6 +121,17 @@ git diff --check
 git status
 ```
 
+### docs-only max safe pack（只改文档的最大安全任务包）
+
+```bash
+<GROUPED_VALIDATION_COMMANDS>
+git diff --name-status main...HEAD
+git diff --check
+git status
+```
+
+`<GROUPED_VALIDATION_COMMANDS>` 表示本轮统一验证命令。docs-only 最大安全包仍只跑 docs-only 验证。Java / dashboard / schema / API 不得混入 docs-only 包。
+
 ### Java 小改
 
 ```bash
@@ -144,6 +165,8 @@ git commit -m "<COMMIT_MESSAGE>"
 git push origin <BRANCH_NAME>
 ```
 
+提交命令和用户需要复制的命令必须尽量保持完整代码块，不要让用户分多次复制。
+
 ## 10. Codex 最终输出格式
 
 Codex 完成后必须输出：
@@ -160,6 +183,12 @@ Codex 完成后必须输出：
 9. 当前分支和 commit hash
 10. 明确说明本轮没有做哪些禁止事项
 ```
+
+Codex 最终输出必须逐项列出每个变更文件。
+
+Codex 最终输出必须逐项确认每条边界没有越界，特别是 Java / test / dashboard / schema / config / API / MarketQuoteClient / scheduler / order / execution / auto-trading。
+
+最大安全任务包完成后，也必须说明是否只修改了 `<GROUPED_ALLOWED_FILES>` 中授权文件。
 
 ## 11. 风险档位变量
 

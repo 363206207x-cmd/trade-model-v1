@@ -1,20 +1,21 @@
 # PROJECT_PROGRESS_INDEX
 
-P201 是 Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）。
+P201 是 Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）。P205 追加吸收 P202-P204 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和最小骨架结果。
 
-本索引来自 P164 全局扫描后的持续维护。本轮只刷新 `docs/PROJECT_PROGRESS_INDEX.md`，并吸收 P197-P200 Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）read-only audit / docs-only semantics（只读审计 / 只改文档语义）闭环结果。P201 不新增 Java，不新增测试，不改 `dashboard.html`，不接 API（接口），不接 `MarketQuoteClient`，不创建 Low-Frequency Scan scheduler（低频扫描定时器），不创建 Opportunity Push execution（机会推送执行），不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比），不创建 close / reverse / buy / sell（平仓 / 反手 / 买入 / 卖出）动作，不升级 Readiness（可执行就绪），不接 auto-trading（自动交易）。
+本索引来自 P164 全局扫描后的持续维护。P201 刷新 `docs/PROJECT_PROGRESS_INDEX.md`，并吸收 P197-P200 Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）read-only audit / docs-only semantics（只读审计 / 只改文档语义）闭环结果。P205 仅补齐 P202-P204 后的状态和工作流文档，不新增 Java，不新增测试，不改 `dashboard.html`，不接 API（接口），不接 `MarketQuoteClient`，不创建真实 Low-Frequency Scan scheduler（低频扫描定时器），不创建 Opportunity Push execution（机会推送执行），不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比），不创建 close / reverse / buy / sell（平仓 / 反手 / 买入 / 卖出）动作，不升级 Readiness（可执行就绪），不接 auto-trading（自动交易）。
 
 ## 一、当前总进度结论
 
-当前项目仍然不是“快完成自动交易”的状态。更准确的状态是：安全地基、只读复核、失败关闭、SourceTrace（证据来源追踪）只读展示、BoundaryCandidate（边界候选交易计划）只读候选展示、ExecutionPlan（执行计划）review-only plan display（只允许复核展示）、Risk Action Guard（风险动作保护器）read-only risk display（只读风险展示）、Position Monitor Strong Reversal / Moving Stop review-only display（持仓强反转 / 移动止损只允许复核展示）、Dashboard Risk Reminder read-only display（首页风险提醒只读展示）以及 Watchlist Low-Frequency Scan / Opportunity Promote read-only audit / docs-only semantics（观察库低频扫描 / 机会提升只读审计 / 只改文档语义）已经更完整；但 real low-frequency scan（真实低频扫描）、Watchlist runtime data source（观察库运行时数据源）、MarketQuoteClient scan integration（行情客户端扫描接入）、scan scheduler（扫描定时器）、Opportunity Promote execution（机会提升执行）、Opportunity Push execution（机会推送执行）、trading buttons（交易按钮）、production candidate generation（生产候选交易计划生成）、trading actions（交易动作）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）、ExecutionPlan Readiness（执行计划可执行就绪）和 auto-trading（自动交易）仍然没有闭环。
+当前项目仍然不是“快完成自动交易”的状态。更准确的状态是：安全地基、只读复核、失败关闭、SourceTrace（证据来源追踪）只读展示、BoundaryCandidate（边界候选交易计划）只读候选展示、ExecutionPlan（执行计划）review-only plan display（只允许复核展示）、Risk Action Guard（风险动作保护器）read-only risk display（只读风险展示）、Position Monitor Strong Reversal / Moving Stop review-only display（持仓强反转 / 移动止损只允许复核展示）、Dashboard Risk Reminder read-only display（首页风险提醒只读展示）、Watchlist Low-Frequency Scan / Opportunity Promote read-only audit / docs-only semantics（观察库低频扫描 / 机会提升只读审计 / 只改文档语义）以及 Low-Frequency Scan Scheduler disabled-by-default skeleton（低频扫描定时器默认关闭骨架）已经更完整；但 real low-frequency scan（真实低频扫描）、Watchlist runtime data source（观察库运行时数据源）、MarketQuoteClient scan integration（行情客户端扫描接入）、active scan scheduler（激活扫描定时器）、ScanScore（扫描分数）、Candidate Attention（候选关注）、Promote To Home（提升到首页观察）、Opportunity Promote execution（机会提升执行）、Opportunity Push execution（机会推送执行）、trading buttons（交易按钮）、production candidate generation（生产候选交易计划生成）、trading actions（交易动作）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）、ExecutionPlan Readiness（执行计划可执行就绪）和 auto-trading（自动交易）仍然没有闭环。
 
-P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展示）闭环。P172-P175 已完成 BoundaryCandidate read-only candidate display（边界候选只读候选展示）闭环。P177-P180 已完成 ExecutionPlan review-only plan display（执行计划只允许复核展示）闭环。P182-P185 已完成 Risk Action Guard / Position Monitor read-only risk display（风险动作保护 / 持仓监控只读风险展示）闭环。P187-P190 已完成 Position Monitor Strong Reversal / Moving Stop Review-Only Pack（持仓强反转 / 移动止损只读复核包）闭环。P192-P195 已完成 Dashboard Risk Reminder Read-Only Display Pack（首页风险提醒只读展示包）闭环。P197-P200 已完成 Watchlist Low-Frequency Scan / Opportunity Promote Audit Pack（观察库低频扫描 / 机会提升审计包）闭环。所以项目总进度可以小幅上调。但这个上调只代表“边界更清楚、只读复核语义更完整”，不代表真实扫描器、实时数据读取、推送执行、交易计划生成、生产 `VALID`（有效候选状态）、真实点位、Readiness（可执行就绪）、交易动作或自动交易完成。
+P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展示）闭环。P172-P175 已完成 BoundaryCandidate read-only candidate display（边界候选只读候选展示）闭环。P177-P180 已完成 ExecutionPlan review-only plan display（执行计划只允许复核展示）闭环。P182-P185 已完成 Risk Action Guard / Position Monitor read-only risk display（风险动作保护 / 持仓监控只读风险展示）闭环。P187-P190 已完成 Position Monitor Strong Reversal / Moving Stop Review-Only Pack（持仓强反转 / 移动止损只读复核包）闭环。P192-P195 已完成 Dashboard Risk Reminder Read-Only Display Pack（首页风险提醒只读展示包）闭环。P197-P200 已完成 Watchlist Low-Frequency Scan / Opportunity Promote Audit Pack（观察库低频扫描 / 机会提升审计包）闭环。P202-P204 已完成 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和默认关闭最小骨架。所以项目总进度只能小幅、谨慎上调。这个上调只代表“边界更清楚、只读复核语义更完整、低频扫描入口有默认关闭骨架”，不代表真实扫描器、实时数据读取、推送执行、交易计划生成、生产 `VALID`（有效候选状态）、真实点位、Readiness（可执行就绪）、交易动作或自动交易完成。
 
 | 项目线 | 当前真实进度 |
 |---|---:|
 | 项目总进度 | 72%-77% |
-| 安全地基进度 | 88%-94% |
+| 安全地基进度 | 89%-94% |
 | Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升）语义进度 | 65%-75% |
+| Low-Frequency Scan Scheduler（低频扫描定时器）骨架进度 | 15%-25% |
 | SourceTrace（证据来源追踪）进度 | 58%-66% |
 | BoundaryCandidate（边界候选交易计划）进度 | 42%-52% |
 | ExecutionPlan（执行计划）进度 | 45%-55% |
@@ -25,7 +26,7 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 | entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）真实点位进度 | 10%-18% |
 | 自动交易进度 | 0%-3% |
 
-这些百分比按“能否安全进入真实生产链路”估算，不按文档数量估算。P197-P200 让 Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升）的语义边界明显更清楚，因此新增该模块进度为 65%-75%。Dashboard（首页工作台）保持 76%-84%，不因 P201 文档刷新明显上调。SourceTrace（证据来源追踪）、BoundaryCandidate（边界候选交易计划）、ExecutionPlan（执行计划）、Risk Action Guard（风险动作保护器）、Position Monitor（持仓监控）、真实生产接线、真实点位和自动交易保持谨慎，因为真实交易计划链路仍缺 source-owned runtime candidate generation（运行时证据来源候选生成）、runtime data source（运行时数据源）、numeric source ownership（数值来源归属）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、Readiness（可执行就绪）和交易动作闭环。
+这些百分比按“能否安全进入真实生产链路”估算，不按文档数量估算。P197-P200 让 Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升）的语义边界明显更清楚，因此该模块保持 65%-75%。P204 只新增 disabled-by-default scheduler skeleton（默认关闭定时器骨架），所以 Low-Frequency Scan Scheduler（低频扫描定时器）只能记录为 15%-25%，不能上调到“真实扫描接近完成”。Dashboard（首页工作台）保持 76%-84%，不因 P205 文档补齐明显上调。SourceTrace（证据来源追踪）、BoundaryCandidate（边界候选交易计划）、ExecutionPlan（执行计划）、Risk Action Guard（风险动作保护器）、Position Monitor（持仓监控）、真实生产接线、真实点位和自动交易保持谨慎，因为真实交易计划链路仍缺 source-owned runtime candidate generation（运行时证据来源候选生成）、runtime data source（运行时数据源）、numeric source ownership（数值来源归属）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、Readiness（可执行就绪）和交易动作闭环。
 
 ## 二、已完成线路
 
@@ -102,6 +103,21 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 - P199 没有生成真实 entry / stop / TP / RR。
 - P199 没有升级 Readiness（可执行就绪）。
 - P199 没有接自动交易。
+- P202 完成 Low-Frequency Scan Scheduler Scope Audit（低频扫描定时器范围审计）。
+- P203 完成 Low-Frequency Scan Scheduler Authorization Gate（低频扫描定时器授权门）。
+- P204 完成 Low-Frequency Scan Scheduler Minimal Skeleton（低频扫描定时器最小骨架）。
+- P204 只是 disabled-by-default scheduler skeleton（默认关闭定时器骨架）。
+- P204 默认 `enabled=false`，`runScheduledScan()` 默认返回 `DISABLED`。
+- P204 在 `enabled=true` 时仍返回 `NOT_IMPLEMENTED`，不进入真实扫描。
+- P204 保留 `notTradeInstruction=true`（不是交易指令）和 `manualReviewRequired=true`（必须人工复核）。
+- P204 不等于真实 Low-Frequency Scan（低频扫描）完成。
+- P204 不等于 Watchlist runtime data source（观察库运行时数据源）完成。
+- P204 不等于 MarketQuoteClient scan integration（行情客户端扫描接入）完成。
+- P204 不等于 ScanScore（扫描分数）/ Candidate Attention（候选关注）/ Promote To Home（提升到首页观察）完成。
+- P204 不等于 Opportunity Push execution（机会推送执行）完成。
+- P204 不等于真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）完成。
+- P204 不等于 Readiness（可执行就绪）升级。
+- P204 不等于 auto-trading（自动交易）。
 - BoundaryCandidate（边界候选交易计划）DTO / valid factory（有效候选工厂）/ service skeleton（服务骨架）已完成，但这不等于 production VALID（生产环境有效候选状态）已经可生成。
 - RuntimeKlineContext（运行时 K 线上下文）/ BoundaryCandidateService（边界候选服务）相关已完成，但这不等于真实交易点位完成。
 - Dashboard（首页工作台）已完成 SourceTrace（证据来源追踪）、BoundaryCandidate（边界候选交易计划）、ExecutionPlan（执行计划）、RiskActionGuard（风险动作保护展示）、PaperObservationDisplay（纸面观察展示）、Position Monitor（持仓监控）和 Dashboard Risk Reminder（首页风险提醒）只读展示。
@@ -109,7 +125,7 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 
 ## 三、正在推进线路
 
-Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界已完成。当前不应该继续把语义边界误推进成扫描器、实时数据读取、机会推送执行、真实点位、Readiness（可执行就绪）或 auto-trading（自动交易）。
+Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界已完成，Low-Frequency Scan Scheduler（低频扫描定时器）已有默认关闭最小骨架。当前不应该继续把骨架误推进成真实扫描器、实时数据读取、机会推送执行、真实点位、Readiness（可执行就绪）或 auto-trading（自动交易）。
 
 如果目标是个人可用最快路径，建议进入：
 
@@ -119,10 +135,9 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 
 如果目标是开始真正实现 Low-Frequency Scan（低频扫描），必须先进入：
 
-1. Low-Frequency Scan Scheduler Scope Audit（低频扫描定时器范围审计）。
-2. Watchlist Runtime Data Source Audit（观察库运行时数据源审计）。
-3. WatchlistScanResult DTO / Contract Audit（观察库扫描结果 DTO / 契约审计）。
-4. ScanScore Rule Definition Audit（扫描分数规则定义审计）。
+1. Watchlist Runtime Data Source Audit（观察库运行时数据源审计）。
+2. WatchlistScanResult DTO / Contract Audit（观察库扫描结果 DTO / 契约审计）。
+3. ScanScore Rule Definition Audit（扫描分数规则定义审计）。
 
 如果目标是严谨后端交易候选，仍建议进入：
 
@@ -134,10 +149,10 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 
 ## 四、暂停线路
 
-- real low-frequency scan（真实低频扫描）：仍暂停，原因是 P197-P200 只完成语义和边界，不创建扫描器。
+- real low-frequency scan（真实低频扫描）：仍暂停，原因是 P204 只完成默认关闭骨架，不创建真实扫描器。
 - Watchlist runtime data source（观察库运行时数据源）：仍暂停，原因是没有审计数据来源、刷新频率、缺失字段和失败关闭规则。
 - MarketQuoteClient scan integration（行情客户端扫描接入）：仍暂停，原因是 P199/P200 明确不接 `MarketQuoteClient`。
-- scan scheduler（扫描定时器）：仍暂停，原因是没有授权 Low-Frequency Scan scheduler（低频扫描定时器）。
+- active scan scheduler（激活扫描定时器）：仍暂停，原因是 P204 只允许 disabled-by-default skeleton（默认关闭骨架）。
 - Opportunity Promote execution（机会提升执行）：仍暂停，原因是 Opportunity Promote（机会提升）当前只是提升到首页观察 / 人工复核语义。
 - Opportunity Push execution（机会推送执行）：仍暂停，原因是没有推送执行授权，也没有交易动作授权。
 - default-six opportunity push（默认六币机会推送）：仍禁止，原因是默认六币只是 Display Slots（首页展示位）空态 / 排序，不是推送全集。
@@ -169,6 +184,12 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 ## 六、容易误判为完成但其实没完成的线路
 
 - Watchlist Low-Frequency Scan（观察库低频扫描）语义完成，不等于低频扫描器完成。
+- Low-Frequency Scan Scheduler（低频扫描定时器）骨架完成，不等于真实低频扫描完成。
+- P204 disabled-by-default scheduler skeleton（默认关闭定时器骨架）不等于 Watchlist runtime data source（观察库运行时数据源）完成。
+- P204 disabled-by-default scheduler skeleton（默认关闭定时器骨架）不等于 MarketQuoteClient scan integration（行情客户端扫描接入）完成。
+- P204 disabled-by-default scheduler skeleton（默认关闭定时器骨架）不等于 ScanScore（扫描分数）、Candidate Attention（候选关注）或 Promote To Home（提升到首页观察）完成。
+- P204 disabled-by-default scheduler skeleton（默认关闭定时器骨架）不等于 Opportunity Push execution（机会推送执行）完成。
+- P204 disabled-by-default scheduler skeleton（默认关闭定时器骨架）不等于真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）完成、Readiness（可执行就绪）升级或 auto-trading（自动交易）。
 - Opportunity Promote（机会提升）语义完成，不等于 Opportunity Push execution（机会推送执行）完成。
 - Display Slots（首页展示位）不是推送候选。
 - 默认六币不是默认推送全集。
@@ -219,7 +240,7 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 - 自动反手。
 - 自动买入 / 自动卖出。
 - 自动修改 Stop Loss（止损）/ Moving Stop（移动止损）。
-- Low-Frequency Scan scheduler（低频扫描定时器）。
+- active Low-Frequency Scan scheduler（激活低频扫描定时器）。
 - Watchlist runtime data source（观察库运行时数据源）。
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
 - Opportunity Promote execution（机会提升执行）。
@@ -243,12 +264,11 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 
 ### 路线 B：开始真实低频扫描前置
 
-1. Low-Frequency Scan Scheduler Scope Audit（低频扫描定时器范围审计）。
-2. Watchlist Runtime Data Source Audit（观察库运行时数据源审计）。
-3. WatchlistScanResult DTO / Contract Audit（观察库扫描结果 DTO / 契约审计）。
-4. ScanScore Rule Definition Audit（扫描分数规则定义审计）。
-5. Low-Cost AI Event Explanation Gate（低成本 AI 事件解释授权门）。
-6. Three-AI Promote-To-Home Review Gate（三 AI 提升到首页复核授权门）。
+1. Watchlist Runtime Data Source Audit（观察库运行时数据源审计）。
+2. WatchlistScanResult DTO / Contract Audit（观察库扫描结果 DTO / 契约审计）。
+3. ScanScore Rule Definition Audit（扫描分数规则定义审计）。
+4. Low-Cost AI Event Explanation Gate（低成本 AI 事件解释授权门）。
+5. Three-AI Promote-To-Home Review Gate（三 AI 提升到首页复核授权门）。
 
 ### 路线 C：继续严谨后端交易候选
 
@@ -276,7 +296,8 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 | Risk Action Guard（风险动作保护器） | 已完成只读风险展示、持仓强反转 / 移动止损只读解释、首页风险提醒集中展示；生产风控动作 / 自动执行未完成，本轮不明显上调 | 47%-57% | `DefaultRiskActionGuardDisplayAdapter.java`、`DefaultRiskActionGuardDisplayAdapterTest.java`、`dashboard.html`、`PHASE_BACKEND_P185_RISK_ACTION_GUARD_POSITION_MONITOR_CLOSURE.md`、`PHASE_BACKEND_P190_POSITION_MONITOR_STRONG_REVERSAL_MOVING_STOP_CLOSURE.md`、`PHASE_BACKEND_P195_DASHBOARD_RISK_REMINDER_READ_ONLY_DISPLAY_CLOSURE.md` | 个人路线做告警 / 推送只读调度审计；严谨路线做生产接线范围审计 |
 | Position Monitor（持仓监控） | 同步 / 告警 / 记录基础 + 只读风险展示 + 强反转 / 移动止损只读展示已完成；强反转自动识别 / 自动处理 / 自动改止损 / 自动平仓未完成，本轮不明显上调 | 52%-62% | `PositionSyncService.java`、`PositionSyncScheduler.java`、`RealPositionMapper.java`、`MonitorAlertMapper.java`、`tm_real_position`、`tm_monitor_alert`、`DefaultRiskActionGuardDisplayAdapter.java`、`PHASE_BACKEND_P190*` | 下一步只能走人工复核流程或风险提醒展示，继续禁止自动动作 |
 | Dashboard（首页工作台） | SourceTrace（证据来源追踪）+ BoundaryCandidate（边界候选交易计划）+ ExecutionPlan（执行计划）+ RiskActionGuard（风险动作保护器）+ Position Monitor（持仓监控）+ Dashboard Risk Reminder（首页风险提醒）只读展示增强已完成；可执行状态未打开，本轮不明显上调 | 76%-84% | `DashboardController.java`、`dashboard.html`、`DashboardControllerTest.java`、`DefaultPlanBoundaryDisplayAdapter.java`、`DefaultExecutionPlanDisplayAdapter.java`、`DefaultRiskActionGuardDisplayAdapter.java`、`PHASE_BACKEND_P170*`、`PHASE_BACKEND_P175*`、`PHASE_BACKEND_P180*`、`PHASE_BACKEND_P185*`、`PHASE_BACKEND_P190*`、`PHASE_BACKEND_P195*` | 只允许继续做告警推送、人工复核或个人可用冒烟，不打开可执行状态 |
-| Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升） | Display Slots / Watchlist Pool / Low-Frequency Scan / Opportunity Promote（首页展示位 / 观察库池 / 低频扫描 / 机会提升）语义边界已完成；真实扫描器、实时数据、推送执行、自动交易未完成 | 65%-75% | `PHASE_BACKEND_P197_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_SCOPE_AUDIT.md`、`PHASE_BACKEND_P198_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_AUTHORIZATION_GATE.md`、`PHASE_BACKEND_P199_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_MINIMAL_WIRING.md`、`PHASE_BACKEND_P200_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_CLOSURE.md`、`dashboard.html` | 个人路线做告警 / 推送只读调度审计；真实扫描路线先做 scheduler / data source / DTO contract 审计 |
+| Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升） | Display Slots / Watchlist Pool / Low-Frequency Scan / Opportunity Promote（首页展示位 / 观察库池 / 低频扫描 / 机会提升）语义边界已完成；真实扫描器、实时数据、推送执行、自动交易未完成 | 65%-75% | `PHASE_BACKEND_P197_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_SCOPE_AUDIT.md`、`PHASE_BACKEND_P198_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_AUTHORIZATION_GATE.md`、`PHASE_BACKEND_P199_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_MINIMAL_WIRING.md`、`PHASE_BACKEND_P200_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_CLOSURE.md`、`dashboard.html` | 个人路线做告警 / 推送只读调度审计；真实扫描路线先做 data source / DTO contract 审计 |
+| Low-Frequency Scan Scheduler（低频扫描定时器） | P202 范围审计、P203 授权门、P204 默认关闭最小骨架已完成；真实扫描、运行时数据、行情接入、扫描分数、候选关注、提升首页、机会推送执行均未完成 | 15%-25% | `WatchlistLowFrequencyScanScheduler.java`、`WatchlistLowFrequencyScanSchedulerTest.java`、`PHASE_P205_LOW_FREQUENCY_SCAN_SCHEDULER_MINIMAL_SKELETON_CLOSURE.md` | 先做 Watchlist Runtime Data Source Audit（观察库运行时数据源审计）或 WatchlistScanResult DTO / Contract Audit（观察库扫描结果 DTO / 契约审计） |
 | Watchlist / Push（观察库 / 推送） | Push snapshot（推送快照）、Recheck（二次复核）、scheduler（定时器）和 ops overview（运维总览）存在；但它们不是 Watchlist Low-Frequency Scan（观察库低频扫描），不是 Opportunity Push execution（机会推送执行） | 45%-55% | `PushRecheckServiceImpl.java`、`PushRecheckScheduler.java`、`PushSnapshotService.java`、`PHASE_P11A_PUSH_RECHECK_NAMING_VERIFICATION.md` | 先做 Alert / Push Channel Review-Only Dispatch Audit（告警 / 推送通道只允许复核调度审计） |
 | AI multi-agent（AI 多角色） | `AiConflictResolverService` 已有冲突分层；多角色生产仲裁链未落地 | 25%-35% | `AiConflictResolverService.java`、`AiConflictResolverServiceImpl.java`、`DecisionEngineServiceTest.java` | 定义多角色输入、冲突降级和人工复核边界 |
 | Production Wiring（真实生产接线） | 真实来源、真实候选、生产风控动作、执行授权仍未闭环，不因 P197-P200 文档语义明显上调 | 26%-34% | P140-P201 文档和现有 service / adapter / dashboard 只读链路 | 先做 BoundaryCandidate 来源接线或数值来源归属审计 |
