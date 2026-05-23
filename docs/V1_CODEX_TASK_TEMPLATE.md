@@ -7,7 +7,7 @@
 ```text
 继续 Trade Model V1 当前分支任务：<TASK_TITLE>。
 
-你必须只完成一个最小交付物：<MINIMAL_DELIVERABLE>。
+你必须只完成一个明确交付包：<DELIVERABLE_SCOPE>。
 
 任务模式：<TASK_MODE>
 
@@ -19,7 +19,7 @@
 - 当前 placeholder: <PLACEHOLDER_PATH>
 ```
 
-`<TASK_MODE>` 可为 `MINIMAL_DELIVERABLE`（单一最小交付物）或 `MAX_SAFE_PACK`（最大安全任务包）。默认优先使用 `MAX_SAFE_PACK`，但不能跨越 A/B/C 授权边界。
+`<TASK_MODE>` 可为 `MINIMAL_DELIVERABLE`（单点交付模式）或 `MAX_SAFE_PACK`（最大安全任务包）。默认优先使用 `MAX_SAFE_PACK`。`MINIMAL_DELIVERABLE` 只在任务确实需要单点收口、风险边界不清，或 Authorization Gate（授权门）前需要暂停时使用。`MAX_SAFE_PACK` 不能跨越 A/B/C 授权边界。
 
 ## 2. 执行前命令
 

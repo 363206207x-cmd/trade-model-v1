@@ -39,7 +39,7 @@
 
 每一轮必须按以下顺序：
 
-1. 判断下一步最小交付物。
+1. 判断下一步最大安全任务包；如遇授权门或风险跨档，则拆分并暂停。
 2. 查重 open Issue（未关闭问题单）。
 3. 查重 open PR（未合并请求）。
 4. 查重 branch（分支）。
@@ -57,7 +57,7 @@
 
 ## 4. 最大安全任务包规则
 
-后续默认任务包不是“能拆多小就拆多小”的最小任务包，而是 maximum safe task pack（最大安全任务包）。
+后续默认任务包不是“能拆多小就拆多小”的微型拆分模式，而是 maximum safe task pack（最大安全任务包）。
 
 同一风险档位、同一模块 / 同一业务轨道、同一验证方式、不会跨越 Authorization Gate（授权门）的内容，应尽量合并成一个 Codex 任务。
 
@@ -212,7 +212,7 @@ cd /Users/xuchao/Documents/trade-model-v1 && git switch main && git pull origin 
 请先以 docs/V1_OPERATOR_WORKFLOW_CONTRACT.md 为最高工作流准则，
 再读取 docs/V1_CURRENT_STATE.md 判断当前阶段。
 不要总结，不要发散，不要重新解释规则。
-每轮只做一个最小交付物。
+每轮只做一个最大安全任务包；如遇授权门或风险跨档，则拆分并暂停。
 先查重 open Issue / PR。
 如果无重复，创建 Issue、branch、marker、Draft PR。
 最后输出：当前状态 / 下一步 / Issue-PR-Branch / Codex 任务包 / 审查结论。
