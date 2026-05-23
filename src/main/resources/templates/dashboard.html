@@ -1137,6 +1137,9 @@
             <h3>Risk Action Guard（占位）</h3>
             <p class="module-status-note">只读风控动作分层（占位），后端未完全接入；非交易指令，需要人工复核。</p>
             <div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge partial">READ_ONLY_PLACEHOLDER / 只读占位</span></span></div>
+            <div class="alert-line confused"><strong>Risk Reminder（只读）：</strong>不是交易指令，必须人工复核；不连接 order API，不触发自动交易动作，不生成真实点位。</div>
+            <div class="kv"><span class="k">风险建议</span><span class="v">等待后端 riskActionAdvice，只允许人工复核。</span></div>
+            <div class="kv"><span class="k">动作关闭</span><span class="v">自动平仓 / 自动反手 / 自动改止损关闭。</span></div>
             <div class="alert-line confused"><strong>通用约束：</strong>本区仅做风险提醒，不连接 order API，不触发自动交易动作。</div>
             <div class="alert-line"><strong>风险高但流动性正常：</strong>可考虑减仓 / 移动止损 / 降低杠杆；仅为风险提醒，不是自动交易动作。</div>
             <div class="alert-line hot"><strong>风险高且流动性恶化：</strong>不建议市价一次性砍仓，优先分批降风险 / 等待流动性恢复 / 只降杠杆，避免在流动性恶化时触发踩踏式错误执行。</div>
@@ -1317,6 +1320,44 @@
         if (v === true) return "允许";
         if (v === false) return "禁止";
         return fallback;
+    }
+
+    function riskReminderValue(v, fallback) {
+        return isPresentValue(v) ? String(v).trim() : fallback;
+    }
+
+    function riskReminderFlag(v, trueText, falseText, fallback) {
+        if (v === true) return trueText;
+        if (v === false) return falseText;
+        return fallback;
+    }
+
+    function renderRiskReminderReadOnly(riskGuard) {
+        var rg = riskGuard || {};
+        var advice = riskReminderValue(rg.riskActionAdvice, "只读风险提醒：不是交易指令，必须人工复核。");
+        var blockingReason = riskReminderValue(rg.riskActionBlockingReason, "等待后端风险阻断原因");
+        var liquidity = riskReminderValue(rg.liquidityState, "BACKEND_PENDING");
+        var stampede = riskReminderFlag(rg.stampedeDetected, "检测到 / 禁止机会推送、反手和新开仓", "未检测到 / 仍只读复核", "未确认 / 按禁止处理");
+        var wickOnly = riskReminderFlag(rg.wickOnlyRisk, "仅插针风险 / 不等于趋势反转", "未检测到 / 仍只读复核", "未确认 / 按等待确认处理");
+        var marketExit = riskReminderFlag(rg.marketOrderExitAllowed, "字段为 true，本页仍不执行市价动作", "false / 不允许市价退出", "禁止 / 未确认");
+        var pushAllowed = riskReminderFlag(rg.opportunityPushAllowed, "字段为 true，仍需人工复核", "false / 禁止机会推送", "禁止 / 未确认");
+        var reverseAllowed = riskReminderFlag(rg.reverseTradeAllowed, "字段为 true，仍不自动反手", "false / 禁止反手", "禁止 / 未确认");
+        var newPositionAllowed = riskReminderFlag(rg.newPositionAllowed, "字段为 true，仍不自动开仓", "false / 禁止新开仓", "禁止 / 未确认");
+        var manualReview = riskReminderFlag(rg.manualRiskReviewRequired, "true / 必须人工复核", "字段为 false，本页仍按需复核", "必须人工复核");
+        var notTradeInstruction = riskReminderFlag(rg.notTradeInstruction, "true / 不是交易指令", "字段为 false，本页仍按非交易指令处理", "非交易指令");
+
+        return '<div class="alert-line confused"><strong>Risk Reminder（只读）：</strong>不是交易指令，必须人工复核；不连接 order API，不触发自动交易动作，不生成真实点位。</div>' +
+            '<div class="kv"><span class="k">风险建议</span><span class="v">' + escapeHtml(advice) + '</span></div>' +
+            '<div class="kv"><span class="k">阻断原因</span><span class="v">' + escapeHtml(blockingReason) + '</span></div>' +
+            '<div class="kv"><span class="k">流动性</span><span class="v">' + escapeHtml(liquidity) + '</span></div>' +
+            '<div class="kv"><span class="k">踩踏</span><span class="v">' + escapeHtml(stampede) + '</span></div>' +
+            '<div class="kv"><span class="k">插针</span><span class="v">' + escapeHtml(wickOnly) + '</span></div>' +
+            '<div class="kv"><span class="k">市价退出</span><span class="v">' + escapeHtml(marketExit) + '</span></div>' +
+            '<div class="kv"><span class="k">动作关闭</span><span class="v">' + escapeHtml(pushAllowed + "；" + reverseAllowed + "；" + newPositionAllowed) + '</span></div>' +
+            '<div class="kv"><span class="k">人工复核</span><span class="v">' + escapeHtml(manualReview) + '</span></div>' +
+            '<div class="kv"><span class="k">交易语义</span><span class="v">' + escapeHtml(notTradeInstruction) + '</span></div>' +
+            '<div class="alert-line">高风险不等于直接止损；强反转不等于直接反手或自动平仓；移动止损不等于自动改止损。</div>' +
+            '<div class="alert-line">踩踏禁止机会推送 / 反手 / 新开仓；插针不等于趋势反转；自动平仓 / 自动反手 / 自动改止损关闭。</div>';
     }
 
     function compactSourceValue(v) {
@@ -1516,6 +1557,7 @@
             riskCard.innerHTML = '<h3>Risk Action Guard（占位）</h3>' +
                 '<p class="module-status-note">只读风控动作分层（占位），后端未完全接入；非交易指令，需要人工复核。</p>' +
                 '<div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge ' + statusBadgeClass(guardStatus) + '">' + escapeHtml(guardStatus + ' / ' + guardLabel) + '</span></span></div>' +
+                renderRiskReminderReadOnly(riskGuard) +
                 '<div class="kv"><span class="k">机会推送</span><span class="v">' + escapeHtml(allowPush) + '</span></div>' +
                 '<div class="kv"><span class="k">反手动作</span><span class="v">' + escapeHtml(allowReverse) + '</span></div>' +
                 '<div class="kv"><span class="k">新开仓动作</span><span class="v">' + escapeHtml(allowNewPos) + '</span></div>' +
