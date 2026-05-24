@@ -1,12 +1,12 @@
 # PROJECT_PROGRESS_INDEX
 
-P201 是 Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）。P205 追加吸收 P202-P204 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和最小骨架结果。P206 已完成 Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包）。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。P215 已完成 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。P216 已完成 Watchlist Runtime Source DTO Skeleton（观察库运行时数据源 DTO 骨架）。P217 已完成 Watchlist Runtime Source DTO Closure and Guard Boundary（观察库运行时数据源 DTO 收口与保护边界）。P218 已完成 Watchlist Runtime Source Guard Validator Skeleton（观察库运行时数据源保护校验器骨架）。P219 已完成 Watchlist Runtime Source Guard Closure and Wiring Gate（观察库运行时数据源保护器收口与接线授权门）。P220 已完成 Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时数据源仅测试接线骨架）。P221 已完成 Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）。P222 已完成 Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）。P223 已完成 Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）。P224 已完成 Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）。P225 已完成 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）。P226 已完成 Production Adapter Fail-Closed No-Op Implementation Plan（生产适配器失败关闭 no-op 实现方案）。P227 已完成 Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。P228 已完成 Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。P233 当前推进 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。
+P201 是 Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）。P205 追加吸收 P202-P204 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和最小骨架结果。P206 已完成 Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包）。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。P215 已完成 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。P216 已完成 Watchlist Runtime Source DTO Skeleton（观察库运行时数据源 DTO 骨架）。P217 已完成 Watchlist Runtime Source DTO Closure and Guard Boundary（观察库运行时数据源 DTO 收口与保护边界）。P218 已完成 Watchlist Runtime Source Guard Validator Skeleton（观察库运行时数据源保护校验器骨架）。P219 已完成 Watchlist Runtime Source Guard Closure and Wiring Gate（观察库运行时数据源保护器收口与接线授权门）。P220 已完成 Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时数据源仅测试接线骨架）。P221 已完成 Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）。P222 已完成 Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）。P223 已完成 Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）。P224 已完成 Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）。P225 已完成 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）。P226 已完成 Production Adapter Fail-Closed No-Op Implementation Plan（生产适配器失败关闭 no-op 实现方案）。P227 已完成 Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。P228 已完成 Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。P233 已完成 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P234 当前推进 Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门）。
 
-本索引来自 P164 全局扫描后的持续维护。P201 刷新 `docs/PROJECT_PROGRESS_INDEX.md`，并吸收 P197-P200 Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）read-only audit / docs-only semantics（只读审计 / 只改文档语义）闭环结果。P205 补齐 P202-P204 后的状态和工作流文档，并把最大安全任务包规则写入工作流契约和 Codex 模板。P206 已完成：运行时契约 / 观察库运行时数据源 / 扫描结果契约 / ScanScore 规则定义审计已完成。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。P215 已完成 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。P216 已完成 Watchlist Runtime Source DTO Skeleton（观察库运行时数据源 DTO 骨架）。P217 已完成 Watchlist Runtime Source DTO Closure and Guard Boundary（观察库运行时数据源 DTO 收口与保护边界）。P218 已完成 Watchlist Runtime Source Guard Validator Skeleton（观察库运行时数据源保护校验器骨架）。P219 已完成 Watchlist Runtime Source Guard Closure and Wiring Gate（观察库运行时数据源保护器收口与接线授权门）。P220 已完成 Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时数据源仅测试接线骨架）。P221 已完成 Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）。P222 已完成 Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）。P223 已完成 Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）。P224 已完成 Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）。P225 已完成 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）。P226 已完成 Production Adapter Fail-Closed No-Op Implementation Plan（生产适配器失败关闭 no-op 实现方案）。P227 已完成 Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。P228 已完成 Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架），只是最小 DB Watchlist Pool config read skeleton（DB 观察库池配置读取骨架），不是真实扫描。P233 当前推进 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门），只是 docs-only closure / Runtime Source Service authorization gate（只改文档收口 / 运行时数据源服务授权门），不是实现；`RuleConfigWatchlistPoolReadAdapter` Java 已存在，DB-backed Watchlist Pool read skeleton 已存在，但 Runtime Source Service（运行时数据源服务）和 Production Source Assembler（生产数据源组装器）仍未实现。P233 不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard.html，不改 schema / config，不接 API，不接 MarketQuoteClient，不接 scheduler（定时器），不创建 scan loop（扫描循环），不实现真实 production adapter implementation（生产适配器实现）、production read implementation（生产读取实现）、ScanScore computation（扫描分数计算）、Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程），不创建 Opportunity Push execution（机会推送执行），不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比），不升级 Readiness（可执行就绪）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭；auto-trading（自动交易）只作为禁止越界安全边界。
+本索引来自 P164 全局扫描后的持续维护。P201 刷新 `docs/PROJECT_PROGRESS_INDEX.md`，并吸收 P197-P200 Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）read-only audit / docs-only semantics（只读审计 / 只改文档语义）闭环结果。P205 补齐 P202-P204 后的状态和工作流文档，并把最大安全任务包规则写入工作流契约和 Codex 模板。P206 已完成：运行时契约 / 观察库运行时数据源 / 扫描结果契约 / ScanScore 规则定义审计已完成。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。P215 已完成 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。P216 已完成 Watchlist Runtime Source DTO Skeleton（观察库运行时数据源 DTO 骨架）。P217 已完成 Watchlist Runtime Source DTO Closure and Guard Boundary（观察库运行时数据源 DTO 收口与保护边界）。P218 已完成 Watchlist Runtime Source Guard Validator Skeleton（观察库运行时数据源保护校验器骨架）。P219 已完成 Watchlist Runtime Source Guard Closure and Wiring Gate（观察库运行时数据源保护器收口与接线授权门）。P220 已完成 Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时数据源仅测试接线骨架）。P221 已完成 Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）。P222 已完成 Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）。P223 已完成 Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）。P224 已完成 Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）。P225 已完成 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）。P226 已完成 Production Adapter Fail-Closed No-Op Implementation Plan（生产适配器失败关闭 no-op 实现方案）。P227 已完成 Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。P228 已完成 Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架），只是最小 DB Watchlist Pool config read skeleton（DB 观察库池配置读取骨架），不是真实扫描。P233 已完成 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P234 当前推进 Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门），只是 docs-only service / assembler plan（只改文档的服务 / 组装器方案），不是 Java implementation（Java 实现）；`RuleConfigWatchlistPoolReadAdapter` Java 已存在，DB-backed Watchlist Pool read skeleton 已存在，但 Runtime Source Service（运行时数据源服务）和 Production Source Assembler（生产数据源组装器）仍未实现。P234 不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard.html，不改 schema / config，不接 API，不接 MarketQuoteClient，不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环），不实现真实 Runtime Source Service（运行时数据源服务）、Production Source Assembler（生产数据源组装器）、ScanScore computation（扫描分数计算）、Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程），不创建 Opportunity Push execution（机会推送执行），不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比），不升级 Readiness（可执行就绪）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭；auto-trading（自动交易）只作为禁止越界安全边界。
 
 ## 一、当前总进度结论
 
-P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。P233 当前推进 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P233 只是 docs-only closure / Runtime Source Service authorization gate（只改文档收口 / 运行时数据源服务授权门），不是实现；`RuleConfigWatchlistPoolReadAdapter` Java 已存在，DB-backed Watchlist Pool read skeleton（数据库观察库池读取骨架）已存在，但 Runtime Source Service（运行时数据源服务）、Production Source Assembler（生产数据源组装器）、MarketQuoteClient integration（行情客户端接入）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、real ScanScore computation（真实扫描分数计算）、Candidate Attention workflow（候选关注流程）、Promote To Home workflow（提升到首页观察流程）、Opportunity Push execution（机会推送执行）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）和 readiness（可执行就绪）仍未实现；order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
+P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。P233 已完成 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P234 当前推进 Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门）。P234 只是 docs-only service / assembler plan（只改文档的服务 / 组装器方案），不是 Java implementation（Java 实现）；`RuleConfigWatchlistPoolReadAdapter` Java 已存在，DB-backed Watchlist Pool read skeleton（数据库观察库池读取骨架）已存在，但 Runtime Source Service（运行时数据源服务）、Production Source Assembler（生产数据源组装器）、MarketQuoteClient integration（行情客户端接入）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、real ScanScore computation（真实扫描分数计算）、Candidate Attention workflow（候选关注流程）、Promote To Home workflow（提升到首页观察流程）、Opportunity Push execution（机会推送执行）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）和 readiness（可执行就绪）仍未实现；order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
 当前项目不是“快完成自动交易”的状态，而且 V1 明确不做 auto-trading（自动交易）。更准确的状态是：安全地基、只读复核、失败关闭、SourceTrace（证据来源追踪）只读展示、BoundaryCandidate（边界候选交易计划）只读候选展示、ExecutionPlan（执行计划）review-only plan display（只允许复核展示）、Risk Action Guard（风险动作保护器）read-only risk display（只读风险展示）、Position Monitor Strong Reversal / Moving Stop review-only display（持仓强反转 / 移动止损只允许复核展示）、Dashboard Risk Reminder read-only display（首页风险提醒只读展示）、Watchlist Low-Frequency Scan / Opportunity Promote read-only audit / docs-only semantics（观察库低频扫描 / 机会提升只读审计 / 只改文档语义）以及 Low-Frequency Scan Scheduler disabled-by-default skeleton（低频扫描定时器默认关闭骨架）已经更完整；P206 已把 Watchlist runtime data source contract（观察库运行时数据源契约）、Watchlist scan result contract（观察库扫描结果契约）和 ScanScore rule definition（扫描分数规则定义）放进文档审计，P207 已把后续 skeleton（骨架）的授权门边界收紧，P208 已完成 DTO / enum / tests（数据传输对象 / 枚举 / 测试）骨架，P209 已完成收口和未来 guard / no-score / no-push（保护器 / 无分数 / 无推送）边界文档，P210 已完成 guard / validator / tests（保护器 / 校验器 / 测试）骨架，P211 已完成 docs-only closure / wiring gate（只改文档收口 / 接线授权门），P212 已完成 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架），P213 已完成 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门），P214 已完成 docs-only runtime source contract definition（只改文档运行时数据源契约定义），P215 已完成 docs-only runtime source authorization gate / DTO skeleton plan（只改文档运行时数据源授权门 / 数据对象骨架方案），P216 已完成 pure DTO / enum / tests runtime source DTO skeleton（纯数据对象 / 枚举 / 测试的运行时数据源 DTO 骨架），P217 已完成 docs-only closure / guard boundary（只改文档收口 / 保护边界），P218 已完成 pure runtime source guard / validator / tests skeleton（纯运行时数据源保护器 / 校验器 / 测试骨架），P219 已完成 docs-only closure / wiring gate（只改文档收口 / 接线授权门），P220 已完成 non-runtime test-only wiring / assembler / tests skeleton（非运行时、仅测试接线 / 组装器 / 测试骨架），P221 已完成 docs-only closure / production read gate（只改文档收口 / 生产读取授权门），P222 已完成 docs-only adapter plan（只改文档适配器方案），P223 已完成 docs-only interface skeleton plan（只改文档接口骨架方案），P224 已完成 interface / DTO / tests skeleton（接口 / 数据对象 / 测试骨架），P225 已完成 docs-only closure / implementation gate（只改文档收口 / 实现授权门），P226 已完成 docs-only fail-closed no-op implementation plan / risk audit（只改文档的失败关闭 no-op 实现方案 / 风险审计），P227 已完成 docs-only Java authorization gate（只改文档 Java 授权门），P228 已完成 fail-closed no-op Java implementation（失败关闭 no-op Java 实现），P229 已完成 docs-only no-op closure / DB Watchlist Pool read authorization gate（只改文档 no-op 收口 / DB 观察库池读取授权门），P230 已完成 docs-only DB read plan / mapper audit / schema audit（只改文档 DB 读取方案 / Mapper 审计 / Schema 审计），P231 已完成 docs-only audit closure / Java authorization gate（只改文档审计收口 / Java 授权门）。`WatchlistRuntimeSourceDTO` Java 已存在，runtime source guard / validator（运行时数据源保护器 / 校验器）已存在，runtime source test-only wiring（运行时数据源仅测试接线）已存在，production read adapter plan（生产读取适配器方案）已存在，production adapter interface skeleton（生产适配器接口骨架）已存在，production fail-closed no-op implementation plan（生产失败关闭 no-op 实现方案）已存在，production fail-closed no-op Java（生产失败关闭 no-op Java）已存在，但它只是永远失败关闭的 no-op adapter，不是 production runtime source read（生产运行时数据源读取）或 production read implementation（生产读取实现）。DB-backed watchlist read（数据库观察库读取）虽进入最小 skeleton 阶段但 production read implementation（生产读取实现）仍未完成，runtime source service（运行时数据源服务）、production source assembler（生产数据源组装器）、real low-frequency scan（真实低频扫描）、runtime source implementation（运行时数据源实现）、runtime data reads（运行时数据读取）、Watchlist runtime data source（观察库运行时数据源）、MarketQuoteClient integration（行情客户端接入）、service wiring（服务接线）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、real ScanScore computation（真实扫描分数计算）、Candidate Attention workflow（候选关注流程）、Promote To Home workflow（提升到首页观察流程）、Opportunity Promote execution（机会提升执行）、Opportunity Push execution（机会推送执行）、trading buttons（交易按钮）、production candidate generation（生产候选交易计划生成）、trading actions（交易动作）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）和 ExecutionPlan Readiness（执行计划可执行就绪）仍然没有闭环；order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
@@ -390,7 +390,7 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 - P232 不改 dashboard / schema / config / mapper / API。
 - P232 不接 MarketQuoteClient / BinanceMarketQuoteClient / scheduler。
 - P232 不创建 scan loop、real scan、ScanScore、Candidate Attention、Promote To Home、Opportunity Push、entry / stop / TP / RR、readiness 或 trading action。
-- P233 当前推进 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。
+- P233 已完成 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P234 当前推进 Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门）。
 - P233 只是 docs-only closure / Runtime Source Service authorization gate（只改文档收口 / 运行时数据源服务授权门），不是实现。
 - `RuleConfigWatchlistPoolReadAdapter` Java 已存在。
 - DB-backed Watchlist Pool read skeleton（数据库观察库池读取骨架）已存在。
@@ -414,7 +414,7 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 
 ## 三、正在推进线路
 
-Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界已完成，Low-Frequency Scan Scheduler（低频扫描定时器）已有默认关闭最小骨架。P206-P228 已逐步完成 runtime contract audit（运行时契约审计）、authorization gate（授权门）、DTO skeleton（数据对象骨架）、guard skeleton（保护器骨架）、test-only wiring skeleton（仅测试接线骨架）、runtime source contract（运行时数据源契约）、adapter plan（适配器方案）、adapter interface skeleton（适配器接口骨架）和 fail-closed no-op Java adapter（失败关闭 no-op Java 适配器）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架），只是最小 DB Watchlist Pool config read skeleton（DB 观察库池配置读取骨架），不是真实扫描。P233 当前推进 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门），只是 docs-only authorization gate（只改文档授权门），不实现 Runtime Source Service。当前不应该把 no-op adapter（no-op 适配器）或 P232 config read skeleton（配置读取骨架）误判为 production read implementation（生产读取实现），也不能把 P233 文档收口误推进成真实扫描器、实时数据读取、MarketQuoteClient integration（行情客户端接入）、scheduler activation（定时器激活）、scan loop（扫描循环）、机会推送执行、真实点位或 Readiness（可执行就绪）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
+Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界已完成，Low-Frequency Scan Scheduler（低频扫描定时器）已有默认关闭最小骨架。P206-P228 已逐步完成 runtime contract audit（运行时契约审计）、authorization gate（授权门）、DTO skeleton（数据对象骨架）、guard skeleton（保护器骨架）、test-only wiring skeleton（仅测试接线骨架）、runtime source contract（运行时数据源契约）、adapter plan（适配器方案）、adapter interface skeleton（适配器接口骨架）和 fail-closed no-op Java adapter（失败关闭 no-op Java 适配器）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架），只是最小 DB Watchlist Pool config read skeleton（DB 观察库池配置读取骨架），不是真实扫描。P233 已完成 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P234 当前推进 Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门），只是 docs-only authorization gate（只改文档授权门），不实现 Runtime Source Service。当前不应该把 no-op adapter（no-op 适配器）或 P232 config read skeleton（配置读取骨架）误判为 production read implementation（生产读取实现），也不能把 P233 文档收口误推进成真实扫描器、实时数据读取、MarketQuoteClient integration（行情客户端接入）、scheduler activation（定时器激活）、scan loop（扫描循环）、机会推送执行、真实点位或 Readiness（可执行就绪）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
 如果目标是个人可用最快路径，建议进入：
 
@@ -1497,71 +1497,73 @@ P223 已完成 Production Runtime Source Adapter Interface Skeleton Plan（生�
 
 P224 已完成 Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）。
 
-P225 已完成 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）。P226 已完成 Production Adapter Fail-Closed No-Op Implementation Plan（生产适配器失败关闭 no-op 实现方案）。P227 已完成 Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。P228 已完成 Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。P233 当前推进 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。
+P225 已完成 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）。P226 已完成 Production Adapter Fail-Closed No-Op Implementation Plan（生产适配器失败关闭 no-op 实现方案）。P227 已完成 Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。P228 已完成 Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。P229 已完成 Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。P230 已完成 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。P231 已完成 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。P232 已完成 DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。P233 已完成 DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。P234 当前推进 Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门）。
 
-P232 只是最小 DB Watchlist Pool config read skeleton（DB 观察库池配置读取骨架），不是真实扫描，不是行情读取，不是 production read implementation（生产读取实现），不是 Market / Scheduler adapter implementation（行情 / 定时器适配器实现）。
+P234 只是 docs-only service / assembler plan（只改文档的服务 / 组装器方案），不是 Java implementation（Java 实现）。
 
-P228 已新增一个 `DefaultWatchlistPoolRuntimeSourceReadAdapter` Java 和一个目标测试。
+`RuleConfigWatchlistPoolReadAdapter` Java 已存在。
 
-P232 可新增 `RuleConfigWatchlistPoolReadAdapter` Java 和一个目标测试。
+DB-backed Watchlist Pool read skeleton（DB 观察库池读取骨架）已存在。
 
-P232 不新增 `NoOpWatchlistPoolRuntimeSourceReadAdapter` Java。
+Runtime Source Service（运行时数据源服务）仍未实现。
 
-P232 不修改既有 Java。
+Production Source Assembler（生产数据源组装器）仍未实现。
 
-P232 不修改既有 test（测试）。
+P234 不写 Java。
 
-P232 不修改 P216 DTO Java。
+P234 不新增测试。
 
-P232 不修改 P218 guard / validator Java。
+P234 不修改既有 Java。
 
-P232 不修改 P220 assembler Java。
+P234 不修改既有 test（测试）。
 
-P232 不修改 `DefaultWatchlistPoolRuntimeSourceReadAdapter` Java。
+P234 不修改 DTO 文件。
 
-P232 不修改 `RuleConfigService` / `RuleConfigServiceImpl` / `RuleConfigMapper` / `RuleConfigDO`。
+P234 不修改 guard / validator 文件。
 
-P232 不改 dashboard.html。
+P234 不修改 assembler 文件。
 
-P232 不改 schema（数据库结构）。
+P234 不改 dashboard.html。
 
-P232 不改 config（配置）。
+P234 不改 schema（数据库结构）。
 
-P232 不接 API（接口）。
+P234 不改 config（配置）。
 
-P232 不改 mapper / service / controller / dashboard / runtime service wiring（映射器 / 服务 / 控制器 / 首页 / 运行时服务接线）。
+P234 不接 API（接口）。
 
-P232 不读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
+P234 不改 mapper / service / controller / dashboard / runtime service wiring（映射器 / 服务 / 控制器 / 首页 / 运行时服务接线）。
 
-P232 不接 MarketQuoteClient / BinanceMarketQuoteClient（行情客户端）。
+P234 不读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
 
-P232 不接 scheduler（定时器），不改变 scheduler behavior（定时器行为）。
+P234 不接 MarketQuoteClient / BinanceMarketQuoteClient（行情客户端）。
 
-P232 不创建 scan loop（扫描循环）。
+P234 不接 scheduler（定时器），不改变 scheduler behavior（定时器行为）。
 
-P232 不创建 real low-frequency scan（真实低频扫描）。
+P234 不创建 scan loop（扫描循环）。
 
-P232 只把 DB-backed watchlist read（数据库观察库读取）推进到最小 RuleConfig config read skeleton（规则配置读取骨架）阶段。
+P234 不创建 real low-frequency scan（真实低频扫描）。
 
-P232 不实现真实 production adapter implementation（生产适配器实现）或 production read implementation（生产读取实现）。
+P234 不实现 Runtime Source Service（运行时数据源服务）。
 
-P232 不实现 real ScanScore computation（真实扫描分数计算）。
+P234 不实现 Production Source Assembler（生产数据源组装器）。
 
-P232 不实现 Candidate Attention workflow（候选关注流程）。
+P234 不实现 real ScanScore computation（真实扫描分数计算）。
 
-P232 不实现 Promote To Home workflow（提升到首页观察流程）。
+P234 不实现 Candidate Attention workflow（候选关注流程）。
 
-P232 不创建 Opportunity Push execution（机会推送执行）。
+P234 不实现 Promote To Home workflow（提升到首页观察流程）。
 
-P232 不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
+P234 不创建 Opportunity Push execution（机会推送执行）。
 
-P232 不升级 readiness（可执行就绪）。
+P234 不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
 
-P232 不接 order API / execution API / auto-trading（下单接口 / 执行接口 / 自动交易）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
+P234 不升级 readiness（可执行就绪）。
 
-P232 不因为 DB config read skeleton（DB 配置读取骨架）而大幅上调真实生产接线进度；真实生产接线仍保持 26%-34%，真实点位仍保持 10%-18%。
+P234 不接 order API / execution API / auto-trading（下单接口 / 执行接口 / 自动交易）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
-P232 后仍未完成 / 未实现 / 未升级清单：
+P234 不因为 docs-only service / assembler plan（只改文档服务 / 组装器方案）而大幅上调真实生产接线进度；真实生产接线仍保持 26%-34%，真实点位仍保持 10%-18%。
+
+P234 后仍未完成 / 未实现 / 未升级清单：
 
 - runtime source contract（运行时数据源契约）已文档化。
 - `WatchlistRuntimeSourceDTO` Java 已存在，runtime source guard / validator（运行时数据源保护器 / 校验器）已存在，runtime source test-only wiring（运行时数据源仅测试接线）已存在，production read adapter plan（生产读取适配器方案）已存在，production adapter interface skeleton（生产适配器接口骨架）已存在，production fail-closed no-op implementation plan（生产失败关闭 no-op 实现方案）已存在，P227 Java authorization gate（Java 授权门）已存在，P228 fail-closed no-op adapter（失败关闭 no-op 适配器）已存在，但 runtime source implementation（运行时数据源实现）仍未实现。
@@ -1569,13 +1571,14 @@ P232 后仍未完成 / 未实现 / 未升级清单：
 - production fail-closed no-op Java（生产失败关闭 no-op Java）已存在，但只是 fail-closed no-op adapter（失败关闭 no-op 适配器），不是 production read implementation。
 - `RuleConfigService` / `RuleConfigMapper` / `tm_rule_config` 已存在。
 - `RuleConfigWatchlistPoolReadAdapter` 可存在，但只是最小 DB Watchlist Pool config read skeleton（DB 观察库池配置读取骨架）。
+- Runtime Source Service（运行时数据源服务）仍未实现。
+- Production Source Assembler（生产数据源组装器）仍未实现。
 - `push.watchlist.symbols` runtime config（运行时配置）如果不存在或为空，仍必须 fail-closed（失败关闭）。
 - `NoOpWatchlistPoolRuntimeSourceReadAdapter` Java 仍未实现，且 P228 选择 `DefaultWatchlistPoolRuntimeSourceReadAdapter`，不同时实现两个 no-op adapter。
 - production adapter implementation（生产适配器实现）仍未实现。
 - production read implementation（生产读取实现）仍未实现。
 - production runtime source read（生产运行时数据源读取）仍未实现。
 - production runtime source wiring（生产运行时数据源接线）仍未实现。
-- runtime source service（运行时数据源服务）仍未实现。
 - DB-backed watchlist read（数据库观察库读取）进入最小 skeleton 阶段，但 production read implementation（生产读取实现）仍未完成。
 - MarketQuoteClient integration（行情客户端接入）仍未实现。
 - scheduler behavior changes（定时器行为改变）仍未实现。

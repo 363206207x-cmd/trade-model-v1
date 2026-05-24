@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-e19dcb4 BACKEND-P232 DB Watchlist Pool Read Java Skeleton (#583)
+2617813 BACKEND-P233 DB Watchlist Pool Read Closure and Runtime Source Service Gate (#585)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并。当前主线基准为 P232 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并。当前主线基准为 P233 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -53,6 +53,7 @@ P229：Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适�
 P230：DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）
 P231：DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）
 P232：DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）
+P233：DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）
 ```
 
 ## 3. 当前项目真实状态
@@ -94,6 +95,7 @@ P232：DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架�
 - DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。
 - DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）。
 - DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。
+- DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。
 
 当前仍未完成：
 
@@ -124,16 +126,16 @@ P232：DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #585：BACKEND-P233 DB Watchlist Pool Read Closure and Runtime Source Service Gate
-Branch：p233
-Issue：#584
+PR #587：BACKEND-P234 Runtime Source Service Plan and Assembler Gate
+Branch：p234
+Issue：#586
 风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P233 只允许完成最大安全 docs-only closure / Runtime Source Service authorization gate（只改文档收口 / 运行时数据源服务授权门）包：记录 P232 `RuleConfigWatchlistPoolReadAdapter` 已完成内容和边界，定义未来 Runtime Source Service / Production Source Assembler（运行时数据源服务 / 生产数据源组装器）授权门，并继续明确 MarketQuoteClient / Scheduler / scan loop（行情客户端 / 定时器 / 扫描循环）仍阻断。P233 不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不接 API，不接 MarketQuoteClient，不接 scheduler，不创建真实扫描。
+P234 只允许完成最大安全 docs-only Runtime Source Service / Production Source Assembler plan and Java authorization gate（只改文档的运行时数据源服务 / 生产数据源组装器方案与 Java 授权门）包：规划未来 Runtime Source Service 只能组合 `RuntimeSourceReadRequestDTO`、`RuleConfigWatchlistPoolReadAdapter`、`WatchlistRuntimeSourceGuardValidator` 和 `RuntimeSourceReadResultDTO` / `WatchlistRuntimeSourceDTO`，定义 future Production Source Assembler（生产数据源组装器）可合并进最小 service skeleton，并继续明确 MarketQuoteClient / Scheduler / scan loop（行情客户端 / 定时器 / 扫描循环）仍阻断。P234 不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不接 API，不接 MarketQuoteClient，不接 scheduler，不读取 runtime / live / external data，不创建真实扫描。
 
-P233 禁止：
+P234 禁止：
 
 - 写 Java。
 - 新增测试。
@@ -173,20 +175,20 @@ P233 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#584：BACKEND-P233 DB Watchlist Pool Read Closure and Runtime Source Service Gate
+#586：BACKEND-P234 Runtime Source Service Plan and Assembler Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P233 DB Watchlist Pool Read Closure and Runtime Source Service Gate。
+完成 P234 Runtime Source Service Plan and Assembler Gate。
 ```
 
-P233 属于 A 档 docs-only（只改文档）。本轮只新增 P233 closure / authorization gate / still blocked 文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P234 属于 A 档 docs-only（只改文档）。本轮只新增 Runtime Source Service plan / Production Source Assembler plan / Java authorization gate / still blocked 文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
