@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-6ad468c BACKEND-P221 Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate (#561)
+02b9a84 BACKEND-P222 Watchlist Production Runtime Source Read Adapter Plan (#563)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并。当前主线基准为 P221 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并。当前主线基准为 P222 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -42,6 +42,7 @@ P218：Watchlist Runtime Source Guard Validator Skeleton（观察库运行时数
 P219：Watchlist Runtime Source Guard Closure and Wiring Gate（观察库运行时数据源保护器收口与接线授权门）
 P220：Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时数据源仅测试接线骨架）
 P221：Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）
+P222：Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）
 ```
 
 ## 3. 当前项目真实状态
@@ -72,6 +73,7 @@ P221：Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gat
 - Watchlist Runtime Source Guard Closure and Wiring Gate（观察库运行时数据源保护器收口与接线授权门）。
 - Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时数据源仅测试接线骨架）。
 - Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）。
+- Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）。
 
 当前仍未完成：
 
@@ -79,6 +81,7 @@ P221：Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gat
 - Watchlist runtime data source（观察库运行时数据源）。
 - production runtime source read（生产运行时数据源读取）。
 - production read adapter（生产读取适配器）。
+- production adapter interface skeleton（生产适配器接口骨架）。
 - DB-backed watchlist read（数据库观察库读取）。
 - runtime source service（运行时数据源服务）。
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
@@ -99,16 +102,16 @@ P221：Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gat
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #563：BACKEND-P222 Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）
-Branch：p222
-Issue：#562
+PR #565：BACKEND-P223 Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）
+Branch：p223
+Issue：#564
 风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P222 只允许完成最大安全 docs-only production runtime source read adapter plan（只改文档的生产运行时数据源读取适配器方案）包：定义未来 adapter（适配器）方案、Watchlist Pool（观察库池）读取边界，并明确 DB / MarketQuoteClient / Scheduler adapters（数据库 / 行情客户端 / 定时器适配器）仍未实现。
+P223 只允许完成最大安全 docs-only adapter interface skeleton authorization plan（只改文档的适配器接口骨架授权方案）包：定义未来 production runtime source adapter interface skeleton（生产运行时数据源适配器接口骨架）的授权门和方案，并明确 DB / MarketQuoteClient / Scheduler implementation（数据库 / 行情客户端 / 定时器实现）仍被阻断。
 
-P222 禁止：
+P223 禁止：
 
 - 写 Java。
 - 新增测试。
@@ -128,6 +131,7 @@ P222 禁止：
 - 创建 scan loop（扫描循环）。
 - 扫描真实资产。
 - 实现 production read adapter（生产读取适配器）。
+- 实现 production adapter interface skeleton（生产适配器接口骨架）。
 - 生成 ScanScore（扫描分数）。
 - 生成 Candidate Attention（候选关注）。
 - 生成 Promote To Home（提升到首页观察）。
@@ -139,20 +143,20 @@ P222 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#562：BACKEND-P222 Watchlist Production Runtime Source Read Adapter Plan
+#564：BACKEND-P223 Production Runtime Source Adapter Interface Skeleton Plan
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P222 Watchlist Production Runtime Source Read Adapter Plan。
+完成 P223 Production Runtime Source Adapter Interface Skeleton Plan。
 ```
 
-P222 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 production read adapter（生产读取适配器），不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P223 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 production adapter interface skeleton（生产适配器接口骨架）或 production read adapter（生产读取适配器），不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
