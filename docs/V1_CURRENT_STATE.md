@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-06d2f06 BACKEND-P213 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate (#545)
+d9cef21 BACKEND-P214 Watchlist Runtime Source Contract Definition Pack (#547)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并。当前主线基准为 P213 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并。当前主线基准为 P214 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -34,6 +34,7 @@ P210：Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器�
 P211：Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）
 P212：Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）
 P213：Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）
+P214：Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）
 ```
 
 ## 3. 当前项目真实状态
@@ -56,11 +57,15 @@ P213：Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察�
 - Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。
 - Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。
 - Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。
+- Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
 
 当前仍未完成：
 
 - 真实低频扫描。
 - Watchlist runtime data source（观察库运行时数据源）。
+- WatchlistRuntimeSourceDTO Java（观察库运行时数据源数据对象 Java）。
+- DB-backed watchlist read（数据库观察库读取）。
+- runtime source service（运行时数据源服务）。
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
 - runtime data reads（运行时数据读取）。
 - scan loop（扫描循环）。
@@ -79,22 +84,23 @@ P213：Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #547：BACKEND-P214 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）
-Branch：p214
-Issue：#546
+PR #549：BACKEND-P215 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）
+Branch：p215
+Issue：#548
 风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P214 只允许完成最大安全 docs-only runtime source contract definition（只改文档的运行时数据源契约定义）包：定义未来 Watchlist runtime source contract（观察库运行时数据源契约）、freshness / staleness（新鲜度 / 过期状态）规则，以及 fail-closed / observability（失败关闭 / 可观测性）规则，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
+P215 只允许完成最大安全 docs-only runtime source authorization gate and DTO skeleton plan（只改文档的运行时数据源授权门与数据对象骨架方案）包：定义未来 P216 是否可以进入 pure DTO / enum / tests（纯数据对象 / 枚举 / 测试）骨架，规划 `WatchlistRuntimeSourceDTO` 方案，并明确 runtime source implementation（运行时数据源实现）仍被阻断。
 
-P214 禁止：
+P215 禁止：
 
 - 写 Java。
 - 新增测试。
 - 修改 P208 DTO Java。
 - 修改 P210 guard / validator Java。
 - 修改 P212 assembler Java。
+- 读取 DB（数据库）。
 - 接 scheduler（定时器）。
 - 接 MarketQuoteClient（行情客户端）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
@@ -113,20 +119,20 @@ P214 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#546：BACKEND-P214 Watchlist Runtime Source Contract Definition Pack
+#548：BACKEND-P215 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P214 Watchlist Runtime Source Contract Definition Pack。
+完成 P215 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan。
 ```
 
-P214 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P215 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 

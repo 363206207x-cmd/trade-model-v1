@@ -1,14 +1,14 @@
 # PROJECT_PROGRESS_INDEX
 
-P201 是 Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）。P205 追加吸收 P202-P204 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和最小骨架结果。P206 已完成 Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包）。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 当前推进 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
+P201 是 Project Progress Index Refresh After Watchlist Scan Promote Semantics（观察库扫描提升语义后项目总进度索引刷新）。P205 追加吸收 P202-P204 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和最小骨架结果。P206 已完成 Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包）。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。P215 当前推进 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。
 
-本索引来自 P164 全局扫描后的持续维护。P201 刷新 `docs/PROJECT_PROGRESS_INDEX.md`，并吸收 P197-P200 Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）read-only audit / docs-only semantics（只读审计 / 只改文档语义）闭环结果。P205 补齐 P202-P204 后的状态和工作流文档，并把最大安全任务包规则写入工作流契约和 Codex 模板。P206 已完成：运行时契约 / 观察库运行时数据源 / 扫描结果契约 / ScanScore 规则定义审计已完成。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 当前推进 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包），只是 docs-only contract definition（只改文档契约定义），不是实现；不写 Java，不新增测试，不修改 DTO / guard / assembler，不改 `dashboard.html`，不接 API（接口），不接 `MarketQuoteClient`，不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不创建 scan loop（扫描循环），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 ScanScore computation（扫描分数计算）、Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程），不创建 Opportunity Push execution（机会推送执行），不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比），不创建 close / reverse / buy / sell（平仓 / 反手 / 买入 / 卖出）动作，不升级 Readiness（可执行就绪）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭；auto-trading（自动交易）只作为禁止越界安全边界。
+本索引来自 P164 全局扫描后的持续维护。P201 刷新 `docs/PROJECT_PROGRESS_INDEX.md`，并吸收 P197-P200 Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）read-only audit / docs-only semantics（只读审计 / 只改文档语义）闭环结果。P205 补齐 P202-P204 后的状态和工作流文档，并把最大安全任务包规则写入工作流契约和 Codex 模板。P206 已完成：运行时契约 / 观察库运行时数据源 / 扫描结果契约 / ScanScore 规则定义审计已完成。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。P215 当前推进 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案），只是 docs-only authorization gate / DTO skeleton plan（只改文档授权门 / 数据对象骨架方案），不是实现；不写 Java，不新增测试，不修改 DTO / guard / assembler，不改 `dashboard.html`，不接 API（接口），不接 `MarketQuoteClient`，不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不创建 scan loop（扫描循环），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 ScanScore computation（扫描分数计算）、Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程），不创建 Opportunity Push execution（机会推送执行），不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比），不创建 close / reverse / buy / sell（平仓 / 反手 / 买入 / 卖出）动作，不升级 Readiness（可执行就绪）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭；auto-trading（自动交易）只作为禁止越界安全边界。
 
 ## 一、当前总进度结论
 
-当前项目不是“快完成自动交易”的状态，而且 V1 明确不做 auto-trading（自动交易）。更准确的状态是：安全地基、只读复核、失败关闭、SourceTrace（证据来源追踪）只读展示、BoundaryCandidate（边界候选交易计划）只读候选展示、ExecutionPlan（执行计划）review-only plan display（只允许复核展示）、Risk Action Guard（风险动作保护器）read-only risk display（只读风险展示）、Position Monitor Strong Reversal / Moving Stop review-only display（持仓强反转 / 移动止损只允许复核展示）、Dashboard Risk Reminder read-only display（首页风险提醒只读展示）、Watchlist Low-Frequency Scan / Opportunity Promote read-only audit / docs-only semantics（观察库低频扫描 / 机会提升只读审计 / 只改文档语义）以及 Low-Frequency Scan Scheduler disabled-by-default skeleton（低频扫描定时器默认关闭骨架）已经更完整；P206 已把 Watchlist runtime data source contract（观察库运行时数据源契约）、Watchlist scan result contract（观察库扫描结果契约）和 ScanScore rule definition（扫描分数规则定义）放进文档审计，P207 已把后续 skeleton（骨架）的授权门边界收紧，P208 已完成 DTO / enum / tests（数据传输对象 / 枚举 / 测试）骨架，P209 已完成收口和未来 guard / no-score / no-push（保护器 / 无分数 / 无推送）边界文档，P210 已完成 guard / validator / tests（保护器 / 校验器 / 测试）骨架，P211 已完成 docs-only closure / wiring gate（只改文档收口 / 接线授权门），P212 已完成 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架），P213 已完成 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门），P214 当前只做 docs-only runtime source contract definition（只改文档运行时数据源契约定义）。但 real low-frequency scan（真实低频扫描）、runtime source implementation（运行时数据源实现）、runtime data reads（运行时数据读取）、DB-backed watchlist read（数据库观察库读取）、Watchlist runtime data source（观察库运行时数据源）、MarketQuoteClient integration（行情客户端接入）、service wiring（服务接线）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、real ScanScore computation（真实扫描分数计算）、Candidate Attention workflow（候选关注流程）、Promote To Home workflow（提升到首页观察流程）、Opportunity Promote execution（机会提升执行）、Opportunity Push execution（机会推送执行）、trading buttons（交易按钮）、production candidate generation（生产候选交易计划生成）、trading actions（交易动作）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）和 ExecutionPlan Readiness（执行计划可执行就绪）仍然没有闭环；order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
+当前项目不是“快完成自动交易”的状态，而且 V1 明确不做 auto-trading（自动交易）。更准确的状态是：安全地基、只读复核、失败关闭、SourceTrace（证据来源追踪）只读展示、BoundaryCandidate（边界候选交易计划）只读候选展示、ExecutionPlan（执行计划）review-only plan display（只允许复核展示）、Risk Action Guard（风险动作保护器）read-only risk display（只读风险展示）、Position Monitor Strong Reversal / Moving Stop review-only display（持仓强反转 / 移动止损只允许复核展示）、Dashboard Risk Reminder read-only display（首页风险提醒只读展示）、Watchlist Low-Frequency Scan / Opportunity Promote read-only audit / docs-only semantics（观察库低频扫描 / 机会提升只读审计 / 只改文档语义）以及 Low-Frequency Scan Scheduler disabled-by-default skeleton（低频扫描定时器默认关闭骨架）已经更完整；P206 已把 Watchlist runtime data source contract（观察库运行时数据源契约）、Watchlist scan result contract（观察库扫描结果契约）和 ScanScore rule definition（扫描分数规则定义）放进文档审计，P207 已把后续 skeleton（骨架）的授权门边界收紧，P208 已完成 DTO / enum / tests（数据传输对象 / 枚举 / 测试）骨架，P209 已完成收口和未来 guard / no-score / no-push（保护器 / 无分数 / 无推送）边界文档，P210 已完成 guard / validator / tests（保护器 / 校验器 / 测试）骨架，P211 已完成 docs-only closure / wiring gate（只改文档收口 / 接线授权门），P212 已完成 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架），P213 已完成 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门），P214 已完成 docs-only runtime source contract definition（只改文档运行时数据源契约定义），P215 当前只做 docs-only runtime source authorization gate / DTO skeleton plan（只改文档运行时数据源授权门 / 数据对象骨架方案）。但 `WatchlistRuntimeSourceDTO` Java 仍未实现，real low-frequency scan（真实低频扫描）、runtime source implementation（运行时数据源实现）、runtime source service（运行时数据源服务）、runtime data reads（运行时数据读取）、DB-backed watchlist read（数据库观察库读取）、Watchlist runtime data source（观察库运行时数据源）、MarketQuoteClient integration（行情客户端接入）、service wiring（服务接线）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、real ScanScore computation（真实扫描分数计算）、Candidate Attention workflow（候选关注流程）、Promote To Home workflow（提升到首页观察流程）、Opportunity Promote execution（机会提升执行）、Opportunity Push execution（机会推送执行）、trading buttons（交易按钮）、production candidate generation（生产候选交易计划生成）、trading actions（交易动作）、production risk action（生产风控动作）、production VALID（生产环境有效候选状态）、真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）和 ExecutionPlan Readiness（执行计划可执行就绪）仍然没有闭环；order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
-P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展示）闭环。P172-P175 已完成 BoundaryCandidate read-only candidate display（边界候选只读候选展示）闭环。P177-P180 已完成 ExecutionPlan review-only plan display（执行计划只允许复核展示）闭环。P182-P185 已完成 Risk Action Guard / Position Monitor read-only risk display（风险动作保护 / 持仓监控只读风险展示）闭环。P187-P190 已完成 Position Monitor Strong Reversal / Moving Stop Review-Only Pack（持仓强反转 / 移动止损只读复核包）闭环。P192-P195 已完成 Dashboard Risk Reminder Read-Only Display Pack（首页风险提醒只读展示包）闭环。P197-P200 已完成 Watchlist Low-Frequency Scan / Opportunity Promote Audit Pack（观察库低频扫描 / 机会提升审计包）闭环。P202-P204 已完成 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和默认关闭最小骨架。P205 已完成最大安全任务包工作流文档补齐。P206 已完成运行时契约 / 观察库运行时数据源 / 扫描结果契约 / ScanScore 规则定义审计。P207 已完成 docs-only authorization gate（只改文档授权门）。P208 已完成 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试）骨架。P209 已完成 docs-only closure / boundary（只改文档收口 / 边界）。P210 已完成 pure guard / validator / tests（纯保护器 / 校验器 / 测试）骨架。P211 已完成 docs-only closure / wiring gate（只改文档收口 / 接线授权门）。P212 已完成 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架）。P213 已完成 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门）。P214 当前只是 docs-only contract definition（只改文档契约定义），不是 runtime source implementation（运行时数据源实现）。所以项目总进度只能小幅、谨慎上调或保持。这个上调只代表“边界更清楚、只读复核语义更完整、低频扫描入口有默认关闭骨架、运行时契约审计完成、授权门边界更清楚、DTO 骨架更清楚、no-score / no-push 边界更清楚、guard 骨架更清楚、test-only wiring 骨架更清楚、runtime source gate 和 contract definition 更清楚”，不代表真实扫描器、实时数据读取、DB-backed watchlist read（数据库观察库读取）、推送执行、交易计划生成、生产 `VALID`（有效候选状态）、真实点位、Readiness（可执行就绪）或交易动作完成；auto-trading（自动交易）不在 V1 范围内，保持关闭，只作为禁止越界安全边界。
+P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展示）闭环。P172-P175 已完成 BoundaryCandidate read-only candidate display（边界候选只读候选展示）闭环。P177-P180 已完成 ExecutionPlan review-only plan display（执行计划只允许复核展示）闭环。P182-P185 已完成 Risk Action Guard / Position Monitor read-only risk display（风险动作保护 / 持仓监控只读风险展示）闭环。P187-P190 已完成 Position Monitor Strong Reversal / Moving Stop Review-Only Pack（持仓强反转 / 移动止损只读复核包）闭环。P192-P195 已完成 Dashboard Risk Reminder Read-Only Display Pack（首页风险提醒只读展示包）闭环。P197-P200 已完成 Watchlist Low-Frequency Scan / Opportunity Promote Audit Pack（观察库低频扫描 / 机会提升审计包）闭环。P202-P204 已完成 Low-Frequency Scan Scheduler（低频扫描定时器）范围审计、授权门和默认关闭最小骨架。P205 已完成最大安全任务包工作流文档补齐。P206 已完成运行时契约 / 观察库运行时数据源 / 扫描结果契约 / ScanScore 规则定义审计。P207 已完成 docs-only authorization gate（只改文档授权门）。P208 已完成 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试）骨架。P209 已完成 docs-only closure / boundary（只改文档收口 / 边界）。P210 已完成 pure guard / validator / tests（纯保护器 / 校验器 / 测试）骨架。P211 已完成 docs-only closure / wiring gate（只改文档收口 / 接线授权门）。P212 已完成 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架）。P213 已完成 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门）。P214 已完成 docs-only contract definition（只改文档契约定义）。P215 当前只是 docs-only authorization gate / DTO skeleton plan（只改文档授权门 / 数据对象骨架方案），不是 runtime source implementation（运行时数据源实现）。所以项目总进度只能小幅、谨慎上调或保持。这个上调只代表“边界更清楚、只读复核语义更完整、低频扫描入口有默认关闭骨架、运行时契约审计完成、授权门边界更清楚、DTO 骨架更清楚、no-score / no-push 边界更清楚、guard 骨架更清楚、test-only wiring 骨架更清楚、runtime source gate、contract definition 和 DTO skeleton plan 更清楚”，不代表 `WatchlistRuntimeSourceDTO` Java、真实扫描器、实时数据读取、DB-backed watchlist read（数据库观察库读取）、推送执行、交易计划生成、生产 `VALID`（有效候选状态）、真实点位、Readiness（可执行就绪）或交易动作完成；auto-trading（自动交易）不在 V1 范围内，保持关闭，只作为禁止越界安全边界。
 
 | 项目线 | 当前真实进度 |
 |---|---:|
@@ -240,7 +240,7 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 - P213 不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
 - P213 不升级 readiness（可执行就绪）。
 - P213 不接 order API / execution API / auto-trading（下单接口 / 执行接口 / 自动交易）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
-- P214 当前推进 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
+- P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
 - P214 只是 docs-only contract definition（只改文档契约定义），不是实现。
 - P214 可文档化 runtime source contract（运行时数据源契约），但 runtime source（运行时数据源）仍未实现。
 - P214 不写 Java。
@@ -259,6 +259,23 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 - P214 不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
 - P214 不升级 readiness（可执行就绪）。
 - P214 不接 order API / execution API / auto-trading（下单接口 / 执行接口 / 自动交易）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
+- P215 当前推进 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。
+- P215 只是 docs-only authorization gate / DTO skeleton plan（只改文档授权门 / 数据对象骨架方案），不是实现。
+- P215 不写 Java。
+- P215 不新增测试。
+- P215 不修改 DTO / guard / assembler（数据对象 / 保护器 / 组装器）。
+- P215 不读取 DB / runtime / live / external data（数据库 / 运行时 / 实时 / 外部数据）。
+- P215 不接 MarketQuoteClient integration（行情客户端接入）。
+- P215 不接 scheduler（定时器）。
+- P215 不接 mapper / service / controller / API / dashboard（映射器 / 服务 / 控制器 / 接口 / 首页）。
+- P215 不创建 scan loop（扫描循环）。
+- P215 不实现 real ScanScore computation（真实扫描分数计算）。
+- P215 不实现 Candidate Attention workflow（候选关注流程）。
+- P215 不实现 Promote To Home workflow（提升到首页观察流程）。
+- P215 不创建 Opportunity Push execution（机会推送执行）。
+- P215 不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
+- P215 不升级 readiness（可执行就绪）。
+- P215 不接 order API / execution API / auto-trading（下单接口 / 执行接口 / 自动交易）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
 - BoundaryCandidate（边界候选交易计划）DTO / valid factory（有效候选工厂）/ service skeleton（服务骨架）已完成，但这不等于 production VALID（生产环境有效候选状态）已经可生成。
 - RuntimeKlineContext（运行时 K 线上下文）/ BoundaryCandidateService（边界候选服务）相关已完成，但这不等于真实交易点位完成。
 - Dashboard（首页工作台）已完成 SourceTrace（证据来源追踪）、BoundaryCandidate（边界候选交易计划）、ExecutionPlan（执行计划）、RiskActionGuard（风险动作保护展示）、PaperObservationDisplay（纸面观察展示）、Position Monitor（持仓监控）和 Dashboard Risk Reminder（首页风险提醒）只读展示。
@@ -266,7 +283,7 @@ P165-P170 已完成 SourceTrace read-only display（证据来源追踪只读展�
 
 ## 三、正在推进线路
 
-Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界已完成，Low-Frequency Scan Scheduler（低频扫描定时器）已有默认关闭最小骨架。P206 已完成 Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包），只把 Watchlist runtime data source（观察库运行时数据源）、WatchlistScanResult（观察库扫描结果）和 ScanScore（扫描分数）的未来契约放进文档审计。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架），只是 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试），不是 runtime scan（运行时扫描）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包），只是 docs-only closure / boundary（只改文档收口 / 边界），不是实现。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架），只是 pure guard / validator / tests（纯保护器 / 校验器 / 测试），不是 runtime scan（运行时扫描）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门），只是 docs-only closure / wiring gate（只改文档收口 / 接线授权门），不是实现。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架），只是 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架），不是 runtime scan（运行时扫描）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门），只是 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门），不是实现。P214 当前推进 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包），只是 docs-only contract definition（只改文档契约定义），不是实现。当前不应该继续把骨架、契约审计、授权门、DTO skeleton（数据对象骨架）、收口文档、guard skeleton（保护器骨架）、test-only wiring skeleton（仅测试接线骨架）或 runtime source contract（运行时数据源契约）误推进成真实扫描器、实时数据读取、DB-backed watchlist read（数据库观察库读取）、MarketQuoteClient integration（行情客户端接入）、scheduler activation（定时器激活）、机会推送执行、真实点位或 Readiness（可执行就绪）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
+Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界已完成，Low-Frequency Scan Scheduler（低频扫描定时器）已有默认关闭最小骨架。P206 已完成 Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包），只把 Watchlist runtime data source（观察库运行时数据源）、WatchlistScanResult（观察库扫描结果）和 ScanScore（扫描分数）的未来契约放进文档审计。P207 已完成 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）。P208 已完成 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架），只是 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试），不是 runtime scan（运行时扫描）。P209 已完成 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包），只是 docs-only closure / boundary（只改文档收口 / 边界），不是实现。P210 已完成 Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架），只是 pure guard / validator / tests（纯保护器 / 校验器 / 测试），不是 runtime scan（运行时扫描）。P211 已完成 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门），只是 docs-only closure / wiring gate（只改文档收口 / 接线授权门），不是实现。P212 已完成 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架），只是 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架），不是 runtime scan（运行时扫描）。P213 已完成 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门），只是 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门），不是实现。P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包），只是 docs-only contract definition（只改文档契约定义），不是实现。P215 当前推进 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案），只是 docs-only authorization gate / DTO skeleton plan（只改文档授权门 / 数据对象骨架方案），不是实现。当前不应该继续把骨架、契约审计、授权门、DTO skeleton（数据对象骨架）、收口文档、guard skeleton（保护器骨架）、test-only wiring skeleton（仅测试接线骨架）、runtime source contract（运行时数据源契约）或 runtime source DTO plan（运行时数据源数据对象方案）误推进成真实扫描器、实时数据读取、DB-backed watchlist read（数据库观察库读取）、MarketQuoteClient integration（行情客户端接入）、scheduler activation（定时器激活）、机会推送执行、真实点位或 Readiness（可执行就绪）；auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
 如果目标是个人可用最快路径，建议进入：
 
@@ -284,8 +301,9 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 6. P211 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门，已完成）。
 7. P212 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架，已完成）。
 8. P213 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门，已完成）。
-9. 完成 P214 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
-10. 后续仍必须另开授权门，不能直接接真实扫描、DB、行情或 scheduler（定时器）。
+9. P214 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包，已完成）。
+10. 完成 P215 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。
+11. 后续如果进入 P216，也只能先做 pure DTO / enum / tests skeleton（纯数据对象 / 枚举 / 测试骨架），不能直接接真实扫描、DB、行情或 scheduler（定时器）。
 
 如果目标是严谨后端交易候选，仍建议进入：
 
@@ -297,18 +315,20 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 
 ## 四、暂停线路
 
-- real low-frequency scan（真实低频扫描）：仍未完成，仍暂停，原因是 P204 只完成默认关闭骨架，P208 只是 DTO skeleton（数据对象骨架），P209 只是 docs-only closure / boundary（只改文档收口 / 边界），P210 只是 guard skeleton（保护器骨架），P211 只是 docs-only wiring gate（只改文档接线授权门），P212 只是 test-only wiring skeleton（仅测试接线骨架），P213 只是 docs-only runtime source gate（只改文档运行时数据源授权门），P214 只是 docs-only contract definition（只改文档契约定义），不创建真实扫描器。
-- Runtime data reads（运行时数据读取）：仍未实现，仍暂停，原因是 P214 不读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
-- Watchlist runtime data source（观察库运行时数据源）：仍未实现，仍暂停，原因是 P206 只审计数据源契约，P207 只做 authorization gate（授权门），P208 只做 DTO skeleton（数据对象骨架），P209 只做收口 / 边界，P210 只做 guard skeleton（保护器骨架），P211 只做 wiring gate（接线授权门），P212 只做 test-only wiring skeleton（仅测试接线骨架），P213 只做 runtime source gate（运行时数据源授权门），P214 只做 contract definition（契约定义），不实现运行时数据源。
-- DB-backed watchlist read（数据库观察库读取）：仍未实现，仍暂停，原因是 P214 只定义未来字段，不读 DB（数据库）。
-- MarketQuoteClient integration（行情客户端接入）：仍未实现，仍暂停，原因是 P199/P200 明确不接 `MarketQuoteClient`，P214 也明确不接。
-- service wiring（服务接线）：仍未实现，仍暂停，原因是 P214 不接 mapper / controller / scheduler / runtime service wiring（映射器 / 控制器 / 定时器 / 运行时服务接线）。
-- scheduler behavior changes（定时器行为改变）：仍未实现，仍暂停，原因是 P204 只允许 disabled-by-default skeleton（默认关闭骨架），P214 不改 scheduler behavior（定时器行为）。
-- scan loop（扫描循环）：仍未实现，仍暂停，原因是 P214 只做文档契约定义，不创建运行时循环。
+- real low-frequency scan（真实低频扫描）：仍未完成，仍暂停，原因是 P204 只完成默认关闭骨架，P208 只是 DTO skeleton（数据对象骨架），P209 只是 docs-only closure / boundary（只改文档收口 / 边界），P210 只是 guard skeleton（保护器骨架），P211 只是 docs-only wiring gate（只改文档接线授权门），P212 只是 test-only wiring skeleton（仅测试接线骨架），P213 只是 docs-only runtime source gate（只改文档运行时数据源授权门），P214 只是 docs-only contract definition（只改文档契约定义），P215 只是 docs-only authorization gate / DTO skeleton plan（只改文档授权门 / 数据对象骨架方案），不创建真实扫描器。
+- Runtime data reads（运行时数据读取）：仍未实现，仍暂停，原因是 P215 不读取 DB / runtime / live / external data（数据库 / 运行时 / 实时 / 外部数据）。
+- Watchlist runtime data source（观察库运行时数据源）：仍未实现，仍暂停，原因是 P206 只审计数据源契约，P207 只做 authorization gate（授权门），P208 只做 DTO skeleton（数据对象骨架），P209 只做收口 / 边界，P210 只做 guard skeleton（保护器骨架），P211 只做 wiring gate（接线授权门），P212 只做 test-only wiring skeleton（仅测试接线骨架），P213 只做 runtime source gate（运行时数据源授权门），P214 只做 contract definition（契约定义），P215 只做 authorization gate / DTO skeleton plan（授权门 / 数据对象骨架方案），不实现运行时数据源。
+- WatchlistRuntimeSourceDTO Java：仍未实现，仍暂停，原因是 P215 只规划未来 P216 DTO skeleton（数据对象骨架），不写 Java。
+- DB-backed watchlist read（数据库观察库读取）：仍未实现，仍暂停，原因是 P215 只定义未来授权边界，不读 DB（数据库）。
+- MarketQuoteClient integration（行情客户端接入）：仍未实现，仍暂停，原因是 P199/P200 明确不接 `MarketQuoteClient`，P215 也明确不接。
+- runtime source service（运行时数据源服务）：仍未实现，仍暂停，原因是 P215 不接 service / mapper / controller / API（服务 / 映射器 / 控制器 / 接口）。
+- service wiring（服务接线）：仍未实现，仍暂停，原因是 P215 不接 mapper / controller / scheduler / runtime service wiring（映射器 / 控制器 / 定时器 / 运行时服务接线）。
+- scheduler behavior changes（定时器行为改变）：仍未实现，仍暂停，原因是 P204 只允许 disabled-by-default skeleton（默认关闭骨架），P215 不改 scheduler behavior（定时器行为）。
+- scan loop（扫描循环）：仍未实现，仍暂停，原因是 P215 只做文档授权门和 DTO 方案，不创建运行时循环。
 - Watchlist scan DTO skeleton（观察库扫描 DTO 骨架）：P208 已完成，但这只是不接线的数据对象骨架，不是运行时扫描结果生产链路。
-- real ScanScore computation（真实扫描分数计算）：仍未实现，仍暂停，原因是 P206 只定义规则审计，P207 只定义 guard（保护器）边界，P208 不计算分数，P209 只写 no-score / no-push（无分数 / 无推送）文档边界，P210 只保持 no-score guard（无分数保护器），P214 不实现分数。
-- Candidate Attention workflow（候选关注流程）：仍未实现，仍暂停，原因是 P206 只定义契约语义，P214 不创建运行时工作流。
-- Promote To Home workflow（提升到首页观察流程）：仍未实现，仍暂停，原因是 P206 只允许人工复核语义，P214 不创建工作流。
+- real ScanScore computation（真实扫描分数计算）：仍未实现，仍暂停，原因是 P206 只定义规则审计，P207 只定义 guard（保护器）边界，P208 不计算分数，P209 只写 no-score / no-push（无分数 / 无推送）文档边界，P210 只保持 no-score guard（无分数保护器），P215 不实现分数。
+- Candidate Attention workflow（候选关注流程）：仍未实现，仍暂停，原因是 P206 只定义契约语义，P215 不创建运行时工作流。
+- Promote To Home workflow（提升到首页观察流程）：仍未实现，仍暂停，原因是 P206 只允许人工复核语义，P215 不创建工作流。
 - Opportunity Promote execution（机会提升执行）：仍暂停，原因是 Opportunity Promote（机会提升）当前只是提升到首页观察 / 人工复核语义。
 - Opportunity Push execution（机会推送执行）：仍未实现，仍暂停，原因是没有推送执行授权，也没有交易动作授权。
 - default-six opportunity push（默认六币机会推送）：仍禁止，原因是默认六币只是 Display Slots（首页展示位）空态 / 排序，不是推送全集。
@@ -380,6 +400,10 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 - P214 runtime source contract（运行时数据源契约）不等于 DB-backed watchlist read（数据库观察库读取）完成。
 - P214 freshness / staleness rules（新鲜度 / 过期状态规则）不等于 freshness calculation（新鲜度计算）实现。
 - P214 fail-closed / observability rules（失败关闭 / 可观测性规则）不等于日志、指标、DB、API 或 dashboard 展示实现。
+- P215 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）不等于 runtime source（运行时数据源）实现。
+- P215 DTO skeleton plan（数据对象骨架方案）不等于 `WatchlistRuntimeSourceDTO` Java 已实现。
+- P215 authorization gate（授权门）不等于 DB-backed watchlist read（数据库观察库读取）、MarketQuoteClient integration（行情客户端接入）、scheduler activation（定时器激活）或 scan loop（扫描循环）完成。
+- P215 方案文档不等于 runtime source service（运行时数据源服务）、API response（接口响应）、dashboard display（首页展示）或 observability logging / metrics（可观测性日志 / 指标）实现。
 - DTO skeleton（数据对象骨架）、guard skeleton（保护器骨架）和 test-only wiring skeleton（仅测试接线骨架）可存在，但 runtime scan（运行时扫描）仍然被阻断。
 - Opportunity Promote（机会提升）语义完成，不等于 Opportunity Push execution（机会推送执行）完成。
 - Display Slots（首页展示位）不是推送候选。
@@ -466,11 +490,12 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 6. P211 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门，已完成）。
 7. P212 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架，已完成）。
 8. P213 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门，已完成）。
-9. 完成 P214 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
-10. Runtime Source Authorization Gate / DTO Skeleton（运行时数据源授权门 / 数据对象骨架）后续。
-11. ScanScore Guard / Rule Definition 后续授权门（扫描分数保护器 / 规则定义后续授权门）。
-12. Low-Cost AI Event Explanation Gate（低成本 AI 事件解释授权门）。
-13. Three-AI Promote-To-Home Review Gate（三 AI 提升到首页复核授权门）。
+9. P214 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包，已完成）。
+10. 完成 P215 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。
+11. Runtime Source DTO Skeleton（运行时数据源数据对象骨架）后续，如果推进也只能是 pure DTO / enum / tests（纯数据对象 / 枚举 / 测试）。
+12. ScanScore Guard / Rule Definition 后续授权门（扫描分数保护器 / 规则定义后续授权门）。
+13. Low-Cost AI Event Explanation Gate（低成本 AI 事件解释授权门）。
+14. Three-AI Promote-To-Home Review Gate（三 AI 提升到首页复核授权门）。
 
 ### 路线 C：继续严谨后端交易候选
 
@@ -490,7 +515,7 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 
 | 模块 | 当前状态 | 完成度 | 证据 / 文件线索 | 下一步 |
 |---|---|---:|---|---|
-| Project Overall（项目总进度） | 安全地基、只读展示、SourceTrace（证据来源追踪）、BoundaryCandidate（边界候选交易计划）、ExecutionPlan（执行计划）、Risk Action Guard（风险动作保护器）、Position Monitor（持仓监控）、Dashboard Risk Reminder（首页风险提醒）、Watchlist / Opportunity Promote（观察库 / 机会提升）语义边界、P206 runtime contract audit（运行时契约审计）、P207 authorization gate（授权门）、P208 DTO skeleton（数据对象骨架）、P209 closure / boundary（收口 / 边界）、P210 guard skeleton（保护器骨架）、P211 wiring gate（接线授权门）、P212 test-only wiring skeleton（仅测试接线骨架）、P213 runtime source gate（运行时数据源授权门）和 P214 runtime source contract definition（运行时数据源契约定义）继续推进；真实扫描器、真实候选、真实点位、Readiness（可执行就绪）、生产风控动作和交易动作未完成；auto-trading（自动交易）不在 V1 范围内，保持关闭 | 72%-77% | `PROJECT_PROGRESS_INDEX.md`、`PHASE_BACKEND_P170_SOURCETRACE_READ_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P175_BOUNDARY_CANDIDATE_READ_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P180_EXECUTION_PLAN_REVIEW_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P185_RISK_ACTION_GUARD_POSITION_MONITOR_CLOSURE.md`、`PHASE_BACKEND_P190_POSITION_MONITOR_STRONG_REVERSAL_MOVING_STOP_CLOSURE.md`、`PHASE_BACKEND_P195_DASHBOARD_RISK_REMINDER_READ_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P200_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_CLOSURE.md`、`PHASE_P206_LOW_FREQUENCY_SCAN_RUNTIME_CONTRACT_AUDIT.md`、`PHASE_P207_WATCHLIST_RUNTIME_DATA_SOURCE_AUTHORIZATION_GATE.md`、`PHASE_P208_WATCHLIST_SCAN_RUNTIME_DTO_SKELETON_VERIFICATION.md`、`PHASE_P209_WATCHLIST_SCAN_DTO_SKELETON_CLOSURE.md`、`PHASE_P210_WATCHLIST_SCAN_GUARD_VALIDATOR_SKELETON_VERIFICATION.md`、`PHASE_P211_RUNTIME_SCAN_STILL_BLOCKED_BOUNDARY.md`、`PHASE_P212_WATCHLIST_SCAN_GUARD_TEST_ONLY_WIRING_VERIFICATION.md`、`PHASE_P213_RUNTIME_SOURCE_AUTHORIZATION_GATE.md`、`PHASE_P214_WATCHLIST_RUNTIME_SOURCE_CONTRACT_DEFINITION.md` | P214 后仍不能接真实扫描、DB、行情或 scheduler；后续必须另开授权门 |
+| Project Overall（项目总进度） | 安全地基、只读展示、SourceTrace（证据来源追踪）、BoundaryCandidate（边界候选交易计划）、ExecutionPlan（执行计划）、Risk Action Guard（风险动作保护器）、Position Monitor（持仓监控）、Dashboard Risk Reminder（首页风险提醒）、Watchlist / Opportunity Promote（观察库 / 机会提升）语义边界、P206 runtime contract audit（运行时契约审计）、P207 authorization gate（授权门）、P208 DTO skeleton（数据对象骨架）、P209 closure / boundary（收口 / 边界）、P210 guard skeleton（保护器骨架）、P211 wiring gate（接线授权门）、P212 test-only wiring skeleton（仅测试接线骨架）、P213 runtime source gate（运行时数据源授权门）、P214 runtime source contract definition（运行时数据源契约定义）和 P215 runtime source authorization gate / DTO skeleton plan（运行时数据源授权门 / 数据对象骨架方案）继续推进；真实扫描器、真实候选、真实点位、Readiness（可执行就绪）、生产风控动作和交易动作未完成；auto-trading（自动交易）不在 V1 范围内，保持关闭 | 72%-77% | `PROJECT_PROGRESS_INDEX.md`、`PHASE_BACKEND_P170_SOURCETRACE_READ_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P175_BOUNDARY_CANDIDATE_READ_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P180_EXECUTION_PLAN_REVIEW_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P185_RISK_ACTION_GUARD_POSITION_MONITOR_CLOSURE.md`、`PHASE_BACKEND_P190_POSITION_MONITOR_STRONG_REVERSAL_MOVING_STOP_CLOSURE.md`、`PHASE_BACKEND_P195_DASHBOARD_RISK_REMINDER_READ_ONLY_DISPLAY_CLOSURE.md`、`PHASE_BACKEND_P200_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_CLOSURE.md`、`PHASE_P206_LOW_FREQUENCY_SCAN_RUNTIME_CONTRACT_AUDIT.md`、`PHASE_P207_WATCHLIST_RUNTIME_DATA_SOURCE_AUTHORIZATION_GATE.md`、`PHASE_P208_WATCHLIST_SCAN_RUNTIME_DTO_SKELETON_VERIFICATION.md`、`PHASE_P209_WATCHLIST_SCAN_DTO_SKELETON_CLOSURE.md`、`PHASE_P210_WATCHLIST_SCAN_GUARD_VALIDATOR_SKELETON_VERIFICATION.md`、`PHASE_P211_RUNTIME_SCAN_STILL_BLOCKED_BOUNDARY.md`、`PHASE_P212_WATCHLIST_SCAN_GUARD_TEST_ONLY_WIRING_VERIFICATION.md`、`PHASE_P213_RUNTIME_SOURCE_AUTHORIZATION_GATE.md`、`PHASE_P214_WATCHLIST_RUNTIME_SOURCE_CONTRACT_DEFINITION.md`、`PHASE_P215_WATCHLIST_RUNTIME_SOURCE_AUTHORIZATION_GATE.md` | P215 后仍不能接真实扫描、DB、行情或 scheduler；后续必须另开授权门 |
 | Safety Foundation（安全地基） | 失败关闭、只读复核、不是交易指令、人工复核、禁止自动动作、最大安全任务包规则、首页集中风险提醒和观察库扫描提升语义边界继续增强；仍不能替代真实生产授权 | 88%-94% | `StaticNoTradeInstructionGuardTest.java`、`DefaultRiskActionGuardDisplayAdapterTest.java`、多份 P140-P206 文档 | 继续把新增能力先放进范围门和只读复核 |
 | SourceTrace（证据来源追踪） | 只读输出 + Dashboard（首页工作台）只读展示已完成；真实候选 / 真实点位 / Readiness（可执行就绪）未完成，本轮不再上调 | 58%-66% | `SourceTraceRuntimePopulationHelper.java`、`SourceTraceRuntimePopulationServiceImpl.java`、`DefaultDashboardSourceTraceDetailAdapter.java`、`dashboard.html`、`PHASE_BACKEND_P170*` | 个人可用路线转告警推送审计；严谨路线继续 BoundaryCandidate 来源审计 |
 | BoundaryCandidate（边界候选交易计划） | DTO（数据对象）/ service skeleton（服务骨架）/ read-only candidate display（只读候选展示）已完成；生产候选 / 真实点位 / production VALID（生产环境有效候选状态）未完成 | 42%-52% | `BoundaryCandidateDTO.java`、`BoundaryCandidateServiceImpl.java`、`BoundaryCandidateServiceImplTest.java`、`DefaultPlanBoundaryDisplayAdapter.java`、`DefaultPlanBoundaryDisplayAdapterTest.java`、`PHASE_BACKEND_P175*` | 严谨路线做 source wiring audit（来源接线审计） |
@@ -498,15 +523,15 @@ Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机
 | Risk Action Guard（风险动作保护器） | 已完成只读风险展示、持仓强反转 / 移动止损只读解释、首页风险提醒集中展示；生产风控动作 / 自动执行未完成，本轮不明显上调 | 47%-57% | `DefaultRiskActionGuardDisplayAdapter.java`、`DefaultRiskActionGuardDisplayAdapterTest.java`、`dashboard.html`、`PHASE_BACKEND_P185_RISK_ACTION_GUARD_POSITION_MONITOR_CLOSURE.md`、`PHASE_BACKEND_P190_POSITION_MONITOR_STRONG_REVERSAL_MOVING_STOP_CLOSURE.md`、`PHASE_BACKEND_P195_DASHBOARD_RISK_REMINDER_READ_ONLY_DISPLAY_CLOSURE.md` | 个人路线做告警 / 推送只读调度审计；严谨路线做生产接线范围审计 |
 | Position Monitor（持仓监控） | 同步 / 告警 / 记录基础 + 只读风险展示 + 强反转 / 移动止损只读展示已完成；强反转自动识别 / 自动处理 / 自动改止损 / 自动平仓未完成，本轮不明显上调 | 52%-62% | `PositionSyncService.java`、`PositionSyncScheduler.java`、`RealPositionMapper.java`、`MonitorAlertMapper.java`、`tm_real_position`、`tm_monitor_alert`、`DefaultRiskActionGuardDisplayAdapter.java`、`PHASE_BACKEND_P190*` | 下一步只能走人工复核流程或风险提醒展示，继续禁止自动动作 |
 | Dashboard（首页工作台） | SourceTrace（证据来源追踪）+ BoundaryCandidate（边界候选交易计划）+ ExecutionPlan（执行计划）+ RiskActionGuard（风险动作保护器）+ Position Monitor（持仓监控）+ Dashboard Risk Reminder（首页风险提醒）只读展示增强已完成；可执行状态未打开，本轮不明显上调 | 76%-84% | `DashboardController.java`、`dashboard.html`、`DashboardControllerTest.java`、`DefaultPlanBoundaryDisplayAdapter.java`、`DefaultExecutionPlanDisplayAdapter.java`、`DefaultRiskActionGuardDisplayAdapter.java`、`PHASE_BACKEND_P170*`、`PHASE_BACKEND_P175*`、`PHASE_BACKEND_P180*`、`PHASE_BACKEND_P185*`、`PHASE_BACKEND_P190*`、`PHASE_BACKEND_P195*` | 只允许继续做告警推送、人工复核或个人可用冒烟，不打开可执行状态 |
-| Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升） | Display Slots / Watchlist Pool / Low-Frequency Scan / Opportunity Promote（首页展示位 / 观察库池 / 低频扫描 / 机会提升）语义边界已完成，P206 已补充 runtime contract audit（运行时契约审计），P207 已补授权门，P208 已补 DTO skeleton（数据对象骨架），P209 已补 closure / boundary（收口 / 边界），P210 已补 guard skeleton（保护器骨架），P211 已补 closure / wiring gate（收口 / 接线授权门），P212 已补 test-only wiring skeleton（仅测试接线骨架），P213 已补 runtime source gate（运行时数据源授权门），P214 当前只做 runtime source contract definition（运行时数据源契约定义）；真实扫描器、实时数据、DB-backed watchlist read（数据库观察库读取）、service wiring（服务接线）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、ScanScore computation（扫描分数计算）和推送执行未完成；auto-trading（自动交易）不在 V1 范围内，保持关闭 | 65%-75% | `PHASE_BACKEND_P197_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_SCOPE_AUDIT.md`、`PHASE_BACKEND_P198_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_AUTHORIZATION_GATE.md`、`PHASE_BACKEND_P199_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_MINIMAL_WIRING.md`、`PHASE_BACKEND_P200_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_CLOSURE.md`、`PHASE_P206_WATCHLIST_RUNTIME_DATA_SOURCE_AUDIT.md`、`PHASE_P206_WATCHLIST_SCAN_RESULT_CONTRACT_AUDIT.md`、`PHASE_P206_SCAN_SCORE_RULE_DEFINITION_AUDIT.md`、`PHASE_P207_WATCHLIST_RUNTIME_DATA_SOURCE_AUTHORIZATION_GATE.md`、`PHASE_P207_SCAN_RESULT_DTO_SKELETON_AUTHORIZATION_GATE.md`、`PHASE_P207_SCAN_SCORE_GUARD_AUTHORIZATION_GATE.md`、`PHASE_P208_WATCHLIST_SCAN_RUNTIME_DTO_SKELETON_VERIFICATION.md`、`PHASE_P209_NO_SCORE_NO_PUSH_SAFETY_GATE.md`、`PHASE_P210_WATCHLIST_SCAN_GUARD_VALIDATOR_SKELETON_VERIFICATION.md`、`PHASE_P211_WATCHLIST_SCAN_GUARD_WIRING_AUTHORIZATION_GATE.md`、`PHASE_P212_WATCHLIST_SCAN_GUARD_TEST_ONLY_WIRING_VERIFICATION.md`、`PHASE_P213_MARKETQUOTECLIENT_SCHEDULER_STILL_BLOCKED.md`、`PHASE_P214_WATCHLIST_RUNTIME_SOURCE_CONTRACT_DEFINITION.md`、`dashboard.html` | P214 后仍不能直接接 DB、MarketQuoteClient、真实 service wiring、scheduler 或 runtime scan |
-| Low-Frequency Scan Scheduler（低频扫描定时器） | P202 范围审计、P203 授权门、P204 默认关闭最小骨架已完成，P206 已文档化运行时契约，P207 已补 authorization gate（授权门），P208 已补 DTO skeleton（数据对象骨架），P209 已补 closure / boundary（收口 / 边界），P210 已补 guard skeleton（保护器骨架），P211 已补 wiring gate（接线授权门），P212 已补 test-only wiring skeleton（仅测试接线骨架），P213 已补 runtime source gate（运行时数据源授权门），P214 当前只补 runtime source contract definition（运行时数据源契约定义）；真实扫描、运行时数据、DB 读取、行情接入、扫描循环、扫描分数计算、候选关注流程、提升首页流程、机会推送执行均未完成 | 15%-25% | `WatchlistLowFrequencyScanScheduler.java`、`WatchlistLowFrequencyScanSchedulerTest.java`、`PHASE_P205_LOW_FREQUENCY_SCAN_SCHEDULER_MINIMAL_SKELETON_CLOSURE.md`、`PHASE_P206_LOW_FREQUENCY_SCAN_RUNTIME_CONTRACT_AUDIT.md`、`PHASE_P207_NEXT_IMPLEMENTATION_BOUNDARY_CHECKLIST.md`、`PHASE_P208_WATCHLIST_SCAN_RUNTIME_DTO_SKELETON_VERIFICATION.md`、`PHASE_P209_WATCHLIST_SCAN_GUARD_IMPLEMENTATION_BOUNDARY.md`、`PHASE_P210_WATCHLIST_SCAN_GUARD_VALIDATOR_SKELETON_VERIFICATION.md`、`PHASE_P211_RUNTIME_SCAN_STILL_BLOCKED_BOUNDARY.md`、`PHASE_P212_WATCHLIST_SCAN_GUARD_TEST_ONLY_WIRING_VERIFICATION.md`、`PHASE_P213_MARKETQUOTECLIENT_SCHEDULER_STILL_BLOCKED.md`、`PHASE_P214_RUNTIME_SOURCE_FRESHNESS_STALENESS_RULES.md` | 仍不接真实扫描；任何 scheduler behavior changes（定时器行为改变）必须另开授权 |
+| Watchlist / Display Slots / Opportunity Promote（观察库 / 首页展示位 / 机会提升） | Display Slots / Watchlist Pool / Low-Frequency Scan / Opportunity Promote（首页展示位 / 观察库池 / 低频扫描 / 机会提升）语义边界已完成，P206 已补充 runtime contract audit（运行时契约审计），P207 已补授权门，P208 已补 DTO skeleton（数据对象骨架），P209 已补 closure / boundary（收口 / 边界），P210 已补 guard skeleton（保护器骨架），P211 已补 closure / wiring gate（收口 / 接线授权门），P212 已补 test-only wiring skeleton（仅测试接线骨架），P213 已补 runtime source gate（运行时数据源授权门），P214 已补 runtime source contract definition（运行时数据源契约定义），P215 当前只做 runtime source authorization gate / DTO skeleton plan（运行时数据源授权门 / 数据对象骨架方案）；`WatchlistRuntimeSourceDTO` Java、真实扫描器、实时数据、DB-backed watchlist read（数据库观察库读取）、runtime source service（运行时数据源服务）、service wiring（服务接线）、scheduler behavior changes（定时器行为改变）、scan loop（扫描循环）、ScanScore computation（扫描分数计算）和推送执行未完成；auto-trading（自动交易）不在 V1 范围内，保持关闭 | 65%-75% | `PHASE_BACKEND_P197_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_SCOPE_AUDIT.md`、`PHASE_BACKEND_P198_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_AUTHORIZATION_GATE.md`、`PHASE_BACKEND_P199_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_MINIMAL_WIRING.md`、`PHASE_BACKEND_P200_WATCHLIST_LOW_FREQUENCY_SCAN_OPPORTUNITY_PROMOTE_CLOSURE.md`、`PHASE_P206_WATCHLIST_RUNTIME_DATA_SOURCE_AUDIT.md`、`PHASE_P206_WATCHLIST_SCAN_RESULT_CONTRACT_AUDIT.md`、`PHASE_P206_SCAN_SCORE_RULE_DEFINITION_AUDIT.md`、`PHASE_P207_WATCHLIST_RUNTIME_DATA_SOURCE_AUTHORIZATION_GATE.md`、`PHASE_P207_SCAN_RESULT_DTO_SKELETON_AUTHORIZATION_GATE.md`、`PHASE_P207_SCAN_SCORE_GUARD_AUTHORIZATION_GATE.md`、`PHASE_P208_WATCHLIST_SCAN_RUNTIME_DTO_SKELETON_VERIFICATION.md`、`PHASE_P209_NO_SCORE_NO_PUSH_SAFETY_GATE.md`、`PHASE_P210_WATCHLIST_SCAN_GUARD_VALIDATOR_SKELETON_VERIFICATION.md`、`PHASE_P211_WATCHLIST_SCAN_GUARD_WIRING_AUTHORIZATION_GATE.md`、`PHASE_P212_WATCHLIST_SCAN_GUARD_TEST_ONLY_WIRING_VERIFICATION.md`、`PHASE_P213_MARKETQUOTECLIENT_SCHEDULER_STILL_BLOCKED.md`、`PHASE_P214_WATCHLIST_RUNTIME_SOURCE_CONTRACT_DEFINITION.md`、`PHASE_P215_WATCHLIST_RUNTIME_SOURCE_DTO_SKELETON_PLAN.md`、`dashboard.html` | P215 后仍不能直接接 DB、MarketQuoteClient、真实 service wiring、scheduler 或 runtime scan |
+| Low-Frequency Scan Scheduler（低频扫描定时器） | P202 范围审计、P203 授权门、P204 默认关闭最小骨架已完成，P206 已文档化运行时契约，P207 已补 authorization gate（授权门），P208 已补 DTO skeleton（数据对象骨架），P209 已补 closure / boundary（收口 / 边界），P210 已补 guard skeleton（保护器骨架），P211 已补 wiring gate（接线授权门），P212 已补 test-only wiring skeleton（仅测试接线骨架），P213 已补 runtime source gate（运行时数据源授权门），P214 已补 runtime source contract definition（运行时数据源契约定义），P215 当前只补 authorization gate / DTO skeleton plan（授权门 / 数据对象骨架方案）；真实扫描、运行时数据、DB 读取、行情接入、扫描循环、扫描分数计算、候选关注流程、提升首页流程、机会推送执行均未完成 | 15%-25% | `WatchlistLowFrequencyScanScheduler.java`、`WatchlistLowFrequencyScanSchedulerTest.java`、`PHASE_P205_LOW_FREQUENCY_SCAN_SCHEDULER_MINIMAL_SKELETON_CLOSURE.md`、`PHASE_P206_LOW_FREQUENCY_SCAN_RUNTIME_CONTRACT_AUDIT.md`、`PHASE_P207_NEXT_IMPLEMENTATION_BOUNDARY_CHECKLIST.md`、`PHASE_P208_WATCHLIST_SCAN_RUNTIME_DTO_SKELETON_VERIFICATION.md`、`PHASE_P209_WATCHLIST_SCAN_GUARD_IMPLEMENTATION_BOUNDARY.md`、`PHASE_P210_WATCHLIST_SCAN_GUARD_VALIDATOR_SKELETON_VERIFICATION.md`、`PHASE_P211_RUNTIME_SCAN_STILL_BLOCKED_BOUNDARY.md`、`PHASE_P212_WATCHLIST_SCAN_GUARD_TEST_ONLY_WIRING_VERIFICATION.md`、`PHASE_P213_MARKETQUOTECLIENT_SCHEDULER_STILL_BLOCKED.md`、`PHASE_P214_RUNTIME_SOURCE_FRESHNESS_STALENESS_RULES.md`、`PHASE_P215_RUNTIME_SOURCE_IMPLEMENTATION_STILL_BLOCKED.md` | 仍不接真实扫描；任何 scheduler behavior changes（定时器行为改变）必须另开授权 |
 | Watchlist / Push（观察库 / 推送） | Push snapshot（推送快照）、Recheck（二次复核）、scheduler（定时器）和 ops overview（运维总览）存在；但它们不是 Watchlist Low-Frequency Scan（观察库低频扫描），不是 Opportunity Push execution（机会推送执行） | 45%-55% | `PushRecheckServiceImpl.java`、`PushRecheckScheduler.java`、`PushSnapshotService.java`、`PHASE_P11A_PUSH_RECHECK_NAMING_VERIFICATION.md` | 先做 Alert / Push Channel Review-Only Dispatch Audit（告警 / 推送通道只允许复核调度审计） |
 | AI multi-agent（AI 多角色） | `AiConflictResolverService` 已有冲突分层；多角色生产仲裁链未落地 | 25%-35% | `AiConflictResolverService.java`、`AiConflictResolverServiceImpl.java`、`DecisionEngineServiceTest.java` | 定义多角色输入、冲突降级和人工复核边界 |
 | Production Wiring（真实生产接线） | 真实来源、真实候选、生产风控动作、执行授权仍未闭环，不因 P197-P206 文档语义明显上调 | 26%-34% | P140-P206 文档和现有 service / adapter / dashboard 只读链路 | 先做 BoundaryCandidate 来源接线或数值来源归属审计 |
 | entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比） | DTO 和 fixture（测试夹具）存在；真实数值来源未闭环，不因观察库语义完成而上调 | 10%-18% | `BoundaryEntryDTO.java`、`BoundaryStopDTO.java`、`BoundaryTakeProfitLevelDTO.java`、`StopTpRrSourceOwnedCandidateFixtureHelper.java` | 先做 numeric source ownership（数值来源归属）审计 |
 | Auto-trading（自动交易） | 不在 V1 范围内，保持关闭；只作为禁止越界安全边界，不作为进度目标 | 不适用 | `StaticNoTradeInstructionGuardTest.java`、多份 P140-P206 禁止清单 | 继续禁止，不纳入 V1 推进路线 |
 
-## 十、P206 / P207 / P208 / P209 / P210 / P211 / P212 / P213 / P214 结论
+## 十、P206 / P207 / P208 / P209 / P210 / P211 / P212 / P213 / P214 / P215 结论
 
 P206 只刷新运行时契约审计相关文档和项目状态索引。
 
@@ -942,7 +967,7 @@ P213 后仍未完成 / 未实现 / 未升级清单：
 - readiness（可执行就绪）仍未升级。
 - order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
 
-P214 当前推进 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
+P214 已完成 Watchlist Runtime Source Contract Definition Pack（观察库运行时数据源契约定义包）。
 
 P214 只是 docs-only contract definition（只改文档契约定义），不是实现。
 
@@ -1007,6 +1032,79 @@ P214 后仍未完成 / 未实现 / 未升级清单：
 - MarketQuoteClient integration（行情客户端接入）仍未实现。
 - scheduler behavior changes（定时器行为改变）仍未实现。
 - scan loop（扫描循环）仍未实现。
+- real ScanScore computation（真实扫描分数计算）仍未实现。
+- Candidate Attention workflow（候选关注流程）仍未实现。
+- Promote To Home workflow（提升到首页观察流程）仍未实现。
+- Opportunity Push execution（机会推送执行）仍未实现。
+- 真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）仍未实现。
+- readiness（可执行就绪）仍未升级。
+- order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
+
+P215 当前推进 Watchlist Runtime Source Authorization Gate and DTO Skeleton Plan（观察库运行时数据源授权门与数据对象骨架方案）。
+
+P215 只是 docs-only authorization gate / DTO skeleton plan（只改文档授权门 / 数据对象骨架方案），不是实现。
+
+P215 runtime source contract（运行时数据源契约）已文档化，但 runtime source（运行时数据源）仍未实现。
+
+P215 只授权未来可能进入 pure DTO / enum / tests skeleton（纯数据对象 / 枚举 / 测试骨架）。
+
+P215 不授权 P216 直接实现 runtime source（运行时数据源）。
+
+P215 不写 Java。
+
+P215 不新增测试。
+
+P215 不修改 P208 DTO Java。
+
+P215 不修改 P210 guard / validator Java。
+
+P215 不修改 P212 assembler Java。
+
+P215 不改 dashboard.html。
+
+P215 不改 schema（数据库结构）。
+
+P215 不改 config（配置）。
+
+P215 不接 API（接口）。
+
+P215 不接 mapper / service / controller / dashboard / runtime service wiring（映射器 / 服务 / 控制器 / 首页 / 运行时服务接线）。
+
+P215 不读取 DB / runtime / live / external data（数据库 / 运行时 / 实时 / 外部数据）。
+
+P215 不接 MarketQuoteClient / BinanceMarketQuoteClient（行情客户端）。
+
+P215 不接 scheduler（定时器），不改变 scheduler behavior（定时器行为）。
+
+P215 不创建 scan loop（扫描循环）。
+
+P215 不创建 real low-frequency scan（真实低频扫描）。
+
+P215 不实现 real ScanScore computation（真实扫描分数计算）。
+
+P215 不实现 Candidate Attention workflow（候选关注流程）。
+
+P215 不实现 Promote To Home workflow（提升到首页观察流程）。
+
+P215 不创建 Opportunity Push execution（机会推送执行）。
+
+P215 不生成真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
+
+P215 不升级 readiness（可执行就绪）。
+
+P215 不接 order API / execution API / auto-trading（下单接口 / 执行接口 / 自动交易）。order API（下单接口）/ execution API（执行接口）/ auto-trading（自动交易）不在 V1 范围内，保持关闭。
+
+P215 不因为 DTO skeleton plan（数据对象骨架方案）而大幅上调真实生产接线进度；真实生产接线仍保持 26%-34%，真实点位仍保持 10%-18%。
+
+P215 后仍未完成 / 未实现 / 未升级清单：
+
+- runtime source contract（运行时数据源契约）已文档化。
+- `WatchlistRuntimeSourceDTO` Java 仍未实现。
+- DB-backed watchlist read（数据库观察库读取）仍未实现。
+- MarketQuoteClient integration（行情客户端接入）仍未实现。
+- scheduler behavior changes（定时器行为改变）仍未实现。
+- scan loop（扫描循环）仍未实现。
+- runtime source service（运行时数据源服务）仍未实现。
 - real ScanScore computation（真实扫描分数计算）仍未实现。
 - Candidate Attention workflow（候选关注流程）仍未实现。
 - Promote To Home workflow（提升到首页观察流程）仍未实现。
