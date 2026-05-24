@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-41d1e52 BACKEND-P223 Production Runtime Source Adapter Interface Skeleton Plan (#565)
+b2c0238 BACKEND-P224 Production Runtime Source Adapter Interface Skeleton (#567)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并。当前主线基准为 P223 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并。当前主线基准为 P224 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -44,6 +44,7 @@ P220：Watchlist Runtime Source Test-Only Wiring Skeleton（观察库运行时�
 P221：Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）
 P222：Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）
 P223：Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）
+P224：Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -76,6 +77,7 @@ P223：Production Runtime Source Adapter Interface Skeleton Plan（生产运行�
 - Watchlist Runtime Source Test-Only Wiring Closure and Production Read Gate（观察库运行时数据源仅测试接线收口与生产读取授权门）。
 - Watchlist Production Runtime Source Read Adapter Plan（观察库生产运行时数据源读取适配器方案）。
 - Production Runtime Source Adapter Interface Skeleton Plan（生产运行时数据源适配器接口骨架方案）。
+- Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）。
 
 当前仍未完成：
 
@@ -104,22 +106,22 @@ P223：Production Runtime Source Adapter Interface Skeleton Plan（生产运行�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #567：BACKEND-P224 Production Runtime Source Adapter Interface Skeleton（生产运行时数据源适配器接口骨架）
-Branch：p224
-Issue：#566
-风险档位：B-low new interface / DTO / tests, no runtime wiring
+PR #569：BACKEND-P225 Production Runtime Source Adapter Interface Closure and Implementation Gate（生产运行时数据源适配器接口收口与实现授权门）
+Branch：p225
+Issue：#568
+风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P224 只允许完成最大安全 production runtime source adapter interface / DTO / tests skeleton（生产运行时数据源适配器接口 / 数据对象 / 测试骨架）包：新增接口和 DTO 安全契约，并用测试证明没有 DB / MarketQuoteClient / Scheduler implementation（数据库 / 行情客户端 / 定时器实现）、没有 runtime read（运行时读取）、没有 production read implementation（生产读取实现）。
+P225 只允许完成最大安全 docs-only closure and implementation authorization gate（只改文档收口与实现授权门）包：记录 P224 adapter interface skeleton（适配器接口骨架）已完成内容和边界，并定义未来 production adapter implementation（生产适配器实现）授权门。P225 不是实现，不解除 DB / MarketQuoteClient / Scheduler runtime read（数据库 / 行情客户端 / 定时器运行时读取）阻断。
 
-P224 禁止：
+P225 禁止：
 
-- 修改既有 Java。
-- 修改既有测试。
-- 修改 P216 DTO Java。
-- 修改 P218 guard / validator Java。
-- 修改 P220 assembler Java。
+- 写 Java。
+- 新增测试。
+- 修改 DTO 文件。
+- 修改 guard / validator 文件。
+- 修改 assembler 文件。
 - 改 dashboard.html。
 - 改 schema（数据库结构）。
 - 改 config（配置）。
@@ -135,7 +137,7 @@ P224 禁止：
 - 实现 DB-backed watchlist read（数据库观察库读取）。
 - 实现 MarketQuoteClient read（行情客户端读取）。
 - 实现 scheduler-triggered read（定时器触发读取）。
-- 实现 production read implementation（生产读取实现）。
+- 实现 production adapter implementation（生产适配器实现）。
 - 生成 ScanScore（扫描分数）。
 - 生成 Candidate Attention（候选关注）。
 - 生成 Promote To Home（提升到首页观察）。
@@ -147,20 +149,20 @@ P224 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#566：BACKEND-P224 Production Runtime Source Adapter Interface Skeleton
+#568：BACKEND-P225 Production Runtime Source Adapter Interface Closure and Implementation Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P224 Production Runtime Source Adapter Interface Skeleton。
+完成 P225 Production Runtime Source Adapter Interface Closure and Implementation Gate。
 ```
 
-P224 属于 B-low 档 new interface / DTO / tests, no runtime wiring（新增接口 / 数据对象 / 测试，无运行时接线）。本轮只新增 production runtime source adapter interface / DTO / tests skeleton（生产运行时数据源适配器接口 / 数据对象 / 测试骨架），不修改既有 Java / test / DTO / guard / validator / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 production read implementation（生产读取实现），不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P225 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 production adapter implementation（生产适配器实现），不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
