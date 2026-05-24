@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-6076960 BACKEND-P207 Watchlist Runtime Data Source Authorization Gate Pack (#533)
+48079c9 BACKEND-P208 Watchlist Scan Runtime DTO Skeleton (#535)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并。当前主线基准为 P207 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并。当前主线基准为 P208 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -28,6 +28,7 @@ P204：Low-Frequency Scan Scheduler Minimal Skeleton（低频扫描定时器最�
 P205：Max Safe Docs Pack After P204 Scheduler Skeleton（P204 定时器骨架后的最大安全文档包）
 P206：Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包）
 P207：Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）
+P208：Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -66,17 +67,20 @@ P207：Watchlist Runtime Data Source Authorization Gate Pack（观察库运行�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #535：BACKEND-P208 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）
-Branch：p208
-Issue：#534
-风险档位：A 档 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试）
+PR #537：BACKEND-P209 Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）
+Branch：p209
+Issue：#536
+风险档位：A 档 docs-only（只改文档）
 状态：Draft PR（草稿合并请求）
 ```
 
-P208 只允许完成最大安全 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试）骨架包：新增 Watchlist runtime snapshot DTO（观察库运行时快照数据对象）、Watchlist scan result DTO（观察库扫描结果数据对象）、scan status enum（扫描状态枚举）和 fail-closed tests（失败关闭测试），并同步更新 verification（验证文档）、`V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
+P209 只允许完成最大安全 docs-only closure / boundary（只改文档收口 / 边界）包：记录 P208 DTO skeleton（数据对象骨架）完成内容，定义未来 guard / validator（保护器 / 校验器）边界和 no-score / no-push（无分数 / 无推送）安全门，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
 
-P208 禁止：
+P209 禁止：
 
+- 写 Java。
+- 新增测试。
+- 修改 P208 DTO Java。
 - 接 MarketQuoteClient（行情客户端）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
 - 扫描真实资产。
@@ -92,20 +96,20 @@ P208 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#534：BACKEND-P208 Watchlist Scan Runtime DTO Skeleton
+#536：BACKEND-P209 Watchlist Scan DTO Closure and Guard Boundary Pack
 ```
 
-P204、P205、P206、P207 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P208 Watchlist Scan Runtime DTO Skeleton。
+完成 P209 DTO closure and guard boundary pack。
 ```
 
-P208 属于 A 档 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试），只补齐 Watchlist scan runtime DTO skeleton（观察库扫描运行时数据对象骨架）。本轮不改既有 Java，不改既有测试，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读取运行时数据，不创建真实扫描，不实现 ScanScore（扫描分数）。
+P209 属于 A 档 docs-only（只改文档），只收口 P208 Watchlist scan runtime DTO skeleton（观察库扫描运行时数据对象骨架）并定义未来 guard / validator（保护器 / 校验器）边界。本轮不写 Java，不新增测试，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读取运行时数据，不创建真实扫描，不实现 ScanScore（扫描分数）。
 
 ## 7. 当前禁止越界
 
