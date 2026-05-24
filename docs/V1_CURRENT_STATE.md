@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-d8a2af2 BACKEND-P210 Watchlist Scan Guard Validator Skeleton (#539)
+68c6bc3 BACKEND-P211 Watchlist Scan Guard Validator Closure and Wiring Gate (#541)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并。当前主线基准为 P210 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并。当前主线基准为 P211 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -31,6 +31,7 @@ P207：Watchlist Runtime Data Source Authorization Gate Pack（观察库运行�
 P208：Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）
 P209：Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）
 P210：Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）
+P211：Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）
 ```
 
 ## 3. 当前项目真实状态
@@ -48,12 +49,17 @@ P210：Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器�
 - Watchlist Low-Frequency Scan / Opportunity Promote（观察库低频扫描 / 机会提升）语义边界。
 - Low-Frequency Scan Scheduler（低频扫描定时器）范围审计和授权门。
 - Low-Frequency Scan Scheduler（低频扫描定时器）disabled-by-default skeleton（默认关闭骨架）。
+- Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。
+- Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。
+- Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。
 
 当前仍未完成：
 
 - 真实低频扫描。
 - Watchlist runtime data source（观察库运行时数据源）。
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
+- runtime data reads（运行时数据读取）。
+- scan loop（扫描循环）。
 - ScanScore（扫描分数）。
 - Candidate Attention（候选关注）。
 - Promote To Home（提升到首页观察）运行时逻辑。
@@ -69,23 +75,23 @@ P210：Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #541：BACKEND-P211 Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）
-Branch：p211
-Issue：#540
-风险档位：A 档 docs-only
+PR #543：BACKEND-P212 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）
+Branch：p212
+Issue：#542
+风险档位：B-low new test-only wiring / assembler, no runtime wiring
 状态：Draft PR（草稿合并请求）
 ```
 
-P211 只允许完成最大安全 docs-only closure / wiring gate（只改文档收口 / 接线授权门）包：记录 P210 guard validator skeleton（保护校验器骨架）完成内容，定义未来 guard wiring（保护器接线）边界，明确 runtime scan（运行时扫描）仍然被阻断，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
+P212 只允许完成最大安全 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架）包：新增 `WatchlistScanGuardWiringAssembler`、`DefaultWatchlistScanGuardWiringAssembler` 和对应测试，只验证输入 DTO 到 guard 输出 DTO 的安全链路，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
 
-P211 禁止：
+P212 禁止：
 
-- 写 Java。
-- 新增测试。
 - 修改 P208 DTO Java。
 - 修改 P210 guard / validator Java。
+- 接 scheduler（定时器）。
 - 接 MarketQuoteClient（行情客户端）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
+- 创建 scan loop（扫描循环）。
 - 扫描真实资产。
 - 接 mapper / controller / scheduler / dashboard（映射器 / 控制器 / 定时器 / 首页）。
 - 接任何 runtime service wiring（运行时服务接线）或外部服务。
@@ -100,20 +106,20 @@ P211 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#540：BACKEND-P211 Watchlist Scan Guard Validator Closure and Wiring Gate
+#542：BACKEND-P212 Watchlist Scan Guard Test-Only Wiring Skeleton
 ```
 
-P204、P205、P206、P207、P208、P209、P210 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P211 Watchlist Scan Guard Validator Closure and Wiring Gate。
+完成 P212 Watchlist Scan Guard Test-Only Wiring Skeleton。
 ```
 
-P211 属于 A 档 docs-only（只改文档），只收口 P210 Watchlist scan guard validator skeleton（观察库扫描保护校验器骨架）并定义未来非 runtime wiring（非运行时接线）授权门。本轮不写 Java，不新增测试，不修改 DTO / guard / validator，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读取运行时数据，不创建真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P212 属于 B-low new test-only wiring / assembler, no runtime wiring（新增仅测试级接线 / 组装器，不接运行时）。本轮不修改 DTO / guard / validator，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
