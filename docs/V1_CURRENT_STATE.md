@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-68c6bc3 BACKEND-P211 Watchlist Scan Guard Validator Closure and Wiring Gate (#541)
+c4a559c BACKEND-P212 Watchlist Scan Guard Test-Only Wiring Skeleton (#543)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并。当前主线基准为 P211 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并。当前主线基准为 P212 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -32,6 +32,7 @@ P208：Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架
 P209：Watchlist Scan DTO Closure and Guard Boundary Pack（观察库扫描 DTO 收口与保护边界包）
 P210：Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）
 P211：Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）
+P212：Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -52,6 +53,7 @@ P211：Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描�
 - Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）。
 - Watchlist Scan Guard Validator Skeleton（观察库扫描保护校验器骨架）。
 - Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描保护校验器收口与接线授权门）。
+- Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）。
 
 当前仍未完成：
 
@@ -75,19 +77,22 @@ P211：Watchlist Scan Guard Validator Closure and Wiring Gate（观察库扫描�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #543：BACKEND-P212 Watchlist Scan Guard Test-Only Wiring Skeleton（观察库扫描保护仅测试接线骨架）
-Branch：p212
-Issue：#542
-风险档位：B-low new test-only wiring / assembler, no runtime wiring
+PR #545：BACKEND-P213 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate（观察库扫描仅测试接线收口与运行时数据源授权门）
+Branch：p213
+Issue：#544
+风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P212 只允许完成最大安全 non-runtime test-only wiring / assembler skeleton（非运行时、仅测试级接线 / 组装器骨架）包：新增 `WatchlistScanGuardWiringAssembler`、`DefaultWatchlistScanGuardWiringAssembler` 和对应测试，只验证输入 DTO 到 guard 输出 DTO 的安全链路，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
+P213 只允许完成最大安全 docs-only closure / runtime source gate（只改文档收口 / 运行时数据源授权门）包：记录 P212 test-only wiring skeleton（仅测试级接线骨架）完成内容，定义未来 runtime source（运行时数据源）授权边界，明确 MarketQuoteClient / Scheduler（行情客户端 / 定时器）仍被阻断，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
 
-P212 禁止：
+P213 禁止：
 
+- 写 Java。
+- 新增测试。
 - 修改 P208 DTO Java。
 - 修改 P210 guard / validator Java。
+- 修改 P212 assembler Java。
 - 接 scheduler（定时器）。
 - 接 MarketQuoteClient（行情客户端）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
@@ -106,20 +111,20 @@ P212 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#542：BACKEND-P212 Watchlist Scan Guard Test-Only Wiring Skeleton
+#544：BACKEND-P213 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P212 Watchlist Scan Guard Test-Only Wiring Skeleton。
+完成 P213 Watchlist Scan Test-Only Wiring Closure and Runtime Source Gate。
 ```
 
-P212 属于 B-low new test-only wiring / assembler, no runtime wiring（新增仅测试级接线 / 组装器，不接运行时）。本轮不修改 DTO / guard / validator，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P213 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / assembler，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
