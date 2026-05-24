@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-4f70874 BACKEND-P229 Production Adapter No-Op Closure and DB Watchlist Read Gate (#577)
+27cc8cc BACKEND-P230 DB Watchlist Pool Read Plan and Mapper Schema Audit (#579)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并。当前主线基准为 P229 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并。当前主线基准为 P230 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -50,6 +50,7 @@ P226：Production Adapter Fail-Closed No-Op Implementation Plan（生产适配�
 P227：Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）
 P228：Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）
 P229：Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）
+P230：DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）
 ```
 
 ## 3. 当前项目真实状态
@@ -88,6 +89,7 @@ P229：Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适�
 - Production Adapter Fail-Closed No-Op Java Authorization Gate（生产适配器失败关闭 no-op Java 授权门）。
 - Production Adapter Fail-Closed No-Op Java Implementation（生产适配器失败关闭 no-op Java 实现）。
 - Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适配器 no-op 收口与 DB 观察库池读取授权门）。
+- DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）。
 
 当前仍未完成：
 
@@ -117,16 +119,16 @@ P229：Production Adapter No-Op Closure and DB Watchlist Read Gate（生产适�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #579：BACKEND-P230 DB Watchlist Pool Read Plan and Mapper Schema Audit（DB 观察库池读取方案与 Mapper / Schema 审计）
-Branch：p230
-Issue：#578
+PR #581：BACKEND-P231 DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观察库池读取审计收口与 Java 授权门）
+Branch：p231
+Issue：#580
 风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P230 只允许完成最大安全 docs-only DB Watchlist Pool read plan / mapper audit / schema audit（只改文档的 DB 观察库池读取方案 / Mapper 审计 / Schema 审计）包：审计 `RuleConfigService`、`RuleConfigMapper` 和 `tm_rule_config` 是否可作为未来 Watchlist Pool 读取来源，并记录未来 DB read 仍需要独立授权门。P230 不是 DB read implementation（数据库读取实现），不解除 MarketQuoteClient / Scheduler runtime read（行情客户端 / 定时器运行时读取）阻断。
+P231 只允许完成最大安全 docs-only DB Watchlist Pool read audit closure and Java authorization gate（只改文档的 DB 观察库池读取审计收口与 Java 授权门）包：收口 P230 审计结论，记录 `RuleConfigService`、`RuleConfigMapper`、`RuleConfigDO` 和 `tm_rule_config` 的可复用状态，并定义未来最小 DB Watchlist Pool read Java skeleton（Java 骨架）授权边界。P231 不是 DB read implementation（数据库读取实现），不解除 MarketQuoteClient / Scheduler runtime read（行情客户端 / 定时器运行时读取）阻断。
 
-P230 禁止：
+P231 禁止：
 
 - 写 Java。
 - 新增测试。
@@ -166,20 +168,20 @@ P230 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#578：BACKEND-P230 DB Watchlist Pool Read Plan and Mapper Schema Audit
+#580：BACKEND-P231 DB Watchlist Pool Read Audit Closure and Java Authorization Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P230 DB Watchlist Pool Read Plan and Mapper Schema Audit。
+完成 P231 DB Watchlist Pool Read Audit Closure and Java Authorization Gate。
 ```
 
-P230 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不执行数据库查询，不运行服务，不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 DB-backed watchlist read（数据库观察库读取）或 production read implementation（生产读取实现），不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P231 属于 A 档 docs-only（只改文档）。本轮不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不接 API，不接 MarketQuoteClient（行情客户端），不读 DB / API / external data（数据库 / 接口 / 外部数据），不执行数据库查询，不运行服务，不接 scheduler（定时器），不读取运行时数据，不创建 scan loop（扫描循环）或真实扫描，不实现 DB-backed watchlist read（数据库观察库读取）或 production read implementation（生产读取实现），不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
