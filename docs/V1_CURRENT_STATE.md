@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-148f7e9 BACKEND-P206 Low-Frequency Scan Runtime Contract Audit Pack (#531)
+6076960 BACKEND-P207 Watchlist Runtime Data Source Authorization Gate Pack (#533)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并。当前主线基准为 P206 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并。当前主线基准为 P207 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -27,6 +27,7 @@ P203：Low-Frequency Scan Scheduler Authorization Gate（低频扫描定时器�
 P204：Low-Frequency Scan Scheduler Minimal Skeleton（低频扫描定时器最小骨架）
 P205：Max Safe Docs Pack After P204 Scheduler Skeleton（P204 定时器骨架后的最大安全文档包）
 P206：Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契约审计包）
+P207：Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）
 ```
 
 ## 3. 当前项目真实状态
@@ -62,24 +63,24 @@ P206：Low-Frequency Scan Runtime Contract Audit Pack（低频扫描运行时契
 
 ## 4. 当前 open PR（未合并请求）
 
-当前已创建但尚未完成的文档 PR：
+当前已创建但尚未完成的 PR：
 
 ```text
-PR #533：BACKEND-P207 Watchlist Runtime Data Source Authorization Gate Pack（观察库运行时数据源授权门包）
-Branch：p207
-Issue：#532
-风险档位：A 档 docs-only（只改文档）
+PR #535：BACKEND-P208 Watchlist Scan Runtime DTO Skeleton（观察库扫描运行时 DTO 骨架）
+Branch：p208
+Issue：#534
+风险档位：A 档 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试）
 状态：Draft PR（草稿合并请求）
 ```
 
-P207 只允许完成最大安全授权门包：新增 Watchlist runtime data source（观察库运行时数据源）、ScanResult DTO skeleton（扫描结果数据对象骨架）、ScanScore guard（扫描分数保护器）授权边界文档，补充下一步实现边界检查清单，并同步更新 `V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
+P208 只允许完成最大安全 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试）骨架包：新增 Watchlist runtime snapshot DTO（观察库运行时快照数据对象）、Watchlist scan result DTO（观察库扫描结果数据对象）、scan status enum（扫描状态枚举）和 fail-closed tests（失败关闭测试），并同步更新 verification（验证文档）、`V1_CURRENT_STATE.md` 与 `PROJECT_PROGRESS_INDEX.md`。
 
-P207 禁止：
+P208 禁止：
 
 - 接 MarketQuoteClient（行情客户端）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
 - 扫描真实资产。
-- 创建 ScanResult DTO Java（扫描结果数据对象 Java 类）。
+- 接 service / mapper / controller / scheduler / dashboard（服务 / 映射器 / 控制器 / 定时器 / 首页）。
 - 生成 ScanScore（扫描分数）。
 - 生成 Candidate Attention（候选关注）。
 - 生成 Promote To Home（提升到首页观察）。
@@ -91,20 +92,20 @@ P207 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#532：BACKEND-P207 Watchlist Runtime Data Source Authorization Gate Pack
+#534：BACKEND-P208 Watchlist Scan Runtime DTO Skeleton
 ```
 
-P204、P205、P206 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P207 最大安全授权门包。
+完成 P208 Watchlist Scan Runtime DTO Skeleton。
 ```
 
-P207 属于 A 档 docs-only（只改文档），只补齐 Watchlist runtime data source（观察库运行时数据源）和 Watchlist scan skeleton（观察库扫描骨架）真实实现前的 authorization gate（授权门）。本轮不写 Java，不改测试，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读取运行时数据，不创建真实扫描，不创建 ScanResult DTO Java（扫描结果数据对象 Java 类），不实现 ScanScore（扫描分数）。
+P208 属于 A 档 pure DTO / enum / tests（纯数据传输对象 / 枚举 / 测试），只补齐 Watchlist scan runtime DTO skeleton（观察库扫描运行时数据对象骨架）。本轮不改既有 Java，不改既有测试，不改 dashboard，不接 API，不接 MarketQuoteClient（行情客户端），不读取运行时数据，不创建真实扫描，不实现 ScanScore（扫描分数）。
 
 ## 7. 当前禁止越界
 
