@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-321e4a5 BACKEND-P234 Runtime Source Service Plan and Assembler Gate (#587)
+973e861 BACKEND-P235 Runtime Source Service Java Skeleton (#589)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并。当前主线基准为 P234 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并。当前主线基准为 P235 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -55,6 +55,7 @@ P231：DB Watchlist Pool Read Audit Closure and Java Authorization Gate（DB 观
 P232：DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）
 P233：DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）
 P234：Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门）
+P235：Runtime Source Service Java Skeleton（运行时数据源服务 Java 骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -98,6 +99,7 @@ P234：Runtime Source Service Plan and Assembler Gate（运行时数据源服务
 - DB Watchlist Pool Read Java Skeleton（DB 观察库池读取 Java 骨架）。
 - DB Watchlist Pool Read Closure and Runtime Source Service Gate（DB 观察库池读取收口与运行时数据源服务授权门）。
 - Runtime Source Service Plan and Assembler Gate（运行时数据源服务方案与组装器授权门）。
+- Runtime Source Service Java Skeleton（运行时数据源服务 Java 骨架）。
 
 当前仍未完成：
 
@@ -108,7 +110,8 @@ P234：Runtime Source Service Plan and Assembler Gate（运行时数据源服务
 - production adapter implementation（生产适配器实现）。
 - production read implementation（生产读取实现）。
 - DB-backed Watchlist Pool read production implementation（数据库观察库池读取生产实现）。
-- runtime source service（运行时数据源服务）。
+- production Runtime Source Service wiring（生产运行时数据源服务接线）。
+- Watchlist Scan Result Assembly（观察库扫描结果组装）。
 - Production Source Assembler（生产数据源组装器）。
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
 - runtime data reads（运行时数据读取）。
@@ -128,19 +131,19 @@ P234：Runtime Source Service Plan and Assembler Gate（运行时数据源服务
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #589：BACKEND-P235 Runtime Source Service Java Skeleton
-Branch：p235
-Issue：#588
-风险档位：B/C boundary Java service skeleton, no market data, no scheduler, no scan loop, no API/dashboard wiring
+PR #591：BACKEND-P236 Runtime Source Service Closure and Watchlist Scan Result Assembly Gate
+Branch：p236
+Issue：#590
+风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P235 只允许完成最大安全 Runtime Source Service Java skeleton（运行时数据源服务 Java 骨架）包：新增 `WatchlistRuntimeSourceService` / `DefaultWatchlistRuntimeSourceService` 和 targeted tests（目标测试），只组合 `RuleConfigWatchlistPoolReadAdapter` 与 `WatchlistRuntimeSourceGuardValidator`，只返回 safe `RuntimeSourceReadResultDTO`，继续保持 Watchlist Pool only（仅观察库池）、review-only（只允许复核）和 fail-closed（失败关闭）。P235 不接 MarketQuoteClient，不接 scheduler，不接 controller / API / dashboard，不创建 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
+P236 只允许完成最大安全 docs-only Runtime Source Service closure and Watchlist Scan Result Assembly authorization gate（只改文档的运行时数据源服务收口与观察库扫描结果组装授权门）包：记录 P235 已完成内容和边界，定义未来 Watchlist Scan Result Assembly（观察库扫描结果组装）授权门，并继续明确 ScanScore / Push / Readiness / point generation 仍阻断。P236 不写 Java，不新增测试，不接 MarketQuoteClient，不接 scheduler，不接 controller / API / dashboard，不创建 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
 
-P235 禁止：
+P236 禁止：
 
-- 修改既有 Java。
-- 修改既有 test（测试）。
+- 写 Java。
+- 新增测试。
 - 修改 DTO 文件。
 - 修改 guard / validator 文件。
 - 修改 assembler 文件。
@@ -161,8 +164,6 @@ P235 禁止：
 - 实现 production read implementation（生产读取实现）。
 - 实现 production Runtime Source Service wiring（生产运行时数据源服务接线）。
 - 实现 Production Source Assembler（生产数据源组装器）。
-- 修改 `DefaultWatchlistPoolRuntimeSourceReadAdapter` Java。
-- 修改 `RuleConfigService` / `RuleConfigServiceImpl` / `RuleConfigMapper` / `RuleConfigDO`。
 - 修改 `schema.sql`。
 - 生成 ScanScore（扫描分数）。
 - 生成 Candidate Attention（候选关注）。
@@ -175,20 +176,20 @@ P235 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#588：BACKEND-P235 Runtime Source Service Java Skeleton
+#590：BACKEND-P236 Runtime Source Service Closure and Watchlist Scan Result Assembly Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P235 Runtime Source Service Java Skeleton。
+完成 P236 Runtime Source Service Closure and Watchlist Scan Result Assembly Gate。
 ```
 
-P235 属于 B/C boundary Java service skeleton（Java 服务骨架边界）。本轮只新增最小 Runtime Source Service interface / implementation / targeted test，并更新 verification 文档、当前状态和进度索引；不修改既有 Java / test，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P236 属于 A 档 docs-only（只改文档）。本轮只新增 Runtime Source Service closure（运行时数据源服务收口）、Watchlist Scan Result Assembly authorization gate（观察库扫描结果组装授权门）和 ScanScore / Push / Readiness still blocked（扫描分数 / 推送 / 可执行就绪仍阻断）文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
