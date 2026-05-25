@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-c3f233e BACKEND-P244 Scheduler Batch Market-Read Scope Audit (#607)
+6db8fc8 BACKEND-P245 Scheduler Trigger Authorization Gate (#609)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并。当前主线基准为 P244 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并。当前主线基准为 P245 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -65,6 +65,7 @@ P241：Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit（低�
 P242：Low-Frequency Watchlist Scan Orchestrator Java Skeleton（低频观察库扫描编排器 Java 骨架）
 P243：Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate（低频扫描编排器收口与 Scheduler / Batch / Market 授权门）
 P244：Scheduler Batch Market-Read Scope Audit（Scheduler / Batch / Market-read 范围审计）
+P245：Scheduler Trigger Authorization Gate（定时器触发授权门）
 ```
 
 ## 3. 当前项目真实状态
@@ -118,6 +119,7 @@ P244：Scheduler Batch Market-Read Scope Audit（Scheduler / Batch / Market-read
 - Low-Frequency Watchlist Scan Orchestrator Java Skeleton（低频观察库扫描编排器 Java 骨架）。
 - Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate（低频扫描编排器收口与 Scheduler / Batch / Market 授权门）。
 - Scheduler Batch Market-Read Scope Audit（Scheduler / Batch / Market-read 范围审计）。
+- Scheduler Trigger Authorization Gate（定时器触发授权门）。
 
 当前仍未完成：
 
@@ -150,19 +152,19 @@ P244：Scheduler Batch Market-Read Scope Audit（Scheduler / Batch / Market-read
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #609：BACKEND-P245 Scheduler Trigger Authorization Gate
-Branch：p245
-Issue：#608
-风险档位：A 档 docs-only
+PR #611：BACKEND-P246 Disabled Scheduler Wiring Skeleton
+Branch：p246
+Issue：#610
+风险档位：B/C boundary Java scheduler wiring skeleton, disabled-by-default, no batch, no market data, no scan loop, no API/dashboard wiring, no score
 状态：Draft PR（草稿合并请求）
 ```
 
-P245 只允许完成最大安全 docs-only Scheduler Trigger Authorization Gate and disabled scheduler wiring skeleton plan（只改文档的定时器触发授权门与默认关闭定时器接线骨架方案）包：记录未来 P246 如推进也只能考虑 disabled scheduler wiring skeleton（默认关闭定时器接线骨架），必须 disabled-by-default（默认关闭）、只能调用 single-symbol orchestrator（单标的编排器），不允许 batch、MarketQuoteClient、ScanScore、Candidate Attention、Promote To Home、Push、readiness、entry-stop-TP-RR、order、execution 或 auto-trading。P245 不写 Java，不新增测试，不接 scheduler，不启用定时任务，不接 batch scan，不接 MarketQuoteClient，不接 controller / API / dashboard，不创建真实 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
+P246 只允许完成最大安全 disabled scheduler wiring skeleton（默认关闭定时器接线骨架）包：本轮选择方案 B，新增独立 `DisabledLowFrequencyScanSchedulerWiring` 和 targeted test（目标测试），默认 disabled-by-default（默认关闭），只处理 single-symbol request（单标的请求），只调用 `LowFrequencyWatchlistScanOrchestrator.scanSingleSymbol(request)`，不使用 `@Scheduled`，不定义 batch 方法，不接 MarketQuoteClient，不接 BinanceMarketQuoteClient，不接 controller / API / dashboard，不创建真实 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
 
-P245 禁止：
+P246 禁止：
 
-- 写 Java。
-- 新增测试。
+- 修改本轮允许文件之外的 Java。
+- 新增本轮允许文件之外的测试。
 - 修改 DTO 文件。
 - 修改 guard / validator 文件。
 - 修改 assembler 文件。
@@ -170,7 +172,7 @@ P245 禁止：
 - 改 schema（数据库结构）。
 - 改 config（配置）。
 - 接 API（接口）。
-- 改 service / scheduler implementation（服务 / 定时器实现）。
+- 改既有 service / scheduler implementation（服务 / 定时器实现）。
 - 改 mapper（数据库映射）。
 - 接 MarketQuoteClient（行情客户端）。
 - 接 BinanceMarketQuoteClient（币安行情客户端）。
@@ -196,20 +198,20 @@ P245 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#608：BACKEND-P245 Scheduler Trigger Authorization Gate
+#610：BACKEND-P246 Disabled Scheduler Wiring Skeleton
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P245 Scheduler Trigger Authorization Gate。
+完成 P246 Disabled Scheduler Wiring Skeleton。
 ```
 
-P245 属于 A 档 docs-only（只改文档）。本轮只新增 Scheduler Trigger Authorization Gate（定时器触发授权门）、disabled scheduler wiring skeleton plan（默认关闭定时器接线骨架方案）和 Batch / Market / Score / Push / Readiness still blocked（批量 / 行情 / 分数 / 推送 / 可执行就绪仍阻断）文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不接 batch scan（批量扫描），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P246 属于 B/C boundary（Java scheduler wiring skeleton，默认关闭）。本轮只新增独立 disabled scheduler wiring skeleton（默认关闭定时器接线骨架）、targeted test（目标测试）和 verification 文档，并更新当前状态和进度索引；不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不接 batch scan（批量扫描），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
