@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-9907fca BACKEND-P255 Candidate Attention and Promote To Home Gate Pack (#629)
+1e52d2f BACKEND-P256 Candidate Attention Review-Only Skeleton (#631)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并。当前主线基准为 P255 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并。当前主线基准为 P256 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -76,6 +76,7 @@ P252：Market Read Adapter Skeleton（行情读取适配器骨架）
 P253：ScanScore DTO and Rule Skeleton（扫描分数 DTO 与规则骨架）
 P254：ScanScore Calculation Review-Only Skeleton（扫描分数计算只允许复核骨架）
 P255：Candidate Attention and Promote To Home Gate Pack（候选关注与提升到首页授权门包）
+P256：Candidate Attention Review-Only Skeleton（候选关注只允许复核骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -140,6 +141,7 @@ P255：Candidate Attention and Promote To Home Gate Pack（候选关注与提升
 - ScanScore DTO and Rule Skeleton（扫描分数 DTO 与规则骨架）。
 - ScanScore Calculation Review-Only Skeleton（扫描分数计算只允许复核骨架）。
 - Candidate Attention and Promote To Home Gate Pack（候选关注与提升到首页授权门包）。
+- Candidate Attention Review-Only Skeleton（候选关注只允许复核骨架）。
 
 当前仍未完成：
 
@@ -163,7 +165,7 @@ P255：Candidate Attention and Promote To Home Gate Pack（候选关注与提升
 - runtime data reads（运行时数据读取）。
 - scan loop（扫描循环）。
 - production ScanScore computation（生产级扫描分数计算）。
-- Candidate Attention（候选关注）。
+- Candidate Attention production workflow（候选关注生产流程）。
 - Promote To Home（提升到首页观察）运行时逻辑。
 - Opportunity Push execution（机会推送执行）。
 - 真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
@@ -177,32 +179,32 @@ P255：Candidate Attention and Promote To Home Gate Pack（候选关注与提升
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #631：BACKEND-P256 Candidate Attention Review-Only Skeleton
-Branch：p256
-Issue：#630
-风险档位：B/C boundary Java review-only Candidate Attention skeleton, no promote, no push, no readiness, no point generation, no API/dashboard wiring, no trading paths
+PR #633：BACKEND-P257 Opportunity Push Authorization and Risk Guard Gate Pack
+Branch：p257
+Issue：#632
+风险档位：A 档 docs-only accelerated gate pack
 状态：Draft PR（草稿合并请求）
 ```
 
-P256 只允许完成最大安全 review-only Candidate Attention DTO / enum / rule skeleton：新增 `CandidateAttentionDTO`、`CandidateAttentionStatusEnum`、`CandidateAttentionRule`、`DefaultCandidateAttentionRule`、targeted test 和 P256 verification 文档，并更新当前状态和进度索引。P256 不修改既有 Java / test / DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator，不接 API、MarketQuoteClient、BinanceMarketQuoteClient、scheduler、order、execution 或 auto-trading，不读取 runtime / live / external data，不实现 Promote To Home、Opportunity Push、Readiness 或 point generation，不生成 entry / stop / TP / RR。
+P257 只允许完成最大安全 docs-only Opportunity Push authorization + Risk Action Guard gate pack：新增 P256 closure、Opportunity Push scope gate、Risk Action Guard push gate、Push Java authorization gate、Readiness / point generation still blocked 文档，并更新当前状态和进度索引。P257 不写 Java，不新增测试，不修改 DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator / candidate rule，不接 API、MarketQuoteClient、BinanceMarketQuoteClient、scheduler、order、execution 或 auto-trading，不读取 runtime / live / external data，不实现 Opportunity Push、Readiness 或 point generation，不生成 entry / stop / TP / RR。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#630：BACKEND-P256 Candidate Attention Review-Only Skeleton
+#632：BACKEND-P257 Opportunity Push Authorization and Risk Guard Gate Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P256 Candidate Attention Review-Only Skeleton。
+完成 P257 Opportunity Push Authorization and Risk Guard Gate Pack。
 ```
 
-P256 属于 B/C boundary Java review-only Candidate Attention skeleton（Java 只允许复核的候选关注骨架），不是 Push、Promote、Readiness、point generation 或交易建议。本轮只新增 Candidate Attention DTO / enum / rule skeleton、targeted test 和 P256 verification 文档，并更新当前状态和进度索引；不修改既有 Java / test / DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator，不改 dashboard，不改 schema，不改 config，不接 API，不接真实 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 Promote To Home、Opportunity Push、Readiness 或 point generation，不生成 entry / stop / TP / RR。
+P257 属于 A 档 docs-only accelerated gate pack（只改文档的加速授权门包），不是 Opportunity Push 实现，不是 Readiness，不是 point generation。本轮只新增 P256 closure、Opportunity Push scope gate、Risk Action Guard push gate、Push Java authorization gate、Readiness / point generation still blocked 文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator / candidate rule，不改 dashboard，不改 schema，不改 config，不接 API，不接真实 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 Opportunity Push、Readiness 或 point generation，不生成 entry / stop / TP / RR。
 
 ## 7. 当前禁止越界
 
