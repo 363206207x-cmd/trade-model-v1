@@ -90,6 +90,12 @@ mvn -B verify -Pci
 结果：本地默认 shell 使用 JDK 25 时失败，原因是 enforcer 要求 JDK 17；切换到 JDK 17 后通过，174 tests，JaCoCo check 通过。
 
 ```bash
+JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home mvn -B clean verify -Pci
+```
+
+结果：通过；干净环境重新编译 385 个 main source files 和 124 个 test source files，174 tests 全部通过，JaCoCo check 通过。
+
+```bash
 git diff --check
 ```
 
