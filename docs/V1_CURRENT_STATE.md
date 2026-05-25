@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-6db8fc8 BACKEND-P245 Scheduler Trigger Authorization Gate (#609)
+fb3b467 BACKEND-P246 Disabled Scheduler Wiring Skeleton (#611)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并。当前主线基准为 P245 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并。当前主线基准为 P246 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -66,6 +66,7 @@ P242：Low-Frequency Watchlist Scan Orchestrator Java Skeleton（低频观察库
 P243：Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate（低频扫描编排器收口与 Scheduler / Batch / Market 授权门）
 P244：Scheduler Batch Market-Read Scope Audit（Scheduler / Batch / Market-read 范围审计）
 P245：Scheduler Trigger Authorization Gate（定时器触发授权门）
+P246：Disabled Scheduler Wiring Skeleton（默认关闭定时器接线骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -120,6 +121,7 @@ P245：Scheduler Trigger Authorization Gate（定时器触发授权门）
 - Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate（低频扫描编排器收口与 Scheduler / Batch / Market 授权门）。
 - Scheduler Batch Market-Read Scope Audit（Scheduler / Batch / Market-read 范围审计）。
 - Scheduler Trigger Authorization Gate（定时器触发授权门）。
+- Disabled Scheduler Wiring Skeleton（默认关闭定时器接线骨架）。
 
 当前仍未完成：
 
@@ -132,6 +134,9 @@ P245：Scheduler Trigger Authorization Gate（定时器触发授权门）
 - DB-backed Watchlist Pool read production implementation（数据库观察库池读取生产实现）。
 - production Runtime Source Service wiring（生产运行时数据源服务接线）。
 - Low-Frequency Watchlist Scan Orchestrator Java production wiring（低频观察库扫描编排器生产接线）。
+- scheduler-triggered orchestrator（定时器触发编排器）。
+- batch scan（批量扫描）。
+- batch orchestrator（批量扫描编排器）。
 - real scan loop（真实扫描循环）。
 - Production Source Assembler（生产数据源组装器）。
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
@@ -152,19 +157,19 @@ P245：Scheduler Trigger Authorization Gate（定时器触发授权门）
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #611：BACKEND-P246 Disabled Scheduler Wiring Skeleton
-Branch：p246
-Issue：#610
-风险档位：B/C boundary Java scheduler wiring skeleton, disabled-by-default, no batch, no market data, no scan loop, no API/dashboard wiring, no score
+PR #613：BACKEND-P247 Disabled Scheduler Wiring Closure and Batch Scan Authorization Gate
+Branch：p247
+Issue：#612
+风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P246 只允许完成最大安全 disabled scheduler wiring skeleton（默认关闭定时器接线骨架）包：本轮选择方案 B，新增独立 `DisabledLowFrequencyScanSchedulerWiring` 和 targeted test（目标测试），默认 disabled-by-default（默认关闭），只处理 single-symbol request（单标的请求），只调用 `LowFrequencyWatchlistScanOrchestrator.scanSingleSymbol(request)`，不使用 `@Scheduled`，不定义 batch 方法，不接 MarketQuoteClient，不接 BinanceMarketQuoteClient，不接 controller / API / dashboard，不创建真实 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
+P247 只允许完成最大安全 docs-only Disabled Scheduler Wiring Closure and Batch Scan Authorization Gate（默认关闭定时器接线收口与批量扫描授权门）包：记录 P246 已完成内容和边界，定义未来 batch scan 授权门和 watchlist-only universe（仅观察库全集）边界。P247 不写 Java，不新增测试，不接 batch scan，不启用 scheduler（定时器），不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环），不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
 
-P246 禁止：
+P247 禁止：
 
-- 修改本轮允许文件之外的 Java。
-- 新增本轮允许文件之外的测试。
+- 写 Java。
+- 新增测试。
 - 修改 DTO 文件。
 - 修改 guard / validator 文件。
 - 修改 assembler 文件。
@@ -176,8 +181,8 @@ P246 禁止：
 - 改 mapper（数据库映射）。
 - 接 MarketQuoteClient（行情客户端）。
 - 接 BinanceMarketQuoteClient（币安行情客户端）。
-- 接 scheduler（定时器）。
 - 接 batch scan（批量扫描）。
+- 启用 scheduler（定时器）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
 - 创建真实 scan loop（真实扫描循环）。
 - 扫描真实资产。
@@ -198,20 +203,20 @@ P246 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#610：BACKEND-P246 Disabled Scheduler Wiring Skeleton
+#612：BACKEND-P247 Disabled Scheduler Wiring Closure and Batch Scan Authorization Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P246 Disabled Scheduler Wiring Skeleton。
+完成 P247 Disabled Scheduler Wiring Closure and Batch Scan Authorization Gate。
 ```
 
-P246 属于 B/C boundary（Java scheduler wiring skeleton，默认关闭）。本轮只新增独立 disabled scheduler wiring skeleton（默认关闭定时器接线骨架）、targeted test（目标测试）和 verification 文档，并更新当前状态和进度索引；不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不接 batch scan（批量扫描），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P247 属于 A 档 docs-only（只改文档）。本轮只新增 closure / authorization gate / universe boundary / still blocked 文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不接 batch scan（批量扫描），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
