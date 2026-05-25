@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-36e1c2a BACKEND-P241 Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit (#601)
+5e19ec6 BACKEND-P242 Low-Frequency Watchlist Scan Orchestrator Java Skeleton (#603)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并。当前主线基准为 P241 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并。当前主线基准为 P242 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -62,6 +62,7 @@ P238：Watchlist Scan Result Assembly Java Authorization Gate（观察库扫描�
 P239：Watchlist Scan Result Assembly Java Skeleton（观察库扫描结果组装 Java 骨架）
 P240：Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate（观察库扫描结果组装收口与低频扫描编排器授权门）
 P241：Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit（低频扫描编排器方案与扫描循环边界审计）
+P242：Low-Frequency Watchlist Scan Orchestrator Java Skeleton（低频观察库扫描编排器 Java 骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -112,6 +113,7 @@ P241：Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit（低�
 - Watchlist Scan Result Assembly Java Skeleton（观察库扫描结果组装 Java 骨架）。
 - Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate（观察库扫描结果组装收口与低频扫描编排器授权门）。
 - Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit（低频扫描编排器方案与扫描循环边界审计）。
+- Low-Frequency Watchlist Scan Orchestrator Java Skeleton（低频观察库扫描编排器 Java 骨架）。
 
 当前仍未完成：
 
@@ -144,19 +146,19 @@ P241：Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit（低�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #603：BACKEND-P242 Low-Frequency Watchlist Scan Orchestrator Java Skeleton
-Branch：p242
-Issue：#602
-风险档位：B/C boundary Java orchestrator skeleton, disabled-by-default, single-symbol only, no market data, no scheduler, no scan loop, no API/dashboard wiring, no score
+PR #605：BACKEND-P243 Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate
+Branch：p243
+Issue：#604
+风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P242 只允许完成最大安全 disabled-by-default single-symbol Low-Frequency Watchlist Scan Orchestrator Java skeleton（默认关闭、单 symbol 低频观察库扫描编排器 Java 骨架）包：新增 `LowFrequencyWatchlistScanOrchestrator`、`DefaultLowFrequencyWatchlistScanOrchestrator` 和 targeted tests，只组合 `WatchlistRuntimeSourceService` 与 `WatchlistScanResultAssembler`，只处理 single symbol / single request，只输出 review-only / blocked / incomplete `WatchlistScanResultDTO`。P242 不接 MarketQuoteClient，不接 scheduler，不接 controller / API / dashboard，不创建 batch scan，不创建真实 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
+P243 只允许完成最大安全 docs-only Low-Frequency Scan Orchestrator closure and Scheduler / Batch / Market authorization gate（只改文档的低频扫描编排器收口与定时器 / 批量 / 行情授权门）包：记录 P242 已完成内容和边界，并定义未来 Scheduler / Batch / Market-read 必须分层推进。P243 不写 Java，不新增测试，不接 MarketQuoteClient，不接 scheduler，不接 batch scan，不接 controller / API / dashboard，不创建真实 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
 
-P242 禁止：
+P243 禁止：
 
-- 修改既有 Java。
-- 修改既有测试。
+- 写 Java。
+- 新增测试。
 - 修改 DTO 文件。
 - 修改 guard / validator 文件。
 - 修改 assembler 文件。
@@ -169,6 +171,7 @@ P242 禁止：
 - 接 MarketQuoteClient（行情客户端）。
 - 接 BinanceMarketQuoteClient（币安行情客户端）。
 - 接 scheduler（定时器）。
+- 接 batch scan（批量扫描）。
 - 读取 runtime / live / external data（运行时 / 实时 / 外部数据）。
 - 创建真实 scan loop（真实扫描循环）。
 - 扫描真实资产。
@@ -189,20 +192,20 @@ P242 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#602：BACKEND-P242 Low-Frequency Watchlist Scan Orchestrator Java Skeleton
+#604：BACKEND-P243 Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P242 Low-Frequency Watchlist Scan Orchestrator Java Skeleton。
+完成 P243 Low-Frequency Scan Orchestrator Closure and Scheduler Batch Market Gate。
 ```
 
-P242 属于 B/C boundary Java skeleton（Java 骨架边界）。本轮只新增 disabled-by-default single-symbol Low-Frequency Watchlist Scan Orchestrator skeleton（默认关闭、单 symbol 低频观察库扫描编排器骨架）、targeted tests（定向测试）和 verification 文档，并更新当前状态和进度索引；不修改既有 Java / test，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P243 属于 A 档 docs-only（只改文档）。本轮只新增 Low-Frequency Scan Orchestrator closure（低频扫描编排器收口）、Scheduler / Batch / Market authorization gate（定时器 / 批量 / 行情授权门）和 ScanScore / Candidate / Push / Readiness still blocked（扫描分数 / 候选 / 推送 / 可执行就绪仍阻断）文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不接 batch scan（批量扫描），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建真实 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
