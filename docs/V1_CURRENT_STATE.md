@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-a428da2 BACKEND-P239 Watchlist Scan Result Assembly Java Skeleton (#597)
+f574e42 BACKEND-P240 Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate (#599)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并。当前主线基准为 P239 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并。当前主线基准为 P240 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -60,6 +60,7 @@ P236：Runtime Source Service Closure and Watchlist Scan Result Assembly Gate（
 P237：Watchlist Scan Result Assembly Plan and DTO Usage Audit（观察库扫描结果组装方案与 DTO 使用审计）
 P238：Watchlist Scan Result Assembly Java Authorization Gate（观察库扫描结果组装 Java 授权门）
 P239：Watchlist Scan Result Assembly Java Skeleton（观察库扫描结果组装 Java 骨架）
+P240：Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate（观察库扫描结果组装收口与低频扫描编排器授权门）
 ```
 
 ## 3. 当前项目真实状态
@@ -108,6 +109,7 @@ P239：Watchlist Scan Result Assembly Java Skeleton（观察库扫描结果组�
 - Watchlist Scan Result Assembly Plan and DTO Usage Audit（观察库扫描结果组装方案与 DTO 使用审计）。
 - Watchlist Scan Result Assembly Java Authorization Gate（观察库扫描结果组装 Java 授权门）。
 - Watchlist Scan Result Assembly Java Skeleton（观察库扫描结果组装 Java 骨架）。
+- Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate（观察库扫描结果组装收口与低频扫描编排器授权门）。
 
 当前仍未完成：
 
@@ -140,16 +142,16 @@ P239：Watchlist Scan Result Assembly Java Skeleton（观察库扫描结果组�
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #599：BACKEND-P240 Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate
-Branch：p240
-Issue：#598
+PR #601：BACKEND-P241 Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit
+Branch：p241
+Issue：#600
 风险档位：A 档 docs-only
 状态：Draft PR（草稿合并请求）
 ```
 
-P240 只允许完成最大安全 docs-only Watchlist Scan Result Assembly closure and Low-Frequency Scan Orchestrator authorization gate（只改文档的观察库扫描结果组装收口与低频扫描编排器授权门）包：记录 P239 已完成的最小 assembly skeleton，定义未来 P241 是否可以进入 Low-Frequency Scan Orchestrator / disabled-by-default scan loop boundary audit，并继续明确 MarketQuoteClient / scheduler / real scan loop / ScanScore / Candidate Attention / Promote To Home / Push / readiness / point generation 仍阻断。P240 不写 Java，不新增测试，不接 MarketQuoteClient，不接 scheduler，不接 controller / API / dashboard，不创建 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
+P241 只允许完成最大安全 docs-only Low-Frequency Scan Orchestrator plan and disabled-by-default scan loop boundary audit（只改文档的低频扫描编排器方案与默认关闭扫描循环边界审计）包：定义未来 Orchestrator 只能组合 `WatchlistRuntimeSourceService`、`WatchlistScanResultAssembler` 和 `WatchlistScanGuardValidator` 保护语义，只处理 single symbol / single request，只输出 review-only / blocked / incomplete `WatchlistScanResultDTO`。P241 不写 Java，不新增测试，不接 MarketQuoteClient，不接 scheduler，不接 controller / API / dashboard，不创建 scan loop，不创建真实扫描，不生成 ScanScore / Candidate Attention / Promote To Home / Push / readiness / entry-stop-TP-RR / trading。
 
-P240 禁止：
+P241 禁止：
 
 - 写 Java。
 - 新增测试。
@@ -185,20 +187,20 @@ P240 禁止：
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#598：BACKEND-P240 Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate
+#600：BACKEND-P241 Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P240 Watchlist Scan Result Assembly Closure and Low-Frequency Scan Orchestrator Gate。
+完成 P241 Low-Frequency Scan Orchestrator Plan and Scan Loop Boundary Audit。
 ```
 
-P240 属于 A 档 docs-only（只改文档）。本轮只新增 Watchlist Scan Result Assembly closure（观察库扫描结果组装收口）、Low-Frequency Scan Orchestrator authorization gate（低频扫描编排器授权门）和 Market / Score / Push / Readiness still blocked（行情 / 分数 / 推送 / 可执行就绪仍阻断）文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
+P241 属于 A 档 docs-only（只改文档）。本轮只新增 Low-Frequency Scan Orchestrator plan（低频扫描编排器方案）、disabled-by-default scan loop boundary audit（默认关闭扫描循环边界审计）、Orchestrator Java authorization gate（编排器 Java 授权门）和 Market / Score / Push / Readiness still blocked（行情 / 分数 / 推送 / 可执行就绪仍阻断）文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler，不改 dashboard，不改 schema，不改 config，不接 API，不接 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不接 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不创建 scan loop（扫描循环）或真实扫描，不实现 ScanScore（扫描分数），不创建 Candidate Attention workflow（候选关注流程）或 Promote To Home workflow（提升到首页观察流程）。
 
 ## 7. 当前禁止越界
 
