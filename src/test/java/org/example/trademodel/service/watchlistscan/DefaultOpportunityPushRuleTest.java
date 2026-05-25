@@ -10,8 +10,10 @@ import java.util.List;
 import org.example.trademodel.dto.watchlistscan.CandidateAttentionDTO;
 import org.example.trademodel.dto.watchlistscan.OpportunityPushDTO;
 import org.example.trademodel.dto.watchlistscan.OpportunityPushStatusEnum;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("core-regression")
 class DefaultOpportunityPushRuleTest {
 
     private final DefaultOpportunityPushRule rule = new DefaultOpportunityPushRule();

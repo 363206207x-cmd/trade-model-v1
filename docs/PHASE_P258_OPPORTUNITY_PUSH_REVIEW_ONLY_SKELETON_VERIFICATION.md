@@ -48,6 +48,17 @@ P258 只实现 Opportunity Push DTO / enum / rule skeleton。该 skeleton 只能
 
 ## 5. 验证命令和结果
 
+CI failure diagnosis:
+
+- `mvn -B compile` passed in the local default shell.
+- `mvn -B verify -Pci` failed in the local default shell before tests because Maven used JDK 25.0.2 and the project enforcer requires `[17,18)`.
+- GitHub CI uses `.github/workflows/ci.yml` with `actions/setup-java@v4` and Temurin JDK 17.
+
+Fix:
+
+- Marked `DefaultOpportunityPushRuleTest` with `@Tag("core-regression")` so the `ci` profile runs the P258 review-only safety tests.
+- Re-ran CI-equivalent Maven commands under JDK 17, matching GitHub Actions.
+
 ```bash
 ./mvnw -q -Dtest=DefaultOpportunityPushRuleTest test
 ```
@@ -65,6 +76,18 @@ P258 只实现 Opportunity Push DTO / enum / rule skeleton。该 skeleton 只能
 ```
 
 结果：通过。
+
+```bash
+mvn -B compile
+```
+
+结果：通过。
+
+```bash
+mvn -B verify -Pci
+```
+
+结果：本地默认 shell 使用 JDK 25 时失败，原因是 enforcer 要求 JDK 17；切换到 JDK 17 后通过，174 tests，JaCoCo check 通过。
 
 ```bash
 git diff --check
