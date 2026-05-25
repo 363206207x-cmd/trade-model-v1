@@ -53,6 +53,8 @@ CI failure diagnosis:
 - `mvn -B compile` passed in the local default shell.
 - `mvn -B verify -Pci` failed in the local default shell before tests because Maven used JDK 25.0.2 and the project enforcer requires `[17,18)`.
 - GitHub CI uses `.github/workflows/ci.yml` with `actions/setup-java@v4` and Temurin JDK 17.
+- GitHub Actions run `26401885169` / job `77715909747` still reported `quality-gate` failure for PR #635 head `0ec28fa`, but the Actions log endpoint returned `BlobNotFound`, the in-app browser showed the GitHub sign-in page, and local `gh auth status` reported an invalid token. No code failure line was available from GitHub logs in this environment.
+- To avoid guessing at hidden CI logs, the local verification was re-run with `JAVA_HOME` and `PATH` pinned to Temurin JDK 17 before advancing the PR head.
 
 Fix:
 
