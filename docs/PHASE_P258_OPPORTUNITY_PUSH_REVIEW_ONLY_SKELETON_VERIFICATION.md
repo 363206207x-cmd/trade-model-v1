@@ -1,0 +1,79 @@
+# P258 Opportunity Push Review-Only Skeleton Verification
+
+## 1. 阶段目标
+
+P258 只实现 Opportunity Push DTO / enum / rule skeleton。该 skeleton 只能表达 review-only opportunity attention（值得人工关注的机会提醒候选），不代表外部推送执行、Readiness、point generation 或交易建议。
+
+## 2. 本轮新增文件
+
+- `src/main/java/org/example/trademodel/dto/watchlistscan/OpportunityPushDTO.java`
+- `src/main/java/org/example/trademodel/dto/watchlistscan/OpportunityPushStatusEnum.java`
+- `src/main/java/org/example/trademodel/service/watchlistscan/OpportunityPushRule.java`
+- `src/main/java/org/example/trademodel/service/watchlistscan/DefaultOpportunityPushRule.java`
+- `src/test/java/org/example/trademodel/service/watchlistscan/DefaultOpportunityPushRuleTest.java`
+
+## 3. 安全语义
+
+- review-only only
+- no external Opportunity Push execution
+- no Telegram / email / webhook / app notification
+- no Readiness
+- no point generation
+- no entry / stop / TP / RR
+- no order / execution / auto-trading
+- no API / dashboard
+- no MarketQuoteClient
+- no scheduler
+- no runtime / live / external data reads
+- Risk Action Guard blocker / stampede / liquidity deterioration blocks push eligibility
+- wick-only / pin-bar direct reversal reason blocks trend-reversal push semantics
+
+## 4. 测试覆盖
+
+`DefaultOpportunityPushRuleTest` 覆盖：
+
+- null input fails closed
+- blank symbol fails closed
+- missing Candidate Attention fails closed
+- unsafe / blocked Candidate Attention fails closed
+- stampede / extreme stress blocks push eligibility
+- liquidity deterioration blocks execution-like push semantics
+- wick-only / pin-bar direct reversal reason blocks trend-reversal push semantics
+- safe review-only Candidate Attention can produce review-only Opportunity Push candidate
+- every output keeps `manualReviewRequired=true` and `notTradeInstruction=true`
+- every output keeps external push / readiness / trading / entry-stop-TP-RR flags false
+- DTO defensive copy
+- enum names expose no BUY / SELL / LONG / SHORT / READY / EXECUTABLE / SENT / TRADE / ORDER / ENTRY / STOP / TAKE_PROFIT surface
+- implementation has no controller / scheduler / MarketQuoteClient / BinanceMarketQuoteClient / webhook / Telegram / email / order / execution / auto-trading dependency
+
+## 5. 验证命令和结果
+
+```bash
+./mvnw -q -Dtest=DefaultOpportunityPushRuleTest test
+```
+
+结果：通过。
+
+```bash
+./mvnw -q -DskipTests compile
+```
+
+结果：通过。
+
+```bash
+./mvnw -q -DskipTests test-compile
+```
+
+结果：通过。
+
+```bash
+git diff --check
+```
+
+结果：通过。
+
+## 6. 当前结论
+
+P258 是 review-only Opportunity Push skeleton，不是外部推送，不是 Readiness，不是 point generation，不是交易建议。
+
+后续 external push channel、Readiness、point generation、entry / stop / TP / RR、order / execution / auto-trading 仍必须另开授权门。

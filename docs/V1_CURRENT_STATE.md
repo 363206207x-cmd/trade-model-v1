@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-1e52d2f BACKEND-P256 Candidate Attention Review-Only Skeleton (#631)
+3472d8e BACKEND-P257 Opportunity Push Authorization and Risk Guard Gate Pack (#633)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并。当前主线基准为 P256 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并。当前主线基准为 P257 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -77,6 +77,7 @@ P253：ScanScore DTO and Rule Skeleton（扫描分数 DTO 与规则骨架）
 P254：ScanScore Calculation Review-Only Skeleton（扫描分数计算只允许复核骨架）
 P255：Candidate Attention and Promote To Home Gate Pack（候选关注与提升到首页授权门包）
 P256：Candidate Attention Review-Only Skeleton（候选关注只允许复核骨架）
+P257：Opportunity Push Authorization and Risk Guard Gate Pack（机会推送授权与风险保护门包）
 ```
 
 ## 3. 当前项目真实状态
@@ -142,6 +143,7 @@ P256：Candidate Attention Review-Only Skeleton（候选关注只允许复核骨
 - ScanScore Calculation Review-Only Skeleton（扫描分数计算只允许复核骨架）。
 - Candidate Attention and Promote To Home Gate Pack（候选关注与提升到首页授权门包）。
 - Candidate Attention Review-Only Skeleton（候选关注只允许复核骨架）。
+- Opportunity Push Authorization and Risk Guard Gate Pack（机会推送授权与风险保护门包）。
 
 当前仍未完成：
 
@@ -179,32 +181,32 @@ P256：Candidate Attention Review-Only Skeleton（候选关注只允许复核骨
 当前已创建但尚未完成的 PR：
 
 ```text
-PR #633：BACKEND-P257 Opportunity Push Authorization and Risk Guard Gate Pack
-Branch：p257
-Issue：#632
-风险档位：A 档 docs-only accelerated gate pack
+PR #635：BACKEND-P258 Opportunity Push Review-Only Skeleton
+Branch：p258
+Issue：#634
+风险档位：B/C boundary Java review-only skeleton, no external push channel, no scheduler, no API/dashboard wiring, no readiness, no point generation, no trading paths
 状态：Draft PR（草稿合并请求）
 ```
 
-P257 只允许完成最大安全 docs-only Opportunity Push authorization + Risk Action Guard gate pack：新增 P256 closure、Opportunity Push scope gate、Risk Action Guard push gate、Push Java authorization gate、Readiness / point generation still blocked 文档，并更新当前状态和进度索引。P257 不写 Java，不新增测试，不修改 DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator / candidate rule，不接 API、MarketQuoteClient、BinanceMarketQuoteClient、scheduler、order、execution 或 auto-trading，不读取 runtime / live / external data，不实现 Opportunity Push、Readiness 或 point generation，不生成 entry / stop / TP / RR。
+P258 只允许完成最大安全 review-only Opportunity Push DTO / enum / rule skeleton：新增 `OpportunityPushDTO`、`OpportunityPushStatusEnum`、`OpportunityPushRule`、`DefaultOpportunityPushRule`、targeted test 和 P258 verification 文档，并更新当前状态和进度索引。P258 不修改既有 Java / test / DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator / candidate rule，不接 API、MarketQuoteClient、BinanceMarketQuoteClient、scheduler、order、execution 或 auto-trading，不读取 runtime / live / external data，不实现 external Opportunity Push execution、Readiness 或 point generation，不生成 entry / stop / TP / RR。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#632：BACKEND-P257 Opportunity Push Authorization and Risk Guard Gate Pack
+#634：BACKEND-P258 Opportunity Push Review-Only Skeleton
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P257 Opportunity Push Authorization and Risk Guard Gate Pack。
+完成 P258 Opportunity Push Review-Only Skeleton。
 ```
 
-P257 属于 A 档 docs-only accelerated gate pack（只改文档的加速授权门包），不是 Opportunity Push 实现，不是 Readiness，不是 point generation。本轮只新增 P256 closure、Opportunity Push scope gate、Risk Action Guard push gate、Push Java authorization gate、Readiness / point generation still blocked 文档，并更新当前状态和进度索引；不写 Java，不新增测试，不修改 DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator / candidate rule，不改 dashboard，不改 schema，不改 config，不接 API，不接真实 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 Opportunity Push、Readiness 或 point generation，不生成 entry / stop / TP / RR。
+P258 属于 B/C boundary Java review-only skeleton（Java 只允许复核的机会提醒候选骨架），不是外部推送，不是 Readiness，不是 point generation 或交易建议。本轮只新增 Opportunity Push DTO / enum / rule skeleton、targeted test 和 P258 verification 文档，并更新当前状态和进度索引；不修改既有 Java / test / DTO / guard / validator / assembler / orchestrator / market adapter / score rule / score calculator / candidate rule，不改 dashboard，不改 schema，不改 config，不接 API，不接真实 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 external Opportunity Push execution、Readiness 或 point generation，不生成 entry / stop / TP / RR。
 
 ## 7. 当前禁止越界
 
