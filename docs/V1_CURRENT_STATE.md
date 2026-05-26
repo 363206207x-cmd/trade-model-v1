@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-25a802f BACKEND-P267 Audit Queue Closure and Delivery Pipeline Authorization Scope Pack (#653)
+3818ddc BACKEND-P268 Delivery Pipeline Skeleton (#655)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并。当前主线基准为 P267 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并。当前主线基准为 P268 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -88,6 +88,7 @@ P264：Audit Envelope Persistence No-Op Java Skeleton（审计信封持久化 no
 P265：Audit Persistence Closure and Audit Queue Authorization Scope Pack（审计持久化收口与审计队列授权范围包）
 P266：Audit Queue No-Op Java Skeleton（审计队列 no-op Java 骨架）
 P267：Audit Queue Closure and Delivery Pipeline Authorization Scope Pack（审计队列收口与投递流水线授权范围包）
+P268：Delivery Pipeline Disabled No-Op Java Skeleton（投递流水线禁用 no-op Java 骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -164,6 +165,7 @@ P267：Audit Queue Closure and Delivery Pipeline Authorization Scope Pack（审�
 - Audit Persistence Closure and Audit Queue Authorization Scope Pack（审计持久化收口与审计队列授权范围包）。
 - Audit Queue No-Op Java Skeleton（审计队列 no-op Java 骨架）。
 - Audit Queue Closure and Delivery Pipeline Authorization Scope Pack（审计队列收口与投递流水线授权范围包）。
+- Delivery Pipeline Disabled No-Op Java Skeleton（投递流水线禁用 no-op Java 骨架）。
 
 当前仍未完成：
 
@@ -193,6 +195,9 @@ P267：Audit Queue Closure and Delivery Pipeline Authorization Scope Pack（审�
 - delivery wiring（推送投递接线）。
 - real audit persistence DB write / audit queue implementation（真实审计持久化 DB 写入 / 审计队列实现）。
 - delivery pipeline（推送投递流水线）。
+- message envelope（消息信封）。
+- message rendering / message sending（消息渲染 / 消息发送）。
+- provider selection / provider integration（provider 选择 / provider 集成）。
 - external push channel（Telegram / email / webhook / app notification / local notification）。
 - 真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
 - ExecutionPlan readiness（执行计划可执行就绪）。
@@ -205,32 +210,32 @@ P267：Audit Queue Closure and Delivery Pipeline Authorization Scope Pack（审�
 当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #655：BACKEND-P268 Delivery Pipeline Disabled No-Op Java Skeleton
-Branch：p268
-Issue：#654
-风险档位：B/C boundary Java disabled no-op delivery pipeline skeleton, no real delivery pipeline/provider/message rendering/message sending/scheduler/API/dashboard/readiness/point generation/trading path
+PR #657：BACKEND-P269 Delivery Pipeline Closure and Message Envelope Authorization Scope Pack
+Branch：p269
+Issue：#656
+风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/message rendering/message sending/provider/external channel/readiness/point generation/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
-P268 只允许新增 delivery pipeline disabled no-op Java skeleton，用于把 `OpportunityPushAuditQueueResultDTO` 进入内部投递流水线资格判断。P268 不实现真实 delivery pipeline，不接 provider，不 render 或 send 任何 message，不启用 scheduler，不接 API / dashboard，不读 runtime / live / external data，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P269 只允许 docs-only 收口 P268 delivery pipeline disabled no-op Java skeleton，并定义 future message envelope disabled no-op Java skeleton 的授权门。P269 不写 Java，不新增测试，不改 DTO，不实现 message rendering，不发送 message，不接 provider，不接 external channel，不启用 scheduler，不接 API / dashboard，不读 runtime / live / external data，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#654：BACKEND-P268 Delivery Pipeline Disabled No-Op Java Skeleton
+#656：BACKEND-P269 Delivery Pipeline Closure and Message Envelope Authorization Scope Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P268 Delivery Pipeline Disabled No-Op Java Skeleton。
+完成 P269 Delivery Pipeline Closure and Message Envelope Authorization Scope Pack。
 ```
 
-P268 属于 B/C boundary Java disabled no-op skeleton，用于新增投递流水线禁用 no-op 骨架。P268 允许新增最小 DTO / enum / policy / no-op implementation / targeted test，但不允许真实 delivery pipeline，不允许 provider，不允许 message rendering，不允许 message sending，不启用 scheduler，不接 API / dashboard，不实现 queue runtime behavior，不做 enqueue / dequeue / worker，不改 schema / mapper / repository / DB write，不读取 runtime / live / external data，不实现 external Opportunity Push execution，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P269 属于 A docs-only Scope Pack，用于收口 P268 disabled no-op delivery pipeline skeleton，并定义 future message envelope authorization scope gate（未来消息信封授权范围门）和 future message envelope Java authorization gate（未来消息信封 Java 授权门）。P269 不修改 Java，不新增测试，不改 DTO，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / repository / service / scheduler，不实现 message rendering，不发送任何 message，不接 provider，不实现 Telegram / email / webhook / app notification / local notification，不接 MarketQuoteClient 或 BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 scan loop，不实现 external Opportunity Push execution，不实现 Promote To Home runtime logic，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。
 
 ## 7. 当前禁止越界
 
