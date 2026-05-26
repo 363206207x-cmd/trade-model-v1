@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-04f32c8 BACKEND-P278 Real Scan Input Contract DTO Authorization Gate (#675)
+409741c BACKEND-P279 Real Scan Input Contract DTO Skeleton (#677)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并。当前主线基准为 P278 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并。当前主线基准为 P279 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -186,6 +186,7 @@ P278：Real Scan Input Contract DTO Authorization Gate（真实扫描输入契�
 - Real Scan Score Candidate Return Scope Pack（real scan / real score / Candidate / Push preview planning 回归范围包）。
 - Real Scan Contract Audit and Market-Read Boundary Plan（真实扫描契约审计与 market-read 边界方案）。
 - Real Scan Input Contract DTO Authorization Gate（真实扫描输入契约 DTO 授权门）。
+- Real Scan Input Contract DTO Skeleton（真实扫描输入契约 DTO 骨架）。
 
 当前仍未完成：
 
@@ -208,7 +209,7 @@ P278：Real Scan Input Contract DTO Authorization Gate（真实扫描输入契�
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
 - runtime data reads（运行时数据读取）。
 - scan loop（扫描循环）。
-- real scan input contract DTO skeleton（真实扫描输入契约 DTO 骨架）。
+- RealScanInputContractGuardValidator skeleton（真实扫描输入契约保护校验器骨架）。
 - production ScanScore computation（生产级扫描分数计算）。
 - Candidate Attention production workflow（候选关注生产流程）。
 - Promote To Home（提升到首页观察）运行时逻辑。
@@ -234,32 +235,34 @@ P278：Real Scan Input Contract DTO Authorization Gate（真实扫描输入契�
 当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #677：BACKEND-P279 Real Scan Input Contract DTO Skeleton
-Branch：p279
-Issue：#676
-风险档位：B/C boundary Java DTO-only skeleton, no service/Spring annotation/controller/endpoint/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
+PR #679：BACKEND-P280 Real Scan Input Contract DTO Closure and Guard Validator Authorization Scope Pack
+Branch：p280
+Issue：#678
+风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
-P278 merged as `04f32c8`。P279 只允许 DTO-only / enum-only / targeted-test-only real scan input contract skeleton。P279 新增的 DTO 必须 review-only、fail-closed，并默认 `manualReviewRequired=true`、`notTradeInstruction=true`。P279 不新增 service，不加 Spring 注解，不接 controller / endpoint / API / scheduler，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Opportunity Push execution，不接 external channel，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P279 merged as `409741c`。P279 新增 `RealScanInputContractDTO`、`RealScanInputContractStatusEnum`、`RealScanInputContractDTOTest`，且 P279 CI passed before merge。P279 只是 DTO-only / enum-only / targeted-test-only skeleton：`RealScanInputContractDTO` 默认 `manualReviewRequired=true`、`notTradeInstruction=true`，missing Watchlist Pool proof fails closed，non-watchlist input fails closed，valid-looking input remains review-only and not trade instruction，且 DTO 没有 trade action / order / execution / entry / stop / take profit / RR / provider / external channel / message sending / readiness fields。
+
+P280 只收口 P279，并授权下一步可以做 `RealScanInputContractGuardValidator` skeleton。未来 GuardValidator 只能验证 DTO safety / Watchlist Pool proof / fail-closed states / review-only flags，不能读取 market data，不能调用 MarketQuoteClient，不能创建 scan output，不能计算 score，不能创建 Candidate，不能触发 Push，不能升级 Readiness，也不能生成 point。P281 只有在另行授权后才可实现 GuardValidator skeleton + targeted test。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#676：BACKEND-P279 Real Scan Input Contract DTO Skeleton
+#678：BACKEND-P280 Real Scan Input Contract DTO Closure and Guard Validator Authorization Scope Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P279 Real Scan Input Contract DTO Skeleton。
+完成 P280 Real Scan Input Contract DTO Closure and Guard Validator Authorization Scope Pack。
 ```
 
-P279 属于 B/C boundary Java DTO-only skeleton，只允许新增 DTO / enum / targeted test / verification。P279 不新增 service，不加 Spring 注解，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / repository / service / scheduler，不接 MarketQuoteClient 或 BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate Attention production workflow，不实现 Promote To Home runtime logic，不实现 Opportunity Push execution，不实现 external channel behavior，不处理 provider credentials，不做 live provider call，不实现 message rendering，不发送任何 message，不接 Telegram / email / webhook / app notification / local notification，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P280 属于 docs-only Scope Pack，只允许文档变更。P280 不写 Java，不新增测试，不改 DTO，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / repository / service / scheduler，不接 MarketQuoteClient 或 BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate Attention production workflow，不实现 Promote To Home runtime logic，不实现 Opportunity Push execution，不实现 external channel behavior，不处理 provider credentials，不做 live provider call，不实现 message rendering，不发送任何 message，不接 Telegram / email / webhook / app notification / local notification，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。Future recommended next package after P280 should be P281 RealScanInputContractGuardValidator skeleton, but only Java skeleton and targeted-test-only。
 
 ## 7. 当前禁止越界
 
