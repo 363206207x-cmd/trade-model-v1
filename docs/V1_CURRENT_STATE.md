@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-4557733 BACKEND-P261 Push Channel No-Op Closure and Delivery Wiring Gate (#641)
+53ce022 BACKEND-P262 Audit-Only Delivery Wiring Java Skeleton (#643)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并。当前主线基准为 P261 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并。当前主线基准为 P262 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -82,6 +82,7 @@ P258：Opportunity Push Review-Only Skeleton（机会推送只允许复核骨架
 P259：Opportunity Push Closure and External Channel Gate Pack（机会推送收口与外部通道授权门包）
 P260：Push Channel Disabled No-Op Java Skeleton（推送通道禁用 no-op Java 骨架）
 P261：Push Channel No-Op Closure and Delivery Wiring Gate（推送通道 no-op 收口与投递接线授权门）
+P262：Audit-Only Delivery Wiring Java Skeleton（审计-only 投递接线 Java 骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -152,6 +153,7 @@ P261：Push Channel No-Op Closure and Delivery Wiring Gate（推送通道 no-op 
 - Opportunity Push Closure and External Channel Gate Pack（机会推送收口与外部通道授权门包）。
 - Push Channel Disabled No-Op Java Skeleton（推送通道禁用 no-op Java 骨架）。
 - Push Channel No-Op Closure and Delivery Wiring Gate（推送通道 no-op 收口与投递接线授权门）。
+- Audit-Only Delivery Wiring Java Skeleton（审计-only 投递接线 Java 骨架）。
 
 当前仍未完成：
 
@@ -180,6 +182,7 @@ P261：Push Channel No-Op Closure and Delivery Wiring Gate（推送通道 no-op 
 - Opportunity Push execution（机会推送执行）。
 - delivery wiring（推送投递接线）。
 - audit-only delivery persistence / queue implementation（审计信封持久化 / 队列实现）。
+- delivery pipeline（推送投递流水线）。
 - external push channel（Telegram / email / webhook / app notification / local notification）。
 - 真实 entry / stop / TP / RR（入场 / 止损 / 止盈 / 盈亏比）。
 - ExecutionPlan readiness（执行计划可执行就绪）。
@@ -187,37 +190,37 @@ P261：Push Channel No-Op Closure and Delivery Wiring Gate（推送通道 no-op 
 - execution API（执行接口）。
 - auto-trading（自动交易）不在 V1 范围内，保持关闭，只作为禁止越界安全边界。
 
-## 4. 当前 open PR（未合并请求）
+## 4. 当前 open PR / 当前任务包（未合并请求）
 
-当前已创建但尚未完成的 PR：
+当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #643：BACKEND-P262 Audit-Only Delivery Wiring Java Skeleton
-Branch：p262
-Issue：#642
-风险档位：B/C boundary Java audit-only wiring skeleton, no production wiring, no external provider, no message sending, no persistence, no queue implementation, no scheduler/API/dashboard wiring, no runtime/live/external reads, no readiness, no point generation, no trading paths
+PR #645：BACKEND-P263 Audit Envelope Closure and Delivery Pipeline Scope Pack
+Branch：p263
+Issue：#644
+风险档位：A docs-only Scope Pack, no Java, no tests, no DTO, no dashboard, no schema/config, no API, no scheduler, no persistence, no queue, no delivery pipeline, no external channel, no runtime/live/external reads, no readiness, no point generation, no trading paths
 状态：Draft PR（草稿合并请求）
 ```
 
-P262 只允许新增 audit-only internal envelope skeleton：`OpportunityPushAuditEnvelopeDTO`、`OpportunityPushAuditEnvelopeStatusEnum`、`OpportunityPushAuditEnvelopeAssembler`、`NoOpOpportunityPushAuditEnvelopeAssembler`、targeted test 和 P262 verification 文档，并更新当前状态和进度索引。P262 可以引用 `OpportunityPushDeliveryDecisionDTO` 作为输入，但 assembler 不得执行 delivery。P262 不修改既有 Java 文件，不修改无关 tests / dashboard / schema / config，不新增 controller / endpoint / API / mapper / scheduler，不接 Telegram / email / webhook / app notification / local notification，不发送任何消息，不持久化 audit envelope，不实现 queue behavior，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 real scan loop，不实现 external Opportunity Push execution 或 Promote To Home runtime logic，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P263 只允许新增 docs-only scope pack：P262 audit-only envelope closure、audit envelope persistence scope gate、audit queue scope gate、delivery pipeline scope gate、external channel still blocked、Readiness / point generation still blocked、next Java authorization gate，并更新当前状态和进度索引。P263 不修改 Java，不修改 tests，不修改 DTO / dashboard / schema / config，不新增 controller / endpoint / API / mapper / service / scheduler，不接 Telegram / email / webhook / app notification / local notification，不发送任何消息，不持久化 audit envelope，不实现 queue behavior，不实现 delivery pipeline，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 scan loop，不实现 external Opportunity Push execution 或 Promote To Home runtime logic，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#642：BACKEND-P262 Audit-Only Delivery Wiring Java Skeleton
+#644：BACKEND-P263 Audit Envelope Closure and Delivery Pipeline Scope Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P262 Audit-Only Delivery Wiring Java Skeleton。
+完成 P263 Audit Envelope Closure and Delivery Pipeline Scope Pack。
 ```
 
-P262 属于 B/C boundary Java audit-only wiring skeleton（边界 Java 审计-only 接线骨架），不是外部推送实现，不是生产接线，不是持久化，不是 queue，不是 Readiness，不是 point generation 或交易建议。本轮只新增允许的 audit envelope DTO / enum / assembler / no-op assembler / targeted test / verification 文档，并更新当前状态和进度索引；不修改既有 Java 文件，不改无关 tests，不改 dashboard，不改 schema / config，不接 API，不接真实 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 Telegram / email / webhook / app notification / local notification，不发送任何消息，不持久化 audit envelope，不实现 queue behavior，不实现 external Opportunity Push execution，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR。
+P263 属于 A docs-only Scope Pack（只改文档范围包），不是外部推送实现，不是生产接线，不是持久化，不是 queue，不是 delivery pipeline，不是 Readiness，不是 point generation 或交易建议。本轮只新增允许的 P263 scope / gate 文档，并更新当前状态和进度索引；不修改 Java，不改 tests，不改 DTO，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / service / scheduler，不接真实 MarketQuoteClient（行情客户端）或 BinanceMarketQuoteClient（币安行情客户端），不启用 scheduler（定时器），不读取 runtime / live / external data（运行时 / 实时 / 外部数据），不实现 Telegram / email / webhook / app notification / local notification，不发送任何消息，不持久化 audit envelope，不实现 queue behavior，不实现 delivery pipeline，不实现 external Opportunity Push execution，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR。
 
 ## 7. 当前禁止越界
 
