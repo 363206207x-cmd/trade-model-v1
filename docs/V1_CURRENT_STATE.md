@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-905fb41 BACKEND-P274 External Channel Skeleton (#667)
+2628f8c BACKEND-P275 External Channel Closure and CI Exception Record Scope Pack (#669)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并。当前主线基准为 P274 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并。当前主线基准为 P275 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -95,6 +95,7 @@ P271：Message Envelope Closure and Provider Channel Authorization Scope Pack（
 P272：Provider Channel Disabled No-Op Java Skeleton（provider channel 禁用 no-op Java 骨架）
 P273：Provider Channel Closure and External Channel Authorization Scope Pack（provider channel 收口与 external channel 授权范围包）
 P274：External Channel Disabled No-Op Java Skeleton（external channel 禁用 no-op Java 骨架，本地验证例外合并）
+P275：External Channel Closure and CI Exception Record Scope Pack（external channel 收口与 CI 例外记录范围包）
 ```
 
 ## 3. 当前项目真实状态
@@ -178,6 +179,7 @@ P274：External Channel Disabled No-Op Java Skeleton（external channel 禁用 n
 - Provider Channel Disabled No-Op Java Skeleton（provider channel 禁用 no-op Java 骨架）。
 - Provider Channel Closure and External Channel Authorization Scope Pack（provider channel 收口与 external channel 授权范围包）。
 - External Channel Disabled No-Op Java Skeleton（external channel 禁用 no-op Java 骨架，本地验证例外合并）。
+- External Channel Closure and CI Exception Record Scope Pack（external channel 收口与 CI 例外记录范围包）。
 
 当前仍未完成：
 
@@ -225,32 +227,32 @@ P274：External Channel Disabled No-Op Java Skeleton（external channel 禁用 n
 当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #669：BACKEND-P275 External Channel Closure and CI Exception Record Scope Pack
-Branch：p275
-Issue：#668
-风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/external channel behavior/provider credentials/live provider calls/message rendering/message sending/readiness/point generation/trading path
+PR #671：BACKEND-P276 Real Scan Score Candidate Return Scope Pack
+Branch：p276
+Issue：#670
+风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
-P275 只允许 docs-only 收口 P274 external channel disabled no-op Java skeleton，记录 P274 GitHub CI did not trigger / local validation exception merge，并停止继续扩 external-channel no-op 层。P275 不写 Java，不新增测试，不改 DTO，不实现 external channel behavior，不处理 provider credentials，不做 live provider call，不实现 message rendering，不发送 message，不启用 scheduler，不接 API / dashboard，不读 runtime / live / external data，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P275 已合并为 `2628f8c`。P274 是本地验证例外合并，且 P275 已记录该例外。P276 只允许 docs-only 把项目主线从 external-channel no-op 扩张拉回 real scan / real score / Candidate / Push preview planning。P276 不写 Java，不新增测试，不改 DTO，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Push execution，不接 scheduler / API / dashboard，不接 external channel，不升级 Readiness，不生成 point generation 或真实 entry / stop / TP / RR，不接 order / execution / auto-trading。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#668：BACKEND-P275 External Channel Closure and CI Exception Record Scope Pack
+#670：BACKEND-P276 Real Scan Score Candidate Return Scope Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P275 External Channel Closure and CI Exception Record Scope Pack。
+完成 P276 Real Scan Score Candidate Return Scope Pack。
 ```
 
-P275 属于 A docs-only Scope Pack，用于收口 P274、记录 P274 本地验证例外合并、停止继续扩 external-channel no-op，并把下一阶段推荐方向拉回 real scan / real score / Candidate / Push preview planning。P275 不修改 Java，不新增测试，不改 DTO，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / repository / service / scheduler，不实现 external channel behavior，不处理 provider credentials，不做 live provider call，不实现 message rendering，不发送任何 message，不接 Telegram / email / webhook / app notification / local notification，不接 MarketQuoteClient 或 BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 scan loop，不实现 external Opportunity Push execution，不实现 Promote To Home runtime logic，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P276 属于 A docs-only Scope Pack，用于把下一阶段推荐方向正式拉回 real scan / real score / Candidate / Push preview planning。P276 不修改 Java，不新增测试，不改 DTO，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / repository / service / scheduler，不接 MarketQuoteClient 或 BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 scan loop，不实现 production ScanScore computation，不实现 Candidate Attention production workflow，不实现 Promote To Home runtime logic，不实现 Opportunity Push execution，不实现 external channel behavior，不处理 provider credentials，不做 live provider call，不实现 message rendering，不发送任何 message，不接 Telegram / email / webhook / app notification / local notification，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。P276 后推荐的下一包应是 real scan contract audit / market-read boundary plan，而不是实现。
 
 ## 7. 当前禁止越界
 
