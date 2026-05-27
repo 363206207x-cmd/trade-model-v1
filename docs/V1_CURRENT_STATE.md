@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-bd1bfeb BACKEND-P280 Real Scan Input Contract DTO Closure and Guard Validator Authorization Scope Pack (#679)
+e65b3a7 BACKEND-P281 RealScanInputContractGuardValidator Skeleton (#681)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并。当前主线基准为 P280 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并。当前主线基准为 P281 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -101,6 +101,7 @@ P277：Real Scan Contract Audit and Market-Read Boundary Plan（真实扫描契�
 P278：Real Scan Input Contract DTO Authorization Gate（真实扫描输入契约 DTO 授权门）
 P279：Real Scan Input Contract DTO Skeleton（真实扫描输入契约 DTO 骨架）
 P280：Real Scan Input Contract DTO Closure and Guard Validator Authorization Scope Pack（真实扫描输入契约 DTO 收口与 Guard Validator 授权范围包）
+P281：RealScanInputContractGuardValidator Skeleton（真实扫描输入契约保护校验器骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -190,6 +191,7 @@ P280：Real Scan Input Contract DTO Closure and Guard Validator Authorization Sc
 - Real Scan Input Contract DTO Authorization Gate（真实扫描输入契约 DTO 授权门）。
 - Real Scan Input Contract DTO Skeleton（真实扫描输入契约 DTO 骨架）。
 - Real Scan Input Contract DTO Closure and Guard Validator Authorization Scope Pack（真实扫描输入契约 DTO 收口与 Guard Validator 授权范围包）。
+- RealScanInputContractGuardValidator Skeleton（真实扫描输入契约保护校验器骨架）。
 
 当前仍未完成：
 
@@ -212,7 +214,7 @@ P280：Real Scan Input Contract DTO Closure and Guard Validator Authorization Sc
 - MarketQuoteClient scan integration（行情客户端扫描接入）。
 - runtime data reads（运行时数据读取）。
 - scan loop（扫描循环）。
-- RealScanInputContractGuardValidator skeleton（真实扫描输入契约保护校验器骨架）。
+- RealScanInputContractGuardValidator test-only wiring skeleton（真实扫描输入契约保护校验器仅测试接线骨架）。
 - production ScanScore computation（生产级扫描分数计算）。
 - Candidate Attention production workflow（候选关注生产流程）。
 - Promote To Home（提升到首页观察）运行时逻辑。
@@ -238,34 +240,36 @@ P280：Real Scan Input Contract DTO Closure and Guard Validator Authorization Sc
 当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #681：BACKEND-P281 RealScanInputContractGuardValidator Skeleton
-Branch：p281
-Issue：#680
-风险档位：B/C Java skeleton, targeted-test-only, no Spring annotation/controller/endpoint/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/scan output/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
+PR #683：BACKEND-P282 RealScanInputContractGuardValidator Closure and Test-Only Wiring Authorization Scope Pack
+Branch：p282
+Issue：#682
+风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/scan output/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
-P280 merged as `bd1bfeb`。P280 收口 P279 real scan input contract DTO skeleton，并授权 P281 可以新增 `RealScanInputContractGuardValidator` skeleton + targeted test。P279 新增 `RealScanInputContractDTO`、`RealScanInputContractStatusEnum`、`RealScanInputContractDTOTest`，且 P279 CI passed before merge。P279 只是 DTO-only / enum-only / targeted-test-only skeleton：`RealScanInputContractDTO` 默认 `manualReviewRequired=true`、`notTradeInstruction=true`，missing Watchlist Pool proof fails closed，non-watchlist input fails closed，valid-looking input remains review-only and not trade instruction，且 DTO 没有 trade action / order / execution / entry / stop / take profit / RR / provider / external channel / message sending / readiness fields。
+P281 merged as `e65b3a7`。P281 新增 `RealScanInputContractGuardValidator`、`DefaultRealScanInputContractGuardValidator`、`DefaultRealScanInputContractGuardValidatorTest`，且 P281 CI passed before merge。P281 只是 Java skeleton + targeted-test-only：P281 validator 只验证 DTO safety / Watchlist Pool proof / fail-closed states / review-only flags，preserves `manualReviewRequired=true` and `notTradeInstruction=true`，null input fails closed，missing Watchlist Pool proof fails closed，non-watchlist input fails closed，valid-looking input remains review-only and not trade instruction，blocked input cannot be upgraded to `REVIEW_ONLY`。
 
-P281 只能新增 GuardValidator interface / default implementation / targeted test / verification。P281 的 validator 只能验证 DTO safety / Watchlist Pool proof / fail-closed states / review-only flags，必须保持 `manualReviewRequired=true` 和 `notTradeInstruction=true`。P281 不读 market data，不调用 MarketQuoteClient，不创建 scan output，不计算 score，不创建 Candidate，不触发 Push，不升级 Readiness，也不生成 point。
+P282 是 docs-only Scope Pack，用来收口 P281 并授权未来 P283 进入 `RealScanInputContractDTO` -> `RealScanInputContractGuardValidator` test-only wiring skeleton。P282 不写 Java，不新增测试，不改 DTO，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime/live/external data，不创建 scan output，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Opportunity Push execution，不接 scheduler/API/dashboard，不接 external channel，不升级 Readiness，不生成 point generation 或 entry-stop-TP-RR，不接 order/execution/auto-trading。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#680：BACKEND-P281 RealScanInputContractGuardValidator Skeleton
+#682：BACKEND-P282 RealScanInputContractGuardValidator Closure and Test-Only Wiring Authorization Scope Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P281 RealScanInputContractGuardValidator Skeleton。
+完成 P282 RealScanInputContractGuardValidator Closure and Test-Only Wiring Authorization Scope Pack。
 ```
 
-P281 属于 B/C Java skeleton，targeted-test-only。P281 只允许新增 GuardValidator interface / default implementation / targeted test / verification。P281 不加 Spring 注解，不改 DTO，不改 dashboard，不改 schema / config，不接 API，不新增 controller / endpoint / mapper / repository / scheduler，不接 MarketQuoteClient 或 BinanceMarketQuoteClient，不读取 runtime / live / external data，不创建 scan output，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate Attention production workflow，不实现 Promote To Home runtime logic，不实现 Opportunity Push execution，不实现 external channel behavior，不处理 provider credentials，不做 live provider call，不实现 message rendering，不发送任何 message，不接 Telegram / email / webhook / app notification / local notification，不升级 Readiness，不生成 point generation 或 entry / stop / TP / RR，不接 order / execution / auto-trading。
+P282 属于 A docs-only Scope Pack。P282 只允许修改 P282 scope docs、`docs/V1_CURRENT_STATE.md` 和 `docs/PROJECT_PROGRESS_INDEX.md`。P282 只授权未来 P283 可以进入 RealScanInputContractGuardValidator Test-Only Wiring Skeleton，但只能 test-only 和 targeted-test-only；future test-only wiring may wire `RealScanInputContractDTO` -> `RealScanInputContractGuardValidator` only in tests, without production service wiring。Future test-only wiring must not read market data, create scan output, compute score, create Candidate, trigger Push, upgrade Readiness, or generate point。
+
+未来推荐下一包：P283 RealScanInputContractGuardValidator Test-Only Wiring Skeleton，但仍只能 test-only and targeted-test-only。
 
 ## 7. 当前禁止越界
 
