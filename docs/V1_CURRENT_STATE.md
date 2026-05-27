@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-f26befe BACKEND-P283 RealScanInputContractGuardValidator Test-Only Wiring Skeleton (#685)
+cbcc34d BACKEND-P284 RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack (#687)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并，P282 已完成并合并，P283 已完成并合并。当前主线基准为 P283 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并，P282 已完成并合并，P283 已完成并合并，P284 已完成并合并。当前主线基准为 P284 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -104,6 +104,7 @@ P280：Real Scan Input Contract DTO Closure and Guard Validator Authorization Sc
 P281：RealScanInputContractGuardValidator Skeleton（真实扫描输入契约保护校验器骨架）
 P282：RealScanInputContractGuardValidator Closure and Test-Only Wiring Authorization Scope Pack（真实扫描输入契约保护校验器收口与仅测试接线授权范围包）
 P283：RealScanInputContractGuardValidator Test-Only Wiring Skeleton（真实扫描输入契约保护校验器仅测试接线骨架）
+P284：RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack（真实扫描输入契约保护校验器仅测试接线收口与 market-read 边界范围包）
 ```
 
 ## 3. 当前项目真实状态
@@ -196,6 +197,7 @@ P283：RealScanInputContractGuardValidator Test-Only Wiring Skeleton（真实扫
 - RealScanInputContractGuardValidator Skeleton（真实扫描输入契约保护校验器骨架）。
 - RealScanInputContractGuardValidator Closure and Test-Only Wiring Authorization Scope Pack（真实扫描输入契约保护校验器收口与仅测试接线授权范围包）。
 - RealScanInputContractGuardValidator Test-Only Wiring Skeleton（真实扫描输入契约保护校验器仅测试接线骨架）。
+- RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack（真实扫描输入契约保护校验器仅测试接线收口与 market-read 边界范围包）。
 
 当前仍未完成：
 
@@ -243,36 +245,40 @@ P283：RealScanInputContractGuardValidator Test-Only Wiring Skeleton（真实扫
 当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #687：BACKEND-P284 RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack
-Branch：p284
-Issue：#686
+PR #689：BACKEND-P285 Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate
+Branch：p285
+Issue：#688
 风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/scan output/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
-P283 merged as `f26befe`。P283 新增 `RealScanInputContractGuardValidatorTestOnlyWiringTest`，且 P283 CI passed before merge。P283 只是 test-only / targeted-test-only：test-only wiring can pass valid-looking `RealScanInputContractDTO` into `RealScanInputContractGuardValidator` and remain `REVIEW_ONLY`；missing Watchlist Pool proof remains `BLOCKED_MISSING_WATCHLIST_PROOF`；non-watchlist input remains `BLOCKED_NOT_WATCHLIST`；null input remains `INCOMPLETE`；blocked input cannot be upgraded to `REVIEW_ONLY`；outputs preserve `manualReviewRequired=true` and `notTradeInstruction=true`。
+P284 merged as `cbcc34d`。P284 是 docs-only / boundary-only。P284 收口 P283 test-only wiring，并定义下一阶段 market-read boundary / real scan input assembly 的进入条件。
 
-P284 只做 docs-only closure / scope pack。P284 收口 P283 test-only wiring，并定义下一阶段 market-read boundary / real scan input assembly 的进入条件。P284 不改 Java，不新增测试，不改 DTO，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime/live/external data，不创建 scan output，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Opportunity Push execution，不接 scheduler/API/dashboard，不接 external channel，不升级 Readiness，不生成 point generation 或 entry-stop-TP-RR，不接 order/execution/auto-trading。
+P283 test-only wiring remains completed and safe。P283 新增 `RealScanInputContractGuardValidatorTestOnlyWiringTest`，且 P283 CI passed before merge。P283 只是 test-only / targeted-test-only：test-only wiring can pass valid-looking `RealScanInputContractDTO` into `RealScanInputContractGuardValidator` and remain `REVIEW_ONLY`；missing Watchlist Pool proof remains `BLOCKED_MISSING_WATCHLIST_PROOF`；non-watchlist input remains `BLOCKED_NOT_WATCHLIST`；null input remains `INCOMPLETE`；blocked input cannot be upgraded to `REVIEW_ONLY`；outputs preserve `manualReviewRequired=true` and `notTradeInstruction=true`；P283 did not modify production Java or DTO files。
 
-下一阶段 market-read boundary scope 必须从 docs-only boundary audit / authorization gate 开始，不是 implementation。下一阶段 real scan input assembly scope 只能定义未来如何组装受保护的 `RealScanInputContractDTO`，但不实现。Future market-read Java must not be implemented until a separate authorization gate has passed。Future recommended next package after P284 should be P285 Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate, docs-only only。
+P285 只做 market-read boundary audit 和 real scan input assembly authorization gate。P285 只定义未来如何证明 Watchlist Pool membership、如何组装受保护的 `RealScanInputContractDTO`、以及未来 market-read Java 的进入条件。P285 不改 Java，不新增测试，不改 DTO，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime/live/external data，不创建 scan output，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Opportunity Push execution，不接 scheduler/API/dashboard，不接 external channel，不升级 Readiness，不生成 point generation 或 entry-stop-TP-RR，不接 order/execution/auto-trading。
+
+P285 market-read boundary audit starts as docs-only and does not authorize implementation。Future proof sources for Watchlist Pool membership may include a separately authorized canonical Watchlist Pool membership source/read model, a separately authorized DB-backed Watchlist Pool read, a reviewed watchlist config snapshot, or a targeted test fixture for test-only packages only。Display Slots / 默认六币 cannot prove scan eligibility and cannot become scan universe or batch universe。Watchlist Pool remains the scan candidate boundary。
+
+Future real scan input assembly entry conditions must include symbol, Watchlist Pool proof, watchlist config version, requested scan reason, requested timeframes, scan timestamp, stale/missing behavior, risk blockers, review-only flags, and guard validation result。When proof/source/timeframe/timestamp/data availability is missing, stale, contradictory, or unauthorized, the future flow must fail closed。Future market-read Java must not be implemented until a separate authorization gate has passed。Future recommended next package after P285 should be P286 Real Scan Input Assembly Plan or Market-Read Request Contract Authorization Gate, docs-only only unless separately authorized。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#686：BACKEND-P284 RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack
+#688：BACKEND-P285 Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281、P282、P283 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281、P282、P283、P284 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P284 RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack。
+完成 P285 Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate。
 ```
 
-P284 属于 A docs-only Scope Pack。P284 只允许文档变更。P284 不允许修改 Java，不允许修改 tests，不允许修改 DTO，不允许 dashboard/schema/config/API/scheduler，不允许 MarketQuoteClient / BinanceMarketQuoteClient，不允许 runtime/live/external data read，不允许 scan output，不允许 real scan loop，不允许 production ScanScore，不允许 Candidate production workflow，不允许 Opportunity Push execution，不允许 Readiness，不允许 point generation，不允许 entry-stop-TP-RR，不允许 order/execution/auto-trading。
+P285 属于 A docs-only Scope Pack。P285 只允许文档变更。P285 不允许修改 Java，不允许修改 tests，不允许修改 DTO，不允许 dashboard/schema/config/API/scheduler，不允许 MarketQuoteClient / BinanceMarketQuoteClient，不允许 runtime/live/external data read，不允许 scan output，不允许 real scan loop，不允许 production ScanScore，不允许 Candidate production workflow，不允许 Opportunity Push execution，不允许 Readiness，不允许 point generation，不允许 entry-stop-TP-RR，不允许 order/execution/auto-trading。
 
 ## 7. 当前禁止越界
 
