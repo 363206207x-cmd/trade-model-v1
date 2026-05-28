@@ -1,8 +1,10 @@
 # V1 Allowed Review-Only Outputs
 
-Review-only does not mean no output.
+Review-only does not mean no-output.
 
-The system may produce useful, structured, non-executable proposals when they are clearly marked as:
+Blocked does not mean no useful output.
+
+Review-only means the system can show useful, structured, non-executable proposals to a human while staying:
 
 - manual-review required;
 - not a trade instruction;
@@ -12,7 +14,7 @@ The system may produce useful, structured, non-executable proposals when they ar
 
 ## Allowed Review-Only Outputs
 
-The following outputs are allowed in review-only scope when their source ownership, freshness, risk state, and guard result are visible:
+The following are allowed review-only outputs when source ownership, freshness, risk state, guard status, and not-trade-instruction flags are visible:
 
 - entry zone proposal;
 - stop zone proposal;
@@ -34,7 +36,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 
 ## Forbidden Executable Outputs
 
-The following remain forbidden unless a future explicitly authorized scope changes the project boundary:
+The following remain forbidden:
 
 - automatic order;
 - automatic close;
@@ -42,12 +44,20 @@ The following remain forbidden unless a future explicitly authorized scope chang
 - automatic leverage change;
 - automatic execution.
 
-## Boundary Notes
+## Operational Rule
 
-Allowed review-only output must not be hidden behind broad blocked language. If a request is unsafe for execution, it should still state whether a safer review-only downgrade exists.
+When a path is unsafe for execution, docs and code should still answer:
 
-Examples:
+- Can a review-only proposal be shown?
+- Can a downgrade suggestion be shown?
+- Can a manual review state be shown?
+- What is the recovery condition?
 
-- `entry zone proposal` is allowed as review-only context; `place buy order` is not allowed.
-- `tighten stop suggestion` is allowed as review-only risk context; `modify stop order` is not allowed.
-- `internal push preview` is allowed; Telegram/email/webhook/app notification send is not allowed until separately authorized.
+Do not replace useful review-only output with broad "blocked forever" language.
+
+## Examples
+
+- `entry zone proposal` is allowed; `place buy order` is forbidden.
+- `tighten stop suggestion` is allowed; `modify stop order` is forbidden.
+- `internal push preview` is allowed; Telegram/email/webhook/app notification send is forbidden.
+- `confused with recovery condition` is allowed; infinite AI deadlock with no output is not useful.

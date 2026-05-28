@@ -1,8 +1,14 @@
 # V1 Capability Matrix
 
-This matrix is the fixed capability-level view for Trade Model V1.
+This matrix is the operational capability source of truth.
 
-Capability levels:
+Current merged main at P291B creation:
+
+- `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
+
+Open PR #705 P292 is not counted as completed until merged.
+
+## Capability Levels
 
 | Level | Name |
 |---:|---|
@@ -17,28 +23,35 @@ Capability levels:
 
 ## Matrix
 
-| Module | Current capability level | Completed | Not completed | Next MAX_SAFE_PACK | Cannot be mistaken as |
+| Module | Current level | Completed evidence | Not completed | Cannot be mistaken as | Next MAX_SAFE_PACK |
 |---|---:|---|---|---|---|
-| Watchlist Pool | 4 TEST_ONLY_WIRING | Boundary and proof rules exist; prior DTO / guard / no-op adapter work constrains candidate source. | Canonical production proof source is not fully closed for the new scan-chain. | Business-chain pack for Watchlist candidate source and proof source alignment. | Not Display Slots, not batch universe, not push universe. |
-| Display Slots | 5 REVIEW_ONLY_RUNTIME | Dashboard can display default slots and related state as a review surface. | Display Slots do not prove scan eligibility. | Keep as UI review surface while scan source comes from Watchlist Pool. | Not Watchlist Pool and not scan universe. |
-| Risk Action Guard | 5 REVIEW_ONLY_RUNTIME | Guard rules and dashboard review semantics exist. | It does not yet provide a complete downgrade-action suggestion chain for every MVP path. | Review-only downgrade output pack. | Not order execution, not auto-trading, not a permanent no-output block. |
-| RealScanInputContractDTO | 3 TARGETED_TEST | DTO and targeted tests preserve review-only / fail-closed semantics. | No production market read assembly. | Reuse in business-chain market-read test-only wiring after P291A. | Not runtime data read. |
-| RealScanInputContractGuardValidator | 3 TARGETED_TEST | Validator skeleton and tests block missing proof / unsafe flags. | No production service wiring. | Fold into market-read test-only wiring pack. | Not production scan loop. |
-| MarketReadRequestDTO | 3 TARGETED_TEST | Pure-data DTO with frozen P287 fields and targeted tests merged in P288. | No assembler and no runtime market-read execution. | MarketReadRequest test-only wiring or assembler scope after workflow reset. | Not MarketQuoteClient wiring. |
-| MarketReadRequestGuardValidator | 3 TARGETED_TEST | Fail-closed validator and targeted tests merged in P290. | No test-only wiring to the broader scan chain yet. | P291/P292 may resume as one test-only wiring pack after P291A. | Not production market read. |
-| MarketReadRequest test-only wiring | 0 NOT_STARTED | Not merged. | No fixture/helper connects DTO into validator chain beyond validator unit tests. | Combine P291 closure and P292 test-only wiring into one pack if still safe. | Not production wiring. |
-| MarketReadRequest assembler | 0 NOT_STARTED | Not implemented. | No conversion from RealScanInputContractDTO to MarketReadRequestDTO. | Test-only assembler pack, then review-only runtime adapter pack. | Not runtime provider call. |
-| MarketReadAdapter | 3 TARGETED_TEST | Safe adapter skeleton / no-op boundary exists for watchlist scan chain. | It is not connected to live provider data for the new scan-chain. | Review-only market-read adapter with fake/test fixture first, provider later. | Not real market read completion. |
-| MarketQuoteClient / BinanceMarketQuoteClient legacy runtime | 6 PRODUCTION_WIRING | Legacy runtime client and Binance implementation exist in older services. | Not authorized as production scan-chain market-read wiring. | Separate migration/adapter authorization before use in scan-chain. | Not proof that P287-P290 market-read chain is complete. |
-| scan output | 3 TARGETED_TEST | Review-only result DTO / assembly skeletons exist. | No production scan output from live market data. | Market read to scan output review-only runtime pack. | Not production scan loop. |
-| ScanScore | 3 TARGETED_TEST | DTO / rule / review-only calculator skeleton and tests exist. | No production ScanScore over live scan output. | Review-only ScanScore runtime pack after scan output. | Not production scoring. |
-| Candidate | 3 TARGETED_TEST | Candidate Attention / Promote review-only skeleton exists. | No production Candidate workflow from live scored scans. | Review-only Candidate assembly pack. | Not production candidate generation. |
-| Opportunity Push | 3 TARGETED_TEST | Review-only / no-op push, audit, queue, envelope, channel skeletons exist. | No external send and no production push execution. | Internal push preview + Push Recheck pack. | Not Telegram/email/webhook send. |
-| Push Recheck | 6 PRODUCTION_WIRING | Legacy scheduled recheck service exists and reads market client. | Not integrated with the new review-only scan-chain output. | Review-only internal preview recheck, no external send. | Not permission to send messages. |
-| ExecutionPlan | 5 REVIEW_ONLY_RUNTIME | Review-only execution plan display exists. | Not backed by a completed source-owned runtime candidate chain for all MVP outputs. | Review-only execution advice proposal pack. | Not order instruction. |
-| entry / stop / TP / RR | 3 TARGETED_TEST | Source-owned candidate designs and fixture-level tests exist. | No complete review-only runtime proposal chain from live scan output. | Review-only proposal pack with explicit not-trade-instruction flags. | Not executable trade signal. |
-| Position Monitor | 6 PRODUCTION_WIRING | Legacy position monitor / sync foundations exist, with simulated default and provider path guarded. | MVP review-only action suggestions are not fully connected to execution advice and monitor alerts. | Manual position entry + review-only monitor action pack. | Not auto-close, auto-reverse, or auto-order. |
-| AI Conflict / GPT / Gemini / Grok | 5 REVIEW_ONLY_RUNTIME | Heuristic conflict handling and role names exist. | No real three-AI provider orchestration, budget, cache, rate-limit, fallback, or final challenge chain. | AI conflict downgrade rule pack before provider integration. | Not actual GPT/Gemini/Grok arbitration. |
-| Dashboard | 5 REVIEW_ONLY_RUNTIME | Dashboard review surfaces exist for many read-only areas. | MVP smoke for the full business chain is not complete. | Dashboard MVP smoke pack after review-only chain outputs exist. | Not proof of production data integrity. |
-| Review | 5 REVIEW_ONLY_RUNTIME | Review/archive concepts and read-only display patterns exist. | Missed-valid logging and full feedback loop are not complete. | Review / missed-valid logging pack. | Not automatic rule correction. |
-| order / execution / auto-trading | 0 NOT_STARTED | Explicitly out of V1 runtime scope and blocked. | No order API, execution API, or auto-trading should be built. | None unless user explicitly opens a future non-V1 scope. | Not a V1 progress target. |
+| Watchlist Pool | 4 TEST_ONLY_WIRING | Boundary/proof rules, runtime source DTO/guard/no-op adapter/test-only wiring lineage are merged. | Canonical new scan-chain proof source is not fully closed. | Not Display Slots, not batch universe, not push universe. | Watchlist candidate source and proof-source alignment. |
+| Display Slots | 5 REVIEW_ONLY_RUNTIME | Dashboard/default slot review surface exists. | Does not prove scan eligibility. | Not Watchlist Pool and not scan universe. | Keep as UI review surface while Watchlist Pool owns scan eligibility. |
+| Risk Action Guard | 5 REVIEW_ONLY_RUNTIME | Review-only guard semantics and dashboard risk surfaces exist. | Full downgrade-action suggestion chain is incomplete. | Not order execution, not auto-trading, not permanent no-output block. | Review-only risk downgrade output pack. |
+| RealScanInputContractDTO | 3 TARGETED_TEST | P279 merged DTO/enum/targeted tests. | No production market-read assembly. | Not runtime data read. | Reuse in MarketReadRequest wiring after source-of-truth fill. |
+| RealScanInputContractGuardValidator | 3 TARGETED_TEST | P281 merged guard validator skeleton and targeted tests. | No production service wiring. | Not production scan loop. | Fold into market-read test-only wiring or assembler work. |
+| RealScanInputContract test-only wiring | 4 TEST_ONLY_WIRING | P283 merged test-only wiring test proving DTO -> guard flow. | No production wiring. | Not runtime market read. | Reuse pattern for MarketReadRequest test-only wiring. |
+| MarketReadRequestDTO | 3 TARGETED_TEST | P288 merged pure-data DTO skeleton and targeted tests. | No production market read; no runtime assembler. | Not production market read. | MarketReadRequest DTO -> GuardValidator test-only wiring. |
+| MarketReadRequestGuardValidator | 3 TARGETED_TEST | P290 merged fail-closed validator skeleton and targeted tests. | No test-only wiring on merged main. | Not production wiring. | MarketReadRequest test-only wiring. |
+| MarketReadRequest test-only wiring | 0 NOT_STARTED | Not merged on main. PR #705 is open and must not be counted. | No merged helper/fixture connects DTO into validator chain. | Not completed until PR #705 or equivalent merges. | P292 test-only wiring review/merge if approved. |
+| MarketReadRequest assembler | 0 NOT_STARTED | No merged assembler for MarketReadRequest. | No conversion from RealScanInputContractDTO to MarketReadRequestDTO. | Not production assembler. | Test-only assembler, then review-only output assembler. |
+| MarketReadAdapter | 3 TARGETED_TEST | Safe/no-op adapter skeleton and tests exist in watchlist scan lineage. | Not connected to live provider for new scan-chain. | Not real market read completion. | Review-only market-read output adapter with fake/test source first. |
+| MarketQuoteClient legacy runtime | 6 PRODUCTION_WIRING | Legacy market quote client interface exists and is used by older runtime paths. | Not authorized for new scan-chain. | Not new scan-chain completion. | Separate migration/adapter authorization before scan-chain use. |
+| BinanceMarketQuoteClient legacy runtime | 6 PRODUCTION_WIRING | Legacy Binance implementation exists for older runtime paths. | Not wired into P287-P290 MarketReadRequest chain. | Not authorized provider wiring for new scan-chain. | Separate provider boundary pack before scan-chain use. |
+| runtime market read for new scan-chain | 0 NOT_STARTED | No merged runtime market-read chain for P287-P290 path. | No provider read, no runtime/live/external data read. | Not legacy market client. | Review-only MarketRead output / scan output with fake/test input first. |
+| scan output | 3 TARGETED_TEST | Watchlist scan result DTO/assembler skeleton and targeted tests exist. | No production scan output from live market read. | Not real scan loop. | Review-only scan output from authorized MarketRead output. |
+| ScanScore | 3 TARGETED_TEST | ScanScore DTO/rule/calculator skeleton and tests exist. | No production ScanScore over live scan output. | Not production scoring. | Review-only ScanScore over review-only scan output. |
+| Candidate Attention | 3 TARGETED_TEST | Review-only Candidate Attention rule skeleton/tests exist. | No production Candidate workflow. | Not production candidate generation. | Review-only Candidate assembly from score. |
+| Promote To Home | 3 TARGETED_TEST | Promote-to-home boundary/review-only semantics exist. | No production promote runtime. | Not dashboard promotion execution. | Review-only promote preview only. |
+| Opportunity Push | 3 TARGETED_TEST | Review-only/no-op push, audit, queue, envelope, provider/channel skeletons exist. | No external send and no production push execution. | Not Telegram/email/webhook/app send. | Internal Opportunity Push preview. |
+| Push Recheck | 6 PRODUCTION_WIRING | Legacy scheduled recheck service exists. | Not aligned with new review-only scan-chain preview. | Not permission to send messages. | Push Recheck alignment for internal preview. |
+| Execution Advice | 5 REVIEW_ONLY_RUNTIME | ExecutionPlan review-only display exists. | Not backed by completed source-owned runtime candidate chain. | Not order instruction. | Review-only execution advice proposal. |
+| entry / stop / TP / RR | 3 TARGETED_TEST | Source-owned candidate designs and fixture-level tests exist. | Review-only proposal runtime is not complete; production points are blocked. | Not production point generation. | Review-only entry/stop/TP/RR proposal pack. |
+| manual position entry | 5 REVIEW_ONLY_RUNTIME | Manual/monitor review surfaces and position foundations exist. | Full manual-entry-to-monitor MVP loop is incomplete. | Not exchange write and not auto-position management. | Manual position entry alignment pack. |
+| Position Monitor | 6 PRODUCTION_WIRING | Legacy monitor/sync foundations exist with guarded provider path. | Review-only action suggestion loop is incomplete. | Not auto-close, auto-reverse, or auto-order. | Position monitoring action suggestion pack. |
+| AI Conflict / GPT / Gemini / Grok | 5 REVIEW_ONLY_RUNTIME | Heuristic conflict handling and role names exist. | Real GPT/Gemini/Grok provider orchestration is not complete. | Not actual three-AI arbitration. | AI conflict downgrade output and recovery-condition pack. |
+| Dashboard MVP smoke | 5 REVIEW_ONLY_RUNTIME | Dashboard review surfaces exist. | Full end-to-end MVP smoke is incomplete. | Not proof of production data integrity. | Dashboard MVP smoke after upstream review-only outputs. |
+| Review / Missed-valid logging | 5 REVIEW_ONLY_RUNTIME | Review/archive concepts and displays exist. | Missed-valid opportunity logging loop is incomplete. | Not automatic rule correction. | Review / missed-valid logging pack. |
+| order API | 0 NOT_STARTED | Explicitly blocked. | No order API should be built in V1. | Not a V1 progress target. | None unless user opens future non-V1 scope. |
+| execution API | 0 NOT_STARTED | Explicitly blocked. | No execution API should be built in V1. | Not a V1 progress target. | None unless user opens future non-V1 scope. |
+| auto-trading | 0 NOT_STARTED | Explicitly blocked. | No auto-trading should be built in V1. | Not a V1 progress target. | None unless user opens future non-V1 scope. |

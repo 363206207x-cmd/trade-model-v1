@@ -1,95 +1,70 @@
 # V1 Current State
 
-This file is a source-of-truth summary. Completion is based only on merged `main`.
+This file is the short current-state summary.
 
-## Current Main
+## Current HEAD
 
-- Source branch baseline: `main`
-- Current merged main: `42e3c6c BACKEND-P290 MarketReadRequestGuardValidator Java Skeleton (#699)`
-- Current workflow package: `BACKEND-P291A Workflow Reset and Progress Source of Truth Pack`
-- P291 / P292 feature progression: paused until P291A workflow reset is merged.
+- Current merged `main`: `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
+- Current work package: `BACKEND-P291B Source of Truth Operational Fill Pack`
+- P291B is not complete until merged.
 
-## Source-Of-Truth Rule
+## Completed Merged Packages
 
-Only merged `main` counts as completed.
+- P287 merged: Market-Read Request DTO Authorization Gate.
+- P288 merged: MarketReadRequestDTO Java Skeleton.
+- P289 merged: MarketReadRequestDTO Closure and Guard Validator Authorization Scope Pack.
+- P290 merged: MarketReadRequestGuardValidator Java Skeleton.
+- P291A merged: Workflow Reset and Progress Source of Truth Pack.
 
-Open Issues, open PRs, local branches, draft PRs, and chat memory do not count as completed progress.
+## Current Open PR
 
-Progress must be read together with:
+- PR #705: BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice.
 
-- `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
-- `docs/V1_CAPABILITY_MATRIX.md`
-- `docs/PROJECT_PROGRESS_INDEX.md`
-- `docs/V1_MVP_REALITY_ROADMAP.md`
+PR #705 is open and must not be counted as completed until merged.
 
-## What P287-P290 Actually Completed
+## Current Capability Chain Position
 
-P287-P290 completed market-read request contract and validator groundwork only:
+The MarketReadRequest chain on merged `main` is currently:
 
-- P287: docs-only authorization gate for future `MarketReadRequestDTO`.
-- P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
-- P289: docs-only closure and authorization for future guard validator.
-- P290: `MarketReadRequestGuardValidator` skeleton, validation result/status DTOs, and targeted validator test.
+- `MarketReadRequestDTO`: `3 TARGETED_TEST`
+- `MarketReadRequestGuardValidator`: `3 TARGETED_TEST`
+- `MarketReadRequest test-only wiring`: `0 NOT_STARTED`
+- `MarketReadRequest assembler`: `0 NOT_STARTED`
+- new scan-chain runtime market read: `0 NOT_STARTED`
 
-These packages are DTO / validator / skeleton / targeted-test work.
+## Current Next Recommendation
 
-They are not production market-read wiring.
+1. Merge P291B source-of-truth fill if review passes.
+2. Then review PR #705 P292 if still open.
+3. Do not start P293 while P292 remains open unless the user explicitly cancels or supersedes P292.
 
-They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the new scan-chain.
+## Not Completed
 
-They do not create runtime market reads, scan output, real scan loop, production ScanScore, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
+Current merged `main` is not:
 
-## What Is Still Not Completed
+- production market-read completion;
+- scan output completion;
+- score completion;
+- Candidate completion;
+- Push execution completion;
+- Readiness completion;
+- point generation completion;
+- entry / stop / TP / RR runtime proposal completion;
+- order / execution / auto-trading completion.
 
-The following remain incomplete for the new MVP chain:
+## Forbidden Overreach
 
-- MarketReadRequest test-only wiring.
-- MarketReadRequest assembler.
-- scan-chain market read adapter connected to authorized review-only inputs.
-- production/runtime market read for the new scan-chain.
-- scan output from live market data.
-- review-only ScanScore over real scan output.
-- review-only Candidate from scored scan output.
-- internal Opportunity Push preview from candidate output.
-- Push Recheck integration for preview expiry/drift handling.
-- review-only Execution Advice from a complete candidate chain.
-- runtime entry / stop / TP / RR proposal chain.
-- manual position entry to monitoring loop closure.
-- position-monitor downgrade/action suggestion loop.
-- real GPT / Gemini / Grok arbitration.
-- missed-valid opportunity logging and feedback loop.
-- dashboard MVP smoke over the full review-only chain.
+Do not claim:
 
-## Legacy Runtime Clarification
+- `MarketQuoteClient` / `BinanceMarketQuoteClient` are connected to the new scan-chain;
+- Display Slots are Watchlist Pool;
+- open PRs are completed;
+- review-only means no output;
+- blocked means no useful proposal;
+- skeleton/test-only work is production wiring.
 
-Legacy market and monitor components exist in the repository, including market clients, dashboard services, scheduled recheck, and position monitoring foundations.
+## Progress Baseline
 
-Those legacy capabilities must not be described as completion of the P287-P290 market-read request scan-chain.
+Use fixed progress ranges from `docs/PROJECT_PROGRESS_INDEX.md`.
 
-Any use of legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` in the new scan-chain requires a separate authorization package.
-
-## Review-Only Output Clarification
-
-P291A restores the principle that review-only does not mean no output.
-
-The system may produce safe manual-review proposals, such as entry zone proposal, stop zone proposal, TP proposal, RR estimate, position size suggestion, leverage cap suggestion, invalidation condition, reduce-position suggestion, tighten-stop suggestion, move-stop suggestion, partial take-profit suggestion, wait-for-trigger state, plan-invalidated state, internal push preview, risk-downgraded candidate, and confused-with-recovery-condition state.
-
-Those outputs must remain non-executable, manual-review required, and not trade instructions.
-
-Automatic order, close, reverse, leverage change, execution, and auto-trading remain blocked.
-
-## Current Recommendation
-
-Do not continue P291/P292 as small closure-only steps yet.
-
-First merge P291A to establish:
-
-- progress source of truth;
-- capability matrix;
-- allowed review-only output policy;
-- blocked capability registry;
-- workflow optimization rules;
-- MVP reality roadmap;
-- drift guard checklist.
-
-After P291A, resume work by business-chain MAX_SAFE_PACK, preferably combining P291 closure and P292 test-only wiring if the scope remains safe.
+P291B does not raise product or runtime progress. It only improves governance and operational clarity.

@@ -284,3 +284,25 @@ review-only 不等于 no output。
 ## 11. 本文件优先级
 
 本文件是工作流最高准则。若聊天记忆、旧提示词、旧文档和本文件冲突，优先按本文件执行。项目业务框架仍以 `docs/PROJECT_PROGRESS_INDEX.md` 和阶段文档为准。
+
+## 12. P291B Operational Source-of-Truth Rules
+
+每个任务包必须说明推动了哪条 business chain（业务链）。
+
+每个任务包必须说明 capability level（能力层级）是否提升；如果没有提升，必须说明为什么不是低价值重复。
+
+每个任务包必须说明 user-visible output（用户可见输出）或 review-only output（只读复核输出）是否改善。
+
+连续两个 docs-only 包之后，必须检查 low-value loop（低价值循环），并优先进入 capability movement（能力层级推进）。
+
+skeleton（骨架）之后默认进入 test-only wiring（仅测试接线），不再默认进入 closure-only（仅收口）。
+
+每次窗口迁移必须先读取：
+
+1. `git log --oneline -5`
+2. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
+3. `docs/V1_CAPABILITY_MATRIX.md`
+4. `docs/V1_CURRENT_STATE.md`
+5. `docs/PROJECT_PROGRESS_INDEX.md`
+
+open PR / branch / Issue 不算完成；只有 merged `main` 算完成。

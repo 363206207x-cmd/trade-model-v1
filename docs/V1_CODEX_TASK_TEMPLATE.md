@@ -277,3 +277,29 @@ If no, what remains blocked:
 - 是否至少推进一个业务链路节点？
 
 如果答案显示低价值重复，必须合并包、改包或暂停。
+
+## 13. P291B Operational Fill 必填项
+
+每个任务必须填写：
+
+```text
+Business-chain step:
+Capability before:
+Capability after:
+User-visible output improved: yes / no
+Review-only output improved: yes / no
+Production wiring: yes / no
+Open PR / branch counted as complete: no
+Source-of-truth docs updated if progress language changed: yes / no
+```
+
+每个任务必须检查：
+
+- 是否把 blocked 写成 no output。
+- 是否把 docs-only 写成 production complete。
+- 是否把 skeleton 写成 production wiring。
+- 是否把 targeted test 写成 runtime behavior。
+- 是否把 test-only wiring 写成 production。
+- 是否把 legacy runtime 写成新 scan-chain 完成。
+
+连续两个 docs-only 后，下一包必须优先寻找 capability movement，除非用户明确要求继续审计或风险跨档。

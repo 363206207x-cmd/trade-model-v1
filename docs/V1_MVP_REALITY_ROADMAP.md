@@ -1,31 +1,36 @@
 # V1 MVP Reality Roadmap
 
-This roadmap follows the user-facing business chain rather than P-number order.
+This roadmap follows the business chain, not P numbers.
+
+Current merged main at P291B creation:
+
+- `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
+
+Open PR #705 P292 is not counted as completed until merged.
 
 ## Roadmap
 
-| Step | Current status | Next MAX_SAFE_PACK | Risk level | Merge grouping recommendation |
-|---|---|---|---|---|
-| Watchlist candidate source | Boundary exists; production proof source for new scan-chain still needs alignment. | Watchlist candidate source and proof source alignment. | B | Can group with MarketReadRequest assembler planning if docs/test-only only. |
-| Market read request wiring | DTO and validator have targeted tests; no test-only chain wiring. | MarketReadRequest DTO to GuardValidator test-only wiring. | B | Merge P291 closure and P292 wiring into one package after P291A. |
-| Market read adapter | Safe/no-op skeleton exists; new scan-chain is not wired to live provider. | Review-only adapter path with fixture/fake data before live provider. | B | Keep separate from provider wiring. |
-| scan output | Skeleton/test layer exists; no production output from live read. | Review-only scan output assembly from test-only market read result. | B | Can group with ScanScore input contract if no runtime provider. |
-| review-only ScanScore | Review-only calculator skeleton exists. | Review-only score over scan output with targeted tests. | B | Can group with score explanation output. |
-| review-only Candidate | Candidate Attention / Promote skeleton exists. | Review-only candidate assembly from score. | B | Can group with internal push preview only if no external send. |
-| internal Opportunity Push preview | No-op/audit/channel skeletons exist. | Internal preview only, no external channel. | B | Can group with Push Recheck preview. |
-| Push Recheck | Legacy recheck exists; not integrated with new preview chain. | Internal preview recheck with expiry/drift handling. | B | Keep external send blocked. |
-| review-only Execution Advice | Display exists, but full chain input not complete. | Execution advice proposal from review-only Candidate. | B | Can group with entry/stop/TP/RR proposal tests. |
-| entry / stop / TP / RR proposal | Fixture/design/test pieces exist; runtime proposal chain incomplete. | Review-only proposal pack with source ownership and guard status. | B | Keep separate from order/execution. |
-| manual position entry | Legacy position foundations exist. | Manual position entry review-only state alignment. | B | Can group with position-monitor display if no provider write. |
-| position monitoring | Legacy monitor/sync foundation exists. | Review-only monitor action suggestions. | B | Keep automatic close/reverse blocked. |
-| AI conflict downgrade | Heuristic role/conflict logic exists; real GPT/Gemini/Grok orchestration not complete. | AI conflict downgrade and recovery-condition pack. | B/C | Provider integration requires separate C-level authorization. |
-| dashboard MVP smoke | Dashboard has review surfaces; full chain smoke incomplete. | MVP smoke after upstream review-only outputs exist. | B | Keep separate from major dashboard redesign. |
-| review / missed-valid logging | Review concepts exist; feedback loop incomplete. | Missed-valid logging and review archive pack. | B | Can group with dashboard archive display if safe. |
+| Business step | Current status | Next MAX_SAFE_PACK | Risk level | Blocked? | User authorization required? |
+|---|---|---|---|---|---|
+| Watchlist candidate source | Boundary and proof semantics exist; canonical new scan-chain proof source still needs alignment. | Watchlist candidate source and proof-source alignment. | B | Partially blocked until proof source is explicit. | Yes, B confirmation before merge. |
+| MarketReadRequest test-only wiring | Not completed on merged main; PR #705 is open. | Review and merge P292 if approved, or recreate test-only wiring pack. | B | Not blocked, but not done. | Yes, B confirmation before merge. |
+| MarketReadRequest assembler | Not started on merged main. | Test-only assembler from RealScanInputContractDTO to MarketReadRequestDTO. | B | Production assembler blocked. | Yes, B confirmation before merge. |
+| review-only market read output | Not started for new scan-chain. | Review-only output object from validated MarketReadRequest, no provider. | B | Runtime/provider read blocked. | Yes, B confirmation before merge. |
+| review-only scan output | Skeleton/test layer exists; no output from MarketRead chain. | Assemble review-only scan output from review-only market read output. | B | Production scan output blocked. | Yes, B confirmation before merge. |
+| review-only ScanScore | DTO/rule/calculator tests exist. | Score review-only scan output with explanation and fail-closed flags. | B | Production scoring blocked. | Yes, B confirmation before merge. |
+| review-only Candidate | Candidate Attention/Promote skeletons exist. | Build review-only Candidate from review-only score. | B | Production Candidate workflow blocked. | Yes, B confirmation before merge. |
+| internal Opportunity Push preview | No-op/audit/channel skeletons exist. | Internal preview only, no external send. | B | External send blocked. | Yes, B confirmation before merge. |
+| Push Recheck alignment | Legacy recheck exists; not aligned with new preview chain. | Recheck internal preview for expiry/drift without sending. | B | External push execution blocked. | Yes, B confirmation before merge. |
+| review-only Execution Advice proposal | ExecutionPlan display exists; full input chain incomplete. | Review-only advice proposal from review-only Candidate. | B | Order/execution/readiness blocked. | Yes, B confirmation before merge. |
+| entry / stop / TP / RR proposal | Design/fixture tests exist; runtime review-only proposal incomplete. | Review-only proposal with source ownership and not-trade-instruction flags. | B/C | Production point generation blocked. | Yes; C if real numeric generation is production-facing. |
+| manual position entry | Foundations exist; MVP loop incomplete. | Manual entry alignment for review-only monitor. | B | Exchange write blocked. | Yes, B confirmation before merge. |
+| position monitoring action suggestion | Legacy monitor exists; action suggestion loop incomplete. | Review-only reduce/tighten/move/partial/invalidated suggestions. | B/C | Auto-close/reverse/order blocked. | Yes; C if it affects real risk actions. |
+| AI conflict downgrade output | Heuristic conflict logic exists; real providers absent. | Downgrade/recovery-condition output without provider calls. | B/C | Real GPT/Gemini/Grok provider orchestration blocked. | Yes; C for provider integration. |
+| dashboard MVP smoke | Dashboard surfaces exist; full chain smoke incomplete. | MVP smoke after upstream review-only outputs exist. | B | Major dashboard redesign blocked. | Yes, B confirmation before merge. |
+| review / missed-valid logging | Review concepts exist; missed-valid loop incomplete. | Missed-valid logging and review archive pack. | B | Automatic rule correction blocked. | Yes, B confirmation before merge. |
 
-## MVP Definition
+## Operational Next Step
 
-MVP means the user can review a safe, non-executable chain:
+If PR #705 is still open, review P292 first after P291B merges.
 
-Watchlist candidate -> market read request -> market read result -> scan output -> review-only score -> review-only Candidate -> internal push preview -> recheck -> review-only execution advice -> manual position monitor -> review / missed-valid log.
-
-MVP does not require auto-trading, external send, or executable readiness.
+Do not start P293 while P292 remains open unless the user explicitly cancels or supersedes P292.

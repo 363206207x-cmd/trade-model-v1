@@ -210,3 +210,18 @@ Low-value repeat risk: yes / no
 ```
 
 如果 capability level 没有提升，必须说明该 PR 是否仍有必要合并。
+
+## 12. P291B Operational Review Checks
+
+PR 审查必须额外确认：
+
+- PR 是否说明推动了哪个 business chain。
+- PR 是否说明 capability level before / after。
+- PR 是否说明 user-visible output 是否改善。
+- PR 是否把 blocked 写成 no output。
+- PR title 是否夸大实际 diff。
+- PR 是否按 Source of Truth 更新状态。
+- PR 是否把 open PR / branch / Issue 当作完成。
+- PR 是否把 skeleton / targeted test / test-only wiring 写成 production。
+
+如果 PR 改了进度语言但没有更新 `docs/V1_CURRENT_STATE.md`、`docs/PROJECT_PROGRESS_INDEX.md` 或 `docs/V1_CAPABILITY_MATRIX.md`，必须要求修复后再合并。
