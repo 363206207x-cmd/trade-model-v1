@@ -183,3 +183,30 @@ git diff --check
 - B 档：请用户确认业务方向
 - C 档：暂停，等待明确授权
 ```
+
+## 11. P291A 后新增审查项
+
+每个 PR 必须额外检查：
+
+- capability level 是否提升。
+- 是否重复 blocked list 而没有新能力。
+- PR title 是否夸大了实际 diff。
+- 产品可用性是否增加。
+- 是否把 review-only 误写成 no output。
+- 是否有 allowed downgrade output。
+- 是否把 docs-only 写成 production complete。
+- 是否把 skeleton 写成 production wiring。
+- 是否把 open PR / branch / Issue 写成 current main 已完成。
+- 是否把 legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` 误写成新 scan-chain 已完成。
+
+审查结论必须写明：
+
+```text
+Capability level before:
+Capability level after:
+Business-chain step moved:
+Allowed review-only output preserved or improved:
+Low-value repeat risk: yes / no
+```
+
+如果 capability level 没有提升，必须说明该 PR 是否仍有必要合并。
