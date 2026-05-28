@@ -1,0 +1,17 @@
+name: workflow-contract
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  workflow-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check workflow contract
+        run: bash scripts/check-workflow-contract.sh

@@ -5,9 +5,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main baseline before P292: `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
-- Current workflow package: `BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice`
-- P291A is complete on main. P292 resumes business-chain progression after the workflow reset.
+- Current merged main: `3ab51dd BACKEND-P291C Workflow Enforcement and Session Bootstrap Pack (#709)`
+- Current workflow package in PR #705 / branch `p292`: `BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice`
+- Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
+- P291A and P291C are complete on main. P292 remains the active Market Read block and does not count as merged main completion until PR #705 is merged.
 
 ## Source-Of-Truth Rule
 
@@ -21,6 +22,8 @@ Progress must be read together with:
 - `docs/V1_CAPABILITY_MATRIX.md`
 - `docs/PROJECT_PROGRESS_INDEX.md`
 - `docs/V1_MVP_REALITY_ROADMAP.md`
+- `docs/ACTIVE_MAINLINE_STATUS.yml`
+- `docs/SESSION_BOOTSTRAP.md`
 
 ## What P287-P292 Actually Completed
 
@@ -90,4 +93,8 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 Do not describe P292 as production market read.
 
-After P292, continue by business-chain MAX_SAFE_PACK into review-only MarketRead output / scan output.
+After P291C, new windows must follow `docs/SESSION_BOOTSTRAP.md` and answer with `docs/ANSWER_FORMAT_CONTRACT.md`.
+
+After PR #705 merges, continue by business-chain MAX_SAFE_PACK into review-only MarketRead output / scan output.
+
+Do not continue to P293 while PR #705 remains open.

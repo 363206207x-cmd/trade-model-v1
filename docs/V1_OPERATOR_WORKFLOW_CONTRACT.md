@@ -1,6 +1,6 @@
 # V1 Operator Workflow Contract（V1 操作工作流契约）
 
-本文件是 Trade Model V1 的长期工作流宪法。以后新聊天窗口、Codex、PR 审查和阶段推进，都必须先读取本文件，再读取 `docs/V1_CURRENT_STATE.md`，然后再继续工作。
+本文件是 Trade Model V1 的长期工作流宪法。以后新聊天窗口、Codex、PR 审查和阶段推进，都必须先读取 `docs/SESSION_BOOTSTRAP.md`，再读取 `docs/ACTIVE_MAINLINE_STATUS.yml`、本文件和 source-of-truth 文件，然后再继续工作。
 
 ## 1. 使用者约束
 
@@ -15,13 +15,17 @@
 
 ## 2. 新窗口启动规则
 
-新窗口第一步必须读取：
+新窗口第一步必须读取 `docs/SESSION_BOOTSTRAP.md`，并按它执行。
 
-1. `docs/V1_OPERATOR_WORKFLOW_CONTRACT.md`
-2. `docs/V1_CURRENT_STATE.md`
-3. `docs/V1_CODEX_TASK_TEMPLATE.md`
-4. `docs/V1_PR_REVIEW_CHECKLIST.md`
-5. `docs/PROJECT_PROGRESS_INDEX.md`
+随后读取：
+
+1. `docs/ACTIVE_MAINLINE_STATUS.yml`
+2. `docs/V1_OPERATOR_WORKFLOW_CONTRACT.md`
+3. `docs/V1_CURRENT_STATE.md`
+4. `docs/V1_CODEX_TASK_TEMPLATE.md`
+5. `docs/V1_PR_REVIEW_CHECKLIST.md`
+6. `docs/PROJECT_PROGRESS_INDEX.md`
+7. `docs/ANSWER_FORMAT_CONTRACT.md`
 
 读取后只输出短确认：
 
@@ -34,6 +38,8 @@
 ```
 
 如果当前阶段、交付物、风险等级或授权要求不清楚，不允许创建 Issue（问题单）或 PR（合并请求）。
+
+Open PR（未合并请求）不算完成，branch（分支）不算完成，Issue（问题单）不算完成，Codex 输出不算完成。只有 merged main（已合并主分支）算完成。
 
 ## 3. 固定工作顺序
 
@@ -284,3 +290,15 @@ review-only 不等于 no output。
 ## 11. 本文件优先级
 
 本文件是工作流最高准则。若聊天记忆、旧提示词、旧文档和本文件冲突，优先按本文件执行。项目业务框架仍以 `docs/PROJECT_PROGRESS_INDEX.md` 和阶段文档为准。
+
+## 12. P291C Workflow Enforcement
+
+每次窗口迁移必须先使用 `docs/SESSION_BOOTSTRAP.md`。
+
+回答状态、进度、任务交接和 PR 审查时，必须使用 `docs/ANSWER_FORMAT_CONTRACT.md` 的字段。
+
+每个 PR 必须填写 `.github/pull_request_template.md` 中的 capability level（能力层级）、source of truth（真相源）、review-only output（只读输出）和 overreach check（越界检查）。
+
+CI 必须运行 `bash scripts/check-workflow-contract.sh`。
+
+如果 workflow contract check（工作流契约检查）失败，不允许合并。

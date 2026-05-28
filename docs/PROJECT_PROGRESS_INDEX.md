@@ -6,15 +6,19 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
+- `3ab51dd BACKEND-P291C Workflow Enforcement and Session Bootstrap Pack (#709)`
 
-Current capability movement pack:
+Current active capability movement pack:
 
-- `BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice`
+- `BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice` in PR #705 / branch `p292`, pending merge.
 
-P292 is capability movement, not closure-only. It moves `MarketReadRequest test-only wiring` from `0 NOT_STARTED` to `4 TEST_ONLY_WIRING`.
+P292 is capability movement, not closure-only. In PR #705, it moves `MarketReadRequest test-only wiring` from `0 NOT_STARTED` to `4 TEST_ONLY_WIRING`.
 
-P292 only permits a small Skeleton / Test and MVP-chain improvement. It must not raise Production Runtime Progress.
+P292 only permits a small Skeleton / Test and MVP-chain improvement inside the PR. It must not raise Production Runtime Progress, and it does not count as merged main completion until PR #705 merges.
+
+P291C does not raise feature progress. It enforces session bootstrap, answer format, PR template, workflow contract script, and CI workflow-contract check.
+
+Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
 
 ## Fixed Progress Percentages
 
@@ -38,6 +42,8 @@ Skeleton packages may improve Skeleton / Test Progress, but must not be describe
 
 Open PRs, branches, Issues, and draft work must not be counted as completed.
 
+Codex output must not be counted as completed.
+
 Legacy runtime `MarketQuoteClient` / `BinanceMarketQuoteClient` capability must not be treated as completion of the new scan-chain market-read request path.
 
 ## Current Capability Summary
@@ -53,6 +59,8 @@ The next useful upgrades should move modules from:
 ## Business Chain Priority
 
 Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
+
+Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
 Near-term priority after P291A:
 

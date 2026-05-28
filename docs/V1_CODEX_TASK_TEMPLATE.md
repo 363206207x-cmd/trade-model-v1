@@ -52,6 +52,9 @@ git status
 
 ```text
 必须读取：
+- docs/SESSION_BOOTSTRAP.md
+- docs/ACTIVE_MAINLINE_STATUS.yml
+- docs/ANSWER_FORMAT_CONTRACT.md
 - docs/V1_OPERATOR_WORKFLOW_CONTRACT.md
 - docs/V1_CURRENT_STATE.md
 - docs/V1_CODEX_TASK_TEMPLATE.md
@@ -59,6 +62,8 @@ git status
 - docs/PROJECT_PROGRESS_INDEX.md
 - <PHASE_PREVIOUS_DOCS>
 ```
+
+Open PR 不算完成。branch 不算完成。Issue 不算完成。Codex 输出不算完成。merged main 才算完成。
 
 ## 5. 允许修改文件
 
@@ -200,6 +205,30 @@ Codex 最终输出必须逐项确认每条边界没有越界，特别是 Java / 
 ```
 
 A 档通常无需用户业务确认。B 档需要用户一句业务确认。C 档必须暂停等用户明确授权。
+
+## 12. P291C Workflow Contract Requirements
+
+每个 Codex 任务必须声明：
+
+```text
+Current Mainline（当前主线）:
+Current Block（当前模块）:
+Current Level（当前层级）:
+Done Criteria（完成标准）:
+Current PR（当前 PR）:
+Can Merge?（能否合并）:
+Next Step（下一步）:
+Remaining Steps（剩余步骤）:
+Do Not Do（禁止事项）:
+```
+
+每个任务必须运行适用的 workflow contract check：
+
+```bash
+bash scripts/check-workflow-contract.sh
+```
+
+如果任务修改 Java 或 test 路径，PR 模板和状态文件必须包含 capability level 字段。
 
 ## 12. P291A 后新增必填项
 

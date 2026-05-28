@@ -15,6 +15,10 @@ Head commit（当前提交）：xxx
 风险档位：A / B / C
 ```
 
+审查前必须读取 `docs/SESSION_BOOTSTRAP.md`、`docs/ACTIVE_MAINLINE_STATUS.yml` 和 `docs/ANSWER_FORMAT_CONTRACT.md`。
+
+Open PR 不算完成，branch 不算完成，Issue 不算完成，Codex 输出不算完成。只有 merged main 算完成。
+
 ## 2. 改动范围检查
 
 必须检查：
@@ -93,6 +97,7 @@ Head commit（当前提交）：xxx
 必须检查：
 
 - CI（自动测试）是否成功。
+- workflow-contract（工作流契约检查）是否成功。
 - Compile（编译）是否成功。
 - Verify（验证）是否成功。
 - 若有 targeted test（目标测试），是否成功。
@@ -210,3 +215,16 @@ Low-value repeat risk: yes / no
 ```
 
 如果 capability level 没有提升，必须说明该 PR 是否仍有必要合并。
+
+## 12. Workflow Contract Review
+
+PR 审查必须检查：
+
+- `.github/pull_request_template.md` 是否填写 capability level before / after。
+- `docs/ACTIVE_MAINLINE_STATUS.yml` 是否仍反映当前主线。
+- `docs/ANSWER_FORMAT_CONTRACT.md` 是否被遵守。
+- 是否把 blocked 写成 no output。
+- 是否按 Source of Truth 更新状态。
+- PR 标题是否夸大实际 diff。
+
+若 `bash scripts/check-workflow-contract.sh` 输出不是 `WORKFLOW_CONTRACT_OK`，必须要求修复。
