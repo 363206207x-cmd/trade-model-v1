@@ -200,3 +200,80 @@ Codex 最终输出必须逐项确认每条边界没有越界，特别是 Java / 
 ```
 
 A 档通常无需用户业务确认。B 档需要用户一句业务确认。C 档必须暂停等用户明确授权。
+
+## 12. P291A 后新增必填项
+
+每个任务必须补充以下内容。
+
+### 12.1 Capability Level Uplift
+
+必须写明本轮提升哪个 capability level：
+
+```text
+Capability before:
+Capability after:
+Business-chain step:
+Why this is not a low-value repeat:
+```
+
+允许的层级：
+
+- `0 NOT_STARTED`
+- `1 DOCS_ONLY_GATE`
+- `2 SKELETON`
+- `3 TARGETED_TEST`
+- `4 TEST_ONLY_WIRING`
+- `5 REVIEW_ONLY_RUNTIME`
+- `6 PRODUCTION_WIRING`
+- `7 PRODUCTION_READY`
+
+### 12.2 Allowed Review-Only Outputs
+
+每个任务必须列出本轮允许或保持允许的 review-only outputs。
+
+如果本轮没有任何 allowed review-only output，必须解释为什么仍然值得做。
+
+可选输出包括：
+
+- entry zone proposal
+- stop zone proposal
+- TP proposal
+- RR estimate
+- position size suggestion
+- leverage cap suggestion
+- invalidation condition
+- reduce position
+- tighten stop
+- move stop
+- partial take-profit
+- wait for trigger
+- plan invalidated
+- manual review required
+- internal push preview
+- risk downgraded candidate
+- confused with recovery condition
+
+### 12.3 Production Wiring Declaration
+
+每个任务必须明确：
+
+```text
+This is production wiring: yes / no
+If yes, explicit authorization source:
+If no, what remains blocked:
+```
+
+除非用户明确授权，否则不能把 skeleton、targeted test、test-only wiring、review-only runtime 写成 production wiring。
+
+### 12.4 Low-Value Repeat Check
+
+提交前必须回答：
+
+- 是否只是 closure-only？
+- 是否只是重复 blocked list？
+- 是否把 docs-only 当成 production complete？
+- 是否把 skeleton 当成 production wiring？
+- 是否把 review-only 写成 no output？
+- 是否至少推进一个业务链路节点？
+
+如果答案显示低价值重复，必须合并包、改包或暂停。

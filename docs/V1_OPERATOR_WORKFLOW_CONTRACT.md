@@ -218,6 +218,69 @@ cd /Users/xuchao/Documents/trade-model-v1 && git switch main && git pull origin 
 最后输出：当前状态 / 下一步 / Issue-PR-Branch / Codex 任务包 / 审查结论。
 ```
 
-## 10. 本文件优先级
+## 10. P291A 工作流重置规则
+
+P291A 之后，项目推进必须从“只设边界”切换为“安全但可用的 review-only MVP 链路”。
+
+### 10.1 Business-chain MAX_SAFE_PACK
+
+优先按业务链路推进最大安全任务包，而不是按 closure / authorization / still-blocked 小碎包推进。
+
+默认业务链路为：
+
+1. Watchlist candidate source
+2. Market read request wiring
+3. Market read adapter
+4. scan output
+5. review-only ScanScore
+6. review-only Candidate
+7. internal Opportunity Push preview
+8. Push Recheck
+9. review-only Execution Advice
+10. entry / stop / TP / RR proposal
+11. manual position entry
+12. position monitoring
+13. AI conflict downgrade
+14. dashboard MVP smoke
+15. review / missed-valid logging
+
+### 10.2 Closure-only 限制
+
+禁止把 closure-only / still-blocked-only 作为默认下一步。
+
+docs-only closure 和下一步 authorization 如果风险档位一致，默认合并为一个 Scope Pack。
+
+连续两个 docs-only 包之后，下一包必须提升能力层级，除非跨风险档位或用户明确要求继续文档审计。
+
+### 10.3 Capability Level Required
+
+每个任务必须声明提升哪个 capability level，使用：
+
+- `0 NOT_STARTED`
+- `1 DOCS_ONLY_GATE`
+- `2 SKELETON`
+- `3 TARGETED_TEST`
+- `4 TEST_ONLY_WIRING`
+- `5 REVIEW_ONLY_RUNTIME`
+- `6 PRODUCTION_WIRING`
+- `7 PRODUCTION_READY`
+
+如果没有提升能力层级，必须解释为什么仍值得做。
+
+### 10.4 Merged Main Only
+
+只有 merged `main` 算完成。
+
+open PR、branch、Issue、draft PR、聊天记忆、计划文档都不能写成已完成。
+
+### 10.5 Review-only Allowed Output Principle
+
+review-only 不等于 no output。
+
+允许 safe / manual-review / not-trade-instruction 的输出，例如 entry zone proposal、stop zone proposal、TP proposal、RR estimate、position size suggestion、leverage cap suggestion、invalidation condition、reduce position、tighten stop、move stop、partial take-profit、wait for trigger、plan invalidated、internal push preview、risk downgraded candidate、confused with recovery condition。
+
+禁止 automatic order、automatic close、automatic reverse、automatic leverage change、automatic execution 和 auto-trading。
+
+## 11. 本文件优先级
 
 本文件是工作流最高准则。若聊天记忆、旧提示词、旧文档和本文件冲突，优先按本文件执行。项目业务框架仍以 `docs/PROJECT_PROGRESS_INDEX.md` 和阶段文档为准。
