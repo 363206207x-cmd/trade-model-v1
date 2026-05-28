@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-c64c8b8 BACKEND-P285 Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate (#689)
+c09a15c BACKEND-P286 Market-Read Request Contract Authorization Gate (#691)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并，P282 已完成并合并，P283 已完成并合并，P284 已完成并合并，P285 已完成并合并。当前主线基准为 P285 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并，P282 已完成并合并，P283 已完成并合并，P284 已完成并合并，P285 已完成并合并，P286 已完成并合并。当前主线基准为 P286 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -106,6 +106,7 @@ P282：RealScanInputContractGuardValidator Closure and Test-Only Wiring Authoriz
 P283：RealScanInputContractGuardValidator Test-Only Wiring Skeleton（真实扫描输入契约保护校验器仅测试接线骨架）
 P284：RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack（真实扫描输入契约保护校验器仅测试接线收口与 market-read 边界范围包）
 P285：Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate（market-read 边界审计与真实扫描输入组装授权门）
+P286：Market-Read Request Contract Authorization Gate（market-read 请求契约授权门）
 ```
 
 ## 3. 当前项目真实状态
@@ -200,6 +201,7 @@ P285：Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gat
 - RealScanInputContractGuardValidator Test-Only Wiring Skeleton（真实扫描输入契约保护校验器仅测试接线骨架）。
 - RealScanInputContractGuardValidator Test-Only Wiring Closure and Market-Read Boundary Scope Pack（真实扫描输入契约保护校验器仅测试接线收口与 market-read 边界范围包）。
 - Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gate（market-read 边界审计与真实扫描输入组装授权门）。
+- Market-Read Request Contract Authorization Gate（market-read 请求契约授权门，docs-only / contract-only）。
 
 当前仍未完成：
 
@@ -247,40 +249,40 @@ P285：Market-Read Boundary Audit and Real Scan Input Assembly Authorization Gat
 当前已创建但尚未完成的 Draft PR：
 
 ```text
-PR #691：BACKEND-P286 Market-Read Request Contract Authorization Gate
-Branch：p286
-Issue：#690
+PR #693：BACKEND-P287 Market-Read Request DTO Authorization Gate
+Branch：p287
+Issue：#692
 风险档位：A docs-only Scope Pack, no Java/test/DTO/dashboard/schema/config/API/scheduler/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/scan output/real scan loop/production ScanScore/Candidate workflow/Push execution/Readiness/point generation/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
-P285 merged as `c64c8b8`。P285 是 docs-only / boundary-only。P285 kept market-read Java blocked。P285 只审计 market-read boundary、Watchlist Pool proof source、real scan input assembly authorization gate，不实现 Java、不读 runtime/live/external data、不创建 scan output、不创建 real scan loop。
+P286 merged as `c09a15c`。P286 是 docs-only / contract-only。P286 defined future `MarketReadRequestDTO` field plan, safety defaults, source boundary, and DTO authorization gate。P286 kept Java blocked。
 
-P286 只做 Market-Read Request Contract Authorization Gate。P286 定义 future `MarketReadRequestDTO` field plan、safety defaults、source boundary 和 future DTO skeleton authorization conditions。Future `MarketReadRequestDTO` must originate only from a GuardValidator-approved `RealScanInputContractDTO`，并保持 `reviewOnly=true` / `notTradeInstruction=true`，不能产生 scan output、score、Candidate、Push、Readiness、point generation 或 trading action。
+P287 只做 Market-Read Request DTO Authorization Gate。P287 授权 P288 implement `MarketReadRequestDTO` Java skeleton only if P288 remains pure data only and targeted-test-only。Future DTO must originate only from a GuardValidator-approved `RealScanInputContractDTO`，并保持 `reviewOnly=true` / `notTradeInstruction=true`，不能产生 scan output、score、Candidate、Push、Readiness、point generation 或 trading action。
 
-Future `MarketReadRequestDTO` required fields to consider include symbol, requestId, sourceContractId, watchlistPoolProof, watchlistConfigVersion, requestedScanReason, requestedTimeframes, scanTimestamp, dataAvailabilityExpectation, stalePolicy, missingDataPolicy, riskBlockers, reviewOnly flag, notTradeInstruction flag, guardValidationStatus, and blockingReasons。
+Future `MarketReadRequestDTO` frozen fields are symbol, requestId, sourceContractId, watchlistPoolProof, watchlistConfigVersion, requestedScanReason, requestedTimeframes, scanTimestamp, dataAvailabilityExpectation, stalePolicy, missingDataPolicy, riskBlockers, reviewOnly, notTradeInstruction, guardValidationStatus, and blockingReasons。
 
-Future request assembly must fail closed when required field/source/proof/timeframe/timestamp/stale policy/missing-data policy is missing or invalid。P286 keeps future DTO skeleton Java blocked until a separate authorization gate passes。P286 不改 Java，不新增测试，不改 DTO，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime/live/external data，不创建 scan output，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Opportunity Push execution，不接 scheduler/API/dashboard，不接 external channel，不升级 Readiness，不生成 point generation 或 entry-stop-TP-RR，不接 order/execution/auto-trading。
+Future DTO safety defaults must preserve `reviewOnly=true`, `notTradeInstruction=true`, fail-closed stale/missing policy, missing proof blocked, missing source contract blocked, and missing timestamp/timeframe blocked。P287 不改 Java，不新增测试，不改 DTO，不接 MarketQuoteClient / BinanceMarketQuoteClient，不读取 runtime/live/external data，不创建 scan output，不创建 real scan loop，不实现 production ScanScore computation，不实现 Candidate production workflow，不实现 Opportunity Push execution，不接 scheduler/API/dashboard，不接 external channel，不升级 Readiness，不生成 point generation 或 entry-stop-TP-RR，不接 order/execution/auto-trading。
 
-Future recommended next package after P286 should be P287 Market-Read Request DTO Authorization Gate or DTO Skeleton, depending on whether another docs-only gate is needed。Display Slots / 默认六币 cannot be scan universe or batch universe。Watchlist Pool remains the scan candidate boundary。Risk Action Guard must remain before delivery / Push / Readiness。踩踏状态禁止机会推送。插针不等于趋势反转。强反转不等于直接反手。
+Future recommended next package after P287 should be P288 MarketReadRequestDTO Skeleton if the authorization is complete, otherwise another docs-only gate。Display Slots / 默认六币 cannot be scan universe or batch universe。Watchlist Pool remains the scan candidate boundary。Risk Action Guard must remain before delivery / Push / Readiness。踩踏状态禁止机会推送。插针不等于趋势反转。强反转不等于直接反手。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#690：BACKEND-P286 Market-Read Request Contract Authorization Gate
+#692：BACKEND-P287 Market-Read Request DTO Authorization Gate
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281、P282、P283、P284、P285 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281、P282、P283、P284、P285、P286 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P286 Market-Read Request Contract Authorization Gate。
+完成 P287 Market-Read Request DTO Authorization Gate。
 ```
 
-P286 属于 A docs-only Scope Pack。P286 只允许文档变更。P286 不允许修改 Java，不允许修改 tests，不允许修改 DTO，不允许 dashboard/schema/config/API/scheduler，不允许 MarketQuoteClient / BinanceMarketQuoteClient，不允许 runtime/live/external data read，不允许 scan output，不允许 real scan loop，不允许 production ScanScore，不允许 Candidate production workflow，不允许 Opportunity Push execution，不允许 Readiness，不允许 point generation，不允许 entry-stop-TP-RR，不允许 order/execution/auto-trading。
+P287 属于 A docs-only Scope Pack。P287 只允许文档变更。P287 不允许修改 Java，不允许修改 tests，不允许修改 DTO，不允许 dashboard/schema/config/API/scheduler，不允许 MarketQuoteClient / BinanceMarketQuoteClient，不允许 runtime/live/external data read，不允许 scan output，不允许 real scan loop，不允许 production ScanScore，不允许 Candidate production workflow，不允许 Opportunity Push execution，不允许 Readiness，不允许 point generation，不允许 entry-stop-TP-RR，不允许 order/execution/auto-trading。
 
 ## 7. 当前禁止越界
 
