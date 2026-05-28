@@ -7,10 +7,10 @@
 当前 main（主分支）基准：
 
 ```text
-c7fa73f BACKEND-P289 MarketReadRequestDTO Closure and Guard Validator Authorization Scope Pack (#697)
+42e3c6c BACKEND-P290 MarketReadRequestGuardValidator Java Skeleton (#699)
 ```
 
-说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并，P282 已完成并合并，P283 已完成并合并，P284 已完成并合并，P285 已完成并合并，P286 已完成并合并，P287 已完成并合并，P288 已完成并合并，P289 已完成并合并。当前主线基准为 P289 合并后状态。
+说明：WORKFLOW-P1 已合并，P204 已合并，P205 已完成并合并，P206 已完成并合并，P207 已完成并合并，P208 已完成并合并，P209 已完成并合并，P210 已完成并合并，P211 已完成并合并，P212 已完成并合并，P213 已完成并合并，P214 已完成并合并，P215 已完成并合并，P216 已完成并合并，P217 已完成并合并，P218 已完成并合并，P219 已完成并合并，P220 已完成并合并，P221 已完成并合并，P222 已完成并合并，P223 已完成并合并，P224 已完成并合并，P225 已完成并合并，P226 已完成并合并，P227 已完成并合并，P228 已完成并合并，P229 已完成并合并，P230 已完成并合并，P231 已完成并合并，P232 已完成并合并，P233 已完成并合并，P234 已完成并合并，P235 已完成并合并，P236 已完成并合并，P237 已完成并合并，P238 已完成并合并，P239 已完成并合并，P240 已完成并合并，P241 已完成并合并，P242 已完成并合并，P243 已完成并合并，P244 已完成并合并，P245 已完成并合并，P246 已完成并合并，P247 已完成并合并，P248 已完成并合并，P249 已完成并合并，P250 已完成并合并，P251 已完成并合并，P252 已完成并合并，P253 已完成并合并，P254 已完成并合并，P255 已完成并合并，P256 已完成并合并，P257 已完成并合并，P258 已完成并合并，P259 已完成并合并，P260 已完成并合并，P261 已完成并合并，P262 已完成并合并，P263 已完成并合并，P264 已完成并合并，P265 已完成并合并，P266 已完成并合并，P267 已完成并合并，P268 已完成并合并，P269 已完成并合并，P270 已完成并合并，P271 已完成并合并，P272 已完成并合并，P273 已完成并合并，P274 已完成并合并，P275 已完成并合并，P276 已完成并合并，P277 已完成并合并，P278 已完成并合并，P279 已完成并合并，P280 已完成并合并，P281 已完成并合并，P282 已完成并合并，P283 已完成并合并，P284 已完成并合并，P285 已完成并合并，P286 已完成并合并，P287 已完成并合并，P288 已完成并合并，P289 已完成并合并，P290 已完成并合并。当前主线基准为 P290 合并后状态。
 
 ## 2. 当前已完成主线
 
@@ -110,6 +110,7 @@ P286：Market-Read Request Contract Authorization Gate（market-read 请求契�
 P287：Market-Read Request DTO Authorization Gate（market-read 请求 DTO 授权门）
 P288：MarketReadRequestDTO Java Skeleton（行情读取请求 DTO Java 骨架）
 P289：MarketReadRequestDTO Closure and Guard Validator Authorization Scope Pack（行情读取请求 DTO 收口与保护校验器授权范围包）
+P290：MarketReadRequestGuardValidator Java Skeleton（行情读取请求保护校验器 Java 骨架）
 ```
 
 ## 3. 当前项目真实状态
@@ -208,6 +209,7 @@ P289：MarketReadRequestDTO Closure and Guard Validator Authorization Scope Pack
 - Market-Read Request DTO Authorization Gate（market-read 请求 DTO 授权门，docs-only）。
 - MarketReadRequestDTO Java Skeleton（行情读取请求 DTO Java 骨架，pure-data DTO + targeted test only）。
 - MarketReadRequestDTO Closure and Guard Validator Authorization Scope Pack（行情读取请求 DTO 收口与保护校验器授权范围包，docs-only）。
+- MarketReadRequestGuardValidator Java Skeleton（行情读取请求保护校验器 Java 骨架，fail-closed / review-only validator skeleton + targeted test only）。
 
 当前仍未完成：
 
@@ -252,13 +254,23 @@ P289：MarketReadRequestDTO Closure and Guard Validator Authorization Scope Pack
 
 ## 4. 当前 open PR / 当前任务包（未合并请求）
 
-当前已创建但尚未完成的 Draft PR：
+最近已合并的上一轮 PR：
 
 ```text
 PR #699：BACKEND-P290 MarketReadRequestGuardValidator Java Skeleton
 Branch：p290
 Issue：#698
 风险档位：B Validator Java/test, no controller/endpoint/API/mapper/repository/scheduler/dashboard/schema/config/MarketQuoteClient/BinanceMarketQuoteClient/runtime data read/scan output/real scan loop/production ScanScore/Candidate/Push/Readiness/point generation/trading path
+状态：已合并到 main，merge commit 为 42e3c6c
+```
+
+当前已创建但尚未完成的 Draft PR：
+
+```text
+PR #701：BACKEND-P291 MarketReadRequestGuardValidator Closure and Test-Only Wiring Authorization Scope Pack
+Branch：p291
+Issue：#700
+风险档位：A docs-only, no Java/tests/DTO/production wiring/runtime market read/MarketQuoteClient/BinanceMarketQuoteClient/scan output/score/Candidate/Push/Readiness/point/trading path
 状态：Draft PR（草稿合并请求）
 ```
 
@@ -270,27 +282,29 @@ P289 merged as `c7fa73f`。P289 是 docs-only Scope Pack。P289 收口 P288，�
 
 `MarketReadRequestDTO` keeps `reviewOnly=true`, `notTradeInstruction=true`, manual review required by review-only semantics, fail-closed stale/missing policy, missing proof blocked, missing source contract blocked, missing timestamp/timeframe blocked, preserved `blockingReasons`, and preserved `riskBlockers`。
 
-P290 当前推进 `MarketReadRequestGuardValidator` Java skeleton。P290 只能校验 `MarketReadRequestDTO`，只能返回 blocked / review-only / fail-closed validation result，必须保留 `blockingReasons` 和 `riskBlockers`，并保持 manual-review-required / not-trade-instruction。P290 不接 service runtime、market client、score、push、readiness、point 或 trading behavior。
+P290 merged as `42e3c6c`。P290 完成 `MarketReadRequestGuardValidator` Java skeleton、`MarketReadRequestGuardValidationResult`、`MarketReadRequestGuardValidationStatusEnum`、targeted validator test 和 P290 closure docs。P290 只能校验 `MarketReadRequestDTO`，只能返回 blocked / review-only / fail-closed validation result，必须保留 `blockingReasons` 和 `riskBlockers`，并保持 manual-review-required / not-trade-instruction。P290 不接 service runtime、market client、score、push、readiness、point 或 trading behavior。
+
+P291 当前推进 docs-only closure and test-only wiring authorization scope pack。P291 收口 P290，并只授权未来 P292 做 `MarketReadRequestDTO` -> `MarketReadRequestGuardValidator` test-only wiring。P291 不写 Java，不改 tests，不改 DTO，不授权 production wiring。
 
 Display Slots / 默认六币 cannot be scan universe or batch universe。Watchlist Pool remains the scan candidate boundary。Risk Action Guard must remain before delivery / Push / Readiness。踩踏状态禁止机会推送。插针不等于趋势反转。强反转不等于直接反手。
 
 ## 5. 当前 open Issue（未关闭问题单）
 
 ```text
-#698：BACKEND-P290 MarketReadRequestGuardValidator Java Skeleton
+#700：BACKEND-P291 MarketReadRequestGuardValidator Closure and Test-Only Wiring Authorization Scope Pack
 ```
 
-P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281、P282、P283、P284、P285、P286、P287、P288、P289 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
+P204、P205、P206、P207、P208、P209、P210、P211、P212、P213、P214、P215、P216、P217、P218、P219、P220、P221、P222、P223、P224、P225、P226、P227、P228、P229、P230、P231、P232、P233、P234、P235、P236、P237、P238、P239、P240、P241、P242、P243、P244、P245、P246、P247、P248、P249、P250、P251、P252、P253、P254、P255、P256、P257、P258、P259、P260、P261、P262、P263、P264、P265、P266、P267、P268、P269、P270、P271、P272、P273、P274、P275、P276、P277、P278、P279、P280、P281、P282、P283、P284、P285、P286、P287、P288、P289、P290 和 WORKFLOW-P1 已合并，不再作为当前 open PR（未合并请求）处理。
 
 ## 6. 下一步推荐
 
 当前优先级：
 
 ```text
-完成 P290 MarketReadRequestGuardValidator Java Skeleton。
+完成 P291 MarketReadRequestGuardValidator Closure and Test-Only Wiring Authorization Scope Pack。
 ```
 
-P290 属于 B Validator Java/test。P290 只允许新增 `MarketReadRequestGuardValidator` skeleton、最小 validation result DTO / enum、targeted validator test、P290 marker / closure 文档，并更新当前状态索引。P290 不允许 controller/endpoint/API/mapper/repository/scheduler/dashboard/schema/config，不允许 MarketQuoteClient / BinanceMarketQuoteClient，不允许 runtime/live/external data read，不允许 scan output，不允许 real scan loop，不允许 production ScanScore，不允许 Candidate production workflow，不允许 Opportunity Push execution，不允许 Readiness，不允许 point generation，不允许 entry-stop-TP-RR，不允许 order/execution/auto-trading。
+P291 属于 A docs-only。P291 只允许新增 P291 marker / closure / test-only wiring authorization / test requirements / production wiring still blocked / score-candidate-push-readiness still blocked docs，并更新当前状态索引。P291 不允许 Java，不允许 tests，不允许 DTO，不允许 controller/endpoint/API/mapper/repository/scheduler/dashboard/schema/config，不允许 MarketQuoteClient / BinanceMarketQuoteClient，不允许 runtime/live/external data read，不允许 scan output，不允许 real scan loop，不允许 production ScanScore，不允许 Candidate production workflow，不允许 Opportunity Push execution，不允许 Readiness，不允许 point generation，不允许 entry-stop-TP-RR，不允许 order/execution/auto-trading。
 
 ## 7. 当前禁止越界
 
