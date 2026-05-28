@@ -1,9 +1,9 @@
-current_head: "26e8943"
+current_head: "3ab51dd"
 active_mainline: "Market Read Mainline"
 active_mainline_cn: "行情读取主线"
 active_block: "MarketReadRequest Test-Only Wiring"
 active_block_cn: "行情读取请求仅测试接线"
-current_level: "TEST_ONLY_WIRING_PENDING"
+current_level: "TEST_ONLY_WIRING"
 current_pr: 705
 current_branch: "p292"
 merge_rule: "B requires user approval"

@@ -7,7 +7,7 @@ This roadmap follows the user-facing business chain rather than P-number order.
 | Step | Current status | Next MAX_SAFE_PACK | Risk level | Merge grouping recommendation |
 |---|---|---|---|---|
 | Watchlist candidate source | Boundary exists; production proof source for new scan-chain still needs alignment. | Watchlist candidate source and proof source alignment. | B | Can group with MarketReadRequest assembler planning if docs/test-only only. |
-| Market read request wiring | DTO and validator have targeted tests; no test-only chain wiring. | MarketReadRequest DTO to GuardValidator test-only wiring. | B | Merge P291 closure and P292 wiring into one package after P291A. |
+| Market read request wiring | Completed as test-only: DTO flows into GuardValidator and returns review-only validation result. | Review-only MarketRead output / scan output slice. | B | Keep provider wiring separate; no production market client in the next slice. |
 | Market read adapter | Safe/no-op skeleton exists; new scan-chain is not wired to live provider. | Review-only adapter path with fixture/fake data before live provider. | B | Keep separate from provider wiring. |
 | scan output | Skeleton/test layer exists; no production output from live read. | Review-only scan output assembly from test-only market read result. | B | Can group with ScanScore input contract if no runtime provider. |
 | review-only ScanScore | Review-only calculator skeleton exists. | Review-only score over scan output with targeted tests. | B | Can group with score explanation output. |
