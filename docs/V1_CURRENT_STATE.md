@@ -5,9 +5,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `42e3c6c BACKEND-P290 MarketReadRequestGuardValidator Java Skeleton (#699)`
-- Current workflow package: `BACKEND-P291A Workflow Reset and Progress Source of Truth Pack`
-- P291 / P292 feature progression: paused until P291A workflow reset is merged.
+- Current merged main: `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
+- Current workflow package: `BACKEND-P291C Workflow Enforcement and Session Bootstrap Pack`
+- Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
+- P292 / PR #705 remains the current active Market Read block and does not count as done until merged.
 
 ## Source-Of-Truth Rule
 
@@ -21,6 +22,8 @@ Progress must be read together with:
 - `docs/V1_CAPABILITY_MATRIX.md`
 - `docs/PROJECT_PROGRESS_INDEX.md`
 - `docs/V1_MVP_REALITY_ROADMAP.md`
+- `docs/ACTIVE_MAINLINE_STATUS.yml`
+- `docs/SESSION_BOOTSTRAP.md`
 
 ## What P287-P290 Actually Completed
 
@@ -92,4 +95,6 @@ First merge P291A to establish:
 - MVP reality roadmap;
 - drift guard checklist.
 
-After P291A, resume work by business-chain MAX_SAFE_PACK, preferably combining P291 closure and P292 test-only wiring if the scope remains safe.
+After P291C, new windows must follow `docs/SESSION_BOOTSTRAP.md` and answer with `docs/ANSWER_FORMAT_CONTRACT.md`.
+
+Do not continue to P293 while PR #705 remains open.

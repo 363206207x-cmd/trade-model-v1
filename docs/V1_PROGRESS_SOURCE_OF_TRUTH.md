@@ -2,6 +2,8 @@
 
 This document defines how Trade Model V1 progress is determined.
 
+New windows must start from `docs/SESSION_BOOTSTRAP.md`.
+
 ## Completion Rule
 
 Only merged `main` counts as completed project state.
@@ -15,6 +17,7 @@ The following do not count as completed:
 - remote branch;
 - unmerged commit;
 - chat memory;
+- Codex output;
 - planned scope;
 - docs-only authorization;
 - code skeleton without the next capability layer;
@@ -24,11 +27,14 @@ The following do not count as completed:
 
 Every progress answer must check these sources in this order:
 
-1. `git log --oneline -5` on `main`
-2. `docs/V1_CURRENT_STATE.md`
-3. `docs/PROJECT_PROGRESS_INDEX.md`
-4. `docs/V1_CAPABILITY_MATRIX.md`
-5. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
+1. `docs/SESSION_BOOTSTRAP.md`
+2. `docs/ACTIVE_MAINLINE_STATUS.yml`
+3. `git log --oneline -5` on `main`
+4. `docs/V1_CURRENT_STATE.md`
+5. `docs/PROJECT_PROGRESS_INDEX.md`
+6. `docs/V1_CAPABILITY_MATRIX.md`
+7. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
+8. `docs/ANSWER_FORMAT_CONTRACT.md`
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
@@ -43,6 +49,8 @@ Do not treat a skeleton as production wiring.
 Do not treat targeted tests as runtime behavior.
 
 Do not treat an open PR, open branch, or open Issue as already merged.
+
+Do not treat Codex output as completion.
 
 Do not treat legacy runtime clients as proof that the new scan-chain is complete.
 
@@ -73,3 +81,5 @@ Review-only means useful proposals and risk actions may be shown to a human whil
 - not a trade instruction;
 - non-executable;
 - blocked from automatic order, close, reverse, leverage change, execution, or external send unless separately authorized.
+
+Status and progress answers must use `docs/ANSWER_FORMAT_CONTRACT.md`.

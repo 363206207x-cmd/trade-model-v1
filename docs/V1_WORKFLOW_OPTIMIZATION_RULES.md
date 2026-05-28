@@ -2,6 +2,8 @@
 
 P291A resets the work style from boundary-only repetition to business-chain MAX_SAFE_PACK progression.
 
+P291C enforces that reset with `docs/SESSION_BOOTSTRAP.md`, `docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/ANSWER_FORMAT_CONTRACT.md`, `.github/pull_request_template.md`, `scripts/check-workflow-contract.sh`, and `.github/workflows/workflow-contract.yml`.
+
 ## Core Rules
 
 1. Business-chain MAX_SAFE_PACK comes first.
@@ -13,6 +15,9 @@ P291A resets the work style from boundary-only repetition to business-chain MAX_
 7. Every 8 to 10 PRs require a Global Audit or source-of-truth refresh.
 8. Every progress answer must cite the progress source of truth.
 9. Every PR review must check whether at least one capability level increased.
+10. Every new window must start from `docs/SESSION_BOOTSTRAP.md`.
+11. Every status answer must follow `docs/ANSWER_FORMAT_CONTRACT.md`.
+12. Open PR / branch / Issue / Codex output does not count as done; merged main only.
 
 ## Low-Value Loop Stop Rules
 
@@ -34,6 +39,8 @@ Do not raise production progress because a docs-only gate merged.
 Do not raise runtime progress because a skeleton merged.
 
 Do raise governance or skeleton/test progress when the package genuinely improves those layers.
+
+If `bash scripts/check-workflow-contract.sh` fails, stop and fix workflow enforcement before continuing feature work.
 
 ## Business Chain Priority
 
