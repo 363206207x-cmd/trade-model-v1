@@ -5,9 +5,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `42e3c6c BACKEND-P290 MarketReadRequestGuardValidator Java Skeleton (#699)`
-- Current workflow package: `BACKEND-P291A Workflow Reset and Progress Source of Truth Pack`
-- P291 / P292 feature progression: paused until P291A workflow reset is merged.
+- Current merged main baseline before P292: `26e8943 BACKEND-P291A Workflow Reset and Progress Source of Truth Pack (#703)`
+- Current workflow package: `BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice`
+- P291A is complete on main. P292 resumes business-chain progression after the workflow reset.
 
 ## Source-Of-Truth Rule
 
@@ -22,16 +22,18 @@ Progress must be read together with:
 - `docs/PROJECT_PROGRESS_INDEX.md`
 - `docs/V1_MVP_REALITY_ROADMAP.md`
 
-## What P287-P290 Actually Completed
+## What P287-P292 Actually Completed
 
-P287-P290 completed market-read request contract and validator groundwork only:
+P287-P292 completed market-read request contract, DTO, validator, and test-only wiring groundwork only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
 - P289: docs-only closure and authorization for future guard validator.
 - P290: `MarketReadRequestGuardValidator` skeleton, validation result/status DTOs, and targeted validator test.
+- P291A: workflow reset, progress source of truth, capability matrix, allowed review-only outputs, blocked capability registry, MVP reality roadmap, and drift guard checklist.
+- P292: test-only `MarketReadRequestDTO` -> `MarketReadRequestGuardValidator` wiring and review-only validation output.
 
-These packages are DTO / validator / skeleton / targeted-test work.
+These packages are DTO / validator / skeleton / targeted-test / test-only wiring work.
 
 They are not production market-read wiring.
 
@@ -39,12 +41,18 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, scan output, real scan loop, production ScanScore, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
+## MarketReadRequest Current Capability
+
+- `MarketReadRequestDTO`: `3 TARGETED_TEST`
+- `MarketReadRequestGuardValidator`: `3 TARGETED_TEST`
+- `MarketReadRequest test-only wiring`: `4 TEST_ONLY_WIRING`
+- `MarketReadRequest assembler`: test-only slice only, not production assembler
+
 ## What Is Still Not Completed
 
 The following remain incomplete for the new MVP chain:
 
-- MarketReadRequest test-only wiring.
-- MarketReadRequest assembler.
+- production MarketReadRequest assembler.
 - scan-chain market read adapter connected to authorized review-only inputs.
 - production/runtime market read for the new scan-chain.
 - scan output from live market data.
@@ -80,16 +88,6 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 ## Current Recommendation
 
-Do not continue P291/P292 as small closure-only steps yet.
+Do not describe P292 as production market read.
 
-First merge P291A to establish:
-
-- progress source of truth;
-- capability matrix;
-- allowed review-only output policy;
-- blocked capability registry;
-- workflow optimization rules;
-- MVP reality roadmap;
-- drift guard checklist.
-
-After P291A, resume work by business-chain MAX_SAFE_PACK, preferably combining P291 closure and P292 test-only wiring if the scope remains safe.
+After P292, continue by business-chain MAX_SAFE_PACK into review-only MarketRead output / scan output.
