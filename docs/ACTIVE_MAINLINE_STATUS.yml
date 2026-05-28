@@ -1,0 +1,16 @@
+current_head: "26e8943"
+active_mainline: "Market Read Mainline"
+active_mainline_cn: "行情读取主线"
+active_block: "MarketReadRequest Test-Only Wiring"
+active_block_cn: "行情读取请求仅测试接线"
+current_level: "TEST_ONLY_WIRING_PENDING"
+current_pr: 705
+current_branch: "p292"
+merge_rule: "B requires user approval"
+next_required_action: "review_pr_705"
+do_not_continue_to: "P293"
+source_of_truth_files:
+  - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
+  - docs/V1_CAPABILITY_MATRIX.md
+  - docs/V1_CURRENT_STATE.md
+  - docs/PROJECT_PROGRESS_INDEX.md
