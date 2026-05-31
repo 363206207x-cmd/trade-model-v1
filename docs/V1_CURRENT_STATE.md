@@ -5,10 +5,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `3ab51dd BACKEND-P291C Workflow Enforcement and Session Bootstrap Pack (#709)`
-- Current workflow package in PR #705 / branch `p292`: `BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice`
+- Current merged main: `4840a07 BACKEND-P292 MarketReadRequest Test-Only Wiring and Review-Only Assembler Slice (#705)`
+- Current open workflow package in PR #711 / branch `p293`: `BACKEND-P293 MarketReadRequest Review-Only Output Assembler Slice`
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- P291A and P291C are complete on main. P292 remains the active Market Read block and does not count as merged main completion until PR #705 is merged.
+- P291A, P291C, and P292 are complete on main. P293 is the active Market Read block and does not count as merged main completion until its PR is merged.
 
 ## Source-Of-Truth Rule
 
@@ -44,12 +44,24 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, scan output, real scan loop, production ScanScore, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
+## Current P293 Scope
+
+P293 adds a review-only output assembler for MarketReadRequest.
+
+P293 turns `MarketReadRequestDTO` plus `MarketReadRequestGuardValidationResult` into `MarketReadReviewOnlyOutputDTO`, so the validation result can be read as a manual-review output instead of remaining only a validator result.
+
+P293 is not production market read.
+
+P293 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+
+P293 does not create scan output, score, Candidate, Push, Readiness, point generation, order execution, execution API, or auto-trading.
+
 ## MarketReadRequest Current Capability
 
 - `MarketReadRequestDTO`: `3 TARGETED_TEST`
 - `MarketReadRequestGuardValidator`: `3 TARGETED_TEST`
 - `MarketReadRequest test-only wiring`: `4 TEST_ONLY_WIRING`
-- `MarketReadRequest assembler`: test-only slice only, not production assembler
+- `MarketReadRequest review-only output assembler`: `REVIEW_ONLY_OUTPUT_SKELETON` in active PR #711, not production assembler
 
 ## What Is Still Not Completed
 
@@ -91,10 +103,10 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 ## Current Recommendation
 
-Do not describe P292 as production market read.
+Do not describe P292 or P293 as production market read.
 
 After P291C, new windows must follow `docs/SESSION_BOOTSTRAP.md` and answer with `docs/ANSWER_FORMAT_CONTRACT.md`.
 
-After PR #705 merges, continue by business-chain MAX_SAFE_PACK into review-only MarketRead output / scan output.
+After P293 merges, continue by business-chain MAX_SAFE_PACK into review-only MarketRead output / scan output.
 
-Do not continue to P293 while PR #705 remains open.
+Do not continue to P294 while the P293 PR remains open.
