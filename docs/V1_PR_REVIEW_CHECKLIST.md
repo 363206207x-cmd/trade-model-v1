@@ -5,6 +5,12 @@
 For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
 （终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
 
+For terminal workflows, prefer `bash scripts/v1-auto.sh` as the default non-interactive entry point.
+（终端工作流默认优先使用 `bash scripts/v1-auto.sh` 作为非交互入口。）
+
+Keep `bash scripts/v1.sh` only as a fallback menu.
+（`bash scripts/v1.sh` 只作为备用菜单。）
+
 ## 1. 基础信息
 
 每次审 PR 必须确认：
