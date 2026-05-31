@@ -203,7 +203,15 @@ A/B/C 授权规则优先于提速规则。最大安全任务包不能跨越到�
 
 ## 8. 本地同步命令
 
-每次合并后给用户这条命令：
+每次合并同步优先运行：
+
+```bash
+bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"
+```
+
+B/C 或 C 档 PR 必须先由用户明确说“同意合并 PR #xxx”后才能运行。
+
+如自动脚本不可用，才给用户这条本地命令：
 
 ```bash
 cd /Users/xuchao/Documents/trade-model-v1 && git switch main && git pull origin main && git status && git log --oneline -5
@@ -302,3 +310,35 @@ review-only 不等于 no output。
 CI 必须运行 `bash scripts/check-workflow-contract.sh`。
 
 如果 workflow contract check（工作流契约检查）失败，不允许合并。
+
+## 13. P291D Workflow Command Automation
+
+新窗口优先运行：
+
+```bash
+bash scripts/v1-session-bootstrap.sh
+```
+
+状态检查优先运行：
+
+```bash
+bash scripts/v1-status.sh
+```
+
+审 PR 优先运行：
+
+```bash
+bash scripts/v1-pr-review-input.sh <PR_NUMBER>
+```
+
+合并同步优先运行：
+
+```bash
+bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"
+```
+
+Codex 完成后优先运行：
+
+```bash
+bash scripts/v1-safe-check.sh
+```

@@ -4,6 +4,8 @@ P291A resets the work style from boundary-only repetition to business-chain MAX_
 
 P291C enforces that reset with `docs/SESSION_BOOTSTRAP.md`, `docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/ANSWER_FORMAT_CONTRACT.md`, `.github/pull_request_template.md`, `scripts/check-workflow-contract.sh`, and `.github/workflows/workflow-contract.yml`.
 
+P291D adds command automation through `docs/WORKFLOW_COMMAND_AUTOMATION.md` and the `scripts/v1-*.sh` helpers.
+
 ## Core Rules
 
 1. Business-chain MAX_SAFE_PACK comes first.
@@ -41,6 +43,14 @@ Do not raise runtime progress because a skeleton merged.
 Do raise governance or skeleton/test progress when the package genuinely improves those layers.
 
 If `bash scripts/check-workflow-contract.sh` fails, stop and fix workflow enforcement before continuing feature work.
+
+## Workflow Command Automation
+
+- 新窗口优先运行 `bash scripts/v1-session-bootstrap.sh`
+- 状态检查优先运行 `bash scripts/v1-status.sh`
+- 审 PR 优先运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- 合并同步优先运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Codex 完成后优先运行 `bash scripts/v1-safe-check.sh`
 
 ## Business Chain Priority
 

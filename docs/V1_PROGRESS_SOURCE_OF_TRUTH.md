@@ -4,6 +4,12 @@ This document defines how Trade Model V1 progress is determined.
 
 New windows must start from `docs/SESSION_BOOTSTRAP.md`.
 
+Preferred command:
+
+```bash
+bash scripts/v1-session-bootstrap.sh
+```
+
 ## Completion Rule
 
 Only merged `main` counts as completed project state.
@@ -83,3 +89,11 @@ Review-only means useful proposals and risk actions may be shown to a human whil
 - blocked from automatic order, close, reverse, leverage change, execution, or external send unless separately authorized.
 
 Status and progress answers must use `docs/ANSWER_FORMAT_CONTRACT.md`.
+
+## Workflow Command Automation
+
+- 新窗口优先运行 `bash scripts/v1-session-bootstrap.sh`
+- 状态检查优先运行 `bash scripts/v1-status.sh`
+- 审 PR 优先运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- 合并同步优先运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Codex 完成后优先运行 `bash scripts/v1-safe-check.sh`
