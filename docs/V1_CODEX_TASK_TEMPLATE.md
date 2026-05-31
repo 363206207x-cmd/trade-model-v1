@@ -23,6 +23,12 @@
 
 ## 2. 执行前命令
 
+状态检查优先使用：
+
+```bash
+bash scripts/v1-status.sh
+```
+
 ```bash
 cd /Users/xuchao/Documents/trade-model-v1
 
@@ -228,6 +234,12 @@ Do Not Do（禁止事项）:
 bash scripts/check-workflow-contract.sh
 ```
 
+Codex 完成后优先运行：
+
+```bash
+bash scripts/v1-safe-check.sh
+```
+
 如果任务修改 Java 或 test 路径，PR 模板和状态文件必须包含 capability level 字段。
 
 ## 12. P291A 后新增必填项
@@ -306,3 +318,11 @@ If no, what remains blocked:
 - 是否至少推进一个业务链路节点？
 
 如果答案显示低价值重复，必须合并包、改包或暂停。
+
+## 13. P291D Workflow Command Automation
+
+- 新窗口优先运行 `bash scripts/v1-session-bootstrap.sh`
+- 状态检查优先运行 `bash scripts/v1-status.sh`
+- 审 PR 优先运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- 合并同步优先运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Codex 完成后优先运行 `bash scripts/v1-safe-check.sh`
