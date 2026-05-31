@@ -1,13 +1,13 @@
-current_head: "ba9cd2c"
+current_head: "58f69ef"
 active_mainline: "Evidence / Score Mainline"
 active_mainline_cn: "证据 / 评分主线"
 active_block: "Review-only Scan Output to Evidence / Score Entry"
 active_block_cn: "只读扫描输出到证据 / 评分入口"
-current_level: "REVIEW_ONLY_SCAN_OUTPUT_SKELETON"
-current_pr: "none"
-current_branch: "main"
-merge_rule: "No active PR; next pack requires normal A/B/C review"
-next_required_action: "open_evidence_score_entry_pack"
+current_level: "REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON"
+current_pr: 721
+current_branch: "p295"
+merge_rule: "B requires user approval"
+next_required_action: "review_pr_721"
 do_not_continue_to: "Candidate / Push / Readiness / point"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
