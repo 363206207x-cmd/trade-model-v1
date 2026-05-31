@@ -1,13 +1,22 @@
 # Workflow Command Automation
 
-This document defines the command shortcuts introduced by P291D.
+This document defines the command shortcuts introduced by P291D and the one-command runner introduced by P291E.
 
 The goal is to reduce repeated copy-paste while preserving P291C workflow enforcement.
+
+Recommended entry point:
+
+```bash
+bash scripts/v1.sh
+```
+
+Standalone scripts may still be called directly when a non-interactive command is clearer.
 
 ## Scripts
 
 | Script | Purpose | Read-only | May merge |
 |---|---|---:|---:|
+| `scripts/v1.sh` | Interactive one-command menu for status, bootstrap, PR review input, approved merge-sync, safe-check, next-pack context, and exit. | mostly | only by explicit merge choice |
 | `scripts/v1-status.sh` | Show current branch, status, recent log, active mainline summary, open PRs, open Issues, and source-of-truth file existence. | yes | no |
 | `scripts/v1-pr-review-input.sh <PR_NUMBER>` | Generate PR review input: metadata, changed files, and forbidden path attention. | yes | no |
 | `scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"` | Mark ready, squash merge, switch to main, pull, and print final status/log. | no | yes |
@@ -16,6 +25,12 @@ The goal is to reduce repeated copy-paste while preserving P291C workflow enforc
 | `scripts/v1-next-pack-context.sh` | Print current HEAD, active mainline/block/level, next required action, source-of-truth files, open PRs, and open Issues. | yes | no |
 
 ## Required Usage
+
+For normal terminal workflows, start with:
+
+```bash
+bash scripts/v1.sh
+```
 
 For a new window, run:
 
@@ -52,6 +67,15 @@ For the next package context, run:
 ```bash
 bash scripts/v1-next-pack-context.sh
 ```
+
+## Common Menu Flow
+
+1. Run `bash scripts/v1.sh`.
+2. Choose Status.
+3. Choose Review PR.
+4. After review passes, wait for the user to explicitly approve the merge.
+5. Choose Merge PR after approval.
+6. Choose Status again to confirm sync.
 
 ## Merge Safety
 

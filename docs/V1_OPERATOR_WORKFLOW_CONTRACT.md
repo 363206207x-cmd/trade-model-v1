@@ -2,6 +2,9 @@
 
 本文件是 Trade Model V1 的长期工作流宪法。以后新聊天窗口、Codex、PR 审查和阶段推进，都必须先读取 `docs/SESSION_BOOTSTRAP.md`，再读取 `docs/ACTIVE_MAINLINE_STATUS.yml`、本文件和 source-of-truth 文件，然后再继续工作。
 
+For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
+（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+
 ## 1. 使用者约束
 
 - 用户不是程序员。

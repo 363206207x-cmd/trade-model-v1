@@ -2,6 +2,9 @@
 
 本文件固定每次 PR（Pull Request，合并请求）审查标准。
 
+For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
+（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+
 ## 1. 基础信息
 
 每次审 PR 必须确认：

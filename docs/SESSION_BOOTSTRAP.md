@@ -2,6 +2,9 @@
 
 Use this file first in every new window.
 
+For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
+（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+
 Preferred command:
 
 ```bash

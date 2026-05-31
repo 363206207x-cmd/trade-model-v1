@@ -2,6 +2,9 @@
 
 本文件固定 Codex 每轮任务格式。以后不要每次重新发明任务包，只填变量。
 
+For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
+（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+
 ## 1. 固定开头
 
 ```text
