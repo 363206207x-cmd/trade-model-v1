@@ -1,14 +1,14 @@
-current_head: "4840a07"
+current_head: "aef1ea0"
 active_mainline: "Market Read Mainline"
 active_mainline_cn: "行情读取主线"
-active_block: "MarketReadRequest Review-Only Output Assembler"
-active_block_cn: "行情读取请求只读输出组装器"
-current_level: "REVIEW_ONLY_OUTPUT_SKELETON"
-current_pr: 711
-current_branch: "p293"
+active_block: "Review-only MarketRead Scan Output"
+active_block_cn: "只读行情读取扫描输出"
+current_level: "REVIEW_ONLY_SCAN_OUTPUT_SKELETON"
+current_pr: 713
+current_branch: "p294"
 merge_rule: "B requires user approval"
-next_required_action: "review_pr_711"
-do_not_continue_to: "P294"
+next_required_action: "review_pr_713"
+do_not_continue_to: "P295"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md

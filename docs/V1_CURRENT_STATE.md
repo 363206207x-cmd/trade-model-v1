@@ -5,11 +5,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `06b5cfe BACKEND-P293 MarketReadRequest Review-Only Output Assembler Slice (#711)`
-- Current workflow automation package in PR #715 / branch `p291d`: `BACKEND-P291D Workflow Command Automation Pack`
+- Current merged main: `aef1ea0 BACKEND-P291D Workflow Command Automation Pack (#715)`
+- Current open Market Read package in PR #713 / branch `p294`: `BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice`
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- P291A, P291C, P292, and P293 are complete on main.
-- P291D is scripts/docs automation only. It does not advance the Market Read business chain.
+- P291A, P291C, P292, P293, and P291D are complete on main. P294 is the active Market Read block and does not count as merged main completion until its PR is merged.
 
 ## Source-Of-Truth Rule
 
@@ -44,11 +43,11 @@ They are not production market-read wiring.
 
 They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the new scan-chain.
 
-They do not create runtime market reads, scan output, real scan loop, production ScanScore, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
+They do not create runtime market reads, production scan output, real scan loop, production ScanScore, Evidence generation, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
 ## Current P291D Scope
 
-P291D adds workflow command automation.
+P291D is merged on main and adds workflow command automation.
 
 P291D adds scripts for status checks, PR review input, merge-sync after explicit approval, safe checks, session bootstrap, and next-pack context.
 
@@ -58,12 +57,25 @@ P291D does not modify Java, tests, DTOs, dashboard, schema, config, resources, s
 
 Use `docs/WORKFLOW_COMMAND_AUTOMATION.md` for command usage.
 
+## Current P294 Scope
+
+P294 is open in PR #713 and adds a review-only scan output skeleton pending merge.
+
+P294 turns `MarketReadReviewOnlyOutputDTO` into `MarketReadReviewOnlyScanOutputDTO`, so MarketRead request review output can become a safe manual-review scan output skeleton.
+
+P294 is not production market read.
+
+P294 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+
+P294 does not create production scan output, score, Evidence, Candidate, Push, Readiness, point generation, order execution, execution API, or auto-trading.
+
 ## MarketReadRequest Current Capability
 
 - `MarketReadRequestDTO`: `3 TARGETED_TEST`
 - `MarketReadRequestGuardValidator`: `3 TARGETED_TEST`
 - `MarketReadRequest test-only wiring`: `4 TEST_ONLY_WIRING`
 - `MarketReadRequest review-only output assembler`: `REVIEW_ONLY_OUTPUT_SKELETON`, completed after P293, not production assembler
+- `Review-only MarketRead scan output`: `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` pending / completed in PR #713, not production scan output
 
 ## What Is Still Not Completed
 
@@ -72,7 +84,8 @@ The following remain incomplete for the new MVP chain:
 - production MarketReadRequest assembler.
 - scan-chain market read adapter connected to authorized review-only inputs.
 - production/runtime market read for the new scan-chain.
-- scan output from live market data.
+- production scan output from live market data.
+- Evidence / Score entry point over review-only scan output.
 - review-only ScanScore over real scan output.
 - review-only Candidate from scored scan output.
 - internal Opportunity Push preview from candidate output.
@@ -105,12 +118,12 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 ## Current Recommendation
 
-Do not describe P292 or P293 as production market read.
+Use P291D command automation scripts for daily workflow.
 
-Do not describe P291D as Market Read business-chain progress.
+Review PR #713 before any merge decision.
 
-After P291C, new windows must follow `docs/SESSION_BOOTSTRAP.md` and answer with `docs/ANSWER_FORMAT_CONTRACT.md`.
+Do not describe P292, P293, or P294 as production market read.
 
-After P291D merges, use the command automation scripts for daily workflow and continue the business chain only through a separately authorized package.
+After P294 merges, continue by business-chain MAX_SAFE_PACK into Evidence / Score entry point.
 
-Do not continue to P294 inside P291D.
+Do not continue to P295 while the P294 PR remains open.
