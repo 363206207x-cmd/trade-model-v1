@@ -17,6 +17,12 @@ Head commit（当前提交）：xxx
 
 审查前必须读取 `docs/SESSION_BOOTSTRAP.md`、`docs/ACTIVE_MAINLINE_STATUS.yml` 和 `docs/ANSWER_FORMAT_CONTRACT.md`。
 
+审 PR 优先运行：
+
+```bash
+bash scripts/v1-pr-review-input.sh <PR_NUMBER>
+```
+
 Open PR 不算完成，branch 不算完成，Issue 不算完成，Codex 输出不算完成。只有 merged main 算完成。
 
 ## 2. 改动范围检查
@@ -228,3 +234,11 @@ PR 审查必须检查：
 - PR 标题是否夸大实际 diff。
 
 若 `bash scripts/check-workflow-contract.sh` 输出不是 `WORKFLOW_CONTRACT_OK`，必须要求修复。
+
+## 13. P291D Workflow Command Automation
+
+- 新窗口优先运行 `bash scripts/v1-session-bootstrap.sh`
+- 状态检查优先运行 `bash scripts/v1-status.sh`
+- 审 PR 优先运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- 合并同步优先运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Codex 完成后优先运行 `bash scripts/v1-safe-check.sh`

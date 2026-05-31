@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -u
+set -euo pipefail
 
 failed=0
 
@@ -26,7 +26,14 @@ require_file "docs/SESSION_BOOTSTRAP.md"
 require_file "docs/ANSWER_FORMAT_CONTRACT.md"
 require_file "docs/V1_CAPABILITY_MATRIX.md"
 require_file "docs/V1_PROGRESS_SOURCE_OF_TRUTH.md"
+require_file "docs/WORKFLOW_COMMAND_AUTOMATION.md"
 require_file ".github/pull_request_template.md"
+require_file "scripts/v1-status.sh"
+require_file "scripts/v1-pr-review-input.sh"
+require_file "scripts/v1-merge-sync.sh"
+require_file "scripts/v1-safe-check.sh"
+require_file "scripts/v1-session-bootstrap.sh"
+require_file "scripts/v1-next-pack-context.sh"
 
 require_contains "docs/ACTIVE_MAINLINE_STATUS.yml" "active_mainline"
 require_contains "docs/ANSWER_FORMAT_CONTRACT.md" "Current Mainline（当前主线）"

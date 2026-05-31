@@ -6,17 +6,19 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- `06b5cfe BACKEND-P293 MarketReadRequest Review-Only Output Assembler Slice (#711)`
+- `aef1ea0 BACKEND-P291D Workflow Command Automation Pack (#715)`
 
 Current active capability movement pack:
 
 - `BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice` in PR #713 / branch `p294`, pending merge.
 
+P291D is merged on main. It adds workflow command automation and reduces copy-paste / window drift, but it does not raise Market Read business-chain capability or Production Runtime Progress.
+
 P292 is merged on main. It moved `MarketReadRequest test-only wiring` to `4 TEST_ONLY_WIRING`.
 
 P293 is merged on main. It moved the MarketReadRequest path from `TEST_ONLY_WIRING` toward `REVIEW_ONLY_OUTPUT_SKELETON` by turning guard validation results into a readable review-only output DTO.
 
-P294 is capability movement, not closure-only. It moves the MarketRead path from `REVIEW_ONLY_OUTPUT_SKELETON` toward `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` by turning `MarketReadReviewOnlyOutputDTO` into a safe review-only scan output skeleton.
+P294 is capability movement, not closure-only. In PR #713, it moves the MarketRead path from `REVIEW_ONLY_OUTPUT_SKELETON` toward `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` by turning `MarketReadReviewOnlyOutputDTO` into a safe review-only scan output skeleton.
 
 P294 only permits a small Java/test review-only scan-output skeleton and MVP-chain improvement inside the PR. It must not raise Production Runtime Progress, and it does not count as merged main completion until its PR merges.
 
@@ -28,11 +30,11 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 
 | Progress view | Current range | Why this range | Why it cannot be higher yet |
 |---|---:|---|---|
-| Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, and safety rules exist. | The full V1 chain still lacks completed market read -> scan output -> score -> candidate -> push preview -> execution advice -> monitor -> review closure. |
-| MVP Progress | 55%-63% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, and active P294 review-only scan output skeleton exist. | The user-facing MVP loop is not yet closed end to end. |
-| Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294 does not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
-| Governance / Contract Progress | 86%-92% | Boundaries, gates, fail-closed rules, no-trade semantics, and review-only policy are extensive. | Governance drift occurred and needs P291A source-of-truth correction. |
-| Skeleton / Test Progress | 73%-81% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, and MarketReadRequest test-only wiring exist. | Review-only runtime wiring is incomplete in several key chain steps. |
+| Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks completed market read -> scan output -> score -> candidate -> push preview -> execution advice -> monitor -> review closure. |
+| MVP Progress | 54%-62% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, and P293 review-only output assembler exist on main. | P294 review-only scan output is still pending in PR #713, and the user-facing MVP loop is not yet closed end to end. |
+| Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P291D and P294 do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
+| Governance / Contract Progress | 88%-94% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, and P291D command automation are extensive. | Future windows still need to use the automation consistently. |
+| Skeleton / Test Progress | 73%-81% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, and MarketReadRequest test-only wiring exist. | Review-only runtime wiring is incomplete in several key chain steps, and P294 is pending merge. |
 | Product Usability Progress | 38%-48% | Dashboard and review-only displays exist. | Core actions still do not form a coherent review-only MVP workflow. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
 | Push / Monitoring Progress | 42%-55% | Push no-op/audit/channel skeletons and legacy position monitor foundations exist. | No external send, no full internal push preview chain, and no complete monitor action loop. |
@@ -49,6 +51,8 @@ Open PRs, branches, Issues, and draft work must not be counted as completed.
 Codex output must not be counted as completed.
 
 Legacy runtime `MarketQuoteClient` / `BinanceMarketQuoteClient` capability must not be treated as completion of the new scan-chain market-read request path.
+
+P291D must not be described as scan output, score, Candidate, Push, Readiness, point generation, or production market read.
 
 P294 must not be described as production scan output, score, Evidence, Candidate, Push, Readiness, point generation, or production market read.
 
@@ -68,10 +72,10 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after P291A:
+Near-term priority after P291D:
 
-1. P294 review-only MarketRead scan output skeleton.
-2. Evidence / Score entry point over review-only scan output.
+1. Review PR #713 for P294 review-only MarketRead scan output skeleton.
+2. After P294 merges, move to an Evidence / Score entry point over review-only scan output.
 3. MarketReadRequest production-unsafe assembler remains blocked; only review-only/test-only assembly may proceed next.
 4. review-only market read adapter path.
 5. review-only ScanScore.
