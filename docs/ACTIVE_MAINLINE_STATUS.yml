@@ -1,13 +1,13 @@
-current_head: "5a609a1"
+current_head: "f963f9c"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Risk Action Guard Numeric Point Contract Plan"
-active_block_cn: "数值点位 Risk Action Guard 合同方案"
-current_level: "RISK_ACTION_GUARD_NUMERIC_POINT_CONTRACT_PLAN"
-current_pr: 769
-current_branch: "p317"
+active_block: "Numeric Point Safety Validator Plan"
+active_block_cn: "数值点位安全校验器方案"
+current_level: "NUMERIC_POINT_SAFETY_VALIDATOR_PLAN"
+current_pr: 771
+current_branch: "p318"
 merge_rule: "A docs-only can merge after review"
-next_required_action: "review_pr_769"
+next_required_action: "review_pr_771"
 do_not_continue_to: "Executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
