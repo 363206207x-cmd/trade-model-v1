@@ -5,13 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`
+- Current merged main: `69440a7 BACKEND-P291H GitHub-Native Workflow Simplification Pack (#725)`
+- Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- There is no current open business-chain PR recorded in Source of Truth.
-- Next business-chain action is an Evidence Normalization Review-Only Slice.
+- Current open business-chain package is PR #727 / branch `p296`: `BACKEND-P296 Evidence Normalization Review-Only Slice`.
+- P296 is review-only evidence normalization. It is not real evidence generation and does not count as merged main completion until its PR is merged.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -61,6 +62,24 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, production scan output, real scan loop, production ScanScore, Evidence generation, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
+## Current P296 Scope
+
+P296 is open on branch `p296` and adds a review-only evidence normalization skeleton pending merge.
+
+P296 turns `ReviewOnlyEvidenceScoreEntryDTO` into `ReviewOnlyNormalizedEvidenceDTO`, so review-only Evidence / Score entry output can become safe manual-review normalized evidence context for later score input / precheck work.
+
+P296 is not real evidence generation.
+
+P296 does not write DB state and does not write `tm_evidence_item`.
+
+P296 is not score calculation and does not generate `ScoreItem`.
+
+P296 does not calculate the eight score dimensions.
+
+P296 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+
+P296 does not create production scan output, real EvidenceItem, real ScoreItem, Candidate, Push, Readiness, point generation, order execution, execution API, or auto-trading.
+
 ## Current Workflow Scope
 
 P291D, P291E, and P291G are merged on main and provide terminal helpers.
@@ -79,7 +98,7 @@ The current block is Evidence Normalization Review-Only Slice.
 
 Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
 
-Evidence normalization is not completed.
+Evidence normalization is in P296 only and is not completed on main until the PR merges.
 
 Evidence generation and score calculation are not completed.
 
@@ -93,6 +112,7 @@ Candidate, Push, Readiness, point generation, order execution, execution API, an
 - `MarketReadRequest review-only output assembler`: `REVIEW_ONLY_OUTPUT_SKELETON`, completed after P293, not production assembler
 - `Review-only MarketRead scan output`: `REVIEW_ONLY_SCAN_OUTPUT_SKELETON`, completed after P294, not production scan output
 - `Review-only Evidence / Score entry`: `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`, completed after P295, not real evidence generation or score calculation
+- `Review-only evidence normalization`: `REVIEW_ONLY_EVIDENCE_NORMALIZATION_SKELETON` pending / completed in P296 PR, not real evidence generation or score calculation
 
 ## What Is Still Not Completed
 
@@ -139,8 +159,10 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 Use GPT + Codex + GitHub-native workflow by default.
 
-Open the next Evidence normalization review-only slice when ready.
+Review P296 before any merge decision.
 
 Do not describe P295 as real evidence generation or real score calculation.
+
+Do not describe P296 as real evidence generation, persisted evidence, or real score calculation.
 
 Do not describe Candidate, Push, Readiness, or point generation as completed.

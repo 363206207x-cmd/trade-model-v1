@@ -1,13 +1,13 @@
-current_head: "24e120b"
+current_head: "69440a7"
 active_mainline: "Evidence / Score Mainline"
 active_mainline_cn: "证据 / 评分主线"
 active_block: "Evidence Normalization Review-Only Slice"
 active_block_cn: "只读证据标准化切片"
-current_level: "REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON"
-current_pr: "none"
-current_branch: "main"
-merge_rule: "No active PR"
-next_required_action: "open_evidence_normalization_pack"
+current_level: "REVIEW_ONLY_EVIDENCE_NORMALIZATION_SKELETON"
+current_pr: 727
+current_branch: "p296"
+merge_rule: "B requires user approval"
+next_required_action: "review_pr_727"
 do_not_continue_to: "Candidate / Push / Readiness / point"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
