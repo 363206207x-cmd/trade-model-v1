@@ -23,7 +23,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 | push preview closure before external channel | Completed in P303: internal push preview is closed as review-only, non-sendable, recheck-required, and Risk Action Guard required before any external channel work. | P304 dashboard / internal preview display gate. | B | Cannot directly send externally; external channel requires separate C-level authorization. |
 | dashboard / internal push preview display gate | Completed in P304: dashboard shows internal push preview status as review-only, not a trade instruction, manual-review required, recheck-required, Risk Action Guard required, and external-channel disabled. | P305 Candidate / Push review-only MVP closure. | A/B | Cannot directly send externally; no readiness or point generation. |
 | Candidate / Push review-only MVP closure | Completed in P305: P299-P304 are closed as an internal read-only chain from review-only score assembly to dashboard-visible internal push preview. | P306 Readiness / Point boundary planning gate. | A | Cannot directly send externally; no real Candidate, real Push, readiness, or point generation. |
-| Readiness / Point boundary planning gate | Active P306 PR: defines the boundary before readiness, point proposal, external channel, and execution-adjacent work. | P307 Review-only Readiness Gate Skeleton. | A | Docs-only planning; not Readiness implementation, not point generation, not entry / stop / TP / RR, and not external channel authorization. |
+| Readiness / Point boundary planning gate | Completed in P306: defines the boundary before readiness, point proposal, external channel, and execution-adjacent work. | P307 Review-only Readiness Gate Skeleton. | A | Docs-only planning; not Readiness implementation, not point generation, not entry / stop / TP / RR, and not external channel authorization. |
+| review-only readiness gate | Active P307 PR: internal push preview becomes a review-only readiness gate skeleton with recheck and Risk Action Guard still required. | P308 Review-only Point Boundary / Proposal Gate. | B | Not executable readiness, not point generation, not entry / stop / TP / RR, and not external channel authorization. |
 | review-only ScanScore | Review-only calculator skeleton exists. | Review-only score over normalized evidence / precheck output with targeted tests after score assembly skeleton lands. | B | Can group with score explanation output only after score assembly remains review-only. |
 | review-only Candidate | Candidate Attention / Promote skeleton exists, P299 prepares a handoff envelope, P300 prepares only a review-only candidate attention envelope, and P301 prepares only a review-only preview guard envelope. | Internal Push Preview / Recheck Handoff review-only slice. | B | Can group with internal push preview only if no external send and no production Candidate workflow. |
 | internal Opportunity Push preview | No-op/audit/channel skeletons exist, P302 adds only a review-only internal preview / recheck handoff envelope, P303 closes that preview before external-channel authorization, P304 displays it internally on the dashboard, and P305 closes the read-only MVP loop. | P307 Review-only Readiness Gate Skeleton, P308 Review-only Point Boundary / Proposal Gate, or C-level External Channel Authorization Gate. | B or C for external channel | Can group with Push Recheck preview only if no external send. |
@@ -46,12 +47,14 @@ MVP does not require auto-trading, external send, or executable readiness.
 
 ## Current Next Recommendation
 
-Candidate / Push review-only chain is complete through internal preview display after P305.
+Candidate / Push review-only chain is complete through internal preview display after P305, and P306 completed the Readiness / Point boundary plan.
 
 Recommended next packages:
 
-1. P307 Review-only Readiness Gate Skeleton.
-2. P308 Review-only Point Boundary / Proposal Gate.
-3. External Channel Authorization Gate, only as a separate C-level package after explicit authorization.
+1. P308 Review-only Point Boundary / Proposal Gate.
+2. External Channel Authorization Gate, only as a separate C-level package after explicit authorization.
+3. Dashboard smoke / internal preview closure if the point boundary is deferred.
 
 Do not directly send externally from the current chain.
+
+Do not directly generate points from the current chain.
