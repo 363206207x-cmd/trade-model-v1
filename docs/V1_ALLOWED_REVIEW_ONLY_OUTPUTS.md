@@ -43,6 +43,8 @@ The following outputs are allowed in review-only scope when their source ownersh
 - RuntimeKlineContext missing / stale / gap / abnormal reason;
 - DataQuality numeric point contract status;
 - DataQuality missing / degraded / threshold failure reason;
+- MultiTimeframe numeric point contract status;
+- MultiTimeframe missing / conflicted / wick-only / noise-only reason;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -85,3 +87,4 @@ Examples:
 - `SourceTrace numeric point contract status` is allowed only as docs-only planning context; it cannot create SourceTrace Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
 - `RuntimeKlineContext numeric point contract status` is allowed only as docs-only planning context; it cannot create RuntimeKlineContext Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
 - `DataQuality numeric point contract status` is allowed only as docs-only planning context; it cannot create DataQuality Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
+- `MultiTimeframe numeric point contract status` is allowed only as docs-only planning context; it cannot create MultiTimeframe Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.

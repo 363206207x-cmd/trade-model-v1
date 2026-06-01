@@ -1,13 +1,13 @@
-current_head: "5f855e6"
+current_head: "9d2cc1c"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "DataQuality Numeric Point Contract Plan"
-active_block_cn: "数值点位数据质量合同方案"
-current_level: "DATA_QUALITY_NUMERIC_POINT_CONTRACT_PLAN"
-current_pr: 765
-current_branch: "p315"
+active_block: "MultiTimeframe Numeric Point Contract Plan"
+active_block_cn: "数值点位多周期确认合同方案"
+current_level: "MULTITIMEFRAME_NUMERIC_POINT_CONTRACT_PLAN"
+current_pr: 767
+current_branch: "p316"
 merge_rule: "A docs-only can merge after review"
-next_required_action: "review_pr_765"
+next_required_action: "review_pr_767"
 do_not_continue_to: "Executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
