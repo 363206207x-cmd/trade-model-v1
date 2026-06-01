@@ -148,10 +148,30 @@ class ReviewOnlyInternalPushPreviewAssemblerTest {
                         "executionIntent"
                 )
         );
-        assertNoExactField(ReviewOnlyInternalPushPreviewDTO.class, "push");
-        assertNoExactField(ReviewOnlyInternalPushPreviewDTO.class, "message");
-        assertNoExactField(ReviewOnlyInternalPushPreviewDTO.class, "tp");
-        assertNoExactField(ReviewOnlyInternalPushPreviewDTO.class, "rr");
+        assertNoExactFields(
+                ReviewOnlyInternalPushPreviewDTO.class,
+                List.of(
+                        "telegram",
+                        "email",
+                        "webhook",
+                        "notification",
+                        "channel",
+                        "externalChannel",
+                        "messageToSend",
+                        "sendMessage",
+                        "readiness",
+                        "point",
+                        "entry",
+                        "stop",
+                        "takeProfit",
+                        "tp",
+                        "rr",
+                        "orderIntent",
+                        "executionIntent",
+                        "push",
+                        "message"
+                )
+        );
     }
 
     @Test
@@ -200,8 +220,12 @@ class ReviewOnlyInternalPushPreviewAssemblerTest {
                 "PromoteToHome",
                 "OpportunityPush",
                 "ExternalChannel",
+                "Telegram",
+                "Email",
+                "Webhook",
                 "Notification",
                 "Readiness",
+                "PointGeneration",
                 "Point",
                 "Trading",
                 "Order",
@@ -217,9 +241,18 @@ class ReviewOnlyInternalPushPreviewAssemblerTest {
                 "PromoteToHome",
                 "OpportunityPush",
                 "ExternalChannel",
+                "Telegram",
+                "Email",
+                "Webhook",
                 "Notification",
+                "Readiness",
+                "MessageToSend",
+                "SendMessage",
                 "PointGeneration",
+                "Point",
                 "Trading",
+                "OrderIntent",
+                "ExecutionIntent",
                 "Order",
                 "Execution"
         ));
@@ -313,6 +346,12 @@ class ReviewOnlyInternalPushPreviewAssemblerTest {
     private void assertNoExactField(Class<?> type, String fieldName) {
         for (Field field : type.getDeclaredFields()) {
             assertThat(field.getName()).isNotEqualToIgnoringCase(fieldName);
+        }
+    }
+
+    private void assertNoExactFields(Class<?> type, List<String> fieldNames) {
+        for (String fieldName : fieldNames) {
+            assertNoExactField(type, fieldName);
         }
     }
 

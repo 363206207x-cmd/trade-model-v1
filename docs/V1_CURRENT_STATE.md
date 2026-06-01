@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `819c17d BACKEND-P301 Candidate Preview / Ranking Guard Review-Only Slice (#737)`
+- Current merged main: `4de4905 BACKEND-P302 Internal Push Preview / Recheck Handoff Review-Only Slice (#739)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
-- Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, and review-only candidate preview / ranking guard through P301.
+- Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, and review-only internal push preview / recheck handoff through P302.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #739 / branch `p302`: `BACKEND-P302 Internal Push Preview / Recheck Handoff Review-Only Slice`.
-- P302 is review-only internal push preview / recheck handoff. It is not a real Push and does not count as merged main completion until its PR is merged.
+- Current open business-chain package is PR #741 / branch `p303`: `BACKEND-P303 Push Preview Closure Before External Channel`.
+- P303 is push preview closure before external channel. It is not a real Push, does not authorize external channel behavior, and does not count as merged main completion until its PR is merged.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -41,9 +41,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P301 Actually Completed
+## What P287-P302 Actually Completed
 
-P287-P301 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, and review-only candidate preview / ranking guard skeleton only:
+P287-P302 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, and review-only internal push preview / recheck handoff skeleton only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -60,6 +60,7 @@ P287-P301 completed market-read request contract, DTO, validator, test-only wiri
 - P299: review-only candidate handoff skeleton from `ReviewOnlyScoreAssemblyDTO` to `ReviewOnlyCandidateHandoffDTO`.
 - P300: review-only candidate attention skeleton from `ReviewOnlyCandidateHandoffDTO` to `ReviewOnlyCandidateAttentionDTO`.
 - P301: review-only candidate preview / ranking guard skeleton from `ReviewOnlyCandidateAttentionDTO` to `ReviewOnlyCandidatePreviewGuardDTO`.
+- P302: review-only internal push preview / recheck handoff skeleton from `ReviewOnlyCandidatePreviewGuardDTO` to `ReviewOnlyInternalPushPreviewDTO`.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
@@ -69,9 +70,9 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, production scan output, real scan loop, production ScanScore, Evidence generation, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
-## Current P302 Scope
+## Completed P302 Scope
 
-P302 is open on branch `p302` and adds a review-only internal push preview / recheck handoff skeleton pending merge.
+P302 is merged on main and adds a review-only internal push preview / recheck handoff skeleton.
 
 P302 turns `ReviewOnlyCandidatePreviewGuardDTO` into `ReviewOnlyInternalPushPreviewDTO`, so review-only candidate preview / ranking guard can become safe manual-review internal push preview and recheck handoff context for later push preview closure / external channel authorization work.
 
@@ -95,6 +96,22 @@ P302 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
 
 P302 does not create production scan output, real EvidenceItem, real ScoreItem, real Candidate, real Push, external channel behavior, Readiness, point generation, order execution, execution API, or auto-trading.
 
+## Current P303 Scope
+
+P303 is open on branch `p303` and closes the internal push preview boundary before any external channel.
+
+P303 adds closure docs and strengthens targeted guard tests for `ReviewOnlyInternalPushPreviewDTO` / `ReviewOnlyInternalPushPreviewAssembler`.
+
+P303 confirms internal push preview remains review-only, not a trade instruction, manual-review required, recheck-required, Risk Action Guard required, non-sendable, and blocked from external channel behavior.
+
+P303 is not a real Push.
+
+P303 does not connect Telegram, email, webhook, app notification, local notification, or any external channel.
+
+P303 does not generate external channel messages, sendable messages, Readiness, point generation, entry, stop, TP, RR, order intent, execution intent, or auto-trading.
+
+If the next step enters external channels, it requires separate C-level authorization. The default next safe step is dashboard / internal preview display.
+
 ## Current Workflow Scope
 
 P291D, P291E, and P291G are merged on main and provide terminal helpers.
@@ -109,7 +126,7 @@ Use `docs/GITHUB_NATIVE_WORKFLOW.md` and `docs/WORKFLOW_COMMAND_AUTOMATION.md` f
 
 The current mainline is Candidate / Push Mainline.
 
-The current block is Internal Push Preview / Recheck Handoff Review-Only Slice.
+The current block is Push Preview Closure Before External Channel.
 
 Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
 
@@ -125,7 +142,9 @@ Candidate Attention is completed at `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON` a
 
 Candidate Preview / Ranking Guard is completed at `REVIEW_ONLY_CANDIDATE_PREVIEW_GUARD_SKELETON` after P301.
 
-Internal Push Preview / Recheck Handoff is in P302 only and is not completed on main until the PR merges.
+Internal Push Preview / Recheck Handoff is completed after P302.
+
+Push Preview Closure Before External Channel is in P303 only and is not completed on main until the PR merges.
 
 Evidence generation and score calculation are not completed.
 
@@ -145,7 +164,8 @@ Candidate, Push, Readiness, point generation, order execution, execution API, an
 - `Review-only candidate handoff`: `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON`, completed after P299, not real Candidate, Candidate Attention, Push, Readiness, or point generation
 - `Review-only candidate attention`: `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON`, completed after P300, not real Candidate, candidate rank, candidate score, Push, Readiness, or point generation
 - `Review-only candidate preview / ranking guard`: `REVIEW_ONLY_CANDIDATE_PREVIEW_GUARD_SKELETON`, completed after P301, not real Candidate, candidate rank, candidate score, real ranking result, Push, Readiness, or point generation
-- `Review-only internal push preview / recheck handoff`: `REVIEW_ONLY_INTERNAL_PUSH_PREVIEW_RECHECK_SKELETON` pending / completed in P302 PR, not real Push, external channel, Readiness, point generation, or message send
+- `Review-only internal push preview / recheck handoff`: `REVIEW_ONLY_INTERNAL_PUSH_PREVIEW_RECHECK_SKELETON`, completed after P302, not real Push, external channel, Readiness, point generation, or message send
+- `Push preview closure before external channel`: `REVIEW_ONLY_PUSH_PREVIEW_CLOSURE` pending / completed in P303 PR, not real Push, external channel, Readiness, point generation, or message send
 
 ## What Is Still Not Completed
 
@@ -173,7 +193,7 @@ The following remain incomplete for the new MVP chain:
 
 Legacy market and monitor components exist in the repository, including market clients, dashboard services, scheduled recheck, and position monitoring foundations.
 
-Those legacy capabilities must not be described as completion of the P287-P302 market-read / evidence-entry / score assembly / candidate handoff / candidate attention / candidate preview guard / internal push preview scan-chain.
+Those legacy capabilities must not be described as completion of the P287-P303 market-read / evidence-entry / score assembly / candidate handoff / candidate attention / candidate preview guard / internal push preview / push preview closure scan-chain.
 
 Any use of legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` in the new scan-chain requires a separate authorization package.
 
@@ -191,7 +211,7 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 Use GPT + Codex + GitHub-native workflow by default.
 
-Review P302 before any merge decision.
+Review P303 before any merge decision.
 
 Do not describe P295 as real evidence generation or real score calculation.
 
@@ -208,5 +228,7 @@ Do not describe P300 as real Candidate, candidate rank, candidate score, Promote
 Do not describe P301 as real Candidate, candidate rank, candidate score, real ranking result, Promote To Home, Push, Readiness, or point generation.
 
 Do not describe P302 as real Push, external channel behavior, Telegram/email/webhook/app/local notification, sendable message rendering, Readiness, point generation, or trading behavior.
+
+Do not describe P303 as external channel authorization, real Push, Telegram/email/webhook/app/local notification, sendable message rendering, message sending, Readiness, point generation, or trading behavior.
 
 Do not describe Candidate, Push, Readiness, or point generation as completed.
