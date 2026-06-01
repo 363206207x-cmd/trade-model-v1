@@ -5,24 +5,25 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `5aa5b4e BACKEND-P308 Review-only Point Boundary / Proposal Gate (#751)`
+- Current merged main: `f2c5873 BACKEND-P309 Source-owned Review-only Point Proposal Skeleton (#753)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #753 / branch `p309`: `BACKEND-P309 Source-owned Review-only Point Proposal Skeleton`.
+- Current open business-chain package is PR #755 / branch `p310`: `BACKEND-P310 Point Proposal Closure / Dashboard Display Gate`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
-- P309 is source-owned review-only point proposal skeleton.
+- P309 is completed on main as Source-owned Review-only Point Proposal Skeleton.
+- P310 is point proposal closure / dashboard display gate.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
 - Entry / stop / TP / RR are nullable, incomplete-safe proposal fields only; they are not executable trading instructions.
 - External Channel is not authorized.
-- Next recommended package after P309 is Point Proposal Closure / Dashboard Display Gate.
+- Next recommended package after P310 must be separately planned and reviewed before any executable point generation or external channel.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -236,7 +237,7 @@ The next recommended package after P308 is Source-owned Review-only Point Propos
 
 ## Current P309 Scope
 
-P309 is open on branch `p309` and adds the Source-owned Review-only Point Proposal Skeleton.
+P309 is merged on main and adds the Source-owned Review-only Point Proposal Skeleton.
 
 P309 turns `ReviewOnlyPointBoundaryGateDTO` into `ReviewOnlyPointProposalDTO`.
 
@@ -258,6 +259,24 @@ P309 preserves recheck-required, Risk Action Guard required, source-trace-requir
 
 The next recommended package after P309 is Point Proposal Closure / Dashboard Display Gate.
 
+## Current P310 Scope
+
+P310 is open on branch `p310` and adds the Point Proposal Closure / Dashboard Display Gate.
+
+P310 turns `ReviewOnlyPointProposalDTO` into `ReviewOnlyPointProposalDisplayDTO`.
+
+P310 is review-only display / closure only.
+
+P310 does not modify `dashboard.html`.
+
+P310 does not add controller, endpoint, API, mapper, repository, scheduler, resource, schema, config, external channel, push send, order, execution, or auto-trading.
+
+P310 keeps entry, stop, TP, and RR display values as unavailable review-only placeholders.
+
+P310 does not create executable point generation, final direction, long-short signal, order intent, execution intent, or auto-trading.
+
+P310 preserves source trace required, runtime kline context required, recheck required, Risk Action Guard required, review-only, manual-review-required, not-trade-instruction, incomplete-safe, and fail-closed status.
+
 ## Current Workflow Scope
 
 P291D, P291E, and P291G are merged on main and provide terminal helpers.
@@ -272,7 +291,7 @@ Use `docs/GITHUB_NATIVE_WORKFLOW.md` and `docs/WORKFLOW_COMMAND_AUTOMATION.md` f
 
 The current mainline is Readiness / Point Mainline.
 
-The current block is Source-owned Review-only Point Proposal Skeleton.
+The current block is Point Proposal Closure / Dashboard Display Gate.
 
 Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
 
@@ -284,7 +303,9 @@ Review-only score assembly is completed at `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON`
 
 Review-only Point Boundary / Proposal Gate is completed at `REVIEW_ONLY_POINT_BOUNDARY_GATE_SKELETON` after P308.
 
-Source-owned Review-only Point Proposal is active at `SOURCE_OWNED_REVIEW_ONLY_POINT_PROPOSAL_SKELETON` in P309.
+Source-owned Review-only Point Proposal is completed at `SOURCE_OWNED_REVIEW_ONLY_POINT_PROPOSAL_SKELETON` after P309.
+
+Point Proposal Closure / Dashboard Display Gate is active at `REVIEW_ONLY_POINT_PROPOSAL_CLOSURE_DISPLAY_GATE` in P310.
 
 Score-to-Candidate handoff is completed at `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON` after P299.
 
