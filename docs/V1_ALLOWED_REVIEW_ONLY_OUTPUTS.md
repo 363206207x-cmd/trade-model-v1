@@ -39,6 +39,8 @@ The following outputs are allowed in review-only scope when their source ownersh
 - source-owned numeric point proposal plan status;
 - SourceTrace numeric point contract status;
 - SourceTrace missing / stale / conflicted reason;
+- RuntimeKlineContext numeric point contract status;
+- RuntimeKlineContext missing / stale / gap / abnormal reason;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -79,3 +81,4 @@ Examples:
 - `executable point generation pre-approval status` is allowed only as docs-only or review-only gating context; it cannot authorize numeric generation, external send, order, execution, or auto-trading.
 - `source-owned numeric point proposal plan status` is allowed only as docs-only planning context; it cannot create Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
 - `SourceTrace numeric point contract status` is allowed only as docs-only planning context; it cannot create SourceTrace Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
+- `RuntimeKlineContext numeric point contract status` is allowed only as docs-only planning context; it cannot create RuntimeKlineContext Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
