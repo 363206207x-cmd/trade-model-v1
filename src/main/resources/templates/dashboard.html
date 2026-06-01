@@ -1084,6 +1084,27 @@
             <div class="kv"><span class="k">Display boundary</span><span class="v">review-only / manual review required / not trade instruction</span></div>
         </section>
 
+        <section class="card module-status-card review-display-card" id="internalPushPreviewDisplay" aria-label="Internal Push Preview display gate">
+            <h3>Internal Push Preview（内部推送预览）</h3>
+            <p class="module-status-note">Review-only preview / 只读预览；dashboard display gate only.</p>
+            <div class="workbench-badges" aria-label="Internal push preview safety labels" style="justify-content:flex-start;margin-bottom:8px;">
+                <span class="status-badge partial">Review-only preview</span>
+                <span class="status-badge pending">Not a trade instruction</span>
+                <span class="status-badge pending">Manual review required</span>
+                <span class="status-badge pending">Recheck required</span>
+                <span class="status-badge pending">Risk Action Guard required</span>
+                <span class="status-badge pending">External channel disabled</span>
+            </div>
+            <div class="kv"><span class="k">Internal push preview status</span><span class="v">DASHBOARD_INTERNAL_PUSH_PREVIEW_DISPLAY_GATE / read-only placeholder</span></div>
+            <div class="kv"><span class="k">Recheck required</span><span class="v">true / 二次确认必需</span></div>
+            <div class="kv"><span class="k">Risk Action Guard required</span><span class="v">true / 风险动作保护必需</span></div>
+            <div class="kv"><span class="k">External channel disabled</span><span class="v">No Telegram / email / webhook connected; app notification and local notification are disconnected.</span></div>
+            <div class="alert-line confused">Blocked / fail-closed explanation: missing source proof, missing recheck, or Risk Action Guard blockers keep this preview blocked.</div>
+            <div class="alert-line">No readiness / point / entry / stop / TP / RR generated.</div>
+            <div class="alert-line">No external channel message, sendable message, order, execution, or auto-trading action is available here.</div>
+            <div class="kv"><span class="k">Candidate source boundary</span><span class="v">Push candidates come from Watchlist Pool / 观察库, not Display Slots / 首页展示位.</span></div>
+        </section>
+
         <!-- 第三层 -->
         <div class="layer3">
             <aside class="nav-panel" id="navPanel">
