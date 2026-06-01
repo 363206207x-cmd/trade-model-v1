@@ -1,14 +1,14 @@
-current_head: "f2c5873"
+current_head: "9bdf47d"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Point Proposal Closure / Dashboard Display Gate"
-active_block_cn: "只读点位建议闭环 / Dashboard 展示门"
-current_level: "REVIEW_ONLY_POINT_PROPOSAL_CLOSURE_DISPLAY_GATE"
-current_pr: 755
-current_branch: "p310"
-merge_rule: "B requires user approval"
-next_required_action: "review_pr_755"
-do_not_continue_to: "External channel / executable point generation / order execution"
+active_block: "Executable Point Generation Pre-Approval Plan"
+active_block_cn: "可执行点位生成前置审批方案"
+current_level: "EXECUTABLE_POINT_GENERATION_PRE_APPROVAL_PLAN"
+current_pr: 757
+current_branch: "p311"
+merge_rule: "A docs-only can merge after review"
+next_required_action: "review_pr_757"
+do_not_continue_to: "Executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md

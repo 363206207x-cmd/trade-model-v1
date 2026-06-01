@@ -18,7 +18,8 @@ Individual scope packs should reference this file instead of copying long blocke
 | production readiness | Blocked | Readiness must not become executable trade readiness. |
 | point boundary gate | Review-only skeleton completed after P308 | P308 may state whether a future source-owned review-only proposal can be reviewed, but it cannot generate point values. |
 | source-owned review-only point proposal | Review-only skeleton completed after P309 | P309 may carry nullable, incomplete-safe entry / stop / TP / RR proposal fields, but it must not become executable point generation or a trade instruction. |
-| point proposal closure / dashboard display gate | Review-only display gate active | P310 may expose display-safe status and unavailable placeholders, but it must not modify dashboard runtime, generate executable point values, or become a trade instruction. |
+| point proposal closure / dashboard display gate | Review-only display gate completed after P310 | P310 exposes display-safe status and unavailable placeholders, but it does not modify dashboard runtime, generate executable point values, or become a trade instruction. |
+| executable point generation pre-approval plan | Docs-only plan active | P311 defines the future source trace, runtime kline context, data quality, multi-timeframe, liquidity / stampede / wick / strong reversal, and Risk Action Guard gates required before numeric point proposal work. |
 | point generation | Not completed | Review-only point boundary work does not equal executable point generation. |
 | executable point generation | Blocked | Entry / stop / TP / RR values must not be generated as executable output. |
 | production point generation | Blocked | Real entry / stop / TP / RR production point generation is not complete. |
