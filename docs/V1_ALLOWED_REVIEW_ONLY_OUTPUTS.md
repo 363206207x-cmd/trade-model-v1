@@ -49,6 +49,8 @@ The following outputs are allowed in review-only scope when their source ownersh
 - Risk Action Guard missing / blocked / recheck reason;
 - Numeric Point Safety Validator plan status;
 - Numeric Point Safety Validator incomplete / blocked / degraded reason;
+- Numeric Point Fixture Matrix plan status;
+- Numeric Point fixture expected outcome summary;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -94,3 +96,4 @@ Examples:
 - `MultiTimeframe numeric point contract status` is allowed only as docs-only planning context; it cannot create MultiTimeframe Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
 - `Risk Action Guard numeric point contract status` is allowed only as docs-only planning context; it cannot create Risk Action Guard Java DTOs, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
 - `Numeric Point Safety Validator plan status` is allowed only as docs-only planning context; it cannot create Safety Validator Java, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
+- `Numeric Point Fixture Matrix plan status` is allowed only as docs-only planning context; it cannot create Java tests, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
