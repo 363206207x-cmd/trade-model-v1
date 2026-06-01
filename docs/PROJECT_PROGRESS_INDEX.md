@@ -6,6 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `5a609a1 BACKEND-P316 MultiTimeframe Numeric Point Contract Plan (#767)`
 - `9d2cc1c BACKEND-P315 DataQuality Numeric Point Contract Plan (#765)`
 - `5f855e6 BACKEND-P314 RuntimeKlineContext Numeric Point Contract Plan (#762)`
 - `072f384 BACKEND-P313 SourceTrace Numeric Point Contract Plan (#761)`
@@ -77,11 +78,13 @@ Current active capability movement:
 - It moved the chain from `SOURCETRACE_NUMERIC_POINT_CONTRACT_PLAN` to `RUNTIME_KLINE_CONTEXT_NUMERIC_POINT_CONTRACT_PLAN`.
 - P315 is merged on main.
 - It moved the chain from `RUNTIME_KLINE_CONTEXT_NUMERIC_POINT_CONTRACT_PLAN` to `DATA_QUALITY_NUMERIC_POINT_CONTRACT_PLAN`.
-- `BACKEND-P316 MultiTimeframe Numeric Point Contract Plan` is in PR #767 / branch `p316`, pending review.
-- P316 is a docs-only plan from `DATA_QUALITY_NUMERIC_POINT_CONTRACT_PLAN` toward `MULTITIMEFRAME_NUMERIC_POINT_CONTRACT_PLAN`.
+- P316 is merged on main.
+- It moved the chain from `DATA_QUALITY_NUMERIC_POINT_CONTRACT_PLAN` to `MULTITIMEFRAME_NUMERIC_POINT_CONTRACT_PLAN`.
+- `BACKEND-P317 Risk Action Guard Numeric Point Contract Plan` is in PR #769 / branch `p317`, pending review.
+- P317 is a docs-only plan from `MULTITIMEFRAME_NUMERIC_POINT_CONTRACT_PLAN` toward `RISK_ACTION_GUARD_NUMERIC_POINT_CONTRACT_PLAN`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is MultiTimeframe Numeric Point Contract Plan.
-- The next required action is `review_pr_767`.
+- The active block is Risk Action Guard Numeric Point Contract Plan.
+- The next required action is `review_pr_769`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -179,6 +182,10 @@ P316 is a MultiTimeframe numeric point contract plan. It defines the documentati
 
 P316 may only make a small Governance / Contract Progress lift. It does not raise Production Runtime Progress and must not describe MultiTimeframe Java DTO completion, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
 
+P317 is a Risk Action Guard numeric point contract plan. It defines the documentation-only minimum contract for future high-risk, liquidity-degraded, stampede-confirmed, wick-only, strong reversal, high-timeframe conflict, entry / stop / TP / RR guard review, incomplete, fail-closed, and fixture matrix behavior.
+
+P317 may only make a small Governance / Contract Progress lift. It does not raise Production Runtime Progress and must not describe Risk Action Guard Java DTO completion, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -190,7 +197,7 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 | Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks source-owned point proposal -> execution advice -> monitor -> review closure. |
 | MVP Progress | 65%-73% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 push preview closure, P304 dashboard display gate, P305 review-only MVP closure, P306 planning, P307 review-only readiness gate skeleton, P308 point boundary gate skeleton, P309 source-owned review-only point proposal skeleton, and P310 display gate exist. | Real Push, external channel, executable Readiness, executable point generation, and the user-facing MVP loop are not complete. |
 | Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294-P304 and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
-| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, P312 numeric point proposal object-boundary rules, P313 SourceTrace contract rules, P314 RuntimeKlineContext contract rules, P315 DataQuality contract rules, and active P316 MultiTimeframe contract rules are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, Risk Action Guard numeric point contracts, safety validator contracts, and Java remains blocked before implementation. |
+| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, P312 numeric point proposal object-boundary rules, P313 SourceTrace contract rules, P314 RuntimeKlineContext contract rules, P315 DataQuality contract rules, P316 MultiTimeframe contract rules, and active P317 Risk Action Guard contract rules are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, safety validator contracts, fixture matrix contracts, and Java remains blocked before implementation. |
 | Skeleton / Test Progress | 86%-94% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 closure guard tests, P304 dashboard guard tests, P305 closure tests, P307 readiness gate skeleton tests, P308 point boundary gate skeleton tests, P309 point proposal skeleton tests, and P310 display gate tests exist. | Real Push / external channel workflow, executable point generation, and executable readiness are not complete. |
 | Product Usability Progress | 42%-52% | Dashboard and review-only displays exist, MarketRead review-only scan output now has a safe entry envelope after P295, and P304 makes internal push preview safety visible in the dashboard while P305 closes the read-only candidate/push MVP loop. | Core actions still do not form an executable MVP workflow, and external send remains blocked. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
@@ -255,6 +262,8 @@ P315 must not be described as DataQuality Java DTO completion, numeric point pro
 
 P316 must not be described as MultiTimeframe Java DTO completion, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel authorization, order execution, execution API, or auto-trading.
 
+P317 must not be described as Risk Action Guard Java DTO completion, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel authorization, order execution, execution API, or auto-trading.
+
 Evidence generation, ScoreItem generation, and Score calculation must not be described as completed until separate merged packages add those layers.
 
 Real Candidate, real Push, executable Readiness, external channel, and point generation must not be described as completed.
@@ -275,9 +284,9 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after P316:
+Near-term priority after P317:
 
-1. Risk Action Guard Numeric Point Contract Plan or Numeric Point Safety Validator Plan.
+1. Numeric Point Safety Validator Plan or Numeric Point Fixture Matrix Plan.
 2. External Channel Authorization Gate only as a separate C-level package.
 3. Readiness / Point specialty planning follow-up before any point generation.
 4. Dashboard smoke / internal preview closure.
