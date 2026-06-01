@@ -32,8 +32,11 @@ The following outputs are allowed in review-only scope when their source ownersh
 - risk downgraded candidate;
 - confused with recovery condition;
 - readiness review-only status;
+- point boundary review-only status;
+- point proposal unavailable reason;
 - incomplete reason;
 - point boundary unavailable reason;
+- manual review required;
 - risk guard required reason.
 
 ## Forbidden Executable Outputs
@@ -46,6 +49,7 @@ The following remain forbidden unless a future explicitly authorized scope chang
 - automatic leverage change;
 - automatic execution;
 - executable readiness;
+- executable point generation;
 - executable entry;
 - executable stop;
 - executable TP;
