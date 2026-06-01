@@ -20,9 +20,11 @@ Individual scope packs should reference this file instead of copying long blocke
 | source-owned review-only point proposal | Review-only skeleton completed after P309 | P309 may carry nullable, incomplete-safe entry / stop / TP / RR proposal fields, but it must not become executable point generation or a trade instruction. |
 | point proposal closure / dashboard display gate | Review-only display gate completed after P310 | P310 exposes display-safe status and unavailable placeholders, but it does not modify dashboard runtime, generate executable point values, or become a trade instruction. |
 | executable point generation pre-approval plan | Docs-only plan completed after P311 | P311 defines the future source trace, runtime kline context, data quality, multi-timeframe, liquidity / stampede / wick / strong reversal, and Risk Action Guard gates required before numeric point proposal work. |
-| source-owned numeric point proposal plan | Docs-only plan active | P312 defines the future review-only numeric proposal shape, source metadata, nullable fields, incomplete rules, and fail-closed rules, but it does not create Java or generate values. |
+| source-owned numeric point proposal plan | Docs-only plan completed after P312 | P312 defines the future review-only numeric proposal shape, source metadata, nullable fields, incomplete rules, and fail-closed rules, but it does not create Java or generate values. |
+| SourceTrace numeric point contract plan | Docs-only plan active | P313 defines future source trace fields, freshness states, entry / stop / TP / RR trace contracts, fixture matrix expectations, and Risk Action Guard references, but it does not create SourceTrace Java DTOs or generate values. |
 | point generation | Not completed | Review-only point boundary work does not equal executable point generation. |
 | executable point generation | Blocked | Entry / stop / TP / RR values must not be generated as executable output. |
+| SourceTrace Java DTO | Not completed | P313 is only the contract plan and must not be counted as Java DTO implementation. |
 | production point generation | Blocked | Real entry / stop / TP / RR production point generation is not complete. |
 | executable entry / stop / TP / RR | Not completed | Entry, stop, TP, and RR must not be generated as executable output without source-owned trace, market context, data quality, structure confirmation, and manual review. |
 | production MarketQuoteClient scan-chain wiring | Blocked | Legacy market clients may not be treated as authorized scan-chain provider wiring. |

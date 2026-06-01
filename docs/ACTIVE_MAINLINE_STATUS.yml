@@ -1,13 +1,13 @@
-current_head: "a3d632f"
+current_head: "04bddb1"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source-owned Numeric Point Proposal Plan"
-active_block_cn: "来源可追踪的只读数值点位建议方案"
-current_level: "SOURCE_OWNED_NUMERIC_POINT_PROPOSAL_PLAN"
-current_pr: 759
-current_branch: "p312"
+active_block: "SourceTrace Numeric Point Contract Plan"
+active_block_cn: "数值点位 SourceTrace 合同方案"
+current_level: "SOURCETRACE_NUMERIC_POINT_CONTRACT_PLAN"
+current_pr: "pending"
+current_branch: "p313"
 merge_rule: "A docs-only can merge after review"
-next_required_action: "review_pr_759"
+next_required_action: "create_draft_pr"
 do_not_continue_to: "Executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
