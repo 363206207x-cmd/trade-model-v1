@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `db5e38a BACKEND-P303 Push Preview Closure Before External Channel (#741)`
+- Current merged main: `86954dd BACKEND-P304 Dashboard / Internal Push Preview Display Gate (#743)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
-- Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, and push preview closure before external channel through P303.
+- Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, and dashboard / internal push preview display gate through P304.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #743 / branch `p304`: `BACKEND-P304 Dashboard / Internal Push Preview Display Gate`.
-- P304 is dashboard / internal push preview display gate. It is not a real Push, does not authorize external channel behavior, and does not count as merged main completion until its PR is merged.
+- Current open business-chain package is PR #745 / branch `p305`: `BACKEND-P305 Candidate / Push Review-Only MVP Closure`.
+- P305 is Candidate / Push Review-Only MVP Closure. It confirms the current Candidate / Push chain is only an internal read-only preview loop and does not authorize external channel behavior.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -41,9 +41,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P303 Actually Completed
+## What P287-P304 Actually Completed
 
-P287-P303 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, and push preview closure before external channel only:
+P287-P304 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, and dashboard / internal push preview display gate only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -62,6 +62,7 @@ P287-P303 completed market-read request contract, DTO, validator, test-only wiri
 - P301: review-only candidate preview / ranking guard skeleton from `ReviewOnlyCandidateAttentionDTO` to `ReviewOnlyCandidatePreviewGuardDTO`.
 - P302: review-only internal push preview / recheck handoff skeleton from `ReviewOnlyCandidatePreviewGuardDTO` to `ReviewOnlyInternalPushPreviewDTO`.
 - P303: push preview closure before external channel, with docs and targeted guard tests only.
+- P304: dashboard / internal push preview display gate, with read-only status, external-channel-disabled copy, and targeted dashboard guard tests.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
@@ -115,7 +116,7 @@ If the next step enters external channels, it requires separate C-level authoriz
 
 ## Current P304 Scope
 
-P304 is open on branch `p304` and adds a dashboard / internal push preview display gate.
+P304 is merged on main and adds a dashboard / internal push preview display gate.
 
 P304 displays internal push preview status as review-only, not a trade instruction, manual-review required, recheck-required, Risk Action Guard required, external-channel disabled, and blocked / fail-closed when source proof or guard conditions are missing.
 
@@ -126,6 +127,30 @@ P304 does not connect Telegram, email, webhook, app notification, local notifica
 P304 does not generate external channel messages, sendable messages, Readiness, point generation, entry, stop, TP, RR, order intent, execution intent, or auto-trading.
 
 If the next step enters external channels, it requires separate C-level authorization. The default next safe step is internal push preview smoke / closure.
+
+## Current P305 Scope
+
+P305 is open on branch `p305` and closes the P299-P304 Candidate / Push review-only MVP chain.
+
+P305 confirms the chain reaches dashboard-visible internal push preview display only.
+
+Candidate / Push currently completes only this internal read-only chain:
+
+- `ReviewOnlyScoreAssemblyDTO` -> `ReviewOnlyCandidateHandoffDTO`
+- `ReviewOnlyCandidateHandoffDTO` -> `ReviewOnlyCandidateAttentionDTO`
+- `ReviewOnlyCandidateAttentionDTO` -> `ReviewOnlyCandidatePreviewGuardDTO`
+- `ReviewOnlyCandidatePreviewGuardDTO` -> `ReviewOnlyInternalPushPreviewDTO`
+- Dashboard / Internal Push Preview Display Gate
+
+P305 is not a real Candidate.
+
+P305 is not a real Push.
+
+P305 does not connect Telegram, email, webhook, app notification, local notification, or any external channel.
+
+P305 does not generate external channel messages, sendable messages, Readiness, point generation, entry, stop, TP, RR, order intent, execution intent, or auto-trading.
+
+If the next step enters external channels, it requires separate C-level authorization. The default does not enter external channel.
 
 ## Current Workflow Scope
 
@@ -141,7 +166,7 @@ Use `docs/GITHUB_NATIVE_WORKFLOW.md` and `docs/WORKFLOW_COMMAND_AUTOMATION.md` f
 
 The current mainline is Candidate / Push Mainline.
 
-The current block is Dashboard / Internal Push Preview Display Gate.
+The current block is Candidate / Push Review-Only MVP Closure.
 
 Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
 
@@ -161,7 +186,9 @@ Internal Push Preview / Recheck Handoff is completed after P302.
 
 Push Preview Closure Before External Channel is completed after P303.
 
-Dashboard / Internal Push Preview Display Gate is in P304 only and is not completed on main until the PR merges.
+Dashboard / Internal Push Preview Display Gate is completed after P304.
+
+Candidate / Push Review-Only MVP Closure is in P305 only and is not completed on main until the PR merges.
 
 Evidence generation and score calculation are not completed.
 
@@ -183,7 +210,8 @@ Candidate, Push, Readiness, point generation, order execution, execution API, an
 - `Review-only candidate preview / ranking guard`: `REVIEW_ONLY_CANDIDATE_PREVIEW_GUARD_SKELETON`, completed after P301, not real Candidate, candidate rank, candidate score, real ranking result, Push, Readiness, or point generation
 - `Review-only internal push preview / recheck handoff`: `REVIEW_ONLY_INTERNAL_PUSH_PREVIEW_RECHECK_SKELETON`, completed after P302, not real Push, external channel, Readiness, point generation, or message send
 - `Push preview closure before external channel`: `REVIEW_ONLY_PUSH_PREVIEW_CLOSURE`, completed after P303, not real Push, external channel, Readiness, point generation, or message send
-- `Dashboard / internal push preview display gate`: `DASHBOARD_INTERNAL_PUSH_PREVIEW_DISPLAY_GATE` pending / completed in P304 PR, not real Push, external channel, Readiness, point generation, or message send
+- `Dashboard / internal push preview display gate`: `DASHBOARD_INTERNAL_PUSH_PREVIEW_DISPLAY_GATE`, completed after P304, not real Push, external channel, Readiness, point generation, or message send
+- `Candidate / Push review-only MVP closure`: `CANDIDATE_PUSH_REVIEW_ONLY_MVP_CLOSURE`, pending / completed in P305 PR, not real Candidate, real Push, external channel, Readiness, point generation, or message send
 
 ## What Is Still Not Completed
 
@@ -211,7 +239,7 @@ The following remain incomplete for the new MVP chain:
 
 Legacy market and monitor components exist in the repository, including market clients, dashboard services, scheduled recheck, and position monitoring foundations.
 
-Those legacy capabilities must not be described as completion of the P287-P304 market-read / evidence-entry / score assembly / candidate handoff / candidate attention / candidate preview guard / internal push preview / push preview closure / dashboard display gate scan-chain.
+Those legacy capabilities must not be described as completion of the P287-P305 market-read / evidence-entry / score assembly / candidate handoff / candidate attention / candidate preview guard / internal push preview / push preview closure / dashboard display gate / Candidate-Push MVP closure scan-chain.
 
 Any use of legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` in the new scan-chain requires a separate authorization package.
 
@@ -229,7 +257,7 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 Use GPT + Codex + GitHub-native workflow by default.
 
-Review P304 before any merge decision.
+Review P305 before any merge decision.
 
 Do not describe P295 as real evidence generation or real score calculation.
 
@@ -250,5 +278,7 @@ Do not describe P302 as real Push, external channel behavior, Telegram/email/web
 Do not describe P303 as external channel authorization, real Push, Telegram/email/webhook/app/local notification, sendable message rendering, message sending, Readiness, point generation, or trading behavior.
 
 Do not describe P304 as external channel authorization, real Push, Telegram/email/webhook/app/local notification, sendable message rendering, message sending, Readiness, point generation, or trading behavior.
+
+Do not describe P305 as real Candidate, real Push, external channel authorization, Telegram/email/webhook/app/local notification, sendable message rendering, message sending, Readiness, point generation, or trading behavior.
 
 Do not describe Candidate, Push, Readiness, or point generation as completed.
