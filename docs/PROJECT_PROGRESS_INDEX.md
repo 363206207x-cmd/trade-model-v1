@@ -6,6 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `4b54233 BACKEND-P299 Score-to-Candidate Handoff Review-Only Slice (#733)`
 - `ad3c045 BACKEND-P298 Review-Only Score Assembly Slice (#731)`
 - `95760cb BACKEND-P297 Score Input / Precheck Review-Only Slice (#729)`
 - `8665c24 BACKEND-P296 Evidence Normalization Review-Only Slice (#727)`
@@ -26,11 +27,13 @@ Current active capability movement:
 - It moved the chain from `REVIEW_ONLY_EVIDENCE_NORMALIZATION_SKELETON` to `REVIEW_ONLY_SCORE_INPUT_PRECHECK_SKELETON`.
 - P298 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCORE_INPUT_PRECHECK_SKELETON` to `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON`.
-- `BACKEND-P299 Score-to-Candidate Handoff Review-Only Slice` is in PR #733 / branch `p299`, pending merge.
-- P299 is capability movement from `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON` toward `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON`.
+- P299 is merged on main.
+- It moved the chain from `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON` to `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON`.
+- `BACKEND-P300 Candidate Attention Review-Only Slice` is in PR #735 / branch `p300`, pending merge.
+- P300 is capability movement from `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON` toward `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON`.
 - The active mainline is Candidate / Push Mainline.
-- The active block is Score-to-Candidate Handoff Review-Only Slice.
-- The next required action is `review_pr_733`.
+- The active block is Candidate Attention Review-Only Slice.
+- The next required action is `review_pr_735`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -60,6 +63,10 @@ P299 is capability movement, not closure-only. It moves the chain from `REVIEW_O
 
 P299 does not raise Production Runtime Progress. It is not real Candidate generation, Candidate Attention production workflow, Promote To Home runtime logic, Push, Readiness, point generation, entry / stop / TP / RR, or trading behavior.
 
+P300 is capability movement, not closure-only. It moves the chain from `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON` toward `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON` by turning review-only candidate handoff into safe candidate attention skeleton output.
+
+P300 does not raise Production Runtime Progress. It is not real Candidate generation, candidate rank, candidate score, Promote To Home runtime logic, Push, Readiness, point generation, entry / stop / TP / RR, or trading behavior.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -69,10 +76,10 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 | Progress view | Current range | Why this range | Why it cannot be higher yet |
 |---|---:|---|---|
 | Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks completed evidence normalization -> score -> candidate -> push preview -> execution advice -> monitor -> review closure. |
-| MVP Progress | 58%-66% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, and active P299 candidate handoff skeleton exist. | Candidate handoff is not merged yet; real Candidate, Push, Readiness, point generation, and the user-facing MVP loop are not complete. |
-| Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294-P299 and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
+| MVP Progress | 59%-67% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, and active P300 candidate attention skeleton exist. | Candidate attention is not merged yet; real Candidate, Push, Readiness, point generation, and the user-facing MVP loop are not complete. |
+| Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294-P300 and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
 | Governance / Contract Progress | 89%-95% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, and GitHub-native workflow rules are extensive. | Future windows still need to follow GitHub-native workflow and stale PR / Issue hygiene. |
-| Skeleton / Test Progress | 79%-87% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, and active P299 candidate handoff skeleton exist. | Candidate handoff is not merged yet, and real Candidate / Push workflow is not complete. |
+| Skeleton / Test Progress | 80%-88% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, and active P300 candidate attention skeleton exist. | Candidate attention is not merged yet, and real Candidate / Push workflow is not complete. |
 | Product Usability Progress | 40%-50% | Dashboard and review-only displays exist, and MarketRead review-only scan output now has a safe entry envelope after P295. | Core actions still do not form a coherent review-only MVP workflow. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
 | Push / Monitoring Progress | 42%-55% | Push no-op/audit/channel skeletons and legacy position monitor foundations exist. | No external send, no full internal push preview chain, and no complete monitor action loop. |
@@ -102,6 +109,8 @@ P298 must not be described as real scoring, ScoreItem generation, score calculat
 
 P299 must not be described as real Candidate, Candidate Attention, Promote To Home, Push, Readiness, or point generation.
 
+P300 must not be described as real Candidate, candidate rank, candidate score, Promote To Home, Push, Readiness, or point generation.
+
 Evidence generation, ScoreItem generation, and Score calculation must not be described as completed until separate merged packages add those layers.
 
 Candidate, Push, Readiness, and point generation must not be described as completed.
@@ -122,9 +131,9 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after P299:
+Near-term priority after P300:
 
-1. Candidate Attention review-only slice.
+1. Candidate Preview / Ranking Guard review-only slice.
 2. review-only Candidate preview.
 3. Promote To Home review-only boundary if still non-runtime.
 4. internal Opportunity Push preview and Push Recheck.
