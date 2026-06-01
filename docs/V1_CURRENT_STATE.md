@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `8665c24 BACKEND-P296 Evidence Normalization Review-Only Slice (#727)`
+- Current merged main: `95760cb BACKEND-P297 Score Input / Precheck Review-Only Slice (#729)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
-- Evidence / Score Mainline has completed a review-only entry envelope through P295 and review-only evidence normalization through P296.
+- Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, and review-only score input / precheck through P297.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #729 / branch `p297`: `BACKEND-P297 Score Input / Precheck Review-Only Slice`.
-- P297 is review-only score input / precheck. It is not real scoring and does not count as merged main completion until its PR is merged.
+- Current open business-chain package is PR #731 / branch `p298`: `BACKEND-P298 Review-Only Score Assembly Slice`.
+- P298 is review-only score assembly. It is not real scoring and does not count as merged main completion until its PR is merged.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -40,9 +40,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P295 Actually Completed
+## What P287-P297 Actually Completed
 
-P287-P296 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, and review-only evidence normalization skeleton only:
+P287-P297 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, and review-only score input / precheck skeleton only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -54,6 +54,7 @@ P287-P296 completed market-read request contract, DTO, validator, test-only wiri
 - P294: review-only scan output skeleton from `MarketReadReviewOnlyOutputDTO` to `MarketReadReviewOnlyScanOutputDTO`.
 - P295: review-only Evidence / Score entry skeleton from `MarketReadReviewOnlyScanOutputDTO` to `ReviewOnlyEvidenceScoreEntryDTO`.
 - P296: review-only evidence normalization skeleton from `ReviewOnlyEvidenceScoreEntryDTO` to `ReviewOnlyNormalizedEvidenceDTO`.
+- P297: review-only score input / precheck skeleton from `ReviewOnlyNormalizedEvidenceDTO` to `ReviewOnlyScoreInputPrecheckDTO`.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
@@ -63,23 +64,25 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, production scan output, real scan loop, production ScanScore, Evidence generation, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
-## Current P297 Scope
+## Current P298 Scope
 
-P297 is open on branch `p297` and adds a review-only score input / precheck skeleton pending merge.
+P298 is open on branch `p298` and adds a review-only score assembly skeleton pending merge.
 
-P297 turns `ReviewOnlyNormalizedEvidenceDTO` into `ReviewOnlyScoreInputPrecheckDTO`, so review-only normalized evidence can become safe manual-review score input precheck context for later review-only score assembly.
+P298 turns `ReviewOnlyScoreInputPrecheckDTO` into `ReviewOnlyScoreAssemblyDTO`, so review-only score input precheck can become safe manual-review score assembly context for later score-to-candidate handoff review-only work.
 
-P297 is not real scoring.
+P298 is not real scoring.
 
-P297 does not generate `ScoreItem`.
+P298 does not generate `ScoreItem`.
 
-P297 does not write DB state and does not write `tm_score_item`.
+P298 does not write DB state and does not write `tm_score_item`.
 
-P297 does not calculate the eight score dimensions.
+P298 does not calculate the eight score dimensions.
 
-P297 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+P298 does not generate final score, direction, or long-short signal.
 
-P297 does not create production scan output, real EvidenceItem, real ScoreItem, Candidate, Push, Readiness, point generation, order execution, execution API, or auto-trading.
+P298 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+
+P298 does not create production scan output, real EvidenceItem, real ScoreItem, final score, direction, Candidate, Push, Readiness, point generation, order execution, execution API, or auto-trading.
 
 ## Current Workflow Scope
 
@@ -95,13 +98,15 @@ Use `docs/GITHUB_NATIVE_WORKFLOW.md` and `docs/WORKFLOW_COMMAND_AUTOMATION.md` f
 
 The current mainline is Evidence / Score Mainline.
 
-The current block is Score Input / Precheck Review-Only Slice.
+The current block is Review-Only Score Assembly Slice.
 
 Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
 
 Evidence normalization is completed at `REVIEW_ONLY_EVIDENCE_NORMALIZATION_SKELETON` after P296.
 
-Score input / precheck is in P297 only and is not completed on main until the PR merges.
+Score input / precheck is completed at `REVIEW_ONLY_SCORE_INPUT_PRECHECK_SKELETON` after P297.
+
+Review-only score assembly is in P298 only and is not completed on main until the PR merges.
 
 Evidence generation and score calculation are not completed.
 
@@ -116,7 +121,8 @@ Candidate, Push, Readiness, point generation, order execution, execution API, an
 - `Review-only MarketRead scan output`: `REVIEW_ONLY_SCAN_OUTPUT_SKELETON`, completed after P294, not production scan output
 - `Review-only Evidence / Score entry`: `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`, completed after P295, not real evidence generation or score calculation
 - `Review-only evidence normalization`: `REVIEW_ONLY_EVIDENCE_NORMALIZATION_SKELETON`, completed after P296, not real evidence generation or score calculation
-- `Review-only score input / precheck`: `REVIEW_ONLY_SCORE_INPUT_PRECHECK_SKELETON` pending / completed in P297 PR, not real score calculation or ScoreItem generation
+- `Review-only score input / precheck`: `REVIEW_ONLY_SCORE_INPUT_PRECHECK_SKELETON`, completed after P297, not real score calculation or ScoreItem generation
+- `Review-only score assembly`: `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON` pending / completed in P298 PR, not real score calculation, final score, direction, or ScoreItem generation
 
 ## What Is Still Not Completed
 
@@ -126,7 +132,6 @@ The following remain incomplete for the new MVP chain:
 - scan-chain market read adapter connected to authorized review-only inputs.
 - production/runtime market read for the new scan-chain.
 - production scan output from live market data.
-- Evidence normalization over review-only entry output.
 - Evidence generation.
 - Score calculation over real evidence.
 - production ScanScore over live scan output.
@@ -145,7 +150,7 @@ The following remain incomplete for the new MVP chain:
 
 Legacy market and monitor components exist in the repository, including market clients, dashboard services, scheduled recheck, and position monitoring foundations.
 
-Those legacy capabilities must not be described as completion of the P287-P295 market-read / evidence-entry scan-chain.
+Those legacy capabilities must not be described as completion of the P287-P298 market-read / evidence-entry / score assembly scan-chain.
 
 Any use of legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` in the new scan-chain requires a separate authorization package.
 
@@ -163,12 +168,14 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 Use GPT + Codex + GitHub-native workflow by default.
 
-Review P297 before any merge decision.
+Review P298 before any merge decision.
 
 Do not describe P295 as real evidence generation or real score calculation.
 
 Do not describe P296 as real evidence generation, persisted evidence, or real score calculation.
 
 Do not describe P297 as real scoring, ScoreItem generation, or score calculation.
+
+Do not describe P298 as real scoring, ScoreItem generation, score calculation, final score, direction, or Candidate handoff completion.
 
 Do not describe Candidate, Push, Readiness, or point generation as completed.
