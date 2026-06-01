@@ -6,6 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `a3d632f BACKEND-P311 Executable Point Generation Pre-Approval Plan (#757)`
 - `9bdf47d BACKEND-P310 Point Proposal Closure / Dashboard Display Gate (#755)`
 - `f2c5873 BACKEND-P309 Source-owned Review-only Point Proposal Skeleton (#753)`
 - `5aa5b4e BACKEND-P308 Review-only Point Boundary / Proposal Gate (#751)`
@@ -62,11 +63,13 @@ Current active capability movement:
 - It moved the chain from `REVIEW_ONLY_POINT_BOUNDARY_GATE_SKELETON` to `SOURCE_OWNED_REVIEW_ONLY_POINT_PROPOSAL_SKELETON`.
 - P310 is merged on main.
 - It moved the chain from `SOURCE_OWNED_REVIEW_ONLY_POINT_PROPOSAL_SKELETON` to `REVIEW_ONLY_POINT_PROPOSAL_CLOSURE_DISPLAY_GATE`.
-- `BACKEND-P311 Executable Point Generation Pre-Approval Plan` is in PR #757 / branch `p311`, pending merge.
-- P311 is a docs-only pre-approval plan from `REVIEW_ONLY_POINT_PROPOSAL_CLOSURE_DISPLAY_GATE` toward `EXECUTABLE_POINT_GENERATION_PRE_APPROVAL_PLAN`.
+- P311 is merged on main.
+- It moved the chain from `REVIEW_ONLY_POINT_PROPOSAL_CLOSURE_DISPLAY_GATE` to `EXECUTABLE_POINT_GENERATION_PRE_APPROVAL_PLAN`.
+- `BACKEND-P312 Source-owned Numeric Point Proposal Plan` is in PR #759 / branch `p312`, pending merge.
+- P312 is a docs-only plan from `EXECUTABLE_POINT_GENERATION_PRE_APPROVAL_PLAN` toward `SOURCE_OWNED_NUMERIC_POINT_PROPOSAL_PLAN`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is Executable Point Generation Pre-Approval Plan.
-- The next required action is `review_pr_757`.
+- The active block is Source-owned Numeric Point Proposal Plan.
+- The next required action is `review_pr_759`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -144,6 +147,10 @@ P311 is an executable point generation pre-approval plan. It defines documentati
 
 P311 may only make a small Governance / Contract Progress lift. It does not raise Production Runtime Progress and must not describe executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
 
+P312 is a source-owned numeric point proposal plan. It defines documentation-only object boundaries, field families, source trace metadata, nullable fields, INCOMPLETE rules, and BLOCKED_FAIL_CLOSED rules for a future review-only numeric proposal object.
+
+P312 may only make a small Governance / Contract Progress lift. It does not raise Production Runtime Progress and must not describe Java DTO completion, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -155,7 +162,7 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 | Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks source-owned point proposal -> execution advice -> monitor -> review closure. |
 | MVP Progress | 65%-73% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 push preview closure, P304 dashboard display gate, P305 review-only MVP closure, P306 planning, P307 review-only readiness gate skeleton, P308 point boundary gate skeleton, P309 source-owned review-only point proposal skeleton, and P310 display gate exist. | Real Push, external channel, executable Readiness, executable point generation, and the user-facing MVP loop are not complete. |
 | Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294-P304 and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
-| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, and active P311 point-generation pre-approval rules are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, and the P311 source trace / runtime context / Risk Action Guard boundary before numeric point work. |
+| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, and active P312 numeric point proposal object-boundary rules are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, and the P312 source trace / runtime context / Risk Action Guard boundary before Java implementation. |
 | Skeleton / Test Progress | 86%-94% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 closure guard tests, P304 dashboard guard tests, P305 closure tests, P307 readiness gate skeleton tests, P308 point boundary gate skeleton tests, P309 point proposal skeleton tests, and P310 display gate tests exist. | Real Push / external channel workflow, executable point generation, and executable readiness are not complete. |
 | Product Usability Progress | 42%-52% | Dashboard and review-only displays exist, MarketRead review-only scan output now has a safe entry envelope after P295, and P304 makes internal push preview safety visible in the dashboard while P305 closes the read-only candidate/push MVP loop. | Core actions still do not form an executable MVP workflow, and external send remains blocked. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
@@ -210,6 +217,8 @@ P310 must not be described as executable point generation, executable entry / st
 
 P311 must not be described as executable point generation, source-owned numeric proposal implementation, executable entry / stop / TP / RR, dashboard runtime integration, external channel authorization, order execution, execution API, or auto-trading.
 
+P312 must not be described as Java DTO completion, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, dashboard runtime integration, external channel authorization, order execution, execution API, or auto-trading.
+
 Evidence generation, ScoreItem generation, and Score calculation must not be described as completed until separate merged packages add those layers.
 
 Real Candidate, real Push, executable Readiness, external channel, and point generation must not be described as completed.
@@ -230,9 +239,9 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after P311:
+Near-term priority after P312:
 
-1. Source-owned Numeric Point Proposal Plan or Point Generation Safety Gate Plan.
+1. SourceTrace Numeric Point Contract Plan or Numeric Point Safety Validator Plan.
 2. External Channel Authorization Gate only as a separate C-level package.
 3. Readiness / Point specialty planning follow-up before any point generation.
 4. Dashboard smoke / internal preview closure.
