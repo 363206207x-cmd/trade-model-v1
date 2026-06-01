@@ -36,11 +36,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,6 +58,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 @Tag("smoke")
 class DashboardControllerTest {
+    private static final Path DASHBOARD_TEMPLATE =
+            Path.of("src/main/resources/templates/dashboard.html");
+    private static final String INTERNAL_PUSH_PREVIEW_START =
+            "<section class=\"card module-status-card review-display-card\" id=\"internalPushPreviewDisplay\"";
+    private static final String SECTION_END = "</section>";
 
     @Mock
     private DecisionService decisionService;
@@ -88,6 +97,38 @@ class DashboardControllerTest {
                         )
                 )
         )).build();
+    }
+
+    @Test
+    void dashboardTemplateRendersInternalPushPreviewDisplayGateAsReviewOnlyAndNonSendable() throws Exception {
+        String section = normalizedInternalPushPreviewDisplay();
+
+        assertThat(section).contains("internal push preview");
+        assertThat(section).contains("review-only preview");
+        assertThat(section).contains("not a trade instruction");
+        assertThat(section).contains("manual review required");
+        assertThat(section).contains("recheck required");
+        assertThat(section).contains("risk action guard required");
+        assertThat(section).contains("external channel disabled");
+        assertThat(section).contains("no telegram / email / webhook connected");
+        assertThat(section).contains("no readiness / point / entry / stop / tp / rr generated");
+        assertThat(section).contains("blocked / fail-closed explanation");
+        assertThat(section).contains("watchlist pool");
+        assertThat(section).contains("display slots");
+        assertThat(section).contains("not display slots");
+
+        assertThat(section).doesNotContain("telegram enabled");
+        assertThat(section).doesNotContain("email enabled");
+        assertThat(section).doesNotContain("webhook enabled");
+        assertThat(section).doesNotContain("external channel enabled");
+        assertThat(section).doesNotContain("readiness generated");
+        assertThat(section).doesNotContain("point generated");
+        assertThat(section).doesNotContain("entry generated");
+        assertThat(section).doesNotContain("stop generated");
+        assertThat(section).doesNotContain("take profit generated");
+        assertThat(section).doesNotContain("place order");
+        assertThat(section).doesNotContain("execute order");
+        assertThat(section).doesNotContain("start auto-trading");
     }
 
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
@@ -525,6 +566,23 @@ class DashboardControllerTest {
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
         when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+    }
+
+    private String normalizedInternalPushPreviewDisplay() throws Exception {
+        return internalPushPreviewDisplay()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ");
+    }
+
+    private String internalPushPreviewDisplay() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        int sectionStart = html.indexOf(INTERNAL_PUSH_PREVIEW_START);
+        assertThat(sectionStart).isNotNegative();
+
+        int sectionEnd = html.indexOf(SECTION_END, sectionStart);
+        assertThat(sectionEnd).isNotNegative();
+
+        return html.substring(sectionStart, sectionEnd + SECTION_END.length());
     }
 
     private static DecisionResultVO newDecisionWithCoreDashboardTruthFields() {
