@@ -36,6 +36,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - source-owned review-only point proposal;
 - point proposal review-only display status;
 - executable point generation pre-approval status;
+- source-owned numeric point proposal plan status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -74,3 +75,4 @@ Examples:
 - `source-owned review-only point proposal` is allowed only when it remains manual-review required, not a trade instruction, and incomplete-safe; executable entry / stop / TP / RR remains forbidden.
 - `point proposal review-only display status` is allowed only when display values remain unavailable placeholders and cannot be interpreted as instructions.
 - `executable point generation pre-approval status` is allowed only as docs-only or review-only gating context; it cannot authorize numeric generation, external send, order, execution, or auto-trading.
+- `source-owned numeric point proposal plan status` is allowed only as docs-only planning context; it cannot create Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
