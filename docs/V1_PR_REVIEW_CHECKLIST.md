@@ -2,14 +2,14 @@
 
 本文件固定每次 PR（Pull Request，合并请求）审查标准。
 
-For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
-（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
 
-For terminal workflows, prefer `bash scripts/v1-auto.sh` as the default non-interactive entry point.
-（终端工作流默认优先使用 `bash scripts/v1-auto.sh` 作为非交互入口。）
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
 
-Keep `bash scripts/v1.sh` only as a fallback menu.
-（`bash scripts/v1.sh` 只作为备用菜单。）
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
 
 ## 1. 基础信息
 
@@ -26,7 +26,7 @@ Head commit（当前提交）：xxx
 
 审查前必须读取 `docs/SESSION_BOOTSTRAP.md`、`docs/ACTIVE_MAINLINE_STATUS.yml` 和 `docs/ANSWER_FORMAT_CONTRACT.md`。
 
-审 PR 优先运行：
+审 PR 默认使用 GitHub PR 页面和 GitHub 工具。终端兜底可运行：
 
 ```bash
 bash scripts/v1-pr-review-input.sh <PR_NUMBER>
@@ -246,8 +246,10 @@ PR 审查必须检查：
 
 ## 13. P291D Workflow Command Automation
 
-- 新窗口优先运行 `bash scripts/v1-session-bootstrap.sh`
-- 状态检查优先运行 `bash scripts/v1-status.sh`
-- 审 PR 优先运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
-- 合并同步优先运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
-- Codex 完成后优先运行 `bash scripts/v1-safe-check.sh`
+- 默认工作流是 GPT + Codex + GitHub 原生。
+- 终端脚本除合并后同步 main 外，只作为兜底。
+- 新窗口兜底运行 `bash scripts/v1-session-bootstrap.sh`
+- 状态检查兜底运行 `bash scripts/v1-status.sh`
+- 审 PR 兜底运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- 合并同步运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Codex 完成后兜底运行 `bash scripts/v1-safe-check.sh`

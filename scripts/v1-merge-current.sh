@@ -5,58 +5,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-require_file() {
-  local file="$1"
-  if [[ ! -f "$file" ]]; then
-    echo "missing file: $file" >&2
-    exit 1
-  fi
-}
-
-yaml_value() {
-  local key="$1"
-  awk -F': ' -v key="$key" '$1 == key { gsub(/^"|"$/, "", $2); print $2 }' docs/ACTIVE_MAINLINE_STATUS.yml
-}
-
 is_number() {
   [[ "$1" =~ ^[0-9]+$ ]]
-}
-
-is_empty_pr_value() {
-  local value="$1"
-  [[ -z "$value" || "$value" == "none" || "$value" == "null" ]]
-}
-
-open_pr_number_for_ref() {
-  local ref="$1"
-  local state
-  if ! state="$(gh pr view "$ref" --json state --jq '.state' 2>/dev/null)"; then
-    return 1
-  fi
-  if [[ "$state" != "OPEN" ]]; then
-    return 1
-  fi
-  gh pr view "$ref" --json number --jq '.number'
-}
-
-current_pr_number() {
-  local branch
-  branch="$(git branch --show-current)"
-  if [[ "$branch" != "main" && "$branch" != "master" ]]; then
-    if open_pr_number_for_ref "$branch"; then
-      return 0
-    fi
-  fi
-
-  local configured_pr
-  configured_pr="$(yaml_value current_pr)"
-  if ! is_empty_pr_value "$configured_pr" && is_number "$configured_pr"; then
-    if open_pr_number_for_ref "$configured_pr"; then
-      return 0
-    fi
-  fi
-
-  return 1
 }
 
 pr_checks_jq() {
@@ -79,35 +29,64 @@ pr_checks_jq() {
   exit 1
 }
 
-require_file "docs/ACTIVE_MAINLINE_STATUS.yml"
+explicit_pr_number="${1:-${APPROVED_PR_NUMBER:-}}"
 
-echo "Only run this after user explicitly approved merge."
-echo "（只能在用户明确同意合并后运行）"
-
-if ! pr_number="$(current_pr_number)"; then
-  echo "NO_CURRENT_PR" >&2
+if [[ -z "$explicit_pr_number" ]]; then
+  echo "MERGE_CURRENT_DISABLED_REQUIRE_EXPLICIT_PR"
   exit 1
 fi
 
-echo
-echo "PR status before merge:"
-gh pr view "$pr_number" --json number,title,state,isDraft,mergeable,headRefName,baseRefName,statusCheckRollup
+if ! is_number "$explicit_pr_number"; then
+  echo "usage: bash scripts/v1-merge-current.sh <PR_NUMBER>" >&2
+  echo "or: APPROVED_PR_NUMBER=<PR_NUMBER> bash scripts/v1-merge-current.sh" >&2
+  exit 1
+fi
 
+pr_number="$explicit_pr_number"
+
+echo "Only run this after user explicitly approved merge."
+echo "（只能在用户明确同意合并 PR #$pr_number 后运行）"
+echo
+
+state="$(gh pr view "$pr_number" --json state --jq '.state')"
+if [[ "$state" != "OPEN" ]]; then
+  echo "PR is not open: $state" >&2
+  exit 1
+fi
+
+title="$(gh pr view "$pr_number" --json title --jq '.title')"
+branch="$(gh pr view "$pr_number" --json headRefName --jq '.headRefName')"
 mergeable="$(gh pr view "$pr_number" --json mergeable --jq '.mergeable')"
+ci_status="UNKNOWN"
+
+total_checks="$(pr_checks_jq "$pr_number" 'length' '0')"
+non_success_checks="$(pr_checks_jq "$pr_number" '[.[] | select(.bucket != "pass" and .bucket != "skipping")] | length' '0')"
+if [[ "$total_checks" -gt 0 && "$non_success_checks" -eq 0 ]]; then
+  ci_status="SUCCESS"
+elif [[ "$total_checks" -eq 0 ]]; then
+  ci_status="UNKNOWN"
+else
+  ci_status="NOT_SUCCESS"
+fi
+
+echo "PR number: $pr_number"
+echo "PR title: $title"
+echo "branch: $branch"
+echo "mergeable: $mergeable"
+echo "CI status: $ci_status"
+echo
+
 if [[ "$mergeable" != "MERGEABLE" ]]; then
   echo "PR is not MERGEABLE: $mergeable" >&2
   exit 1
 fi
 
-total_checks="$(pr_checks_jq "$pr_number" 'length' '0')"
-non_success_checks="$(pr_checks_jq "$pr_number" '[.[] | select(.bucket != "pass" and .bucket != "skipping")] | length' '0')"
 if [[ "$total_checks" -eq 0 || "$non_success_checks" -ne 0 ]]; then
   echo "CI is not all SUCCESS." >&2
   gh pr checks "$pr_number"
   exit 1
 fi
 
-title="$(gh pr view "$pr_number" --json title --jq '.title')"
 subject="$title (#$pr_number)"
 
 is_draft="$(gh pr view "$pr_number" --json isDraft --jq '.isDraft')"

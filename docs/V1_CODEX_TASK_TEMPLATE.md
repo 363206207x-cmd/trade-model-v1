@@ -2,14 +2,14 @@
 
 本文件固定 Codex 每轮任务格式。以后不要每次重新发明任务包，只填变量。
 
-For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
-（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
 
-For terminal workflows, prefer `bash scripts/v1-auto.sh` as the default non-interactive entry point.
-（终端工作流默认优先使用 `bash scripts/v1-auto.sh` 作为非交互入口。）
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
 
-Keep `bash scripts/v1.sh` only as a fallback menu.
-（`bash scripts/v1.sh` 只作为备用菜单。）
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
 
 ## 1. 固定开头
 
@@ -32,7 +32,7 @@ Keep `bash scripts/v1.sh` only as a fallback menu.
 
 ## 2. 执行前命令
 
-状态检查优先使用：
+终端状态检查只作为兜底使用：
 
 ```bash
 bash scripts/v1-status.sh

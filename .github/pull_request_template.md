@@ -1,5 +1,9 @@
 # Pull Request Checklist
 
+Default workflow is GPT + Codex + GitHub-native.
+Terminal scripts are fallback only except local main sync after merge.
+Codex must output PR number and stop.
+
 Mainline（主线）:
 
 Block（模块）:
