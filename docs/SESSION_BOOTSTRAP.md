@@ -2,16 +2,16 @@
 
 Use this file first in every new window.
 
-For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
-（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
 
-For terminal workflows, prefer `bash scripts/v1-auto.sh` as the default non-interactive entry point.
-（终端工作流默认优先使用 `bash scripts/v1-auto.sh` 作为非交互入口。）
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
 
-Keep `bash scripts/v1.sh` only as a fallback menu.
-（`bash scripts/v1.sh` 只作为备用菜单。）
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
 
-Preferred command:
+Fallback bootstrap command:
 
 ```bash
 bash scripts/v1-session-bootstrap.sh
@@ -28,8 +28,9 @@ bash scripts/v1-session-bootstrap.sh
 
 ## Workflow Command Shortcuts
 
-- New window: `bash scripts/v1-session-bootstrap.sh`
-- Status check: `bash scripts/v1-status.sh`
-- PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
-- Merge and sync after explicit approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
-- Codex completion safe check: `bash scripts/v1-safe-check.sh`
+- Default workflow: GPT decides the next pack, Codex creates Issue / branch / Draft PR, GPT reviews the GitHub PR.
+- Fallback new window command: `bash scripts/v1-session-bootstrap.sh`
+- Fallback status check: `bash scripts/v1-status.sh`
+- Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- Local merge sync after explicit approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Fallback Codex completion safe check: `bash scripts/v1-safe-check.sh`

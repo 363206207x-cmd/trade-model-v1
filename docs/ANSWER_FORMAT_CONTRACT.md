@@ -2,6 +2,15 @@
 
 Every status, progress, task-handoff, and PR-review answer must use the fields below.
 
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
+
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
+
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
+
 Use both English and Chinese labels. Do not answer only in English or only in Chinese.
 
 ```text

@@ -5,11 +5,22 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`
+- Current merged main: `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`
+- Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
+- Evidence / Score Mainline has completed a review-only entry envelope through P295.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #721 / branch `p295`: `BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice`.
-- P295 is a review-only Evidence / Score entry slice. It is not real score calculation and does not count as merged main completion until its PR is merged.
+- There is no current open business-chain PR recorded in Source of Truth.
+- Next business-chain action is an Evidence Normalization Review-Only Slice.
+
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
+
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
+
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
 
 ## Source-Of-Truth Rule
 
@@ -26,9 +37,11 @@ Progress must be read together with:
 - `docs/ACTIVE_MAINLINE_STATUS.yml`
 - `docs/SESSION_BOOTSTRAP.md`
 
-## What P287-P294 Actually Completed
+If these sources disagree, merged `main` wins and the docs must be corrected.
 
-P287-P294 completed market-read request contract, DTO, validator, test-only wiring, review-only output, and review-only scan output skeleton only:
+## What P287-P295 Actually Completed
+
+P287-P295 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, and review-only Evidence / Score entry skeleton only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -38,6 +51,7 @@ P287-P294 completed market-read request contract, DTO, validator, test-only wiri
 - P292: test-only `MarketReadRequestDTO` -> `MarketReadRequestGuardValidator` wiring and review-only validation output.
 - P293: review-only output assembler from `MarketReadRequestDTO` + guard result to `MarketReadReviewOnlyOutputDTO`.
 - P294: review-only scan output skeleton from `MarketReadReviewOnlyOutputDTO` to `MarketReadReviewOnlyScanOutputDTO`.
+- P295: review-only Evidence / Score entry skeleton from `MarketReadReviewOnlyScanOutputDTO` to `ReviewOnlyEvidenceScoreEntryDTO`.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
@@ -47,41 +61,25 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, production scan output, real scan loop, production ScanScore, Evidence generation, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
-## Current Workflow Automation Scope
+## Current Workflow Scope
 
-P291D is merged on main and adds workflow command automation.
+P291D, P291E, and P291G are merged on main and provide terminal helpers.
 
-P291E is merged on main and adds `bash scripts/v1.sh` as the single terminal entry point.
+P291H changes the default priority: GitHub-native workflow first, terminal scripts fallback only except local main sync after merge.
 
-P291F is merged on main and refreshes the active mainline to Evidence / Score Mainline after P294.
+Workflow/source-of-truth packages are not production runtime progress.
 
-These workflow/source-of-truth packages are not production runtime progress.
-
-Use `docs/WORKFLOW_COMMAND_AUTOMATION.md` for command usage.
-
-## Current P295 Scope
-
-P295 is open on branch `p295` and adds a review-only Evidence / Score entry skeleton pending merge.
-
-P295 turns `MarketReadReviewOnlyScanOutputDTO` into `ReviewOnlyEvidenceScoreEntryDTO`, so review-only scan output can become a safe manual-review entry envelope for later evidence / score work.
-
-P295 is not real evidence generation.
-
-P295 is not score calculation.
-
-P295 does not calculate the eight score dimensions.
-
-P295 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
-
-P295 does not create production scan output, real EvidenceItem, real ScoreItem, Candidate, Push, Readiness, point generation, order execution, execution API, or auto-trading.
+Use `docs/GITHUB_NATIVE_WORKFLOW.md` and `docs/WORKFLOW_COMMAND_AUTOMATION.md` for workflow rules.
 
 ## Current Next Mainline
 
 The current mainline is Evidence / Score Mainline.
 
-The current block is Review-only Scan Output to Evidence / Score Entry.
+The current block is Evidence Normalization Review-Only Slice.
 
-Evidence / Score entry is in P295 only and is not completed on main until the PR merges.
+Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
+
+Evidence normalization is not completed.
 
 Evidence generation and score calculation are not completed.
 
@@ -94,7 +92,7 @@ Candidate, Push, Readiness, point generation, order execution, execution API, an
 - `MarketReadRequest test-only wiring`: `4 TEST_ONLY_WIRING`
 - `MarketReadRequest review-only output assembler`: `REVIEW_ONLY_OUTPUT_SKELETON`, completed after P293, not production assembler
 - `Review-only MarketRead scan output`: `REVIEW_ONLY_SCAN_OUTPUT_SKELETON`, completed after P294, not production scan output
-- `Review-only Evidence / Score entry`: `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` pending / completed in P295 PR, not real evidence generation or score calculation
+- `Review-only Evidence / Score entry`: `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`, completed after P295, not real evidence generation or score calculation
 
 ## What Is Still Not Completed
 
@@ -123,7 +121,7 @@ The following remain incomplete for the new MVP chain:
 
 Legacy market and monitor components exist in the repository, including market clients, dashboard services, scheduled recheck, and position monitoring foundations.
 
-Those legacy capabilities must not be described as completion of the P287-P294 market-read request scan-chain.
+Those legacy capabilities must not be described as completion of the P287-P295 market-read / evidence-entry scan-chain.
 
 Any use of legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` in the new scan-chain requires a separate authorization package.
 
@@ -139,11 +137,9 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 ## Current Recommendation
 
-Use `bash scripts/v1.sh` for daily workflow.
+Use GPT + Codex + GitHub-native workflow by default.
 
-Review P295 before any merge decision.
-
-After P295 merges, continue to an Evidence normalization review-only slice.
+Open the next Evidence normalization review-only slice when ready.
 
 Do not describe P295 as real evidence generation or real score calculation.
 

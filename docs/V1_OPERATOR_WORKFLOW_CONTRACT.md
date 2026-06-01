@@ -2,14 +2,14 @@
 
 本文件是 Trade Model V1 的长期工作流宪法。以后新聊天窗口、Codex、PR 审查和阶段推进，都必须先读取 `docs/SESSION_BOOTSTRAP.md`，再读取 `docs/ACTIVE_MAINLINE_STATUS.yml`、本文件和 source-of-truth 文件，然后再继续工作。
 
-For terminal workflows, prefer bash scripts/v1.sh as the single entry point.  
-（终端工作流优先使用 bash scripts/v1.sh 作为单一入口。）
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
 
-For terminal workflows, prefer `bash scripts/v1-auto.sh` as the default non-interactive entry point.
-（终端工作流默认优先使用 `bash scripts/v1-auto.sh` 作为非交互入口。）
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
 
-Keep `bash scripts/v1.sh` only as a fallback menu.
-（`bash scripts/v1.sh` 只作为备用菜单。）
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
 
 ## 1. 使用者约束
 
@@ -69,6 +69,8 @@ Open PR（未合并请求）不算完成，branch（分支）不算完成，Issu
 13. 合并后给用户本地同步命令。
 14. 用户贴回 `git status` 和 `git log --oneline -5`。
 15. 确认 main（主分支）clean（干净）后继续下一步。
+
+默认不要求用户运行菜单脚本、寻找 PR 编号、判断 mergeable（可合并状态）或判断 CI（自动测试）。
 
 ## 4. 最大安全任务包规则
 
@@ -212,7 +214,7 @@ A/B/C 授权规则优先于提速规则。最大安全任务包不能跨越到�
 
 ## 8. 本地同步命令
 
-每次合并同步优先运行：
+每次合并后的本地同步优先运行：
 
 ```bash
 bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"

@@ -6,6 +6,17 @@ P291C enforces that reset with `docs/SESSION_BOOTSTRAP.md`, `docs/ACTIVE_MAINLIN
 
 P291D adds command automation through `docs/WORKFLOW_COMMAND_AUTOMATION.md` and the `scripts/v1-*.sh` helpers.
 
+P291H makes GPT + Codex + GitHub-native the default workflow and keeps terminal scripts as fallback only, except local main sync after merge.
+
+Default workflow is GPT + Codex + GitHub-native.
+（默认工作流是 GPT + Codex + GitHub 原生。）
+
+Terminal scripts are fallback only except local main sync after merge.
+（终端脚本除合并后同步 main 外，只作为兜底。）
+
+Codex must output PR number and stop.
+（Codex 必须输出 PR 编号并停止。）
+
 ## Core Rules
 
 1. Business-chain MAX_SAFE_PACK comes first.
@@ -46,11 +57,14 @@ If `bash scripts/check-workflow-contract.sh` fails, stop and fix workflow enforc
 
 ## Workflow Command Automation
 
-- 新窗口优先运行 `bash scripts/v1-session-bootstrap.sh`
-- 状态检查优先运行 `bash scripts/v1-status.sh`
-- 审 PR 优先运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
-- 合并同步优先运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
-- Codex 完成后优先运行 `bash scripts/v1-safe-check.sh`
+- Default workflow is GPT + Codex + GitHub-native.
+- Terminal scripts are fallback only except local main sync after merge.
+- Codex must output PR number and stop.
+- 新窗口兜底运行 `bash scripts/v1-session-bootstrap.sh`
+- 状态检查兜底运行 `bash scripts/v1-status.sh`
+- 审 PR 兜底运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
+- 合并同步运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Codex 完成后兜底运行 `bash scripts/v1-safe-check.sh`
 
 ## Business Chain Priority
 

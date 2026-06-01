@@ -6,18 +6,21 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`
+- `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`
 - `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`
+- `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`
 - `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`
 
 Current active capability movement:
 
-- `BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice` in PR #721 / branch `p295`, pending merge.
+- P295 is merged on main.
+- It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
 - The active mainline is Evidence / Score Mainline.
-- The active block is Review-only Scan Output to Evidence / Score Entry.
+- The active block is Evidence Normalization Review-Only Slice.
+- The next required action is `open_evidence_normalization_pack`.
 
-P291D and P291E are merged on main. They add workflow command automation and a one-command runner, but they do not raise Market Read business-chain capability or Production Runtime Progress.
-
-P291F is merged on main. It refreshes the active mainline status after P294, but it does not raise business-chain runtime progress.
+P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
 P292 is merged on main. It moved `MarketReadRequest test-only wiring` to `4 TEST_ONLY_WIRING`.
 
@@ -25,11 +28,11 @@ P293 is merged on main. It moved the MarketReadRequest path from `TEST_ONLY_WIRI
 
 P294 is merged on main. It moved the MarketRead path to `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` by turning `MarketReadReviewOnlyOutputDTO` into a safe review-only scan output skeleton.
 
-P295 is capability movement, not closure-only. It moves the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` toward `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` by turning review-only scan output into a safe evidence / score entry envelope.
+P295 is merged on main. It moved the chain to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` by turning review-only scan output into a safe Evidence / Score entry envelope.
 
 P295 does not raise Production Runtime Progress. It is not real evidence generation, score calculation, production scan output, Candidate, Push, Readiness, point generation, or trading behavior.
 
-P291C does not raise feature progress. It enforces session bootstrap, answer format, PR template, workflow contract script, and CI workflow-contract check.
+P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
 
@@ -38,11 +41,11 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 | Progress view | Current range | Why this range | Why it cannot be higher yet |
 |---|---:|---|---|
 | Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks completed evidence normalization -> score -> candidate -> push preview -> execution advice -> monitor -> review closure. |
-| MVP Progress | 55%-63% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, and active P295 evidence / score entry skeleton exist. | Evidence normalization, real score calculation, Candidate, Push, Readiness, point generation, and the user-facing MVP loop are not complete. |
-| Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294, P295, P291D, P291E, and P291F do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
-| Governance / Contract Progress | 88%-94% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, P291D command automation, and P291E one-command runner are extensive. | Future windows still need to use the automation consistently. |
-| Skeleton / Test Progress | 75%-83% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, and active P295 evidence / score entry skeleton exist. | Evidence normalization and real score calculation are not complete. |
-| Product Usability Progress | 40%-50% | Dashboard and review-only displays exist, and MarketRead review-only scan output now has a safe entry envelope in P295. | Core actions still do not form a coherent review-only MVP workflow. |
+| MVP Progress | 55%-63% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, and P295 evidence / score entry skeleton exist. | Evidence normalization, real score calculation, Candidate, Push, Readiness, point generation, and the user-facing MVP loop are not complete. |
+| Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294, P295, and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
+| Governance / Contract Progress | 89%-95% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, and GitHub-native workflow rules are extensive. | Future windows still need to follow GitHub-native workflow and stale PR / Issue hygiene. |
+| Skeleton / Test Progress | 76%-84% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, and P295 evidence / score entry skeleton exist. | Evidence normalization and real score calculation are not complete. |
+| Product Usability Progress | 40%-50% | Dashboard and review-only displays exist, and MarketRead review-only scan output now has a safe entry envelope after P295. | Core actions still do not form a coherent review-only MVP workflow. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
 | Push / Monitoring Progress | 42%-55% | Push no-op/audit/channel skeletons and legacy position monitor foundations exist. | No external send, no full internal push preview chain, and no complete monitor action loop. |
 | AI Arbitration Progress | 25%-35% | Role names and heuristic conflict logic exist. | Real GPT/Gemini/Grok orchestration, budget/cache/rate limits, fallback, and conflict downgrade closure are incomplete. |
@@ -63,7 +66,7 @@ P294 must not be described as production scan output, score, Evidence, Candidate
 
 P295 must not be described as real evidence generation or score calculation.
 
-Evidence generation / Score calculation must not be described as completed until a separate merged package adds that layer.
+Evidence normalization, Evidence generation, and Score calculation must not be described as completed until separate merged packages add those layers.
 
 Candidate, Push, Readiness, and point generation must not be described as completed.
 
