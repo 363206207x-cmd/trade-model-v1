@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `4b54233 BACKEND-P299 Score-to-Candidate Handoff Review-Only Slice (#733)`
+- Current merged main: `bf14ec0 BACKEND-P300 Candidate Attention Review-Only Slice (#735)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
-- Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299.
+- Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299 and review-only candidate attention through P300.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #735 / branch `p300`: `BACKEND-P300 Candidate Attention Review-Only Slice`.
-- P300 is review-only candidate attention. It is not a real Candidate and does not count as merged main completion until its PR is merged.
+- Current open business-chain package is PR #737 / branch `p301`: `BACKEND-P301 Candidate Preview / Ranking Guard Review-Only Slice`.
+- P301 is review-only candidate preview / ranking guard. It is not a real Candidate and does not count as merged main completion until its PR is merged.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -41,9 +41,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P299 Actually Completed
+## What P287-P300 Actually Completed
 
-P287-P299 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, and review-only candidate handoff skeleton only:
+P287-P300 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, and review-only candidate attention skeleton only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -58,6 +58,7 @@ P287-P299 completed market-read request contract, DTO, validator, test-only wiri
 - P297: review-only score input / precheck skeleton from `ReviewOnlyNormalizedEvidenceDTO` to `ReviewOnlyScoreInputPrecheckDTO`.
 - P298: review-only score assembly skeleton from `ReviewOnlyScoreInputPrecheckDTO` to `ReviewOnlyScoreAssemblyDTO`.
 - P299: review-only candidate handoff skeleton from `ReviewOnlyScoreAssemblyDTO` to `ReviewOnlyCandidateHandoffDTO`.
+- P300: review-only candidate attention skeleton from `ReviewOnlyCandidateHandoffDTO` to `ReviewOnlyCandidateAttentionDTO`.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
@@ -67,27 +68,29 @@ They do not connect `MarketQuoteClient` / `BinanceMarketQuoteClient` into the ne
 
 They do not create runtime market reads, production scan output, real scan loop, production ScanScore, Evidence generation, production Candidate workflow, Opportunity Push execution, Readiness, point generation, order execution, or auto-trading.
 
-## Current P300 Scope
+## Current P301 Scope
 
-P300 is open on branch `p300` and adds a review-only candidate attention skeleton pending merge.
+P301 is open on branch `p301` and adds a review-only candidate preview / ranking guard skeleton pending merge.
 
-P300 turns `ReviewOnlyCandidateHandoffDTO` into `ReviewOnlyCandidateAttentionDTO`, so review-only candidate handoff can become safe manual-review candidate attention context for later Candidate Preview / Ranking Guard review-only work.
+P301 turns `ReviewOnlyCandidateAttentionDTO` into `ReviewOnlyCandidatePreviewGuardDTO`, so review-only candidate attention can become safe manual-review candidate preview / ranking guard context for later Internal Push Preview / Recheck Handoff review-only work.
 
-P300 is not a real Candidate.
+P301 is not a real Candidate.
 
-P300 does not generate candidate rank or candidate score.
+P301 does not generate candidate rank or candidate score.
 
-P300 does not generate Promote To Home.
+P301 does not generate a real ranking result.
 
-P300 does not generate Opportunity Push.
+P301 does not generate Promote To Home.
 
-P300 does not generate Readiness.
+P301 does not generate Opportunity Push.
 
-P300 does not generate point generation, entry, stop, TP, RR, final direction, long-short signal, order intent, execution intent, or auto-trading.
+P301 does not generate Readiness.
 
-P300 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+P301 does not generate point generation, entry, stop, TP, RR, final direction, long-short signal, order intent, execution intent, or auto-trading.
 
-P300 does not create production scan output, real EvidenceItem, real ScoreItem, real Candidate, candidate rank, candidate score, Promote To Home, Push, Readiness, point generation, order execution, execution API, or auto-trading.
+P301 does not connect `MarketQuoteClient` / `BinanceMarketQuoteClient`.
+
+P301 does not create production scan output, real EvidenceItem, real ScoreItem, real Candidate, candidate rank, candidate score, real ranking result, Promote To Home, Push, Readiness, point generation, order execution, execution API, or auto-trading.
 
 ## Current Workflow Scope
 
@@ -103,7 +106,7 @@ Use `docs/GITHUB_NATIVE_WORKFLOW.md` and `docs/WORKFLOW_COMMAND_AUTOMATION.md` f
 
 The current mainline is Candidate / Push Mainline.
 
-The current block is Candidate Attention Review-Only Slice.
+The current block is Candidate Preview / Ranking Guard Review-Only Slice.
 
 Evidence / Score entry is completed at `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON` after P295.
 
@@ -115,7 +118,9 @@ Review-only score assembly is completed at `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON`
 
 Score-to-Candidate handoff is completed at `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON` after P299.
 
-Candidate Attention is in P300 only and is not completed on main until the PR merges.
+Candidate Attention is completed at `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON` after P300.
+
+Candidate Preview / Ranking Guard is in P301 only and is not completed on main until the PR merges.
 
 Evidence generation and score calculation are not completed.
 
@@ -133,7 +138,8 @@ Candidate, Push, Readiness, point generation, order execution, execution API, an
 - `Review-only score input / precheck`: `REVIEW_ONLY_SCORE_INPUT_PRECHECK_SKELETON`, completed after P297, not real score calculation or ScoreItem generation
 - `Review-only score assembly`: `REVIEW_ONLY_SCORE_ASSEMBLY_SKELETON`, completed after P298, not real score calculation, final score, direction, or ScoreItem generation
 - `Review-only candidate handoff`: `REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON`, completed after P299, not real Candidate, Candidate Attention, Push, Readiness, or point generation
-- `Review-only candidate attention`: `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON` pending / completed in P300 PR, not real Candidate, candidate rank, candidate score, Push, Readiness, or point generation
+- `Review-only candidate attention`: `REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON`, completed after P300, not real Candidate, candidate rank, candidate score, Push, Readiness, or point generation
+- `Review-only candidate preview / ranking guard`: `REVIEW_ONLY_CANDIDATE_PREVIEW_GUARD_SKELETON` pending / completed in P301 PR, not real Candidate, candidate rank, candidate score, real ranking result, Push, Readiness, or point generation
 
 ## What Is Still Not Completed
 
@@ -161,7 +167,7 @@ The following remain incomplete for the new MVP chain:
 
 Legacy market and monitor components exist in the repository, including market clients, dashboard services, scheduled recheck, and position monitoring foundations.
 
-Those legacy capabilities must not be described as completion of the P287-P300 market-read / evidence-entry / score assembly / candidate handoff / candidate attention scan-chain.
+Those legacy capabilities must not be described as completion of the P287-P301 market-read / evidence-entry / score assembly / candidate handoff / candidate attention / candidate preview guard scan-chain.
 
 Any use of legacy `MarketQuoteClient` / `BinanceMarketQuoteClient` in the new scan-chain requires a separate authorization package.
 
@@ -179,7 +185,7 @@ Automatic order, close, reverse, leverage change, execution, and auto-trading re
 
 Use GPT + Codex + GitHub-native workflow by default.
 
-Review P300 before any merge decision.
+Review P301 before any merge decision.
 
 Do not describe P295 as real evidence generation or real score calculation.
 
@@ -192,5 +198,7 @@ Do not describe P298 as real scoring, ScoreItem generation, score calculation, f
 Do not describe P299 as real Candidate, Candidate Attention, Promote To Home, Push, Readiness, or point generation.
 
 Do not describe P300 as real Candidate, candidate rank, candidate score, Promote To Home, Push, Readiness, or point generation.
+
+Do not describe P301 as real Candidate, candidate rank, candidate score, real ranking result, Promote To Home, Push, Readiness, or point generation.
 
 Do not describe Candidate, Push, Readiness, or point generation as completed.
