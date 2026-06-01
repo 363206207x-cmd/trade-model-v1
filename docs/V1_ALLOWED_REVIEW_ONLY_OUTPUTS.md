@@ -30,7 +30,11 @@ The following outputs are allowed in review-only scope when their source ownersh
 - manual review required;
 - internal push preview;
 - risk downgraded candidate;
-- confused with recovery condition.
+- confused with recovery condition;
+- readiness review-only status;
+- incomplete reason;
+- point boundary unavailable reason;
+- risk guard required reason.
 
 ## Forbidden Executable Outputs
 
@@ -40,7 +44,12 @@ The following remain forbidden unless a future explicitly authorized scope chang
 - automatic close;
 - automatic reverse;
 - automatic leverage change;
-- automatic execution.
+- automatic execution;
+- executable entry;
+- executable stop;
+- executable TP;
+- real order instruction;
+- external push send.
 
 ## Boundary Notes
 
@@ -51,3 +60,5 @@ Examples:
 - `entry zone proposal` is allowed as review-only context; `place buy order` is not allowed.
 - `tighten stop suggestion` is allowed as review-only risk context; `modify stop order` is not allowed.
 - `internal push preview` is allowed; Telegram/email/webhook/app notification send is not allowed until separately authorized.
+- `readiness review-only status` is allowed; executable readiness is not allowed.
+- `point boundary unavailable reason` is allowed; fabricated entry / stop / TP / RR is not allowed.
