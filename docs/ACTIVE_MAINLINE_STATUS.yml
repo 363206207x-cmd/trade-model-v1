@@ -1,14 +1,14 @@
-current_head: "bf14ec0"
+current_head: "819c17d"
 active_mainline: "Candidate / Push Mainline"
 active_mainline_cn: "候选 / 推送主线"
-active_block: "Candidate Preview / Ranking Guard Review-Only Slice"
-active_block_cn: "候选预览 / 排序保护只读切片"
-current_level: "REVIEW_ONLY_CANDIDATE_PREVIEW_GUARD_SKELETON"
-current_pr: 737
-current_branch: "p301"
+active_block: "Internal Push Preview / Recheck Handoff Review-Only Slice"
+active_block_cn: "内部推送预览 / 二次确认交接只读切片"
+current_level: "REVIEW_ONLY_INTERNAL_PUSH_PREVIEW_RECHECK_SKELETON"
+current_pr: 739
+current_branch: "p302"
 merge_rule: "B requires user approval"
-next_required_action: "review_pr_737"
-do_not_continue_to: "Push / Readiness / point"
+next_required_action: "review_pr_739"
+do_not_continue_to: "External channel / Readiness / point"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md
