@@ -45,6 +45,8 @@ The following outputs are allowed in review-only scope when their source ownersh
 - DataQuality missing / degraded / threshold failure reason;
 - MultiTimeframe numeric point contract status;
 - MultiTimeframe missing / conflicted / wick-only / noise-only reason;
+- Risk Action Guard numeric point contract status;
+- Risk Action Guard missing / blocked / recheck reason;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -88,3 +90,4 @@ Examples:
 - `RuntimeKlineContext numeric point contract status` is allowed only as docs-only planning context; it cannot create RuntimeKlineContext Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
 - `DataQuality numeric point contract status` is allowed only as docs-only planning context; it cannot create DataQuality Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
 - `MultiTimeframe numeric point contract status` is allowed only as docs-only planning context; it cannot create MultiTimeframe Java DTOs, generate numeric values, or authorize executable entry / stop / TP / RR.
+- `Risk Action Guard numeric point contract status` is allowed only as docs-only planning context; it cannot create Risk Action Guard Java DTOs, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
