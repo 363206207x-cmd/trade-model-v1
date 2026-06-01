@@ -1,13 +1,13 @@
-current_head: "ffaf52b"
+current_head: "78d4f83"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Readiness / Point Boundary Planning Gate"
-active_block_cn: "就绪 / 点位边界规划门"
-current_level: "READINESS_POINT_BOUNDARY_PLAN"
-current_pr: 747
-current_branch: "p306"
-merge_rule: "A docs-only can merge after review"
-next_required_action: "review_pr_747"
+active_block: "Review-only Readiness Gate Skeleton"
+active_block_cn: "只读就绪门骨架"
+current_level: "REVIEW_ONLY_READINESS_GATE_SKELETON"
+current_pr: 749
+current_branch: "p307"
+merge_rule: "B requires user approval"
+next_required_action: "review_pr_749"
 do_not_continue_to: "External channel / point generation / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

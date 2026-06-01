@@ -14,6 +14,7 @@ Individual scope packs should reference this file instead of copying long blocke
 | external send | Blocked | No Telegram, email, webhook, app notification, local notification, or provider send is authorized. |
 | external channel | Blocked until C authorization | Internal push preview and dashboard display do not authorize Telegram, email, webhook, app notification, local notification, or provider send. |
 | readiness | Not completed | Readiness must first pass a review-only gate with recheck, Risk Action Guard, data quality, source trace, incomplete, and liquidity / stampede checks. |
+| executable readiness | Blocked | Review-only readiness gate output must not unlock point generation, execution planning, external send, or trading action. |
 | production readiness | Blocked | Readiness must not become executable trade readiness. |
 | point generation | Not completed | Review-only point boundary work has not started for the current chain. |
 | production point generation | Blocked | Real entry / stop / TP / RR production point generation is not complete. |

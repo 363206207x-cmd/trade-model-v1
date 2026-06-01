@@ -45,6 +45,7 @@ The following remain forbidden unless a future explicitly authorized scope chang
 - automatic reverse;
 - automatic leverage change;
 - automatic execution;
+- executable readiness;
 - executable entry;
 - executable stop;
 - executable TP;
