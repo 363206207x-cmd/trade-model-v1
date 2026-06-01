@@ -1,13 +1,13 @@
-current_head: "ad3c045"
+current_head: "4b54233"
 active_mainline: "Candidate / Push Mainline"
 active_mainline_cn: "候选 / 推送主线"
-active_block: "Score-to-Candidate Handoff Review-Only Slice"
-active_block_cn: "评分到候选交接只读切片"
-current_level: "REVIEW_ONLY_CANDIDATE_HANDOFF_SKELETON"
-current_pr: 733
-current_branch: "p299"
+active_block: "Candidate Attention Review-Only Slice"
+active_block_cn: "只读候选关注切片"
+current_level: "REVIEW_ONLY_CANDIDATE_ATTENTION_SKELETON"
+current_pr: 735
+current_branch: "p300"
 merge_rule: "B requires user approval"
-next_required_action: "review_pr_733"
+next_required_action: "review_pr_735"
 do_not_continue_to: "Push / Readiness / point"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
