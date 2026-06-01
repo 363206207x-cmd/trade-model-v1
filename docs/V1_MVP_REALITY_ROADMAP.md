@@ -27,7 +27,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 | review-only readiness gate | Completed in P307: internal push preview becomes a review-only readiness gate skeleton with recheck and Risk Action Guard still required. | P308 Review-only Point Boundary / Proposal Gate. | B | Not executable readiness, not point generation, not entry / stop / TP / RR, and not external channel authorization. |
 | review-only point boundary / proposal gate | Completed in P308: review-only readiness gate becomes a point boundary gate skeleton that can state whether a future source-owned review-only point proposal is unavailable or may be reviewed. | P309 Source-owned Review-only Point Proposal Skeleton. | B | Not executable point generation, not entry / stop / TP / RR, not final direction, not order/execution, and not external channel authorization. |
 | source-owned review-only point proposal | Completed in P309: point boundary gate becomes a source-owned review-only point proposal skeleton with nullable, incomplete-safe entry / stop / TP / RR proposal fields. | P310 Point Proposal Closure / Dashboard Display Gate. | B | Not executable point generation, not executable entry / stop / TP / RR, not final direction, not order/execution, and not external channel authorization. |
-| point proposal closure / dashboard display gate | Active P310 PR: source-owned point proposal becomes a review-only display DTO with unavailable placeholders and safe display status. | Separate planning / approval / PR before executable point generation. | B | Not dashboard runtime integration, not executable point generation, not external channel, not order/execution. |
+| point proposal closure / dashboard display gate | Completed in P310: source-owned point proposal becomes a review-only display DTO with unavailable placeholders and safe display status. | P311 Executable Point Generation Pre-Approval Plan. | A | Not dashboard runtime integration, not executable point generation, not external channel, not order/execution. |
+| executable point generation pre-approval plan | Active P311 docs-only package: defines source trace, runtime kline context, data quality, multi-timeframe confirmation, Risk Action Guard, INCOMPLETE, and BLOCKED_FAIL_CLOSED boundaries before any future numeric point proposal. | Source-owned Numeric Point Proposal Plan or Point Generation Safety Gate Plan. | A | Not Java, not executable point generation, not real entry / stop / TP / RR, not external channel, not order/execution. |
 | review-only ScanScore | Review-only calculator skeleton exists. | Review-only score over normalized evidence / precheck output with targeted tests after score assembly skeleton lands. | B | Can group with score explanation output only after score assembly remains review-only. |
 | review-only Candidate | Candidate Attention / Promote skeleton exists, P299 prepares a handoff envelope, P300 prepares only a review-only candidate attention envelope, and P301 prepares only a review-only preview guard envelope. | Internal Push Preview / Recheck Handoff review-only slice. | B | Can group with internal push preview only if no external send and no production Candidate workflow. |
 | internal Opportunity Push preview | No-op/audit/channel skeletons exist, P302 adds only a review-only internal preview / recheck handoff envelope, P303 closes that preview before external-channel authorization, P304 displays it internally on the dashboard, and P305 closes the read-only MVP loop. | P307 Review-only Readiness Gate Skeleton, P308 Review-only Point Boundary / Proposal Gate, or C-level External Channel Authorization Gate. | B or C for external channel | Can group with Push Recheck preview only if no external send. |
@@ -50,13 +51,14 @@ MVP does not require auto-trading, external send, or executable readiness.
 
 ## Current Next Recommendation
 
-Candidate / Push review-only chain is complete through internal preview display after P305. P306 completed the Readiness / Point boundary plan, P307 completed the review-only readiness gate, P308 completed the review-only point boundary / proposal gate, and P309 completed the source-owned review-only point proposal skeleton.
+Candidate / Push review-only chain is complete through internal preview display after P305. P306 completed the Readiness / Point boundary plan, P307 completed the review-only readiness gate, P308 completed the review-only point boundary / proposal gate, P309 completed the source-owned review-only point proposal skeleton, and P310 completed the review-only point proposal display gate.
 
 Recommended next packages:
 
-1. Separate planning / approval / PR before executable point generation.
-2. External Channel Authorization Gate, only as a separate C-level package after explicit authorization.
-3. Dashboard smoke / internal preview closure if the point boundary is deferred.
+1. P311 Executable Point Generation Pre-Approval Plan.
+2. Source-owned Numeric Point Proposal Plan or Point Generation Safety Gate Plan.
+3. External Channel Authorization Gate, only as a separate C-level package after explicit authorization.
+4. Dashboard smoke / internal preview closure if the point boundary is deferred.
 
 Do not directly send externally from the current chain.
 

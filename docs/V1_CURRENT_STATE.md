@@ -5,25 +5,28 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `f2c5873 BACKEND-P309 Source-owned Review-only Point Proposal Skeleton (#753)`
+- Current merged main: `9bdf47d BACKEND-P310 Point Proposal Closure / Dashboard Display Gate (#755)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #755 / branch `p310`: `BACKEND-P310 Point Proposal Closure / Dashboard Display Gate`.
+- Current open business-chain package is PR #757 / branch `p311`: `BACKEND-P311 Executable Point Generation Pre-Approval Plan`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
 - P309 is completed on main as Source-owned Review-only Point Proposal Skeleton.
-- P310 is point proposal closure / dashboard display gate.
+- P310 is completed on main as Point Proposal Closure / Dashboard Display Gate.
+- P311 is a docs-only Executable Point Generation Pre-Approval Plan.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
 - Entry / stop / TP / RR are nullable, incomplete-safe proposal fields only; they are not executable trading instructions.
 - External Channel is not authorized.
-- Next recommended package after P310 must be separately planned and reviewed before any executable point generation or external channel.
+- P311 defines the pre-approval boundary before any future source-owned numeric point proposal or executable point-generation-adjacent work.
+- P311 does not implement Java, tests, dashboard runtime integration, external channel, order, execution, or auto-trading.
+- Next recommended package after P311 is Source-owned Numeric Point Proposal Plan or Point Generation Safety Gate Plan, not real executable point generation.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -51,9 +54,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P308 Actually Completed
+## What P287-P310 Actually Completed
 
-P287-P308 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, and review-only point boundary gate skeleton only:
+P287-P310 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, and point proposal closure / display gate only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -77,6 +80,8 @@ P287-P308 completed market-read request contract, DTO, validator, test-only wiri
 - P306: Readiness / Point boundary planning gate, confirming readiness, points, external channel, and execution-adjacent work must remain blocked until separate review-only gates or authorization packages.
 - P307: review-only readiness gate skeleton from `ReviewOnlyInternalPushPreviewDTO` to `ReviewOnlyReadinessGateDTO`.
 - P308: review-only point boundary / proposal gate skeleton from `ReviewOnlyReadinessGateDTO` to `ReviewOnlyPointBoundaryGateDTO`.
+- P309: source-owned review-only point proposal skeleton from `ReviewOnlyPointBoundaryGateDTO` to `ReviewOnlyPointProposalDTO`.
+- P310: point proposal closure / display gate from `ReviewOnlyPointProposalDTO` to `ReviewOnlyPointProposalDisplayDTO`.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
@@ -235,7 +240,7 @@ P308 may expose only a review-only `pointProposalAllowed` gate state or a point 
 
 The next recommended package after P308 is Source-owned Review-only Point Proposal Skeleton.
 
-## Current P309 Scope
+## Completed P309 Scope
 
 P309 is merged on main and adds the Source-owned Review-only Point Proposal Skeleton.
 
@@ -257,7 +262,39 @@ P309 does not authorize external channel behavior.
 
 P309 preserves recheck-required, Risk Action Guard required, source-trace-required, runtime-kline-context-required, review-only, manual-review-required, and not-trade-instruction status.
 
-The next recommended package after P309 is Point Proposal Closure / Dashboard Display Gate.
+P309 fed P310 Point Proposal Closure / Dashboard Display Gate.
+
+## Completed P310 Scope
+
+P310 is merged on main and adds the Point Proposal Closure / Dashboard Display Gate.
+
+P310 turns `ReviewOnlyPointProposalDTO` into `ReviewOnlyPointProposalDisplayDTO`.
+
+P310 is review-only only.
+
+P310 maps proposal values to internal display-safe unavailable placeholders and proves they cannot be interpreted as executable entry, stop, TP, or RR instructions.
+
+P310 does not modify dashboard HTML.
+
+P310 does not add controller, endpoint, API, mapper, repository, scheduler, resource, schema, config, external channel, Telegram, email, webhook, push send, order, execution, or auto-trading.
+
+P310 does not implement executable point generation.
+
+The next recommended package after P310 is a separate executable point generation pre-approval plan.
+
+## Current P311 Scope
+
+P311 is the active docs-only package.
+
+P311 defines the approval boundary before any future source-owned numeric point proposal or executable point-generation-adjacent work.
+
+P311 must answer when source trace, runtime kline context, data quality, multi-timeframe confirmation, liquidity / stampede / wick / strong reversal checks, Risk Action Guard, and manual review are sufficient to consider a future review-only numeric point proposal.
+
+P311 does not modify Java, tests, dashboard, resources, schema, config, pom, external channel, push send, order, execution, or auto-trading.
+
+P311 does not implement executable point generation.
+
+P311 does not complete entry, stop, TP, or RR as executable outputs.
 
 ## Current P310 Scope
 
