@@ -22,10 +22,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 | internal push preview / recheck handoff | Completed in P302: candidate preview guard becomes a review-only internal push preview / recheck handoff skeleton with recheck and risk-action guard required. | P303 push preview closure before external channel. | A/B | Keep external channel, message rendering/sending, Readiness, and point generation separate. |
 | push preview closure before external channel | Completed in P303: internal push preview is closed as review-only, non-sendable, recheck-required, and Risk Action Guard required before any external channel work. | P304 dashboard / internal preview display gate. | B | Cannot directly send externally; external channel requires separate C-level authorization. |
 | dashboard / internal push preview display gate | Completed in P304: dashboard shows internal push preview status as review-only, not a trade instruction, manual-review required, recheck-required, Risk Action Guard required, and external-channel disabled. | P305 Candidate / Push review-only MVP closure. | A/B | Cannot directly send externally; no readiness or point generation. |
-| Candidate / Push review-only MVP closure | Active P305 PR: P299-P304 are closed as an internal read-only chain from review-only score assembly to dashboard-visible internal push preview. | External Channel Authorization Gate, Readiness / Point specialty planning, or dashboard smoke / internal preview closure. | A/B or C for external channel | Cannot directly send externally; no real Candidate, real Push, readiness, or point generation. |
+| Candidate / Push review-only MVP closure | Completed in P305: P299-P304 are closed as an internal read-only chain from review-only score assembly to dashboard-visible internal push preview. | P306 Readiness / Point boundary planning gate. | A | Cannot directly send externally; no real Candidate, real Push, readiness, or point generation. |
+| Readiness / Point boundary planning gate | Active P306 PR: defines the boundary before readiness, point proposal, external channel, and execution-adjacent work. | P307 Review-only Readiness Gate Skeleton. | A | Docs-only planning; not Readiness implementation, not point generation, not entry / stop / TP / RR, and not external channel authorization. |
 | review-only ScanScore | Review-only calculator skeleton exists. | Review-only score over normalized evidence / precheck output with targeted tests after score assembly skeleton lands. | B | Can group with score explanation output only after score assembly remains review-only. |
 | review-only Candidate | Candidate Attention / Promote skeleton exists, P299 prepares a handoff envelope, P300 prepares only a review-only candidate attention envelope, and P301 prepares only a review-only preview guard envelope. | Internal Push Preview / Recheck Handoff review-only slice. | B | Can group with internal push preview only if no external send and no production Candidate workflow. |
-| internal Opportunity Push preview | No-op/audit/channel skeletons exist, P302 adds only a review-only internal preview / recheck handoff envelope, P303 closes that preview before external-channel authorization, P304 displays it internally on the dashboard, and P305 closes the read-only MVP loop. | External Channel Authorization Gate, Readiness / Point specialty planning, or dashboard smoke / internal preview closure. | B or C for external channel | Can group with Push Recheck preview only if no external send. |
+| internal Opportunity Push preview | No-op/audit/channel skeletons exist, P302 adds only a review-only internal preview / recheck handoff envelope, P303 closes that preview before external-channel authorization, P304 displays it internally on the dashboard, and P305 closes the read-only MVP loop. | P307 Review-only Readiness Gate Skeleton, P308 Review-only Point Boundary / Proposal Gate, or C-level External Channel Authorization Gate. | B or C for external channel | Can group with Push Recheck preview only if no external send. |
 | Push Recheck | Legacy recheck exists; not integrated with new preview chain. | Internal preview recheck with expiry/drift handling. | B | Keep external send blocked. |
 | review-only Execution Advice | Display exists, but full chain input not complete. | Execution advice proposal from review-only Candidate. | B | Can group with entry/stop/TP/RR proposal tests. |
 | entry / stop / TP / RR proposal | Fixture/design/test pieces exist; runtime proposal chain incomplete. | Review-only proposal pack with source ownership and guard status. | B | Keep separate from order/execution. |
@@ -42,3 +43,15 @@ MVP means the user can review a safe, non-executable chain:
 Watchlist candidate -> market read request -> market read result -> scan output -> review-only score -> review-only Candidate -> internal push preview -> recheck -> review-only execution advice -> manual position monitor -> review / missed-valid log.
 
 MVP does not require auto-trading, external send, or executable readiness.
+
+## Current Next Recommendation
+
+Candidate / Push review-only chain is complete through internal preview display after P305.
+
+Recommended next packages:
+
+1. P307 Review-only Readiness Gate Skeleton.
+2. P308 Review-only Point Boundary / Proposal Gate.
+3. External Channel Authorization Gate, only as a separate C-level package after explicit authorization.
+
+Do not directly send externally from the current chain.

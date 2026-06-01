@@ -1,14 +1,14 @@
-current_head: "86954dd"
-active_mainline: "Candidate / Push Mainline"
-active_mainline_cn: "候选 / 推送主线"
-active_block: "Candidate / Push Review-Only MVP Closure"
-active_block_cn: "候选 / 推送只读 MVP 收口"
-current_level: "CANDIDATE_PUSH_REVIEW_ONLY_MVP_CLOSURE"
-current_pr: 745
-current_branch: "p305"
-merge_rule: "A/B requires review; C required before external channel"
-next_required_action: "review_pr_745"
-do_not_continue_to: "External channel / Readiness / point"
+current_head: "ffaf52b"
+active_mainline: "Readiness / Point Mainline"
+active_mainline_cn: "就绪 / 点位主线"
+active_block: "Readiness / Point Boundary Planning Gate"
+active_block_cn: "就绪 / 点位边界规划门"
+current_level: "READINESS_POINT_BOUNDARY_PLAN"
+current_pr: 747
+current_branch: "p306"
+merge_rule: "A docs-only can merge after review"
+next_required_action: "review_pr_747"
+do_not_continue_to: "External channel / point generation / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md
