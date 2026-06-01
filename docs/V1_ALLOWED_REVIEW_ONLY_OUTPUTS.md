@@ -34,6 +34,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - readiness review-only status;
 - point boundary review-only status;
 - source-owned review-only point proposal;
+- point proposal review-only display status;
 - point proposal unavailable reason;
 - incomplete reason;
 - point boundary unavailable reason;
@@ -69,3 +70,4 @@ Examples:
 - `readiness review-only status` is allowed; executable readiness is not allowed.
 - `point boundary unavailable reason` is allowed; fabricated entry / stop / TP / RR is not allowed.
 - `source-owned review-only point proposal` is allowed only when it remains manual-review required, not a trade instruction, and incomplete-safe; executable entry / stop / TP / RR remains forbidden.
+- `point proposal review-only display status` is allowed only when display values remain unavailable placeholders and cannot be interpreted as instructions.
