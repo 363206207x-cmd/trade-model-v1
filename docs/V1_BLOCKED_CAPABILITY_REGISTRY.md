@@ -16,11 +16,12 @@ Individual scope packs should reference this file instead of copying long blocke
 | readiness | Not completed | Readiness must first pass a review-only gate with recheck, Risk Action Guard, data quality, source trace, incomplete, and liquidity / stampede checks. |
 | executable readiness | Blocked | Review-only readiness gate output must not unlock point generation, execution planning, external send, or trading action. |
 | production readiness | Blocked | Readiness must not become executable trade readiness. |
-| point boundary gate | Review-only skeleton active | P308 may state whether a future source-owned review-only proposal can be reviewed, but it cannot generate point values. |
+| point boundary gate | Review-only skeleton completed after P308 | P308 may state whether a future source-owned review-only proposal can be reviewed, but it cannot generate point values. |
+| source-owned review-only point proposal | Review-only skeleton active | P309 may carry nullable, incomplete-safe entry / stop / TP / RR proposal fields, but it must not become executable point generation or a trade instruction. |
 | point generation | Not completed | Review-only point boundary work does not equal executable point generation. |
 | executable point generation | Blocked | Entry / stop / TP / RR values must not be generated as executable output. |
 | production point generation | Blocked | Real entry / stop / TP / RR production point generation is not complete. |
-| entry / stop / TP / RR | Not completed | Entry, stop, TP, and RR must not be generated without source-owned trace, market context, data quality, structure confirmation, and manual review. |
+| executable entry / stop / TP / RR | Not completed | Entry, stop, TP, and RR must not be generated as executable output without source-owned trace, market context, data quality, structure confirmation, and manual review. |
 | production MarketQuoteClient scan-chain wiring | Blocked | Legacy market clients may not be treated as authorized scan-chain provider wiring. |
 | production Push execution | Blocked | Internal previews and no-op/audit paths do not equal external push execution. |
 | production Candidate workflow | Blocked | Review-only Candidate skeletons do not equal production candidate generation. |

@@ -1,13 +1,13 @@
-current_head: "9e060a3"
+current_head: "5aa5b4e"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Review-only Point Boundary / Proposal Gate"
-active_block_cn: "只读点位边界 / 建议门"
-current_level: "REVIEW_ONLY_POINT_BOUNDARY_GATE_SKELETON"
-current_pr: 751
-current_branch: "p308"
+active_block: "Source-owned Review-only Point Proposal Skeleton"
+active_block_cn: "来源可追踪的只读点位建议骨架"
+current_level: "SOURCE_OWNED_REVIEW_ONLY_POINT_PROPOSAL_SKELETON"
+current_pr: 753
+current_branch: "p309"
 merge_rule: "B requires user approval"
-next_required_action: "review_pr_751"
+next_required_action: "review_pr_753"
 do_not_continue_to: "External channel / executable point generation / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

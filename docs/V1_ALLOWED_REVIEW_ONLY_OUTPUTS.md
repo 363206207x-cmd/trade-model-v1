@@ -33,6 +33,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - confused with recovery condition;
 - readiness review-only status;
 - point boundary review-only status;
+- source-owned review-only point proposal;
 - point proposal unavailable reason;
 - incomplete reason;
 - point boundary unavailable reason;
@@ -67,3 +68,4 @@ Examples:
 - `internal push preview` is allowed; Telegram/email/webhook/app notification send is not allowed until separately authorized.
 - `readiness review-only status` is allowed; executable readiness is not allowed.
 - `point boundary unavailable reason` is allowed; fabricated entry / stop / TP / RR is not allowed.
+- `source-owned review-only point proposal` is allowed only when it remains manual-review required, not a trade instruction, and incomplete-safe; executable entry / stop / TP / RR remains forbidden.
