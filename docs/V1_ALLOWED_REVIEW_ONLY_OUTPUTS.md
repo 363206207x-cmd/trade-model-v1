@@ -67,6 +67,9 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceTrace Numeric Source Read Model Plan status;
 - SourceTraceNumericSourceContextDTO skeleton status;
 - SourceTrace numeric source missing / blocked reason;
+- SourceTraceNumericSourceReadModelValidator skeleton status;
+- SourceTrace numeric source validation result status;
+- SourceTrace numeric source validator incomplete / blocked / degraded reason;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -122,3 +125,4 @@ Examples:
 - `Source Context Integration Plan status` is allowed only as docs-only planning context; it cannot connect real SourceTrace, RuntimeKlineContext, DataQuality, MultiTimeframe, RiskActionGuard, WatchlistPoolProof, source-owned point contexts, services, dashboard runtime, executable entry / stop / TP / RR, external push, order, execution, or auto-trading.
 - `SourceTrace Numeric Source Read Model Plan status` is allowed only as docs-only planning context; it cannot create SourceTrace Java DTOs, validators, assemblers, runtime reads, services, dashboard runtime, executable entry / stop / TP / RR, external push, order, execution, or auto-trading.
 - `SourceTraceNumericSourceContextDTO skeleton status` is allowed only as DTO/test skeleton context; it cannot validate, assemble, read runtime sources, connect services, connect dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
+- `SourceTraceNumericSourceReadModelValidator skeleton status` is allowed only as validator/test skeleton context; it cannot assemble, read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
