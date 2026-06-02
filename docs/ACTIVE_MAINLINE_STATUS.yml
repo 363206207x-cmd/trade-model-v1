@@ -1,14 +1,14 @@
-current_head: "aac638f"
+current_head: "63a9232"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "SourceTraceNumericSourceContextDTO Java Skeleton"
-active_block_cn: "SourceTrace 数值来源上下文 DTO Java 骨架"
-current_level: "SOURCETRACE_NUMERIC_SOURCE_CONTEXT_DTO_JAVA_SKELETON"
-current_pr: "792"
-current_branch: "p328"
+active_block: "SourceTraceNumericSourceReadModelValidator Java Skeleton"
+active_block_cn: "SourceTrace 数值来源读模型校验器 Java 骨架"
+current_level: "SOURCETRACE_NUMERIC_SOURCE_READ_MODEL_VALIDATOR_JAVA_SKELETON"
+current_pr: "794"
+current_branch: "p329"
 merge_rule: "B requires user approval"
-next_required_action: "review_pr_792"
-do_not_continue_to: "SourceTrace validator / SourceTrace assembler / RuntimeKlineContext wiring / service runtime / dashboard runtime / executable point generation / external channel / order execution"
+next_required_action: "review_pr_794"
+do_not_continue_to: "SourceTrace assembler / RuntimeKlineContext wiring / service runtime / dashboard runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md
