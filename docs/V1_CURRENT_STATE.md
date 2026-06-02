@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `f963f9c BACKEND-P317 Risk Action Guard Numeric Point Contract Plan (#769)`
+- Current merged main: `8c2c37a BACKEND-P318 Numeric Point Safety Validator Plan (#771)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #771 / branch `p318`: `BACKEND-P318 Numeric Point Safety Validator Plan`.
+- Current open business-chain package is PR #773 / branch `p319`: `BACKEND-P319 Numeric Point Fixture Matrix Plan`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -25,7 +25,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P315 is completed on main as DataQuality Numeric Point Contract Plan.
 - P316 is completed on main as MultiTimeframe Numeric Point Contract Plan.
 - P317 is completed on main as Risk Action Guard Numeric Point Contract Plan.
-- P318 is the active docs-only Numeric Point Safety Validator Plan.
+- P318 is completed on main as Numeric Point Safety Validator Plan.
+- P319 is the active docs-only Numeric Point Fixture Matrix Plan.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -39,9 +40,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P316 defines the future MultiTimeframe contract for 4h / 1h / 15m / 5m roles, entry / stop / TP / RR timeframe confirmation, high-timeframe conflicts, low-timeframe noise, wick-only signals, strong reversal, and Risk Action Guard references.
 - P317 defines the future Risk Action Guard numeric point contract for high-risk, liquidity-degraded, stampede-confirmed, wick-only, strong reversal, high-timeframe conflict, entry / stop / TP / RR review, and fail-closed behavior.
 - P318 defines the future Numeric Point Safety Validator plan for checking SourceTrace, RuntimeKlineContext, DataQuality, MultiTimeframe, Risk Action Guard, Watchlist Pool proof, safety flags, forbidden semantics, partial candidates, incomplete states, and fail-closed states.
-- P318 does not implement Java, tests, dashboard runtime integration, external channel, order, execution, or auto-trading.
-- P318 does not mean Safety Validator Java is complete, numeric point proposal is implemented, or real entry / stop / TP / RR are complete.
-- Next recommended package after P318 is Numeric Point Fixture Matrix Plan or ReviewOnlyNumericPointProposalDTO Java Skeleton, not real executable point generation.
+- P319 defines the future Numeric Point Fixture Matrix plan for positive, incomplete, fail-closed, degraded, partial, forbidden-semantics, Watchlist / Display Slots, external channel, order / execution / auto-trading, and cross-contract consistency fixture categories.
+- P319 does not implement Java, tests, dashboard runtime integration, external channel, order, execution, or auto-trading.
+- P319 does not mean Java tests are complete, Safety Validator Java is complete, numeric point proposal is implemented, or real entry / stop / TP / RR are complete.
+- Next recommended package after P319 is ReviewOnlyNumericPointProposalDTO Java Skeleton or Numeric Point Safety Validator Java Skeleton, not real executable point generation.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -69,9 +71,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P317 Actually Completed
+## What P287-P318 Actually Completed
 
-P287-P317 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, and Risk Action Guard numeric point contract plan only:
+P287-P318 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, and Numeric Point Safety Validator plan only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -104,6 +106,7 @@ P287-P317 completed market-read request contract, DTO, validator, test-only wiri
 - P315: DataQuality numeric point contract plan defining future data quality score, hard / warning thresholds, SourceTrace quality, RuntimeKlineContext quality, OHLCV completeness, freshness, liquidity, stampede, wick, event, abnormal data, multi-timeframe consistency, and Risk Action Guard references.
 - P316: MultiTimeframe numeric point contract plan defining future 4h / 1h / 15m / 5m roles, required timeframe presence, entry / stop / TP / RR timeframe confirmation, high-timeframe conflicts, low-timeframe noise, wick-only signals, strong reversal, fixture matrix expectations, and Risk Action Guard references.
 - P317: Risk Action Guard numeric point contract plan defining future high-risk, liquidity-degraded, stampede-confirmed, wick-only, strong reversal, high-timeframe conflict, entry / stop / TP / RR review, fail-closed behavior, fixture matrix expectations, and Watchlist Pool / Display Slots boundary.
+- P318: Numeric Point Safety Validator plan defining future validator inputs, output states, mandatory safety flags, SourceTrace / RuntimeKlineContext / DataQuality / MultiTimeframe / Risk Action Guard checks, entry / stop / TP / RR partial handling, forbidden semantics, and fixture matrix expectations.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
