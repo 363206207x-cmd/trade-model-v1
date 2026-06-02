@@ -1,14 +1,14 @@
-current_head: "44c3607"
+current_head: "1ce8c8e"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "SourceTrace Numeric Source Assembler Verification"
-active_block_cn: "SourceTrace 数值来源组装器验证收口"
-current_level: "SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION"
+active_block: "SourceTrace Runtime / Source Binding Plan"
+active_block_cn: "SourceTrace 运行来源绑定方案"
+current_level: "SOURCE_TRACE_RUNTIME_BINDING_PLAN"
 current_pr: "none"
-current_branch: "p332"
-merge_rule: "A docs-only verification; no runtime wiring"
-next_required_action: "create_review_for_p332_or_merge_after_approval"
-do_not_continue_to: "SourceTrace runtime wiring / RuntimeKlineContext runtime / service runtime / dashboard runtime / executable point generation / external channel / order execution"
+current_branch: "p333"
+merge_rule: "A docs-only skeleton plan; no runtime wiring"
+next_required_action: "P334 SourceTrace Runtime / Source Binding Verification"
+do_not_continue_to: "RuntimeKlineContext runtime / DataQuality runtime / MultiTimeframe runtime / RiskActionGuard runtime / WatchlistPoolProof / service runtime / dashboard runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md
