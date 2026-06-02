@@ -55,6 +55,8 @@ The following outputs are allowed in review-only scope when their source ownersh
 - ReviewOnlyNumericPointProposalDTO missing / blocked / degraded reason;
 - Numeric Point Safety Validator skeleton status;
 - Numeric Point Safety Validator incomplete / blocked / degraded reason;
+- ReviewOnly Numeric Point Assembler skeleton status;
+- ReviewOnly Numeric Point Assembler validation result status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -103,3 +105,4 @@ Examples:
 - `Numeric Point Fixture Matrix plan status` is allowed only as docs-only planning context; it cannot create Java tests, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
 - `ReviewOnlyNumericPointProposalDTO skeleton status` is allowed only as DTO/test skeleton context; it cannot validate, assemble, calculate, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
 - `Numeric Point Safety Validator skeleton status` is allowed only as validator/test skeleton context; it cannot assemble, calculate, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
+- `ReviewOnly Numeric Point Assembler skeleton status` is allowed only as explicit-input assembler/test skeleton context; it cannot calculate, infer, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
