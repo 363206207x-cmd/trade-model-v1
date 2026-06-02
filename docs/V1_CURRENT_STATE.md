@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `d2a048d BACKEND-P324 Source-owned Numeric Point Candidate Assembler Java Skeleton (#784)`
+- Current merged main: `780857b BACKEND-P325 Source-owned Numeric Point Candidate Assembler Verification (#786)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #786 on branch `p325`: `BACKEND-P325 Source-owned Numeric Point Candidate Assembler Verification`.
+- Current open business-chain package is PR #788 on branch `p326`: `BACKEND-P326 Source Context Integration Plan`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -32,7 +32,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P322 is completed on main as ReviewOnly Numeric Point Assembler Java Skeleton.
 - P323 is completed on main as Source-owned Numeric Point Candidate Assembler Plan.
 - P324 is completed on main as Source-owned Numeric Point Candidate Assembler Java Skeleton.
-- P325 is the active docs-only source-owned numeric point candidate assembler verification package.
+- P325 is completed on main as Source-owned Numeric Point Candidate Assembler Verification.
+- P326 is the active docs-only Source Context Integration Plan package.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -52,10 +53,11 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P322 added only a plain Java assembler skeleton and targeted assembler tests.
 - P323 added only a docs-only plan for future source-owned numeric point candidate assembly.
 - P324 added only a plain Java source-owned candidate assembler skeleton and targeted tests.
-- P325 verifies P320-P324 as a review-only numeric candidate chain with DTO, safety validator, explicit assembler, and source-owned candidate assembler.
-- P325 does not add Java, tests, service wiring, dashboard runtime integration, external channel, order, execution, or auto-trading.
-- P325 does not mean real point generation is complete or entry / stop / TP / RR are usable as trading output.
-- Next recommended package after P325 is Review-only Numeric Point Internal Preview Plan or Source Context Integration Plan, not real executable point generation.
+- P325 verified P320-P324 as a review-only numeric candidate chain with DTO, safety validator, explicit assembler, and source-owned candidate assembler.
+- P326 defines how future real SourceTrace, RuntimeKlineContext, DataQuality, MultiTimeframe, RiskActionGuard, WatchlistPoolProof, and source-owned point contexts may be integrated.
+- P326 does not add Java, tests, service wiring, dashboard runtime integration, external channel, order, execution, or auto-trading.
+- P326 does not mean real source context is connected, real point generation is complete, or entry / stop / TP / RR are usable as trading output.
+- Next recommended package after P326 is SourceTrace Numeric Source Read Model Plan, RuntimeKlineContext Source Binding Plan, DataQualityContext Source Binding Plan, or Review-only Numeric Point Internal Preview Plan.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -83,9 +85,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P324 Actually Completed
+## What P287-P325 Actually Completed
 
-P287-P324 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, and Source-owned Numeric Point Candidate Assembler Java Skeleton only:
+P287-P325 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, and Source-owned Numeric Point Candidate Assembler Verification only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -125,6 +127,7 @@ P287-P324 completed market-read request contract, DTO, validator, test-only wiri
 - P322: ReviewOnly Numeric Point Assembler Java skeleton defining assembler-only, targeted-test-only explicit input movement into `ReviewOnlyNumericPointProposalDTO` plus mandatory `NumericPointSafetyValidator` validation.
 - P323: Source-owned Numeric Point Candidate Assembler Plan defining docs-only future source-owned context selection, explicit proposal input creation, mandatory P322 assembler invocation, and mandatory validator gating.
 - P324: Source-owned Numeric Point Candidate Assembler Java skeleton defining source-owned-field-only conversion into P322 explicit assembly input, mandatory P322 assembler invocation, mandatory validator gating, trusted-source fail-closed handling, and targeted tests.
+- P325: Source-owned Numeric Point Candidate Assembler Verification confirming P320-P324 are only a review-only DTO / validator / explicit assembler / source-owned assembler chain and still cannot read real source context or generate executable point values.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
