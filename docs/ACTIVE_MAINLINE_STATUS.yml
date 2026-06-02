@@ -1,14 +1,14 @@
-current_head: "780857b"
+current_head: "297c973"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source Context Integration Plan"
-active_block_cn: "真实来源上下文接入方案"
-current_level: "SOURCE_CONTEXT_INTEGRATION_PLAN"
-current_pr: "788"
-current_branch: "p326"
+active_block: "SourceTrace Numeric Source Read Model Plan"
+active_block_cn: "SourceTrace 数值来源读模型方案"
+current_level: "SOURCETRACE_NUMERIC_SOURCE_READ_MODEL_PLAN"
+current_pr: "790"
+current_branch: "p327"
 merge_rule: "A docs-only can merge after review"
-next_required_action: "review_pr_788"
-do_not_continue_to: "Dashboard runtime / service runtime / executable point generation / external channel / order execution"
+next_required_action: "review_pr_790"
+do_not_continue_to: "RuntimeKlineContext wiring / dashboard runtime / service runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md
