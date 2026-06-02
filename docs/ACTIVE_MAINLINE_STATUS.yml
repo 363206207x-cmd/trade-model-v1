@@ -1,14 +1,14 @@
-current_head: "9ab6ed1"
+current_head: "d2a048d"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source-owned Numeric Point Candidate Assembler Java Skeleton"
-active_block_cn: "来源归属数值点位候选组装器 Java 骨架"
-current_level: "SOURCE_OWNED_NUMERIC_POINT_CANDIDATE_ASSEMBLER_JAVA_SKELETON"
-current_pr: "784"
-current_branch: "p324"
-merge_rule: "B requires user approval"
-next_required_action: "review_pr_784"
-do_not_continue_to: "Executable point generation / external channel / order execution"
+active_block: "Source-owned Numeric Point Candidate Assembler Verification"
+active_block_cn: "来源归属数值点位候选组装器验证收口"
+current_level: "SOURCE_OWNED_NUMERIC_POINT_CANDIDATE_ASSEMBLER_VERIFICATION"
+current_pr: "786"
+current_branch: "p325"
+merge_rule: "A docs-only can merge after review"
+next_required_action: "review_pr_786"
+do_not_continue_to: "Dashboard runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md

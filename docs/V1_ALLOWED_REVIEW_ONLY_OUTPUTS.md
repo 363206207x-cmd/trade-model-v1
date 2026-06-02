@@ -61,6 +61,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - Source-owned numeric candidate missing / blocked / degraded reason plan;
 - Source-owned Numeric Point Candidate Assembler skeleton status;
 - Source-owned Numeric Point Candidate Assembler validation result status;
+- Source-owned Numeric Point Candidate Assembler verification status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -112,3 +113,4 @@ Examples:
 - `ReviewOnly Numeric Point Assembler skeleton status` is allowed only as explicit-input assembler/test skeleton context; it cannot calculate, infer, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
 - `Source-owned Numeric Point Candidate Assembler plan status` is allowed only as docs-only planning context; it cannot create Java, read runtime providers, calculate numeric point values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
 - `Source-owned Numeric Point Candidate Assembler skeleton status` is allowed only as source-owned-field assembler/test skeleton context; it cannot calculate, infer, generate numeric values, authorize executable entry / stop / TP / RR, or authorize external push, order, execution, or auto-trading.
+- `Source-owned Numeric Point Candidate Assembler verification status` is allowed only as docs-only verification context; it cannot create Java, tests, services, dashboard runtime, source context integration, executable entry / stop / TP / RR, external push, order, execution, or auto-trading.
