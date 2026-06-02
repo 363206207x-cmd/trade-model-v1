@@ -73,6 +73,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceTrace Numeric Source Validator Verification status;
 - SourceTraceNumericSourceReadModelAssembler skeleton status;
 - SourceTrace numeric source assembler validation result status;
+- SourceTrace Numeric Source Assembler Verification status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -131,3 +132,4 @@ Examples:
 - `SourceTraceNumericSourceReadModelValidator skeleton status` is allowed only as validator/test skeleton context; it cannot assemble, read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
 - `SourceTrace Numeric Source Validator Verification status` is allowed only as docs-only verification context; it cannot create Java, tests, assemblers, read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
 - `SourceTraceNumericSourceReadModelAssembler skeleton status` is allowed only as explicit-input assembler/test skeleton context; it cannot read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
+- `SourceTrace Numeric Source Assembler Verification status` is allowed only as docs-only verification context; it cannot create Java, tests, read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
