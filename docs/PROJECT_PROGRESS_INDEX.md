@@ -6,6 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `aac638f BACKEND-P327 SourceTrace Numeric Source Read Model Plan (#790)`
 - `297c973 BACKEND-P326 Source Context Integration Plan (#788)`
 - `780857b BACKEND-P325 Source-owned Numeric Point Candidate Assembler Verification (#786)`
 - `d2a048d BACKEND-P324 Source-owned Numeric Point Candidate Assembler Java Skeleton (#784)`
@@ -110,11 +111,13 @@ Current active capability movement:
 - It moved the chain from `SOURCE_OWNED_NUMERIC_POINT_CANDIDATE_ASSEMBLER_JAVA_SKELETON` to `SOURCE_OWNED_NUMERIC_POINT_CANDIDATE_ASSEMBLER_VERIFICATION`.
 - P326 is merged on main.
 - It moved the chain from `SOURCE_OWNED_NUMERIC_POINT_CANDIDATE_ASSEMBLER_VERIFICATION` to `SOURCE_CONTEXT_INTEGRATION_PLAN`.
-- `BACKEND-P327 SourceTrace Numeric Source Read Model Plan` is open as draft PR #790 on branch `p327`.
-- P327 is a docs-only plan from `SOURCE_CONTEXT_INTEGRATION_PLAN` toward `SOURCETRACE_NUMERIC_SOURCE_READ_MODEL_PLAN`.
+- P327 is merged on main.
+- It moved the chain from `SOURCE_CONTEXT_INTEGRATION_PLAN` to `SOURCETRACE_NUMERIC_SOURCE_READ_MODEL_PLAN`.
+- `BACKEND-P328 SourceTraceNumericSourceContextDTO Java Skeleton` is open as draft PR #792 on branch `p328`.
+- P328 is a DTO-only Java/test skeleton from `SOURCETRACE_NUMERIC_SOURCE_READ_MODEL_PLAN` toward `SOURCETRACE_NUMERIC_SOURCE_CONTEXT_DTO_JAVA_SKELETON`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is SourceTrace Numeric Source Read Model Plan.
-- The next required action is `review_pr_790`.
+- The active block is SourceTraceNumericSourceContextDTO Java Skeleton.
+- The next required action is `review_pr_792`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -256,6 +259,10 @@ P327 is a SourceTrace Numeric Source Read Model Plan package. It is docs-only an
 
 P327 may only make a small Governance / Contract Progress lift. It does not raise Production Runtime Progress and must not describe SourceTrace read model Java completion, real source context integration, Java changes, tests, service wiring, numeric point generation, executable entry / stop / TP / RR, final direction, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
 
+P328 is a SourceTraceNumericSourceContextDTO Java Skeleton package. It adds only a plain Java DTO carrier and targeted DTO tests for SourceTrace numeric source read model fields, safety flags, source types, numeric field roles, freshness, and incomplete / fail-closed status semantics.
+
+P328 may only make a small Readiness / Point Mainline and Skeleton / Test Progress lift. It does not raise Production Runtime Progress and must not describe SourceTrace validator completion, SourceTrace assembler completion, source context integration, service wiring, numeric point generation, executable entry / stop / TP / RR, final direction, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -267,8 +274,8 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 | Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks source-owned point proposal -> execution advice -> monitor -> review closure. |
 | MVP Progress | 65%-73% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 push preview closure, P304 dashboard display gate, P305 review-only MVP closure, P306 planning, P307 review-only readiness gate skeleton, P308 point boundary gate skeleton, P309 source-owned review-only point proposal skeleton, and P310 display gate exist. | Real Push, external channel, executable Readiness, executable point generation, and the user-facing MVP loop are not complete. |
 | Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294-P304 and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
-| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, P312 numeric point proposal object-boundary rules, P313 SourceTrace contract rules, P314 RuntimeKlineContext contract rules, P315 DataQuality contract rules, P316 MultiTimeframe contract rules, P317 Risk Action Guard contract rules, P318 Numeric Point Safety Validator plan rules, P319 Numeric Point Fixture Matrix plan rules, P323 source-owned candidate assembler plan rules, P325 verification rules, P326 source context integration planning rules, and active P327 SourceTrace numeric source read model rules are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, Java skeleton contracts, and Java remains blocked before implementation. |
-| Skeleton / Test Progress | 86%-94% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 closure guard tests, P304 dashboard guard tests, P305 closure tests, P307 readiness gate skeleton tests, P308 point boundary gate skeleton tests, P309 point proposal skeleton tests, P310 display gate tests, P320 numeric point proposal DTO skeleton tests, P321 numeric point safety validator skeleton tests, P322 numeric point assembler skeleton tests, and P324 source-owned candidate assembler skeleton tests exist. | Real Push / external channel workflow, executable point generation, service wiring, and executable readiness are not complete. |
+| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, P312 numeric point proposal object-boundary rules, P313 SourceTrace contract rules, P314 RuntimeKlineContext contract rules, P315 DataQuality contract rules, P316 MultiTimeframe contract rules, P317 Risk Action Guard contract rules, P318 Numeric Point Safety Validator plan rules, P319 Numeric Point Fixture Matrix plan rules, P323 source-owned candidate assembler plan rules, P325 verification rules, P326 source context integration planning rules, P327 SourceTrace numeric source read model rules, and active P328 SourceTrace DTO skeleton boundaries are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, validator / assembler contracts, and runtime implementation remains blocked before authorization. |
+| Skeleton / Test Progress | 86%-94% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 closure guard tests, P304 dashboard guard tests, P305 closure tests, P307 readiness gate skeleton tests, P308 point boundary gate skeleton tests, P309 point proposal skeleton tests, P310 display gate tests, P320 numeric point proposal DTO skeleton tests, P321 numeric point safety validator skeleton tests, P322 numeric point assembler skeleton tests, P324 source-owned candidate assembler skeleton tests, and active P328 SourceTrace numeric source context DTO tests exist. | Real Push / external channel workflow, executable point generation, service wiring, and executable readiness are not complete. |
 | Product Usability Progress | 42%-52% | Dashboard and review-only displays exist, MarketRead review-only scan output now has a safe entry envelope after P295, and P304 makes internal push preview safety visible in the dashboard while P305 closes the read-only candidate/push MVP loop. | Core actions still do not form an executable MVP workflow, and external send remains blocked. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
 | Push / Monitoring Progress | 42%-55% | Push no-op/audit/channel skeletons and legacy position monitor foundations exist. | No external send, no full internal push preview chain, and no complete monitor action loop. |
@@ -354,6 +361,8 @@ P326 must not be described as Java implementation, test completion, real source 
 
 P327 must not be described as SourceTrace read model Java completion, Java implementation, test completion, real source context integration, service wiring, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, final direction, dashboard runtime integration, external channel authorization, order execution, execution API, or auto-trading.
 
+P328 must not be described as SourceTrace validator completion, SourceTrace assembler completion, source context integration, service wiring, numeric point proposal implementation, executable point generation, executable entry / stop / TP / RR, final direction, dashboard runtime integration, external channel authorization, order execution, execution API, or auto-trading.
+
 Evidence generation, ScoreItem generation, and Score calculation must not be described as completed until separate merged packages add those layers.
 
 Real Candidate, real Push, executable Readiness, external channel, and point generation must not be described as completed.
@@ -374,9 +383,9 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after P327:
+Near-term priority after P328:
 
-1. SourceTraceNumericSourceContextDTO Java Skeleton or SourceTraceNumericSourceReadModelValidator Java Skeleton.
+1. SourceTraceNumericSourceReadModelValidator Java Skeleton or SourceTrace Numeric Source DTO Verification.
 2. External Channel Authorization Gate only as a separate C-level package.
 3. Readiness / Point specialty planning follow-up before any point generation.
 4. Dashboard smoke / internal preview closure.
