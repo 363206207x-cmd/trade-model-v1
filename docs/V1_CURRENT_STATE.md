@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `63a9232 BACKEND-P328 SourceTraceNumericSourceContextDTO Java Skeleton (#792)`
+- Current merged main: `7981088 BACKEND-P329 SourceTraceNumericSourceReadModelValidator Java Skeleton (#794)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is PR #794 on branch `p329`: `BACKEND-P329 SourceTraceNumericSourceReadModelValidator Java Skeleton`.
+- Current open business-chain package is branch `p330`: `BACKEND-P330 SourceTrace Numeric Source Validator Verification` (Issue / PR managed by GPT).
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -36,7 +36,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P326 is completed on main as Source Context Integration Plan.
 - P327 is completed on main as SourceTrace Numeric Source Read Model Plan.
 - P328 is completed on main as SourceTraceNumericSourceContextDTO Java Skeleton.
-- P329 is the active SourceTraceNumericSourceReadModelValidator Java Skeleton package.
+- P329 is completed on main as SourceTraceNumericSourceReadModelValidator Java Skeleton.
+- P330 is the active SourceTrace Numeric Source Validator Verification package.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -61,9 +62,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P327 defines the future SourceTraceNumericSourceContext read model for entry / stop / TP / RR numeric source identity.
 - P328 adds only a plain Java `SourceTraceNumericSourceContextDTO` skeleton and targeted DTO tests.
 - P329 adds only a plain Java `SourceTraceNumericSourceReadModelValidator` skeleton and targeted validator tests.
-- P329 does not add SourceTrace assembler, source-owned candidate assembly, source context integration, RuntimeKlineContext wiring, DataQuality wiring, MultiTimeframe wiring, RiskActionGuard wiring, service wiring, dashboard runtime integration, external channel, order, execution, or auto-trading.
-- P329 does not mean SourceTrace read model assembly is complete, source context is connected, real point generation is complete, or entry / stop / TP / RR are usable as trading output.
-- Next recommended package after P329 is SourceTrace Numeric Source Validator Verification or SourceTraceNumericSourceReadModelAssembler Java Skeleton.
+- P330 verifies P327-P329 as a SourceTrace numeric source read model plan + DTO carrier + validator skeleton chain.
+- P330 does not add Java, tests, SourceTrace assembler, source-owned candidate assembly, source context integration, RuntimeKlineContext wiring, DataQuality wiring, MultiTimeframe wiring, RiskActionGuard wiring, WatchlistPoolProof wiring, service wiring, dashboard runtime integration, external channel, order, execution, or auto-trading.
+- P330 does not mean SourceTrace read model assembly is complete, source context is connected, real point generation is complete, or entry / stop / TP / RR are usable as trading output.
+- Next recommended package after P330 is SourceTraceNumericSourceReadModelAssembler Java Skeleton or RuntimeKlineContext Source Binding Plan.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -91,9 +93,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P328 Actually Completed
+## What P287-P329 Actually Completed
 
-P287-P328 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, Source-owned Numeric Point Candidate Assembler Verification, Source Context Integration Plan, SourceTrace Numeric Source Read Model Plan, and SourceTraceNumericSourceContextDTO Java Skeleton only:
+P287-P329 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, Source-owned Numeric Point Candidate Assembler Verification, Source Context Integration Plan, SourceTrace Numeric Source Read Model Plan, SourceTraceNumericSourceContextDTO Java Skeleton, and SourceTraceNumericSourceReadModelValidator Java Skeleton only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -137,6 +139,7 @@ P287-P328 completed market-read request contract, DTO, validator, test-only wiri
 - P326: Source Context Integration Plan defining future required SourceTrace, RuntimeKlineContext, DataQuality, MultiTimeframe, RiskActionGuard, WatchlistPoolProof, and source-owned point context integration boundaries without connecting any real source context.
 - P327: SourceTrace Numeric Source Read Model Plan defining future SourceTrace numeric source read model boundaries without creating Java or connecting source context.
 - P328: SourceTraceNumericSourceContextDTO Java Skeleton defining a DTO-only, targeted-test-only carrier for future SourceTrace numeric source context fields.
+- P329: SourceTraceNumericSourceReadModelValidator Java Skeleton defining a validator-only, targeted-test-only safety gate for the SourceTrace DTO.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
