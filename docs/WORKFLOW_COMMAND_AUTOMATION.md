@@ -1,105 +1,146 @@
 # Workflow Command Automation
 
-This document keeps the P291D / P291E / P291G scripts available, but P291H changes the priority.
+This document defines the fixed local workflow commands for Trade Model V1 while keeping the default workflow GPT + Codex + GitHub-native.
 
-Default workflow is GPT + Codex + GitHub-native.
-（默认工作流是 GPT + Codex + GitHub 原生。）
+本文档定义 Trade Model V1 的固定本地工作流命令，同时保留默认工作流 GPT + Codex + GitHub-native。
 
-Terminal scripts are fallback only except local main sync after merge.
-（终端脚本除合并后同步 main 外，只作为兜底。）
+It is a workflow execution helper only. It does not change business capability, Java, tests, runtime wiring, dashboard, external channel, Push, order, execution, or auto-trading.
 
-Codex must output PR number and stop.
-（Codex 必须输出 PR 编号并停止。）
+它只用于工作流执行辅助，不改变业务能力、Java、测试、运行时接线、dashboard、external channel、Push、order、execution 或 auto-trading。
 
-## Default Priority
+## Status Check / 状态检测
 
-Default:
-
-- GPT decides the next pack.
-- Codex checks duplicate Issue / PR / branch.
-- Codex creates Issue, branch, commit, push, and Draft PR.
-- GPT reviews the GitHub PR.
-- The user only confirms B/C or C merge.
-- Terminal is used for local main sync after merge, or when GitHub tools are unavailable.
-
-Do not default to asking the user to run a menu, find a PR number, judge mergeability, or inspect CI.
-
-## Fallback Scripts
-
-Use these only when the GitHub-native path is unavailable or a local diagnostic is needed:
-
-- `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
-- `bash scripts/v1-status.sh`
-- `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
-- `bash scripts/v1-safe-check.sh`
-- `bash scripts/v1-session-bootstrap.sh`
-- `bash scripts/v1-next-pack-context.sh`
-
-## Not Recommended As Default
-
-- `bash scripts/v1.sh` menu is a fallback menu, not the default entry point.
-- `bash scripts/v1-auto.sh` is a fallback diagnostic, not the default workflow.
-- `bash scripts/v1-merge-current.sh` must not guess the PR from branch or stale status.
-- `bash scripts/v1-merge-current.sh` requires an explicit PR number.
-
-Valid explicit forms:
+Use:
 
 ```bash
-bash scripts/v1-merge-current.sh <PR_NUMBER>
-APPROVED_PR_NUMBER=<PR_NUMBER> bash scripts/v1-merge-current.sh
+bash scripts/v1-state.sh
 ```
 
-Without an explicit PR number, it must stop with:
+The script prints:
 
-```text
-MERGE_CURRENT_DISABLED_REQUIRE_EXPLICIT_PR
+- `BRANCH:`
+- `WORKTREE_CLEAN:`
+- `HEAD:`
+- `RECENT_COMMITS:`
+- `OPEN_PRS:`
+- `MAIN_SYNC:`
+- `CAN_CONTINUE_NEXT_PACKAGE:`
+- `BLOCKERS:`
+
+脚本输出当前分支、工作区是否干净、HEAD、最近提交、open PR、main 同步状态、是否可以进入下一包，以及阻塞原因。
+
+If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and must not produce unreadable errors.
+
+如果 `gh` 不可用，脚本在 open PR 字段输出 `GH_NOT_AVAILABLE`，不得输出不可读错误。
+
+## Create Draft PR / 创建 Draft PR
+
+Use:
+
+```bash
+bash scripts/v1-open-pr.sh <branch> "<title>" <risk>
 ```
 
-## Merge Safety
+Example:
 
-For B/C PRs and C PRs, the user must explicitly say the equivalent of:
-
-```text
-同意合并 PR #<PR_NUMBER>
+```bash
+bash scripts/v1-open-pr.sh p337 "BACKEND-P337 RuntimeKlineContextSourceBindingValidator Java Skeleton" "B"
 ```
 
-before any merge script may run.
+Supported risks:
 
-`v1-merge-sync.sh` and `v1-merge-current.sh` check PR state, mergeability, and CI status before merging, but they do not replace human approval rules.
+- `A`
+- `B`
+- `B/C`
+- `C`
 
-`v1-merge-sync.sh` also supports already-merged PRs. If the PR state is `MERGED`, it must not attempt another merge; it enters already-merged sync mode, switches to `main`, pulls `origin main`, and prints `MERGE_SYNC_DONE`.
+The script checks that the remote branch exists and that no PR already exists for the same head branch. If a PR already exists, it prints the PR URL and does not create a duplicate.
 
-`v1-merge-sync.sh` 也支持已合并 PR。如果 PR state 是 `MERGED`，脚本不得再次尝试 merge；它进入 already-merged sync mode，切回 `main`，pull `origin main`，并输出 `MERGE_SYNC_DONE`。
+脚本会检查远端分支存在，并检查同一 head branch 是否已有 PR。如果已有 PR，直接输出 PR URL，不重复创建。
 
-If a PR is closed without being merged, `v1-merge-sync.sh` must stop with `PR_CLOSED_NOT_MERGED`.
+The generated PR body must include:
 
-如果 PR 已关闭但未合并，`v1-merge-sync.sh` 必须以 `PR_CLOSED_NOT_MERGED` 停止。
+- no executable point generation;
+- no executable entry / stop / TP / RR;
+- no external channel;
+- no Push send;
+- no order / execution / auto-trading;
+- incomplete-safe / fail-closed;
+- Risk Action Guard remains mandatory.
 
-## Script Inventory
+生成的 PR body 必须包含以上安全边界。
 
-| Script | Purpose | Default? | May merge |
-|---|---|---:|---:|
-| `scripts/v1-pr-review-input.sh <PR_NUMBER>` | Fallback PR metadata and changed-file report. | fallback | no |
-| `scripts/v1-status.sh` | Fallback local status and open GitHub item list. | fallback | no |
-| `scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"` | Explicit PR merge and local main sync after approval. | sync helper | yes |
-| `scripts/v1-safe-check.sh` | Fallback local safety check after Codex work. | fallback | no |
-| `scripts/v1-session-bootstrap.sh` | Fallback new-window context. | fallback | no |
-| `scripts/v1-next-pack-context.sh` | Fallback next-pack context. | fallback | no |
-| `scripts/v1-auto.sh` | Fallback diagnostic that prints current status and next step. | fallback | no |
-| `scripts/v1.sh` | Fallback interactive menu. | fallback | only by explicit merge choice |
-| `scripts/v1-merge-current.sh <PR_NUMBER>` | Explicit current PR merge helper after approval. | fallback | yes |
+The script must not mark ready, merge, switch to the next package, edit files, stage files, or commit.
 
-## Boundaries
+脚本不得 mark ready、merge、切下一包、改文件、stage 或 commit。
+
+## Merge And Sync / 合并并同步
+
+Use:
+
+```bash
+bash scripts/v1-merge-sync.sh <pr-number> "<title (#pr)>"
+```
+
+The script checks PR state, draft status, mergeability, and checks before merging an open PR.
+
+脚本在合并 open PR 前检查 PR 状态、Draft 状态、可合并状态和 checks。
+
+If the PR is already `MERGED`, the script enters already-merged sync mode: it switches to `main`, pulls `origin main`, prints status/log, and finishes with `MERGE_SYNC_DONE`.
+
+如果 PR 已经是 `MERGED`，脚本进入已合并同步模式：切回 `main`，pull `origin main`，输出状态和日志，并以 `MERGE_SYNC_DONE` 收尾。
+
+If a PR is closed without being merged, the script must stop with `PR_CLOSED_NOT_MERGED`.
+
+如果 PR 已关闭但未合并，脚本必须以 `PR_CLOSED_NOT_MERGED` 停止。
+
+## Fixed Command Rule / 固定命令规则
+
+Do not handwrite long `gh pr create` commands.
+
+不再手写大段 `gh pr create` 命令。
+
+Do not handwrite long `gh pr merge` commands.
+
+不再手写大段 `gh pr merge` 命令。
+
+When the GitHub connector is unavailable, GPT should give only these fixed local script commands.
+
+GitHub connector 不可用时，GPT 只给这些固定本地脚本命令。
+
+Do not open the next package before the current package is completed on merged `main`.
+
+当前包没有进入 merged `main` 前，不允许开下一包。
+
+When the current package is merged, `main` is synced, the worktree is clean, checks passed, and no blocker exists, GPT should directly provide the next Codex task prompt instead of asking whether to continue.
+
+当前包已 merge、main 已同步、worktree clean、checks 通过且无 blocker 时，GPT 直接给下一包 Codex 提示词，不再问是否继续。
+
+## Legacy Fallback Inventory / 旧兜底脚本清单
+
+The following legacy scripts remain fallback diagnostics or explicit helpers, but they are not the default path for creating PRs or merging PRs:
+
+- `bash scripts/v1.sh`
+- `bash scripts/v1-auto.sh`
+- `bash scripts/v1-merge-current.sh`
+
+以下旧脚本仍可作为兜底诊断或显式辅助，但不是创建 PR 或合并 PR 的默认路径。
+
+## Non-Scope / 非范围
 
 These scripts do not authorize:
 
-- Java changes;
-- tests or DTO changes;
-- dashboard, schema, config, or resource changes;
-- runtime/live/external data reads;
-- `MarketQuoteClient` / `BinanceMarketQuoteClient` wiring;
-- scan output / score / Candidate / Push / Readiness / point generation;
-- entry / stop / TP / RR implementation;
+- Java business changes;
+- test business changes;
+- resources, dashboard, schema, config, or pom changes;
+- runtime/live market reads;
+- latest price or latest close reads;
+- external provider reads;
+- RuntimeKlineContext / DataQuality / MultiTimeframe / RiskActionGuard runtime wiring;
+- executable entry / stop / TP / RR generation;
+- final direction generation;
+- external channel;
+- Push send;
 - order / execution / auto-trading.
 
-If a script reports failure, do not continue feature work until the failure is understood.
+这些脚本不授权以上任何业务或运行时能力。
