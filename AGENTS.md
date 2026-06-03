@@ -8,6 +8,7 @@ Codex must read these files before each task:
 - `docs/V1_CAPABILITY_MATRIX.md`
 - `docs/V1_MVP_REALITY_ROADMAP.md`
 - `docs/ANSWER_FORMAT_CONTRACT.md`
+- `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
 
 ## Default Workflow
 
@@ -17,6 +18,9 @@ Default workflow is GPT + Codex + GitHub-native.
 Terminal scripts are fallback only except local main sync after merge.
 （终端脚本除合并后同步 main 外，只作为兜底。）
 
+GitHub connector / Codex GitHub auth / local `gh` responsibility split is governed by `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
+（GitHub connector / Codex GitHub auth / 本地 `gh` 的责任分工以 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md` 为准。）
+
 Codex must self-contain each task:
 
 1. Check for existing Issue / PR / branch.
@@ -25,8 +29,8 @@ Codex must self-contain each task:
 4. Execute the scoped task.
 5. Run required validation.
 6. Push the branch.
-7. Create a Draft PR.
-8. Output the PR number and stop.
+7. Create a Draft PR only when the task and auth handoff rule assign PR creation to Codex.
+8. Otherwise stop after push and report branch / commit / changed files / checks.
 
 Open PR / branch / Issue does not count as done. Codex output does not count as done. Only merged `main` counts as done.
 

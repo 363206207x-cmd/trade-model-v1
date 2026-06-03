@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `800bf89 DOCS-P334 SourceTrace Runtime Binding Verification (#799)`
+- Current merged main: `60dd58f DOCS-P335 RuntimeKlineContext Source Binding Plan (#800)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is branch `p335`: `P335 RuntimeKlineContext Source Binding Plan`.
+- Current open workflow package is branch `workflow-github-auth-handoff-rule`: `WORKFLOW-P336A GitHub Auth And Handoff Rule`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -42,7 +42,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P332 is completed on main as SourceTrace Numeric Source Assembler Verification.
 - P333 is completed on main as SourceTrace Runtime / Source Binding Plan.
 - P334 is completed on main as SourceTrace Runtime / Source Binding Verification.
-- P335 is the active RuntimeKlineContext Source Binding Plan package.
+- P335 is completed on main as RuntimeKlineContext Source Binding Plan.
+- WORKFLOW-P336A is the active docs-only workflow fix for GitHub auth and GPT / Codex / local `gh` handoff rules.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -84,7 +85,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P334 confirms there is no real entry / stop / TP / RR generation and no RR generation.
 - P335 defines only the future RuntimeKlineContext Source Binding Plan.
 - P335 does not add Java, tests, RuntimeKlineContext runtime wiring, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, market data reads, latest price reads, latest close reads, external provider reads, service wiring, dashboard runtime, external channel, Push wiring, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
-- Fixed next recommended package after P335 is `RuntimeKlineContextSourceBindingDTO Java Skeleton`, still not runtime wiring.
+- WORKFLOW-P336A adds only workflow documentation for GitHub connector / Codex GitHub auth / local `gh` handoff, completion-state rules, A/B/C merge authorization, no-skip rules, main-clean auto-next rules, token exposure handling, and new-window continuation.
+- WORKFLOW-P336A does not change P335 business content, business capability, Java, tests, runtime wiring, dashboard, external channel, Push, order, execution, or auto-trading.
+- Fixed next recommended business package after this workflow fix merges is `RuntimeKlineContextSourceBindingDTO Java Skeleton`, still not runtime wiring.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -103,6 +106,7 @@ Open Issues, open PRs, local branches, draft PRs, and chat memory do not count a
 
 Progress must be read together with:
 
+- `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
 - `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
 - `docs/V1_CAPABILITY_MATRIX.md`
 - `docs/PROJECT_PROGRESS_INDEX.md`
