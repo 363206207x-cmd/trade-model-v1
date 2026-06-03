@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `96332cb feat(point): add source-owned candidate integration source binding DTO (#813)`
+- Current merged main: `820eed1 feat(point): add source-owned candidate integration source binding validator (#814)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is branch `p346`: `P346 SourceOwnedCandidateIntegrationSourceBindingValidator Java Skeleton`.
+- Current open business-chain package is branch `p347`: `P347 SourceOwnedCandidateIntegrationSourceBindingValidator Verification`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -56,7 +56,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P343 is completed on main as Source-Owned Candidate Integration Boundary Plan.
 - P344 is completed on main as Source-Owned Candidate Integration Source Binding Plan.
 - P345 is completed on main as SourceOwnedCandidateIntegrationSourceBindingDTO Java Skeleton.
-- P346 is the active SourceOwnedCandidateIntegrationSourceBindingValidator Java Skeleton package.
+- P346 is completed on main as SourceOwnedCandidateIntegrationSourceBindingValidator Java Skeleton.
+- P347 is the active SourceOwnedCandidateIntegrationSourceBindingValidator Verification package.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -124,7 +125,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P345 does not add validator, assembler, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, or executable action output.
 - P346 adds only a plain Java `SourceOwnedCandidateIntegrationSourceBindingValidator` skeleton and targeted validator tests.
 - P346 does not add assembler, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, or executable action output.
-- Fixed next recommended business package after P346 is `P347 SourceOwnedCandidateIntegrationSourceBindingValidator Verification`, still not assembler or runtime wiring.
+- P347 verifies only the P345 DTO and P346 validator stage.
+- P347 does not add Java, tests, assembler, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, or executable action output.
+- Fixed next recommended business package after P347 is `P348 SourceOwnedCandidateIntegrationSourceBindingAssembler Plan`, still not Java assembler implementation or runtime wiring.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -153,9 +156,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P345 Actually Completed
+## What P287-P346 Actually Completed
 
-P287-P345 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, Source-owned Numeric Point Candidate Assembler Verification, Source Context Integration Plan, SourceTrace Numeric Source Read Model Plan, SourceTraceNumericSourceContextDTO Java Skeleton, SourceTraceNumericSourceReadModelValidator Java Skeleton, SourceTrace Numeric Source Validator Verification, SourceTraceNumericSourceReadModelAssembler Java Skeleton, SourceTrace Numeric Source Assembler Verification, SourceTrace Runtime / Source Binding Plan, SourceTrace Runtime / Source Binding Verification, RuntimeKlineContext Source Binding Plan, RuntimeKlineContextSourceBindingDTO Java Skeleton, RuntimeKlineContextSourceBindingValidator Java Skeleton, RuntimeKlineContextSourceBindingAssembler And Verification, DataQualityContext Source Binding Ability Closure, MultiTimeframeContext Source Binding Ability Closure, RiskActionGuard Source Binding Ability Closure, WatchlistPoolProof Source Binding Ability Closure, Source-Owned Candidate Integration Boundary Plan, Source-Owned Candidate Integration Source Binding Plan, and SourceOwnedCandidateIntegrationSourceBindingDTO Java Skeleton only:
+P287-P346 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, Source-owned Numeric Point Candidate Assembler Verification, Source Context Integration Plan, SourceTrace Numeric Source Read Model Plan, SourceTraceNumericSourceContextDTO Java Skeleton, SourceTraceNumericSourceReadModelValidator Java Skeleton, SourceTrace Numeric Source Validator Verification, SourceTraceNumericSourceReadModelAssembler Java Skeleton, SourceTrace Numeric Source Assembler Verification, SourceTrace Runtime / Source Binding Plan, SourceTrace Runtime / Source Binding Verification, RuntimeKlineContext Source Binding Plan, RuntimeKlineContextSourceBindingDTO Java Skeleton, RuntimeKlineContextSourceBindingValidator Java Skeleton, RuntimeKlineContextSourceBindingAssembler And Verification, DataQualityContext Source Binding Ability Closure, MultiTimeframeContext Source Binding Ability Closure, RiskActionGuard Source Binding Ability Closure, WatchlistPoolProof Source Binding Ability Closure, Source-Owned Candidate Integration Boundary Plan, Source-Owned Candidate Integration Source Binding Plan, SourceOwnedCandidateIntegrationSourceBindingDTO Java Skeleton, and SourceOwnedCandidateIntegrationSourceBindingValidator Java Skeleton only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -216,6 +219,7 @@ P287-P345 completed market-read request contract, DTO, validator, test-only wiri
 - P343: Source-Owned Candidate Integration Boundary Plan defining docs-only prerequisites, fail-closed rules, Watchlist Pool boundaries, Risk Action Guard boundaries, allowed review-only output fields, and L0-L7 progress boundaries for future source-owned candidate integration.
 - P344: Source-Owned Candidate Integration Source Binding Plan defining docs-only future source binding DTO fields, binding status, validator rules, assembler rules, incomplete-safe rules, fail-closed rules, allowed output boundaries, and next Java split.
 - P345: SourceOwnedCandidateIntegrationSourceBindingDTO Java Skeleton defining a DTO-only, targeted-test-only carrier for future source-owned candidate integration source binding fields.
+- P346: SourceOwnedCandidateIntegrationSourceBindingValidator Java Skeleton defining a validator-only, targeted-test-only safety gate for the P345 DTO.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
