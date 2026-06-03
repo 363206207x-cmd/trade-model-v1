@@ -81,6 +81,9 @@ The following outputs are allowed in review-only scope when their source ownersh
 - RuntimeKlineContextSourceBindingValidator skeleton status;
 - RuntimeKlineContext source binding validation result status;
 - RuntimeKlineContext source binding incomplete / blocked / degraded reason;
+- RuntimeKlineContextSourceBindingAssembler skeleton status;
+- RuntimeKlineContext source binding assembler validation result status;
+- RuntimeKlineContext Source Binding Verification status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -145,4 +148,6 @@ Examples:
 - `RuntimeKlineContext Source Binding Plan status` is allowed only as docs-only planning context; it cannot create Java, tests, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext runtime, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
 - `RuntimeKlineContextSourceBindingDTO status` is allowed only as DTO/test carrier context; it cannot validate, assemble, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext runtime, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
 - `RuntimeKlineContextSourceBindingValidator skeleton status` is allowed only as validator/test skeleton context; it cannot assemble, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext runtime, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
+- `RuntimeKlineContextSourceBindingAssembler skeleton status` is allowed only as explicit-input assembler/test skeleton context; it cannot read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext runtime, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
+- `RuntimeKlineContext Source Binding Verification status` is allowed only as closure documentation for the P335-P338 skeleton chain; it cannot create runtime wiring, source context integration, dashboard runtime, external channel, Push wiring, order, execution, or auto-trading.
 - `RuntimeKlineContext source binding validation result status` is allowed only as review-only validation context; it cannot become an entry, stop, TP, RR, direction, service signal, dashboard runtime output, external channel output, order, execution, or auto-trading action.
