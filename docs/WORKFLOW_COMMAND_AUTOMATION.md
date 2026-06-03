@@ -67,6 +67,14 @@ before any merge script may run.
 
 `v1-merge-sync.sh` and `v1-merge-current.sh` check PR state, mergeability, and CI status before merging, but they do not replace human approval rules.
 
+`v1-merge-sync.sh` also supports already-merged PRs. If the PR state is `MERGED`, it must not attempt another merge; it enters already-merged sync mode, switches to `main`, pulls `origin main`, and prints `MERGE_SYNC_DONE`.
+
+`v1-merge-sync.sh` 也支持已合并 PR。如果 PR state 是 `MERGED`，脚本不得再次尝试 merge；它进入 already-merged sync mode，切回 `main`，pull `origin main`，并输出 `MERGE_SYNC_DONE`。
+
+If a PR is closed without being merged, `v1-merge-sync.sh` must stop with `PR_CLOSED_NOT_MERGED`.
+
+如果 PR 已关闭但未合并，`v1-merge-sync.sh` 必须以 `PR_CLOSED_NOT_MERGED` 停止。
+
 ## Script Inventory
 
 | Script | Purpose | Default? | May merge |
