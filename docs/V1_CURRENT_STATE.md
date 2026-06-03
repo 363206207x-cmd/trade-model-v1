@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `b53a987 WORKFLOW-P336A GitHub Auth And Handoff Rule (#801)`
+- Current merged main: `c869a41 BACKEND-P336 RuntimeKlineContextSourceBindingDTO Java Skeleton (#802)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is branch `p336`: `P336 RuntimeKlineContextSourceBindingDTO Java Skeleton`.
+- Current workflow fix package is branch `workflow-merge-sync-already-merged`: `WORKFLOW-P336C v1-merge-sync already-merged fallback`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -44,7 +44,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P334 is completed on main as SourceTrace Runtime / Source Binding Verification.
 - P335 is completed on main as RuntimeKlineContext Source Binding Plan.
 - WORKFLOW-P336A is completed on main as GitHub Auth And Handoff Rule.
-- P336 is the active RuntimeKlineContextSourceBindingDTO Java Skeleton package.
+- P336 is completed on main as RuntimeKlineContextSourceBindingDTO Java Skeleton.
+- WORKFLOW-P336C is the active workflow script fix for `v1-merge-sync.sh` already-merged PR sync fallback.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -88,6 +89,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P335 does not add Java, tests, RuntimeKlineContext runtime wiring, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, market data reads, latest price reads, latest close reads, external provider reads, service wiring, dashboard runtime, external channel, Push wiring, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
 - WORKFLOW-P336A adds only workflow documentation for GitHub connector / Codex GitHub auth / local `gh` handoff, completion-state rules, A/B/C merge authorization, no-skip rules, main-clean auto-next rules, token exposure handling, and new-window continuation.
 - WORKFLOW-P336A does not change P335 business content, business capability, Java, tests, runtime wiring, dashboard, external channel, Push, order, execution, or auto-trading.
+- P336 adds only a plain Java `RuntimeKlineContextSourceBindingDTO` skeleton and targeted DTO tests.
+- P336 does not add validator, assembler, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard, MarketQuoteClient, RuntimeKlineContext real reads, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
+- WORKFLOW-P336C modifies only workflow script / workflow docs so `scripts/v1-merge-sync.sh` can sync local main when a PR is already merged.
+- WORKFLOW-P336C does not change P336 business content, RuntimeKlineContext business content, SourceTrace business content, business Java, business tests, runtime wiring, dashboard, external channel, Push, order, execution, or auto-trading.
 - P336 adds only a plain Java `RuntimeKlineContextSourceBindingDTO` skeleton and targeted DTO tests.
 - P336 does not add validator, assembler, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard, MarketQuoteClient, RuntimeKlineContext real reads, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
 - Fixed next recommended business package after P336 is `RuntimeKlineContextSourceBindingValidator Java Skeleton` or `RuntimeKlineContext Source Binding DTO Verification`, still not runtime wiring.

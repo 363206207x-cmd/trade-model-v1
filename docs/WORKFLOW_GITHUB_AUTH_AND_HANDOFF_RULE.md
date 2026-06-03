@@ -134,11 +134,15 @@ Merge priority is:
 2. If connector is unavailable but local `gh` is available, GPT gives one command that performs the approved ready / merge / pull sequence.
 3. If both connector and local `gh` are unavailable, pause and do not continue to the next package.
 
+If a PR is already merged but local `main` still needs synchronization, local fallback may run `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`; the script must treat `MERGED` as a sync-only state, not as a failure.
+
 合并优先级：
 
 1. GPT GitHub connector 可用时，GPT 审 PR 并按 A/B/C 规则 merge。
 2. connector 不可用但本地 `gh` 可用时，GPT 给一条完成 ready / merge / pull 的命令。
 3. connector 和本地 `gh` 都不可用时，暂停，不继续下一包。
+
+如果 PR 已经合并但本地 `main` 仍需同步，本地兜底可以运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`；脚本必须把 `MERGED` 视为只同步状态，而不是失败状态。
 
 ## A/B/C Merge Authorization / A/B/C 合并授权
 
