@@ -114,6 +114,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - source-owned candidate source binding completeness summary;
 - source-owned candidate source binding trace refs;
 - SourceOwnedCandidateIntegrationSourceBindingDTO skeleton status;
+- SourceOwnedCandidateIntegrationSourceBindingValidator result status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -201,4 +202,5 @@ Examples:
 - `Source-Owned Candidate Integration Source Binding Plan status` is allowed only as docs-only source binding planning context; it cannot create DTO Java, validator Java, assembler Java, tests, source-owned candidate runtime, service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
 - `source-owned candidate integration binding status` is allowed only as future review-only source binding output and must remain `notTradeInstruction=true` and `manualReviewRequired=true`; it cannot become candidate generation, executable point generation, final direction, push payload, external channel message, order, execution, or auto-trading.
 - `SourceOwnedCandidateIntegrationSourceBindingDTO skeleton status` is allowed only as DTO/test carrier context; it cannot validate, assemble, connect source-owned candidate runtime, connect service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
+- `SourceOwnedCandidateIntegrationSourceBindingValidator result status` is allowed only as validator/test skeleton context; it cannot assemble, connect source-owned candidate runtime, connect service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
 - `RuntimeKlineContext source binding validation result status` is allowed only as review-only validation context; it cannot become an entry, stop, TP, RR, direction, service signal, dashboard runtime output, external channel output, order, execution, or auto-trading action.
