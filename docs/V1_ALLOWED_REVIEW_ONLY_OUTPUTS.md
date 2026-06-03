@@ -74,6 +74,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceTraceNumericSourceReadModelAssembler skeleton status;
 - SourceTrace numeric source assembler validation result status;
 - SourceTrace Numeric Source Assembler Verification status;
+- SourceTrace Runtime / Source Binding Plan status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -133,3 +134,4 @@ Examples:
 - `SourceTrace Numeric Source Validator Verification status` is allowed only as docs-only verification context; it cannot create Java, tests, assemblers, read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
 - `SourceTraceNumericSourceReadModelAssembler skeleton status` is allowed only as explicit-input assembler/test skeleton context; it cannot read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
 - `SourceTrace Numeric Source Assembler Verification status` is allowed only as docs-only verification context; it cannot create Java, tests, read runtime sources, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
+- `SourceTrace Runtime / Source Binding Plan status` is allowed only as docs-only planning context; it cannot create Java, tests, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
