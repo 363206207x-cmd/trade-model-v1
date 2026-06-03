@@ -1,14 +1,14 @@
-current_head: "3a9c109"
+current_head: "a1dcdef"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "RuntimeKlineContextSourceBindingAssembler And Verification"
-active_block_cn: "RuntimeKlineContext 来源绑定组装器 + 验证收口"
-current_level: "RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_ASSEMBLER_AND_VERIFICATION"
+active_block: "DataQualityContext Source Binding Ability Closure"
+active_block_cn: "DataQualityContext 来源绑定能力闭环"
+current_level: "DATA_QUALITY_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE"
 current_pr: "none"
-current_branch: "p338"
-merge_rule: "B Java/test assembler + docs verification; no service, no runtime wiring"
-next_required_action: "DataQualityContext Source Binding Plan or DataQuality DTO+Validator+Assembler capability closure"
-do_not_continue_to: "RuntimeKlineContext runtime wiring / DataQuality runtime / MultiTimeframe runtime / RiskActionGuard runtime / WatchlistPoolProof / service runtime / dashboard runtime / executable point generation / external channel / order execution"
+current_branch: "p339"
+merge_rule: "B Java/test ability closure; no service, no runtime wiring"
+next_required_action: "MultiTimeframeContext Source Binding Ability Closure"
+do_not_continue_to: "DataQuality runtime / MultiTimeframe runtime / RiskActionGuard runtime / WatchlistPoolProof / service runtime / dashboard runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
