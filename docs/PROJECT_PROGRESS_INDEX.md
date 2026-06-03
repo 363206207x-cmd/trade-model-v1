@@ -6,6 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `071ce44 BACKEND-P341 RiskActionGuard Source Binding Ability Closure (#809)`
 - `67b06b1 BACKEND-P340 MultiTimeframeContext Source Binding Ability Closure (#808)`
 - `bfb61c9 BACKEND-P339 DataQualityContext Source Binding Ability Closure (#807)`
 - `a1dcdef BACKEND-P338 RuntimeKlineContextSourceBindingAssembler And Verification (#806)`
@@ -161,7 +162,9 @@ Current active capability movement:
 - It moved the chain from `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_ASSEMBLER_AND_VERIFICATION` to `DATA_QUALITY_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE`.
 - P340 is merged on main.
 - It moved the chain from `DATA_QUALITY_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE` to `MULTITIMEFRAME_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE`.
-- `P341 RiskActionGuard Source Binding Ability Closure` is active on branch `p341`.
+- P341 is merged on main.
+- It moved the chain from `MULTITIMEFRAME_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE` to `RISK_ACTION_GUARD_SOURCE_BINDING_ABILITY_CLOSURE`.
+- `P342 WatchlistPoolProof Source Binding Ability Closure` is active on branch `p342`.
 - P333 is a docs-only skeleton plan from `SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION` toward `SOURCE_TRACE_RUNTIME_BINDING_PLAN`.
 - P334 is a docs-only verification from `SOURCE_TRACE_RUNTIME_BINDING_PLAN` toward `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION`.
 - P335 is a docs-only plan from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
@@ -173,9 +176,10 @@ Current active capability movement:
 - P339 is a Java/test ability closure package from `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_ASSEMBLER_AND_VERIFICATION` toward `DATA_QUALITY_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE`.
 - P340 is a Java/test ability closure package from `DATA_QUALITY_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE` toward `MULTITIMEFRAME_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE`.
 - P341 is a Java/test ability closure package from `MULTITIMEFRAME_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE` toward `RISK_ACTION_GUARD_SOURCE_BINDING_ABILITY_CLOSURE`.
+- P342 is a Java/test ability closure package from `RISK_ACTION_GUARD_SOURCE_BINDING_ABILITY_CLOSURE` toward `WATCHLIST_POOL_PROOF_SOURCE_BINDING_ABILITY_CLOSURE`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is RiskActionGuard Source Binding Ability Closure.
-- The next required business action is `WatchlistPoolProof Source Binding Ability Closure`.
+- The active block is WatchlistPoolProof Source Binding Ability Closure.
+- The next required business action is `Source-Owned Candidate Integration Boundary Plan` or `Source-Owned Candidate Integration Source Binding Plan`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -363,6 +367,8 @@ P340 is a MultiTimeframeContext Source Binding Ability Closure package. It adds 
 
 P341 is a RiskActionGuard Source Binding Ability Closure package. It adds only RiskActionGuard source-binding plan, DTO, validator, assembler, targeted tests, and verification docs. It does not add service wiring, RiskActionGuard runtime, WatchlistPoolProof runtime, source-owned candidate assembly, numeric point generation, real entry, real stop, real TP, RR generation, final direction, executable action output, dashboard runtime integration, external channel, Push wiring, order execution, execution API, or auto-trading as completed.
 
+P342 is a WatchlistPoolProof Source Binding Ability Closure package. It adds only WatchlistPoolProof source-binding plan, DTO, validator, assembler, targeted tests, and verification docs. It does not add service wiring, Watchlist runtime, Watchlist service, rule config reads, audit table reads, source-owned candidate assembly, numeric point generation, real entry, real stop, real TP, RR generation, final direction, push sending, dashboard runtime integration, external channel, order execution, execution API, or auto-trading as completed.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -374,7 +380,7 @@ Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STAT
 | Total Progress | 58%-64% | Many review-only displays, contracts, DTOs, validators, no-op skeletons, workflow automation, and safety rules exist. | The full V1 chain still lacks source-owned point proposal -> execution advice -> monitor -> review closure. |
 | MVP Progress | 65%-73% | Watchlist/display/review surfaces, skeletons, the MarketReadRequest DTO -> GuardValidator test-only wiring slice, P293 review-only output assembler, P294 review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 push preview closure, P304 dashboard display gate, P305 review-only MVP closure, P306 planning, P307 review-only readiness gate skeleton, P308 point boundary gate skeleton, P309 source-owned review-only point proposal skeleton, and P310 display gate exist. | Real Push, external channel, executable Readiness, executable point generation, and the user-facing MVP loop are not complete. |
 | Production Runtime Progress | 28%-36% | Some legacy runtime components exist, including market clients, schedulers, dashboard services, and position foundations. | P294-P304 and workflow packs do not add production wiring; the new scan-chain production runtime is not wired, and push/readiness/point/trading paths remain blocked. |
-| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, P312 numeric point proposal object-boundary rules, P313 SourceTrace contract rules, P314 RuntimeKlineContext contract rules, P315 DataQuality contract rules, P316 MultiTimeframe contract rules, P317 Risk Action Guard contract rules, P318 Numeric Point Safety Validator plan rules, P319 Numeric Point Fixture Matrix plan rules, P323 source-owned candidate assembler plan rules, P325 verification rules, P326 source context integration planning rules, P327 SourceTrace numeric source read model rules, P328 SourceTrace DTO skeleton boundaries, P329 SourceTrace validator skeleton boundaries, P330 SourceTrace validator verification boundaries, P331 SourceTrace read-model assembler boundaries, P332 SourceTrace assembler verification boundaries, P333 SourceTrace runtime/source binding planning boundaries, P334 SourceTrace runtime/source binding verification boundaries, P335 RuntimeKlineContext source binding planning boundaries, P336 RuntimeKlineContext source-binding DTO skeleton boundaries, P337 RuntimeKlineContext source-binding validator skeleton boundaries, P338 RuntimeKlineContext source-binding assembler + verification boundaries, P339 DataQualityContext source-binding ability closure boundaries, P340 MultiTimeframeContext source-binding ability closure boundaries, WORKFLOW-P336A GitHub auth / handoff rules, WORKFLOW-P336B-R2 command automation rules, WORKFLOW-P336C merge-sync fallback rules, and active P341 RiskActionGuard source-binding ability closure boundaries are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, assembler contracts, and runtime implementation remains blocked before authorization. |
+| Governance / Contract Progress | 90%-96% | Boundaries, gates, fail-closed rules, no-trade semantics, review-only policy, command automation, one-command runner, auto-decision diagnostics, GitHub-native workflow rules, P306 readiness / point planning rules, P311 point-generation pre-approval rules, P312 numeric point proposal object-boundary rules, P313 SourceTrace contract rules, P314 RuntimeKlineContext contract rules, P315 DataQuality contract rules, P316 MultiTimeframe contract rules, P317 Risk Action Guard contract rules, P318 Numeric Point Safety Validator plan rules, P319 Numeric Point Fixture Matrix plan rules, P323 source-owned candidate assembler plan rules, P325 verification rules, P326 source context integration planning rules, P327 SourceTrace numeric source read model rules, P328 SourceTrace DTO skeleton boundaries, P329 SourceTrace validator skeleton boundaries, P330 SourceTrace validator verification boundaries, P331 SourceTrace read-model assembler boundaries, P332 SourceTrace assembler verification boundaries, P333 SourceTrace runtime/source binding planning boundaries, P334 SourceTrace runtime/source binding verification boundaries, P335 RuntimeKlineContext source binding planning boundaries, P336 RuntimeKlineContext source-binding DTO skeleton boundaries, P337 RuntimeKlineContext source-binding validator skeleton boundaries, P338 RuntimeKlineContext source-binding assembler + verification boundaries, P339 DataQualityContext source-binding ability closure boundaries, P340 MultiTimeframeContext source-binding ability closure boundaries, P341 RiskActionGuard source-binding ability closure boundaries, WORKFLOW-P336A GitHub auth / handoff rules, WORKFLOW-P336B-R2 command automation rules, WORKFLOW-P336C merge-sync fallback rules, and active P342 WatchlistPoolProof source-binding ability closure boundaries are extensive. | Future windows still need to follow GitHub-native workflow, stale PR / Issue hygiene, assembler contracts, and runtime implementation remains blocked before authorization. |
 | Skeleton / Test Progress | 86%-94% | DTO, validator, no-op, audit, queue, channel, score, candidate, market-read request skeletons/tests, MarketReadRequest test-only wiring, review-only scan output skeleton, P295 evidence / score entry skeleton, P296 evidence normalization skeleton, P297 score input / precheck skeleton, P298 score assembly skeleton, P299 candidate handoff skeleton, P300 candidate attention skeleton, P301 candidate preview guard skeleton, P302 internal push preview skeleton, P303 closure guard tests, P304 dashboard guard tests, P305 closure tests, P307 readiness gate skeleton tests, P308 point boundary gate skeleton tests, P309 point proposal skeleton tests, P310 display gate tests, P320 numeric point proposal DTO skeleton tests, P321 numeric point safety validator skeleton tests, P322 numeric point assembler skeleton tests, P324 source-owned candidate assembler skeleton tests, P328 SourceTrace numeric source context DTO tests, P329 SourceTrace numeric source read model validator tests, and active P331 SourceTrace numeric source read model assembler tests exist. | Real Push / external channel workflow, executable point generation, service wiring, and executable readiness are not complete. |
 | Product Usability Progress | 42%-52% | Dashboard and review-only displays exist, MarketRead review-only scan output now has a safe entry envelope after P295, and P304 makes internal push preview safety visible in the dashboard while P305 closes the read-only candidate/push MVP loop. | Core actions still do not form an executable MVP workflow, and external send remains blocked. |
 | Execution Advice Progress | 30%-40% | ExecutionPlan review-only display and entry/stop/TP/RR design/test groundwork exist. | Runtime source-owned proposal generation remains incomplete. |
@@ -487,10 +493,10 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after merged P340 / active P341:
+Near-term priority after merged P341 / active P342:
 
-1. Complete P341 RiskActionGuard Source Binding Ability Closure.
-2. WatchlistPoolProof Source Binding Ability Closure.
+1. Complete P342 WatchlistPoolProof Source Binding Ability Closure.
+2. Source-Owned Candidate Integration Boundary Plan or Source-Owned Candidate Integration Source Binding Plan.
 3. External Channel Authorization Gate only as a separate C-level package.
 4. Readiness / Point specialty planning follow-up before any point generation.
 5. Dashboard smoke / internal preview closure.

@@ -96,6 +96,10 @@ The following outputs are allowed in review-only scope when their source ownersh
 - RiskActionGuard source binding validator result status;
 - RiskActionGuard source binding assembler validation result status;
 - RiskActionGuard Source Binding Verification status;
+- WatchlistPoolProof source binding DTO status;
+- WatchlistPoolProof source binding validator result status;
+- WatchlistPoolProof source binding assembler validation result status;
+- WatchlistPoolProof Source Binding Verification status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -174,4 +178,8 @@ Examples:
 - `RiskActionGuard source binding validator result status` is allowed only as validator/test skeleton context; it cannot assemble, read runtime data, connect RiskActionGuard runtime, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, produce executable action output, authorize external push, Push wiring, order, execution, or auto-trading.
 - `RiskActionGuard source binding assembler validation result status` is allowed only as explicit-input assembler/test skeleton context; it cannot read runtime data, connect RiskActionGuard runtime, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, produce executable action output, authorize external push, Push wiring, order, execution, or auto-trading.
 - `RiskActionGuard Source Binding Verification status` is allowed only as closure documentation for the P341 skeleton chain; it cannot create runtime wiring, source context integration, dashboard runtime, executable action output, external channel, Push wiring, order, execution, or auto-trading.
+- `WatchlistPoolProof source binding DTO status` is allowed only as DTO/test carrier context; it cannot validate, assemble, read watchlist runtime, connect Watchlist service, read rule config, read audit tables, connect source-owned candidate runtime, generate executable entry / stop / TP / RR, produce final direction, send push, authorize external push, order, execution, or auto-trading.
+- `WatchlistPoolProof source binding validator result status` is allowed only as validator/test skeleton context; it cannot assemble, read watchlist runtime, connect Watchlist service, read rule config, read audit tables, connect source-owned candidate runtime, generate executable entry / stop / TP / RR, produce final direction, send push, authorize external push, order, execution, or auto-trading.
+- `WatchlistPoolProof source binding assembler validation result status` is allowed only as explicit-input assembler/test skeleton context; it cannot read watchlist runtime, connect Watchlist service, read rule config, read audit tables, connect source-owned candidate runtime, generate executable entry / stop / TP / RR, produce final direction, send push, authorize external push, order, execution, or auto-trading.
+- `WatchlistPoolProof Source Binding Verification status` is allowed only as closure documentation for the P342 skeleton chain; it cannot create runtime wiring, source context integration, dashboard runtime, push sending, external channel, order, execution, or auto-trading.
 - `RuntimeKlineContext source binding validation result status` is allowed only as review-only validation context; it cannot become an entry, stop, TP, RR, direction, service signal, dashboard runtime output, external channel output, order, execution, or auto-trading action.
