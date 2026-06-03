@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `a1dcdef BACKEND-P338 RuntimeKlineContextSourceBindingAssembler And Verification (#806)`
+- Current merged main: `bfb61c9 BACKEND-P339 DataQualityContext Source Binding Ability Closure (#807)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is branch `p339`: `P339 DataQualityContext Source Binding Ability Closure`.
+- Current open business-chain package is branch `p340`: `P340 MultiTimeframeContext Source Binding Ability Closure`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -49,7 +49,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - WORKFLOW-P336B-R2 is completed on main as Workflow Command Automation Retry.
 - P337 is completed on main as RuntimeKlineContextSourceBindingValidator Java Skeleton.
 - P338 is completed on main as RuntimeKlineContextSourceBindingAssembler And Verification.
-- P339 is the active DataQualityContext Source Binding Ability Closure package.
+- P339 is completed on main as DataQualityContext Source Binding Ability Closure.
+- P340 is the active MultiTimeframeContext Source Binding Ability Closure package.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -103,7 +104,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P338 does not add service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard, MarketQuoteClient, RuntimeKlineContext real reads, DataQualityContext runtime, MultiTimeframeContext runtime, RiskActionGuardContext runtime, WatchlistPoolProof runtime, source-owned candidate integration, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
 - P339 adds only DataQualityContext source-binding plan, DTO, validator, assembler, targeted tests, and verification docs.
 - P339 does not add service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard, MarketQuoteClient, DataQuality runtime, MultiTimeframe runtime, RiskActionGuard runtime, WatchlistPoolProof runtime, source-owned candidate integration, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
-- Fixed next recommended business package after P339 is `MultiTimeframeContext Source Binding Ability Closure`, still not runtime wiring.
+- P340 adds only MultiTimeframeContext source-binding plan, DTO, validator, assembler, targeted tests, and verification docs.
+- P340 does not add service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard, MarketQuoteClient, MultiTimeframe runtime, RiskActionGuard runtime, WatchlistPoolProof runtime, source-owned candidate integration, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, or RR generation.
+- Fixed next recommended business package after P340 is `RiskActionGuard Source Binding Ability Closure`, still not runtime wiring.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
@@ -132,9 +135,9 @@ Progress must be read together with:
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
-## What P287-P338 Actually Completed
+## What P287-P339 Actually Completed
 
-P287-P335 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, Source-owned Numeric Point Candidate Assembler Verification, Source Context Integration Plan, SourceTrace Numeric Source Read Model Plan, SourceTraceNumericSourceContextDTO Java Skeleton, SourceTraceNumericSourceReadModelValidator Java Skeleton, SourceTrace Numeric Source Validator Verification, SourceTraceNumericSourceReadModelAssembler Java Skeleton, SourceTrace Numeric Source Assembler Verification, SourceTrace Runtime / Source Binding Plan, SourceTrace Runtime / Source Binding Verification, and RuntimeKlineContext Source Binding Plan only:
+P287-P339 completed market-read request contract, DTO, validator, test-only wiring, review-only output, review-only scan output, review-only Evidence / Score entry, review-only evidence normalization, review-only score input / precheck, review-only score assembly, review-only candidate handoff, review-only candidate attention, review-only candidate preview / ranking guard, review-only internal push preview / recheck handoff skeleton, push preview closure before external channel, dashboard / internal push preview display gate, Candidate / Push review-only MVP closure, Readiness / Point boundary planning, review-only readiness gate skeleton, review-only point boundary gate skeleton, source-owned review-only point proposal skeleton, point proposal closure / display gate, executable point generation pre-approval plan, source-owned numeric point proposal plan, SourceTrace numeric point contract plan, RuntimeKlineContext numeric point contract plan, DataQuality numeric point contract plan, MultiTimeframe numeric point contract plan, Risk Action Guard numeric point contract plan, Numeric Point Safety Validator plan, Numeric Point Fixture Matrix plan, ReviewOnlyNumericPointProposalDTO Java skeleton, Numeric Point Safety Validator Java skeleton, ReviewOnly Numeric Point Assembler Java skeleton, Source-owned Numeric Point Candidate Assembler Plan, Source-owned Numeric Point Candidate Assembler Java Skeleton, Source-owned Numeric Point Candidate Assembler Verification, Source Context Integration Plan, SourceTrace Numeric Source Read Model Plan, SourceTraceNumericSourceContextDTO Java Skeleton, SourceTraceNumericSourceReadModelValidator Java Skeleton, SourceTrace Numeric Source Validator Verification, SourceTraceNumericSourceReadModelAssembler Java Skeleton, SourceTrace Numeric Source Assembler Verification, SourceTrace Runtime / Source Binding Plan, SourceTrace Runtime / Source Binding Verification, RuntimeKlineContext Source Binding Plan, RuntimeKlineContextSourceBindingDTO Java Skeleton, RuntimeKlineContextSourceBindingValidator Java Skeleton, RuntimeKlineContextSourceBindingAssembler And Verification, and DataQualityContext Source Binding Ability Closure only:
 
 - P287: docs-only authorization gate for future `MarketReadRequestDTO`.
 - P288: pure-data `MarketReadRequestDTO` skeleton plus targeted DTO test.
@@ -182,6 +185,13 @@ P287-P335 completed market-read request contract, DTO, validator, test-only wiri
 - P330: SourceTrace Numeric Source Validator Verification confirming P327-P329 are only a SourceTrace read-model plan, DTO carrier, and validator skeleton chain.
 - P331: SourceTraceNumericSourceReadModelAssembler Java Skeleton defining an assembler-only, targeted-test-only explicit SourceTrace input mover into the SourceTrace DTO plus validator result.
 - P332: SourceTrace Numeric Source Assembler Verification confirming P331 is only a SourceTrace explicit-input assembler skeleton and targeted-test package.
+- P333: SourceTrace Runtime / Source Binding Plan defining docs-only future source binding boundaries without runtime wiring.
+- P334: SourceTrace Runtime / Source Binding Verification confirming P333 remains docs-only and review-only.
+- P335: RuntimeKlineContext Source Binding Plan defining how future RuntimeKlineContext evidence may bind existing SourceTrace refs without reading market data.
+- P336: RuntimeKlineContextSourceBindingDTO Java Skeleton defining a DTO-only, targeted-test-only carrier for future RuntimeKlineContext source binding fields.
+- P337: RuntimeKlineContextSourceBindingValidator Java Skeleton defining a validator-only, targeted-test-only safety gate for RuntimeKlineContext source binding.
+- P338: RuntimeKlineContextSourceBindingAssembler And Verification defining an explicit-input assembler skeleton and closing P335-P338 at L0-L4.
+- P339: DataQualityContext Source Binding Ability Closure defining DataQualityContext source-binding plan, DTO, validator, assembler, targeted tests, and verification docs at L0-L4.
 
 These packages are DTO / validator / skeleton / targeted-test / test-only wiring / review-only output work.
 
