@@ -8,8 +8,8 @@ Default workflow is GPT + Codex + GitHub-native.
 Terminal scripts are fallback only except local main sync after merge.
 （终端脚本除合并后同步 main 外，只作为兜底。）
 
-Codex must output PR number and stop.
-（Codex 必须输出 PR 编号并停止。）
+GitHub connector / Codex GitHub auth / local `gh` responsibility split is governed by `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
+（GitHub connector / Codex GitHub auth / 本地 `gh` 的责任分工以 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md` 为准。）
 
 ## 1. 使用者约束
 
@@ -29,12 +29,13 @@ Codex must output PR number and stop.
 随后读取：
 
 1. `docs/ACTIVE_MAINLINE_STATUS.yml`
-2. `docs/V1_OPERATOR_WORKFLOW_CONTRACT.md`
-3. `docs/V1_CURRENT_STATE.md`
-4. `docs/V1_CODEX_TASK_TEMPLATE.md`
-5. `docs/V1_PR_REVIEW_CHECKLIST.md`
-6. `docs/PROJECT_PROGRESS_INDEX.md`
-7. `docs/ANSWER_FORMAT_CONTRACT.md`
+2. `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
+3. `docs/V1_OPERATOR_WORKFLOW_CONTRACT.md`
+4. `docs/V1_CURRENT_STATE.md`
+5. `docs/V1_CODEX_TASK_TEMPLATE.md`
+6. `docs/V1_PR_REVIEW_CHECKLIST.md`
+7. `docs/PROJECT_PROGRESS_INDEX.md`
+8. `docs/ANSWER_FORMAT_CONTRACT.md`
 
 读取后只输出短确认：
 
@@ -58,17 +59,17 @@ Open PR（未合并请求）不算完成，branch（分支）不算完成，Issu
 2. 查重 open Issue（未关闭问题单）。
 3. 查重 open PR（未合并请求）。
 4. 查重 branch（分支）。
-5. 如果无重复，创建 Issue（问题单）。
+5. 如果无重复，按 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md` 判断由 GPT connector、本地 `gh` 或 Codex 创建 Issue（问题单）。
 6. 创建 branch（分支）。
 7. 创建 placeholder / marker（占位文件）。
-8. 创建 Draft PR（草稿合并请求）。
+8. 按 handoff 规则创建 Draft PR（草稿合并请求）；如果认证不可用，则暂停，不进入下一包。
 9. 输出 Codex 任务包。
 10. 用户执行 Codex 后，只需发：`审 PR #xxx`。
 11. 助手审查 PR（合并请求）。
 12. 按 A/B/C 档决定是否合并或请求用户业务授权。
 13. 合并后给用户本地同步命令。
 14. 用户贴回 `git status` 和 `git log --oneline -5`。
-15. 确认 main（主分支）clean（干净）后继续下一步。
+15. 确认 main（主分支）已同步且 clean（干净）后，直接生成下一包最大安全任务包，不再问“是否下一步”。
 
 默认不要求用户运行菜单脚本、寻找 PR 编号、判断 mergeable（可合并状态）或判断 CI（自动测试）。
 

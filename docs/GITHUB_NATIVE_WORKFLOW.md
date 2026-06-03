@@ -6,13 +6,13 @@ Default workflow is GPT + Codex + GitHub-native.
 Terminal scripts are fallback only except local main sync after merge.
 （终端脚本除合并后同步 main 外，只作为兜底。）
 
-Codex must output PR number and stop.
-（Codex 必须输出 PR 编号并停止。）
+GitHub auth and handoff priority is defined in `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
+（GitHub 认证和交接优先级由 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md` 定义。）
 
 ## Default Flow
 
 1. GPT decides next pack（GPT 判断下一包）.
-2. Codex executes and creates Draft PR（Codex 执行并创建 Draft PR）.
+2. Codex executes scoped work, checks, commits, and pushes（Codex 执行限定工作、检查、commit、push）.
 3. GPT reviews GitHub PR（GPT 审 GitHub PR）.
 4. User approves B/C or C merge（用户确认 B/C 或 C 档合并）.
 5. Terminal sync only after merge（终端只在合并后同步）.
@@ -27,7 +27,7 @@ Users should no longer be asked by default to:
 - inspect CI status;
 - judge whether stale PRs or Issues are current work.
 
-Codex must perform Issue / PR / branch duplicate checks, run validation, push the branch, create the Draft PR, and report the PR number.
+Codex must perform branch / duplicate checks when assigned, run validation, push the branch, and report branch / commit / changed files / checks. Issue / PR creation is performed by GPT connector, local `gh`, or Codex according to `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
 
 ## Fallback Scripts
 

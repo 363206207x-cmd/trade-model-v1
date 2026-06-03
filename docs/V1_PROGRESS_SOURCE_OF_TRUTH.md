@@ -10,8 +10,8 @@ Default workflow is GPT + Codex + GitHub-native.
 Terminal scripts are fallback only except local main sync after merge.
 （终端脚本除合并后同步 main 外，只作为兜底。）
 
-Codex must output PR number and stop.
-（Codex 必须输出 PR 编号并停止。）
+GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
+（GitHub 认证与 GPT / Codex / 本地 `gh` 交接必须遵守 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`。）
 
 Fallback bootstrap command:
 
@@ -28,8 +28,12 @@ The following do not count as completed:
 - open Issue;
 - open PR;
 - draft PR;
+- approved PR that is not merged;
+- CI green PR that is not merged;
 - local branch;
 - remote branch;
+- unsynced main after merge;
+- dirty worktree;
 - unmerged commit;
 - chat memory;
 - Codex output;
@@ -44,12 +48,13 @@ Every progress answer must check these sources in this order:
 
 1. `docs/SESSION_BOOTSTRAP.md`
 2. `docs/ACTIVE_MAINLINE_STATUS.yml`
-3. `git log --oneline -5` on `main`
-4. `docs/V1_CURRENT_STATE.md`
-5. `docs/PROJECT_PROGRESS_INDEX.md`
-6. `docs/V1_CAPABILITY_MATRIX.md`
-7. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
-8. `docs/ANSWER_FORMAT_CONTRACT.md`
+3. `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
+4. `git branch --show-current`, `git status --short`, and `git log --oneline -5` on `main`
+5. `docs/V1_CURRENT_STATE.md`
+6. `docs/PROJECT_PROGRESS_INDEX.md`
+7. `docs/V1_CAPABILITY_MATRIX.md`
+8. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
+9. `docs/ANSWER_FORMAT_CONTRACT.md`
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
@@ -66,6 +71,8 @@ Do not treat targeted tests as runtime behavior.
 Do not treat an open PR, open branch, or open Issue as already merged.
 
 Do not treat Codex output as completion.
+
+Do not continue to the next package when PR creation, PR review, merge, main sync, or worktree cleanliness is unresolved.
 
 Do not treat legacy runtime clients as proof that the new scan-chain is complete.
 
