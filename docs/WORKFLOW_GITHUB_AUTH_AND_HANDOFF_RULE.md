@@ -108,6 +108,24 @@ The user should not manually judge mergeability, CI, changed files, or workflow 
 
 用户不需要手动判断 mergeability、CI、changed files 或流程顺序。
 
+## Fixed Local Commands / 固定本地命令
+
+When the GitHub connector is unavailable, use the fixed local command helpers in `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
+
+GitHub connector 不可用时，使用 `docs/WORKFLOW_COMMAND_AUTOMATION.md` 中的固定本地命令。
+
+The standard helpers are:
+
+- `bash scripts/v1-state.sh`;
+- `bash scripts/v1-open-pr.sh <branch> "<title>" <risk>`;
+- `bash scripts/v1-merge-sync.sh <pr-number> "<title (#pr)>"`.
+
+标准辅助命令为以上三条。
+
+Do not handwrite long `gh pr create` or `gh pr merge` commands when these helpers can be used.
+
+能使用这些辅助命令时，不再手写大段 `gh pr create` 或 `gh pr merge` 命令。
+
 ## PR Creation Priority / PR 创建优先级
 
 PR creation priority is:

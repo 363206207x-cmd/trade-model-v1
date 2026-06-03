@@ -1,15 +1,16 @@
-current_head: "c869a41"
+current_head: "a97e1be"
 active_mainline: "Workflow / Handoff Mainline"
 active_mainline_cn: "工作流 / 交接主线"
-active_block: "v1-merge-sync already-merged fallback"
-active_block_cn: "v1-merge-sync 已合并 PR 同步兜底修复"
-current_level: "WORKFLOW_MERGE_SYNC_ALREADY_MERGED_FALLBACK"
+active_block: "Workflow Command Automation Retry"
+active_block_cn: "工作流命令自动化重做包"
+current_level: "WORKFLOW_COMMAND_AUTOMATION_RETRY"
 current_pr: "none"
-current_branch: "workflow-merge-sync-already-merged"
+current_branch: "workflow-command-automation-v2"
 merge_rule: "A workflow script fix; no business Java/test, no runtime wiring"
-next_required_action: "Review and merge workflow merge-sync already-merged fallback before any next business package"
+next_required_action: "Review and merge workflow command automation retry before any next business package"
 do_not_continue_to: "P337 business package / RuntimeKlineContext runtime wiring / DataQuality runtime / MultiTimeframe runtime / RiskActionGuard runtime / WatchlistPoolProof / service runtime / dashboard runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
+  - docs/WORKFLOW_COMMAND_AUTOMATION.md
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_CAPABILITY_MATRIX.md
