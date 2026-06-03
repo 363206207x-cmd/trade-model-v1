@@ -11,6 +11,9 @@ Terminal scripts are fallback only except local main sync after merge.
 GitHub connector / Codex GitHub auth / local `gh` responsibility split is governed by `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
 （GitHub connector / Codex GitHub auth / 本地 `gh` 的责任分工以 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md` 为准。）
 
+Fixed fallback commands for state detection, Draft PR creation, and merge sync are governed by `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
+（状态检测、Draft PR 创建、合并同步的固定兜底命令以 `docs/WORKFLOW_COMMAND_AUTOMATION.md` 为准。）
+
 ## 1. 使用者约束
 
 - 用户不是程序员。
@@ -30,12 +33,13 @@ GitHub connector / Codex GitHub auth / local `gh` responsibility split is govern
 
 1. `docs/ACTIVE_MAINLINE_STATUS.yml`
 2. `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
-3. `docs/V1_OPERATOR_WORKFLOW_CONTRACT.md`
-4. `docs/V1_CURRENT_STATE.md`
-5. `docs/V1_CODEX_TASK_TEMPLATE.md`
-6. `docs/V1_PR_REVIEW_CHECKLIST.md`
-7. `docs/PROJECT_PROGRESS_INDEX.md`
-8. `docs/ANSWER_FORMAT_CONTRACT.md`
+3. `docs/WORKFLOW_COMMAND_AUTOMATION.md`
+4. `docs/V1_OPERATOR_WORKFLOW_CONTRACT.md`
+5. `docs/V1_CURRENT_STATE.md`
+6. `docs/V1_CODEX_TASK_TEMPLATE.md`
+7. `docs/V1_PR_REVIEW_CHECKLIST.md`
+8. `docs/PROJECT_PROGRESS_INDEX.md`
+9. `docs/ANSWER_FORMAT_CONTRACT.md`
 
 读取后只输出短确认：
 
@@ -71,7 +75,7 @@ Open PR（未合并请求）不算完成，branch（分支）不算完成，Issu
 14. 用户贴回 `git status` 和 `git log --oneline -5`。
 15. 确认 main（主分支）已同步且 clean（干净）后，直接生成下一包最大安全任务包，不再问“是否下一步”。
 
-默认不要求用户运行菜单脚本、寻找 PR 编号、判断 mergeable（可合并状态）或判断 CI（自动测试）。
+默认不要求用户运行菜单脚本、寻找 PR 编号、判断 mergeable（可合并状态）或判断 CI（自动测试）。需要本地兜底时，优先使用 `bash scripts/v1-state.sh`、`bash scripts/v1-open-pr.sh <branch> "<title>" <risk>`、`bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`，不手写大段 `gh` 命令。
 
 ## 4. 最大安全任务包规则
 

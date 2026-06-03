@@ -6,6 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `c869a41 BACKEND-P336 RuntimeKlineContextSourceBindingDTO Java Skeleton (#802)`
 - `b53a987 WORKFLOW-P336A GitHub Auth And Handoff Rule (#801)`
 - `60dd58f DOCS-P335 RuntimeKlineContext Source Binding Plan (#800)`
 - `800bf89 DOCS-P334 SourceTrace Runtime Binding Verification (#799)`
@@ -140,15 +141,17 @@ Current active capability movement:
 - It moved the chain from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` to `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
 - WORKFLOW-P336A is merged on main.
 - It added workflow governance for GitHub connector / Codex GitHub auth / local `gh` handoff without moving the business chain.
-- `P336 RuntimeKlineContextSourceBindingDTO Java Skeleton` is active on branch `p336`.
+- P336 is merged on main.
+- It moved the chain from `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN` to `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_DTO_JAVA_SKELETON`.
+- `WORKFLOW-P336B Workflow Command Automation` is active on branch `workflow-command-automation`.
 - P333 is a docs-only skeleton plan from `SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION` toward `SOURCE_TRACE_RUNTIME_BINDING_PLAN`.
 - P334 is a docs-only verification from `SOURCE_TRACE_RUNTIME_BINDING_PLAN` toward `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION`.
 - P335 is a docs-only plan from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
 - WORKFLOW-P336A is a docs-only workflow fix. It does not move the business chain or raise Production Runtime Progress.
 - P336 is a Java/test DTO skeleton package from `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_DTO_JAVA_SKELETON`.
-- The active mainline is Readiness / Point Mainline.
-- The active block is RuntimeKlineContextSourceBindingDTO Java Skeleton.
-- The next required business action is `RuntimeKlineContextSourceBindingValidator Java Skeleton` or `RuntimeKlineContext Source Binding DTO Verification`.
+- WORKFLOW-P336B is a workflow scripts/docs fix. It does not move the business chain or raise Production Runtime Progress.
+- The active workflow fix is Workflow Command Automation.
+- The next required action is to review and merge the workflow automation package before any next business package.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 

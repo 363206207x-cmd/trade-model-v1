@@ -11,6 +11,9 @@ Terminal scripts are fallback only except local main sync after merge.
 GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
 （GitHub 认证与 GPT / Codex / 本地 `gh` 交接必须遵守 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`。）
 
+Fixed command fallbacks for state, PR creation, and merge sync are defined in `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
+（状态检测、创建 PR、合并同步的固定命令兜底定义在 `docs/WORKFLOW_COMMAND_AUTOMATION.md`。）
+
 Codex must output the result requested by the current package and stop; PR number is required only when PR creation is assigned to Codex.
 （Codex 必须输出当前包要求的结果并停止；只有 PR 创建分配给 Codex 时才必须输出 PR 编号。）
 
@@ -24,17 +27,19 @@ bash scripts/v1-session-bootstrap.sh
 2. Read `docs/V1_CAPABILITY_MATRIX.md`.
 3. Read `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`.
 4. Read `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
-5. Run `git branch --show-current`, `git status --short`, and `git log --oneline -5`.
-6. Never use chat memory as progress.
-7. Reply using `docs/ANSWER_FORMAT_CONTRACT.md`.
-8. Do not continue to next package unless current PR is merged, main is synced, and worktree is clean.
-9. Open PR / branch / Issue does not count as done.
+5. Read `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
+6. Run `git branch --show-current`, `git status --short`, and `git log --oneline -5`.
+7. Never use chat memory as progress.
+8. Reply using `docs/ANSWER_FORMAT_CONTRACT.md`.
+9. Do not continue to next package unless current PR is merged, main is synced, and worktree is clean.
+10. Open PR / branch / Issue does not count as done.
 
 ## Workflow Command Shortcuts
 
 - Default workflow: GPT decides the next pack, Codex executes scoped file changes / checks / commit / push, and PR creation / merge follows `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
 - Fallback new window command: `bash scripts/v1-session-bootstrap.sh`
-- Fallback status check: `bash scripts/v1-status.sh`
+- Fixed status check: `bash scripts/v1-state.sh`
+- Fixed Draft PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk>`
 - Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
 - Local merge sync after explicit approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
 - Fallback Codex completion safe check: `bash scripts/v1-safe-check.sh`

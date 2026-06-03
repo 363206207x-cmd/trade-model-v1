@@ -108,6 +108,10 @@ The user should not manually judge mergeability, CI, changed files, or workflow 
 
 用户不需要手动判断 mergeability、CI、changed files 或流程顺序。
 
+Local `gh` fallback commands must use the fixed script entry points in `docs/WORKFLOW_COMMAND_AUTOMATION.md` whenever possible.
+
+本地 `gh` 兜底命令应优先使用 `docs/WORKFLOW_COMMAND_AUTOMATION.md` 中的固定脚本入口。
+
 ## PR Creation Priority / PR 创建优先级
 
 PR creation priority is:
