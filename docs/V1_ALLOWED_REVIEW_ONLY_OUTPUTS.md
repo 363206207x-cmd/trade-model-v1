@@ -88,6 +88,14 @@ The following outputs are allowed in review-only scope when their source ownersh
 - DataQualityContext source binding validator result status;
 - DataQualityContext source binding assembler validation result status;
 - DataQualityContext Source Binding Verification status;
+- MultiTimeframeContext source binding DTO status;
+- MultiTimeframeContext source binding validator result status;
+- MultiTimeframeContext source binding assembler validation result status;
+- MultiTimeframeContext Source Binding Verification status;
+- RiskActionGuard source binding DTO status;
+- RiskActionGuard source binding validator result status;
+- RiskActionGuard source binding assembler validation result status;
+- RiskActionGuard Source Binding Verification status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -162,4 +170,8 @@ Examples:
 - `MultiTimeframeContext source binding validator result status` is allowed only as validator/test skeleton context; it cannot assemble, read runtime data, connect MultiTimeframe runtime, connect RiskActionGuardContext, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, authorize external push, Push wiring, order, execution, or auto-trading.
 - `MultiTimeframeContext source binding assembler validation result status` is allowed only as explicit-input assembler/test skeleton context; it cannot read runtime data, connect MultiTimeframe runtime, connect RiskActionGuardContext, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, authorize external push, Push wiring, order, execution, or auto-trading.
 - `MultiTimeframeContext Source Binding Verification status` is allowed only as closure documentation for the P340 skeleton chain; it cannot create runtime wiring, source context integration, dashboard runtime, external channel, Push wiring, order, execution, or auto-trading.
+- `RiskActionGuard source binding DTO status` is allowed only as DTO/test carrier context; it cannot validate, assemble, read market data, connect RiskActionGuard runtime, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, produce executable action output, authorize external push, Push wiring, order, execution, or auto-trading.
+- `RiskActionGuard source binding validator result status` is allowed only as validator/test skeleton context; it cannot assemble, read runtime data, connect RiskActionGuard runtime, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, produce executable action output, authorize external push, Push wiring, order, execution, or auto-trading.
+- `RiskActionGuard source binding assembler validation result status` is allowed only as explicit-input assembler/test skeleton context; it cannot read runtime data, connect RiskActionGuard runtime, connect WatchlistPoolProof, connect services, generate executable entry / stop / TP / RR, produce final direction, produce executable action output, authorize external push, Push wiring, order, execution, or auto-trading.
+- `RiskActionGuard Source Binding Verification status` is allowed only as closure documentation for the P341 skeleton chain; it cannot create runtime wiring, source context integration, dashboard runtime, executable action output, external channel, Push wiring, order, execution, or auto-trading.
 - `RuntimeKlineContext source binding validation result status` is allowed only as review-only validation context; it cannot become an entry, stop, TP, RR, direction, service signal, dashboard runtime output, external channel output, order, execution, or auto-trading action.

@@ -1,14 +1,14 @@
-current_head: "bfb61c9"
+current_head: "67b06b1"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "MultiTimeframeContext Source Binding Ability Closure"
-active_block_cn: "MultiTimeframeContext 来源绑定能力闭环"
-current_level: "MULTITIMEFRAME_CONTEXT_SOURCE_BINDING_ABILITY_CLOSURE"
+active_block: "RiskActionGuard Source Binding Ability Closure"
+active_block_cn: "RiskActionGuard 来源绑定能力闭环"
+current_level: "RISK_ACTION_GUARD_SOURCE_BINDING_ABILITY_CLOSURE"
 current_pr: "none"
-current_branch: "p340"
+current_branch: "p341"
 merge_rule: "B Java/test ability closure; no service, no runtime wiring"
-next_required_action: "RiskActionGuard Source Binding Ability Closure"
-do_not_continue_to: "MultiTimeframe runtime / RiskActionGuard runtime / WatchlistPoolProof / source-owned candidate integration / service runtime / dashboard runtime / executable point generation / external channel / order execution"
+next_required_action: "WatchlistPoolProof Source Binding Ability Closure"
+do_not_continue_to: "RiskActionGuard runtime / WatchlistPoolProof runtime / source-owned candidate integration / service runtime / dashboard runtime / executable point generation / external channel / order execution"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
