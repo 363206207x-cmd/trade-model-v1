@@ -77,6 +77,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceTrace Runtime / Source Binding Plan status;
 - SourceTrace Runtime / Source Binding Verification status;
 - RuntimeKlineContext Source Binding Plan status;
+- RuntimeKlineContextSourceBindingDTO status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
@@ -139,3 +140,4 @@ Examples:
 - `SourceTrace Runtime / Source Binding Plan status` is allowed only as docs-only planning context; it cannot create Java, tests, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, order, execution, or auto-trading.
 - `SourceTrace Runtime / Source Binding Verification status` is allowed only as docs-only verification context; it cannot create Java, tests, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
 - `RuntimeKlineContext Source Binding Plan status` is allowed only as docs-only planning context; it cannot create Java, tests, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext runtime, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
+- `RuntimeKlineContextSourceBindingDTO status` is allowed only as DTO/test carrier context; it cannot validate, assemble, read market data, read latest price, read latest close, read external providers, connect RuntimeKlineContext runtime, DataQualityContext, MultiTimeframeContext, RiskActionGuardContext, WatchlistPoolProof, services, dashboard runtime, generate executable entry / stop / TP / RR, authorize external push, Push wiring, order, execution, or auto-trading.
