@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule and ownership-map track, the current selected target is `PositionSync + Dashboard review-only status`, and the default next required action is `PositionSync/Dashboard Source Read Verification`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, and runtime wiring target selection, the current selected target is `PositionSync + Dashboard review-only status`, the active stop-loss action is `PositionSync/Dashboard Source Read Verification`, and the default next required action is `Minimal Review-Only PositionSync Runtime Wiring Design`.
 
 ## Capability Language
 
@@ -131,9 +131,10 @@ Current stop-loss sequence:
 1. #830 global audit: completed.
 2. Global Duplicate Skeleton Freeze Rule: active.
 3. Cursor Artifact Inventory + Ownership Map: completed stop-loss audit track.
-4. Runtime Wiring Target Selection Plan: active stop-loss selection track.
+4. Runtime Wiring Target Selection Plan: completed stop-loss selection track.
 5. Selected target: `PositionSync + Dashboard review-only status`.
-6. Next required action: `PositionSync/Dashboard Source Read Verification`.
+6. PositionSync/Dashboard Source Read Verification: active source-read verification track.
+7. Next required action: `Minimal Review-Only PositionSync Runtime Wiring Design`.
 
 ## Workflow Command Automation
 
