@@ -268,6 +268,15 @@
         .provider-state.neutral { color: var(--text-secondary); }
         .provider-state.ok { color: var(--status-ok); font-weight: 600; }
         .provider-state.warn { color: var(--status-warn); font-weight: 600; }
+        .provider-state.blocked { color: var(--status-error); font-weight: 600; }
+        .provider-boundary-note {
+            margin-top: 7px;
+            padding-top: 7px;
+            border-top: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            line-height: 1.35;
+        }
 
         .hot-block {
             margin-top: 8px;
@@ -1240,9 +1249,25 @@
     var CUSTOM_LS_KEY = "trine_dashboard_custom_symbols";
     var MODE_LS_KEY = "trine_dashboard_mode";
     var showNavSection = function () {};
-    var positionProviderStatus = { text: "状态待确认", className: "neutral" };
+    var positionProviderStatus = {
+        status: "INCOMPLETE",
+        text: "状态待确认",
+        className: "neutral",
+        configuredProviderType: "UNKNOWN",
+        activeProviderType: "UNKNOWN",
+        activeProviderName: "—",
+        fallbackOccurred: null,
+        fallbackReason: "—",
+        lastSyncSuccess: null,
+        lastSyncMessage: "—",
+        freshnessStatus: "UNKNOWN",
+        freshnessDetail: "—",
+        currentOpenPositionCount: null,
+        lastSyncTime: null
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
+    window.__positionSyncReviewStatus = "INCOMPLETE";
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -1678,11 +1703,21 @@
         var sysBox = document.getElementById("sidebarSystemStatus");
         var alertBox = document.getElementById("sidebarAlertList");
         var sys = systemStatus || {};
+        var ps = positionProviderStatus || {};
         if (sysBox) {
             sysBox.innerHTML = '<div class="kv"><span class="k">状态</span><span class="v">' + escapeHtml((sys.status || "OK") === "OK" ? "正常" : (sys.status || "—")) + '</span></div>'
                 + '<div class="kv"><span class="k">监控币种</span><span class="v">' + escapeHtml(sys.monitoredCoins != null ? sys.monitoredCoins : "—") + '</span></div>'
-                + '<div class="kv"><span class="k">真实持仓</span><span class="v">' + Number(openPositionCount || 0) + '</span></div>'
-                + '<div class="kv"><span class="k">最后决策</span><span class="v">' + escapeHtml(formatDateTime(sys.lastDecisionTime)) + '</span></div>';
+                + '<div class="kv"><span class="k">持仓读模型</span><span class="v" id="providerOpenCountValue">' + escapeHtml(displayPositionSyncValue(ps.currentOpenPositionCount, Number(openPositionCount || 0))) + '</span></div>'
+                + '<div class="kv"><span class="k">最后决策</span><span class="v">' + escapeHtml(formatDateTime(sys.lastDecisionTime)) + '</span></div>'
+                + '<div class="kv"><span class="k">PositionSync</span><span id="providerStatusValue" class="v provider-state ' + escapeHtml(ps.className || "neutral") + '">' + escapeHtml(ps.status || "INCOMPLETE") + ' / ' + escapeHtml(ps.text || "状态待确认") + '</span></div>'
+                + '<div class="kv"><span class="k">当前来源</span><span class="v" id="providerActiveValue">' + escapeHtml(ps.activeProviderType || "UNKNOWN") + '</span></div>'
+                + '<div class="kv"><span class="k">配置来源</span><span class="v" id="providerConfiguredValue">' + escapeHtml(ps.configuredProviderType || "UNKNOWN") + '</span></div>'
+                + '<div class="kv"><span class="k">是否 fallback</span><span class="v" id="providerFallbackValue">' + escapeHtml(formatProviderBoolean(ps.fallbackOccurred)) + '</span></div>'
+                + '<div class="kv"><span class="k">fallback reason</span><span class="v" id="providerFallbackReasonValue">' + escapeHtml(ps.fallbackReason || "—") + '</span></div>'
+                + '<div class="kv"><span class="k">最近同步成功</span><span class="v" id="providerLastSyncSuccessValue">' + escapeHtml(formatProviderBoolean(ps.lastSyncSuccess)) + '</span></div>'
+                + '<div class="kv"><span class="k">freshness</span><span class="v" id="providerFreshnessValue">' + escapeHtml(ps.freshnessStatus || "UNKNOWN") + '</span></div>'
+                + '<div class="kv"><span class="k">最近同步时间</span><span class="v" id="providerLastSyncTimeValue">' + escapeHtml(formatDateTime(ps.lastSyncTime)) + '</span></div>'
+                + '<div class="provider-boundary-note"><div id="providerReviewOnlyValue">只读状态，不是交易建议</div><div id="providerSimulationBoundaryValue">模拟来源不等于真实 Binance 持仓</div></div>';
         }
         if (alertBox) {
             var list = (alerts || []).slice(0, 3);
@@ -2355,33 +2390,97 @@
         return String(s);
     }
 
+    function normalizeProviderType(raw) {
+        var value = raw == null ? "" : String(raw).trim().toUpperCase();
+        return value || "UNKNOWN";
+    }
+
+    function formatProviderBoolean(value) {
+        if (value === true) return "是";
+        if (value === false) return "否";
+        return "未知";
+    }
+
+    function displayPositionSyncValue(value, fallbackValue) {
+        if (value == null || value === "") return fallbackValue != null ? fallbackValue : "—";
+        return value;
+    }
+
     function resolvePositionProviderStatus(payload) {
         var d = payload || {};
-        var configured = (d.configuredProviderType || "").toString().toUpperCase();
-        var active = (d.activeProviderType || "").toString().toUpperCase();
+        var configured = normalizeProviderType(d.configuredProviderType);
+        var active = normalizeProviderType(d.activeProviderType);
         var fallback = d.fallbackOccurred === true;
         var reason = (d.fallbackReason || "").toString().trim();
+        var freshness = normalizeProviderType(d.freshnessStatus);
+        var lastSuccess = d.lastSyncSuccess === true ? true : (d.lastSyncSuccess === false ? false : null);
+        var contradiction = (configured === "SIMULATED" && active === "BINANCE")
+            || (fallback && active === "BINANCE")
+            || (lastSuccess === true && active === "UNKNOWN");
 
-        if (configured === "SIMULATED" && active === "SIMULATED") {
-            return { text: "模拟", className: "neutral" };
+        var status = "INCOMPLETE";
+        var text = "同步状态不完整";
+        var className = "neutral";
+
+        if (contradiction) {
+            status = "BLOCKED_FAIL_CLOSED";
+            text = "来源状态矛盾";
+            className = "blocked";
+        } else if (active === "BINANCE" && lastSuccess === true && freshness === "FRESH" && !fallback) {
+            status = "REVIEW_ONLY_POSITION_SYNC_READY";
+            text = "Binance 只读状态可复核";
+            className = "ok";
+        } else if (fallback || active === "SIMULATED") {
+            status = "SIMULATED_FALLBACK";
+            text = "模拟 / fallback 来源";
+            className = "warn";
+        } else if (lastSuccess === false || lastSuccess == null || freshness === "STALE" || freshness === "UNKNOWN") {
+            status = "INCOMPLETE";
+            text = "同步状态不完整";
+            className = "neutral";
         }
-        if (configured === "BINANCE" && active === "BINANCE" && !fallback) {
-            return { text: "Binance（已生效）", className: "ok" };
-        }
-        if (configured === "BINANCE" && active === "SIMULATED" && fallback) {
-            var suffix = reason ? "（当前降级为模拟）" : "（当前降级为模拟）";
-            return { text: "Binance" + suffix, className: "warn" };
-        }
-        return { text: "状态待确认", className: "neutral" };
+
+        return {
+            status: status,
+            text: text,
+            className: className,
+            configuredProviderType: configured,
+            activeProviderType: active,
+            activeProviderName: d.activeProviderName || "—",
+            fallbackOccurred: d.fallbackOccurred === true ? true : (d.fallbackOccurred === false ? false : null),
+            fallbackReason: reason || "—",
+            lastSyncSuccess: lastSuccess,
+            lastSyncMessage: d.lastSyncMessage || "—",
+            freshnessStatus: freshness,
+            freshnessDetail: d.freshnessDetail || "—",
+            currentOpenPositionCount: d.currentOpenPositionCount,
+            lastSyncTime: d.lastSyncEndTime || d.lastSyncStartTime || null
+        };
     }
 
     function updateProviderStatusDisplay() {
+        var ps = positionProviderStatus || {};
         var el = document.getElementById("providerStatusValue");
-        if (!el) return;
-        var cls = positionProviderStatus.className || "neutral";
-        var text = positionProviderStatus.text || "状态待确认";
-        el.className = "v provider-state " + cls;
-        el.textContent = text;
+        if (el) {
+            var cls = ps.className || "neutral";
+            el.className = "v provider-state " + cls;
+            el.textContent = (ps.status || "INCOMPLETE") + " / " + (ps.text || "状态待确认");
+        }
+        setText("providerActiveValue", ps.activeProviderType || "UNKNOWN");
+        setText("providerConfiguredValue", ps.configuredProviderType || "UNKNOWN");
+        setText("providerFallbackValue", formatProviderBoolean(ps.fallbackOccurred));
+        setText("providerFallbackReasonValue", ps.fallbackReason || "—");
+        setText("providerLastSyncSuccessValue", formatProviderBoolean(ps.lastSyncSuccess));
+        setText("providerFreshnessValue", ps.freshnessStatus || "UNKNOWN");
+        setText("providerOpenCountValue", displayPositionSyncValue(ps.currentOpenPositionCount, "—"));
+        setText("providerLastSyncTimeValue", formatDateTime(ps.lastSyncTime));
+        setText("providerReviewOnlyValue", "只读状态，不是交易建议");
+        setText("providerSimulationBoundaryValue", "模拟来源不等于真实 Binance 持仓");
+    }
+
+    function setText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text == null || text === "" ? "—" : String(text);
     }
 
     function fetchPositionProviderStatus() {
@@ -2392,12 +2491,14 @@
                 positionProviderStatus = resolvePositionProviderStatus(payload);
                 window.__providerStatusText = positionProviderStatus.text || "状态待确认";
                 window.__providerStatusClass = positionProviderStatus.className || "neutral";
+                window.__positionSyncReviewStatus = positionProviderStatus.status || "INCOMPLETE";
                 updateProviderStatusDisplay();
             })
             .catch(function () {
-                positionProviderStatus = { text: "状态待确认", className: "neutral" };
+                positionProviderStatus = resolvePositionProviderStatus({});
                 window.__providerStatusText = "状态待确认";
                 window.__providerStatusClass = "neutral";
+                window.__positionSyncReviewStatus = "INCOMPLETE";
                 updateProviderStatusDisplay();
             });
     }
@@ -2674,7 +2775,7 @@
     function positionModule(d) {
         if (!hasRealPositionDetail(d)) {
             return '<p class="mod-title">持仓跟踪</p>' +
-                '<div class="side-note">当前无真实持仓记录。接入交易所实时持仓后，可在此持续跟踪开仓后逻辑是否反转、风险是否升高，以及是否仍支持继续持有。</div>' +
+                '<div class="side-note">当前无持仓读模型记录。持仓状态仅用于人工复核展示；模拟来源不等于真实 Binance 持仓。</div>' +
                 '<div class="detail-grid">' +
                 '<div class="kv"><span class="k">开仓方向</span><span class="v">—</span></div>' +
                 '<div class="kv"><span class="k">开仓价格</span><span class="v">—</span></div>' +
