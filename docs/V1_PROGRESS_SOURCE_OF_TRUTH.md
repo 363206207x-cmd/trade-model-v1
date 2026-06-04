@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, and source-read verification, the current selected target is `PositionSync + Dashboard review-only status`, the active stop-loss action is `Minimal Review-Only PositionSync Runtime Wiring Design`, and the default next required action is `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, and wiring design, the current selected target is `PositionSync + Dashboard review-only status`, the active stop-loss action is `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`, and the default next required action is `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
 
 ## Capability Language
 
@@ -134,8 +134,9 @@ Current stop-loss sequence:
 4. Runtime Wiring Target Selection Plan: completed stop-loss selection track.
 5. Selected target: `PositionSync + Dashboard review-only status`.
 6. PositionSync/Dashboard Source Read Verification: completed source-read verification track.
-7. Minimal Review-Only PositionSync Runtime Wiring Design: active docs-only wiring design track.
-8. Next required action: `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`.
+7. Minimal Review-Only PositionSync Runtime Wiring Design: completed docs-only wiring design track.
+8. Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate: active docs-only readiness gate.
+9. Next required action: `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
 
 ## Workflow Command Automation
 

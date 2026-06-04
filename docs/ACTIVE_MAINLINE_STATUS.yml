@@ -1,13 +1,13 @@
-current_head: "7c22d20"
+current_head: "c81c271"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only PositionSync Runtime Wiring Design"
-active_block_cn: "最小只读 PositionSync Runtime 接线设计"
+active_block: "Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate"
+active_block_cn: "最小只读 PositionSync Runtime 接线实现就绪门"
 current_level: "DOCS_ONLY_GATE"
 current_pr: "none"
-current_branch: "minimal-review-only-positionsync-runtime-wiring-design"
-merge_rule: "Docs-only wiring design; no Java, no tests, no runtime wiring, no service implementation, no dashboard implementation, no provider change, no push, no external channel, no order execution"
-next_required_action: "Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate"
+current_branch: "positionsync-runtime-wiring-implementation-readiness-gate"
+merge_rule: "Docs-only implementation readiness gate; no Java, no tests, no dashboard implementation, no runtime wiring, no service/provider/scheduler/mapper/schema changes, no push, no external channel, no order execution"
+next_required_action: "Minimal Review-Only PositionSync Runtime Wiring Implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -18,7 +18,8 @@ first_minimal_runtime_wiring_candidate: "PositionSync + Dashboard review-only st
 selected_runtime_wiring_target: "PositionSync + Dashboard review-only status"
 runtime_wiring_target_selection_status: "completed on main; selects PositionSync + Dashboard review-only status and prepares source-read verification without implementation"
 positionsync_dashboard_source_read_status: "completed on main as #835; verified existing provider/service/scheduler/mapper/schema/dashboard/API path and confirmed dashboard provider/fallback visibility gaps without implementation"
-minimal_positionsync_runtime_wiring_design_status: "active; designs the minimal review-only status mapping over existing PositionSyncService / PositionSyncStatusVO / SystemController / dashboard.html without implementation"
+minimal_positionsync_runtime_wiring_design_status: "completed on main as #836; designs the minimal review-only status mapping over existing PositionSyncService / PositionSyncStatusVO / SystemController / dashboard.html without implementation"
+positionsync_runtime_wiring_implementation_readiness_status: "active; verifies PositionSyncStatusVO fields, /api/system/position-sync-status endpoint sufficiency, dashboard DOM/copy gaps, future test scope, and go/no-go before minimal implementation"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
