@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, and #840 verification, the current selected target is `PositionSync + Dashboard review-only status`, the active stop-loss action is `Dashboard PositionSync Visual Verification`, and the default next required action is `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, and #841 visual verification, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Source-Owned Runtime vs Existing Point Proposal Merge Map`, and the default next required action is `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
 
 ## Capability Language
 

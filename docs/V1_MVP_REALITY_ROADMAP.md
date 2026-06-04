@@ -4,17 +4,18 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Dashboard PositionSync Visual Verification`.
+- Active track: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
+- Next required action: `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
 - #839 raises the selected slice toward `REVIEW_ONLY_RUNTIME partial` by showing existing PositionSync runtime status on the dashboard, without backend service/controller/provider/schema changes.
 - #840 completed compile/test checks, static dashboard label checks, forbidden path checks, and runtime smoke for #839.
-- The active visual verification confirms dashboard visibility, safety copy visibility, simulated fallback warning visibility, and layout acceptability.
-- This visual verification does not create a new skeleton and does not revive P359/P360.
+- #841 completed visual verification and confirmed dashboard visibility, safety copy visibility, simulated fallback warning visibility, and layout acceptability.
+- The active merge map reduces duplicate point/runtime skeleton risk by comparing Source-Owned Runtime, Existing Point Proposal, BoundaryCandidate, ExecutionPlan, DecisionResult, and dashboard display adapters.
+- This merge map does not create a new skeleton and does not revive P359/P360.
 
 ## Roadmap
 
@@ -127,6 +128,7 @@ Recommended next actions:
 8. Minimal Review-Only PositionSync Runtime Wiring Verification.
 9. Dashboard PositionSync Visual Verification.
 10. Source-Owned Runtime vs Existing Point Proposal Merge Map.
+11. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner.
 
 Do not continue P359 or start P360 by default.
 
