@@ -6,11 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Dashboard PositionSync Visual Verification`.
+- Active stop-loss track: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
+- Next required action: `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `b7a1964 docs(wiring): record positionsync dashboard visual verification (#841)`
 - `7593c10 docs(wiring): verify review-only positionsync runtime slice (#840)`
 - `29904a9 feat(dashboard): show review-only positionsync status (#839)`
 - `e58dde3 docs(wiring): verify positionsync implementation readiness (#837)`
