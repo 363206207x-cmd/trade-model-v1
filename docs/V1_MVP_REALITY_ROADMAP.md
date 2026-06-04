@@ -2,6 +2,14 @@
 
 This roadmap follows the user-facing business chain rather than P-number order.
 
+## Current Stop-Loss Track
+
+- Active track: `Cursor Artifact Inventory + Ownership Map`.
+- Next required action: `Runtime Wiring Target Selection Plan`.
+- P359/P360 remain frozen by default.
+- The current ownership map does not raise business capability level; it reduces duplicate skeleton risk and selects canonical Cursor-era service/runtime/dashboard/API owners.
+- First minimal runtime wiring candidate: `PositionSync + Dashboard review-only status`.
+
 ## Roadmap
 
 | Step | Current status | Next MAX_SAFE_PACK | Risk level | Merge grouping recommendation |

@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`, and the default next required action after #830 is Cursor Artifact Inventory + Ownership Map.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule and ownership-map track, the default next required action is Runtime Wiring Target Selection Plan.
 
 ## Capability Language
 
@@ -125,6 +125,13 @@ Future packages must include these extra final-output fields:
 - 是否符合 #830 审计建议: Yes / No
 
 If the package would only add another skeleton or wrapper, it must be rejected and redirected to the ownership-map / wiring-plan tracks.
+
+Current stop-loss sequence:
+
+1. #830 global audit: completed.
+2. Global Duplicate Skeleton Freeze Rule: active.
+3. Cursor Artifact Inventory + Ownership Map: active stop-loss audit track.
+4. Next required action after ownership map: Runtime Wiring Target Selection Plan.
 
 ## Workflow Command Automation
 

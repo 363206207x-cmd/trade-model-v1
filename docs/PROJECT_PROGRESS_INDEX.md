@@ -6,6 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- Active stop-loss track: `Cursor Artifact Inventory + Ownership Map`.
+- Next required action: `Runtime Wiring Target Selection Plan`.
+- P359/P360 remain frozen by default.
+- Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `f8107d1 docs(workflow): sync bootstrap with freeze rule (#832)`
+- `623f0c9 docs(workflow): freeze duplicate skeleton packages (#831)`
 - `23cca44 docs(audit): assess cursor before p1 and codex p1 p359 usability (#830)`
 - `701a019 docs(point): define source-owned candidate integration runtime assembler plan (#828)`
 - `c693481 docs(point): verify source-owned candidate integration runtime validator (#827)`

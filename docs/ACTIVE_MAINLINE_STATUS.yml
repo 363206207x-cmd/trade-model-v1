@@ -1,18 +1,20 @@
-current_head: "23cca44"
+current_head: "f8107d1"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Global Duplicate Skeleton Freeze Rule"
-active_block_cn: "全局重复骨架冻结规则"
+active_block: "Cursor Artifact Inventory + Ownership Map"
+active_block_cn: "Cursor 资产盘点与 canonical ownership map"
 current_level: "DOCS_ONLY_GATE"
 current_pr: "none"
-current_branch: "freeze-duplicate-skeleton-rule"
-merge_rule: "A docs-only workflow rule update; no Java, no tests, no runtime wiring, no service, no dashboard, no push, no external channel, no order execution"
-next_required_action: "Cursor Artifact Inventory + Ownership Map"
+current_branch: "cursor-artifact-inventory-ownership-map"
+merge_rule: "Docs-only audit / ownership map; no Java, no tests, no runtime wiring, no service, no dashboard implementation, no push, no external channel, no order execution"
+next_required_action: "Runtime Wiring Target Selection Plan"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
 p360_status: "not allowed to start"
 new_skeleton_default: "blocked unless it directly reduces duplication, selects canonical ownership, wires existing service/runtime/dashboard/API review-only path, or resolves #830 runtime wiring gap"
+ownership_map_status: "active; maps Cursor-era dashboard/service/schema/provider assets to canonical owners and freezes duplicate Codex skeleton expansion"
+first_minimal_runtime_wiring_candidate: "PositionSync + Dashboard review-only status"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

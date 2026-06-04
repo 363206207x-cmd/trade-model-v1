@@ -5,15 +5,17 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `23cca44 docs(audit): assess cursor before p1 and codex p1 p359 usability (#830)`
+- Current merged main: `f8107d1 docs(workflow): sync bootstrap with freeze rule (#832)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Global Duplicate Skeleton Freeze Rule`.
-- Current next required action is `Cursor Artifact Inventory + Ownership Map`.
+- Current active block is `Cursor Artifact Inventory + Ownership Map`.
+- Current next required action is `Runtime Wiring Target Selection Plan`.
+- The ownership map track is docs-only audit work: it does not raise business capability level, but it directly reduces duplicate skeleton risk and selects canonical owner candidates.
+- First minimal runtime wiring candidate is `PositionSync + Dashboard review-only status`.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
 - P360 is not allowed to start.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
@@ -74,7 +76,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P357 is completed on main as Source-Owned Candidate Integration Runtime Validator Verification.
 - P358 is completed on main as Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
 - #830 is completed on main as the Cursor-before-P1 vs Codex-P1-P359 global usability / duplication / continuity audit.
-- The active block is now Global Duplicate Skeleton Freeze Rule.
+- The active block is now Cursor Artifact Inventory + Ownership Map.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
