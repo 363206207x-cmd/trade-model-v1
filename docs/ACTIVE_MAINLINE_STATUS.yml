@@ -1,14 +1,14 @@
-current_head: "1198d90"
+current_head: "d7c4f99"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source-Owned Candidate Integration Runtime Validator Java Skeleton"
-active_block_cn: "来源归属候选集成运行时校验器 Java 骨架"
-current_level: "SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON"
+active_block: "Source-Owned Candidate Integration Runtime Validator Verification"
+active_block_cn: "来源归属候选集成运行时校验器验证"
+current_level: "SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION"
 current_pr: "none"
-current_branch: "p356"
-merge_rule: "B Java/test runtime validator skeleton; no runtime assembler, no orchestrator, no service, no runtime wiring, no dashboard, no external channel"
-next_required_action: "P357 Source-Owned Candidate Integration Runtime Validator Verification"
-do_not_continue_to: "runtime assembler / orchestrator / source-owned candidate runtime / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
+current_branch: "p357"
+merge_rule: "A docs-only runtime validator verification; no Java, no tests, no runtime assembler, no orchestrator, no service, no runtime wiring, no dashboard, no external channel"
+next_required_action: "P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan"
+do_not_continue_to: "Java runtime assembler / orchestrator implementation / source-owned candidate runtime / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

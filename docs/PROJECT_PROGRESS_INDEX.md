@@ -206,7 +206,9 @@ Current active capability movement:
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_DTO_PLAN` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_DTO_JAVA_SKELETON`.
 - P355 is merged on main.
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_DTO_JAVA_SKELETON` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN`.
-- `P356 Source-Owned Candidate Integration Runtime Validator Java Skeleton` is active on branch `p356`.
+- P356 is merged on main.
+- It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON`.
+- `P357 Source-Owned Candidate Integration Runtime Validator Verification` is active on branch `p357`.
 - P333 is a docs-only skeleton plan from `SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION` toward `SOURCE_TRACE_RUNTIME_BINDING_PLAN`.
 - P334 is a docs-only verification from `SOURCE_TRACE_RUNTIME_BINDING_PLAN` toward `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION`.
 - P335 is a docs-only plan from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
@@ -233,9 +235,10 @@ Current active capability movement:
 - P354 is a Java/test runtime DTO skeleton package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_DTO_PLAN` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_DTO_JAVA_SKELETON`.
 - P355 is a docs-only runtime validator plan from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_DTO_JAVA_SKELETON` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN`.
 - P356 is a Java/test runtime validator skeleton package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON`.
+- P357 is a docs-only runtime validator verification package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is Source-Owned Candidate Integration Runtime Validator Java Skeleton.
-- The next required business action is `P357 Source-Owned Candidate Integration Runtime Validator Verification`.
+- The active block is Source-Owned Candidate Integration Runtime Validator Verification.
+- The next required business action is `P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -453,6 +456,8 @@ P355 is a Source-Owned Candidate Integration Runtime Validator Plan package. It 
 
 P356 is a Source-Owned Candidate Integration Runtime Validator Java Skeleton package. It adds only a plain Java runtime candidate validator, targeted validator tests, and status documentation updates for future review-only runtime candidate status. It does not add runtime assembler, runtime orchestrator, service wiring, source-owned candidate runtime, dashboard runtime, source context runtime, numeric point generation, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order execution, execution API, or auto-trading as completed.
 
+P357 is a Source-Owned Candidate Integration Runtime Validator Verification package. It adds only docs verifying the P354 runtime DTO and P356 runtime validator stages. It does not add Java, tests, runtime assembler, runtime orchestrator, service wiring, source-owned candidate runtime, dashboard runtime, source context runtime, numeric point generation, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order execution, execution API, or auto-trading as completed.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -577,10 +582,10 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after merged P355 / active P356:
+Near-term priority after merged P356 / active P357:
 
-1. Complete P356 Source-Owned Candidate Integration Runtime Validator Java Skeleton.
-2. P357 Source-Owned Candidate Integration Runtime Validator Verification.
+1. Complete P357 Source-Owned Candidate Integration Runtime Validator Verification.
+2. P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
 3. External Channel Authorization Gate only as a separate C-level package.
 4. Readiness / Point specialty planning follow-up before any point generation.
 5. Dashboard smoke / internal preview closure.
