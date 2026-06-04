@@ -5,16 +5,17 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `e2c2ed9 docs(wiring): select minimal review-only runtime target (#834)`
+- Current merged main: `7c22d20 docs(wiring): verify positionsync dashboard source path (#835)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `PositionSync/Dashboard Source Read Verification`.
-- Current next required action is `Minimal Review-Only PositionSync Runtime Wiring Design`.
-- The PositionSync/Dashboard source-read verification track is docs-only stop-loss work: it does not raise business capability level, but it verifies whether the selected Cursor-era service/runtime/dashboard/API target is ready for minimal review-only wiring design.
+- Current active block is `Minimal Review-Only PositionSync Runtime Wiring Design`.
+- Current next required action is `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`.
+- The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
+- The Minimal Review-Only PositionSync Runtime Wiring Design track is docs-only stop-loss work: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - Selected runtime wiring target is `PositionSync + Dashboard review-only status`.
 - The selected target reuses `PositionSyncService`, `PositionSyncScheduler`, `PositionProvider`, `SwitchablePositionProvider`, `BinancePositionProvider`, `SimulatedPositionProvider`, `RealPositionMapper`, `tm_real_position`, `DashboardController`, `dashboard.html`, and `/api/system/position-sync-status`.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
@@ -78,7 +79,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P358 is completed on main as Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
 - #830 is completed on main as the Cursor-before-P1 vs Codex-P1-P359 global usability / duplication / continuity audit.
 - #834 is completed on main as Runtime Wiring Target Selection Plan.
-- The active block is now PositionSync/Dashboard Source Read Verification.
+- #835 is completed on main as PositionSync/Dashboard Source Read Verification.
+- The active block is now Minimal Review-Only PositionSync Runtime Wiring Design.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
