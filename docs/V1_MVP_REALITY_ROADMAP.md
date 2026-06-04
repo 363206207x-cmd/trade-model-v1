@@ -4,12 +4,12 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Runtime Wiring Target Selection Plan`.
+- Active track: `PositionSync/Dashboard Source Read Verification`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `PositionSync/Dashboard Source Read Verification`.
+- Next required action: `Minimal Review-Only PositionSync Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
-- The current runtime wiring target selection does not raise business capability level; it chooses the first concrete existing Cursor-era service/runtime/dashboard/API path to move toward `REVIEW_ONLY_RUNTIME`.
-- This selection does not implement wiring, does not create a new skeleton, and does not revive P359/P360.
+- The current source-read verification does not raise business capability level; it verifies the selected existing Cursor-era provider/service/scheduler/mapper/schema/dashboard/API path before any minimal wiring design.
+- This verification does not implement wiring, does not create a new skeleton, and does not revive P359/P360.
 
 ## Roadmap
 
@@ -116,7 +116,7 @@ Recommended next actions:
 2. Cursor Artifact Inventory + Ownership Map.
 3. Runtime Wiring Target Selection Plan.
 4. PositionSync/Dashboard Source Read Verification.
-5. Minimal Review-Only PositionSync Runtime Integration Plan.
+5. Minimal Review-Only PositionSync Runtime Wiring Design.
 6. Source-Owned Runtime vs Existing Point Proposal Merge Map.
 
 Do not continue P359 or start P360 by default.
