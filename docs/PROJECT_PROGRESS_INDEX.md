@@ -6,10 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Cursor Artifact Inventory + Ownership Map`.
-- Next required action: `Runtime Wiring Target Selection Plan`.
+- Active stop-loss track: `Runtime Wiring Target Selection Plan`.
+- Selected target: `PositionSync + Dashboard review-only status`.
+- Next required action: `PositionSync/Dashboard Source Read Verification`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `917d45f docs(audit): map cursor artifacts to canonical owners (#833)`
 - `f8107d1 docs(workflow): sync bootstrap with freeze rule (#832)`
 - `623f0c9 docs(workflow): freeze duplicate skeleton packages (#831)`
 - `23cca44 docs(audit): assess cursor before p1 and codex p1 p359 usability (#830)`
@@ -91,11 +93,14 @@ Current active capability movement:
 
 - #830 is merged on main.
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
-- Current active block is `Global Duplicate Skeleton Freeze Rule`.
+- #833 is merged on main.
+- It completed Cursor Artifact Inventory + Ownership Map and identified `PositionSync + Dashboard review-only status` as the first minimal runtime wiring candidate.
+- Current active block is `Runtime Wiring Target Selection Plan`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
-- The next required action is `Cursor Artifact Inventory + Ownership Map`, not a new skeleton package.
+- Selected target is `PositionSync + Dashboard review-only status`.
+- The next required action is `PositionSync/Dashboard Source Read Verification`, not a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
@@ -231,8 +236,10 @@ Current active capability movement:
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
 - `P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan` is completed on main by `701a019`.
 - `#830 V1 Cursor-before-P1 vs Codex-P1-P359 Global Usability / Duplication / Continuity Audit` is completed on main by `23cca44`.
-- The active workflow block is `Global Duplicate Skeleton Freeze Rule`.
-- The next required action is `Cursor Artifact Inventory + Ownership Map`.
+- `#833 Cursor Artifact Inventory + Ownership Map` is completed on main by `917d45f`.
+- The active workflow block is `Runtime Wiring Target Selection Plan`.
+- The selected runtime wiring target is `PositionSync + Dashboard review-only status`.
+- The next required action is `PositionSync/Dashboard Source Read Verification`.
 - P333 is a docs-only skeleton plan from `SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION` toward `SOURCE_TRACE_RUNTIME_BINDING_PLAN`.
 - P334 is a docs-only verification from `SOURCE_TRACE_RUNTIME_BINDING_PLAN` toward `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION`.
 - P335 is a docs-only plan from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
@@ -262,8 +269,9 @@ Current active capability movement:
 - P357 is a docs-only runtime validator verification package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
 - P358 is a docs-only runtime assembler / orchestrator plan from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_ASSEMBLER_ORCHESTRATOR_PLAN`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is Global Duplicate Skeleton Freeze Rule.
-- The next required business action is `Cursor Artifact Inventory + Ownership Map`.
+- The active block is Runtime Wiring Target Selection Plan.
+- The selected runtime wiring target is `PositionSync + Dashboard review-only status`.
+- The next required business action is `PositionSync/Dashboard Source Read Verification`.
 - Do not continue P359 by default.
 - Do not start P360.
 
@@ -616,9 +624,9 @@ Near-term priority after #830:
 1. Enforce `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 2. Cursor Artifact Inventory + Ownership Map.
 3. Runtime Wiring Target Selection Plan.
-4. Source-Owned Runtime vs Existing Point Proposal Merge Map.
-5. Minimal Review-Only Runtime Integration Plan.
-6. Existing Dashboard / Service / API Runtime Slice Selection.
+4. PositionSync/Dashboard Source Read Verification.
+5. Minimal Review-Only PositionSync Runtime Integration Plan.
+6. Source-Owned Runtime vs Existing Point Proposal Merge Map.
 
 Do not continue P359 or start P360 by default.
 
