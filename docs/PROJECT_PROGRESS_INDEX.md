@@ -6,11 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
+- Active stop-loss track: `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
+- Next required action: `Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `7e73b41 docs(wiring): map source-owned runtime and point proposal ownership (#842)`
 - `b7a1964 docs(wiring): record positionsync dashboard visual verification (#841)`
 - `7593c10 docs(wiring): verify review-only positionsync runtime slice (#840)`
 - `29904a9 feat(dashboard): show review-only positionsync status (#839)`
@@ -102,12 +103,12 @@ Current active capability movement:
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
 - #833 is merged on main.
 - It completed Cursor Artifact Inventory + Ownership Map and identified `PositionSync + Dashboard review-only status` as the first minimal runtime wiring candidate.
-- Current active block is `Dashboard PositionSync Visual Verification`.
+- Current active block is `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Selected target is `PositionSync + Dashboard review-only status`.
-- The next required action is `Source-Owned Runtime vs Existing Point Proposal Merge Map`, not a new skeleton package.
+- The next required action is `Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters`, not a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
