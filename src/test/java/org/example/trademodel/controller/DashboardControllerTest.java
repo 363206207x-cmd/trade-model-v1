@@ -131,6 +131,31 @@ class DashboardControllerTest {
         assertThat(section).doesNotContain("start auto-trading");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyPositionSyncProviderStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/system/position-sync-status");
+        assertThat(html).contains("providerStatusValue");
+        assertThat(html).contains("providerActiveValue");
+        assertThat(html).contains("providerConfiguredValue");
+        assertThat(html).contains("providerFallbackValue");
+        assertThat(html).contains("providerFallbackReasonValue");
+        assertThat(html).contains("providerLastSyncSuccessValue");
+        assertThat(html).contains("providerFreshnessValue");
+        assertThat(html).contains("providerOpenCountValue");
+        assertThat(html).contains("providerLastSyncTimeValue");
+        assertThat(html).contains("REVIEW_ONLY_POSITION_SYNC_READY");
+        assertThat(html).contains("SIMULATED_FALLBACK");
+        assertThat(html).contains("INCOMPLETE");
+        assertThat(html).contains("BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("只读状态，不是交易建议");
+        assertThat(html).contains("模拟来源不等于真实 Binance 持仓");
+        assertThat(html).contains("currentOpenPositionCount");
+        assertThat(html).contains("lastSyncEndTime");
+        assertThat(html).contains("lastSyncStartTime");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;

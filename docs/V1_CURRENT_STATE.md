@@ -5,18 +5,19 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `c81c271 docs(wiring): design review-only positionsync status mapping (#836)`
+- Current merged main: `e58dde3 docs(wiring): verify positionsync implementation readiness (#837)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`.
-- Current next required action is `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
+- Current active block is `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
+- Current next required action is `Minimal Review-Only PositionSync Runtime Wiring Verification`.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
-- The active implementation readiness gate verifies existing fields, endpoint sufficiency, dashboard DOM/copy gaps, and future test scope before allowing a minimal dashboard-only implementation.
+- The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.
+- The active implementation minimally displays existing PositionSync provider/fallback/simulated/freshness/last-sync/open-position-count status on `dashboard.html` with explicit review-only safety copy and no backend service/controller/provider/schema changes.
 - Selected runtime wiring target is `PositionSync + Dashboard review-only status`.
 - The selected target reuses `PositionSyncService`, `PositionSyncScheduler`, `PositionProvider`, `SwitchablePositionProvider`, `BinancePositionProvider`, `SimulatedPositionProvider`, `RealPositionMapper`, `tm_real_position`, `DashboardController`, `dashboard.html`, and `/api/system/position-sync-status`.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
@@ -82,7 +83,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - #834 is completed on main as Runtime Wiring Target Selection Plan.
 - #835 is completed on main as PositionSync/Dashboard Source Read Verification.
 - #836 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Design.
-- The active block is now Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate.
+- #837 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate.
+- The active block is now Minimal Review-Only PositionSync Runtime Wiring Implementation.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.

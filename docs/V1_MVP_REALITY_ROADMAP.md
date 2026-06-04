@@ -4,14 +4,15 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`.
+- Active track: `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only PositionSync Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
-- The active readiness gate does not raise business capability level; it verifies fields, endpoint sufficiency, dashboard DOM/copy gaps, and future test scope before any minimal implementation.
-- This readiness gate does not implement wiring, does not create a new skeleton, and does not revive P359/P360.
+- The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
+- The active implementation raises the selected slice toward `REVIEW_ONLY_RUNTIME partial` by showing existing PositionSync runtime status on the dashboard, without backend service/controller/provider/schema changes.
+- This implementation does not create a new skeleton and does not revive P359/P360.
 
 ## Roadmap
 
@@ -121,7 +122,8 @@ Recommended next actions:
 5. Minimal Review-Only PositionSync Runtime Wiring Design.
 6. Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate.
 7. Minimal Review-Only PositionSync Runtime Wiring Implementation.
-8. Source-Owned Runtime vs Existing Point Proposal Merge Map.
+8. Minimal Review-Only PositionSync Runtime Wiring Verification.
+9. Source-Owned Runtime vs Existing Point Proposal Merge Map.
 
 Do not continue P359 or start P360 by default.
 
