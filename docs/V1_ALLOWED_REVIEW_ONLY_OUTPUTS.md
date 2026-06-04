@@ -122,6 +122,8 @@ The following outputs are allowed in review-only scope when their source ownersh
 - Source-Owned Candidate Integration Runtime Boundary Plan status;
 - Source-Owned Candidate Integration Runtime Input Contract Plan status;
 - Source-Owned Candidate Integration Runtime DTO Plan status;
+- SourceOwnedCandidateIntegrationRuntimeCandidateDTO skeleton status;
+- SourceOwnedCandidateIntegrationRuntimeCandidateDTO incomplete / blocked / degraded reason;
 - source-owned candidate runtime integration status;
 - source-owned candidate runtime candidate unavailable reason;
 - source-owned candidate runtime candidate blocked reason;
