@@ -6,11 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `PositionSync/Dashboard Source Read Verification`.
+- Active stop-loss track: `Minimal Review-Only PositionSync Runtime Wiring Design`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Minimal Review-Only PositionSync Runtime Wiring Design`.
+- Next required action: `Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `7c22d20 docs(wiring): verify positionsync dashboard source path (#835)`
 - `e2c2ed9 docs(wiring): select minimal review-only runtime target (#834)`
 - `917d45f docs(audit): map cursor artifacts to canonical owners (#833)`
 - `f8107d1 docs(workflow): sync bootstrap with freeze rule (#832)`
