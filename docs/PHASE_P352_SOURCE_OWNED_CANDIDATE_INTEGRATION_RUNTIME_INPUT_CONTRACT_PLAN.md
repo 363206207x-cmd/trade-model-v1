@@ -6,6 +6,8 @@ P352 is the docs-only runtime input contract plan after the P351 runtime boundar
 
 It defines allowed future input sources, forbidden runtime reads, required input fields, incomplete input conditions, blocked fail-closed input conditions, and next safe package boundaries.
 
+The runtime input contract includes `missingReason` for incomplete-state traceability.
+
 ## Capability Movement
 
 `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_BOUNDARY_PLAN -> SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_INPUT_CONTRACT_PLAN`
