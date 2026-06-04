@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, and #839 implementation, the current selected target is `PositionSync + Dashboard review-only status`, the active stop-loss action is `Minimal Review-Only PositionSync Runtime Wiring Verification`, and the default next required action is `Dashboard smoke / visual verification follow-up`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, and #840 verification, the current selected target is `PositionSync + Dashboard review-only status`, the active stop-loss action is `Dashboard PositionSync Visual Verification`, and the default next required action is `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
 
 ## Capability Language
 
@@ -137,8 +137,9 @@ Current stop-loss sequence:
 7. Minimal Review-Only PositionSync Runtime Wiring Design: completed docs-only wiring design track.
 8. Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate: completed docs-only readiness gate.
 9. Minimal Review-Only PositionSync Runtime Wiring Implementation: completed on main as #839.
-10. Minimal Review-Only PositionSync Runtime Wiring Verification: active verification-only track.
-11. Next required action: `Dashboard smoke / visual verification follow-up`.
+10. Minimal Review-Only PositionSync Runtime Wiring Verification: completed on main as #840.
+11. Dashboard PositionSync Visual Verification: active visual verification-only track.
+12. Next required action: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
 
 ## Workflow Command Automation
 
