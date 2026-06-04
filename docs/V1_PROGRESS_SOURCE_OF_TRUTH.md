@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, and #842 merge map, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`, and the default next required action is `Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, and #843 owner source read, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Minimal Merge Design for BoundaryCandidate / ExecutionPlan owner + safety adapters`, and the default next required action is `Minimal implementation readiness gate for owner-path safety adapter merge`.
 
 ## Capability Language
 
@@ -140,8 +140,9 @@ Current stop-loss sequence:
 10. Minimal Review-Only PositionSync Runtime Wiring Verification: completed on main as #840.
 11. Dashboard PositionSync Visual Verification: completed on main as #841.
 12. Source-Owned Runtime vs Existing Point Proposal Merge Map: completed on main as #842.
-13. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner: active source-read track.
-14. Next required action: `Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
+13. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner: completed on main as #843.
+14. Minimal Merge Design for BoundaryCandidate / ExecutionPlan owner + safety adapters: active design track.
+15. Next required action: `Minimal implementation readiness gate for owner-path safety adapter merge`.
 
 ## Workflow Command Automation
 
