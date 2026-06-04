@@ -6,11 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
+- Active stop-loss track: `Minimal Review-Only PositionSync Runtime Wiring Verification`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Minimal Review-Only PositionSync Runtime Wiring Verification`.
+- Next required action: `Dashboard smoke / visual verification follow-up`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `29904a9 feat(dashboard): show review-only positionsync status (#839)`
 - `e58dde3 docs(wiring): verify positionsync implementation readiness (#837)`
 - `c81c271 docs(wiring): design review-only positionsync status mapping (#836)`
 - `7c22d20 docs(wiring): verify positionsync dashboard source path (#835)`
@@ -99,12 +100,12 @@ Current active capability movement:
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
 - #833 is merged on main.
 - It completed Cursor Artifact Inventory + Ownership Map and identified `PositionSync + Dashboard review-only status` as the first minimal runtime wiring candidate.
-- Current active block is `Minimal Review-Only PositionSync Runtime Wiring Implementation`.
+- Current active block is `Minimal Review-Only PositionSync Runtime Wiring Verification`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Selected target is `PositionSync + Dashboard review-only status`.
-- The next required action is `Minimal Review-Only PositionSync Runtime Wiring Verification`, not a new skeleton package.
+- The next required action is `Dashboard smoke / visual verification follow-up`, not a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
