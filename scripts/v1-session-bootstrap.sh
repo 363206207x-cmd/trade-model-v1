@@ -23,6 +23,7 @@ for file in \
   docs/ACTIVE_MAINLINE_STATUS.yml \
   docs/ANSWER_FORMAT_CONTRACT.md \
   docs/V1_CAPABILITY_MATRIX.md \
+  docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md \
   docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
 do
   require_file "$file"
@@ -46,3 +47,7 @@ git status --short
 echo
 echo "ACTIVE_MAINLINE_STATUS.yml:"
 cat docs/ACTIVE_MAINLINE_STATUS.yml
+
+echo
+echo "V1_DUPLICATE_SKELETON_FREEZE_RULE.md:"
+cat docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md
