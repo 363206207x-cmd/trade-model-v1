@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, and #841 visual verification, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Source-Owned Runtime vs Existing Point Proposal Merge Map`, and the default next required action is `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, and #842 merge map, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Targeted Source Read for BoundaryCandidate / ExecutionPlan owner`, and the default next required action is `Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
 
 ## Capability Language
 
@@ -138,8 +138,10 @@ Current stop-loss sequence:
 8. Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate: completed docs-only readiness gate.
 9. Minimal Review-Only PositionSync Runtime Wiring Implementation: completed on main as #839.
 10. Minimal Review-Only PositionSync Runtime Wiring Verification: completed on main as #840.
-11. Dashboard PositionSync Visual Verification: active visual verification-only track.
-12. Next required action: `Source-Owned Runtime vs Existing Point Proposal Merge Map`.
+11. Dashboard PositionSync Visual Verification: completed on main as #841.
+12. Source-Owned Runtime vs Existing Point Proposal Merge Map: completed on main as #842.
+13. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner: active source-read track.
+14. Next required action: `Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
 
 ## Workflow Command Automation
 
