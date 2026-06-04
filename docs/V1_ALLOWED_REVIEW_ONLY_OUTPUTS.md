@@ -121,7 +121,11 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceOwnedCandidateIntegrationSourceBindingAssembler Verification status;
 - Source-Owned Candidate Integration Runtime Boundary Plan status;
 - Source-Owned Candidate Integration Runtime Input Contract Plan status;
+- Source-Owned Candidate Integration Runtime DTO Plan status;
 - source-owned candidate runtime integration status;
+- source-owned candidate runtime candidate unavailable reason;
+- source-owned candidate runtime candidate blocked reason;
+- source-owned candidate runtime candidate degraded reason;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
 - incomplete reason;
