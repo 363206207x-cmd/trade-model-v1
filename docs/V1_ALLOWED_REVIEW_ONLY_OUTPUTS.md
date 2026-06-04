@@ -128,6 +128,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceOwnedCandidateIntegrationRuntimeCandidateValidator validation result status;
 - Source-Owned Candidate Integration Runtime Validator Verification status;
 - Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan status;
+- SourceOwnedCandidateIntegrationRuntimeCandidateAssembler validation result status;
 - source-owned candidate runtime integration status;
 - source-owned candidate runtime candidate unavailable reason;
 - source-owned candidate runtime candidate blocked reason;

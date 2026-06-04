@@ -6,6 +6,10 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `701a019 docs(point): define source-owned candidate integration runtime assembler plan (#828)`
+- `c693481 docs(point): verify source-owned candidate integration runtime validator (#827)`
+- `d7c4f99 feat(point): add source-owned candidate integration runtime validator (#826)`
+- `1198d90 docs(point): define source-owned candidate integration runtime validator plan (#825)`
 - `fc1f1ac feat(point): add source-owned candidate integration runtime DTO (#824)`
 - `5925539 docs(point): define source-owned candidate integration runtime DTO plan (#823)`
 - `69384bb docs(point): align runtime input missing reason contract (#822)`
@@ -210,7 +214,9 @@ Current active capability movement:
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON`.
 - P357 is merged on main.
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
-- `P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan` is active on branch `p358`.
+- P358 is merged on main.
+- It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_ASSEMBLER_ORCHESTRATOR_PLAN`.
+- `P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton` is active on branch `p359`.
 - P333 is a docs-only skeleton plan from `SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION` toward `SOURCE_TRACE_RUNTIME_BINDING_PLAN`.
 - P334 is a docs-only verification from `SOURCE_TRACE_RUNTIME_BINDING_PLAN` toward `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION`.
 - P335 is a docs-only plan from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
@@ -239,9 +245,10 @@ Current active capability movement:
 - P356 is a Java/test runtime validator skeleton package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON`.
 - P357 is a docs-only runtime validator verification package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
 - P358 is a docs-only runtime assembler / orchestrator plan from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_ASSEMBLER_ORCHESTRATOR_PLAN`.
+- P359 is a Java/test runtime assembler skeleton from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_ASSEMBLER_ORCHESTRATOR_PLAN` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_ASSEMBLER_ORCHESTRATOR_JAVA_SKELETON`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
-- The next required business action is `P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton`.
+- The active block is Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton.
+- The next required business action is `P360 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Verification`.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -463,6 +470,8 @@ P357 is a Source-Owned Candidate Integration Runtime Validator Verification pack
 
 P358 is a Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan package. It adds only docs defining future explicit runtime assembly input, assembled result, DTO factory selection, validator invocation, incomplete / blocked / degraded / review-only assembly rules, forbidden executable semantics, disabled-by-default boundaries, and next Java skeleton scope. It does not add Java, tests, runtime assembler implementation, runtime orchestrator implementation, service wiring, source-owned candidate runtime, dashboard runtime, source context runtime, numeric point generation, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order execution, execution API, or auto-trading as completed.
 
+P359 is a Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton package. It adds only a plain Java explicit-input runtime assembler, targeted assembler tests, and status documentation. It does not add Runtime Verification, service wiring, source-owned candidate runtime service, internal wiring, dashboard runtime, source context runtime, numeric point generation, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order execution, execution API, or auto-trading as completed.
+
 P291H is workflow simplification. It changes workflow priority to GitHub-native first and terminal scripts fallback only. It does not raise business-chain runtime progress.
 
 Current active mainline status is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
@@ -587,10 +596,10 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after merged P357 / active P358:
+Near-term priority after merged P358 / active P359:
 
-1. Complete P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
-2. P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton.
+1. Complete P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton.
+2. P360 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Verification.
 3. External Channel Authorization Gate only as a separate C-level package.
 4. Readiness / Point specialty planning follow-up before any point generation.
 5. Dashboard smoke / internal preview closure.
