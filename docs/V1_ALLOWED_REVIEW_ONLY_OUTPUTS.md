@@ -120,6 +120,7 @@ The following outputs are allowed in review-only scope when their source ownersh
 - SourceOwnedCandidateIntegrationSourceBindingAssembler validation result status;
 - SourceOwnedCandidateIntegrationSourceBindingAssembler Verification status;
 - Source-Owned Candidate Integration Runtime Boundary Plan status;
+- Source-Owned Candidate Integration Runtime Input Contract Plan status;
 - source-owned candidate runtime integration status;
 - source-owned numeric point proposal unavailable reason;
 - point proposal unavailable reason;
@@ -214,5 +215,6 @@ Examples:
 - `SourceOwnedCandidateIntegrationSourceBindingAssembler validation result status` is allowed only as explicit-input assembler/test skeleton context; it cannot connect source-owned candidate runtime, connect service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
 - `SourceOwnedCandidateIntegrationSourceBindingAssembler Verification status` is allowed only as docs-only verification context for the P345 DTO, P346 validator, and P349 assembler stages; it cannot create Java, tests, source-owned candidate runtime, service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
 - `Source-Owned Candidate Integration Runtime Boundary Plan status` is allowed only as docs-only runtime boundary planning context; it cannot create Java, tests, source-owned candidate runtime, service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
+- `Source-Owned Candidate Integration Runtime Input Contract Plan status` is allowed only as docs-only runtime input contract planning context; it cannot create Java, tests, runtime DTOs, validators, orchestrators, source-owned candidate runtime, service wiring, dashboard runtime, real entry, real stop, real TP, RR generation, final direction, push sending, external channel, order, execution, or auto-trading.
 - `source-owned candidate runtime integration status` is allowed only as future review-only runtime status and must remain `notTradeInstruction=true` and `manualReviewRequired=true`; it cannot become point proposal generation, executable entry / stop / TP / RR, final direction, push payload, external channel message, order, execution, or auto-trading.
 - `RuntimeKlineContext source binding validation result status` is allowed only as review-only validation context; it cannot become an entry, stop, TP, RR, direction, service signal, dashboard runtime output, external channel output, order, execution, or auto-trading action.
