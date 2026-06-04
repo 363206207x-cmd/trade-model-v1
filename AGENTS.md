@@ -7,6 +7,7 @@ Codex must read these files before each task:
 - `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
 - `docs/V1_CAPABILITY_MATRIX.md`
 - `docs/V1_MVP_REALITY_ROADMAP.md`
+- `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`
 - `docs/ANSWER_FORMAT_CONTRACT.md`
 - `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
 - `docs/WORKFLOW_COMMAND_AUTOMATION.md`
@@ -47,3 +48,13 @@ Every task must declare:
 - Overreach Boundary（越界边界）
 
 Do not continue into the next business package until the current package is merged on `main`.
+
+## Duplicate Skeleton Freeze
+
+After #830, Codex must follow `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
+
+Do not default to new DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages.
+
+Do not continue P359 or start P360 by default.
+
+The next allowed track is Cursor Artifact Inventory + Ownership Map unless a task directly reduces duplication, selects canonical ownership, or wires an existing service / runtime / dashboard / API review-only path.

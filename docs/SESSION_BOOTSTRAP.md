@@ -14,6 +14,9 @@ GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITH
 Fixed local fallback commands must follow `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
 （固定本地兜底命令必须遵守 `docs/WORKFLOW_COMMAND_AUTOMATION.md`。）
 
+After #830, duplicate skeleton packages must follow `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
+（#830 之后，重复骨架包必须遵守 `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`。）
+
 Codex must output the result requested by the current package and stop; PR number is required only when PR creation is assigned to Codex.
 （Codex 必须输出当前包要求的结果并停止；只有 PR 创建分配给 Codex 时才必须输出 PR 编号。）
 
@@ -26,13 +29,15 @@ bash scripts/v1-session-bootstrap.sh
 1. Read `docs/ACTIVE_MAINLINE_STATUS.yml`.
 2. Read `docs/V1_CAPABILITY_MATRIX.md`.
 3. Read `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`.
-4. Read `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
-5. Read `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
-6. Run `git branch --show-current`, `git status --short`, and `git log --oneline -5`.
-7. Never use chat memory as progress.
-8. Reply using `docs/ANSWER_FORMAT_CONTRACT.md`.
-9. Do not continue to next package unless current PR is merged, main is synced, and worktree is clean.
-10. Open PR / branch / Issue does not count as done.
+4. Read `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
+5. Read `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
+6. Read `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
+7. Run `git branch --show-current`, `git status --short`, and `git log --oneline -5`.
+8. Never use chat memory as progress.
+9. Reply using `docs/ANSWER_FORMAT_CONTRACT.md`.
+10. Do not continue to next package unless current PR is merged, main is synced, and worktree is clean.
+11. Open PR / branch / Issue does not count as done.
+12. Do not continue P359 or start P360 by default; the next allowed track is Cursor Artifact Inventory + Ownership Map.
 
 ## Workflow Command Shortcuts
 

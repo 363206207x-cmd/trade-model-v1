@@ -8,6 +8,8 @@ Individual scope packs should reference this file instead of copying long blocke
 
 | Capability | Current state | Meaning |
 |---|---|---|
+| duplicate skeleton packages | Blocked by default after #830 | New DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, and point-candidate wrapper packages must not continue unless they reduce duplication, select canonical ownership, connect an existing service / runtime / dashboard / API review-only path, or resolve the #830 runtime wiring gap. |
+| P359 / P360 continuation | Blocked by default after #830 | P359 is not completed progress because it was not merged and PR #829 was closed unmerged. P360 must not start. The next required action is Cursor Artifact Inventory + Ownership Map. |
 | auto-trading | Blocked | The system must not place, close, reverse, resize, or automate trades. |
 | order API | Blocked | No order-placement API may be connected. |
 | execution API | Blocked | No execution or broker/exchange write API may be connected. |

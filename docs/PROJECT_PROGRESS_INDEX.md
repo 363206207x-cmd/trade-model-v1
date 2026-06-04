@@ -6,6 +6,11 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
+- `23cca44 docs(audit): assess cursor before p1 and codex p1 p359 usability (#830)`
+- `701a019 docs(point): define source-owned candidate integration runtime assembler plan (#828)`
+- `c693481 docs(point): verify source-owned candidate integration runtime validator (#827)`
+- `d7c4f99 feat(point): add source-owned candidate integration runtime validator (#826)`
+- `1198d90 docs(point): define source-owned candidate integration runtime validator plan (#825)`
 - `fc1f1ac feat(point): add source-owned candidate integration runtime DTO (#824)`
 - `5925539 docs(point): define source-owned candidate integration runtime DTO plan (#823)`
 - `69384bb docs(point): align runtime input missing reason contract (#822)`
@@ -77,6 +82,14 @@ Current merged main:
 - `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`
 
 Current active capability movement:
+
+- #830 is merged on main.
+- It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
+- Current active block is `Global Duplicate Skeleton Freeze Rule`.
+- New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
+- P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
+- P360 is not allowed to start.
+- The next required action is `Cursor Artifact Inventory + Ownership Map`, not a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
@@ -210,7 +223,10 @@ Current active capability movement:
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_PLAN` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON`.
 - P357 is merged on main.
 - It moved the chain from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` to `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
-- `P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan` is active on branch `p358`.
+- `P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan` is completed on main by `701a019`.
+- `#830 V1 Cursor-before-P1 vs Codex-P1-P359 Global Usability / Duplication / Continuity Audit` is completed on main by `23cca44`.
+- The active workflow block is `Global Duplicate Skeleton Freeze Rule`.
+- The next required action is `Cursor Artifact Inventory + Ownership Map`.
 - P333 is a docs-only skeleton plan from `SOURCETRACE_NUMERIC_SOURCE_ASSEMBLER_VERIFICATION` toward `SOURCE_TRACE_RUNTIME_BINDING_PLAN`.
 - P334 is a docs-only verification from `SOURCE_TRACE_RUNTIME_BINDING_PLAN` toward `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION`.
 - P335 is a docs-only plan from `SOURCE_TRACE_RUNTIME_BINDING_VERIFICATION` toward `RUNTIME_KLINE_CONTEXT_SOURCE_BINDING_PLAN`.
@@ -240,8 +256,10 @@ Current active capability movement:
 - P357 is a docs-only runtime validator verification package from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_JAVA_SKELETON` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION`.
 - P358 is a docs-only runtime assembler / orchestrator plan from `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_VALIDATOR_VERIFICATION` toward `SOURCE_OWNED_CANDIDATE_INTEGRATION_RUNTIME_ASSEMBLER_ORCHESTRATOR_PLAN`.
 - The active mainline is Readiness / Point Mainline.
-- The active block is Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
-- The next required business action is `P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton`.
+- The active block is Global Duplicate Skeleton Freeze Rule.
+- The next required business action is `Cursor Artifact Inventory + Ownership Map`.
+- Do not continue P359 by default.
+- Do not start P360.
 
 P291D, P291E, P291F, P291G, and P291H are workflow/source-of-truth packages. They do not raise Market Read business-chain capability or Production Runtime Progress.
 
@@ -587,17 +605,18 @@ Use `docs/V1_MVP_REALITY_ROADMAP.md` as the roadmap.
 
 Use `docs/SESSION_BOOTSTRAP.md` at every new window.
 
-Near-term priority after merged P357 / active P358:
+Near-term priority after #830:
 
-1. Complete P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
-2. P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton.
-3. External Channel Authorization Gate only as a separate C-level package.
-4. Readiness / Point specialty planning follow-up before any point generation.
-5. Dashboard smoke / internal preview closure.
-6. Review-only Execution Advice and entry / stop / TP / RR proposal only after source-owned gates.
-7. manual position entry and monitor suggestions.
-8. AI conflict downgrade and recovery conditions.
-9. review / missed-valid logging.
+1. Enforce `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
+2. Cursor Artifact Inventory + Ownership Map.
+3. Runtime Wiring Target Selection Plan.
+4. Source-Owned Runtime vs Existing Point Proposal Merge Map.
+5. Minimal Review-Only Runtime Integration Plan.
+6. Existing Dashboard / Service / API Runtime Slice Selection.
+
+Do not continue P359 or start P360 by default.
+
+Do not open Three AI, Position Monitor expansion, Dashboard expansion, external Push, executable point generation, a new source-binding family, a new candidate family, a new point family, order execution, or auto-trading while the freeze rule is active.
 
 ## Blocked Capability Reference
 

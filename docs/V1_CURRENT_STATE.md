@@ -5,14 +5,17 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `c693481 docs(point): verify source-owned candidate integration runtime validator (#827)`
+- Current merged main: `23cca44 docs(audit): assess cursor before p1 and codex p1 p359 usability (#830)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is branch `p358`: `P358 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan`.
+- Current active block is `Global Duplicate Skeleton Freeze Rule`.
+- Current next required action is `Cursor Artifact Inventory + Ownership Map`.
+- P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
+- P360 is not allowed to start.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -69,7 +72,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P355 is completed on main as Source-Owned Candidate Integration Runtime Validator Plan.
 - P356 is completed on main as Source-Owned Candidate Integration Runtime Validator Java Skeleton.
 - P357 is completed on main as Source-Owned Candidate Integration Runtime Validator Verification.
-- P358 is the active Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan package.
+- P358 is completed on main as Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan.
+- #830 is completed on main as the Cursor-before-P1 vs Codex-P1-P359 global usability / duplication / continuity audit.
+- The active block is now Global Duplicate Skeleton Freeze Rule.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -162,7 +167,17 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P357 does not add Java, tests, Runtime Assembler, Runtime Orchestrator, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, point proposal, push payload, candidate runtime output, or executable action output.
 - P358 defines only the future Source-Owned Candidate Integration Runtime Assembler / Orchestrator Plan after Runtime DTO + Validator verification.
 - P358 does not add Java, tests, Runtime Assembler implementation, Runtime Orchestrator implementation, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, point proposal, push payload, candidate runtime output, or executable action output.
-- Fixed next recommended business package after P358 is `P359 Source-Owned Candidate Integration Runtime Assembler / Orchestrator Java Skeleton`, still not service runtime or runtime-safe usable implementation.
+- Fixed next recommended action after #830 is `Cursor Artifact Inventory + Ownership Map`, not P359, not P360, and not a new DTO / Validator / Assembler / Orchestrator package.
+
+## Global Duplicate Skeleton Freeze Rule
+
+`docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md` is now a source-of-truth gate.
+
+The project must not default to new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper packages.
+
+Allowed next work must reduce duplication, merge Cursor-era assets with Codex-era skeletons, select canonical ownership, connect an existing service / runtime / dashboard / API review-only path, raise capability level toward `REVIEW_ONLY_RUNTIME`, or resolve a runtime wiring gap identified by #830.
+
+P359 is not revived by default. P360 is blocked.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
