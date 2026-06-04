@@ -5,14 +5,14 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `1d6f549 docs(point): verify source-owned candidate integration assembler (#818)`
+- Current merged main: `dc675e7 docs(point): define source-owned candidate integration runtime boundary (#819)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current open business-chain package is branch `p351`: `P351 Source-Owned Candidate Integration Runtime Boundary Plan`.
+- Current open business-chain package is branch `p352`: `P352 Source-Owned Candidate Integration Runtime Input Contract Plan`.
 - P306 is completed on main as Readiness / Point Boundary Planning Gate. It defines the boundary before Readiness, point proposal, external channel, and execution-adjacent work.
 - P307 is completed on main as Review-only Readiness Gate Skeleton.
 - P308 is completed on main as Review-only Point Boundary / Proposal Gate.
@@ -61,7 +61,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P348 is completed on main as SourceOwnedCandidateIntegrationSourceBindingAssembler Plan.
 - P349 is completed on main as SourceOwnedCandidateIntegrationSourceBindingAssembler Java Skeleton.
 - P350 is completed on main as SourceOwnedCandidateIntegrationSourceBindingAssembler Verification.
-- P351 is the active Source-Owned Candidate Integration Runtime Boundary Plan package.
+- P351 is completed on main as Source-Owned Candidate Integration Runtime Boundary Plan.
+- P352 is the active Source-Owned Candidate Integration Runtime Input Contract Plan package.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
@@ -139,7 +140,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - P350 does not add Java, tests, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, candidate runtime output, or executable action output.
 - P351 defines only the future Source-Owned Candidate Integration Runtime Boundary Plan after the source binding L0-L4 skeleton is complete.
 - P351 does not add Java, tests, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, candidate runtime output, or executable action output.
-- Fixed next recommended business package after P351 is `P352 Source-Owned Candidate Integration Runtime Input Contract Plan`, still not runtime implementation.
+- P352 defines only the future Source-Owned Candidate Integration Runtime Input Contract Plan after the runtime boundary plan.
+- P352 does not add Java, tests, service, controller, mapper, repository, scheduler, resources, schema, config, pom, dashboard runtime, source-owned candidate runtime, internal preview, external channel, Push, order, execution, auto-trading, real entry, real stop, real TP, RR generation, final direction, candidate runtime output, or executable action output.
+- Fixed next recommended business package after P352 is `P353 Source-Owned Candidate Integration Runtime DTO Plan`, still not runtime implementation.
 
 Default workflow is GPT + Codex + GitHub-native.
 （默认工作流是 GPT + Codex + GitHub 原生。）
