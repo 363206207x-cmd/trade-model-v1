@@ -10,6 +10,10 @@ The system may produce useful, structured, non-executable proposals when they ar
 - not executable by the system;
 - blocked from external send unless a later package explicitly authorizes that channel.
 
+Allowed review-only output does not authorize another duplicate skeleton package.
+
+After #830, `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md` blocks new DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages by default unless the work reduces duplication, selects canonical ownership, connects an existing service / runtime / dashboard / API review-only path, or resolves a runtime wiring gap.
+
 ## Allowed Review-Only Outputs
 
 The following outputs are allowed in review-only scope when their source ownership, freshness, risk state, and guard result are visible:

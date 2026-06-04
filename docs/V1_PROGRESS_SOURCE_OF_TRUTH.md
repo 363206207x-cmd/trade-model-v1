@@ -53,8 +53,9 @@ Every progress answer must check these sources in this order:
 5. `docs/V1_CURRENT_STATE.md`
 6. `docs/PROJECT_PROGRESS_INDEX.md`
 7. `docs/V1_CAPABILITY_MATRIX.md`
-8. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
-9. `docs/ANSWER_FORMAT_CONTRACT.md`
+8. `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`
+9. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
+10. `docs/ANSWER_FORMAT_CONTRACT.md`
 
 If these sources disagree, merged `main` wins and the docs must be corrected.
 
@@ -77,6 +78,10 @@ Do not continue to the next package when PR creation, PR review, merge, main syn
 Do not treat legacy runtime clients as proof that the new scan-chain is complete.
 
 Do not count repeated blocked-list documents as product usability progress.
+
+Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
+
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`, and the default next required action after #830 is Cursor Artifact Inventory + Ownership Map.
 
 ## Capability Language
 
@@ -105,6 +110,21 @@ Review-only means useful proposals and risk actions may be shown to a human whil
 - blocked from automatic order, close, reverse, leverage change, execution, or external send unless separately authorized.
 
 Status and progress answers must use `docs/ANSWER_FORMAT_CONTRACT.md`.
+
+## Duplicate Skeleton Freeze
+
+The #830 audit found a package-count progress trap: repeated skeleton and docs-only packages were increasing surface area without moving user-visible capability toward `REVIEW_ONLY_RUNTIME`.
+
+Future packages must include these extra final-output fields:
+
+- 是否创建新骨架: Yes / No
+- 是否复用 Cursor-era 资产: Yes / No
+- 是否减少重复: Yes / No
+- 是否提升 capability level: Yes / No
+- 是否接 service/runtime/dashboard/API: Yes / No
+- 是否符合 #830 审计建议: Yes / No
+
+If the package would only add another skeleton or wrapper, it must be rejected and redirected to the ownership-map / wiring-plan tracks.
 
 ## Workflow Command Automation
 
