@@ -7,6 +7,8 @@ import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -402,6 +404,31 @@ class DefaultExecutionPlanDisplayAdapterTest {
             assertFalse(fieldName.contains("automation"));
             assertFalse(fieldName.contains("autotrading"));
             assertFalse(fieldName.contains("boundarycandidate"));
+        }
+    }
+
+    @Test
+    void displayAdaptersShouldNotBecomePointProposalOrRuntimeCandidateOwners() throws Exception {
+        List<Path> displayOwnerSources = List.of(
+                Path.of("src/main/java/org/example/trademodel/service/dashboard/DefaultExecutionPlanDisplayAdapter.java"),
+                Path.of("src/main/java/org/example/trademodel/service/dashboard/DefaultPlanBoundaryDisplayAdapter.java")
+        );
+        List<String> frozenOwnerNames = List.of(
+                "SourceOwnedCandidateIntegrationRuntimeCandidate",
+                "SourceOwnedCandidateIntegrationRuntimeCandidateAssembler",
+                "SourceOwnedCandidateIntegrationRuntimeCandidateValidator",
+                "ReviewOnlyNumericPointProposal",
+                "ReviewOnlyPointProposal",
+                "NumericPointSafetyValidator",
+                "SourceTraceNumericSourceContextDTO"
+        );
+
+        for (Path displayOwnerSource : displayOwnerSources) {
+            String sourceText = Files.readString(displayOwnerSource);
+            for (String frozenOwnerName : frozenOwnerNames) {
+                assertFalse(sourceText.contains(frozenOwnerName),
+                        displayOwnerSource + " must not depend on frozen owner " + frozenOwnerName);
+            }
         }
     }
 
