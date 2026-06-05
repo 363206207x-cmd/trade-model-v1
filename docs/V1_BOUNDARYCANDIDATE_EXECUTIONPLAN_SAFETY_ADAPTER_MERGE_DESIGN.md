@@ -17,7 +17,9 @@
 
 可以保留的 adapter 语义包括：`manualReviewRequired`、`notTradeInstruction`、fail-closed、incomplete-safe、source trace completeness、numeric source ownership labels、blocking reasons、display-only readiness reasons，以及不生成 executable output 的测试约束。
 
-必须冻结的 wrapper 包括：P359、P360、`SourceOwnedCandidateIntegrationRuntimeCandidate` 作为 canonical owner、`ReviewOnlyNumericPointProposal` 作为 standalone owner、`ReviewOnlyPointProposal` 作为 standalone owner，以及任何新的 DTO / Validator / Assembler family。
+必须冻结的 wrapper 包括：P359、P360、`SourceOwnedCandidateIntegrationRuntimeCandidate` 保持 non-canonical 并作为 standalone owner 冻结、`ReviewOnlyNumericPointProposal` 作为 standalone owner、`ReviewOnlyPointProposal` 作为 standalone owner，以及任何新的 DTO / Validator / Assembler family。
+
+`SourceOwnedCandidateIntegrationRuntimeCandidate` must remain non-canonical. It must be frozen as a standalone owner, may only be reused later as display/readiness safety semantics absorbed into the `BoundaryCandidate` / `ExecutionPlan` owner path, and must not become a canonical runtime candidate owner.
 
 不允许恢复 P359/P360。#843 没有证明 P359 会减少重复；它更可能在 `BoundaryCandidate`、`ExecutionPlan`、`DecisionResult`、dashboard adapters 旁边新增一条 parallel runtime candidate owner。
 
@@ -53,7 +55,7 @@ BoundaryCandidateService / BoundaryCandidateDTO
 | `NumericPointSafetyValidator` | Forbidden executable semantics, required refs, fail-closed / incomplete / degraded checks, safety flags. | High if kept as parallel validator. Existing owner path already has boundary status, blocking reasons, source trace, data quality, and RiskActionGuard handling. | Existing `BoundaryCandidateService` validation rules and targeted owner-path tests. | Merge-later as rule source; do not keep as canonical runtime validator. |
 | `SourceTraceNumericSource` | Numeric source identity, source owner labels, freshness / completeness semantics, source confidence labels. | Medium-high. It overlaps `BoundarySourceFieldsDTO` and source trace display adapters. | `BoundarySourceFieldsDTO` / source trace display adapters. | Freeze standalone source owner; merge-later as source field labels and completeness reasons. |
 | `SourceOwnedCandidateIntegrationSourceBinding` | Upstream source completeness, trust, review-only, incomplete-safe, fail-closed flags. | High. It wraps source ownership but is not connected to existing runtime owner path. | Boundary / execution readiness reasons only after owner-path gate. | Freeze; reuse only as safety vocabulary. |
-| `SourceOwnedCandidateIntegrationRuntimeCandidate` | Runtime candidate status, incomplete / blocked / degraded / review-only distinctions, safety flags. | Very high. It competes with `BoundaryCandidate`, `ExecutionPlan`, and dashboard adapters as runtime/display owner. | Display/readiness reasons inside existing owner path, not as object owner. | Freeze as canonical owner. |
+| `SourceOwnedCandidateIntegrationRuntimeCandidate` | Runtime candidate status, incomplete / blocked / degraded / review-only distinctions, safety flags. | Very high. It competes with `BoundaryCandidate`, `ExecutionPlan`, and dashboard adapters as runtime/display owner. | Display/readiness reasons inside existing owner path, not as object owner. | Freeze as standalone owner; keep non-canonical; reuse later only as absorbed display/readiness safety semantics. |
 | `SourceOwnedCandidateIntegrationRuntimeCandidateValidator` | Safety flag enforcement, forbidden semantics checks, blocked/incomplete/degraded/review-only validation result. | High if revived independently. It has no service/dashboard runtime owner path. | Owner-path tests and fail-closed validation rules. | Merge-later as test/rule reference only. |
 | P359 Runtime Assembler | Explicit-input assembly discipline and mandatory validator invocation. | Very high. It would create a new parallel assembler path beside the existing owners. | None until readiness gate proves it reduces duplication. | Freeze. Do not revive by default. |
 
@@ -106,7 +108,7 @@ The following remain frozen:
 
 - P359
 - P360
-- `SourceOwnedCandidateIntegrationRuntimeCandidate` as canonical owner
+- `SourceOwnedCandidateIntegrationRuntimeCandidate` as a standalone owner, explicitly non-canonical
 - `ReviewOnlyNumericPointProposal` as standalone owner
 - `ReviewOnlyPointProposal` as standalone owner
 - new DTO / Validator / Assembler families
