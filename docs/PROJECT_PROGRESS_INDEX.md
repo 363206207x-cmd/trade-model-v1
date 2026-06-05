@@ -6,11 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Merge Design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
+- Active stop-loss track: `Minimal Implementation Readiness Gate for BoundaryCandidate / ExecutionPlan owner-path safety adapter merge`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Minimal implementation readiness gate for owner-path safety adapter merge`.
+- Next required action: `Minimal owner-path safety adapter test/merge implementation`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `04c8cb8 Design BoundaryCandidate ExecutionPlan safety adapter merge (#844)`
 - `a7782c9 docs(wiring): read boundary candidate execution plan owners (#843)`
 - `7e73b41 docs(wiring): map source-owned runtime and point proposal ownership (#842)`
 - `b7a1964 docs(wiring): record positionsync dashboard visual verification (#841)`
@@ -106,12 +107,14 @@ Current active capability movement:
 - It completed Cursor Artifact Inventory + Ownership Map and identified `PositionSync + Dashboard review-only status` as the first minimal runtime wiring candidate.
 - #843 is merged on main.
 - It completed Targeted Source Read for BoundaryCandidate / ExecutionPlan owner and confirmed `BoundaryCandidateService` / `BoundaryCandidateDTO`, `PlanService` / `ExecutionPlanVO/DO/Mapper`, `DecisionResult`, and dashboard display adapters as owner paths while keeping `NumericPointProposal`, `SourceOwnedRuntimeCandidate`, P359, and P360 frozen.
-- Current active block is `Minimal Merge Design for BoundaryCandidate / ExecutionPlan owner + safety adapters`.
+- #844 is merged on main.
+- It completed the BoundaryCandidate / ExecutionPlan safety adapter merge design, keeps `SourceOwnedCandidateIntegrationRuntimeCandidate` non-canonical, and keeps P359/P360 frozen.
+- Current active block is `Minimal Implementation Readiness Gate for BoundaryCandidate / ExecutionPlan owner-path safety adapter merge`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Selected target is `PositionSync + Dashboard review-only status`.
-- The next required action is `Minimal implementation readiness gate for owner-path safety adapter merge`, not a new skeleton package.
+- The next required action is `Minimal owner-path safety adapter test/merge implementation`, not a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
