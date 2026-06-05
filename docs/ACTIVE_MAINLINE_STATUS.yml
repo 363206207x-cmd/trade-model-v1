@@ -1,13 +1,13 @@
-current_head: "a7782c9"
+current_head: "04c8cb8"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Merge Design for BoundaryCandidate / ExecutionPlan Owner + Safety Adapters"
-active_block_cn: "BoundaryCandidate / ExecutionPlan owner + safety adapters 最小合并设计"
+active_block: "Minimal Implementation Readiness Gate for BoundaryCandidate / ExecutionPlan Owner-Path Safety Adapter Merge"
+active_block_cn: "BoundaryCandidate / ExecutionPlan owner-path safety adapter merge 最小实现 readiness gate"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "boundarycandidate-executionplan-safety-adapter-merge-design"
-merge_rule: "Merge design only; no Java, tests, dashboard, service/controller/provider/scheduler/mapper/schema/config/pom changes, no new endpoint, no new DTO/Validator/Assembler/Orchestrator, no point generation, no push, no external channel, no order execution"
-next_required_action: "Minimal implementation readiness gate for owner-path safety adapter merge"
+current_branch: "boundarycandidate-executionplan-safety-adapter-readiness-gate"
+merge_rule: "Readiness gate only; no Java, tests, dashboard, service/controller/provider/scheduler/mapper/schema/config/pom changes, no new endpoint, no new DTO/Validator/Assembler/Orchestrator, no point generation, no push, no external channel, no order execution"
+next_required_action: "Minimal owner-path safety adapter test/merge implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -25,7 +25,8 @@ positionsync_runtime_wiring_verification_status: "completed on main as #840; ver
 positionsync_dashboard_visual_verification_status: "completed on main as #841; visually verified #839/#840 dashboard PositionSync visibility, provider/fallback/simulated/freshness/last-sync/open-position-count display, safety copy, simulated warning, layout, and no trading action semantics"
 source_owned_runtime_vs_existing_point_proposal_merge_map_status: "completed on main as #842; maps SourceOwnedCandidateIntegration runtime wrappers, NumericPointProposal, ReviewOnlyPointProposal, BoundaryCandidate, ExecutionPlan, DecisionResult, and dashboard display adapters to canonical owner candidates without implementation"
 boundarycandidate_executionplan_owner_source_read_status: "completed on main as #843; confirms BoundaryCandidateService/DTO, PlanService/ExecutionPlanVO/DO/Mapper, DecisionResult read model, and dashboard adapters as owner paths; keeps NumericPointProposal, SourceOwnedRuntimeCandidate, P359, and P360 frozen"
-boundarycandidate_executionplan_safety_adapter_merge_design_status: "active; designs how Codex safety semantics can be absorbed into the existing BoundaryCandidate / ExecutionPlan / DecisionResult / dashboard adapter owner path without new wrapper owners"
+boundarycandidate_executionplan_safety_adapter_merge_design_status: "completed on main as #844; designs how Codex safety semantics can be absorbed into the existing BoundaryCandidate / ExecutionPlan / DecisionResult / dashboard adapter owner path without new wrapper owners, keeps SourceOwnedCandidateIntegrationRuntimeCandidate non-canonical, and keeps P359/P360 frozen"
+boundarycandidate_executionplan_safety_adapter_implementation_readiness_status: "active; verifies whether a minimal owner-path safety adapter test/merge implementation can proceed without new DTO/Validator/Assembler, runtime candidate wrapper, P359/P360, point generation, or dashboard path expansion"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
