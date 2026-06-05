@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, and #845 implementation readiness gate, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Minimal Owner-Path Safety Adapter Test/Merge Implementation`, and the default next required action is `Minimal Owner-Path Safety Adapter Test/Merge Verification`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, #845 implementation readiness gate, and #846 tests-first owner-path safety adapter merge, the current selected target remains `PositionSync + Dashboard review-only status`, the active stop-loss action is `Minimal Owner-Path Safety Adapter Test/Merge Verification`, and the default next required action is `Minimal owner-path safety adapter production merge readiness review`.
 
 ## Capability Language
 
@@ -143,8 +143,9 @@ Current stop-loss sequence:
 13. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner: completed on main as #843.
 14. Minimal Merge Design for BoundaryCandidate / ExecutionPlan owner + safety adapters: completed on main as #844.
 15. Minimal Implementation Readiness Gate for BoundaryCandidate / ExecutionPlan owner-path safety adapter merge: completed on main as #845.
-16. Minimal Owner-Path Safety Adapter Test/Merge Implementation: active.
-17. Next required action: `Minimal Owner-Path Safety Adapter Test/Merge Verification`.
+16. Minimal Owner-Path Safety Adapter Test/Merge Implementation: completed on main as #846.
+17. Minimal Owner-Path Safety Adapter Test/Merge Verification: active.
+18. Next required action: `Minimal owner-path safety adapter production merge readiness review`.
 
 ## Workflow Command Automation
 
