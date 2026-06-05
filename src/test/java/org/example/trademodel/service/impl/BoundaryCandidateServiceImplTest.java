@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -326,6 +328,34 @@ class BoundaryCandidateServiceImplTest {
         assertThat(methodNames).noneMatch(name -> name.contains("order"));
         assertThat(methodNames).noneMatch(name -> name.contains("close"));
         assertThat(methodNames).noneMatch(name -> name.contains("reverse"));
+    }
+
+    @Test
+    void ownerPathShouldNotReferenceFrozenPointOrRuntimeWrappers() throws Exception {
+        List<Path> ownerPathSources = List.of(
+                Path.of("src/main/java/org/example/trademodel/service/impl/BoundaryCandidateServiceImpl.java"),
+                Path.of("src/main/java/org/example/trademodel/dto/planboundary/BoundaryCandidateDTO.java"),
+                Path.of("src/main/java/org/example/trademodel/dto/planboundary/BoundaryEntryDTO.java"),
+                Path.of("src/main/java/org/example/trademodel/dto/planboundary/BoundaryStopDTO.java"),
+                Path.of("src/main/java/org/example/trademodel/dto/planboundary/BoundaryTakeProfitLevelDTO.java"),
+                Path.of("src/main/java/org/example/trademodel/dto/planboundary/BoundarySourceFieldsDTO.java")
+        );
+        List<String> frozenWrapperNames = List.of(
+                "SourceOwnedCandidateIntegrationRuntimeCandidate",
+                "SourceOwnedCandidateIntegrationRuntimeCandidateAssembler",
+                "SourceOwnedCandidateIntegrationRuntimeCandidateValidator",
+                "ReviewOnlyNumericPointProposal",
+                "ReviewOnlyPointProposal",
+                "NumericPointSafetyValidator",
+                "SourceTraceNumericSourceContextDTO"
+        );
+
+        for (Path ownerPathSource : ownerPathSources) {
+            String sourceText = Files.readString(ownerPathSource);
+            for (String frozenWrapperName : frozenWrapperNames) {
+                assertThat(sourceText).doesNotContain(frozenWrapperName);
+            }
+        }
     }
 
     private SourceTraceDTO validSourceTrace() {

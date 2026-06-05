@@ -4,9 +4,9 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Implementation Readiness Gate for BoundaryCandidate / ExecutionPlan owner-path safety adapter merge`.
+- Active track: `Minimal Owner-Path Safety Adapter Test/Merge Implementation`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Minimal owner-path safety adapter test/merge implementation`.
+- Next required action: `Minimal Owner-Path Safety Adapter Test/Merge Verification`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -17,7 +17,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #842 completed the merge map that reduces duplicate point/runtime skeleton risk by comparing Source-Owned Runtime, Existing Point Proposal, BoundaryCandidate, ExecutionPlan, DecisionResult, and dashboard display adapters.
 - #843 confirmed BoundaryCandidate / ExecutionPlan / DecisionResult / dashboard adapter owner paths before merge design.
 - #844 completed the merge design that maps Codex safety adapters into those existing owners, keeps `SourceOwnedCandidateIntegrationRuntimeCandidate` non-canonical, does not create a new skeleton, and does not revive P359/P360.
-- The active readiness gate decides whether a minimal owner-path safety adapter test/merge implementation can proceed without new DTO / Validator / Assembler, runtime candidate wrapper, P359/P360, point generation, or dashboard path expansion.
+- #845 completed the readiness gate and returned GO for tests-first owner-path safety adapter merge.
+- The active implementation strengthens existing BoundaryCandidate / ExecutionPlan owner-path tests without production Java changes, new DTO / Validator / Assembler, runtime candidate wrapper, P359/P360, point generation, or dashboard path expansion.
 
 ## Roadmap
 
@@ -133,6 +134,7 @@ Recommended next actions:
 11. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner.
 12. Minimal merge design for BoundaryCandidate / ExecutionPlan owner + safety adapters.
 13. Minimal implementation readiness gate for owner-path safety adapter merge.
+14. Minimal owner-path safety adapter test/merge implementation.
 
 Do not continue P359 or start P360 by default.
 
