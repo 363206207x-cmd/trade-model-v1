@@ -1,13 +1,13 @@
-current_head: "39dd7da"
+current_head: "840ca72"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source Read for MarketQuote Freshness / Fallback Dashboard API Status"
-active_block_cn: "MarketQuote 新鲜度 / fallback / dashboard API 状态 source read"
+active_block: "Minimal Review-Only MarketQuote Freshness Runtime Wiring Design"
+active_block_cn: "MarketQuote 新鲜度 review-only runtime 接线设计"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "marketquote-freshness-fallback-dashboard-source-read"
-merge_rule: "Source-read only; may add MarketQuote source-read docs and status/source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, MarketQuote runtime implementation, candidate, Decision, Point, final direction, order execution, P359, or P360"
-next_required_action: "Minimal Review-Only MarketQuote Freshness Runtime Wiring Design"
+current_branch: "minimal-review-only-marketquote-freshness-runtime-wiring-design"
+merge_rule: "Design only; may add MarketQuote freshness wiring design docs and status/source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, MarketQuote runtime implementation, candidate, Decision, Point, final direction, order execution, P359, or P360"
+next_required_action: "Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -40,7 +40,8 @@ minimal_review_only_watchlist_runtime_wiring_implementation_status: "completed o
 minimal_review_only_watchlist_runtime_wiring_verification_status: "completed on main as #856; verified #855 workflow contract, compile, test-compile, targeted controller/dashboard/adapter tests, API smoke, dashboard smoke, forbidden paths, and no Push / MarketQuote / candidate / point / trading expansion"
 watchlist_visual_verification_closure_status: "completed on main as #857; browser-verified #855/#856 dashboard Watchlist Pool status panel, Display Slots boundary copy, default-six boundary, no layout overlap, and no Push / MarketQuote / candidate / point / trading semantics"
 next_minimal_runtime_slice_selection_status: "completed on main as #858; selects MarketQuote freshness / fallback / dashboard API status as the next minimal source-read target after PositionSync and Watchlist REVIEW_ONLY_RUNTIME partial slices"
-marketquote_freshness_fallback_dashboard_source_read_status: "active; source-read confirms MarketQuoteClient / BinanceMarketQuoteClient, RealMarketEnvironmentService, dashboard detail/source trace quote metadata, and tests exist, while dedicated quote freshness/fallback/source-health API/dashboard status remains partial and must move to design only"
+marketquote_freshness_fallback_dashboard_source_read_status: "completed on main as #859; source-read confirms MarketQuoteClient / BinanceMarketQuoteClient, RealMarketEnvironmentService, dashboard detail/source trace quote metadata, and tests exist, while dedicated quote freshness/fallback/source-health API/dashboard status remains partial and must move to design only"
+minimal_review_only_marketquote_freshness_runtime_wiring_design_status: "active; designs review-only MarketQuote freshness/fallback/source-health owner path, status mapping, dashboard/API surface, Watchlist boundary, readiness checklist, and no-Push/no-Candidate/no-Point/no-trading boundary without implementation"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Source Read for MarketQuote Freshness / Fallback Dashboard API Status`.
+- Active track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
 - Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`.
+- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -33,7 +33,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #856 completed Minimal Review-Only Watchlist Runtime Wiring Verification and validates #855 compile/test results, API smoke, dashboard smoke, forbidden path boundaries, and no executable semantics.
 - #857 completed Watchlist Visual Verification / Closure and confirms the dashboard Watchlist Pool panel, Display Slots / Watchlist Pool boundary copy, default-six boundary copy, review-only / no-Push copy, layout acceptability, and no visible trading semantics.
 - #858 completed Next Minimal Runtime Slice Selection and selected `MarketQuote freshness / fallback / dashboard API status` as the next source-read target.
-- The active MarketQuote source read confirms legacy quote provider/service/dashboard-detail assets exist, but dedicated quote freshness/fallback/source-health API/dashboard status remains partial and must move to design before implementation.
+- #859 completed MarketQuote freshness / fallback / dashboard API status source read and confirms legacy quote provider/service/dashboard-detail assets exist, but dedicated quote freshness/fallback/source-health API/dashboard status remains partial.
+- The active MarketQuote wiring design defines the future review-only owner path, status mapping, dashboard/API surface, Watchlist boundary, and readiness checklist before any implementation.
 
 ## Roadmap
 
@@ -164,6 +165,7 @@ Recommended next actions:
 26. Next minimal runtime slice selection.
 27. Source Read for MarketQuote Freshness / Fallback Dashboard API Status.
 28. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design.
+29. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate.
 
 Do not continue P359 or start P360 by default.
 
