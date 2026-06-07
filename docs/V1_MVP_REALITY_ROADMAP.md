@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`.
+- Active track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
 - Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
+- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -34,7 +34,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #857 completed Watchlist Visual Verification / Closure and confirms the dashboard Watchlist Pool panel, Display Slots / Watchlist Pool boundary copy, default-six boundary copy, review-only / no-Push copy, layout acceptability, and no visible trading semantics.
 - #858 completed Next Minimal Runtime Slice Selection and selected `MarketQuote freshness / fallback / dashboard API status` as the next source-read target.
 - #859 completed MarketQuote freshness / fallback / dashboard API status source read and confirms legacy quote provider/service/dashboard-detail assets exist, but dedicated quote freshness/fallback/source-health API/dashboard status remains partial.
-- The active MarketQuote wiring design defines the future review-only owner path, status mapping, dashboard/API surface, Watchlist boundary, and readiness checklist before any implementation.
+- #860 completed Minimal Review-Only MarketQuote Freshness Runtime Wiring Design and defines the future review-only owner path, status mapping, dashboard/API surface, Watchlist boundary, and readiness checklist before any implementation.
+- The active MarketQuote readiness gate decides whether a minimal review-only implementation may proceed without new DTO / Validator / Assembler, Push, Candidate, Point, or trading expansion.
 
 ## Roadmap
 
@@ -166,6 +167,7 @@ Recommended next actions:
 27. Source Read for MarketQuote Freshness / Fallback Dashboard API Status.
 28. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design.
 29. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate.
+30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation, only if readiness remains GO.
 
 Do not continue P359 or start P360 by default.
 

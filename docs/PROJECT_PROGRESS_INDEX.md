@@ -6,13 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`.
+- Active stop-loss track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
 - Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
+- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `b6eb455 docs(marketquote): design review-only freshness runtime wiring (#860)`
 - `840ca72 docs(marketquote): read market quote freshness source path (#859)`
 - `39dd7da docs(runtime): select next minimal runtime slice (#858)`
 - `ca5b477 docs(watchlist): record watchlist visual verification closure (#857)`
@@ -156,13 +157,15 @@ Current active capability movement:
 - It completed Next Minimal Runtime Slice Selection and selected `MarketQuote freshness / fallback / dashboard API status` as the next source-read target after the completed PositionSync and Watchlist review-only runtime slices.
 - #859 is merged on main.
 - It completed Source Read for MarketQuote Freshness / Fallback Dashboard API Status and confirmed legacy MarketQuote provider/service/dashboard-detail/source-trace assets exist while dedicated quote freshness/fallback/source-health status remains partial.
-- Current active block is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`.
+- #860 is merged on main.
+- It completed Minimal Review-Only MarketQuote Freshness Runtime Wiring Design and fixed the future owner path, status mapping, dashboard/API surface, Watchlist boundary, and readiness checklist without implementation.
+- Current active block is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status` and `Watchlist + RuleConfig + Dashboard/API review-only status`, both `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `MarketQuote freshness / fallback / dashboard API status`.
-- The next required action is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`, readiness-only and not MarketQuote runtime implementation.
+- The next required action is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation`, but only after this readiness gate remains GO.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.

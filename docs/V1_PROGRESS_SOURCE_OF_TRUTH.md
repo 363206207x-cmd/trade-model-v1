@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, #845 implementation readiness gate, #846 tests-first owner-path safety adapter merge, #847 owner-path safety adapter test/merge verification, #848 owner-path production merge readiness review, #849 Watchlist source read, #850 Watchlist wiring design, #851 Watchlist readiness gate, #852 further Watchlist API / dashboard source read, #853 Watchlist implementation plan, #854 Watchlist implementation readiness gate, #855 Watchlist implementation, #856 Watchlist runtime verification, #857 Watchlist visual verification closure, #858 next minimal runtime slice selection, and #859 MarketQuote source read, the completed runtime slices are `PositionSync + Dashboard review-only status` and `Watchlist + RuleConfig + Dashboard/API review-only status`, both `REVIEW_ONLY_RUNTIME partial`; the active stop-loss action is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`, and the default next required action is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, #845 implementation readiness gate, #846 tests-first owner-path safety adapter merge, #847 owner-path safety adapter test/merge verification, #848 owner-path production merge readiness review, #849 Watchlist source read, #850 Watchlist wiring design, #851 Watchlist readiness gate, #852 further Watchlist API / dashboard source read, #853 Watchlist implementation plan, #854 Watchlist implementation readiness gate, #855 Watchlist implementation, #856 Watchlist runtime verification, #857 Watchlist visual verification closure, #858 next minimal runtime slice selection, #859 MarketQuote source read, and #860 MarketQuote freshness wiring design, the completed runtime slices are `PositionSync + Dashboard review-only status` and `Watchlist + RuleConfig + Dashboard/API review-only status`, both `REVIEW_ONLY_RUNTIME partial`; the active stop-loss action is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`, and the default next required action is `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation` only if this readiness gate remains GO.
 
 ## Capability Language
 
@@ -157,8 +157,9 @@ Current stop-loss sequence:
 27. Watchlist Visual Verification / Closure: completed on main as #857.
 28. Next Minimal Runtime Slice Selection: completed on main as #858.
 29. Source Read for MarketQuote Freshness / Fallback Dashboard API Status: completed on main as #859.
-30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design: active.
-31. Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
+30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design: completed on main as #860.
+31. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate: active.
+32. Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation`, only if readiness remains GO.
 
 ## Workflow Command Automation
 
