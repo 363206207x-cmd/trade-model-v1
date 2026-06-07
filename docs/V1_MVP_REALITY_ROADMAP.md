@@ -4,10 +4,10 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Further Watchlist API / Dashboard Source Read`.
+- Active track: `Minimal Review-Only Watchlist Runtime Wiring Implementation Plan`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation Plan / Readiness Design`.
+- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -25,7 +25,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #849 completed the Watchlist / RuleConfig / Dashboard/API source read and confirmed the existing RuleConfig watchlist owner path, dashboard boundary copy, and fail-closed tests are enough to move into a minimal review-only Watchlist runtime wiring design, while dedicated watchlist API, watchlist audit, and DB-backed dashboard current pool status remain partial or missing.
 - #850 completed the Minimal Review-Only Watchlist Runtime Wiring Design and fixes the future owner path, status mapping, Dashboard/API surface, fail-closed rules, and readiness checklist without implementation.
 - #851 completed the Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate and returned NO-GO for direct implementation until the dedicated endpoint, audit endpoint, RuleConfig exposure, dashboard DOM, and audit gaps are read more narrowly.
-- The active Further Watchlist API / Dashboard Source Read narrows those endpoint / dashboard / audit gaps without implementation.
+- #852 completed Further Watchlist API / Dashboard Source Read and confirmed the missing dedicated read endpoint, audit endpoint, and DB-backed dashboard status DOM.
+- The active Minimal Review-Only Watchlist Runtime Wiring Implementation Plan defines a safe future minimal endpoint/dashboard/audit boundary without implementation.
 
 ## Roadmap
 
@@ -149,6 +150,7 @@ Recommended next actions:
 19. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate.
 20. Further Watchlist API / Dashboard Source Read.
 21. Minimal Review-Only Watchlist Runtime Wiring Implementation Plan / Readiness Design.
+22. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate.
 
 Do not continue P359 or start P360 by default.
 
