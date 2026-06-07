@@ -1067,6 +1067,17 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="watchlistReasonValue">WATCHLIST_CONFIG_MISSING</span></div>
         </div>
 
+        <div class="module-status-note" id="marketQuoteStatusPanel" aria-label="MarketQuote freshness review-only status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">MarketQuote 只读状态</span><span class="v" id="marketQuoteRuntimeStatusValue">MARKETQUOTE_MISSING_FAIL_CLOSED / 行情状态待确认</span></div>
+            <div class="kv"><span class="k">样本标的</span><span class="v" id="marketQuoteSampleSymbolValue">BTCUSDT</span></div>
+            <div class="kv"><span class="k">quote source / source type</span><span class="v"><span id="marketQuoteSourceValue">UNKNOWN</span> · <span id="marketQuoteSourceTypeValue">MISSING</span></span></div>
+            <div class="kv"><span class="k">freshness / fallback</span><span class="v"><span id="marketQuoteFreshnessValue">missing</span> · fallback <span id="marketQuoteFallbackValue">是</span></span></div>
+            <div class="kv"><span class="k">source health / last update</span><span class="v"><span id="marketQuoteSourceHealthValue">MISSING</span> · <span id="marketQuoteLastUpdatedValue">—</span></span></div>
+            <div class="kv"><span class="k">只读说明</span><span class="v" id="marketQuoteReviewOnlyValue">只读行情状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Watchlist boundary</span><span class="v" id="marketQuoteBoundaryValue">dashboard-only sample；Watchlist Pool 才是候选边界；Display Slots 不是行情候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="marketQuoteReasonValue">QUOTE_UNAVAILABLE</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1256,6 +1267,12 @@
     var WATCHLIST_STATUS_EMPTY = "WATCHLIST_EMPTY_FAIL_CLOSED";
     var WATCHLIST_STATUS_MISSING = "WATCHLIST_CONFIG_MISSING";
     var WATCHLIST_STATUS_BLOCKED = "BLOCKED_FAIL_CLOSED";
+    var MARKETQUOTE_STATUS_READY = "MARKETQUOTE_REVIEW_ONLY_READY";
+    var MARKETQUOTE_STATUS_STALE = "MARKETQUOTE_STALE_FAIL_CLOSED";
+    var MARKETQUOTE_STATUS_MISSING = "MARKETQUOTE_MISSING_FAIL_CLOSED";
+    var MARKETQUOTE_STATUS_FALLBACK = "MARKETQUOTE_FALLBACK_ACTIVE";
+    var MARKETQUOTE_STATUS_PARTIAL = "MARKETQUOTE_SOURCE_HEALTH_PARTIAL";
+    var MARKETQUOTE_STATUS_BLOCKED = "MARKETQUOTE_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1289,10 +1306,29 @@
         reason: WATCHLIST_STATUS_MISSING,
         message: "等待 DB Watchlist Pool 配置"
     };
+    var marketQuoteRuntimeStatus = {
+        status: MARKETQUOTE_STATUS_MISSING,
+        sampleSymbol: "BTCUSDT",
+        source: "UNKNOWN",
+        sourceType: "MISSING",
+        fresh: false,
+        fallbackActive: true,
+        sourceHealth: "MISSING",
+        lastUpdatedAt: null,
+        freshnessSeconds: null,
+        staleThresholdSeconds: 60,
+        reviewOnly: true,
+        notTradingSignal: true,
+        dashboardOnlySample: true,
+        watchlistBounded: false,
+        reason: "QUOTE_UNAVAILABLE",
+        message: "行情状态待确认；只读状态，不是交易信号。"
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
     window.__watchlistReviewStatus = WATCHLIST_STATUS_MISSING;
+    window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -2555,6 +2591,69 @@
             });
     }
 
+    function normalizeMarketQuoteSampleSymbol(symbol) {
+        var raw = (symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0] || "BTCUSDT").toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (!raw) return "BTCUSDT";
+        return raw.indexOf("USDT") === raw.length - 4 ? raw : raw + "USDT";
+    }
+
+    function resolveMarketQuoteRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        var sample = firstNonEmpty(p.sampleSymbol, requestedSymbol, DEFAULT_DISPLAY_SLOT_SYMBOLS[0], "BTCUSDT").toUpperCase();
+        return {
+            status: firstNonEmpty(p.status, MARKETQUOTE_STATUS_MISSING).toUpperCase(),
+            sampleSymbol: sample,
+            source: firstNonEmpty(p.source, "UNKNOWN").toUpperCase(),
+            sourceType: firstNonEmpty(p.sourceType, "MISSING").toUpperCase(),
+            fresh: p.fresh === true,
+            fallbackActive: p.fallbackActive === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            lastUpdatedAt: p.lastUpdatedAt || p.lastQuoteTime || null,
+            freshnessSeconds: p.freshnessSeconds,
+            staleThresholdSeconds: p.staleThresholdSeconds,
+            reviewOnly: true,
+            notTradingSignal: true,
+            dashboardOnlySample: p.dashboardOnlySample !== false,
+            watchlistBounded: p.watchlistBounded === true,
+            reason: firstNonEmpty(p.reason, p.status, "QUOTE_UNAVAILABLE"),
+            message: firstNonEmpty(p.message, "行情状态待确认；只读状态，不是交易信号。")
+        };
+    }
+
+    function updateMarketQuoteRuntimeStatusDisplay() {
+        var qs = marketQuoteRuntimeStatus || {};
+        var freshness = qs.fresh ? "fresh" : "stale / missing";
+        if (qs.freshnessSeconds != null) freshness += " · " + qs.freshnessSeconds + "s";
+        if (qs.staleThresholdSeconds != null) freshness += " / threshold " + qs.staleThresholdSeconds + "s";
+        setText("marketQuoteRuntimeStatusValue", (qs.status || MARKETQUOTE_STATUS_MISSING) + " / " + (qs.message || "只读状态"));
+        setText("marketQuoteSampleSymbolValue", qs.sampleSymbol || "BTCUSDT");
+        setText("marketQuoteSourceValue", qs.source || "UNKNOWN");
+        setText("marketQuoteSourceTypeValue", qs.sourceType || "MISSING");
+        setText("marketQuoteFreshnessValue", freshness);
+        setText("marketQuoteFallbackValue", qs.fallbackActive ? "是" : "否");
+        setText("marketQuoteSourceHealthValue", qs.sourceHealth || "MISSING");
+        setText("marketQuoteLastUpdatedValue", formatDateTime(qs.lastUpdatedAt));
+        setText("marketQuoteReviewOnlyValue", "只读行情状态，不是交易信号。");
+        setText("marketQuoteBoundaryValue", "dashboard-only sample；Watchlist Pool 才是候选边界；Display Slots 不是行情候选池。");
+        setText("marketQuoteReasonValue", qs.reason || "—");
+    }
+
+    function fetchMarketQuoteRuntimeStatus(symbol) {
+        var sample = normalizeMarketQuoteSampleSymbol(symbol);
+        return fetch("/api/market/quote-status?symbol=" + encodeURIComponent(sample))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                marketQuoteRuntimeStatus = resolveMarketQuoteRuntimeStatus(payload, sample);
+                window.__marketQuoteReviewStatus = marketQuoteRuntimeStatus.status || MARKETQUOTE_STATUS_MISSING;
+                updateMarketQuoteRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                marketQuoteRuntimeStatus = resolveMarketQuoteRuntimeStatus({}, sample);
+                window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
+                updateMarketQuoteRuntimeStatusDisplay();
+            });
+    }
+
     function fetchPositionProviderStatus() {
         return fetch("/api/system/position-sync-status")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3162,11 +3261,13 @@
             .catch(function () {
                 document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchWatchlistRuntimeStatus();
+                fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
             });
     }
 
     function requestDetailForSelectedSymbol() {
         var symbol = selectedSymbol;
+        fetchMarketQuoteRuntimeStatus(symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3310,6 +3411,7 @@
         updateModeHint();
         renderModuleStatusBoard();
         updateWatchlistRuntimeStatusDisplay();
+        updateMarketQuoteRuntimeStatusDisplay();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();
