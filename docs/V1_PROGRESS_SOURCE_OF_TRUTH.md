@@ -81,7 +81,7 @@ Do not count repeated blocked-list documents as product usability progress.
 
 Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
 
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, #845 implementation readiness gate, #846 tests-first owner-path safety adapter merge, #847 owner-path safety adapter test/merge verification, #848 owner-path production merge readiness review, #849 Watchlist source read, #850 Watchlist wiring design, #851 Watchlist readiness gate, #852 further Watchlist API / dashboard source read, and #853 Watchlist implementation plan, the current selected runtime slice remains `PositionSync + Dashboard review-only status`, the next selected minimal slice candidate is `Watchlist + RuleConfig + Dashboard/API review-only status`, the active stop-loss action is `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`, and the default next required action is `Minimal Review-Only Watchlist Runtime Wiring Implementation`.
+Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, #845 implementation readiness gate, #846 tests-first owner-path safety adapter merge, #847 owner-path safety adapter test/merge verification, #848 owner-path production merge readiness review, #849 Watchlist source read, #850 Watchlist wiring design, #851 Watchlist readiness gate, #852 further Watchlist API / dashboard source read, #853 Watchlist implementation plan, and #854 Watchlist implementation readiness gate, the current selected runtime slice remains `PositionSync + Dashboard review-only status`, the next selected minimal slice candidate is `Watchlist + RuleConfig + Dashboard/API review-only status`, the active stop-loss action is `Minimal Review-Only Watchlist Runtime Wiring Implementation`, and the default next required action is `Minimal Review-Only Watchlist Runtime Wiring Verification`.
 
 ## Capability Language
 
@@ -151,8 +151,9 @@ Current stop-loss sequence:
 21. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate: completed on main as #851; NO-GO direct implementation.
 22. Further Watchlist API / Dashboard Source Read: completed on main as #852.
 23. Minimal Review-Only Watchlist Runtime Wiring Implementation Plan: completed on main as #853.
-24. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate: active.
-25. Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation`, only if the readiness gate remains GO.
+24. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate: completed on main as #854.
+25. Minimal Review-Only Watchlist Runtime Wiring Implementation: active.
+26. Next required action: `Minimal Review-Only Watchlist Runtime Wiring Verification`.
 
 ## Workflow Command Automation
 
