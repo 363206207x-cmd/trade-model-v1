@@ -1,13 +1,13 @@
-current_head: "12aecc0"
+current_head: "58f6ac5"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read"
-active_block_cn: "Watchlist / RuleConfig / Dashboard API 只读运行时切片 source read"
+active_block: "Minimal Review-Only Watchlist Runtime Wiring Design"
+active_block_cn: "最小 Watchlist 只读运行时接线设计"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "watchlist-ruleconfig-dashboard-runtime-slice-source-read"
-merge_rule: "Source read and target confirmation only; no Java, no tests, no dashboard, service/runtime wiring, MarketQuote, Push, external channel, schema/config/pom changes, new endpoint, new DTO/Validator/Assembler/Orchestrator, point generation, final direction, or order execution"
-next_required_action: "Minimal Review-Only Watchlist Runtime Wiring Design"
+current_branch: "minimal-review-only-watchlist-runtime-wiring-design"
+merge_rule: "Design only; no Java, no tests, no dashboard, service/runtime wiring, MarketQuote, Push, external channel, schema/config/pom changes, new endpoint, new DTO/Validator/Assembler/Orchestrator, candidate generation, point generation, final direction, or order execution"
+next_required_action: "Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -30,7 +30,8 @@ boundarycandidate_executionplan_safety_adapter_implementation_readiness_status: 
 boundarycandidate_executionplan_safety_adapter_test_merge_implementation_status: "completed on main as #846; strengthens existing owner-path tests so safety semantics remain absorbed into BoundaryCandidate / ExecutionPlan / dashboard display adapters and frozen wrappers do not become canonical owners, without production Java changes"
 boundarycandidate_executionplan_safety_adapter_test_merge_verification_status: "completed on main as #847; verifies #846 tests-first owner-path safety adapter coverage, no production Java changes, no new DTO/Validator/Assembler, no P359/P360, frozen wrapper dependency absence, and continued REVIEW_ONLY_RUNTIME partial level"
 boundarycandidate_executionplan_production_merge_readiness_review_status: "completed on main as #848; returns NO-GO for production Java changes because tests-first owner-path safety coverage is sufficient and no clear production gap was found"
-watchlist_ruleconfig_dashboard_runtime_slice_source_read_status: "active; source-reads existing RuleConfig / Watchlist Pool / Display Slots / dashboard/API path after #848, confirms current API/audit/dashboard visibility gaps, and selects whether Minimal Review-Only Watchlist Runtime Wiring Design is safe"
+watchlist_ruleconfig_dashboard_runtime_slice_source_read_status: "completed on main as #849; source-read confirms RuleConfig / Watchlist Pool / Display Slots / dashboard/API path exists but dedicated watchlist API, watchlist audit, and DB-backed dashboard current pool status remain partial/missing; selects Minimal Review-Only Watchlist Runtime Wiring Design"
+minimal_review_only_watchlist_runtime_wiring_design_status: "active; designs the minimal Watchlist review-only status mapping, RuleConfig owner path, dashboard/API boundary, fail-closed rules, and readiness checklist without implementation"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
