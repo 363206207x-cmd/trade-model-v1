@@ -179,6 +179,28 @@ class DashboardControllerTest {
         assertThat(html).contains("不在 Watchlist Pool 不进入候选/推送/扫描/点位");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyMarketQuoteFreshnessStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/market/quote-status");
+        assertThat(html).contains("marketQuoteStatusPanel");
+        assertThat(html).contains("marketQuoteRuntimeStatusValue");
+        assertThat(html).contains("marketQuoteSampleSymbolValue");
+        assertThat(html).contains("marketQuoteSourceValue");
+        assertThat(html).contains("marketQuoteSourceTypeValue");
+        assertThat(html).contains("marketQuoteFreshnessValue");
+        assertThat(html).contains("marketQuoteFallbackValue");
+        assertThat(html).contains("marketQuoteSourceHealthValue");
+        assertThat(html).contains("marketQuoteLastUpdatedValue");
+        assertThat(html).contains("MARKETQUOTE_REVIEW_ONLY_READY");
+        assertThat(html).contains("MARKETQUOTE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("只读行情状态，不是交易信号");
+        assertThat(html).contains("dashboard-only sample");
+        assertThat(html).contains("Watchlist Pool 才是候选边界");
+        assertThat(html).contains("Display Slots 不是行情候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;

@@ -6,13 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate`.
+- Active stop-loss track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
 - Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `60d1ccf docs(marketquote): verify freshness implementation readiness (#861)`
 - `b6eb455 docs(marketquote): design review-only freshness runtime wiring (#860)`
 - `840ca72 docs(marketquote): read market quote freshness source path (#859)`
 - `39dd7da docs(runtime): select next minimal runtime slice (#858)`
@@ -118,6 +119,8 @@ Current merged main:
 - `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`
 
 Current active capability movement:
+
+- `Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation` connects one minimal review-only MarketQuote freshness/status API and dashboard status surface over the existing MarketQuote owner path. It remains `REVIEW_ONLY_RUNTIME partial`, does not add DTO / Validator / Assembler, does not connect Push / Candidate / Point / Trading, and prepares verification as the next required action.
 
 - #830 is merged on main.
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
