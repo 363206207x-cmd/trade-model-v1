@@ -4,9 +4,9 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Owner-Path Safety Adapter Test/Merge Verification`.
+- Active track: `Minimal Owner-Path Safety Adapter Production Merge Readiness Review`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Minimal owner-path safety adapter production merge readiness review`.
+- Next required action: `Next Minimal Runtime Slice Selection`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -19,7 +19,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #844 completed the merge design that maps Codex safety adapters into those existing owners, keeps `SourceOwnedCandidateIntegrationRuntimeCandidate` non-canonical, does not create a new skeleton, and does not revive P359/P360.
 - #845 completed the readiness gate and returned GO for tests-first owner-path safety adapter merge.
 - #846 completed the tests-first owner-path safety adapter merge by strengthening existing BoundaryCandidate / ExecutionPlan owner-path tests without production Java changes, new DTO / Validator / Assembler, runtime candidate wrapper, P359/P360, point generation, or dashboard path expansion.
-- The active verification checks #846 test coverage and changed-file boundaries before any production merge readiness review.
+- #847 completed the owner-path safety adapter test/merge verification and confirmed #846 stayed test-only, kept production Java untouched, and kept frozen wrappers out of the owner path.
+- The active production merge readiness review checks whether a production Java change is genuinely needed; without a clear production gap, the decision must be NO-GO and the next action should move to the next minimal runtime slice selection.
 
 ## Roadmap
 
@@ -137,6 +138,8 @@ Recommended next actions:
 13. Minimal implementation readiness gate for owner-path safety adapter merge.
 14. Minimal owner-path safety adapter test/merge implementation.
 15. Minimal owner-path safety adapter test/merge verification.
+16. Minimal owner-path safety adapter production merge readiness review.
+17. Next Minimal Runtime Slice Selection.
 
 Do not continue P359 or start P360 by default.
 

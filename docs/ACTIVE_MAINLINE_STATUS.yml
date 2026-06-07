@@ -1,13 +1,13 @@
-current_head: "23d9133"
+current_head: "152f4b7"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Owner-Path Safety Adapter Test/Merge Verification"
-active_block_cn: "BoundaryCandidate / ExecutionPlan owner-path safety adapter tests-first 合并验证"
+active_block: "Minimal Owner-Path Safety Adapter Production Merge Readiness Review"
+active_block_cn: "BoundaryCandidate / ExecutionPlan owner-path safety adapter 生产合并就绪审查"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "verify-boundarycandidate-executionplan-safety-adapter-test-merge"
-merge_rule: "Verification only; no production Java, no tests, no dashboard, service/controller/provider/scheduler/mapper/schema/config/pom changes, no new endpoint, no new DTO/Validator/Assembler/Orchestrator, no runtime candidate wrapper, no point generation, no push, no external channel, no order execution"
-next_required_action: "Minimal owner-path safety adapter production merge readiness review"
+current_branch: "boundarycandidate-executionplan-production-merge-readiness-review"
+merge_rule: "Readiness review only; no production Java, no tests, no dashboard, service/controller/provider/scheduler/mapper/schema/config/pom changes, no new endpoint, no new DTO/Validator/Assembler/Orchestrator, no runtime candidate wrapper, no point generation, no push, no external channel, no order execution"
+next_required_action: "Next Minimal Runtime Slice Selection"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -28,7 +28,8 @@ boundarycandidate_executionplan_owner_source_read_status: "completed on main as 
 boundarycandidate_executionplan_safety_adapter_merge_design_status: "completed on main as #844; designs how Codex safety semantics can be absorbed into the existing BoundaryCandidate / ExecutionPlan / DecisionResult / dashboard adapter owner path without new wrapper owners, keeps SourceOwnedCandidateIntegrationRuntimeCandidate non-canonical, and keeps P359/P360 frozen"
 boundarycandidate_executionplan_safety_adapter_implementation_readiness_status: "completed on main as #845; returns GO for tests-first owner-path safety adapter merge using existing tests and owner path only, without new DTO/Validator/Assembler, runtime candidate wrapper, P359/P360, point generation, or dashboard path expansion"
 boundarycandidate_executionplan_safety_adapter_test_merge_implementation_status: "completed on main as #846; strengthens existing owner-path tests so safety semantics remain absorbed into BoundaryCandidate / ExecutionPlan / dashboard display adapters and frozen wrappers do not become canonical owners, without production Java changes"
-boundarycandidate_executionplan_safety_adapter_test_merge_verification_status: "active; verifies #846 tests-first owner-path safety adapter coverage, no production Java changes, no new DTO/Validator/Assembler, no P359/P360, frozen wrapper dependency absence, and continued REVIEW_ONLY_RUNTIME partial level"
+boundarycandidate_executionplan_safety_adapter_test_merge_verification_status: "completed on main as #847; verifies #846 tests-first owner-path safety adapter coverage, no production Java changes, no new DTO/Validator/Assembler, no P359/P360, frozen wrapper dependency absence, and continued REVIEW_ONLY_RUNTIME partial level"
+boundarycandidate_executionplan_production_merge_readiness_review_status: "active; reviews whether a production owner-path safety adapter merge is actually needed after #846/#847 and returns NO-GO unless a clear production gap exists"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
