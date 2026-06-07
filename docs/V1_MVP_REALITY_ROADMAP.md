@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next Minimal Runtime Slice Selection`.
+- Active track: `Source Read for MarketQuote Freshness / Fallback Dashboard API Status`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
 - Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `Source Read for MarketQuote Freshness / Fallback Dashboard API Status`.
+- Next required action: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -32,7 +32,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #855 completed the Minimal Review-Only Watchlist Runtime Wiring Implementation and adds the first Watchlist review-only API/dashboard visibility slice without Push, MarketQuote, candidate, point, or trading scope.
 - #856 completed Minimal Review-Only Watchlist Runtime Wiring Verification and validates #855 compile/test results, API smoke, dashboard smoke, forbidden path boundaries, and no executable semantics.
 - #857 completed Watchlist Visual Verification / Closure and confirms the dashboard Watchlist Pool panel, Display Slots / Watchlist Pool boundary copy, default-six boundary copy, review-only / no-Push copy, layout acceptability, and no visible trading semantics.
-- The active Next Minimal Runtime Slice Selection compares the next safe user-visible runtime slices and selects `MarketQuote freshness / fallback / dashboard API status` for source read only.
+- #858 completed Next Minimal Runtime Slice Selection and selected `MarketQuote freshness / fallback / dashboard API status` as the next source-read target.
+- The active MarketQuote source read confirms legacy quote provider/service/dashboard-detail assets exist, but dedicated quote freshness/fallback/source-health API/dashboard status remains partial and must move to design before implementation.
 
 ## Roadmap
 
@@ -162,6 +163,7 @@ Recommended next actions:
 25. Watchlist visual verification / closure.
 26. Next minimal runtime slice selection.
 27. Source Read for MarketQuote Freshness / Fallback Dashboard API Status.
+28. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design.
 
 Do not continue P359 or start P360 by default.
 
