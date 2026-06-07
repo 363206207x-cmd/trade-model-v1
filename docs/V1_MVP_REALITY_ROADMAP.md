@@ -4,10 +4,10 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Watchlist Runtime Wiring Implementation`.
+- Active track: `Minimal Review-Only Watchlist Runtime Wiring Verification`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Verification`.
+- Next required action: `Watchlist visual verification / closure`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -28,7 +28,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #852 completed Further Watchlist API / Dashboard Source Read and confirmed the missing dedicated read endpoint, audit endpoint, and DB-backed dashboard status DOM.
 - #853 completed Minimal Review-Only Watchlist Runtime Wiring Implementation Plan and defines a safe future minimal endpoint/dashboard/audit boundary without implementation.
 - #854 completed Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate and returned GO for one read-only `/api/rule/push-watchlist` endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates.
-- The active Minimal Review-Only Watchlist Runtime Wiring Implementation adds the first Watchlist review-only API/dashboard visibility slice without Push, MarketQuote, candidate, point, or trading scope.
+- #855 completed the Minimal Review-Only Watchlist Runtime Wiring Implementation and adds the first Watchlist review-only API/dashboard visibility slice without Push, MarketQuote, candidate, point, or trading scope.
+- The active Minimal Review-Only Watchlist Runtime Wiring Verification validates #855 compile/test results, API smoke, dashboard smoke, forbidden path boundaries, and no executable semantics.
 
 ## Roadmap
 
@@ -155,6 +156,7 @@ Recommended next actions:
 22. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate.
 23. Minimal Review-Only Watchlist Runtime Wiring Implementation, only if the readiness gate remains GO.
 24. Minimal Review-Only Watchlist Runtime Wiring Verification.
+25. Watchlist visual verification / closure.
 
 Do not continue P359 or start P360 by default.
 
