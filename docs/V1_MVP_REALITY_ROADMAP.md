@@ -4,10 +4,10 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read`.
+- Active track: `Minimal Review-Only Watchlist Runtime Wiring Design`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Design`.
+- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -22,7 +22,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #846 completed the tests-first owner-path safety adapter merge by strengthening existing BoundaryCandidate / ExecutionPlan owner-path tests without production Java changes, new DTO / Validator / Assembler, runtime candidate wrapper, P359/P360, point generation, or dashboard path expansion.
 - #847 completed the owner-path safety adapter test/merge verification and confirmed #846 stayed test-only, kept production Java untouched, and kept frozen wrappers out of the owner path.
 - #848 completed the owner-path production merge readiness review and returned NO-GO for production Java changes.
-- The active Watchlist / RuleConfig / Dashboard/API source read checks whether the existing RuleConfig watchlist owner path, dashboard boundary copy, and fail-closed tests are enough to move into a minimal review-only Watchlist runtime wiring design.
+- #849 completed the Watchlist / RuleConfig / Dashboard/API source read and confirmed the existing RuleConfig watchlist owner path, dashboard boundary copy, and fail-closed tests are enough to move into a minimal review-only Watchlist runtime wiring design, while dedicated watchlist API, watchlist audit, and DB-backed dashboard current pool status remain partial or missing.
+- The active Minimal Review-Only Watchlist Runtime Wiring Design fixes the future owner path, status mapping, Dashboard/API surface, fail-closed rules, and readiness checklist without implementation.
 
 ## Roadmap
 
@@ -143,6 +144,7 @@ Recommended next actions:
 16. Minimal owner-path safety adapter production merge readiness review.
 17. Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read.
 18. Minimal Review-Only Watchlist Runtime Wiring Design.
+19. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate.
 
 Do not continue P359 or start P360 by default.
 

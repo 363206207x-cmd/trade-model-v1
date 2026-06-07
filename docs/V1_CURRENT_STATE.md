@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `12aecc0 docs(wiring): review boundary plan production merge readiness (#848)`
+- Current merged main: `58f6ac5 docs(watchlist): read watchlist runtime slice source path (#849)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read`.
-- Current next required action is `Minimal Review-Only Watchlist Runtime Wiring Design`.
+- Current active block is `Minimal Review-Only Watchlist Runtime Wiring Design`.
+- Current next required action is `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.
@@ -27,7 +27,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - #846 is completed on main as Minimal Owner-Path Safety Adapter Test/Merge Implementation: it strengthens existing owner-path tests so BoundaryCandidate / ExecutionPlan / dashboard display adapters absorb safety semantics without depending on frozen point/runtime wrappers, without production Java changes.
 - #847 is completed on main as Minimal Owner-Path Safety Adapter Test/Merge Verification: it verifies #846 test coverage, changed-file boundaries, frozen-wrapper dependency absence, no production Java changes, no new DTO / Validator / Assembler, and continued P359/P360 freeze.
 - #848 is completed on main as Minimal Owner-Path Safety Adapter Production Merge Readiness Review: it returns NO-GO for production Java changes because the owner-path tests already lock the relevant safety semantics and no clear production gap was found.
-- The active Watchlist / RuleConfig / Dashboard/API source read checks whether the existing `tm_rule_config`, `RuleConfigServiceImpl`, `RuleConfigWatchlistPoolReadAdapter`, dashboard Display Slots boundary, and watchlist fail-closed tests are enough to enter a minimal review-only Watchlist runtime wiring design.
+- #849 is completed on main as Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read: it confirms the existing `tm_rule_config`, `RuleConfigServiceImpl`, `RuleConfigWatchlistPoolReadAdapter`, dashboard Display Slots boundary, and watchlist fail-closed tests are enough to enter a minimal review-only Watchlist runtime wiring design, while dedicated watchlist API, watchlist audit, and DB-backed dashboard current pool status remain partial or missing.
+- The active Minimal Review-Only Watchlist Runtime Wiring Design defines the future owner path, status mapping, Dashboard/API boundary, fail-closed rules, and readiness checklist without implementation.
 - Selected runtime wiring target is `PositionSync + Dashboard review-only status`.
 - The selected target reuses `PositionSyncService`, `PositionSyncScheduler`, `PositionProvider`, `SwitchablePositionProvider`, `BinancePositionProvider`, `SimulatedPositionProvider`, `RealPositionMapper`, `tm_real_position`, `DashboardController`, `dashboard.html`, and `/api/system/position-sync-status`.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
@@ -95,7 +96,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - #836 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Design.
 - #837 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate.
 - #840 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Verification.
-- The active block is now Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read.
+- The active block is now Minimal Review-Only Watchlist Runtime Wiring Design.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
