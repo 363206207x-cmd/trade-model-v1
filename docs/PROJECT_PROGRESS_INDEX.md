@@ -6,11 +6,13 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Owner-Path Safety Adapter Production Merge Readiness Review`.
+- Active stop-loss track: `Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Next required action: `Next Minimal Runtime Slice Selection`.
+- Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
+- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `12aecc0 docs(wiring): review boundary plan production merge readiness (#848)`
 - `152f4b7 docs(wiring): verify boundary plan safety adapter tests (#847)`
 - `23d9133 test(wiring): cover boundary plan safety adapter owner path (#846)`
 - `b6ee49e docs(wiring): verify boundary plan safety adapter readiness (#845)`
@@ -118,12 +120,15 @@ Current active capability movement:
 - It strengthened existing owner-path tests and confirms BoundaryCandidate / ExecutionPlan / dashboard display adapters do not depend on frozen point/runtime wrapper owners.
 - #847 is merged on main.
 - It verified the #846 tests-first owner-path safety adapter coverage, confirmed no production Java changes, no new DTO / Validator / Assembler, no P359/P360, no frozen wrapper dependency in owner path, and no trading semantics.
-- Current active block is `Minimal Owner-Path Safety Adapter Production Merge Readiness Review`.
+- #848 is merged on main.
+- It completed the Minimal Owner-Path Safety Adapter Production Merge Readiness Review and returned NO-GO for production Java changes because tests-first owner-path safety coverage is already sufficient and no clear production gap was found.
+- Current active block is `Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Selected target is `PositionSync + Dashboard review-only status`.
-- The next required action is `Next Minimal Runtime Slice Selection`, not a production Java change or a new skeleton package.
+- Selected next minimal slice candidate is `Watchlist + RuleConfig + Dashboard/API review-only status`.
+- The next required action is `Minimal Review-Only Watchlist Runtime Wiring Design`, not a production Java change, external Push, MarketQuote wiring, or a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
