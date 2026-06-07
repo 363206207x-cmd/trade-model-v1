@@ -156,6 +156,29 @@ class DashboardControllerTest {
         assertThat(html).contains("lastSyncStartTime");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyWatchlistRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/rule/push-watchlist");
+        assertThat(html).contains("watchlistStatusPanel");
+        assertThat(html).contains("watchlistRuntimeStatusValue");
+        assertThat(html).contains("watchlistSymbolsValue");
+        assertThat(html).contains("watchlistSourceValue");
+        assertThat(html).contains("watchlistFailClosedValue");
+        assertThat(html).contains("watchlistDisplaySlotsBoundaryValue");
+        assertThat(html).contains("watchlistReviewOnlyValue");
+        assertThat(html).contains("WATCHLIST_REVIEW_ONLY_READY");
+        assertThat(html).contains("WATCHLIST_EMPTY_FAIL_CLOSED");
+        assertThat(html).contains("WATCHLIST_CONFIG_MISSING");
+        assertThat(html).contains("BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("Display Slots 只是首页展示位");
+        assertThat(html).contains("Display Slots 不是候选池");
+        assertThat(html).contains("默认六个币不是候选池");
+        assertThat(html).contains("只读状态，不发送 Push");
+        assertThat(html).contains("不在 Watchlist Pool 不进入候选/推送/扫描/点位");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;

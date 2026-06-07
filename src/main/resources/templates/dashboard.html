@@ -1058,6 +1058,15 @@
 
         <p class="muted" style="margin:10px 0 12px 0;max-width:64rem;">Display Slots / 首页展示位只决定首页优先阅读顺序；Watchlist Pool / 观察库仍是推送候选边界。下方详情按当前标的展示最新分析，复盘页固定为某次 analysis_id，二者请勿混为同一轮。</p>
 
+        <div class="module-status-note" id="watchlistStatusPanel" aria-label="Watchlist Pool review-only status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Watchlist Pool 只读状态</span><span class="v" id="watchlistRuntimeStatusValue">WATCHLIST_CONFIG_MISSING / 等待 DB 配置</span></div>
+            <div class="kv"><span class="k">Watchlist Pool 当前资产</span><span class="v" id="watchlistSymbolsValue">—</span></div>
+            <div class="kv"><span class="k">来源 / fail-closed</span><span class="v"><span id="watchlistSourceValue">MISSING</span> · <span id="watchlistFailClosedValue">是</span></span></div>
+            <div class="kv"><span class="k">Display Slots 边界</span><span class="v" id="watchlistDisplaySlotsBoundaryValue">Display Slots 只是首页展示位；Display Slots 不是候选池；默认六个币不是候选池。</span></div>
+            <div class="kv"><span class="k">只读说明</span><span class="v" id="watchlistReviewOnlyValue">只读状态，不发送 Push；不在 Watchlist Pool 不进入候选/推送/扫描/点位。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="watchlistReasonValue">WATCHLIST_CONFIG_MISSING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1243,6 +1252,10 @@
     var detailEvidenceTopItemsMap = {};
     var detailScoreTopItemsMap = {};
     var DEFAULT_DISPLAY_SLOT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"];
+    var WATCHLIST_STATUS_READY = "WATCHLIST_REVIEW_ONLY_READY";
+    var WATCHLIST_STATUS_EMPTY = "WATCHLIST_EMPTY_FAIL_CLOSED";
+    var WATCHLIST_STATUS_MISSING = "WATCHLIST_CONFIG_MISSING";
+    var WATCHLIST_STATUS_BLOCKED = "BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1265,9 +1278,21 @@
         currentOpenPositionCount: null,
         lastSyncTime: null
     };
+    var watchlistRuntimeStatus = {
+        status: WATCHLIST_STATUS_MISSING,
+        source: "MISSING",
+        symbols: [],
+        empty: true,
+        failClosed: true,
+        reviewOnly: true,
+        displaySlotsAreCandidatePool: false,
+        reason: WATCHLIST_STATUS_MISSING,
+        message: "等待 DB Watchlist Pool 配置"
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
+    window.__watchlistReviewStatus = WATCHLIST_STATUS_MISSING;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -2483,6 +2508,53 @@
         if (el) el.textContent = text == null || text === "" ? "—" : String(text);
     }
 
+    function resolveWatchlistRuntimeStatus(payload) {
+        var source = firstNonEmpty(payload && payload.source, "UNKNOWN").toUpperCase();
+        var status = firstNonEmpty(payload && payload.status, WATCHLIST_STATUS_MISSING).toUpperCase();
+        var symbols = Array.isArray(payload && payload.symbols)
+            ? payload.symbols.map(function (s) { return String(s || "").trim().toUpperCase(); }).filter(Boolean)
+            : [];
+        var failClosed = payload && payload.failClosed === true;
+        return {
+            status: status,
+            source: source,
+            symbols: symbols,
+            empty: payload && payload.empty === false ? false : symbols.length === 0,
+            failClosed: failClosed,
+            reviewOnly: true,
+            displaySlotsAreCandidatePool: false,
+            reason: firstNonEmpty(payload && payload.reason, status),
+            message: firstNonEmpty(payload && payload.message, "Watchlist Pool 只读状态待确认")
+        };
+    }
+
+    function updateWatchlistRuntimeStatusDisplay() {
+        var ws = watchlistRuntimeStatus || {};
+        setText("watchlistRuntimeStatusValue", (ws.status || WATCHLIST_STATUS_MISSING) + " / " + (ws.message || "只读状态"));
+        setText("watchlistSymbolsValue", ws.symbols && ws.symbols.length ? ws.symbols.join(", ") : "—");
+        setText("watchlistSourceValue", ws.source || "UNKNOWN");
+        setText("watchlistFailClosedValue", ws.failClosed ? "是" : "否");
+        setText("watchlistDisplaySlotsBoundaryValue", "Display Slots 只是首页展示位；Display Slots 不是候选池；默认六个币不是候选池。");
+        setText("watchlistReviewOnlyValue", "只读状态，不发送 Push；不在 Watchlist Pool 不进入候选/推送/扫描/点位。");
+        setText("watchlistReasonValue", ws.reason || "—");
+    }
+
+    function fetchWatchlistRuntimeStatus() {
+        return fetch("/api/rule/push-watchlist")
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (resp) {
+                var payload = resp && typeof resp === "object" && resp.data ? resp.data : resp;
+                watchlistRuntimeStatus = resolveWatchlistRuntimeStatus(payload);
+                window.__watchlistReviewStatus = watchlistRuntimeStatus.status || WATCHLIST_STATUS_MISSING;
+                updateWatchlistRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                watchlistRuntimeStatus = resolveWatchlistRuntimeStatus({});
+                window.__watchlistReviewStatus = WATCHLIST_STATUS_MISSING;
+                updateWatchlistRuntimeStatusDisplay();
+            });
+    }
+
     function fetchPositionProviderStatus() {
         return fetch("/api/system/position-sync-status")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3085,9 +3157,11 @@
                 requestDetailForSelectedSymbol();
                 document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchPositionProviderStatus();
+                fetchWatchlistRuntimeStatus();
             })
             .catch(function () {
                 document.getElementById("lastUpdatedText").textContent = nowText();
+                fetchWatchlistRuntimeStatus();
             });
     }
 
@@ -3235,6 +3309,7 @@
         } catch (e) {}
         updateModeHint();
         renderModuleStatusBoard();
+        updateWatchlistRuntimeStatusDisplay();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();
