@@ -1,13 +1,13 @@
-current_head: "6e0cd17"
+current_head: "0eea851"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Watchlist Runtime Wiring Implementation Plan"
-active_block_cn: "最小 Watchlist 只读运行时接线实现计划"
+active_block: "Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate"
+active_block_cn: "最小 Watchlist 只读运行时接线实现就绪门"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-watchlist-runtime-wiring-implementation-plan"
-merge_rule: "Implementation plan only; no Java, no tests, no dashboard, service/runtime wiring, MarketQuote, Push, external channel, schema/config/pom changes, new endpoint, new DTO/Validator/Assembler/Orchestrator, candidate generation, point generation, final direction, or order execution"
-next_required_action: "Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate"
+current_branch: "minimal-review-only-watchlist-runtime-wiring-implementation-readiness-gate"
+merge_rule: "Readiness gate only; no Java, no tests, no dashboard, service/runtime wiring, MarketQuote, Push, external channel, schema/config/pom changes, new endpoint, new DTO/Validator/Assembler/Orchestrator, candidate generation, point generation, final direction, or order execution"
+next_required_action: "Minimal Review-Only Watchlist Runtime Wiring Implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -34,7 +34,8 @@ watchlist_ruleconfig_dashboard_runtime_slice_source_read_status: "completed on m
 minimal_review_only_watchlist_runtime_wiring_design_status: "completed on main as #850; designs the minimal Watchlist review-only status mapping, RuleConfig owner path, dashboard/API boundary, fail-closed rules, and readiness checklist without implementation"
 minimal_review_only_watchlist_runtime_wiring_readiness_gate_status: "completed on main as #851; returns NO-GO direct implementation and requires further Watchlist API / dashboard source read before any minimal implementation plan"
 watchlist_api_dashboard_source_read_status: "completed on main as #852; confirms dedicated /api/rule/push-watchlist and /api/rule/push-watchlist/audit absence, existing RuleConfig owner path, dashboard Display Slots DOM, and DB-backed Watchlist status/audit DOM gaps without implementation"
-minimal_review_only_watchlist_runtime_wiring_implementation_plan_status: "active; defines whether a minimal /api/rule/push-watchlist endpoint, audit handling, dashboard status DOM, tests, and no-new-DTO boundary may enter a readiness gate without implementation"
+minimal_review_only_watchlist_runtime_wiring_implementation_plan_status: "completed on main as #853; defines whether a minimal /api/rule/push-watchlist endpoint, audit handling, dashboard status DOM, tests, and no-new-DTO boundary may enter a readiness gate without implementation"
+minimal_review_only_watchlist_runtime_wiring_implementation_readiness_gate_status: "active; decides whether the future minimal Watchlist implementation may add one read-only /api/rule/push-watchlist endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates without DTO/Validator/Assembler, audit endpoint, Push, MarketQuote, candidate, point, or trading expansion"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

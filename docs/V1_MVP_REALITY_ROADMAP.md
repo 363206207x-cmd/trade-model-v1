@@ -4,10 +4,10 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Watchlist Runtime Wiring Implementation Plan`.
+- Active track: `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
+- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -26,7 +26,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #850 completed the Minimal Review-Only Watchlist Runtime Wiring Design and fixes the future owner path, status mapping, Dashboard/API surface, fail-closed rules, and readiness checklist without implementation.
 - #851 completed the Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate and returned NO-GO for direct implementation until the dedicated endpoint, audit endpoint, RuleConfig exposure, dashboard DOM, and audit gaps are read more narrowly.
 - #852 completed Further Watchlist API / Dashboard Source Read and confirmed the missing dedicated read endpoint, audit endpoint, and DB-backed dashboard status DOM.
-- The active Minimal Review-Only Watchlist Runtime Wiring Implementation Plan defines a safe future minimal endpoint/dashboard/audit boundary without implementation.
+- #853 completed Minimal Review-Only Watchlist Runtime Wiring Implementation Plan and defines a safe future minimal endpoint/dashboard/audit boundary without implementation.
+- The active Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate decides whether that minimal implementation can proceed without new DTO / Validator / Assembler, audit endpoint expansion, Push, MarketQuote, candidate, point, or trading scope.
 
 ## Roadmap
 
@@ -151,6 +152,7 @@ Recommended next actions:
 20. Further Watchlist API / Dashboard Source Read.
 21. Minimal Review-Only Watchlist Runtime Wiring Implementation Plan / Readiness Design.
 22. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate.
+23. Minimal Review-Only Watchlist Runtime Wiring Implementation, only if the readiness gate remains GO.
 
 Do not continue P359 or start P360 by default.
 
