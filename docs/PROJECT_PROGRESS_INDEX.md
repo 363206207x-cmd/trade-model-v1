@@ -6,12 +6,13 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
+- Active stop-loss track: `Further Watchlist API / Dashboard Source Read`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Further Watchlist API / Dashboard Source Read`.
+- Next required action: `Minimal Review-Only Watchlist Runtime Wiring Implementation Plan / Readiness Design`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `b5220fa docs(watchlist): verify watchlist runtime wiring readiness (#851)`
 - `70073c0 docs(watchlist): design review-only watchlist runtime wiring (#850)`
 - `58f6ac5 docs(watchlist): read watchlist runtime slice source path (#849)`
 - `12aecc0 docs(wiring): review boundary plan production merge readiness (#848)`
@@ -128,13 +129,15 @@ Current active capability movement:
 - It completed the Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read and confirmed that the RuleConfig / Watchlist owner path exists while dedicated watchlist API, watchlist audit, and DB-backed dashboard current pool status remain partial or missing.
 - #850 is merged on main.
 - It completed the Minimal Review-Only Watchlist Runtime Wiring Design and defined the Watchlist owner path, status mapping, dashboard/API boundary, fail-closed rules, and readiness checklist without implementation.
-- Current active block is `Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate`.
+- #851 is merged on main.
+- It completed the Watchlist Runtime Wiring Implementation Readiness Gate and returned NO-GO for direct implementation until `/api/rule/push-watchlist`, `/api/rule/push-watchlist/audit`, RuleConfig exposure, dashboard DOM, and audit gaps are read more narrowly.
+- Current active block is `Further Watchlist API / Dashboard Source Read`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Selected target is `PositionSync + Dashboard review-only status`.
 - Selected next minimal slice candidate is `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- The next required action is `Further Watchlist API / Dashboard Source Read`, not a production Java change, external Push, MarketQuote wiring, or a new skeleton package.
+- The next required action is `Minimal Review-Only Watchlist Runtime Wiring Implementation Plan / Readiness Design`, not a production Java change, external Push, MarketQuote wiring, or a new skeleton package.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
