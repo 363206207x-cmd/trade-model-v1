@@ -6,12 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Watchlist Visual Verification / Closure`.
+- Active stop-loss track: `Next Minimal Runtime Slice Selection`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Next minimal runtime slice selection`.
+- Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
+- Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
+- Next required action: `Source Read for MarketQuote Freshness / Fallback Dashboard API Status`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `ca5b477 docs(watchlist): record watchlist visual verification closure (#857)`
 - `cbdc5f3 docs(watchlist): verify review-only watchlist runtime wiring (#856)`
 - `823d181 feat(watchlist): show review-only watchlist runtime status (#855)`
 - `8f146b5 docs(watchlist): verify minimal watchlist implementation readiness (#854)`
@@ -146,13 +148,15 @@ Current active capability movement:
 - It completed the Minimal Review-Only Watchlist Runtime Wiring Implementation with one read-only `/api/rule/push-watchlist` endpoint, minimal dashboard Watchlist Pool status/copy/DOM, RuleControllerTest, DashboardControllerTest, and source-of-truth updates.
 - #856 is merged on main.
 - It completed the Minimal Review-Only Watchlist Runtime Wiring Verification with workflow contract, compile, test-compile, targeted tests, API smoke, dashboard smoke, forbidden path checks, and no Push / MarketQuote / candidate / point / trading expansion.
-- Current active block is `Watchlist Visual Verification / Closure`.
+- #857 is merged on main.
+- It completed Watchlist Visual Verification / Closure and confirmed the dashboard Watchlist Pool panel is visible, Display Slots / Watchlist Pool boundary copy is clear, default-six boundary copy is visible, layout is acceptable, and no Push / MarketQuote / candidate / point / trading semantics are visible.
+- Current active block is `Next Minimal Runtime Slice Selection`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
-- Selected target is `PositionSync + Dashboard review-only status`.
-- Selected next minimal slice candidate is `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- The next required action is `Next minimal runtime slice selection`, after this visual closure confirms the Watchlist dashboard panel is visible, boundary copy is clear, layout is acceptable, and no Push / MarketQuote / candidate / point / trading semantics are visible.
+- Completed runtime slices are `PositionSync + Dashboard review-only status` and `Watchlist + RuleConfig + Dashboard/API review-only status`, both `REVIEW_ONLY_RUNTIME partial`.
+- Selected next minimal runtime slice is `MarketQuote freshness / fallback / dashboard API status`.
+- The next required action is `Source Read for MarketQuote Freshness / Fallback Dashboard API Status`, source-read only and not MarketQuote runtime implementation.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.

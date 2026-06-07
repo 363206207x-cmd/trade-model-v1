@@ -1,13 +1,13 @@
-current_head: "cbdc5f3"
+current_head: "ca5b477"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Watchlist Visual Verification / Closure"
-active_block_cn: "Watchlist 浏览器视觉验证与收口"
+active_block: "Next Minimal Runtime Slice Selection"
+active_block_cn: "下一条最小运行时切片选择"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "watchlist-visual-verification-closure"
-merge_rule: "Visual verification / closure only; may add closure docs and status/source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, MarketQuote, candidate, Decision, Point, final direction, order execution, P359, or P360"
-next_required_action: "Next minimal runtime slice selection"
+current_branch: "next-minimal-runtime-slice-selection"
+merge_rule: "Selection / source-read-lite only; may add selection docs and status/source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, MarketQuote runtime, candidate, Decision, Point, final direction, order execution, P359, or P360"
+next_required_action: "Source Read for MarketQuote Freshness / Fallback Dashboard API Status"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -38,7 +38,8 @@ minimal_review_only_watchlist_runtime_wiring_implementation_plan_status: "comple
 minimal_review_only_watchlist_runtime_wiring_implementation_readiness_gate_status: "completed on main as #854; returns GO for one read-only /api/rule/push-watchlist endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates without DTO/Validator/Assembler, audit endpoint, Push, MarketQuote, candidate, point, or trading expansion"
 minimal_review_only_watchlist_runtime_wiring_implementation_status: "completed on main as #855; implements one read-only /api/rule/push-watchlist endpoint, minimal dashboard Watchlist Pool status/copy/DOM, RuleControllerTest, DashboardControllerTest, and source-of-truth updates over the existing RuleConfig owner path without DTO/Validator/Assembler, Push, MarketQuote, candidate, point, or trading expansion"
 minimal_review_only_watchlist_runtime_wiring_verification_status: "completed on main as #856; verified #855 workflow contract, compile, test-compile, targeted controller/dashboard/adapter tests, API smoke, dashboard smoke, forbidden paths, and no Push / MarketQuote / candidate / point / trading expansion"
-watchlist_visual_verification_closure_status: "active; visually verifies #855/#856 dashboard Watchlist Pool status panel, Display Slots boundary copy, default-six boundary, no layout overlap, and no Push / MarketQuote / candidate / point / trading semantics"
+watchlist_visual_verification_closure_status: "completed on main as #857; browser-verified #855/#856 dashboard Watchlist Pool status panel, Display Slots boundary copy, default-six boundary, no layout overlap, and no Push / MarketQuote / candidate / point / trading semantics"
+next_minimal_runtime_slice_selection_status: "active; compares MarketQuote freshness/fallback, Evidence/Score, DecisionResult, ExecutionPlan/BoundaryCandidate, internal Push preview, and Position Monitor options after the completed PositionSync and Watchlist REVIEW_ONLY_RUNTIME partial slices"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

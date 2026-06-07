@@ -4,10 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Watchlist Visual Verification / Closure`.
+- Active track: `Next Minimal Runtime Slice Selection`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Selected next minimal slice candidate: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Next required action: `Next minimal runtime slice selection`.
+- Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
+- Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
+- Next required action: `Source Read for MarketQuote Freshness / Fallback Dashboard API Status`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -30,7 +31,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #854 completed Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate and returned GO for one read-only `/api/rule/push-watchlist` endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates.
 - #855 completed the Minimal Review-Only Watchlist Runtime Wiring Implementation and adds the first Watchlist review-only API/dashboard visibility slice without Push, MarketQuote, candidate, point, or trading scope.
 - #856 completed Minimal Review-Only Watchlist Runtime Wiring Verification and validates #855 compile/test results, API smoke, dashboard smoke, forbidden path boundaries, and no executable semantics.
-- The active Watchlist Visual Verification / Closure confirms the dashboard Watchlist Pool panel, Display Slots / Watchlist Pool boundary copy, default-six boundary copy, review-only / no-Push copy, layout acceptability, and no visible trading semantics.
+- #857 completed Watchlist Visual Verification / Closure and confirms the dashboard Watchlist Pool panel, Display Slots / Watchlist Pool boundary copy, default-six boundary copy, review-only / no-Push copy, layout acceptability, and no visible trading semantics.
+- The active Next Minimal Runtime Slice Selection compares the next safe user-visible runtime slices and selects `MarketQuote freshness / fallback / dashboard API status` for source read only.
 
 ## Roadmap
 
@@ -159,6 +161,7 @@ Recommended next actions:
 24. Minimal Review-Only Watchlist Runtime Wiring Verification.
 25. Watchlist visual verification / closure.
 26. Next minimal runtime slice selection.
+27. Source Read for MarketQuote Freshness / Fallback Dashboard API Status.
 
 Do not continue P359 or start P360 by default.
 
