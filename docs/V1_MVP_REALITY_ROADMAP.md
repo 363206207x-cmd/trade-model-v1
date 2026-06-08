@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next Minimal Runtime Slice Selection After Evidence / Score Closure`.
+- Active track: `Source Read for DecisionResult review-only dashboard/API status`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
 - Selected next minimal runtime slice: `DecisionResult review-only dashboard/API status`.
-- Next required action: `Source Read for DecisionResult review-only dashboard/API status`.
+- Next required action: `Minimal Review-Only DecisionResult Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -46,7 +46,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #869 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation with one read-only Evidence / Score runtime status endpoint, dashboard status/copy/DOM, targeted `DashboardControllerTest`, and no DTO / Validator / Assembler, Push, Candidate, Decision, Point, or trading expansion.
 - #870 completed Minimal Review-Only Evidence / Score Runtime Wiring Verification with workflow contract, compile/test, API smoke, dashboard smoke, forbidden path checks, and source-of-truth updates.
 - #871 completed Evidence / Score Visual Verification / Closure and confirms Evidence / Score status visibility, counts, top summary, source trace / source health, Watchlist / MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics.
-- The active selection package recommends `DecisionResult review-only dashboard/API status` as the next source-read-only target after comparing DecisionResult, ExecutionPlan / BoundaryCandidate, Data Source Health, Review / Replay, Internal Push preview, Position Monitor, and Three AI options.
+- #872 completed Next Minimal Runtime Slice Selection After Evidence / Score Closure and selected `DecisionResult review-only dashboard/API status` as the next source-read-only target after comparing DecisionResult, ExecutionPlan / BoundaryCandidate, Data Source Health, Review / Replay, Internal Push preview, Position Monitor, and Three AI options.
+- The active source-read package confirms the DecisionResult owner path, `DecisionService`, mapper/schema, dashboard summary/detail API, dashboard display, tests, `ai_role_results`, source trace/provenance, and partial review-only/fail-closed boundaries before design.
 
 ## Roadmap
 
@@ -188,8 +189,9 @@ Recommended next actions:
 37. Minimal Review-Only Evidence / Score Runtime Wiring Implementation: completed on main as #869.
 38. Minimal Review-Only Evidence / Score Runtime Wiring Verification: completed on main as #870.
 39. Evidence / Score visual verification / closure: completed on main as #871.
-40. Next minimal runtime slice selection after Evidence / Score closure: active.
-41. Source Read for DecisionResult review-only dashboard/API status: next required action.
+40. Next minimal runtime slice selection after Evidence / Score closure: completed on main as #872.
+41. Source Read for DecisionResult review-only dashboard/API status: active.
+42. Minimal Review-Only DecisionResult Runtime Wiring Design: next required action.
 33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
