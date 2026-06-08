@@ -6,13 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `MarketQuote Visual Verification / Closure`.
+- Active stop-loss track: `Next Minimal Runtime Slice Selection After MarketQuote Closure`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
-- Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `Next minimal runtime slice selection`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`.
+- Selected next minimal runtime slice recommendation: `Evidence / Score review-only runtime status`.
+- Next required action: `Source Read for Evidence / Score Review-Only Runtime Status`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `08c65b5 docs(marketquote): record marketquote visual verification closure (#864)`
 - `6fe6d33 docs(marketquote): verify review-only freshness runtime wiring (#863)`
 - `cc225c4 feat(marketquote): show review-only freshness runtime status (#862)`
 - `60d1ccf docs(marketquote): verify freshness implementation readiness (#861)`
@@ -122,7 +123,7 @@ Current merged main:
 
 Current active capability movement:
 
-- `MarketQuote Visual Verification / Closure` browser-verifies the #862/#863 MarketQuote dashboard status panel, source/freshness/fallback/source-health/last-update display, dashboard-only sample and Watchlist boundary copy, no layout overlap, and no Push / Candidate / Decision / Point / Trading action semantics.
+- `Next Minimal Runtime Slice Selection After MarketQuote Closure` compares Evidence/Score, DecisionResult, ExecutionPlan/BoundaryCandidate, internal Push preview, Position Monitor, Data Source Health, and Review/Replay after the PositionSync, Watchlist, and MarketQuote review-only runtime slices, and selects the next source-read target without implementation.
 
 - #830 is merged on main.
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
@@ -170,13 +171,15 @@ Current active capability movement:
 - It completed Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation with one read-only `/api/market/quote-status` endpoint, dashboard MarketQuote freshness/status/copy/DOM, `MarketControllerTest`, and `DashboardControllerTest`.
 - #863 is merged on main.
 - It completed Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification with workflow contract, compile, test-compile, targeted controller/dashboard/market tests, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / Trading expansion.
-- Current active block is `MarketQuote Visual Verification / Closure`.
+- #864 is merged on main.
+- It completed MarketQuote Visual Verification / Closure and confirmed the dashboard MarketQuote panel is visible, source/freshness/fallback/source-health/last-update copy is clear, dashboard-only sample and Watchlist boundary copy are visible, layout is acceptable, and no Push / Candidate / Decision / Point / Trading semantics are visible.
+- Current active block is `Next Minimal Runtime Slice Selection After MarketQuote Closure`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
-- Completed runtime slices are `PositionSync + Dashboard review-only status` and `Watchlist + RuleConfig + Dashboard/API review-only status`, both `REVIEW_ONLY_RUNTIME partial`.
-- Selected next minimal runtime slice is `MarketQuote freshness / fallback / dashboard API status`.
-- The next required action is `Next minimal runtime slice selection` after this visual closure package is complete.
+- Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`, all `REVIEW_ONLY_RUNTIME partial`.
+- Selected next minimal runtime slice recommendation is `Evidence / Score review-only runtime status`.
+- The next required action is `Source Read for Evidence / Score Review-Only Runtime Status`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
