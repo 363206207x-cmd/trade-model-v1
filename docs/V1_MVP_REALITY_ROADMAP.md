@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Evidence / Score Runtime Wiring Verification`.
+- Active track: `Evidence / Score Visual Verification / Closure`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
 - Selected next minimal runtime slice: `Evidence / Score review-only runtime status`.
-- Next required action: `Evidence / Score visual verification / closure`.
+- Next required action: `Next minimal runtime slice selection`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -44,7 +44,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #867 completed Minimal Review-Only Evidence / Score Runtime Wiring Design and defines the future Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundary, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails before any implementation.
 - #868 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate and returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO / Validator / Assembler.
 - #869 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation with one read-only Evidence / Score runtime status endpoint, dashboard status/copy/DOM, targeted `DashboardControllerTest`, and no DTO / Validator / Assembler, Push, Candidate, Decision, Point, or trading expansion.
-- The active verification package validates #869 with workflow contract, compile/test, API smoke, dashboard smoke, forbidden path checks, and source-of-truth updates.
+- #870 completed Minimal Review-Only Evidence / Score Runtime Wiring Verification with workflow contract, compile/test, API smoke, dashboard smoke, forbidden path checks, and source-of-truth updates.
+- The active visual closure package browser-verifies Evidence / Score status visibility, counts, top summary, source trace / source health, Watchlist / MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics.
 
 ## Roadmap
 
@@ -184,8 +185,9 @@ Recommended next actions:
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
 36. Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate: completed on main as #868.
 37. Minimal Review-Only Evidence / Score Runtime Wiring Implementation: completed on main as #869.
-38. Minimal Review-Only Evidence / Score Runtime Wiring Verification: active.
-39. Evidence / Score visual verification / closure: next required action if verification remains green.
+38. Minimal Review-Only Evidence / Score Runtime Wiring Verification: completed on main as #870.
+39. Evidence / Score visual verification / closure: active.
+40. Next minimal runtime slice selection: next required action if visual closure remains green.
 33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
