@@ -1,13 +1,13 @@
-current_head: "08c65b5"
+current_head: "e72d2a1"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Next Minimal Runtime Slice Selection After MarketQuote Closure"
-active_block_cn: "MarketQuote 收口后的下一条最小 runtime slice 选择"
+active_block: "Source Read for Evidence / Score Review-Only Runtime Status"
+active_block_cn: "Evidence / Score 只读 runtime 状态源读"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "next-minimal-runtime-slice-selection-after-marketquote"
-merge_rule: "Selection / source-read-lite only; may add next minimal runtime slice selection documentation and source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
-next_required_action: "Source Read for Evidence / Score Review-Only Runtime Status"
+current_branch: "evidence-score-review-only-runtime-source-read"
+merge_rule: "Source read only; may add Evidence / Score review-only runtime source-read documentation and source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
+next_required_action: "Minimal Review-Only Evidence / Score Runtime Wiring Design"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -46,7 +46,8 @@ marketquote_freshness_runtime_wiring_implementation_readiness_status: "completed
 marketquote_freshness_runtime_wiring_implementation_status: "completed on main as #862; implements one minimal read-only MarketQuote freshness/status endpoint plus dashboard source/freshness/fallback/source-health display over existing MarketQuote owner assets, with targeted tests and no DTO/Validator/Assembler, Push, Candidate, Point, or trading expansion"
 marketquote_freshness_runtime_wiring_verification_status: "completed on main as #863; verifies #862 with workflow contract, compile, test-compile, targeted controller/dashboard/market tests, API smoke, dashboard smoke, forbidden paths, and no Push / Candidate / Decision / Point / trading expansion"
 marketquote_visual_verification_closure_status: "completed on main as #864; browser-verifies #862/#863 dashboard MarketQuote freshness/status panel visibility, quote source/freshness/fallback/source-health/last-update display, dashboard-only sample and Watchlist boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics"
-next_minimal_runtime_slice_selection_after_marketquote_status: "active; compares Evidence/Score, DecisionResult, ExecutionPlan/BoundaryCandidate, internal Push preview, Position Monitor, Data Source Health, and Review/Replay options after PositionSync, Watchlist, and MarketQuote review-only runtime partial closures without implementation"
+next_minimal_runtime_slice_selection_after_marketquote_status: "completed on main as #865; selects Evidence / Score review-only runtime status as the next source-read target after PositionSync, Watchlist, and MarketQuote review-only runtime partial closures"
+evidence_score_review_only_runtime_source_read_status: "active; source-read confirms existing Evidence / Score owner path, service/controller/API/dashboard/test/schema assets and decides whether the slice can move to review-only runtime wiring design without implementation"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
