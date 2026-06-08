@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Evidence / Score Runtime Wiring Implementation`.
+- Active track: `Minimal Review-Only Evidence / Score Runtime Wiring Verification`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`.
 - Selected next minimal runtime slice: `Evidence / Score review-only runtime status`.
-- Next required action: `Minimal Review-Only Evidence / Score Runtime Wiring Verification`.
+- Next required action: `Evidence / Score visual verification / closure`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -43,7 +43,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #866 completed Source Read for Evidence / Score Review-Only Runtime Status and confirms Evidence / Score owner paths, service/controller/API/dashboard/test/schema assets, and review-only/fail-closed boundaries, while dedicated review-only status endpoint/panel remains missing.
 - #867 completed Minimal Review-Only Evidence / Score Runtime Wiring Design and defines the future Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundary, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails before any implementation.
 - #868 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate and returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO / Validator / Assembler.
-- The active implementation package adds the minimal Evidence / Score review-only runtime status surface while staying inside existing owner paths.
+- #869 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation with one read-only Evidence / Score runtime status endpoint, dashboard status/copy/DOM, targeted `DashboardControllerTest`, and no DTO / Validator / Assembler, Push, Candidate, Decision, Point, or trading expansion.
+- The active verification package validates #869 with workflow contract, compile/test, API smoke, dashboard smoke, forbidden path checks, and source-of-truth updates.
 
 ## Roadmap
 
@@ -178,6 +179,13 @@ Recommended next actions:
 30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation: completed on main as #862.
 31. Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification: completed on main as #863.
 32. MarketQuote visual verification / closure: completed on main as #864.
+33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
+34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
+35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
+36. Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate: completed on main as #868.
+37. Minimal Review-Only Evidence / Score Runtime Wiring Implementation: completed on main as #869.
+38. Minimal Review-Only Evidence / Score Runtime Wiring Verification: active.
+39. Evidence / Score visual verification / closure: next required action if verification remains green.
 33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
