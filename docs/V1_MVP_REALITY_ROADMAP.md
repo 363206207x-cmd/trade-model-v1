@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification`.
+- Active track: `MarketQuote Visual Verification / Closure`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed second minimal runtime slice: `Watchlist + RuleConfig + Dashboard/API review-only status`.
 - Selected next minimal runtime slice: `MarketQuote freshness / fallback / dashboard API status`.
-- Next required action: `MarketQuote visual verification / closure`.
+- Next required action: `Next minimal runtime slice selection`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -37,7 +37,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #860 completed Minimal Review-Only MarketQuote Freshness Runtime Wiring Design and defines the future review-only owner path, status mapping, dashboard/API surface, Watchlist boundary, and readiness checklist before any implementation.
 - #861 completed the Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only quote freshness/status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no new DTO / Validator / Assembler.
 - #862 completed the Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation with one read-only quote freshness/status API, dashboard status/copy/DOM, targeted controller/dashboard tests, and no DTO / Validator / Assembler.
-- The active MarketQuote verification checks #862 with compile/test, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion.
+- #863 completed the Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification with compile/test, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion.
+- The active MarketQuote visual closure browser-verifies the dashboard MarketQuote panel, source/freshness/fallback/source-health/last-update display, dashboard-only sample and Watchlist boundary copy, layout, and no executable action semantics.
 
 ## Roadmap
 
@@ -170,8 +171,9 @@ Recommended next actions:
 28. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design.
 29. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate.
 30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation: completed on main as #862.
-31. Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification.
+31. Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification: completed on main as #863.
 32. MarketQuote visual verification / closure.
+33. Next minimal runtime slice selection.
 
 Do not continue P359 or start P360 by default.
 
