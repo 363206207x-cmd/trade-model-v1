@@ -1,13 +1,13 @@
-current_head: "dacaa29"
+current_head: "95d740c"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Evidence / Score Runtime Wiring Implementation"
-active_block_cn: "Evidence / Score 只读 runtime 状态最小实现"
+active_block: "Minimal Review-Only Evidence / Score Runtime Wiring Verification"
+active_block_cn: "Evidence / Score 只读 runtime 状态验证"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-evidence-score-runtime-wiring-implementation"
-merge_rule: "Minimal implementation only; may add one read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted controller/dashboard tests, implementation note, and source-of-truth updates; no DTO/Validator/Assembler/Orchestrator, schema/config/pom, Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
-next_required_action: "Minimal Review-Only Evidence / Score Runtime Wiring Verification"
+current_branch: "verify-review-only-evidence-score-runtime-wiring"
+merge_rule: "Verification only; may add one Evidence / Score runtime wiring verification note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
+next_required_action: "Evidence / Score visual verification / closure"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -50,7 +50,8 @@ next_minimal_runtime_slice_selection_after_marketquote_status: "completed on mai
 evidence_score_review_only_runtime_source_read_status: "completed on main as #866; source-read confirms existing Evidence / Score owner path, service/controller/API/dashboard/test/schema assets and returns GO for review-only runtime wiring design without implementation"
 minimal_review_only_evidence_score_runtime_wiring_design_status: "completed on main as #867; designs Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails without implementation"
 evidence_score_runtime_wiring_implementation_readiness_status: "completed on main as #868; returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
-minimal_review_only_evidence_score_runtime_wiring_implementation_status: "active; implements one minimal read-only Evidence / Score runtime status endpoint plus dashboard availability/count/top-summary/source-trace/source-health display over existing Evidence / Score owner assets without DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
+minimal_review_only_evidence_score_runtime_wiring_implementation_status: "completed on main as #869; implements one minimal read-only Evidence / Score runtime status endpoint plus dashboard availability/count/top-summary/source-trace/source-health display over existing Evidence / Score owner assets without DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
+minimal_review_only_evidence_score_runtime_wiring_verification_status: "active; verifies #869 with workflow contract, compile, test-compile, targeted dashboard/evidence/score/review aggregate tests, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
