@@ -6,13 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Source Read for Evidence / Score Review-Only Runtime Status`.
+- Active stop-loss track: `Minimal Review-Only Evidence / Score Runtime Wiring Design`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`.
 - Selected next minimal runtime slice: `Evidence / Score review-only runtime status`.
-- Next required action: `Minimal Review-Only Evidence / Score Runtime Wiring Design`.
+- Next required action: `Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `7672cc4 docs(evidence-score): read review-only runtime source path (#866)`
 - `e72d2a1 docs(runtime): select next slice after marketquote closure (#865)`
 - `08c65b5 docs(marketquote): record marketquote visual verification closure (#864)`
 - `6fe6d33 docs(marketquote): verify review-only freshness runtime wiring (#863)`
@@ -124,7 +125,7 @@ Current merged main:
 
 Current active capability movement:
 
-- `Source Read for Evidence / Score Review-Only Runtime Status` confirms the existing Evidence / Score owner path, service/controller/API/dashboard/detail/test/schema assets, and decides whether the slice can safely move to a review-only runtime wiring design without implementation.
+- `Minimal Review-Only Evidence / Score Runtime Wiring Design` fixes the future Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundary, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails without implementation.
 
 - #830 is merged on main.
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
@@ -176,13 +177,15 @@ Current active capability movement:
 - It completed MarketQuote Visual Verification / Closure and confirmed the dashboard MarketQuote panel is visible, source/freshness/fallback/source-health/last-update copy is clear, dashboard-only sample and Watchlist boundary copy are visible, layout is acceptable, and no Push / Candidate / Decision / Point / Trading semantics are visible.
 - #865 is merged on main.
 - It completed Next Minimal Runtime Slice Selection After MarketQuote Closure and selected `Evidence / Score review-only runtime status` as the next minimal source-read target after the three completed review-only runtime slices.
-- Current active block is `Source Read for Evidence / Score Review-Only Runtime Status`.
+- #866 is merged on main.
+- It completed Source Read for Evidence / Score Review-Only Runtime Status and confirmed the existing Evidence / Score owner path, service/controller/API/dashboard/detail/test/schema assets, while dedicated review-only status endpoint/panel remains missing.
+- Current active block is `Minimal Review-Only Evidence / Score Runtime Wiring Design`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `Evidence / Score review-only runtime status`.
-- The next required action is `Minimal Review-Only Evidence / Score Runtime Wiring Design`.
+- The next required action is `Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
