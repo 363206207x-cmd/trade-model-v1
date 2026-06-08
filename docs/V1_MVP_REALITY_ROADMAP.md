@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next Minimal Runtime Slice Selection After MarketQuote Closure`.
+- Active track: `Source Read for Evidence / Score Review-Only Runtime Status`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`.
-- Selected next minimal runtime slice recommendation: `Evidence / Score review-only runtime status`.
-- Next required action: `Source Read for Evidence / Score Review-Only Runtime Status`.
+- Selected next minimal runtime slice: `Evidence / Score review-only runtime status`.
+- Next required action: `Minimal Review-Only Evidence / Score Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -39,7 +39,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #862 completed the Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation with one read-only quote freshness/status API, dashboard status/copy/DOM, targeted controller/dashboard tests, and no DTO / Validator / Assembler.
 - #863 completed the Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification with compile/test, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion.
 - #864 completed MarketQuote Visual Verification / Closure and confirms the dashboard MarketQuote panel, source/freshness/fallback/source-health/last-update display, dashboard-only sample and Watchlist boundary copy, layout, and no executable action semantics.
-- The active selection package compares Evidence/Score, DecisionResult, ExecutionPlan/BoundaryCandidate, internal Push preview, Position Monitor, Data Source Health, and Review/Replay after the completed PositionSync, Watchlist, and MarketQuote review-only runtime slices.
+- #865 completed Next Minimal Runtime Slice Selection After MarketQuote Closure and selected `Evidence / Score review-only runtime status` as the next source-read target.
+- The active source-read package checks existing Evidence / Score owner paths, service/controller/API/dashboard/test/schema assets, and review-only/fail-closed boundaries before any design or implementation.
 
 ## Roadmap
 
@@ -174,8 +175,9 @@ Recommended next actions:
 30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation: completed on main as #862.
 31. Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification: completed on main as #863.
 32. MarketQuote visual verification / closure: completed on main as #864.
-33. Next minimal runtime slice selection after MarketQuote closure.
+33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status.
+35. Minimal Review-Only Evidence / Score Runtime Wiring Design.
 
 Do not continue P359 or start P360 by default.
 
