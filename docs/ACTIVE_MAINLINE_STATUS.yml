@@ -1,13 +1,13 @@
-current_head: "95d740c"
+current_head: "06bbfad"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Evidence / Score Runtime Wiring Verification"
-active_block_cn: "Evidence / Score 只读 runtime 状态验证"
+active_block: "Evidence / Score Visual Verification / Closure"
+active_block_cn: "Evidence / Score 浏览器视觉验证 / 收口"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "verify-review-only-evidence-score-runtime-wiring"
-merge_rule: "Verification only; may add one Evidence / Score runtime wiring verification note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
-next_required_action: "Evidence / Score visual verification / closure"
+current_branch: "evidence-score-visual-verification-closure"
+merge_rule: "Visual closure only; may add one Evidence / Score visual verification closure note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
+next_required_action: "Next minimal runtime slice selection"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -51,7 +51,8 @@ evidence_score_review_only_runtime_source_read_status: "completed on main as #86
 minimal_review_only_evidence_score_runtime_wiring_design_status: "completed on main as #867; designs Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails without implementation"
 evidence_score_runtime_wiring_implementation_readiness_status: "completed on main as #868; returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
 minimal_review_only_evidence_score_runtime_wiring_implementation_status: "completed on main as #869; implements one minimal read-only Evidence / Score runtime status endpoint plus dashboard availability/count/top-summary/source-trace/source-health display over existing Evidence / Score owner assets without DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
-minimal_review_only_evidence_score_runtime_wiring_verification_status: "active; verifies #869 with workflow contract, compile, test-compile, targeted dashboard/evidence/score/review aggregate tests, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion"
+minimal_review_only_evidence_score_runtime_wiring_verification_status: "completed on main as #870; verifies #869 with workflow contract, compile, test-compile, targeted dashboard/evidence/score/review aggregate tests, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion"
+evidence_score_visual_verification_closure_status: "active; browser-verifies #869/#870 dashboard Evidence / Score status panel visibility, Evidence/Score status/count/top-summary/source-trace/source-health display, Watchlist/MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
