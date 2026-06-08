@@ -1,13 +1,13 @@
-current_head: "06bbfad"
+current_head: "7e8866c"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Evidence / Score Visual Verification / Closure"
-active_block_cn: "Evidence / Score 浏览器视觉验证 / 收口"
+active_block: "Next Minimal Runtime Slice Selection After Evidence / Score Closure"
+active_block_cn: "Evidence / Score 收口后的下一条最小 runtime slice 选择"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "evidence-score-visual-verification-closure"
-merge_rule: "Visual closure only; may add one Evidence / Score visual verification closure note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
-next_required_action: "Next minimal runtime slice selection"
+current_branch: "next-minimal-runtime-slice-selection-after-evidence-score"
+merge_rule: "Selection/source-read-lite only; may add one next minimal runtime slice selection note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
+next_required_action: "Source Read for DecisionResult review-only dashboard/API status"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -52,7 +52,8 @@ minimal_review_only_evidence_score_runtime_wiring_design_status: "completed on m
 evidence_score_runtime_wiring_implementation_readiness_status: "completed on main as #868; returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
 minimal_review_only_evidence_score_runtime_wiring_implementation_status: "completed on main as #869; implements one minimal read-only Evidence / Score runtime status endpoint plus dashboard availability/count/top-summary/source-trace/source-health display over existing Evidence / Score owner assets without DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
 minimal_review_only_evidence_score_runtime_wiring_verification_status: "completed on main as #870; verifies #869 with workflow contract, compile, test-compile, targeted dashboard/evidence/score/review aggregate tests, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion"
-evidence_score_visual_verification_closure_status: "active; browser-verifies #869/#870 dashboard Evidence / Score status panel visibility, Evidence/Score status/count/top-summary/source-trace/source-health display, Watchlist/MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics"
+evidence_score_visual_verification_closure_status: "completed on main as #871; browser-verifies #869/#870 dashboard Evidence / Score status panel visibility, Evidence/Score status/count/top-summary/source-trace/source-health display, Watchlist/MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics"
+next_minimal_runtime_slice_selection_after_evidence_score_status: "active; compares DecisionResult, ExecutionPlan / BoundaryCandidate, Data Source Health, Review / Replay, Internal Push preview, Position Monitor, and Three AI options after four REVIEW_ONLY_RUNTIME partial closures and selects the next source-read-only target"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

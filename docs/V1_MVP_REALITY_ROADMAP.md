@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Evidence / Score Visual Verification / Closure`.
+- Active track: `Next Minimal Runtime Slice Selection After Evidence / Score Closure`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
-- Selected next minimal runtime slice: `Evidence / Score review-only runtime status`.
-- Next required action: `Next minimal runtime slice selection`.
+- Selected next minimal runtime slice: `DecisionResult review-only dashboard/API status`.
+- Next required action: `Source Read for DecisionResult review-only dashboard/API status`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -45,7 +45,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #868 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate and returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO / Validator / Assembler.
 - #869 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation with one read-only Evidence / Score runtime status endpoint, dashboard status/copy/DOM, targeted `DashboardControllerTest`, and no DTO / Validator / Assembler, Push, Candidate, Decision, Point, or trading expansion.
 - #870 completed Minimal Review-Only Evidence / Score Runtime Wiring Verification with workflow contract, compile/test, API smoke, dashboard smoke, forbidden path checks, and source-of-truth updates.
-- The active visual closure package browser-verifies Evidence / Score status visibility, counts, top summary, source trace / source health, Watchlist / MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics.
+- #871 completed Evidence / Score Visual Verification / Closure and confirms Evidence / Score status visibility, counts, top summary, source trace / source health, Watchlist / MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics.
+- The active selection package recommends `DecisionResult review-only dashboard/API status` as the next source-read-only target after comparing DecisionResult, ExecutionPlan / BoundaryCandidate, Data Source Health, Review / Replay, Internal Push preview, Position Monitor, and Three AI options.
 
 ## Roadmap
 
@@ -186,8 +187,9 @@ Recommended next actions:
 36. Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate: completed on main as #868.
 37. Minimal Review-Only Evidence / Score Runtime Wiring Implementation: completed on main as #869.
 38. Minimal Review-Only Evidence / Score Runtime Wiring Verification: completed on main as #870.
-39. Evidence / Score visual verification / closure: active.
-40. Next minimal runtime slice selection: next required action if visual closure remains green.
+39. Evidence / Score visual verification / closure: completed on main as #871.
+40. Next minimal runtime slice selection after Evidence / Score closure: active.
+41. Source Read for DecisionResult review-only dashboard/API status: next required action.
 33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
