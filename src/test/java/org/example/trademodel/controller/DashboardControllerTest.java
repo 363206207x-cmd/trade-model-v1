@@ -33,6 +33,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
@@ -199,6 +200,33 @@ class DashboardControllerTest {
         assertThat(html).contains("dashboard-only sample");
         assertThat(html).contains("Watchlist Pool 才是候选边界");
         assertThat(html).contains("Display Slots 不是行情候选池");
+    }
+
+    @Test
+    void dashboardTemplateShowsReviewOnlyEvidenceScoreRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/evidence-score-status");
+        assertThat(html).contains("evidenceScoreStatusPanel");
+        assertThat(html).contains("evidenceScoreRuntimeStatusValue");
+        assertThat(html).contains("evidenceScoreSymbolValue");
+        assertThat(html).contains("evidenceCountValue");
+        assertThat(html).contains("scoreCountValue");
+        assertThat(html).contains("evidenceScoreTopSummaryValue");
+        assertThat(html).contains("evidenceScoreSourceTraceValue");
+        assertThat(html).contains("evidenceScoreSourceHealthValue");
+        assertThat(html).contains("EVIDENCE_SCORE_REVIEW_ONLY_READY");
+        assertThat(html).contains("EVIDENCE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("SCORE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED");
+        assertThat(html).contains("EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL");
+        assertThat(html).contains("EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("Evidence / Score 是只读状态，不是交易信号");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是 Decision");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("Watchlist Pool 和 MarketQuote freshness / fallback 边界仍适用");
+        assertThat(html).contains("Display Slots 不是候选池");
     }
 
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
@@ -392,6 +420,101 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'eventWindowBlockers')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'wickConfirmationSources')]").exists())
                 .andExpect(jsonPath("$.derivativesRiskContext.missingFields[?(@ == 'dataQualityScore')]").doesNotExist());
+    }
+
+    @Test
+    void evidenceScoreStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-evidence-score-ready");
+        EvidenceBriefVO evidence = new EvidenceBriefVO();
+        evidence.setEvidenceType("价格结构");
+        evidence.setDescription("突破后回踩确认");
+        evidence.setDirection("BULLISH");
+        evidence.setSource("SYSTEM_GENERATED");
+        ScoreBriefVO score = new ScoreBriefVO();
+        score.setScoreType("综合评分");
+        score.setScoreValue(82.0);
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-evidence-score-ready")).thenReturn(List.of(evidence));
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-evidence-score-ready")).thenReturn(List.of(score));
+
+        mockMvc.perform(get("/api/dashboard/evidence-score-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EVIDENCE_SCORE_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.evidenceCount").value(1))
+                .andExpect(jsonPath("$.scoreCount").value(1))
+                .andExpect(jsonPath("$.evidenceAvailable").value(true))
+                .andExpect(jsonPath("$.scoreAvailable").value(true))
+                .andExpect(jsonPath("$.evidenceTopItems[0].evidenceType").value("价格结构"))
+                .andExpect(jsonPath("$.scoreTopItems[0].scoreType").value("综合评分"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("OK"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionSignal").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void evidenceScoreStatusEndpointFailsClosedWhenAnalysisContextMissing() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("ETHUSDT")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/evidence-score-status").param("symbol", "ETHUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("ETHUSDT"))
+                .andExpect(jsonPath("$.evidenceCount").value(0))
+                .andExpect(jsonPath("$.scoreCount").value(0))
+                .andExpect(jsonPath("$.evidenceAvailable").value(false))
+                .andExpect(jsonPath("$.scoreAvailable").value(false))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionSignal").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("ANALYSIS_CONTEXT_MISSING"));
+    }
+
+    @Test
+    void evidenceScoreStatusEndpointDoesNotExposeExecutableCandidateDecisionPointOrTradingFields() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-evidence-score-safe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-evidence-score-safe")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-evidence-score-safe")).thenReturn(Collections.emptyList());
+
+        MvcResult result = mockMvc.perform(get("/api/dashboard/evidence-score-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).doesNotContain(
+                "candidateRanking",
+                "finalDirection",
+                "entry",
+                "stop",
+                "takeProfit",
+                "riskReward",
+                "positionSize",
+                "leverage",
+                "placeOrder",
+                "createOrder",
+                "submitOrder",
+                "auto-trading",
+                "order action"
+        );
     }
 
     @Test

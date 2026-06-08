@@ -1078,6 +1078,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="marketQuoteReasonValue">QUOTE_UNAVAILABLE</span></div>
         </div>
 
+        <div class="module-status-note" id="evidenceScoreStatusPanel" aria-label="Evidence Score review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Evidence / Score 只读状态</span><span class="v" id="evidenceScoreRuntimeStatusValue">EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED / Evidence / Score 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的</span><span class="v" id="evidenceScoreSymbolValue">—</span></div>
+            <div class="kv"><span class="k">Evidence / Score count</span><span class="v"><span id="evidenceCountValue">0</span> / <span id="scoreCountValue">0</span></span></div>
+            <div class="kv"><span class="k">top evidence / top score summary</span><span class="v" id="evidenceScoreTopSummaryValue">—</span></div>
+            <div class="kv"><span class="k">source trace / source health</span><span class="v"><span id="evidenceScoreSourceTraceValue">partial</span> · <span id="evidenceScoreSourceHealthValue">MISSING</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="evidenceScoreReviewOnlyValue">Evidence / Score 是只读状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision / Point</span><span class="v" id="evidenceScoreSignalBoundaryValue">不是 Candidate；不是 Decision；不是 Point；不是交易信号。</span></div>
+            <div class="kv"><span class="k">Watchlist / MarketQuote boundary</span><span class="v" id="evidenceScoreBoundaryValue">Watchlist Pool 和 MarketQuote freshness / fallback 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="evidenceScoreReasonValue">EVIDENCE_SCORE_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1273,6 +1285,12 @@
     var MARKETQUOTE_STATUS_FALLBACK = "MARKETQUOTE_FALLBACK_ACTIVE";
     var MARKETQUOTE_STATUS_PARTIAL = "MARKETQUOTE_SOURCE_HEALTH_PARTIAL";
     var MARKETQUOTE_STATUS_BLOCKED = "MARKETQUOTE_BLOCKED_FAIL_CLOSED";
+    var EVIDENCE_SCORE_STATUS_READY = "EVIDENCE_SCORE_REVIEW_ONLY_READY";
+    var EVIDENCE_SCORE_STATUS_EVIDENCE_MISSING = "EVIDENCE_MISSING_FAIL_CLOSED";
+    var EVIDENCE_SCORE_STATUS_SCORE_MISSING = "SCORE_MISSING_FAIL_CLOSED";
+    var EVIDENCE_SCORE_STATUS_INCOMPLETE = "EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED";
+    var EVIDENCE_SCORE_STATUS_SOURCE_TRACE_PARTIAL = "EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL";
+    var EVIDENCE_SCORE_STATUS_BLOCKED = "EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1324,11 +1342,35 @@
         reason: "QUOTE_UNAVAILABLE",
         message: "行情状态待确认；只读状态，不是交易信号。"
     };
+    var evidenceScoreRuntimeStatus = {
+        status: EVIDENCE_SCORE_STATUS_INCOMPLETE,
+        symbol: null,
+        evidenceCount: 0,
+        scoreCount: 0,
+        evidenceAvailable: false,
+        scoreAvailable: false,
+        evidenceTopItems: [],
+        scoreTopItems: [],
+        sourceTraceComplete: false,
+        sourceHealth: "MISSING",
+        reason: "EVIDENCE_SCORE_STATUS_PENDING",
+        message: "Evidence / Score 只读状态待确认；不是交易信号。",
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionSignal: true,
+        notPointSignal: true,
+        watchlistBounded: true,
+        marketQuoteChecked: true,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
     window.__watchlistReviewStatus = WATCHLIST_STATUS_MISSING;
     window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
+    window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -2654,6 +2696,86 @@
             });
     }
 
+    function resolveEvidenceScoreRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        var evidenceTopItems = Array.isArray(p.evidenceTopItems) ? p.evidenceTopItems : [];
+        var scoreTopItems = Array.isArray(p.scoreTopItems) ? p.scoreTopItems : [];
+        return {
+            status: firstNonEmpty(p.status, EVIDENCE_SCORE_STATUS_INCOMPLETE).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            evidenceCount: Number(p.evidenceCount || evidenceTopItems.length || 0),
+            scoreCount: Number(p.scoreCount || scoreTopItems.length || 0),
+            evidenceAvailable: p.evidenceAvailable === true,
+            scoreAvailable: p.scoreAvailable === true,
+            evidenceTopItems: evidenceTopItems,
+            scoreTopItems: scoreTopItems,
+            sourceTraceComplete: p.sourceTraceComplete === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "EVIDENCE_SCORE_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Evidence / Score 只读状态待确认；不是交易信号。"),
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionSignal: true,
+            notPointSignal: true,
+            watchlistBounded: p.watchlistBounded !== false,
+            marketQuoteChecked: p.marketQuoteChecked !== false,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function summarizeEvidenceScoreTopItems(status) {
+        var evidence = Array.isArray(status.evidenceTopItems) && status.evidenceTopItems.length
+            ? status.evidenceTopItems[0]
+            : null;
+        var score = Array.isArray(status.scoreTopItems) && status.scoreTopItems.length
+            ? status.scoreTopItems[0]
+            : null;
+        var evidenceText = evidence
+            ? firstNonEmpty(evidence.evidenceType, evidence.description, "Evidence top item")
+            : "Evidence 暂无";
+        var scoreType = score ? firstNonEmpty(score.scoreType, "Score top item") : "Score 暂无";
+        var scoreValue = score && score.scoreValue != null ? String(score.scoreValue) : "";
+        return evidenceText + " / " + scoreType + (scoreValue ? " " + scoreValue : "");
+    }
+
+    function updateEvidenceScoreRuntimeStatusDisplay() {
+        var es = evidenceScoreRuntimeStatus || {};
+        setText("evidenceScoreRuntimeStatusValue", (es.status || EVIDENCE_SCORE_STATUS_INCOMPLETE) + " / " + (es.message || "只读状态"));
+        setText("evidenceScoreSymbolValue", es.symbol || "—");
+        setText("evidenceCountValue", es.evidenceCount);
+        setText("scoreCountValue", es.scoreCount);
+        setText("evidenceScoreTopSummaryValue", summarizeEvidenceScoreTopItems(es));
+        setText("evidenceScoreSourceTraceValue", es.sourceTraceComplete ? "complete" : "partial / missing");
+        setText("evidenceScoreSourceHealthValue", es.sourceHealth || "MISSING");
+        setText("evidenceScoreReviewOnlyValue", "Evidence / Score 是只读状态，不是交易信号。");
+        setText("evidenceScoreSignalBoundaryValue", "不是 Candidate；不是 Decision；不是 Point；不是交易信号。");
+        setText("evidenceScoreBoundaryValue", "Watchlist Pool 和 MarketQuote freshness / fallback 边界仍适用；Display Slots 不是候选池。");
+        setText("evidenceScoreReasonValue", es.reason || "—");
+    }
+
+    function fetchEvidenceScoreRuntimeStatus(symbol) {
+        if (!symbol) {
+            evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
+            window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
+            updateEvidenceScoreRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/evidence-score-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus(payload, symbol);
+                window.__evidenceScoreReviewStatus = evidenceScoreRuntimeStatus.status || EVIDENCE_SCORE_STATUS_INCOMPLETE;
+                updateEvidenceScoreRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({}, symbol);
+                window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
+                updateEvidenceScoreRuntimeStatusDisplay();
+            });
+    }
+
     function fetchPositionProviderStatus() {
         return fetch("/api/system/position-sync-status")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3262,12 +3384,14 @@
                 document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchWatchlistRuntimeStatus();
                 fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
+                fetchEvidenceScoreRuntimeStatus(selectedSymbol);
             });
     }
 
     function requestDetailForSelectedSymbol() {
         var symbol = selectedSymbol;
         fetchMarketQuoteRuntimeStatus(symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
+        fetchEvidenceScoreRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3412,6 +3536,7 @@
         renderModuleStatusBoard();
         updateWatchlistRuntimeStatusDisplay();
         updateMarketQuoteRuntimeStatusDisplay();
+        updateEvidenceScoreRuntimeStatusDisplay();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();

@@ -20,6 +20,7 @@ import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.SystemHealthService;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DashboardSummaryResponseVO;
+import org.example.trademodel.vo.DecisionResultVO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -30,7 +31,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Controller
@@ -45,6 +48,12 @@ public class DashboardController {
             "</api/dashboard/summary>; rel=\"alternate\"; title=\"replacement\"";
     private static final String MARKET_ENV_SOURCE_HEURISTIC = "BINANCE_24H_HEURISTIC";
     private static final String MARKET_ENV_SOURCE_FALLBACK = "PLACEHOLDER_FALLBACK";
+    private static final String EVIDENCE_SCORE_READY = "EVIDENCE_SCORE_REVIEW_ONLY_READY";
+    private static final String EVIDENCE_MISSING_FAIL_CLOSED = "EVIDENCE_MISSING_FAIL_CLOSED";
+    private static final String SCORE_MISSING_FAIL_CLOSED = "SCORE_MISSING_FAIL_CLOSED";
+    private static final String EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED = "EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED";
+    private static final String EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL = "EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL";
+    private static final String EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED = "EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED";
 
     private final DecisionService decisionService;
     private final SystemHealthService systemHealthService;
@@ -191,12 +200,98 @@ public class DashboardController {
         return body;
     }
 
+    @GetMapping("/api/dashboard/evidence-score-status")
+    @ResponseBody
+    public Map<String, Object> evidenceScoreStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseEvidenceScoreStatus(normalizedSymbol);
+        DecisionResultVO decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+        if (decision == null || !hasText(decision.getAnalysisId())) {
+            applyEvidenceScoreStatus(
+                    status,
+                    EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED,
+                    "ANALYSIS_CONTEXT_MISSING",
+                    "Evidence / Score analysis context 缺失；只读状态 fail-closed，不生成候选、决策、点位或交易信号。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        String analysisId = decision.getAnalysisId();
+        List<EvidenceBriefVO> evidenceRows = resolveEvidenceTopItemsByAnalysisId(analysisId);
+        List<ScoreBriefVO> scoreRows = resolveScoreTopItemsByAnalysisId(analysisId);
+        boolean evidenceAvailable = !evidenceRows.isEmpty();
+        boolean scoreAvailable = !scoreRows.isEmpty();
+        boolean sourceTraceComplete = evidenceScoreSourceTraceComplete(evidenceRows, scoreRows);
+
+        status.put("evidenceCount", evidenceRows.size());
+        status.put("scoreCount", scoreRows.size());
+        status.put("evidenceAvailable", evidenceAvailable);
+        status.put("scoreAvailable", scoreAvailable);
+        status.put("evidenceTopItems", evidenceRows);
+        status.put("scoreTopItems", scoreRows);
+        status.put("sourceTraceComplete", sourceTraceComplete);
+
+        if (evidenceAvailable && scoreAvailable && sourceTraceComplete) {
+            applyEvidenceScoreStatus(
+                    status,
+                    EVIDENCE_SCORE_READY,
+                    "EVIDENCE_SCORE_OWNER_PATH_READ",
+                    "Evidence / Score 只读状态可读；不是 Candidate、Decision、Point 或交易信号。",
+                    false,
+                    "OK"
+            );
+        } else if (evidenceAvailable && scoreAvailable) {
+            applyEvidenceScoreStatus(
+                    status,
+                    EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL,
+                    "SOURCE_TRACE_PARTIAL",
+                    "Evidence / Score 来源追踪不完整；仅显示摘要，不作为候选、决策、点位或交易信号。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!evidenceAvailable && scoreAvailable) {
+            applyEvidenceScoreStatus(
+                    status,
+                    EVIDENCE_MISSING_FAIL_CLOSED,
+                    "EVIDENCE_MISSING",
+                    "Evidence 缺失；Score 不能作为候选排序、决策或点位依据。",
+                    true,
+                    "MISSING"
+            );
+        } else if (evidenceAvailable) {
+            applyEvidenceScoreStatus(
+                    status,
+                    SCORE_MISSING_FAIL_CLOSED,
+                    "SCORE_MISSING",
+                    "Score 缺失；Evidence / Score 链路对 Candidate、Decision、Point、Push 和交易保持 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+        } else {
+            applyEvidenceScoreStatus(
+                    status,
+                    EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED,
+                    "EVIDENCE_AND_SCORE_MISSING",
+                    "Evidence / Score 缺失或不完整；只读展示，候选、决策、点位和交易全部关闭。",
+                    true,
+                    "MISSING"
+            );
+        }
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
         }
         String analysisId = body.getDecision().getAnalysisId();
-        if (analysisId == null || analysisId.isBlank()) {
+        return resolveEvidenceTopItemsByAnalysisId(analysisId);
+    }
+
+    private List<EvidenceBriefVO> resolveEvidenceTopItemsByAnalysisId(String analysisId) {
+        if (!hasText(analysisId) || evidenceService == null) {
             return Collections.emptyList();
         }
         List<EvidenceBriefVO> rows = evidenceService.listTopEvidenceBriefByAnalysisId(analysisId);
@@ -208,11 +303,69 @@ public class DashboardController {
             return Collections.emptyList();
         }
         String analysisId = body.getDecision().getAnalysisId();
-        if (analysisId == null || analysisId.isBlank()) {
+        return resolveScoreTopItemsByAnalysisId(analysisId);
+    }
+
+    private List<ScoreBriefVO> resolveScoreTopItemsByAnalysisId(String analysisId) {
+        if (!hasText(analysisId) || scoreService == null) {
             return Collections.emptyList();
         }
         List<ScoreBriefVO> rows = scoreService.listTopScoreBriefByAnalysisId(analysisId);
         return rows != null ? rows : Collections.emptyList();
+    }
+
+    private Map<String, Object> baseEvidenceScoreStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("evidenceCount", 0);
+        status.put("scoreCount", 0);
+        status.put("evidenceAvailable", false);
+        status.put("scoreAvailable", false);
+        status.put("evidenceTopItems", Collections.emptyList());
+        status.put("scoreTopItems", Collections.emptyList());
+        status.put("sourceTraceComplete", false);
+        status.put("sourceHealth", "MISSING");
+        status.put("reason", "EVIDENCE_SCORE_STATUS_PENDING");
+        status.put("message", "Evidence / Score 只读状态待确认；不是交易信号。");
+        status.put("reviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionSignal", true);
+        status.put("notPointSignal", true);
+        status.put("watchlistBounded", true);
+        status.put("marketQuoteChecked", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        return status;
+    }
+
+    private void applyEvidenceScoreStatus(Map<String, Object> status,
+                                          String statusValue,
+                                          String reason,
+                                          String message,
+                                          boolean failClosed,
+                                          String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private boolean evidenceScoreSourceTraceComplete(List<EvidenceBriefVO> evidenceRows, List<ScoreBriefVO> scoreRows) {
+        if (evidenceRows == null || evidenceRows.isEmpty() || scoreRows == null || scoreRows.isEmpty()) {
+            return false;
+        }
+        boolean evidenceSourcesPresent = evidenceRows.stream()
+                .allMatch(row -> row != null && hasText(row.getEvidenceType()) && hasText(row.getSource()));
+        boolean scoreSummariesPresent = scoreRows.stream()
+                .allMatch(row -> row != null && hasText(row.getScoreType()) && row.getScoreValue() != null);
+        return evidenceSourcesPresent && scoreSummariesPresent;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private DashboardDetailResponseVO.MarketEnvironmentMiniVO resolveMarketEnvironmentMini(

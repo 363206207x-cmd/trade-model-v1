@@ -1,13 +1,13 @@
-current_head: "452b08c"
+current_head: "dacaa29"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate"
-active_block_cn: "Evidence / Score 只读 runtime 状态实现准备门"
+active_block: "Minimal Review-Only Evidence / Score Runtime Wiring Implementation"
+active_block_cn: "Evidence / Score 只读 runtime 状态最小实现"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "evidence-score-runtime-wiring-readiness-gate"
-merge_rule: "Readiness gate only; may add Evidence / Score runtime wiring implementation readiness documentation and source-of-truth updates; no Java, tests, dashboard, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
-next_required_action: "Minimal Review-Only Evidence / Score Runtime Wiring Implementation"
+current_branch: "minimal-review-only-evidence-score-runtime-wiring-implementation"
+merge_rule: "Minimal implementation only; may add one read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted controller/dashboard tests, implementation note, and source-of-truth updates; no DTO/Validator/Assembler/Orchestrator, schema/config/pom, Push, external channel, Candidate, Decision, Point, direction output, order/execution, P359, or P360"
+next_required_action: "Minimal Review-Only Evidence / Score Runtime Wiring Verification"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -49,7 +49,8 @@ marketquote_visual_verification_closure_status: "completed on main as #864; brow
 next_minimal_runtime_slice_selection_after_marketquote_status: "completed on main as #865; selects Evidence / Score review-only runtime status as the next source-read target after PositionSync, Watchlist, and MarketQuote review-only runtime partial closures"
 evidence_score_review_only_runtime_source_read_status: "completed on main as #866; source-read confirms existing Evidence / Score owner path, service/controller/API/dashboard/test/schema assets and returns GO for review-only runtime wiring design without implementation"
 minimal_review_only_evidence_score_runtime_wiring_design_status: "completed on main as #867; designs Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails without implementation"
-evidence_score_runtime_wiring_implementation_readiness_status: "active; verifies whether the Evidence / Score review-only runtime status slice may enter minimal implementation using existing owner path, optional minimal read-only endpoint, minimal dashboard status/copy, targeted tests, and no DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
+evidence_score_runtime_wiring_implementation_readiness_status: "completed on main as #868; returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
+minimal_review_only_evidence_score_runtime_wiring_implementation_status: "active; implements one minimal read-only Evidence / Score runtime status endpoint plus dashboard availability/count/top-summary/source-trace/source-health display over existing Evidence / Score owner assets without DTO/Validator/Assembler, Push, Candidate, Decision, Point, or trading expansion"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

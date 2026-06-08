@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate`.
+- Active track: `Minimal Review-Only Evidence / Score Runtime Wiring Implementation`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, and `MarketQuote freshness / fallback / dashboard API status`.
 - Selected next minimal runtime slice: `Evidence / Score review-only runtime status`.
-- Next required action: `Minimal Review-Only Evidence / Score Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only Evidence / Score Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -42,7 +42,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #865 completed Next Minimal Runtime Slice Selection After MarketQuote Closure and selected `Evidence / Score review-only runtime status` as the next source-read target.
 - #866 completed Source Read for Evidence / Score Review-Only Runtime Status and confirms Evidence / Score owner paths, service/controller/API/dashboard/test/schema assets, and review-only/fail-closed boundaries, while dedicated review-only status endpoint/panel remains missing.
 - #867 completed Minimal Review-Only Evidence / Score Runtime Wiring Design and defines the future Evidence / Score review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote boundary, readiness checklist, and no-Push/no-Candidate/no-Decision/no-Point/no-trading guardrails before any implementation.
-- The active readiness package verifies whether the next minimal implementation may add or reuse a read-only status endpoint and minimal dashboard status/copy while staying inside existing owner paths.
+- #868 completed Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate and returns GO for a minimal read-only Evidence / Score runtime status endpoint, minimal dashboard status/copy/DOM, targeted tests, and no DTO / Validator / Assembler.
+- The active implementation package adds the minimal Evidence / Score review-only runtime status surface while staying inside existing owner paths.
 
 ## Roadmap
 
@@ -180,8 +181,9 @@ Recommended next actions:
 33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
-36. Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate.
-37. Minimal Review-Only Evidence / Score Runtime Wiring Implementation, only if this readiness gate remains GO.
+36. Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate: completed on main as #868.
+37. Minimal Review-Only Evidence / Score Runtime Wiring Implementation.
+38. Minimal Review-Only Evidence / Score Runtime Wiring Verification, only after implementation branch is pushed.
 
 Do not continue P359 or start P360 by default.
 
