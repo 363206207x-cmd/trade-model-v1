@@ -1,13 +1,13 @@
-current_head: "e71e0af"
+current_head: "7435a6a"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source Read for DecisionResult review-only dashboard/API status"
-active_block_cn: "DecisionResult 只读 dashboard/API status source read"
+active_block: "Minimal Review-Only DecisionResult Runtime Wiring Design"
+active_block_cn: "DecisionResult 最小只读 runtime wiring design"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "decisionresult-review-only-runtime-source-read"
-merge_rule: "Source-read only; may add one DecisionResult source-read note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision generation, Point, final direction, order/execution, P359, or P360"
-next_required_action: "Minimal Review-Only DecisionResult Runtime Wiring Design"
+current_branch: "minimal-review-only-decisionresult-runtime-wiring-design"
+merge_rule: "Design only; may add one DecisionResult wiring design note and source-of-truth updates; no Java/test/dashboard/schema/config/pom changes, no DTO/Validator/Assembler/Orchestrator, no Push, external channel, Candidate, Decision generation, Point, final direction, order/execution, P359, or P360"
+next_required_action: "Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -54,7 +54,8 @@ minimal_review_only_evidence_score_runtime_wiring_implementation_status: "comple
 minimal_review_only_evidence_score_runtime_wiring_verification_status: "completed on main as #870; verifies #869 with workflow contract, compile, test-compile, targeted dashboard/evidence/score/review aggregate tests, API smoke, dashboard smoke, forbidden path checks, and no Push / Candidate / Decision / Point / trading expansion"
 evidence_score_visual_verification_closure_status: "completed on main as #871; browser-verifies #869/#870 dashboard Evidence / Score status panel visibility, Evidence/Score status/count/top-summary/source-trace/source-health display, Watchlist/MarketQuote boundary copy, layout, and no Push / Candidate / Decision / Point / trading action semantics"
 next_minimal_runtime_slice_selection_after_evidence_score_status: "completed on main as #872; compares DecisionResult, ExecutionPlan / BoundaryCandidate, Data Source Health, Review / Replay, Internal Push preview, Position Monitor, and Three AI options after four REVIEW_ONLY_RUNTIME partial closures and selects DecisionResult review-only dashboard/API status as the next source-read-only target"
-decisionresult_review_only_runtime_source_read_status: "active; source-read confirms DecisionResult owner path, DecisionService, mapper/schema, dashboard summary/detail API, dashboard display, tests, ai_role_results, and partial review-only/fail-closed boundaries before design"
+decisionresult_review_only_runtime_source_read_status: "completed on main as #873; source-read confirms DecisionResult owner path, DecisionService, mapper/schema, dashboard summary/detail API, dashboard display, tests, ai_role_results, and partial review-only/fail-closed boundaries before design"
+minimal_review_only_decisionresult_runtime_wiring_design_status: "active; designs DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails without implementation"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
