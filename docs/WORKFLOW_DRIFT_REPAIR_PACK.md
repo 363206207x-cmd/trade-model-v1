@@ -11,6 +11,7 @@
 - `v1-status.sh` / `v1-state.sh` 命名漂移：统一为 `scripts/v1-state.sh`。
 - A/B/C merge rule 没有脚本化：`v1-merge-sync.sh` 增加 risk / confirm 参数。
 - task prompt 太长：新增 `CODEX_NEXT_TASK.yml`、任务模板、`codex-next-task.sh`。
+- 合并后 handoff 漂移：`CODEX_NEXT_TASK.yml` 必须指向合并后的当前下一包，而不是本 workflow repair 包自身。
 - source-of-truth 历史日志与当前状态混杂：拆出 Current State Rules、Current Active Block、Runtime Slice History、Fixed Workflow Commands、Forbidden Shortcuts。
 - Codex shell `GH_NOT_AVAILABLE` 误判：规则明确它只是 Codex GitHub status unknown，可由 GPT connector 或用户本机 terminal handoff evidence 补足项目状态判断。
 
@@ -23,6 +24,7 @@
 | v1-status/v1-state 命名漂移 | source-of-truth 写 `scripts/v1-status.sh` | 脚本改名后文档未同步 | 统一为 `scripts/v1-state.sh` |
 | A/B/C merge rule 未脚本化 | merge 脚本无 risk / confirm 参数 | merge 风险规则只在文档 | `v1-merge-sync.sh` 增加 `--risk` / `--confirm` |
 | task prompt 太长 | 用户在 GPT / Codex / terminal 间重复复制长提示 | 缺少机器可读 next-task handoff | 新增 `CODEX_NEXT_TASK.yml`、模板、`codex-next-task.sh` |
+| 合并后 handoff 指回本包 | `CODEX_NEXT_TASK.yml` 如果指向 Workflow Drift Repair Pack，会在 #877 合并后重复生成 repair 任务 | next-task 文件被当作当前包描述，而不是 merge-after handoff | `CODEX_NEXT_TASK.yml` 固定为合并后下一包：DecisionResult Runtime Wiring Verification |
 | 当前状态和历史流水混杂 | source-of-truth 长句串联历史 PR | 当前态与历史态未分层 | 重排 `V1_PROGRESS_SOURCE_OF_TRUTH.md` |
 | Codex GH_NOT_AVAILABLE 误判 | Codex shell 可能无法读本机 keyring | Codex 环境 auth 与项目 GitHub 状态混为一谈 | handoff 规则区分 Codex status unknown 与项目 blocker |
 
@@ -37,6 +39,8 @@
 7. main clean 后继续下一包
 
 If Codex shell cannot run `gh`, treat that as Codex GitHub status unknown. GPT connector or user terminal evidence can satisfy open PR / main sync / clean worktree handoff.
+
+`docs/CODEX_NEXT_TASK.yml` is the merge-after handoff for the current next package. For #877, it must render `Minimal Review-Only DecisionResult Runtime Wiring Verification`, not this Workflow Drift Repair Pack again.
 
 ## 4. Risk Rules
 
