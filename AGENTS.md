@@ -49,6 +49,15 @@ Every task must declare:
 
 Do not continue into the next business package until the current package is merged on `main`.
 
+Current task selection must use `docs/ACTIVE_MAINLINE_STATUS.yml`:
+
+- `active_block` defines the current block.
+- `next_required_action` defines the next allowed action.
+- If chat memory, branch names, PR state, and docs conflict, merged `main` plus `bash scripts/v1-state.sh` wins.
+- If Codex shell reports `GH_NOT_AVAILABLE`, treat Codex GitHub status as unknown, not as project state failure. GPT connector evidence or the user's local terminal `gh` output may be used as handoff evidence for open PR / main sync / clean worktree status.
+- Do not open the next package until the current package is merged on `main`, local `main` is synced, and the worktree is clean.
+- Prefer fixed workflow commands over handwritten long `gh pr create` / `gh pr merge` commands.
+
 ## Duplicate Skeleton Freeze
 
 After #830, Codex must follow `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
@@ -57,4 +66,6 @@ Do not default to new DTO / Validator / Assembler / Orchestrator / docs-only pla
 
 Do not continue P359 or start P360 by default.
 
-The next allowed track is Cursor Artifact Inventory + Ownership Map unless a task directly reduces duplication, selects canonical ownership, or wires an existing service / runtime / dashboard / API review-only path.
+Do not connect auto-trading, Push, external channels, Candidate generation, Point generation, order, execution, or executable trade semantics unless a future task explicitly authorizes that scope.
+
+The next allowed track is not hard-coded here. It is whatever merged `main`, `docs/ACTIVE_MAINLINE_STATUS.yml`, and `bash scripts/v1-state.sh` jointly confirm as safe.

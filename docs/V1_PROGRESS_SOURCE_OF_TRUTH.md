@@ -1,87 +1,96 @@
 # V1 Progress Source Of Truth
 
-This document defines how Trade Model V1 progress is determined.
+This document defines how Trade Model V1 progress is determined. New windows must start from `docs/SESSION_BOOTSTRAP.md`.
 
-New windows must start from `docs/SESSION_BOOTSTRAP.md`.
+Default workflow is GPT + Codex + GitHub-native. Terminal scripts are fixed fallback helpers, except local main sync after merge.
 
-Default workflow is GPT + Codex + GitHub-native.
-（默认工作流是 GPT + Codex + GitHub 原生。）
-
-Terminal scripts are fallback only except local main sync after merge.
-（终端脚本除合并后同步 main 外，只作为兜底。）
-
-GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
-（GitHub 认证与 GPT / Codex / 本地 `gh` 交接必须遵守 `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`。）
-
-Fallback bootstrap command:
-
-```bash
-bash scripts/v1-session-bootstrap.sh
-```
-
-## Completion Rule
+## Current State Rules
 
 Only merged `main` counts as completed project state.
 
+Current state must be read from:
+
+1. `docs/ACTIVE_MAINLINE_STATUS.yml`
+2. `bash scripts/v1-state.sh`
+3. merged `main`
+4. `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
+5. this file and the other source-of-truth docs
+
+If chat memory, branch names, local docs, PR state, and command output conflict, merged `main` plus `scripts/v1-state.sh` wins.
+
+Codex shell `GH_NOT_AVAILABLE` means Codex GitHub status unknown. It is not, by itself, proof that project state failed. GPT connector evidence or the user's local terminal `gh` evidence may be used as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
+
 The following do not count as completed:
 
-- open Issue;
-- open PR;
-- draft PR;
-- approved PR that is not merged;
-- CI green PR that is not merged;
-- local branch;
-- remote branch;
-- unsynced main after merge;
-- dirty worktree;
-- unmerged commit;
-- chat memory;
-- Codex output;
-- planned scope;
-- docs-only authorization;
-- code skeleton without the next capability layer;
-- test-only fixture when production wiring is being discussed.
+- open Issue
+- open PR
+- Draft PR
+- approved PR that is not merged
+- CI green PR that is not merged
+- local branch or remote branch
+- unsynced main after merge
+- dirty worktree
+- unmerged commit
+- chat memory
+- Codex output
+- docs-only authorization
 
-## Required Progress Inputs
+## Current Active Block
 
-Every progress answer must check these sources in this order:
+- Current merged main: `0c7d4d4 feat(decision): show review-only runtime status (#876)`
+- Current active block: `Workflow Drift Repair Pack`
+- Current level: `REVIEW_ONLY_RUNTIME partial`
+- Capability movement from this pack: none; workflow repair only
+- Next required action: `Resume Minimal Review-Only DecisionResult Runtime Wiring Verification`
+- #876 is completed and synced on main by user terminal handoff evidence.
+- This pack must not be mistaken for DecisionResult runtime capability, Push, Candidate, Decision generation, Point, or trading progress.
 
-1. `docs/SESSION_BOOTSTRAP.md`
-2. `docs/ACTIVE_MAINLINE_STATUS.yml`
-3. `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`
-4. `git branch --show-current`, `git status --short`, and `git log --oneline -5` on `main`
-5. `docs/V1_CURRENT_STATE.md`
-6. `docs/PROJECT_PROGRESS_INDEX.md`
-7. `docs/V1_CAPABILITY_MATRIX.md`
-8. `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`
-9. `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
-10. `docs/ANSWER_FORMAT_CONTRACT.md`
+## Runtime Slice History
 
-If these sources disagree, merged `main` wins and the docs must be corrected.
+Completed review-only runtime slices:
 
-## Forbidden Progress Shortcuts
+1. `PositionSync + Dashboard review-only status`: `REVIEW_ONLY_RUNTIME partial`
+2. `Watchlist + RuleConfig + Dashboard/API review-only status`: `REVIEW_ONLY_RUNTIME partial`
+3. `MarketQuote freshness / fallback / dashboard API status`: `REVIEW_ONLY_RUNTIME partial`
+4. `Evidence / Score review-only runtime status`: `REVIEW_ONLY_RUNTIME partial`
 
-Do not use chat memory to determine progress.
+DecisionResult chain history:
 
-Do not treat docs-only work as production completion.
+- #872 selected `DecisionResult review-only dashboard/API status`.
+- #873 completed DecisionResult source read.
+- #874 completed DecisionResult review-only runtime wiring design.
+- #875 completed DecisionResult implementation readiness gate.
+- #876 completed DecisionResult minimal review-only implementation.
+- Next action after this workflow repair pack is to resume DecisionResult runtime wiring verification.
 
-Do not treat a skeleton as production wiring.
+Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
-Do not treat targeted tests as runtime behavior.
+P359 remains not completed progress because PR #829 was closed unmerged. P360 is not allowed to start.
 
-Do not treat an open PR, open branch, or open Issue as already merged.
+## Fixed Workflow Commands
 
-Do not treat Codex output as completion.
+- Bootstrap: `bash scripts/v1-session-bootstrap.sh`
+- State: `bash scripts/v1-state.sh`
+- Next task prompt: `bash scripts/codex-next-task.sh`
+- PR helper: `bash scripts/v1-pr-flow-helper.sh --branch <branch> --title "<title>" --risk <risk>`
+- Open PR: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
+- Merge sync: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`
+- Safe check: `bash scripts/v1-safe-check.sh`
 
-Do not continue to the next package when PR creation, PR review, merge, main sync, or worktree cleanliness is unresolved.
+Do not write `scripts/v1-status.sh`; the fixed state script is `scripts/v1-state.sh`.
 
-Do not treat legacy runtime clients as proof that the new scan-chain is complete.
+## Forbidden Shortcuts
 
-Do not count repeated blocked-list documents as product usability progress.
+Do not:
 
-Do not create a new DTO, Validator, Assembler, Orchestrator, docs-only plan, verification-only package, source-binding wrapper, runtime-candidate wrapper, or point-candidate wrapper unless it satisfies `docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md`.
-
-Do not continue P359 or start P360 by default. P359 is not completed progress unless it is merged into `main`. After the freeze rule, ownership-map track, runtime wiring target selection, source-read verification, wiring design, readiness gate, #839 implementation, #840 verification, #841 visual verification, #842 merge map, #843 owner source read, #844 safety adapter merge design, #845 implementation readiness gate, #846 tests-first owner-path safety adapter merge, #847 owner-path safety adapter test/merge verification, #848 owner-path production merge readiness review, #849 Watchlist source read, #850 Watchlist wiring design, #851 Watchlist readiness gate, #852 further Watchlist API / dashboard source read, #853 Watchlist implementation plan, #854 Watchlist implementation readiness gate, #855 Watchlist implementation, #856 Watchlist runtime verification, #857 Watchlist visual verification closure, #858 next minimal runtime slice selection, #859 MarketQuote source read, #860 MarketQuote freshness wiring design, #861 MarketQuote implementation readiness gate, #862 MarketQuote implementation, #863 MarketQuote runtime verification, #864 MarketQuote visual verification closure, #865 next minimal runtime slice selection after MarketQuote closure, #866 Evidence / Score source read, #867 Evidence / Score wiring design, #868 Evidence / Score implementation readiness gate, #869 Evidence / Score implementation, #870 Evidence / Score runtime verification, #871 Evidence / Score visual verification closure, #872 next minimal runtime slice selection after Evidence / Score closure, #873 DecisionResult source read, #874 DecisionResult wiring design, and #875 DecisionResult implementation readiness gate, the completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`, all `REVIEW_ONLY_RUNTIME partial`; the active stop-loss action is `Minimal Review-Only DecisionResult Runtime Wiring Implementation`, and the next required action is `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
+- use chat memory to determine progress
+- treat branch pushed / PR created / CI green / Codex output as completion
+- handwrite long `gh pr create` or `gh pr merge` commands when fixed scripts cover the case
+- open the next package before current package is merged on `main`
+- continue P359 or start P360 by default
+- add new DTO / Validator / Assembler / Orchestrator by default
+- connect Push, external channel, Candidate generation, Decision generation, Point generation, order, execution, or auto-trading
+- describe this workflow repair as a business capability increase
 
 ## Capability Language
 
@@ -98,90 +107,4 @@ Progress must be described by capability level:
 | 6 | PRODUCTION_WIRING | Real runtime wiring exists, still not necessarily production-ready. |
 | 7 | PRODUCTION_READY | Production-ready behavior with complete safety, observability, and review requirements. |
 
-## Review-Only Principle
-
-Review-only does not mean no output.
-
-Review-only means useful proposals and risk actions may be shown to a human while staying:
-
-- manual-review required;
-- not a trade instruction;
-- non-executable;
-- blocked from automatic order, close, reverse, leverage change, execution, or external send unless separately authorized.
-
-Status and progress answers must use `docs/ANSWER_FORMAT_CONTRACT.md`.
-
-## Duplicate Skeleton Freeze
-
-The #830 audit found a package-count progress trap: repeated skeleton and docs-only packages were increasing surface area without moving user-visible capability toward `REVIEW_ONLY_RUNTIME`.
-
-Future packages must include these extra final-output fields:
-
-- 是否创建新骨架: Yes / No
-- 是否复用 Cursor-era 资产: Yes / No
-- 是否减少重复: Yes / No
-- 是否提升 capability level: Yes / No
-- 是否接 service/runtime/dashboard/API: Yes / No
-- 是否符合 #830 审计建议: Yes / No
-
-If the package would only add another skeleton or wrapper, it must be rejected and redirected to the ownership-map / wiring-plan tracks.
-
-Current stop-loss sequence:
-
-1. #830 global audit: completed.
-2. Global Duplicate Skeleton Freeze Rule: active.
-3. Cursor Artifact Inventory + Ownership Map: completed stop-loss audit track.
-4. Runtime Wiring Target Selection Plan: completed stop-loss selection track.
-5. Selected target: `PositionSync + Dashboard review-only status`.
-6. PositionSync/Dashboard Source Read Verification: completed source-read verification track.
-7. Minimal Review-Only PositionSync Runtime Wiring Design: completed docs-only wiring design track.
-8. Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate: completed docs-only readiness gate.
-9. Minimal Review-Only PositionSync Runtime Wiring Implementation: completed on main as #839.
-10. Minimal Review-Only PositionSync Runtime Wiring Verification: completed on main as #840.
-11. Dashboard PositionSync Visual Verification: completed on main as #841.
-12. Source-Owned Runtime vs Existing Point Proposal Merge Map: completed on main as #842.
-13. Targeted Source Read for BoundaryCandidate / ExecutionPlan owner: completed on main as #843.
-14. Minimal Merge Design for BoundaryCandidate / ExecutionPlan owner + safety adapters: completed on main as #844.
-15. Minimal Implementation Readiness Gate for BoundaryCandidate / ExecutionPlan owner-path safety adapter merge: completed on main as #845.
-16. Minimal Owner-Path Safety Adapter Test/Merge Implementation: completed on main as #846.
-17. Minimal Owner-Path Safety Adapter Test/Merge Verification: completed on main as #847.
-18. Minimal Owner-Path Safety Adapter Production Merge Readiness Review: completed on main as #848; NO-GO for production Java changes.
-19. Watchlist + RuleConfig + Dashboard/API Runtime Slice Source Read: completed on main as #849.
-20. Minimal Review-Only Watchlist Runtime Wiring Design: completed on main as #850.
-21. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate: completed on main as #851; NO-GO direct implementation.
-22. Further Watchlist API / Dashboard Source Read: completed on main as #852.
-23. Minimal Review-Only Watchlist Runtime Wiring Implementation Plan: completed on main as #853.
-24. Minimal Review-Only Watchlist Runtime Wiring Implementation Readiness Gate: completed on main as #854.
-25. Minimal Review-Only Watchlist Runtime Wiring Implementation: completed on main as #855.
-26. Minimal Review-Only Watchlist Runtime Wiring Verification: completed on main as #856.
-27. Watchlist Visual Verification / Closure: completed on main as #857.
-28. Next Minimal Runtime Slice Selection: completed on main as #858.
-29. Source Read for MarketQuote Freshness / Fallback Dashboard API Status: completed on main as #859.
-30. Minimal Review-Only MarketQuote Freshness Runtime Wiring Design: completed on main as #860.
-31. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation Readiness Gate: completed on main as #861.
-32. Minimal Review-Only MarketQuote Freshness Runtime Wiring Implementation: completed on main as #862.
-33. Minimal Review-Only MarketQuote Freshness Runtime Wiring Verification: completed on main as #863.
-34. MarketQuote Visual Verification / Closure: completed on main as #864.
-35. Next Minimal Runtime Slice Selection After MarketQuote Closure: completed on main as #865.
-36. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
-37. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
-38. Minimal Review-Only Evidence / Score Runtime Wiring Implementation Readiness Gate: completed on main as #868.
-39. Minimal Review-Only Evidence / Score Runtime Wiring Implementation: completed on main as #869.
-40. Minimal Review-Only Evidence / Score Runtime Wiring Verification: completed on main as #870.
-41. Evidence / Score Visual Verification / Closure: completed on main as #871.
-42. Next Minimal Runtime Slice Selection After Evidence / Score Closure: completed on main as #872.
-43. Source Read for DecisionResult review-only dashboard/API status: completed on main as #873.
-44. Minimal Review-Only DecisionResult Runtime Wiring Design: completed on main as #874.
-45. Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate: completed on main as #875.
-46. Minimal Review-Only DecisionResult Runtime Wiring Implementation: active.
-47. Next required action: `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
-
-## Workflow Command Automation
-
-- 默认工作流是 GPT + Codex + GitHub 原生。
-- 终端脚本除合并后同步 main 外，只作为兜底。
-- 新窗口兜底运行 `bash scripts/v1-session-bootstrap.sh`
-- 状态检查兜底运行 `bash scripts/v1-status.sh`
-- 审 PR 兜底运行 `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
-- 合并同步运行 `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
-- Codex 完成后兜底运行 `bash scripts/v1-safe-check.sh`
+`REVIEW_ONLY_RUNTIME partial` remains the current level.

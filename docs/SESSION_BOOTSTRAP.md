@@ -37,14 +37,20 @@ bash scripts/v1-session-bootstrap.sh
 9. Reply using `docs/ANSWER_FORMAT_CONTRACT.md`.
 10. Do not continue to next package unless current PR is merged, main is synced, and worktree is clean.
 11. Open PR / branch / Issue does not count as done.
-12. Do not continue P359 or start P360 by default; the next allowed track is Cursor Artifact Inventory + Ownership Map.
+12. Do not continue P359 or start P360 by default.
+13. Do not default back to a historical track. The current active block comes from `docs/ACTIVE_MAINLINE_STATUS.yml`.
+14. Continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms clean/synced `main`, no open PR, and no blockers.
+
+If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub status unknown. It is not, by itself, proof that the project has an open PR or an unsynced main. GPT connector evidence or the user's local terminal `gh` output may be accepted as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
 
 ## Workflow Command Shortcuts
 
 - Default workflow: GPT decides the next pack, Codex executes scoped file changes / checks / commit / push, and PR creation / merge follows `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
 - Fallback new window command: `bash scripts/v1-session-bootstrap.sh`
 - Fixed status check: `bash scripts/v1-state.sh`
-- Fixed Draft PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk>`
+- Fixed PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
-- Local merge sync after explicit approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`
+- Local merge sync after approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`
 - Fallback Codex completion safe check: `bash scripts/v1-safe-check.sh`
+
+Token leakage remains a hard stop: never paste or repeat GitHub tokens in chat or logs.

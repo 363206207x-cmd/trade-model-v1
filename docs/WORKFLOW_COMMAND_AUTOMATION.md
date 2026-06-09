@@ -41,6 +41,12 @@ Use:
 bash scripts/v1-open-pr.sh <branch> "<title>" <risk>
 ```
 
+Preferred extended form when a package needs a dedicated PR body:
+
+```bash
+bash scripts/v1-open-pr.sh <branch> "<title>" <risk> --body-file <file>
+```
+
 Example:
 
 ```bash
@@ -74,12 +80,22 @@ The script must not mark ready, merge, switch to the next package, edit files, s
 
 脚本不得 mark ready、merge、切下一包、改文件、stage 或 commit。
 
+By default the script creates a Draft PR. Use `--ready` only for A-risk docs-only PRs or when the handoff rule explicitly authorizes a ready PR. Use `--draft` to force Draft mode. Use `--base <branch>` to override the default base `main`. Use `--dry-run` to print the intended action without creating a PR.
+
+默认创建 Draft PR。只有 A-risk docs-only 或明确授权时才使用 `--ready` 创建非 Draft PR。`--draft` 强制 Draft，`--base <branch>` 覆盖默认 base `main`，`--dry-run` 只打印动作。
+
 ## Merge And Sync / 合并并同步
 
 Use:
 
 ```bash
 bash scripts/v1-merge-sync.sh <pr-number> "<title (#pr)>"
+```
+
+Risk-aware form:
+
+```bash
+bash scripts/v1-merge-sync.sh <pr-number> "<title (#pr)>" --risk <A|B|B/C|C> [--confirm]
 ```
 
 The script checks PR state, draft status, mergeability, and checks before merging an open PR.
@@ -94,19 +110,35 @@ If a PR is closed without being merged, the script must stop with `PR_CLOSED_NOT
 
 如果 PR 已关闭但未合并，脚本必须以 `PR_CLOSED_NOT_MERGED` 停止。
 
+Risk rules:
+
+- `--risk A`: may merge after checks, mergeability, changed-file scope, and technical review are satisfied.
+- `--risk B`, `--risk B/C`, or `--risk C`: must include `--confirm` after the user explicitly approves merge.
+- Implementation packages that touch Java, tests, or dashboard behavior must wait for explicit user merge approval.
+
+风险规则：
+
+- `--risk A`：checks、mergeability、changed-file 范围和技术审查满足后可合并。
+- `--risk B`、`--risk B/C`、`--risk C`：用户明确同意后必须带 `--confirm`。
+- 涉及 Java、测试或 dashboard 行为的 implementation 包必须等待用户明确同意合并。
+
 ## Fixed Command Rule / 固定命令规则
 
-Do not handwrite long `gh pr create` commands.
+Do not handwrite long `gh pr create` commands when `scripts/v1-open-pr.sh` covers the case.
 
 不再手写大段 `gh pr create` 命令。
 
-Do not handwrite long `gh pr merge` commands.
+Do not handwrite long `gh pr merge` commands when `scripts/v1-merge-sync.sh` covers the case.
 
 不再手写大段 `gh pr merge` 命令。
 
 When the GitHub connector is unavailable, GPT should give only these fixed local script commands.
 
 GitHub connector 不可用时，GPT 只给这些固定本地脚本命令。
+
+If a handwritten `gh` command is truly required, the handoff must state why the fixed script does not cover the case.
+
+如果确实必须手写 `gh` 命令，交接说明必须写明固定脚本无法覆盖的原因。
 
 Do not open the next package before the current package is completed on merged `main`.
 

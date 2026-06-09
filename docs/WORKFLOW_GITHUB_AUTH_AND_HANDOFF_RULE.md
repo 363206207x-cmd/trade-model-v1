@@ -46,6 +46,10 @@ If a new window sees conflict between chat memory, `ACTIVE_MAINLINE_STATUS.yml`,
 
 如果新窗口发现聊天记忆、`ACTIVE_MAINLINE_STATUS.yml`、open PR 或本地 branch 相互冲突，以 merged `main` 为准。
 
+Codex shell GitHub auth status and project GitHub state are separate. If Codex shell reports `GH_NOT_AVAILABLE`, record it as Codex GitHub status unknown. Do not treat that alone as project state failure. GPT connector evidence or the user's local terminal `gh` evidence may confirm `OPEN_PRS: none`, `MAIN_SYNC: OK`, and clean worktree for handoff.
+
+Codex shell 的 GitHub auth 状态与项目 GitHub 状态分开判断。若 Codex shell 报 `GH_NOT_AVAILABLE`，只表示 Codex GitHub 状态未知，不等于项目状态失败。GPT connector 或用户本机 terminal `gh` 的证据可作为 handoff evidence，确认 open PR none、main synced、worktree clean。
+
 ## Responsibility Split / Codex、GPT、本地 gh 分工
 
 Codex is responsible by default for:
@@ -108,6 +112,10 @@ The user should not manually judge mergeability, CI, changed files, or workflow 
 
 用户不需要手动判断 mergeability、CI、changed files 或流程顺序。
 
+When the user's local terminal has already confirmed open PR none / main sync / clean worktree, Codex may continue the scoped task even if Codex's own `gh auth status` is unavailable, as long as the task does not require Codex itself to create or merge a PR.
+
+当用户本机 terminal 已确认 open PR none / main sync / clean worktree 时，即使 Codex 自身 `gh auth status` 不可用，Codex 仍可继续执行当前范围任务；前提是该任务不要求 Codex 自己创建或合并 PR。
+
 ## Fixed Local Commands / 固定本地命令
 
 When the GitHub connector is unavailable, use the fixed local command helpers in `docs/WORKFLOW_COMMAND_AUTOMATION.md`.
@@ -117,8 +125,8 @@ GitHub connector 不可用时，使用 `docs/WORKFLOW_COMMAND_AUTOMATION.md` 中
 The standard helpers are:
 
 - `bash scripts/v1-state.sh`;
-- `bash scripts/v1-open-pr.sh <branch> "<title>" <risk>`;
-- `bash scripts/v1-merge-sync.sh <pr-number> "<title (#pr)>"`.
+- `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`;
+- `bash scripts/v1-merge-sync.sh <pr-number> "<title (#pr)>" --risk <risk> [--confirm]`.
 
 标准辅助命令为以上三条。
 
@@ -131,7 +139,7 @@ Do not handwrite long `gh pr create` or `gh pr merge` commands when these helper
 PR creation priority is:
 
 1. If GPT GitHub connector is available, GPT creates the Issue / Draft PR.
-2. If GPT connector is unavailable but local `gh` is available, GPT gives one `gh pr create` command.
+2. If GPT connector is unavailable but local `gh` is available, GPT gives one fixed script command, usually `bash scripts/v1-open-pr.sh ...`.
 3. If Codex GitHub auth is available and the task explicitly asks Codex to create the Issue / PR, Codex may create them.
 4. If Codex GitHub auth is unavailable, Codex must not force Issue / PR creation.
 5. If both connector and local `gh` are unavailable, pause the current package and do not open the next package.
@@ -149,7 +157,7 @@ PR 创建优先级：
 Merge priority is:
 
 1. If GPT GitHub connector is available, GPT reviews the PR and merges according to A/B/C rules.
-2. If connector is unavailable but local `gh` is available, GPT gives one command that performs the approved ready / merge / pull sequence.
+2. If connector is unavailable but local `gh` is available, GPT gives one fixed script command, usually `bash scripts/v1-merge-sync.sh ... --risk <risk>`.
 3. If both connector and local `gh` are unavailable, pause and do not continue to the next package.
 
 If a PR is already merged but local `main` still needs synchronization, local fallback may run `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>"`; the script must treat `MERGED` as a sync-only state, not as a failure.
@@ -167,6 +175,7 @@ If a PR is already merged but local `main` still needs synchronization, local fa
 A-risk docs-only PRs may be merged directly after technical review if all of the following are true:
 
 - CI is green;
+- technical review has been completed;
 - changed files match the declared docs-only scope;
 - no overreach exists;
 - no forbidden runtime / service / dashboard / external / execution logic is touched.
@@ -174,6 +183,7 @@ A-risk docs-only PRs may be merged directly after technical review if all of the
 A 档 docs-only PR 在以下条件全部满足时，技术审查后可直接合并，不再问用户确认：
 
 - CI 通过；
+- 技术审查已完成；
 - changed files 符合声明的 docs-only 范围；
 - 无越界；
 - 未触碰 runtime / service / dashboard / external / execution 等禁止逻辑。
@@ -181,6 +191,10 @@ A 档 docs-only PR 在以下条件全部满足时，技术审查后可直接合�
 B-risk Java/test PRs require explicit user approval before merge, even if CI is green.
 
 B 档 Java/test PR 即使 CI 通过，也必须等用户明确同意后才能 merge。
+
+B-risk dashboard implementation PRs follow the same explicit approval rule.
+
+B 档 dashboard implementation PR 同样必须等用户明确同意后才能 merge。
 
 B/C or C-risk PRs require the user to say exactly or equivalently: `同意合并 PR #xxx`.
 
