@@ -5,14 +5,95 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+usage() {
+  cat <<'EOF'
+usage: bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SQUASH_SUBJECT>" [options]
+
+options:
+  --risk <A|B|B/C|C>  Merge risk class. Default: A for backward-compatible docs-only use.
+  --confirm           Required for B, B/C, and C risk merges after explicit user approval.
+  --no-confirm        Explicitly state that no user approval is present.
+  --dry-run           Print the planned action without merging.
+  --help              Show this help.
+
+The script does not generate the next package and does not bypass approval rules.
+EOF
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
 if [[ "$#" -lt 2 ]]; then
-  echo 'usage: bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SQUASH_SUBJECT>"' >&2
-  echo 'run only after user explicitly says: 同意合并 PR #<PR_NUMBER>' >&2
+  usage >&2
   exit 1
 fi
 
 PR_NUMBER="$1"
 SQUASH_SUBJECT="$2"
+shift 2
+
+RISK="A"
+CONFIRM="false"
+DRY_RUN="false"
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --risk)
+      if [[ "$#" -lt 2 ]]; then
+        echo "MISSING_VALUE: --risk" >&2
+        exit 1
+      fi
+      RISK="$2"
+      shift 2
+      ;;
+    --confirm)
+      CONFIRM="true"
+      shift
+      ;;
+    --no-confirm)
+      CONFIRM="false"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "UNKNOWN_OPTION: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "$RISK" in
+  A|B|"B/C"|C)
+    ;;
+  *)
+    echo "UNSUPPORTED_RISK: $RISK" >&2
+    exit 1
+    ;;
+esac
+
+if [[ "$RISK" != "A" && "$CONFIRM" != "true" ]]; then
+  echo "MERGE_REQUIRES_USER_CONFIRMATION: risk=$RISK requires --confirm after explicit user approval" >&2
+  exit 1
+fi
+
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "DRY_RUN: v1-merge-sync"
+  echo "PR_NUMBER: $PR_NUMBER"
+  echo "SQUASH_SUBJECT: $SQUASH_SUBJECT"
+  echo "RISK: $RISK"
+  echo "CONFIRM: $CONFIRM"
+  exit 0
+fi
 
 if ! command -v gh >/dev/null 2>&1; then
   echo "GH_NOT_AVAILABLE" >&2
@@ -35,6 +116,10 @@ sync_main() {
   echo
   echo "git log --oneline -5:"
   git log --oneline -5
+
+  echo
+  echo "v1-state:"
+  bash scripts/v1-state.sh || true
 
   local worktree_clean="No"
   if [[ -z "$(git status --short)" ]]; then
@@ -80,7 +165,12 @@ fi
 
 is_draft="$(gh pr view "$PR_NUMBER" --json isDraft --jq '.isDraft')"
 if [[ "$is_draft" == "true" ]]; then
-  gh pr ready "$PR_NUMBER"
+  if [[ "$RISK" == "A" || "$CONFIRM" == "true" ]]; then
+    gh pr ready "$PR_NUMBER"
+  else
+    echo "PR_DRAFT_REQUIRES_CONFIRMATION" >&2
+    exit 1
+  fi
 else
   echo "PR is already ready for review."
 fi
