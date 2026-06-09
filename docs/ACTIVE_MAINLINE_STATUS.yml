@@ -1,13 +1,13 @@
-current_head: "0c7d4d4"
+current_head: "0079363"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Workflow Drift Repair Pack"
-active_block_cn: "工作流漂移修复包"
+active_block: "Minimal Review-Only DecisionResult Runtime Wiring Verification"
+active_block_cn: "DecisionResult 最小只读 runtime wiring verification"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "workflow-drift-repair"
-merge_rule: "Workflow docs/scripts repair package only; no Java business code, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360; does not raise business capability"
-next_required_action: "Resume Minimal Review-Only DecisionResult Runtime Wiring Verification"
+current_branch: "decisionresult-runtime-wiring-verification"
+merge_rule: "Verification docs/source-of-truth only; no Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360; does not raise business capability"
+next_required_action: "DecisionResult Visual Verification / Closure"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -58,7 +58,8 @@ decisionresult_review_only_runtime_source_read_status: "completed on main as #87
 minimal_review_only_decisionresult_runtime_wiring_design_status: "completed on main as #874; designs DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails without implementation"
 decisionresult_runtime_wiring_implementation_readiness_status: "completed on main as #875; returns GO for one minimal read-only DecisionResult status endpoint or reuse of existing summary/detail path, minimal dashboard status/copy, targeted tests, and no DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360 expansion"
 minimal_review_only_decisionresult_runtime_wiring_implementation_status: "completed on main as #876; implements one minimal read-only DecisionResult status endpoint, dashboard DecisionResult status/copy/DOM, targeted tests, and source-of-truth updates over existing DecisionResult owner assets without DTO/Validator/Assembler, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, or trading expansion"
-workflow_drift_repair_pack_status: "active; repairs workflow entry, fixed PR/open/merge commands, handoff evidence rules, Codex GH_NOT_AVAILABLE interpretation, next-task templates, and source-of-truth current-state structure without business capability changes"
+workflow_drift_repair_pack_status: "completed on main as #877; repairs workflow entry, fixed PR/open/merge commands, handoff evidence rules, Codex GH_NOT_AVAILABLE interpretation, next-task templates, and source-of-truth current-state structure without business capability changes"
+minimal_review_only_decisionresult_runtime_wiring_verification_status: "active in branch decisionresult-runtime-wiring-verification; verifies #876 endpoint/dashboard review-only behavior, full compile/test results, forbidden semantics classification, and source-of-truth drift after #877; not completed on main until merged"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

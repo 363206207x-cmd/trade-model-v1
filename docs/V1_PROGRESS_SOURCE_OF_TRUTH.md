@@ -37,13 +37,14 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `0c7d4d4 feat(decision): show review-only runtime status (#876)`
-- Current active block: `Workflow Drift Repair Pack`
+- Current merged main: `0079363 chore(workflow): repair drift in codex handoff automation (#877)`
+- Current active block: `Minimal Review-Only DecisionResult Runtime Wiring Verification`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: none; workflow repair only
-- Next required action: `Resume Minimal Review-Only DecisionResult Runtime Wiring Verification`
+- Capability movement from this pack: none; verification only
+- Next required action: `DecisionResult Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
-- This pack must not be mistaken for DecisionResult runtime capability, Push, Candidate, Decision generation, Point, or trading progress.
+- #877 is completed and synced on main; workflow drift repair is now history, not the active package.
+- This verification package must not be mistaken for DecisionResult runtime capability, Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -61,7 +62,8 @@ DecisionResult chain history:
 - #874 completed DecisionResult review-only runtime wiring design.
 - #875 completed DecisionResult implementation readiness gate.
 - #876 completed DecisionResult minimal review-only implementation.
-- Next action after this workflow repair pack is to resume DecisionResult runtime wiring verification.
+- #877 completed workflow drift repair and fixed the Codex handoff/task template flow.
+- Current active package verifies #876 DecisionResult review-only runtime wiring; it is not completed on main until this verification branch is merged.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
