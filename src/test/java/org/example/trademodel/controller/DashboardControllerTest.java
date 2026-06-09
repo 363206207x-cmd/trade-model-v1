@@ -229,6 +229,35 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyDecisionResultRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/decision-result-status");
+        assertThat(html).contains("decisionResultStatusPanel");
+        assertThat(html).contains("decisionResultRuntimeStatusValue");
+        assertThat(html).contains("decisionResultSymbolValue");
+        assertThat(html).contains("decisionResultAnalysisIdValue");
+        assertThat(html).contains("decisionAvailableValue");
+        assertThat(html).contains("decisionConfidenceValue");
+        assertThat(html).contains("decisionAiRoleValue");
+        assertThat(html).contains("decisionSourceTraceValue");
+        assertThat(html).contains("decisionSourceHealthValue");
+        assertThat(html).contains("DECISIONRESULT_REVIEW_ONLY_READY");
+        assertThat(html).contains("DECISIONRESULT_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("DECISIONRESULT_READ_MODEL_PARTIAL");
+        assertThat(html).contains("DECISIONRESULT_SOURCE_TRACE_PARTIAL");
+        assertThat(html).contains("DECISIONRESULT_AI_ROLE_PARTIAL");
+        assertThat(html).contains("DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED");
+        assertThat(html).contains("DECISIONRESULT_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("DecisionResult 是只读状态，不是交易信号");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score 边界仍适用");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
@@ -515,6 +544,159 @@ class DashboardControllerTest {
                 "auto-trading",
                 "order action"
         );
+    }
+
+    @Test
+    void decisionResultStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-ready");
+        decision.setAnalysisId("ana-ready");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        decision.setConfidenceLevel("HIGH");
+        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setReadModelTruthStatus("FULL");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        mockMvc.perform(get("/api/dashboard/decision-result-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECISIONRESULT_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-ready"))
+                .andExpect(jsonPath("$.decisionAvailable").value(true))
+                .andExpect(jsonPath("$.decisionStatus").value("FULL"))
+                .andExpect(jsonPath("$.confidence").value("HIGH"))
+                .andExpect(jsonPath("$.aiRoleResultsAvailable").value(true))
+                .andExpect(jsonPath("$.aiRoleResultsSummary").value("available; raw read-model context hidden from review-only status"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("OK"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.evidenceScoreChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void decisionResultStatusEndpointFailsClosedWhenDecisionResultMissing() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("ETHUSDT")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/decision-result-status").param("symbol", "ETHUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECISIONRESULT_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("ETHUSDT"))
+                .andExpect(jsonPath("$.analysisId").value(nullValue()))
+                .andExpect(jsonPath("$.decisionAvailable").value(false))
+                .andExpect(jsonPath("$.decisionStatus").value("UNKNOWN"))
+                .andExpect(jsonPath("$.aiRoleResultsAvailable").value(false))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.evidenceScoreChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("DECISIONRESULT_MISSING"));
+    }
+
+    @Test
+    void decisionResultStatusEndpointMarksReadModelPartialFailClosed() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-partial");
+        decision.setAnalysisId("ana-partial");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        decision.setConfidenceLevel("MEDIUM");
+        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setReadModelTruthStatus("PARTIAL");
+        decision.setReadModelFallbackReason("LEGACY_MISSING:review_reasons");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        mockMvc.perform(get("/api/dashboard/decision-result-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECISIONRESULT_READ_MODEL_PARTIAL"))
+                .andExpect(jsonPath("$.decisionAvailable").value(true))
+                .andExpect(jsonPath("$.decisionStatus").value("PARTIAL"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("PARTIAL"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("LEGACY_MISSING:review_reasons"));
+    }
+
+    @Test
+    void decisionResultStatusEndpointMarksSourceTracePartialFailClosed() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-source-partial");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        decision.setConfidenceLevel("HIGH");
+        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setReadModelTruthStatus("FULL");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        mockMvc.perform(get("/api/dashboard/decision-result-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECISIONRESULT_SOURCE_TRACE_PARTIAL"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("PARTIAL"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("SOURCE_TRACE_PARTIAL"));
+    }
+
+    @Test
+    void decisionResultStatusEndpointMarksAiRolePartialFailClosed() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-ai-partial");
+        decision.setAnalysisId("ana-ai-partial");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        decision.setConfidenceLevel("HIGH");
+        decision.setReadModelTruthStatus("FULL");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        mockMvc.perform(get("/api/dashboard/decision-result-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECISIONRESULT_AI_ROLE_PARTIAL"))
+                .andExpect(jsonPath("$.aiRoleResultsAvailable").value(false))
+                .andExpect(jsonPath("$.aiRoleResultsSummary").value("missing"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("PARTIAL"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("AI_ROLE_RESULTS_MISSING"));
+    }
+
+    @Test
+    void decisionResultStatusEndpointDoesNotExposeExecutableCandidateDecisionPointOrTradingFields() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-safe");
+        decision.setAnalysisId("ana-safe");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        decision.setConfidenceLevel("HIGH");
+        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setReadModelTruthStatus("FULL");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        mockMvc.perform(get("/api/dashboard/decision-result-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.decisionId").doesNotExist())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
     }
 
     @Test

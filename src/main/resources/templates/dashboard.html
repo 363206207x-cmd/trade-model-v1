@@ -1090,6 +1090,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="evidenceScoreReasonValue">EVIDENCE_SCORE_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="decisionResultStatusPanel" aria-label="DecisionResult review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">DecisionResult 只读状态</span><span class="v" id="decisionResultRuntimeStatusValue">DECISIONRESULT_BLOCKED_FAIL_CLOSED / DecisionResult 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="decisionResultSymbolValue">—</span> · <span id="decisionResultAnalysisIdValue">—</span></span></div>
+            <div class="kv"><span class="k">decisionAvailable / confidence</span><span class="v"><span id="decisionAvailableValue">否</span> · <span id="decisionConfidenceValue">—</span></span></div>
+            <div class="kv"><span class="k">ai_role_results availability / summary</span><span class="v" id="decisionAiRoleValue">missing</span></div>
+            <div class="kv"><span class="k">source trace / source health</span><span class="v"><span id="decisionSourceTraceValue">partial</span> · <span id="decisionSourceHealthValue">BLOCKED</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="decisionResultReviewOnlyValue">DecisionResult 是只读状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="decisionResultSignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不是交易信号。</span></div>
+            <div class="kv"><span class="k">Watchlist / MarketQuote / Evidence-Score boundary</span><span class="v" id="decisionResultBoundaryValue">Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="decisionResultReasonValue">DECISIONRESULT_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1291,6 +1303,13 @@
     var EVIDENCE_SCORE_STATUS_INCOMPLETE = "EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED";
     var EVIDENCE_SCORE_STATUS_SOURCE_TRACE_PARTIAL = "EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL";
     var EVIDENCE_SCORE_STATUS_BLOCKED = "EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED";
+    var DECISIONRESULT_STATUS_READY = "DECISIONRESULT_REVIEW_ONLY_READY";
+    var DECISIONRESULT_STATUS_MISSING = "DECISIONRESULT_MISSING_FAIL_CLOSED";
+    var DECISIONRESULT_STATUS_READ_MODEL_PARTIAL = "DECISIONRESULT_READ_MODEL_PARTIAL";
+    var DECISIONRESULT_STATUS_SOURCE_TRACE_PARTIAL = "DECISIONRESULT_SOURCE_TRACE_PARTIAL";
+    var DECISIONRESULT_STATUS_AI_ROLE_PARTIAL = "DECISIONRESULT_AI_ROLE_PARTIAL";
+    var DECISIONRESULT_STATUS_STALE_OR_UNKNOWN = "DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED";
+    var DECISIONRESULT_STATUS_BLOCKED = "DECISIONRESULT_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1365,12 +1384,37 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var decisionResultRuntimeStatus = {
+        status: DECISIONRESULT_STATUS_BLOCKED,
+        symbol: null,
+        analysisId: null,
+        decisionAvailable: false,
+        decisionStatus: "UNKNOWN",
+        confidence: null,
+        aiRoleResultsAvailable: false,
+        aiRoleResultsSummary: "missing",
+        sourceTraceComplete: false,
+        sourceHealth: "BLOCKED",
+        reason: "DECISIONRESULT_STATUS_PENDING",
+        message: "DecisionResult 只读状态待确认；不是交易信号。",
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        watchlistBounded: true,
+        marketQuoteChecked: true,
+        evidenceScoreChecked: true,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
     window.__watchlistReviewStatus = WATCHLIST_STATUS_MISSING;
     window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
     window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
+    window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -2755,6 +2799,71 @@
         setText("evidenceScoreReasonValue", es.reason || "—");
     }
 
+    function resolveDecisionResultRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, DECISIONRESULT_STATUS_BLOCKED).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            decisionAvailable: p.decisionAvailable === true,
+            decisionStatus: firstNonEmpty(p.decisionStatus, "UNKNOWN").toUpperCase(),
+            confidence: p.confidence || null,
+            aiRoleResultsAvailable: p.aiRoleResultsAvailable === true,
+            aiRoleResultsSummary: firstNonEmpty(p.aiRoleResultsSummary, "missing"),
+            sourceTraceComplete: p.sourceTraceComplete === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "DECISIONRESULT_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "DecisionResult 只读状态待确认；不是交易信号。"),
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            watchlistBounded: p.watchlistBounded !== false,
+            marketQuoteChecked: p.marketQuoteChecked !== false,
+            evidenceScoreChecked: p.evidenceScoreChecked !== false,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateDecisionResultRuntimeStatusDisplay() {
+        var ds = decisionResultRuntimeStatus || {};
+        setText("decisionResultRuntimeStatusValue", (ds.status || DECISIONRESULT_STATUS_BLOCKED) + " / " + (ds.message || "只读状态"));
+        setText("decisionResultSymbolValue", ds.symbol || "—");
+        setText("decisionResultAnalysisIdValue", ds.analysisId || "—");
+        setText("decisionAvailableValue", ds.decisionAvailable ? "是" : "否");
+        setText("decisionConfidenceValue", ds.confidence || "—");
+        setText("decisionAiRoleValue", (ds.aiRoleResultsAvailable ? "available" : "missing") + " · " + (ds.aiRoleResultsSummary || "—"));
+        setText("decisionSourceTraceValue", ds.sourceTraceComplete ? "complete" : "partial / missing");
+        setText("decisionSourceHealthValue", ds.sourceHealth || "BLOCKED");
+        setText("decisionResultReviewOnlyValue", "DecisionResult 是只读状态，不是交易信号。");
+        setText("decisionResultSignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不是交易信号。");
+        setText("decisionResultBoundaryValue", "Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score 边界仍适用；Display Slots 不是候选池。");
+        setText("decisionResultReasonValue", ds.reason || "—");
+    }
+
+    function fetchDecisionResultRuntimeStatus(symbol) {
+        if (!symbol) {
+            decisionResultRuntimeStatus = resolveDecisionResultRuntimeStatus({});
+            window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
+            updateDecisionResultRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/decision-result-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                decisionResultRuntimeStatus = resolveDecisionResultRuntimeStatus(payload, symbol);
+                window.__decisionResultReviewStatus = decisionResultRuntimeStatus.status || DECISIONRESULT_STATUS_BLOCKED;
+                updateDecisionResultRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                decisionResultRuntimeStatus = resolveDecisionResultRuntimeStatus({}, symbol);
+                window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
+                updateDecisionResultRuntimeStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -3385,6 +3494,7 @@
                 fetchWatchlistRuntimeStatus();
                 fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
                 fetchEvidenceScoreRuntimeStatus(selectedSymbol);
+                fetchDecisionResultRuntimeStatus(selectedSymbol);
             });
     }
 
@@ -3392,6 +3502,7 @@
         var symbol = selectedSymbol;
         fetchMarketQuoteRuntimeStatus(symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
         fetchEvidenceScoreRuntimeStatus(symbol);
+        fetchDecisionResultRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
