@@ -6,13 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate`.
+- Active stop-loss track: `Minimal Review-Only DecisionResult Runtime Wiring Implementation`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
 - Selected next minimal runtime slice: `DecisionResult review-only dashboard/API status`.
-- Next required action: `Minimal Review-Only DecisionResult Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
+- `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`
 - `52c2eea docs(decision): design review-only runtime wiring (#874)`
 - `7435a6a docs(decision): read review-only runtime source path (#873)`
 - `e71e0af docs(runtime): select next slice after evidence score closure (#872)`
@@ -134,7 +135,8 @@ Current merged main:
 Current active capability movement:
 
 - `Minimal Review-Only DecisionResult Runtime Wiring Design` completed on main as #874 and defines the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
-- `Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate` is active. It only decides GO / NO-GO for the next minimal implementation; it does not implement runtime wiring, Java, tests, dashboard, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360.
+- `Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate` completed on main as #875 and returned GO for the minimal implementation.
+- `Minimal Review-Only DecisionResult Runtime Wiring Implementation` is active. It may add one read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and source-of-truth updates while keeping DTO / Validator / Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, and P360 frozen.
 
 - #830 is merged on main.
 - It does not raise product runtime capability; it establishes a workflow freeze after the global usability / duplication / continuity audit.
@@ -202,13 +204,17 @@ Current active capability movement:
 - It completed Next Minimal Runtime Slice Selection After Evidence / Score Closure and selected `DecisionResult review-only dashboard/API status` as the next minimal source-read target.
 - #873 is merged on main.
 - It completed Source Read for DecisionResult review-only dashboard/API status and confirmed the existing DecisionResult owner path, DecisionService, mapper/schema, dashboard summary/detail API, dashboard display, tests, ai_role_results, and partial review-only/fail-closed boundaries.
-- Current active block is `Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate`.
+- #874 is merged on main.
+- It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
+- #875 is merged on main.
+- It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
+- Current active block is `Minimal Review-Only DecisionResult Runtime Wiring Implementation`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`, all `REVIEW_ONLY_RUNTIME partial` after this visual closure.
 - Selected next minimal runtime slice is `DecisionResult review-only dashboard/API status`.
-- The next required action is `Minimal Review-Only DecisionResult Runtime Wiring Implementation`.
+- The next required action is `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.

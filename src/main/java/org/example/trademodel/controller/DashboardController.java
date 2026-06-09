@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +55,14 @@ public class DashboardController {
     private static final String EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED = "EVIDENCE_SCORE_INCOMPLETE_FAIL_CLOSED";
     private static final String EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL = "EVIDENCE_SCORE_SOURCE_TRACE_PARTIAL";
     private static final String EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED = "EVIDENCE_SCORE_BLOCKED_FAIL_CLOSED";
+    private static final String DECISIONRESULT_READY = "DECISIONRESULT_REVIEW_ONLY_READY";
+    private static final String DECISIONRESULT_MISSING_FAIL_CLOSED = "DECISIONRESULT_MISSING_FAIL_CLOSED";
+    private static final String DECISIONRESULT_READ_MODEL_PARTIAL = "DECISIONRESULT_READ_MODEL_PARTIAL";
+    private static final String DECISIONRESULT_SOURCE_TRACE_PARTIAL = "DECISIONRESULT_SOURCE_TRACE_PARTIAL";
+    private static final String DECISIONRESULT_AI_ROLE_PARTIAL = "DECISIONRESULT_AI_ROLE_PARTIAL";
+    private static final String DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED = "DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED";
+    private static final String DECISIONRESULT_BLOCKED_FAIL_CLOSED = "DECISIONRESULT_BLOCKED_FAIL_CLOSED";
+    private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
     private final SystemHealthService systemHealthService;
@@ -282,6 +291,88 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/decision-result-status")
+    @ResponseBody
+    public Map<String, Object> decisionResultStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseDecisionResultStatus(normalizedSymbol);
+        DecisionResultVO decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+        if (decision == null) {
+            applyDecisionResultStatus(
+                    status,
+                    DECISIONRESULT_MISSING_FAIL_CLOSED,
+                    "DECISIONRESULT_MISSING",
+                    "DecisionResult 缺失；只读状态 fail-closed，不生成候选、决策、点位、Push 或交易信号。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        boolean aiRoleResultsAvailable = hasText(decision.getAiRoleResults());
+        boolean sourceTraceComplete = decisionResultSourceTraceComplete(decision);
+        status.put("analysisId", decision.getAnalysisId());
+        status.put("decisionAvailable", true);
+        status.put("decisionStatus", hasText(decision.getReadModelTruthStatus())
+                ? decision.getReadModelTruthStatus()
+                : "UNKNOWN");
+        status.put("confidence", decision.getConfidenceLevel());
+        status.put("aiRoleResultsAvailable", aiRoleResultsAvailable);
+        status.put("aiRoleResultsSummary", aiRoleResultsAvailable
+                ? "available; raw read-model context hidden from review-only status"
+                : "missing");
+        status.put("sourceTraceComplete", sourceTraceComplete);
+
+        if (decision.getCreateTime() == null || !hasText(decision.getReadModelTruthStatus())) {
+            applyDecisionResultStatus(
+                    status,
+                    DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED,
+                    "DECISIONRESULT_STALE_OR_UNKNOWN",
+                    "DecisionResult 最新性或 read-model 完整性未知；只读状态 fail-closed。",
+                    true,
+                    "UNKNOWN"
+            );
+        } else if (!READ_MODEL_FULL.equalsIgnoreCase(decision.getReadModelTruthStatus())
+                || hasText(decision.getReadModelFallbackReason())) {
+            applyDecisionResultStatus(
+                    status,
+                    DECISIONRESULT_READ_MODEL_PARTIAL,
+                    firstNonBlank(decision.getReadModelFallbackReason(), "READ_MODEL_PARTIAL"),
+                    "DecisionResult read model 不完整；仅显示状态，不作为候选、决策生成、点位或交易信号。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!sourceTraceComplete) {
+            applyDecisionResultStatus(
+                    status,
+                    DECISIONRESULT_SOURCE_TRACE_PARTIAL,
+                    "SOURCE_TRACE_PARTIAL",
+                    "DecisionResult source trace 不完整；只读展示，不能升级为点位或执行建议。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!aiRoleResultsAvailable) {
+            applyDecisionResultStatus(
+                    status,
+                    DECISIONRESULT_AI_ROLE_PARTIAL,
+                    "AI_ROLE_RESULTS_MISSING",
+                    "ai_role_results 缺失或不可用；不是 Three AI 裁决，也不是新的 Decision generation。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applyDecisionResultStatus(
+                    status,
+                    DECISIONRESULT_READY,
+                    "DECISIONRESULT_OWNER_PATH_READ",
+                    "DecisionResult 只读状态可读；这是已有 read model，不是新的决策生成或交易信号。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -340,12 +431,52 @@ public class DashboardController {
         return status;
     }
 
+    private Map<String, Object> baseDecisionResultStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", DECISIONRESULT_BLOCKED_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("decisionAvailable", false);
+        status.put("decisionStatus", "UNKNOWN");
+        status.put("confidence", null);
+        status.put("aiRoleResultsAvailable", false);
+        status.put("aiRoleResultsSummary", "missing");
+        status.put("sourceTraceComplete", false);
+        status.put("sourceHealth", "BLOCKED");
+        status.put("reason", "DECISIONRESULT_STATUS_PENDING");
+        status.put("message", "DecisionResult 只读状态待确认；不是交易信号。");
+        status.put("reviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("watchlistBounded", true);
+        status.put("marketQuoteChecked", true);
+        status.put("evidenceScoreChecked", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        return status;
+    }
+
     private void applyEvidenceScoreStatus(Map<String, Object> status,
                                           String statusValue,
                                           String reason,
                                           String message,
                                           boolean failClosed,
                                           String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyDecisionResultStatus(Map<String, Object> status,
+                                           String statusValue,
+                                           String reason,
+                                           String message,
+                                           boolean failClosed,
+                                           String sourceHealth) {
         status.put("status", statusValue);
         status.put("reason", reason);
         status.put("message", message);
@@ -364,8 +495,23 @@ public class DashboardController {
         return evidenceSourcesPresent && scoreSummariesPresent;
     }
 
+    private boolean decisionResultSourceTraceComplete(DecisionResultVO decision) {
+        if (decision == null) {
+            return false;
+        }
+        LocalDateTime createTime = decision.getCreateTime();
+        return hasText(decision.getDecisionId())
+                && hasText(decision.getAnalysisId())
+                && hasText(decision.getSymbol())
+                && createTime != null;
+    }
+
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String firstNonBlank(String value, String fallback) {
+        return hasText(value) ? value : fallback;
     }
 
     private DashboardDetailResponseVO.MarketEnvironmentMiniVO resolveMarketEnvironmentMini(
