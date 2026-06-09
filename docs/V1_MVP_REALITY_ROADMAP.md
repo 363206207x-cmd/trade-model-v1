@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only DecisionResult Runtime Wiring Implementation`.
+- Active track: `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
 - Selected next minimal runtime slice: `DecisionResult review-only dashboard/API status`.
-- Next required action: `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
+- Next required action: `DecisionResult Visual Verification / Closure`.
 - P359/P360 remain frozen by default.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
@@ -50,7 +50,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #873 completed Source Read for DecisionResult review-only dashboard/API status and confirms the DecisionResult owner path, `DecisionService`, mapper/schema, dashboard summary/detail API, dashboard display, tests, `ai_role_results`, source trace/provenance, and partial review-only/fail-closed boundaries before design.
 - #874 completed Minimal Review-Only DecisionResult Runtime Wiring Design and defines the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returns GO for one minimal read-only DecisionResult status endpoint, dashboard status panel, targeted tests, and source-of-truth updates.
-- The active implementation adds minimal DecisionResult review-only API/dashboard status over existing owner assets; it does not authorize DTO / Validator / Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360.
+- #876 completed Minimal Review-Only DecisionResult Runtime Wiring Implementation and adds minimal DecisionResult review-only API/dashboard status over existing owner assets; it does not authorize DTO / Validator / Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360.
+- The active verification validates #876 workflow contract, compile, test-compile, full test, endpoint/panel/status mapping evidence, forbidden semantics grep, diff checks, and source-of-truth updates.
 
 ## Roadmap
 
@@ -196,8 +197,9 @@ Recommended next actions:
 41. Source Read for DecisionResult review-only dashboard/API status: completed on main as #873.
 42. Minimal Review-Only DecisionResult Runtime Wiring Design: completed on main as #874.
 43. Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate: completed on main as #875.
-44. Minimal Review-Only DecisionResult Runtime Wiring Implementation: active.
-45. Minimal Review-Only DecisionResult Runtime Wiring Verification: next required action after implementation.
+44. Minimal Review-Only DecisionResult Runtime Wiring Implementation: completed on main as #876.
+45. Minimal Review-Only DecisionResult Runtime Wiring Verification: active.
+46. DecisionResult Visual Verification / Closure: next required action after verification.
 33. Next minimal runtime slice selection after MarketQuote closure: completed on main as #865.
 34. Source Read for Evidence / Score Review-Only Runtime Status: completed on main as #866.
 35. Minimal Review-Only Evidence / Score Runtime Wiring Design: completed on main as #867.
