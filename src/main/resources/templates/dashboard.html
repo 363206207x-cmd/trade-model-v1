@@ -1127,6 +1127,20 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="reviewReplayReasonValue">REVIEW_REPLAY_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="dataSourceHealthStatusPanel" aria-label="Data Source Health review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Data Source Health 只读状态</span><span class="v" id="dataSourceHealthRuntimeStatusValue">DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED / Data Source Health 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / source health</span><span class="v"><span id="dataSourceHealthSymbolValue">—</span> · <span id="dataSourceHealthSourceHealthValue">MISSING</span></span></div>
+            <div class="kv"><span class="k">scoped sources</span><span class="v" id="dataSourceHealthScopedSourcesValue">MarketQuote, Evidence / Score, DecisionResult, ExecutionPlan / BoundaryCandidate, Review / Replay</span></div>
+            <div class="kv"><span class="k">ok / partial sources</span><span class="v"><span id="dataSourceHealthOkSourcesValue">—</span> · <span id="dataSourceHealthPartialSourcesValue">—</span></span></div>
+            <div class="kv"><span class="k">missing / stale sources</span><span class="v" id="dataSourceHealthMissingStaleSourcesValue">—</span></div>
+            <div class="kv"><span class="k">watch-only / blocked sources</span><span class="v" id="dataSourceHealthWatchBlockedSourcesValue">—</span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="dataSourceHealthReviewOnlyValue">Data Source Health 是只读状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="dataSourceHealthSignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。</span></div>
+            <div class="kv"><span class="k">External refresh boundary</span><span class="v" id="dataSourceHealthRefreshBoundaryValue">不触发 external API refresh / scheduler / collector / API client；不补数据。</span></div>
+            <div class="kv"><span class="k">Upstream boundary</span><span class="v" id="dataSourceHealthUpstreamValue">Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="dataSourceHealthReasonValue">DATA_SOURCE_HEALTH_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1350,6 +1364,12 @@
     var REVIEW_REPLAY_STATUS_SOURCE_TRACE_PARTIAL = "REVIEW_REPLAY_SOURCE_TRACE_PARTIAL";
     var REVIEW_REPLAY_STATUS_EXECUTION_BLOCKED = "REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED";
     var REVIEW_REPLAY_STATUS_BLOCKED = "REVIEW_REPLAY_BLOCKED_FAIL_CLOSED";
+    var DATA_SOURCE_HEALTH_STATUS_READY = "DATA_SOURCE_HEALTH_REVIEW_ONLY_READY";
+    var DATA_SOURCE_HEALTH_STATUS_PARTIAL = "DATA_SOURCE_HEALTH_PARTIAL_REVIEW_ONLY";
+    var DATA_SOURCE_HEALTH_STATUS_STALE = "DATA_SOURCE_HEALTH_STALE_FAIL_CLOSED";
+    var DATA_SOURCE_HEALTH_STATUS_MISSING = "DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED";
+    var DATA_SOURCE_HEALTH_STATUS_WATCH_ONLY = "DATA_SOURCE_HEALTH_WATCH_ONLY_REVIEW";
+    var DATA_SOURCE_HEALTH_STATUS_BLOCKED = "DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1505,6 +1525,37 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var dataSourceHealthRuntimeStatus = {
+        status: DATA_SOURCE_HEALTH_STATUS_MISSING,
+        symbol: null,
+        sourceHealth: "MISSING",
+        scopedSources: ["MarketQuote", "Evidence / Score", "DecisionResult", "ExecutionPlan / BoundaryCandidate", "Review / Replay"],
+        sourceStatuses: [],
+        okSources: [],
+        partialSources: [],
+        staleSources: [],
+        missingSources: [],
+        watchOnlySources: [],
+        blockedSources: [],
+        reason: "DATA_SOURCE_HEALTH_STATUS_PENDING",
+        message: "Data Source Health 只读状态待确认；不触发外部刷新、采集、回放或交易动作。",
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notReplayExecution: true,
+        notExecutable: true,
+        watchlistBounded: true,
+        marketQuoteChecked: true,
+        evidenceScoreChecked: true,
+        decisionResultChecked: true,
+        executionPlanBoundaryChecked: true,
+        reviewReplayChecked: true,
+        externalRefreshTriggered: false,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -1514,6 +1565,7 @@
     window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
     window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
     window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
+    window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -3107,6 +3159,83 @@
             });
     }
 
+    function resolveDataSourceHealthRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, DATA_SOURCE_HEALTH_STATUS_MISSING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            scopedSources: Array.isArray(p.scopedSources) ? p.scopedSources : ["MarketQuote", "Evidence / Score", "DecisionResult", "ExecutionPlan / BoundaryCandidate", "Review / Replay"],
+            sourceStatuses: Array.isArray(p.sourceStatuses) ? p.sourceStatuses : [],
+            okSources: Array.isArray(p.okSources) ? p.okSources : [],
+            partialSources: Array.isArray(p.partialSources) ? p.partialSources : [],
+            staleSources: Array.isArray(p.staleSources) ? p.staleSources : [],
+            missingSources: Array.isArray(p.missingSources) ? p.missingSources : [],
+            watchOnlySources: Array.isArray(p.watchOnlySources) ? p.watchOnlySources : [],
+            blockedSources: Array.isArray(p.blockedSources) ? p.blockedSources : [],
+            reason: firstNonEmpty(p.reason, p.status, "DATA_SOURCE_HEALTH_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Data Source Health 只读状态待确认；不触发外部刷新、采集、回放或交易动作。"),
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notReplayExecution: true,
+            notExecutable: true,
+            watchlistBounded: p.watchlistBounded !== false,
+            marketQuoteChecked: p.marketQuoteChecked !== false,
+            evidenceScoreChecked: p.evidenceScoreChecked !== false,
+            decisionResultChecked: p.decisionResultChecked !== false,
+            executionPlanBoundaryChecked: p.executionPlanBoundaryChecked !== false,
+            reviewReplayChecked: p.reviewReplayChecked !== false,
+            externalRefreshTriggered: p.externalRefreshTriggered === true ? true : false,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function formatSourceList(items) {
+        return Array.isArray(items) && items.length ? items.join(", ") : "—";
+    }
+
+    function updateDataSourceHealthRuntimeStatusDisplay() {
+        var hs = dataSourceHealthRuntimeStatus || {};
+        setText("dataSourceHealthRuntimeStatusValue", (hs.status || DATA_SOURCE_HEALTH_STATUS_MISSING) + " / " + (hs.message || "只读状态"));
+        setText("dataSourceHealthSymbolValue", hs.symbol || "—");
+        setText("dataSourceHealthSourceHealthValue", hs.sourceHealth || "MISSING");
+        setText("dataSourceHealthScopedSourcesValue", formatSourceList(hs.scopedSources));
+        setText("dataSourceHealthOkSourcesValue", formatSourceList(hs.okSources));
+        setText("dataSourceHealthPartialSourcesValue", formatSourceList(hs.partialSources));
+        setText("dataSourceHealthMissingStaleSourcesValue", "missing: " + formatSourceList(hs.missingSources) + " · stale: " + formatSourceList(hs.staleSources));
+        setText("dataSourceHealthWatchBlockedSourcesValue", "watch-only: " + formatSourceList(hs.watchOnlySources) + " · blocked: " + formatSourceList(hs.blockedSources));
+        setText("dataSourceHealthReviewOnlyValue", "Data Source Health 是只读状态，不是交易信号。");
+        setText("dataSourceHealthSignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。");
+        setText("dataSourceHealthRefreshBoundaryValue", "不触发 external API refresh / scheduler / collector / API client；不补数据。");
+        setText("dataSourceHealthUpstreamValue", "Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay 边界仍适用；Display Slots 不是候选池。");
+        setText("dataSourceHealthReasonValue", hs.reason || "—");
+    }
+
+    function fetchDataSourceHealthRuntimeStatus(symbol) {
+        if (!symbol) {
+            dataSourceHealthRuntimeStatus = resolveDataSourceHealthRuntimeStatus({});
+            window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
+            updateDataSourceHealthRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/data-source-health-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                dataSourceHealthRuntimeStatus = resolveDataSourceHealthRuntimeStatus(payload, symbol);
+                window.__dataSourceHealthReviewStatus = dataSourceHealthRuntimeStatus.status || DATA_SOURCE_HEALTH_STATUS_MISSING;
+                updateDataSourceHealthRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                dataSourceHealthRuntimeStatus = resolveDataSourceHealthRuntimeStatus({}, symbol);
+                window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
+                updateDataSourceHealthRuntimeStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -3740,6 +3869,7 @@
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
+                fetchDataSourceHealthRuntimeStatus(selectedSymbol);
             });
     }
 
@@ -3750,6 +3880,7 @@
         fetchDecisionResultRuntimeStatus(symbol);
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
+        fetchDataSourceHealthRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3898,6 +4029,7 @@
         updateDecisionResultRuntimeStatusDisplay();
         updateExecutionPlanBoundaryRuntimeStatusDisplay();
         updateReviewReplayRuntimeStatusDisplay();
+        updateDataSourceHealthRuntimeStatusDisplay();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();

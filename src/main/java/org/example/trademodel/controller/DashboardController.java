@@ -35,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,6 +82,12 @@ public class DashboardController {
     private static final String REVIEW_REPLAY_SOURCE_TRACE_PARTIAL = "REVIEW_REPLAY_SOURCE_TRACE_PARTIAL";
     private static final String REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED = "REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED";
     private static final String REVIEW_REPLAY_BLOCKED_FAIL_CLOSED = "REVIEW_REPLAY_BLOCKED_FAIL_CLOSED";
+    private static final String DATA_SOURCE_HEALTH_READY = "DATA_SOURCE_HEALTH_REVIEW_ONLY_READY";
+    private static final String DATA_SOURCE_HEALTH_PARTIAL = "DATA_SOURCE_HEALTH_PARTIAL_REVIEW_ONLY";
+    private static final String DATA_SOURCE_HEALTH_STALE_FAIL_CLOSED = "DATA_SOURCE_HEALTH_STALE_FAIL_CLOSED";
+    private static final String DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED = "DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED";
+    private static final String DATA_SOURCE_HEALTH_WATCH_ONLY = "DATA_SOURCE_HEALTH_WATCH_ONLY_REVIEW";
+    private static final String DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED = "DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -559,6 +566,47 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/data-source-health-status")
+    @ResponseBody
+    public Map<String, Object> dataSourceHealthStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseDataSourceHealthStatus(normalizedSymbol);
+        List<Map<String, Object>> sourceStatuses = new ArrayList<>();
+
+        sourceStatuses.add(sourceStatus(
+                "MarketQuote",
+                "/api/market/quote-status",
+                "MISSING",
+                "MARKETQUOTE_STATUS_SURFACE_NOT_INVOKED",
+                "MarketQuote status endpoint 作为上游边界存在；Data Source Health 聚合只读，不触发行情刷新或 API client。"
+        ));
+        sourceStatuses.add(sourceStatusFromPayload(
+                "Evidence / Score",
+                "/api/dashboard/evidence-score-status",
+                evidenceScoreStatus(normalizedSymbol)
+        ));
+        sourceStatuses.add(sourceStatusFromPayload(
+                "DecisionResult",
+                "/api/dashboard/decision-result-status",
+                decisionResultStatus(normalizedSymbol)
+        ));
+        sourceStatuses.add(sourceStatus(
+                "ExecutionPlan / BoundaryCandidate",
+                "/api/dashboard/execution-plan-boundary-status",
+                "WATCH_ONLY",
+                "EXECUTIONPLAN_BOUNDARY_STATUS_SURFACE_NOT_INVOKED",
+                "ExecutionPlan / BoundaryCandidate status surface 已存在；Data Source Health 聚合不调用 dashboard detail，避免触发外部行情上下文读取。"
+        ));
+        sourceStatuses.add(sourceStatusFromPayload(
+                "Review / Replay",
+                "/api/dashboard/review-replay-result-status",
+                reviewReplayResultStatus(null, normalizedSymbol)
+        ));
+
+        applyDataSourceHealthRollup(status, sourceStatuses);
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -704,6 +752,46 @@ public class DashboardController {
         status.put("evidenceScoreChecked", true);
         status.put("decisionResultChecked", true);
         status.put("executionPlanBoundaryChecked", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        return status;
+    }
+
+    private Map<String, Object> baseDataSourceHealthStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("sourceHealth", "MISSING");
+        status.put("scopedSources", List.of(
+                "MarketQuote",
+                "Evidence / Score",
+                "DecisionResult",
+                "ExecutionPlan / BoundaryCandidate",
+                "Review / Replay"
+        ));
+        status.put("sourceStatuses", Collections.emptyList());
+        status.put("okSources", Collections.emptyList());
+        status.put("partialSources", Collections.emptyList());
+        status.put("staleSources", Collections.emptyList());
+        status.put("missingSources", Collections.emptyList());
+        status.put("watchOnlySources", Collections.emptyList());
+        status.put("blockedSources", Collections.emptyList());
+        status.put("reason", "DATA_SOURCE_HEALTH_STATUS_PENDING");
+        status.put("message", "Data Source Health 只读状态待确认；不触发外部刷新、采集、回放或交易动作。");
+        status.put("reviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notReplayExecution", true);
+        status.put("notExecutable", true);
+        status.put("watchlistBounded", true);
+        status.put("marketQuoteChecked", true);
+        status.put("evidenceScoreChecked", true);
+        status.put("decisionResultChecked", true);
+        status.put("executionPlanBoundaryChecked", true);
+        status.put("reviewReplayChecked", true);
+        status.put("externalRefreshTriggered", false);
         status.put("displaySlotsAreCandidatePool", false);
         status.put("failClosed", true);
         return status;
@@ -875,6 +963,146 @@ public class DashboardController {
         status.put("message", message);
         status.put("failClosed", failClosed);
         status.put("sourceHealth", sourceHealth);
+    }
+
+    private Map<String, Object> sourceStatusFromPayload(String name, String endpoint, Map<String, Object> payload) {
+        String health = payload != null ? String.valueOf(payload.getOrDefault("sourceHealth", "MISSING")) : "MISSING";
+        String reason = payload != null ? String.valueOf(payload.getOrDefault("reason", "SOURCE_STATUS_MISSING")) : "SOURCE_STATUS_MISSING";
+        String message = payload != null ? String.valueOf(payload.getOrDefault("message", "source status missing")) : "source status missing";
+        return sourceStatus(name, endpoint, health, reason, message);
+    }
+
+    private Map<String, Object> sourceStatus(
+            String name,
+            String endpoint,
+            String sourceHealth,
+            String reason,
+            String message) {
+        Map<String, Object> source = new LinkedHashMap<>();
+        source.put("name", name);
+        source.put("endpoint", endpoint);
+        source.put("sourceHealth", normalizeSourceHealth(sourceHealth));
+        source.put("reason", firstNonBlank(reason, "SOURCE_STATUS_UNKNOWN"));
+        source.put("message", firstNonBlank(message, "source status unknown"));
+        source.put("reviewOnly", true);
+        source.put("notTradingSignal", true);
+        source.put("notCandidateSignal", true);
+        source.put("notDecisionGeneration", true);
+        source.put("notPointSignal", true);
+        source.put("notExecutable", true);
+        return source;
+    }
+
+    private void applyDataSourceHealthRollup(Map<String, Object> status, List<Map<String, Object>> sourceStatuses) {
+        List<String> okSources = new ArrayList<>();
+        List<String> partialSources = new ArrayList<>();
+        List<String> staleSources = new ArrayList<>();
+        List<String> missingSources = new ArrayList<>();
+        List<String> watchOnlySources = new ArrayList<>();
+        List<String> blockedSources = new ArrayList<>();
+
+        for (Map<String, Object> source : sourceStatuses) {
+            String sourceName = String.valueOf(source.getOrDefault("name", "UNKNOWN"));
+            String sourceHealth = normalizeSourceHealth(String.valueOf(source.getOrDefault("sourceHealth", "MISSING")));
+            if ("OK".equals(sourceHealth)) {
+                okSources.add(sourceName);
+            } else if ("PARTIAL".equals(sourceHealth)) {
+                partialSources.add(sourceName);
+            } else if ("STALE".equals(sourceHealth)) {
+                staleSources.add(sourceName);
+            } else if ("MISSING".equals(sourceHealth)) {
+                missingSources.add(sourceName);
+            } else if ("WATCH_ONLY".equals(sourceHealth)) {
+                watchOnlySources.add(sourceName);
+            } else {
+                blockedSources.add(sourceName);
+            }
+        }
+
+        status.put("sourceStatuses", sourceStatuses);
+        status.put("okSources", okSources);
+        status.put("partialSources", partialSources);
+        status.put("staleSources", staleSources);
+        status.put("missingSources", missingSources);
+        status.put("watchOnlySources", watchOnlySources);
+        status.put("blockedSources", blockedSources);
+
+        if (!blockedSources.isEmpty()) {
+            applyDataSourceHealthStatus(
+                    status,
+                    DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED,
+                    "DATA_SOURCE_HEALTH_BLOCKED",
+                    "Data Source Health 存在 blocked source；只读状态 fail-closed，不触发外部刷新、候选、点位、推送或交易。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (!missingSources.isEmpty()) {
+            applyDataSourceHealthStatus(
+                    status,
+                    DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED,
+                    "DATA_SOURCE_HEALTH_MISSING",
+                    "Data Source Health 存在 missing source；只读状态 fail-closed，不补数据、不刷新外部来源。",
+                    true,
+                    "MISSING"
+            );
+        } else if (!staleSources.isEmpty()) {
+            applyDataSourceHealthStatus(
+                    status,
+                    DATA_SOURCE_HEALTH_STALE_FAIL_CLOSED,
+                    "DATA_SOURCE_HEALTH_STALE",
+                    "Data Source Health 存在 stale source；只读状态 fail-closed。",
+                    true,
+                    "STALE"
+            );
+        } else if (!partialSources.isEmpty()) {
+            applyDataSourceHealthStatus(
+                    status,
+                    DATA_SOURCE_HEALTH_PARTIAL,
+                    "DATA_SOURCE_HEALTH_PARTIAL",
+                    "Data Source Health 部分来源可读；仅供人工复核，不作为交易信号。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!watchOnlySources.isEmpty()) {
+            applyDataSourceHealthStatus(
+                    status,
+                    DATA_SOURCE_HEALTH_WATCH_ONLY,
+                    "DATA_SOURCE_HEALTH_WATCH_ONLY",
+                    "Data Source Health 存在 watch-only source；仅观察，不生成候选、点位或交易动作。",
+                    true,
+                    "WATCH_ONLY"
+            );
+        } else {
+            applyDataSourceHealthStatus(
+                    status,
+                    DATA_SOURCE_HEALTH_READY,
+                    "DATA_SOURCE_HEALTH_OWNER_PATH_READ",
+                    "Data Source Health 只读状态可读；不触发外部刷新，不生成候选、点位、推送或交易信号。",
+                    false,
+                    "OK"
+            );
+        }
+    }
+
+    private void applyDataSourceHealthStatus(Map<String, Object> status,
+                                             String statusValue,
+                                             String reason,
+                                             String message,
+                                             boolean failClosed,
+                                             String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private String normalizeSourceHealth(String sourceHealth) {
+        String normalized = normalizedStatus(sourceHealth);
+        if (normalized == null) {
+            return "MISSING";
+        }
+        return normalized.replace('-', '_').replace(' ', '_');
     }
 
     private boolean evidenceScoreSourceTraceComplete(List<EvidenceBriefVO> evidenceRows, List<ScoreBriefVO> scoreRows) {
