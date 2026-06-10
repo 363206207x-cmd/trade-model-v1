@@ -5,6 +5,8 @@ import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
+import org.example.trademodel.service.ReviewAggregateService;
+import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.dashboard.DashboardSourceTraceDetailAdapter;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
@@ -13,6 +15,8 @@ import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
+import org.example.trademodel.vo.ReviewAggregateSummaryVO;
+import org.example.trademodel.vo.ReviewStateVO;
 import org.example.trademodel.vo.ScoreBriefVO;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
@@ -70,6 +74,13 @@ public class DashboardController {
     private static final String EXECUTIONPLAN_SOURCE_TRACE_PARTIAL = "EXECUTIONPLAN_SOURCE_TRACE_PARTIAL";
     private static final String EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED = "EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED";
     private static final String EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED = "EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String REVIEW_REPLAY_READY = "REVIEW_REPLAY_REVIEW_ONLY_READY";
+    private static final String REVIEW_RESULT_MISSING_FAIL_CLOSED = "REVIEW_RESULT_MISSING_FAIL_CLOSED";
+    private static final String REVIEW_AGGREGATE_MISSING_FAIL_CLOSED = "REVIEW_AGGREGATE_MISSING_FAIL_CLOSED";
+    private static final String REPLAY_SUMMARY_MISSING_FAIL_CLOSED = "REPLAY_SUMMARY_MISSING_FAIL_CLOSED";
+    private static final String REVIEW_REPLAY_SOURCE_TRACE_PARTIAL = "REVIEW_REPLAY_SOURCE_TRACE_PARTIAL";
+    private static final String REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED = "REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED";
+    private static final String REVIEW_REPLAY_BLOCKED_FAIL_CLOSED = "REVIEW_REPLAY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -80,6 +91,8 @@ public class DashboardController {
     private final MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
+    private final ReviewService reviewService;
+    private final ReviewAggregateService reviewAggregateService;
     private final DashboardSourceTraceDetailAdapter dashboardSourceTraceDetailAdapter;
     private final PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter;
     private final ExecutionPlanDisplayAdapter executionPlanDisplayAdapter;
@@ -94,6 +107,8 @@ public class DashboardController {
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
                                EvidenceService evidenceService,
                                ScoreService scoreService,
+                               ReviewService reviewService,
+                               ReviewAggregateService reviewAggregateService,
                                DashboardSourceTraceDetailAdapter dashboardSourceTraceDetailAdapter,
                                PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
                                ExecutionPlanDisplayAdapter executionPlanDisplayAdapter,
@@ -107,6 +122,8 @@ public class DashboardController {
         this.marketEnvironmentSnapshotMapper = marketEnvironmentSnapshotMapper;
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
+        this.reviewService = reviewService;
+        this.reviewAggregateService = reviewAggregateService;
         this.dashboardSourceTraceDetailAdapter = dashboardSourceTraceDetailAdapter;
         this.planBoundaryDisplayAdapter = planBoundaryDisplayAdapter;
         this.executionPlanDisplayAdapter = executionPlanDisplayAdapter;
@@ -419,6 +436,129 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/review-replay-result-status")
+    @ResponseBody
+    public Map<String, Object> reviewReplayResultStatus(
+            @RequestParam(value = "analysisId", required = false) String analysisId,
+            @RequestParam(value = "symbol", required = false) String symbol) {
+        String normalizedSymbol = hasText(symbol) ? normalizeSymbol(symbol) : null;
+        String normalizedAnalysisId = normalizeAnalysisIdOrNull(analysisId);
+        DecisionResultVO decision = null;
+        if (!hasText(normalizedAnalysisId) && hasText(normalizedSymbol)) {
+            decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+            normalizedAnalysisId = decision != null ? normalizeAnalysisIdOrNull(decision.getAnalysisId()) : null;
+        }
+
+        Map<String, Object> status = baseReviewReplayStatus(normalizedAnalysisId, normalizedSymbol);
+        if (!hasText(normalizedAnalysisId)) {
+            applyReviewReplayStatus(
+                    status,
+                    REVIEW_REPLAY_BLOCKED_FAIL_CLOSED,
+                    "ANALYSIS_CONTEXT_MISSING",
+                    "Review / Replay analysis context 缺失；只读状态 fail-closed，不触发回放执行或生成复盘结果。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        if (decision == null && hasText(normalizedSymbol)) {
+            decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+        }
+        if (!hasText(normalizedSymbol) && decision != null) {
+            normalizedSymbol = decision.getSymbol();
+            status.put("symbol", normalizedSymbol);
+        }
+
+        ReviewStateVO reviewState = reviewService != null
+                ? reviewService.getStateByAnalysisId(normalizedAnalysisId)
+                : null;
+        status.put("reviewResultAvailable", reviewState != null);
+        status.put("reviewUpdatedAt", reviewState != null ? reviewState.getUpdateTime() : null);
+        status.put("reviewErrorType", reviewState != null ? firstNonBlank(reviewState.getErrorType(), "REVIEW_RESULT_PRESENT") : null);
+        if (reviewState == null) {
+            applyReviewReplayStatus(
+                    status,
+                    REVIEW_RESULT_MISSING_FAIL_CLOSED,
+                    "REVIEW_RESULT_MISSING",
+                    "Review result 缺失；不伪造复盘结果，不触发 replay execution。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        Optional<ReviewAggregateSummaryVO> aggregate = reviewAggregateService != null
+                ? reviewAggregateService.getAggregateSummaryByAnalysisId(normalizedAnalysisId)
+                : Optional.empty();
+        status.put("reviewAggregateAvailable", aggregate.isPresent());
+        if (aggregate.isEmpty()) {
+            applyReviewReplayStatus(
+                    status,
+                    REVIEW_AGGREGATE_MISSING_FAIL_CLOSED,
+                    "REVIEW_AGGREGATE_MISSING",
+                    "Review aggregate 缺失；不伪造聚合摘要，不触发回放执行。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        ReviewAggregateSummaryVO summary = aggregate.get();
+        if (!hasText(normalizedSymbol) && summary.getRun() != null && hasText(summary.getRun().getSymbol())) {
+            normalizedSymbol = summary.getRun().getSymbol();
+            status.put("symbol", normalizedSymbol);
+        }
+        ReviewAggregateSummaryVO.DetailSectionMeta replayMeta = replaySummaryMeta(summary);
+        boolean reviewClosureAvailable = summary.getReviewClosure() != null;
+        boolean replaySummaryOwnerPresent = replayMeta != null;
+        int replaySummaryCount = replayMeta != null && replayMeta.getTotal() != null ? replayMeta.getTotal() : 0;
+        status.put("reviewClosureAvailable", reviewClosureAvailable);
+        status.put("replaySummaryAvailable", replaySummaryOwnerPresent && replaySummaryCount > 0);
+        status.put("replaySummaryCount", replaySummaryCount);
+        status.put("replaySummaryRecommendedLimit", replayMeta != null ? replayMeta.getRecommendedLimit() : null);
+        status.put("sourceTraceComplete", reviewReplaySourceTraceComplete(summary, reviewState, replayMeta));
+
+        if (!replaySummaryOwnerPresent) {
+            applyReviewReplayStatus(
+                    status,
+                    REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED,
+                    "REPLAY_SUMMARY_OWNER_PATH_MISSING",
+                    "Replay summary owner path 缺失；状态只读，不执行 replay，不生成复盘结果。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (replaySummaryCount <= 0) {
+            applyReviewReplayStatus(
+                    status,
+                    REPLAY_SUMMARY_MISSING_FAIL_CLOSED,
+                    "REPLAY_SUMMARY_MISSING",
+                    "Replay summary 缺失；不触发 replay execution，不伪造摘要。",
+                    true,
+                    "MISSING"
+            );
+        } else if (!reviewClosureAvailable || !reviewReplaySourceTraceComplete(summary, reviewState, replayMeta)) {
+            applyReviewReplayStatus(
+                    status,
+                    REVIEW_REPLAY_SOURCE_TRACE_PARTIAL,
+                    "REVIEW_REPLAY_SOURCE_TRACE_PARTIAL",
+                    "Review / Replay source trace 不完整；仅展示只读状态，不生成交易结论。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applyReviewReplayStatus(
+                    status,
+                    REVIEW_REPLAY_READY,
+                    "REVIEW_REPLAY_OWNER_PATH_READ",
+                    "Review / Replay result status 只读可读；不触发回放执行，不生成复盘结果或交易信号。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -530,6 +670,40 @@ public class DashboardController {
         status.put("marketQuoteChecked", true);
         status.put("evidenceScoreChecked", true);
         status.put("decisionResultChecked", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        return status;
+    }
+
+    private Map<String, Object> baseReviewReplayStatus(String analysisId, String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", REVIEW_REPLAY_BLOCKED_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", analysisId);
+        status.put("reviewResultAvailable", false);
+        status.put("reviewAggregateAvailable", false);
+        status.put("reviewClosureAvailable", false);
+        status.put("replaySummaryAvailable", false);
+        status.put("replaySummaryCount", 0);
+        status.put("replaySummaryRecommendedLimit", null);
+        status.put("reviewUpdatedAt", null);
+        status.put("reviewErrorType", null);
+        status.put("sourceTraceComplete", false);
+        status.put("sourceHealth", "BLOCKED");
+        status.put("reason", "REVIEW_REPLAY_STATUS_PENDING");
+        status.put("message", "Review / Replay result status 只读状态待确认；不是交易信号。");
+        status.put("reviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notReplayExecution", true);
+        status.put("notExecutable", true);
+        status.put("watchlistBounded", true);
+        status.put("marketQuoteChecked", true);
+        status.put("evidenceScoreChecked", true);
+        status.put("decisionResultChecked", true);
+        status.put("executionPlanBoundaryChecked", true);
         status.put("displaySlotsAreCandidatePool", false);
         status.put("failClosed", true);
         return status;
@@ -690,6 +864,19 @@ public class DashboardController {
         status.put("sourceHealth", sourceHealth);
     }
 
+    private void applyReviewReplayStatus(Map<String, Object> status,
+                                         String statusValue,
+                                         String reason,
+                                         String message,
+                                         boolean failClosed,
+                                         String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
     private boolean evidenceScoreSourceTraceComplete(List<EvidenceBriefVO> evidenceRows, List<ScoreBriefVO> scoreRows) {
         if (evidenceRows == null || evidenceRows.isEmpty() || scoreRows == null || scoreRows.isEmpty()) {
             return false;
@@ -714,6 +901,33 @@ public class DashboardController {
 
     private boolean executionPlanSourceTraceComplete(SourceTraceDTO sourceTrace) {
         return sourceTrace != null && sourceTrace.hasRequiredBoundarySources();
+    }
+
+    private boolean reviewReplaySourceTraceComplete(ReviewAggregateSummaryVO summary,
+                                                    ReviewStateVO reviewState,
+                                                    ReviewAggregateSummaryVO.DetailSectionMeta replayMeta) {
+        if (summary == null || reviewState == null || replayMeta == null) {
+            return false;
+        }
+        ReviewAggregateSummaryVO.DetailSectionMeta meta = replayMeta;
+        return hasText(reviewState.getAnalysisId())
+                && summary.getRun() != null
+                && hasText(summary.getRun().getAnalysisId())
+                && hasText(summary.getRun().getSymbol())
+                && summary.getReviewClosure() != null
+                && hasText(meta.getSection())
+                && meta.getTotal() != null
+                && meta.getTotal() > 0;
+    }
+
+    private ReviewAggregateSummaryVO.DetailSectionMeta replaySummaryMeta(ReviewAggregateSummaryVO summary) {
+        if (summary == null || summary.getDetailSections() == null) {
+            return null;
+        }
+        return summary.getDetailSections().stream()
+                .filter(meta -> meta != null && "pushRecheck".equals(meta.getSection()))
+                .findFirst()
+                .orElse(null);
     }
 
     private String resolveExecutionPlanSourceTraceStatus(
@@ -825,5 +1039,12 @@ public class DashboardController {
             throw new ResponseStatusException(BAD_REQUEST, "symbol must not be blank");
         }
         return normalized;
+    }
+
+    private String normalizeAnalysisIdOrNull(String analysisId) {
+        if (!hasText(analysisId)) {
+            return null;
+        }
+        return analysisId.trim();
     }
 }
