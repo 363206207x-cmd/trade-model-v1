@@ -4,14 +4,15 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next Minimal Runtime Slice Selection After DecisionResult Closure`.
-- Selected target: `PositionSync + Dashboard review-only status`.
+- Active track: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
 - Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
-- The active selection pack only chooses the next source-read target and does not change capability level.
+- `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
+- The active source-read pack reads existing owner assets and does not change capability level.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.

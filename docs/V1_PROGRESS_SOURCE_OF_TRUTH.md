@@ -37,18 +37,19 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `1b12cd5 chore(workflow): refresh auto operator post-merge state`
-- Current active block: `Next Minimal Runtime Slice Selection After DecisionResult Closure`
+- Current merged main: `c75919c docs(runtime): select next slice after decisionresult closure`
+- Current active block: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: none; selection/source-read-lite only
-- Next required action: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`
+- Capability movement from this pack: none; source-read only
+- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - V1 Auto Operator Pack is completed on main as `b30c30e`; it adds the Chinese workflow operator script and does not change business capability.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`; it browser-verifies the #876 / `a0a432b` DecisionResult dashboard status panel and read-only safety copy.
 - V1 Auto Operator Post-Merge State Refresh is completed on main as `1b12cd5`; it refreshes the Chinese auto-operator summary and next-task handoff after DecisionResult visual closure without changing business capability.
-- Current active package is selection/source-read-lite for the next minimal runtime slice after DecisionResult closure. It selects a next source-read target only and must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
+- `c75919c` completed Next Minimal Runtime Slice Selection After DecisionResult Closure and selected `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
+- Current active package is source-read only for ExecutionPlan / BoundaryCandidate review-only display continuation. It reads existing owner assets and must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -72,7 +73,8 @@ DecisionResult chain history:
 - `b30c30e` completed the V1 Auto Operator Pack.
 - `baa5cfe` completed DecisionResult Visual Verification / Closure.
 - `1b12cd5` completed the V1 Auto Operator Post-Merge State Refresh.
-- Current active package selects `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read-only runtime slice after DecisionResult closure.
+- `c75919c` completed Next Minimal Runtime Slice Selection After DecisionResult Closure and selected `ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Current active package source-reads `ExecutionPlan / BoundaryCandidate review-only display continuation` and prepares a design-only next step.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
