@@ -6,13 +6,15 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Workflow Drift Repair Pack`.
+- Active stop-loss track: `DecisionResult Visual Verification / Closure`.
 - Selected target: `PositionSync + Dashboard review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
 - Selected next minimal runtime slice: `DecisionResult review-only dashboard/API status`.
-- Next required action: `Resume Minimal Review-Only DecisionResult Runtime Wiring Verification`.
+- Next required action: `Next minimal runtime slice selection`.
 - P359/P360 remain frozen by default.
-- Workflow repair does not raise business capability; it fixes fixed-command, handoff, and current-state drift after #876.
+- Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
+- DecisionResult runtime wiring verification is completed on main as `a0a432b`.
+- V1 Auto Operator Pack is completed on main as `b30c30e`.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`
