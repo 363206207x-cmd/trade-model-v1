@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `791260f docs(review-replay): verify review-only runtime wiring`
-- Current active block: `Review / Replay Result Status Visual Verification / Closure`
+- Current merged main: `001cbf7 chore(workflow): add one-command codex runner`
+- Current active block: `Next minimal runtime slice selection after Review / Replay result status closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: verification only; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Review / Replay Result Status Visual Verification / Closure`
+- Capability movement from this pack: visual closure confirms Review / Replay result status as `REVIEW_ONLY_RUNTIME partial`; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Next minimal runtime slice selection after Review / Replay result status closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -64,8 +64,9 @@ The following do not count as completed:
 - `650816c` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate and returned GO for minimal implementation.
 - `2f98fc3` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation. It adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, a dashboard Review / Replay result status panel, targeted `DashboardControllerTest` coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading.
 - `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping, forbidden semantics classification, and source-of-truth drift from `650816c` to `2f98fc3`.
-- This workflow improvement package adds one-command Codex runner and PR completion helpers only; it does not complete Review / Replay visual closure and does not change business capability.
-- Current active package after this workflow improvement remains `Review / Replay Result Status Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
+- `001cbf7` completes the V1 One-Command Codex Runner workflow improvement. It adds one-command Codex runner and PR completion helpers only; it does not change business capability.
+- This package completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
+- Current active package after this visual closure is `Next minimal runtime slice selection after Review / Replay result status closure`. It may add only selection docs and source-of-truth updates.
 
 ## Runtime Slice History
 
@@ -77,6 +78,7 @@ Completed review-only runtime slices:
 4. `Evidence / Score review-only runtime status`: `REVIEW_ONLY_RUNTIME partial`
 5. `DecisionResult review-only dashboard/API status`: `REVIEW_ONLY_RUNTIME partial`
 6. `ExecutionPlan / BoundaryCandidate review-only runtime status`: `REVIEW_ONLY_RUNTIME partial`
+7. `Review / Replay result status`: `REVIEW_ONLY_RUNTIME partial`
 
 DecisionResult chain history:
 
@@ -105,7 +107,9 @@ DecisionResult chain history:
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed on main as `650816c`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation is completed on main as `2f98fc3`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification is completed on main as `791260f`.
-- Current active package is Review / Replay Result Status Visual Verification / Closure.
+- V1 One-Command Codex Runner workflow improvement is completed on main as `001cbf7`.
+- Review / Replay Result Status Visual Verification / Closure is completed by this package when merged.
+- Current active package is Next minimal runtime slice selection after Review / Replay result status closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
