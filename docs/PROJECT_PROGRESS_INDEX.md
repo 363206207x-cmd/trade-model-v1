@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `62843de chore(workflow): normalize data source health readiness phase`.
-- Active stop-loss track: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`.
+- Current HEAD: `9290c1b docs(health): verify data source health implementation readiness`.
+- Active stop-loss track: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 - Selected target: `Data Source Health dashboard/API status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
 - Selected next minimal runtime slice: `Data Source Health dashboard/API status`.
-- Next required action: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -39,7 +39,8 @@ Current merged main:
 - Source Read for Data Source Health dashboard/API status is completed on main as `6343a60`: `DataSourceHealthDO` exists as an unwired carrier, existing `sourceHealth` signals are distributed across completed status endpoints/panels, and no dedicated aggregate Data Source Health API/panel/schema owner was found.
 - `c90fe98` completes Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design and returns GO to implementation readiness gate without implementation.
 - `62843de` completes the Data Source Health readiness phase normalization workflow fix.
-- This readiness-gate package returns GO to minimal review-only Data Source Health Dashboard/API status implementation. The next implementation remains B-risk and may only add a minimal read-only endpoint/dashboard/status surface, targeted tests, implementation docs, and source-of-truth updates.
+- `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to minimal review-only implementation.
+- This implementation package adds one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and source-of-truth updates. The next package is verification.
 - Data Source Health is not yet a completed runtime slice; completed minimal runtime slices remain 7.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
@@ -241,13 +242,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Implementation readiness gate for Data Source Health dashboard/API status`.
+- Current active block is `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `Data Source Health dashboard/API status`.
-- The next required action is `Implementation readiness gate for Data Source Health dashboard/API status`.
+- The next required action is `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.

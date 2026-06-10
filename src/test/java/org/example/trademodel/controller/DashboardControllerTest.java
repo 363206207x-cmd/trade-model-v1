@@ -334,6 +334,38 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyDataSourceHealthRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/data-source-health-status");
+        assertThat(html).contains("dataSourceHealthStatusPanel");
+        assertThat(html).contains("dataSourceHealthRuntimeStatusValue");
+        assertThat(html).contains("dataSourceHealthSymbolValue");
+        assertThat(html).contains("dataSourceHealthSourceHealthValue");
+        assertThat(html).contains("dataSourceHealthScopedSourcesValue");
+        assertThat(html).contains("dataSourceHealthOkSourcesValue");
+        assertThat(html).contains("dataSourceHealthPartialSourcesValue");
+        assertThat(html).contains("dataSourceHealthMissingStaleSourcesValue");
+        assertThat(html).contains("dataSourceHealthWatchBlockedSourcesValue");
+        assertThat(html).contains("dataSourceHealthReviewOnlyValue");
+        assertThat(html).contains("dataSourceHealthSignalBoundaryValue");
+        assertThat(html).contains("dataSourceHealthRefreshBoundaryValue");
+        assertThat(html).contains("DATA_SOURCE_HEALTH_REVIEW_ONLY_READY");
+        assertThat(html).contains("DATA_SOURCE_HEALTH_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("DATA_SOURCE_HEALTH_STALE_FAIL_CLOSED");
+        assertThat(html).contains("DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("DATA_SOURCE_HEALTH_WATCH_ONLY_REVIEW");
+        assertThat(html).contains("DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("Data Source Health 是只读状态，不是交易信号");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("不触发 external API refresh / scheduler / collector / API client");
+        assertThat(html).contains("Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay 边界仍适用");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
@@ -1084,6 +1116,74 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.orderAction").doesNotExist())
                 .andExpect(jsonPath("$.executionAction").doesNotExist())
                 .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
+    void dataSourceHealthStatusEndpointReturnsReviewOnlyFailClosedStatus() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/data-source-health-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.scopedSources[?(@ == 'MarketQuote')]").exists())
+                .andExpect(jsonPath("$.scopedSources[?(@ == 'Evidence / Score')]").exists())
+                .andExpect(jsonPath("$.scopedSources[?(@ == 'DecisionResult')]").exists())
+                .andExpect(jsonPath("$.scopedSources[?(@ == 'ExecutionPlan / BoundaryCandidate')]").exists())
+                .andExpect(jsonPath("$.scopedSources[?(@ == 'Review / Replay')]").exists())
+                .andExpect(jsonPath("$.sourceStatuses[?(@.name == 'MarketQuote')]").exists())
+                .andExpect(jsonPath("$.sourceStatuses[?(@.name == 'Evidence / Score')]").exists())
+                .andExpect(jsonPath("$.sourceStatuses[?(@.name == 'DecisionResult')]").exists())
+                .andExpect(jsonPath("$.sourceStatuses[?(@.name == 'ExecutionPlan / BoundaryCandidate')]").exists())
+                .andExpect(jsonPath("$.sourceStatuses[?(@.name == 'Review / Replay')]").exists())
+                .andExpect(jsonPath("$.missingSources[?(@ == 'MarketQuote')]").exists())
+                .andExpect(jsonPath("$.watchOnlySources[?(@ == 'ExecutionPlan / BoundaryCandidate')]").exists())
+                .andExpect(jsonPath("$.blockedSources[?(@ == 'Evidence / Score')]").exists())
+                .andExpect(jsonPath("$.blockedSources[?(@ == 'Review / Replay')]").exists())
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.evidenceScoreChecked").value(true))
+                .andExpect(jsonPath("$.decisionResultChecked").value(true))
+                .andExpect(jsonPath("$.executionPlanBoundaryChecked").value(true))
+                .andExpect(jsonPath("$.reviewReplayChecked").value(true))
+                .andExpect(jsonPath("$.externalRefreshTriggered").value(false))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void dataSourceHealthStatusEndpointDoesNotExposeExecutableRefreshCandidatePointOrTradingFields() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/data-source-health-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.externalRefreshAction").doesNotExist())
+                .andExpect(jsonPath("$.collectorTrigger").doesNotExist())
+                .andExpect(jsonPath("$.schedulerTrigger").doesNotExist())
+                .andExpect(jsonPath("$.apiClientTrigger").doesNotExist())
                 .andExpect(jsonPath("$.pushSendState").doesNotExist())
                 .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
     }

@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`.
+- Active track: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 - Selected target: `Data Source Health dashboard/API status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
 - Selected next minimal runtime slice: `Data Source Health dashboard/API status`.
-- Next required action: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -34,7 +34,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Source Read for Data Source Health dashboard/API status is completed on main as `6343a60`: `DataSourceHealthDO` exists but is unwired, existing `sourceHealth` signals are distributed across completed slice-local status endpoints/panels, and no aggregate Data Source Health API/panel/schema owner was found.
 - `c90fe98` completes Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design: it selects a thin review-only aggregate over existing slice-local source-health status surfaces, keeps DataSourceHealthDO inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping and fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - `62843de` completes the Data Source Health readiness phase normalization workflow fix.
-- This readiness-gate package returns GO to minimal review-only Data Source Health Dashboard/API status implementation. The next package may add only a minimal read-only endpoint/dashboard/status surface, targeted tests, implementation docs, and source-of-truth updates.
+- `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to minimal implementation.
+- This implementation package adds one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates without external refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, or trading.
 - Data Source Health is not yet a completed runtime slice; completed minimal runtime slices remain 7.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
