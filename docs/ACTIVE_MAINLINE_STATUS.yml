@@ -1,12 +1,12 @@
-current_head: "b30c30e"
+current_head: "baa5cfe"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "DecisionResult Visual Verification / Closure"
-active_block_cn: "DecisionResult 决策结果视觉验证 / 收口"
+active_block: "Next minimal runtime slice selection"
+active_block_cn: "选择下一个最小运行时模块"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "decisionresult-visual-verification-closure"
-merge_rule: "Visual verification docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360; does not raise business capability"
+current_branch: "main"
+merge_rule: "Selection/source-read-lite docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360; does not raise business capability"
 next_required_action: "Next minimal runtime slice selection"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
@@ -61,7 +61,7 @@ minimal_review_only_decisionresult_runtime_wiring_implementation_status: "comple
 workflow_drift_repair_pack_status: "completed on main as #877; repairs workflow entry, fixed PR/open/merge commands, handoff evidence rules, Codex GH_NOT_AVAILABLE interpretation, next-task templates, and source-of-truth current-state structure without business capability changes"
 minimal_review_only_decisionresult_runtime_wiring_verification_status: "completed on main as a0a432b; verifies #876 endpoint/dashboard review-only behavior, full compile/test results, forbidden semantics classification, and source-of-truth drift after #877"
 v1_auto_operator_pack_status: "completed on main as b30c30e; adds scripts/v1-auto.sh as the Chinese workflow operator entry and docs, without business capability changes"
-decisionresult_visual_verification_closure_status: "active in branch decisionresult-visual-verification-closure; browser-verifies #876 / a0a432b dashboard DecisionResult status panel visibility, safety copy, source trace / source health display, layout, and no Push / Candidate / Decision generation / Point / trading semantics; not completed on main until merged"
+decisionresult_visual_verification_closure_status: "completed on main as baa5cfe; browser-verifies #876 / a0a432b dashboard DecisionResult status panel visibility, safety copy, source trace / source health display, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

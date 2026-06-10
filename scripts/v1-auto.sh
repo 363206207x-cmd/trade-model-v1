@@ -91,6 +91,24 @@ translate_yes_no() {
   esac
 }
 
+phase_label() {
+  local phase="$1"
+  local active="${2:-}"
+  if [[ "$active" == *"Next minimal runtime slice selection"* ]]; then
+    echo "Selection（选择下一个最小运行时模块）"
+    return
+  fi
+  case "$phase" in
+    source_read) echo "Source Read（源码读取）" ;;
+    design) echo "Design（设计）" ;;
+    readiness_gate) echo "Readiness Gate（实现前就绪门）" ;;
+    implementation) echo "Implementation（实现）" ;;
+    verification) echo "Verification（验证）" ;;
+    visual_closure) echo "Visual Closure（视觉收口）" ;;
+    *) echo "${phase:-UNKNOWN}（未知阶段）" ;;
+  esac
+}
+
 describe_open_pr() {
   local open_prs="$1"
   case "$open_prs" in
@@ -147,9 +165,9 @@ current_status_summary() {
   echo "当前状态摘要（中文）"
   print_hr
   echo "当前模块: ${active_block:-UNKNOWN}（${active_block_cn:-未记录中文名}）"
-  echo "当前阶段: workflow efficiency package（工作流提效包） / next task phase=${next_phase:-UNKNOWN}"
+  echo "当前阶段: $(phase_label "${next_phase:-UNKNOWN}" "${next_active:-$active_block}")"
   echo "当前项目能力层级: ${current_level:-UNKNOWN}（Review-Only Runtime partial，只读运行时部分完成）"
-  echo "ACTIVE current_head（事实源记录）: ${current_head:-UNKNOWN}"
+  echo "ACTIVE current_head（事实源记录的当前主线 HEAD）: ${current_head:-UNKNOWN}"
   echo "实际当前 HEAD: ${head:-UNKNOWN}"
   echo "当前分支: ${branch:-UNKNOWN}"
   echo "Worktree Clean（工作区干净）: $(translate_yes_no "${worktree:-UNKNOWN}")"
@@ -158,7 +176,7 @@ current_status_summary() {
   echo "是否可以继续: $(describe_can_continue "${can_continue:-UNKNOWN}" "${blockers:-UNKNOWN}")"
   echo "Blockers（阻塞）: ${blockers:-none}"
   echo "下一业务动作: ${next_action:-UNKNOWN}"
-  echo "CODEX_NEXT_TASK（下一任务）: ${next_active:-UNKNOWN}"
+  echo "CODEX_NEXT_TASK（下一任务配置）: ${next_active:-UNKNOWN}"
   echo "下一任务分支: ${next_branch:-UNKNOWN}"
   echo "下一任务 main 基线: ${next_main:-UNKNOWN}"
 }
@@ -180,19 +198,20 @@ cmd_summary() {
 
   echo "项目总进度摘要（白话版）"
   print_hr
-  echo "已完成 4 个 Review-Only Runtime partial（只读运行时部分完成）小闭环:"
+  echo "已完成 5 个 Review-Only Runtime partial（只读运行时部分完成）小闭环:"
   echo "1. PositionSync（持仓同步）+ Dashboard（仪表盘）完整闭环。"
-  echo "2. Watchlist + RuleConfig（观察列表 + 规则配置）+ Dashboard/API 完整闭环。"
-  echo "3. MarketQuote（行情报价）freshness/fallback/dashboard API 完整闭环。"
-  echo "4. Evidence / Score（证据 / 评分）review-only runtime status 完整闭环。"
+  echo "2. Watchlist + RuleConfig（观察列表 + 规则配置）+ Dashboard/API（仪表盘 / 接口）完整闭环。"
+  echo "3. MarketQuote（行情报价）freshness/fallback/dashboard API（新鲜度 / 兜底 / 仪表盘接口）完整闭环。"
+  echo "4. Evidence / Score（证据 / 评分）review-only runtime status（只读运行时状态）完整闭环。"
+  echo "5. DecisionResult（决策结果）review-only dashboard/API status（只读仪表盘 / 接口状态）完整闭环。"
   echo
   echo "DecisionResult（决策结果）当前进度:"
   echo "- implementation（实现）已完成并合并。"
   echo "- verification（验证）已完成并合并。"
-  echo "- 下一步是 Visual Closure（视觉收口）：确认 dashboard 上 DecisionResult panel 真实可见、文案清楚、没有交易含义。"
+  echo "- visual closure（视觉收口）已完成并合并。"
   echo
-  echo "当前暂停业务推进，正在做: ${active_block:-V1 Auto Operator Pack（V1 自动操作台包）}"
-  echo "完成本 workflow efficiency package（工作流提效包）后，下一步恢复: ${next_active:-$next_action}"
+  echo "当前模块: ${active_block:-UNKNOWN}"
+  echo "下一业务动作: ${next_active:-$next_action}（选择下一个最小运行时模块）"
   echo "建议下一任务分支: ${next_branch:-UNKNOWN}"
   echo
   echo "能力层级不变: REVIEW_ONLY_RUNTIME partial（只读运行时部分完成）。"
@@ -216,8 +235,8 @@ cmd_task() {
   echo
   echo "任务中文摘要:"
   print_hr
-  echo "模块: $(yaml_value "$NEXT_TASK_FILE" "module")"
-  echo "阶段: $(yaml_value "$NEXT_TASK_FILE" "active_block")"
+  echo "Module（模块）: $(yaml_value "$NEXT_TASK_FILE" "module")"
+  echo "Phase（阶段）: $(yaml_value "$NEXT_TASK_FILE" "active_block")"
   echo "分支: $(yaml_value "$NEXT_TASK_FILE" "branch")"
   echo "风险: $(yaml_value "$NEXT_TASK_FILE" "risk")"
   echo "允许改动: $(yaml_value "$NEXT_TASK_FILE" "allowed_changes")"
