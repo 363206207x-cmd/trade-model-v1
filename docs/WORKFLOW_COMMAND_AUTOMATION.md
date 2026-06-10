@@ -55,6 +55,16 @@ This generates the next task through `v1-auto.sh next` and starts Codex CLI when
 
 一键执行入口通过 `v1-auto.sh next` 生成下一任务，并在 Codex CLI 可用时启动 Codex。它不会 stage、commit、push、创建 PR 或合并。
 
+If Codex shell cannot confirm Open PR（未合并 PR）status because local `gh` is unavailable, but GPT connector or the user's terminal has confirmed Open PR none, use:
+
+```bash
+bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
+```
+
+This flag only bypasses Codex GitHub status unknown. It does not bypass non-main branch, dirty worktree, explicit open PR, failed Main Sync（主分支同步）, `CAN_CONTINUE_NEXT_PACKAGE: NO` from other blockers, or merge approval rules.
+
+如果 Codex shell 因本地 `gh` 不可用无法确认 Open PR 状态，但 GPT connector 或用户本机 terminal 已确认 Open PR none，可使用 `--open-pr-none-confirmed`。该参数只处理 Codex GitHub 状态未知，不绕过其他安全条件。
+
 One-command PR completion entry:
 
 ```bash
@@ -64,6 +74,10 @@ bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-review
 This runs `v1-auto.sh check-pr <PR_NUMBER> <risk>`, waits for required CI, and then uses `v1-merge-sync.sh` when the risk rule allows merge.
 
 PR 完成入口会先运行风险感知 PR 检查，等待必需 CI，再在风险规则允许时通过 `v1-merge-sync.sh` 合并。
+
+`v1-pr-complete.sh` accepts the current `gh pr checks` JSON shape where check results are reported through `state`, and remains compatible with a future `conclusion` field. It requires every matching `quality-gate` check to pass when both push and pull_request entries exist, and requires `workflow-contract` to pass before any A-risk auto merge.
+
+`v1-pr-complete.sh` 兼容当前 `gh pr checks` 使用 `state` 字段的输出，也兼容未来可能出现的 `conclusion` 字段。当 push 和 pull_request 同时产生多个 `quality-gate` 时，所有同名检查都必须成功；`workflow-contract` 也必须成功后才允许 A-risk 自动合并。
 
 ## Create Draft PR / 创建 Draft PR
 

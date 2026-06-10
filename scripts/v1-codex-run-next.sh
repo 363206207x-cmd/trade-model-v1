@@ -9,6 +9,22 @@ print_hr() {
   echo "------------------------------------------------------------"
 }
 
+usage() {
+  cat <<'EOF'
+用法:
+  bash scripts/v1-codex-run-next.sh [--open-pr-none-confirmed]
+
+说明:
+  默认必须由 scripts/v1-state.sh 确认 Open PR（未合并 PR）为 none。
+  如果 Codex shell 的 gh 不可用导致 Open PR 状态未知，但 GPT connector 或用户本机 terminal 已确认 Open PR none，可使用:
+
+  bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
+
+  该参数只放行 Codex GitHub status unknown（Codex GitHub 状态未知）这一种情况。
+  它不会绕过非 main 分支、dirty worktree（脏工作区）、明确存在 Open PR、Main Sync（主分支同步）失败、或其他 blocker（阻塞）。
+EOF
+}
+
 state_value() {
   local state_text="$1"
   local key="$2"
@@ -41,6 +57,25 @@ stop_with_task_path() {
   exit 1
 }
 
+OPEN_PR_NONE_CONFIRMED="false"
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --open-pr-none-confirmed)
+      OPEN_PR_NONE_CONFIRMED="true"
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "STOP（停止）: unknown option（未知选项）: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
 echo "V1 Codex Run Next（一键启动下一步 Codex 任务）"
 print_hr
 
@@ -51,6 +86,7 @@ echo
 branch="$(state_value "$state_text" "BRANCH")"
 worktree="$(state_value "$state_text" "WORKTREE_CLEAN")"
 open_prs="$(state_value "$state_text" "OPEN_PRS")"
+main_sync="$(state_value "$state_text" "MAIN_SYNC")"
 can_continue="$(state_value "$state_text" "CAN_CONTINUE_NEXT_PACKAGE")"
 blockers="$(state_value "$state_text" "BLOCKERS")"
 
@@ -62,12 +98,25 @@ if [[ "$worktree" != "Yes" ]]; then
 fi
 if [[ "$open_prs" != "none" ]]; then
   if [[ "$open_prs" == "GH_NOT_AVAILABLE" ]]; then
-    stop_with_task_path "Open PR（未合并 PR）状态未知。Codex GH_NOT_AVAILABLE 是 Codex GitHub 状态未知，需要用户本机 gh 或 GPT connector 证据。"
+    if [[ "$OPEN_PR_NONE_CONFIRMED" == "true" ]]; then
+      echo "已使用人工确认 Open PR none，继续执行。"
+      echo "说明: Codex GH_NOT_AVAILABLE 是 Codex GitHub status unknown（Codex GitHub 状态未知），本次以 GPT connector 或用户本机 terminal handoff evidence（交接证据）为准。"
+    else
+      stop_with_task_path "Open PR（未合并 PR）状态未知。Codex GH_NOT_AVAILABLE 是 Codex GitHub 状态未知，需要用户本机 gh 或 GPT connector 证据。"
+    fi
+  else
+    stop_with_task_path "存在 Open PR（未合并 PR）: $open_prs"
   fi
-  stop_with_task_path "存在 Open PR（未合并 PR）: $open_prs"
+fi
+if [[ "$main_sync" != "OK" ]]; then
+  stop_with_task_path "Main Sync（主分支同步）不是 OK。当前值: ${main_sync:-UNKNOWN}"
 fi
 if [[ "$can_continue" != "YES" ]]; then
-  stop_with_task_path "CAN_CONTINUE_NEXT_PACKAGE 不是 YES。Blockers（阻塞）: ${blockers:-UNKNOWN}"
+  if [[ "$OPEN_PR_NONE_CONFIRMED" == "true" && "$open_prs" == "GH_NOT_AVAILABLE" && "$blockers" == "OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE" ]]; then
+    echo "CAN_CONTINUE_NEXT_PACKAGE 因 Codex GitHub status unknown（Codex GitHub 状态未知）显示为 NO；人工确认 Open PR none 后继续执行。"
+  else
+    stop_with_task_path "CAN_CONTINUE_NEXT_PACKAGE 不是 YES。Blockers（阻塞）: ${blockers:-UNKNOWN}"
+  fi
 fi
 
 auto_output_file="${TMPDIR:-/tmp}/v1-auto-next-output.txt"

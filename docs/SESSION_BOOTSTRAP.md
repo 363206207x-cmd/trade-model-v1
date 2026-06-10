@@ -42,6 +42,14 @@ bash scripts/v1-codex-run-next.sh
 
 This starts from clean/synced `main`, generates the next Codex task through `v1-auto.sh next`, and tries to launch Codex CLI. It does not stage, commit, push, create PRs, or merge.
 
+If Codex shell cannot confirm Open PR because local `gh` is unavailable, but GPT connector or the user's terminal has already confirmed Open PR none, the allowed handoff form is:
+
+```bash
+bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
+```
+
+This only bypasses Codex GitHub status unknown. It does not bypass non-main branch, dirty worktree, explicit open PR, failed Main Sync, or other blockers.
+
 One-command PR completion helper:
 
 ```bash
@@ -68,6 +76,8 @@ This helper always checks through `v1-auto.sh check-pr` and merges only through 
 
 If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub status unknown. It is not, by itself, proof that the project has an open PR or an unsynced main. GPT connector evidence or the user's local terminal `gh` output may be accepted as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
 
+For one-command execution, use `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed` only after that handoff evidence exists.
+
 ## Workflow Command Shortcuts
 
 - Default workflow: GPT decides the next pack, Codex executes scoped file changes / checks / commit / push, and PR creation / merge follows `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
@@ -75,6 +85,7 @@ If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub sta
 - Fixed status check: `bash scripts/v1-state.sh`
 - Chinese operator entry: `bash scripts/v1-auto.sh next`
 - One-command Codex runner: `bash scripts/v1-codex-run-next.sh`
+- One-command Codex runner with explicit Open PR none handoff: `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed`
 - PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
 - Fixed PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`

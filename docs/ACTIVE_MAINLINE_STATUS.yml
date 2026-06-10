@@ -1,4 +1,4 @@
-current_head: "001cbf7"
+current_head: "5da301b"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
 active_block: "Next minimal runtime slice selection after Review / Replay result status closure"
@@ -15,7 +15,7 @@ p360_status: "not allowed to start"
 new_skeleton_default: "blocked unless it directly reduces duplication, selects canonical ownership, wires existing service/runtime/dashboard/API review-only path, or resolves #830 runtime wiring gap"
 ownership_map_status: "completed on main; maps Cursor-era dashboard/service/schema/provider assets to canonical owners and freezes duplicate Codex skeleton expansion"
 first_minimal_runtime_wiring_candidate: "PositionSync + Dashboard review-only status"
-selected_runtime_wiring_target: "Review / Replay result status"
+selected_runtime_wiring_target: "pending next minimal runtime slice selection after Review / Replay result status closure"
 runtime_wiring_target_selection_status: "completed on main; selects PositionSync + Dashboard review-only status and prepares source-read verification without implementation"
 positionsync_dashboard_source_read_status: "completed on main as #835; verified existing provider/service/scheduler/mapper/schema/dashboard/API path and confirmed dashboard provider/fallback visibility gaps without implementation"
 minimal_positionsync_runtime_wiring_design_status: "completed on main as #836; designs the minimal review-only status mapping over existing PositionSyncService / PositionSyncStatusVO / SystemController / dashboard.html without implementation"
@@ -77,7 +77,8 @@ minimal_review_only_review_replay_result_status_runtime_wiring_design_status: "c
 review_replay_result_status_runtime_wiring_implementation_readiness_status: "completed on main as 650816c; returns GO for minimal review-only implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets, without DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, or trading"
 minimal_review_only_review_replay_result_status_runtime_wiring_implementation_status: "completed on main as 2f98fc3; implements one minimal read-only /api/dashboard/review-replay-result-status endpoint, dashboard Review / Replay result status panel, targeted DashboardControllerTest coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading"
 minimal_review_only_review_replay_result_status_runtime_wiring_verification_status: "completed on main as 791260f; verifies 2f98fc3 compile/test results, targeted DashboardControllerTest coverage, endpoint/panel/status mapping, forbidden semantics classification, source-of-truth alignment, and notes sandbox-blocked local HTTP smoke"
-review_replay_result_status_visual_verification_closure_status: "completed by this package when merged; browser-verifies dashboard Review / Replay status panel visibility, fail-closed status, safety copy, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
+review_replay_result_status_visual_verification_closure_status: "completed on main as 5da301b; browser-verifies dashboard Review / Replay status panel visibility, fail-closed status, safety copy, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
+v1_one_command_runner_hotfix_status: "in progress on branch v1-one-command-runner-hotfix; workflow hotfix only, fixes gh pr checks state parsing and --open-pr-none-confirmed handoff without changing business capability"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

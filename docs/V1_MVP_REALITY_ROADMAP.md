@@ -5,9 +5,9 @@ This roadmap follows the user-facing business chain rather than P-number order.
 ## Current Stop-Loss Track
 
 - Active track: `Next minimal runtime slice selection after Review / Replay result status closure`.
-- Selected target: `Review / Replay result status`.
+- Selected target: pending; the next runtime slice must be selected by the active selection package.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
-- Selected next minimal runtime slice: `Review / Replay result status`.
+- Selected next minimal runtime slice: pending selection after Review / Replay result status closure.
 - Next required action: `Next minimal runtime slice selection after Review / Replay result status closure`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
@@ -26,7 +26,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `2f98fc3` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation with one read-only `/api/dashboard/review-replay-result-status` endpoint, a dashboard status panel, targeted tests, implementation docs, and source-of-truth updates; it does not trigger replay execution or generate review results.
 - `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification with workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping grep, forbidden semantics classification, and source-of-truth updates.
 - `001cbf7` completes the V1 One-Command Codex Runner workflow improvement; it does not raise business capability.
-- This package completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
+- `5da301b` completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
+- This hotfix package fixes one-command runner CI parsing and Codex GitHub status handoff only; it does not raise business capability.
 - Review / Replay result status is now the seventh completed Review-Only Runtime partial slice and is not the active in-progress module.
 - The active package after this visual closure is Next minimal runtime slice selection after Review / Replay result status closure and may add only selection docs and source-of-truth updates.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
