@@ -26,6 +26,14 @@ Fallback bootstrap command:
 bash scripts/v1-session-bootstrap.sh
 ```
 
+Preferred user-facing operator command:
+
+```bash
+bash scripts/v1-auto.sh next
+```
+
+`v1-auto.sh` is a Chinese workflow operator. It summarizes state, progress, blockers, and the next Codex task while still delegating to the fixed workflow scripts.
+
 1. Read `docs/ACTIVE_MAINLINE_STATUS.yml`.
 2. Read `docs/V1_CAPABILITY_MATRIX.md`.
 3. Read `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`.
@@ -48,6 +56,7 @@ If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub sta
 - Default workflow: GPT decides the next pack, Codex executes scoped file changes / checks / commit / push, and PR creation / merge follows `docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md`.
 - Fallback new window command: `bash scripts/v1-session-bootstrap.sh`
 - Fixed status check: `bash scripts/v1-state.sh`
+- Chinese operator entry: `bash scripts/v1-auto.sh next`
 - Fixed PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
 - Local merge sync after approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`

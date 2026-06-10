@@ -37,14 +37,15 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `0079363 chore(workflow): repair drift in codex handoff automation (#877)`
-- Current active block: `Minimal Review-Only DecisionResult Runtime Wiring Verification`
+- Current merged main: `a0a432b docs(decision): verify review-only runtime wiring`
+- Current active block: `V1 Auto Operator Pack`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: none; verification only
+- Capability movement from this pack: none; workflow efficiency only
 - Next required action: `DecisionResult Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
-- This verification package must not be mistaken for DecisionResult runtime capability, Push, Candidate, Decision generation, Point, or trading progress.
+- DecisionResult runtime wiring verification is completed on main as `a0a432b`.
+- This V1 Auto Operator Pack temporarily pauses business module progress to add a Chinese workflow operator script. It must not be mistaken for DecisionResult runtime capability, Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -63,7 +64,8 @@ DecisionResult chain history:
 - #875 completed DecisionResult implementation readiness gate.
 - #876 completed DecisionResult minimal review-only implementation.
 - #877 completed workflow drift repair and fixed the Codex handoff/task template flow.
-- Current active package verifies #876 DecisionResult review-only runtime wiring; it is not completed on main until this verification branch is merged.
+- `a0a432b` completed DecisionResult review-only runtime wiring verification.
+- Current active workflow package adds `scripts/v1-auto.sh`; after it is merged, business work should resume with DecisionResult Visual Verification / Closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
@@ -74,6 +76,7 @@ P359 remains not completed progress because PR #829 was closed unmerged. P360 is
 - Bootstrap: `bash scripts/v1-session-bootstrap.sh`
 - State: `bash scripts/v1-state.sh`
 - Next task prompt: `bash scripts/codex-next-task.sh`
+- Chinese operator entry: `bash scripts/v1-auto.sh next`
 - PR helper: `bash scripts/v1-pr-flow-helper.sh --branch <branch> --title "<title>" --risk <risk>`
 - Open PR: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Merge sync: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`

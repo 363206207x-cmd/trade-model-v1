@@ -33,6 +33,18 @@ If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and mu
 
 如果 `gh` 不可用，脚本在 open PR 字段输出 `GH_NOT_AVAILABLE`，不得输出不可读错误。
 
+## V1 Auto Operator / V1 自动操作台
+
+Preferred user-facing command:
+
+```bash
+bash scripts/v1-auto.sh next
+```
+
+`v1-auto.sh` is the Chinese operator entry for routine status, summary, next-task generation, PR checking, and merge handoff. It does not replace the fixed scripts; it delegates to `v1-state.sh`, `codex-next-task.sh`, `v1-open-pr.sh`, and `v1-merge-sync.sh`.
+
+`v1-auto.sh` 不绕过固定脚本，只把状态、下一步、PR 检查和合并交接变成用户可读的中文操作台。
+
 ## Create Draft PR / 创建 Draft PR
 
 Use:
@@ -153,7 +165,6 @@ When the current package is merged, `main` is synced, the worktree is clean, che
 The following legacy scripts remain fallback diagnostics or explicit helpers, but they are not the default path for creating PRs or merging PRs:
 
 - `bash scripts/v1.sh`
-- `bash scripts/v1-auto.sh`
 - `bash scripts/v1-merge-current.sh`
 
 以下旧脚本仍可作为兜底诊断或显式辅助，但不是创建 PR 或合并 PR 的默认路径。
