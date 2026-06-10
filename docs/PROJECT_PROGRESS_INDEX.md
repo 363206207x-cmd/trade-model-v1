@@ -6,18 +6,19 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Next Minimal Runtime Slice Selection After DecisionResult Closure`.
-- Selected target: `PositionSync + Dashboard review-only status`.
+- Active stop-loss track: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
 - Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - V1 Auto Operator Pack is completed on main as `b30c30e`.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`.
 - V1 Auto Operator Post-Merge State Refresh is completed on main as `1b12cd5`.
-- Current selection is source-read-lite only and does not change business capability.
+- `c75919c` completed the selection package and selected `ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Current package is source-read only and does not change business capability.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`
