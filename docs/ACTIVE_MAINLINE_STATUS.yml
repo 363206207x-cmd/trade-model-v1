@@ -1,13 +1,13 @@
-current_head: "91613bb"
+current_head: "5534b52"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source Read for Data Source Health dashboard/API status"
-active_block_cn: "数据源健康仪表盘 / API 状态源码读取"
+active_block: "Design for Data Source Health dashboard/API status"
+active_block_cn: "数据源健康仪表盘 / API 状态设计"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "data-source-health-dashboard-status-source-read"
-merge_rule: "A-risk source read after Review / Replay visual closure and next-slice selection; allow only source-read docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
-next_required_action: "Source Read for Data Source Health dashboard/API status"
+current_branch: "data-source-health-dashboard-status-design"
+merge_rule: "A-risk design after Data Source Health dashboard/API status source read; allow only design docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
+next_required_action: "Design for Data Source Health dashboard/API status"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -80,7 +80,9 @@ minimal_review_only_review_replay_result_status_runtime_wiring_verification_stat
 review_replay_result_status_visual_verification_closure_status: "completed on main as 5da301b; browser-verifies dashboard Review / Replay status panel visibility, fail-closed status, safety copy, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
 v1_one_command_runner_hotfix_status: "completed on main as 91613bb; workflow hotfix only, fixes gh pr checks state parsing and --open-pr-none-confirmed handoff without changing business capability"
 next_minimal_runtime_slice_selection_after_review_replay_status: "selected Data Source Health dashboard/API status as the next source-read-only target after seven REVIEW_ONLY_RUNTIME partial closures; this selection package is docs/source-of-truth only and does not change business capability"
+data_source_health_dashboard_api_status_source_read_status: "completed in current source-read package; confirms DataSourceHealthDO exists as an unwired carrier, existing sourceHealth signals are distributed across MarketQuote / Evidence-Score / DecisionResult / ExecutionPlan-BoundaryCandidate / Review-Replay status endpoints and dashboard panels, no dedicated aggregate data-source-health API/panel/schema owner was found, and returns GO to design only without implementation"
 source_of_truth_files:
+  - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_SOURCE_READ.md
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md

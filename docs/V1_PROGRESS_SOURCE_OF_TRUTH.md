@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `91613bb chore(workflow): fix one-command runner CI parsing`
-- Current active block: `Source Read for Data Source Health dashboard/API status`
+- Current merged main: `5534b52 docs(runtime): select next slice after review replay closure`
+- Current active block: `Design for Data Source Health dashboard/API status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this selection: none. Review / Replay result status was already confirmed as the seventh `REVIEW_ONLY_RUNTIME partial` slice on merged main; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Source Read for Data Source Health dashboard/API status`
+- Capability movement from this source read: none. Data Source Health dashboard/API status is not implemented; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Design for Data Source Health dashboard/API status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -68,7 +68,9 @@ The following do not count as completed:
 - `5da301b` completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
 - `91613bb` completes the V1 One-Command Runner Hotfix. It fixes `gh pr checks` state parsing, duplicate quality-gate handling, and `--open-pr-none-confirmed` Codex GitHub status handoff without changing business capability.
 - This selection package chooses `Data Source Health dashboard/API status` as the next minimal source-read target after seven completed review-only runtime slices. It may add only selection docs and source-of-truth updates.
-- Current active package after this selection handoff is `Source Read for Data Source Health dashboard/API status`. It may read and document existing source-health assets only; it may not implement endpoint/dashboard/service/test changes.
+- `5534b52` completes Next Minimal Runtime Slice Selection After Review / Replay Closure and selects `Data Source Health dashboard/API status` as the next source-read target.
+- Source Read for Data Source Health dashboard/API status is completed in the current source-read package: it confirms `DataSourceHealthDO` exists as an unwired carrier, local `sourceHealth` signals already exist across MarketQuote / Evidence-Score / DecisionResult / ExecutionPlan-BoundaryCandidate / Review-Replay status endpoints and dashboard panels, and no dedicated aggregate data-source-health API/panel/schema owner was found.
+- Current active package after this source-read handoff is `Design for Data Source Health dashboard/API status`. It may design owner path, rollup/status mapping, dashboard/API boundary, fail-closed rules, and readiness checklist only; it may not implement endpoint/dashboard/service/test changes.
 
 ## Runtime Slice History
 
@@ -113,7 +115,8 @@ DecisionResult chain history:
 - Review / Replay Result Status Visual Verification / Closure is completed on main as `5da301b`.
 - V1 One-Command Runner Hotfix is completed on main as `91613bb`; it fixes `gh pr checks` state parsing and adds `--open-pr-none-confirmed` without changing business capability.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
-- Current active package is Source Read for Data Source Health dashboard/API status.
+- Source Read for Data Source Health dashboard/API status is completed in the current package and returns GO to design only.
+- Current active package is Design for Data Source Health dashboard/API status.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
