@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `5da301b docs(review-replay): record visual verification closure`
-- Current active block: `Next minimal runtime slice selection after Review / Replay result status closure`
+- Current merged main: `91613bb chore(workflow): fix one-command runner CI parsing`
+- Current active block: `Source Read for Data Source Health dashboard/API status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this hotfix: none. Review / Replay result status was already confirmed as the seventh `REVIEW_ONLY_RUNTIME partial` slice on merged main; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Next minimal runtime slice selection after Review / Replay result status closure`
+- Capability movement from this selection: none. Review / Replay result status was already confirmed as the seventh `REVIEW_ONLY_RUNTIME partial` slice on merged main; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Source Read for Data Source Health dashboard/API status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -66,8 +66,9 @@ The following do not count as completed:
 - `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping, forbidden semantics classification, and source-of-truth drift from `650816c` to `2f98fc3`.
 - `001cbf7` completes the V1 One-Command Codex Runner workflow improvement. It adds one-command Codex runner and PR completion helpers only; it does not change business capability.
 - `5da301b` completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
-- This hotfix package only fixes one-command runner CI parsing and Codex GitHub status handoff behavior; it does not change business capability.
-- Current active package after this visual closure is `Next minimal runtime slice selection after Review / Replay result status closure`. It may add only selection docs and source-of-truth updates.
+- `91613bb` completes the V1 One-Command Runner Hotfix. It fixes `gh pr checks` state parsing, duplicate quality-gate handling, and `--open-pr-none-confirmed` Codex GitHub status handoff without changing business capability.
+- This selection package chooses `Data Source Health dashboard/API status` as the next minimal source-read target after seven completed review-only runtime slices. It may add only selection docs and source-of-truth updates.
+- Current active package after this selection handoff is `Source Read for Data Source Health dashboard/API status`. It may read and document existing source-health assets only; it may not implement endpoint/dashboard/service/test changes.
 
 ## Runtime Slice History
 
@@ -110,8 +111,9 @@ DecisionResult chain history:
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification is completed on main as `791260f`.
 - V1 One-Command Codex Runner workflow improvement is completed on main as `001cbf7`.
 - Review / Replay Result Status Visual Verification / Closure is completed on main as `5da301b`.
-- V1 One-Command Runner Hotfix is in progress on `v1-one-command-runner-hotfix`; it fixes `gh pr checks` state parsing and adds `--open-pr-none-confirmed` without changing business capability.
-- Current active package is Next minimal runtime slice selection after Review / Replay result status closure.
+- V1 One-Command Runner Hotfix is completed on main as `91613bb`; it fixes `gh pr checks` state parsing and adds `--open-pr-none-confirmed` without changing business capability.
+- Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
+- Current active package is Source Read for Data Source Health dashboard/API status.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
