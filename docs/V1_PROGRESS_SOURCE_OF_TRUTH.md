@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `8f404cd docs(wiring): read executionplan boundarycandidate display source path`
-- Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design`
+- Current merged main: `b3e6d71 docs(wiring): design executionplan boundarycandidate runtime wiring`
+- Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: none; design only
-- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate`
+- Capability movement from this pack: none; readiness gate only
+- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation` if this gate remains GO
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -50,7 +50,8 @@ The following do not count as completed:
 - V1 Auto Operator Post-Merge State Refresh is completed on main as `1b12cd5`; it refreshes the Chinese auto-operator summary and next-task handoff after DecisionResult visual closure without changing business capability.
 - `c75919c` completed Next Minimal Runtime Slice Selection After DecisionResult Closure and selected `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
 - `8f404cd` completed Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation and confirmed the existing owner path, dashboard detail/display adapters, dashboard DOM slot, schema/mapper, and targeted tests before design.
-- Current active package is design-only for ExecutionPlan / BoundaryCandidate review-only runtime wiring. It fixes future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist, but must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
+- `b3e6d71` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design and fixed future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
+- Current active package is readiness-only for ExecutionPlan / BoundaryCandidate review-only runtime wiring. It decides whether the b3e6d71 design may enter minimal implementation; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -76,7 +77,8 @@ DecisionResult chain history:
 - `1b12cd5` completed the V1 Auto Operator Post-Merge State Refresh.
 - `c75919c` completed Next Minimal Runtime Slice Selection After DecisionResult Closure and selected `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - `8f404cd` completed Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation.
-- Current active package designs the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring and prepares an implementation readiness gate.
+- `b3e6d71` completed the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring design.
+- Current active package is the implementation readiness gate for ExecutionPlan / BoundaryCandidate review-only display continuation.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
