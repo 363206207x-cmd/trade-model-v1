@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `650816c docs(review-replay): verify runtime implementation readiness`
-- Current active block: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`
+- Current merged main: `2f98fc3 feat(review-replay): show review-only runtime status`
+- Current active block: `Review / Replay Result Status Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: minimal review-only implementation for this slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`
+- Capability movement from this pack: verification only; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Review / Replay Result Status Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -62,8 +62,9 @@ The following do not count as completed:
 - `fb0263e` completed Source Read for Review / Replay result status: it confirms the existing ReviewResult / ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregate / review page / replay summary owner assets, while dedicated review-only status endpoint and dashboard panel remain missing and replay execution must be excluded.
 - `4d17081` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Design. It fixes owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
 - `650816c` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate and returned GO for minimal implementation.
-- This package completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation. It adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, a dashboard Review / Replay result status panel, targeted `DashboardControllerTest` coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading.
-- Current active package after this implementation is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`. It may add only verification docs and source-of-truth updates.
+- `2f98fc3` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation. It adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, a dashboard Review / Replay result status panel, targeted `DashboardControllerTest` coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading.
+- This package completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping, forbidden semantics classification, and source-of-truth drift from `650816c` to `2f98fc3`.
+- Current active package after this verification is `Review / Replay Result Status Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
 
 ## Runtime Slice History
 
@@ -101,8 +102,9 @@ DecisionResult chain history:
 - Source Read for Review / Replay result status is completed on main as `fb0263e` and returns GO to design.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed on main as `4d17081`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed on main as `650816c`.
-- Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation is completed by this package.
-- Current active package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation is completed on main as `2f98fc3`.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification is completed by this package.
+- Current active package is Review / Replay Result Status Visual Verification / Closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 

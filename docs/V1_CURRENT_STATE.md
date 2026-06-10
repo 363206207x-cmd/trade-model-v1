@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `650816c docs(review-replay): verify runtime implementation readiness`
+- Current merged main: `2f98fc3 feat(review-replay): show review-only runtime status`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`.
-- Current next required action is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`.
+- Current active block is `Review / Replay Result Status Visual Verification / Closure`.
+- Current next required action is `Review / Replay Result Status Visual Verification / Closure`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -33,7 +33,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `fb0263e` completes Source Read for Review / Replay result status and confirms ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregateService / review page / replay summary assets exist, while dedicated review-only status endpoint/panel remains missing and replay execution must be excluded.
 - `4d17081` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Design and fixes the future Review / Replay result status owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
 - `650816c` completes the Review / Replay implementation readiness gate and returns GO for minimal implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets.
-- This implementation package adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard status panel, targeted tests, and source-of-truth updates without DTO/Validator/Assembler, schema/config/pom, replay execution, review result generation, Push, Candidate, Decision generation, Point, or trading.
+- `2f98fc3` adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard status panel, targeted tests, and source-of-truth updates without DTO/Validator/Assembler, schema/config/pom, replay execution, review result generation, Push, Candidate, Decision generation, Point, or trading.
+- This verification package confirms the `2f98fc3` implementation with workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping grep, forbidden semantics classification, and source-of-truth alignment.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.
@@ -78,7 +79,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - The completed workflow repair and V1 Auto Operator packs do not change DecisionResult runtime behavior.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`.
-- The active package is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`; it may add only verification docs and source-of-truth updates.
+- The active package is `Review / Replay Result Status Visual Verification / Closure`; it may add only visual verification docs and source-of-truth updates.
 - Selected runtime wiring target is `Review / Replay result status`.
 - The selected target reuses `ReviewService`, `ReviewController`, `ReviewResultMapper`, `tm_review_result`, `ReviewAggregateService`, and read-only replay summary assets if they can remain non-Push and non-executable.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
