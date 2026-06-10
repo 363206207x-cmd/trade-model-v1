@@ -5,22 +5,23 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `c75919c docs(runtime): select next slice after decisionresult closure`
+- Current merged main: `8f404cd docs(wiring): read executionplan boundarycandidate display source path`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Current next required action is `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design`.
+- Current active block is `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design`.
+- Current next required action is `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`; it verifies existing review-only dashboard/API behavior and does not add Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, or trading behavior.
 - The V1 Auto Operator Post-Merge State Refresh is completed on main as `1b12cd5`; it aligns `v1-auto.sh`, `CODEX_NEXT_TASK.yml`, and source-of-truth handoff after DecisionResult closure without raising business capability.
 - `c75919c` completes Next Minimal Runtime Slice Selection After DecisionResult Closure and selects `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
-- The active source-read package reads existing ExecutionPlan / BoundaryCandidate owner paths after five completed review-only runtime closures; it does not implement runtime behavior.
+- `8f404cd` completes Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation and confirms existing owner paths before design.
+- The active design package fixes the future ExecutionPlan / BoundaryCandidate review-only owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist; it does not implement runtime behavior.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.
