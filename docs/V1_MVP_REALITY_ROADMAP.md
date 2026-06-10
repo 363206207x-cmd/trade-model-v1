@@ -4,17 +4,18 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate`.
+- Active track: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation`.
 - Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
 - Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation` if this gate remains GO.
+- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
 - `8f404cd` completed the source-read pack and confirmed the existing owner assets before design.
 - `b3e6d71` completed the design pack and fixed the future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist without changing capability level.
-- The active readiness gate verifies whether the design can enter minimal review-only implementation and does not change capability level.
+- `a84a4aa` completed the implementation readiness gate and returned GO for minimal review-only implementation.
+- The active package implements only the minimal review-only endpoint/panel/test/docs slice and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.

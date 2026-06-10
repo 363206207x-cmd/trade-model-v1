@@ -1102,6 +1102,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="decisionResultReasonValue">DECISIONRESULT_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="executionPlanBoundaryStatusPanel" aria-label="ExecutionPlan BoundaryCandidate review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">ExecutionPlan / BoundaryCandidate 只读状态</span><span class="v" id="executionPlanBoundaryRuntimeStatusValue">EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED / ExecutionPlan / BoundaryCandidate 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="executionPlanBoundarySymbolValue">—</span> · <span id="executionPlanBoundaryAnalysisIdValue">—</span></span></div>
+            <div class="kv"><span class="k">PlanBoundary / ExecutionPlan status</span><span class="v"><span id="planBoundaryStatusValue">BACKEND_PENDING</span> · <span id="executionPlanStatusValue">BOUNDARY_PENDING</span></span></div>
+            <div class="kv"><span class="k">source trace / source health</span><span class="v"><span id="executionPlanSourceTraceValue">partial</span> · <span id="executionPlanSourceHealthValue">BLOCKED</span></span></div>
+            <div class="kv"><span class="k">RiskActionGuard / not executable</span><span class="v"><span id="executionPlanRiskGuardValue">BACKEND_PENDING</span> · <span id="executionPlanNotExecutableReasonValue">PLAN_BOUNDARY_BACKEND_PENDING</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="executionPlanBoundaryReviewOnlyValue">ExecutionPlan / BoundaryCandidate 是只读状态，不是交易信号，不可执行。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="executionPlanBoundarySignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。</span></div>
+            <div class="kv"><span class="k">Watchlist / MarketQuote / Evidence-Score / DecisionResult boundary</span><span class="v" id="executionPlanBoundaryUpstreamValue">Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score、DecisionResult 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="executionPlanBoundaryReasonValue">EXECUTIONPLAN_BOUNDARY_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1310,6 +1322,14 @@
     var DECISIONRESULT_STATUS_AI_ROLE_PARTIAL = "DECISIONRESULT_AI_ROLE_PARTIAL";
     var DECISIONRESULT_STATUS_STALE_OR_UNKNOWN = "DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED";
     var DECISIONRESULT_STATUS_BLOCKED = "DECISIONRESULT_BLOCKED_FAIL_CLOSED";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_READY = "EXECUTIONPLAN_BOUNDARY_REVIEW_ONLY_READY";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_PLAN_PENDING = "PLAN_BOUNDARY_BACKEND_PENDING_FAIL_CLOSED";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_INCOMPLETE = "PLAN_BOUNDARY_INCOMPLETE_FAIL_CLOSED";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_WATCH_ONLY = "PLAN_BOUNDARY_WATCH_ONLY";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_EXECUTION_PENDING = "EXECUTIONPLAN_BOUNDARY_PENDING_FAIL_CLOSED";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_SOURCE_TRACE_PARTIAL = "EXECUTIONPLAN_SOURCE_TRACE_PARTIAL";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_RISK_BLOCKED = "EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED";
+    var EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED = "EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1408,6 +1428,34 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var executionPlanBoundaryRuntimeStatus = {
+        status: EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED,
+        symbol: null,
+        analysisId: null,
+        planBoundaryStatus: "BACKEND_PENDING",
+        executionPlanStatus: "BOUNDARY_PENDING",
+        sourceTraceStatus: "UNKNOWN",
+        sourceTraceComplete: false,
+        sourceHealth: "BLOCKED",
+        riskActionGuardStatus: "BACKEND_PENDING",
+        notExecutableReason: "PLAN_BOUNDARY_BACKEND_PENDING",
+        incompleteReasons: [],
+        blockingReasons: [],
+        reason: "EXECUTIONPLAN_BOUNDARY_STATUS_PENDING",
+        message: "ExecutionPlan / BoundaryCandidate 只读状态待确认；不是交易信号。",
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notExecutable: true,
+        watchlistBounded: true,
+        marketQuoteChecked: true,
+        evidenceScoreChecked: true,
+        decisionResultChecked: true,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -1415,6 +1463,7 @@
     window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
     window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
     window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
+    window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -2864,6 +2913,76 @@
             });
     }
 
+    function resolveExecutionPlanBoundaryRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            planBoundaryStatus: firstNonEmpty(p.planBoundaryStatus, "BACKEND_PENDING").toUpperCase(),
+            executionPlanStatus: firstNonEmpty(p.executionPlanStatus, "BOUNDARY_PENDING").toUpperCase(),
+            sourceTraceStatus: firstNonEmpty(p.sourceTraceStatus, "UNKNOWN").toUpperCase(),
+            sourceTraceComplete: p.sourceTraceComplete === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            riskActionGuardStatus: firstNonEmpty(p.riskActionGuardStatus, "BACKEND_PENDING").toUpperCase(),
+            notExecutableReason: firstNonEmpty(p.notExecutableReason, "PLAN_BOUNDARY_BACKEND_PENDING"),
+            incompleteReasons: Array.isArray(p.incompleteReasons) ? p.incompleteReasons : [],
+            blockingReasons: Array.isArray(p.blockingReasons) ? p.blockingReasons : [],
+            reason: firstNonEmpty(p.reason, p.status, "EXECUTIONPLAN_BOUNDARY_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "ExecutionPlan / BoundaryCandidate 只读状态待确认；不是交易信号。"),
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notExecutable: true,
+            watchlistBounded: p.watchlistBounded !== false,
+            marketQuoteChecked: p.marketQuoteChecked !== false,
+            evidenceScoreChecked: p.evidenceScoreChecked !== false,
+            decisionResultChecked: p.decisionResultChecked !== false,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateExecutionPlanBoundaryRuntimeStatusDisplay() {
+        var ps = executionPlanBoundaryRuntimeStatus || {};
+        setText("executionPlanBoundaryRuntimeStatusValue", (ps.status || EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED) + " / " + (ps.message || "只读状态"));
+        setText("executionPlanBoundarySymbolValue", ps.symbol || "—");
+        setText("executionPlanBoundaryAnalysisIdValue", ps.analysisId || "—");
+        setText("planBoundaryStatusValue", ps.planBoundaryStatus || "BACKEND_PENDING");
+        setText("executionPlanStatusValue", ps.executionPlanStatus || "BOUNDARY_PENDING");
+        setText("executionPlanSourceTraceValue", ps.sourceTraceComplete ? "complete" : (ps.sourceTraceStatus || "partial / missing"));
+        setText("executionPlanSourceHealthValue", ps.sourceHealth || "BLOCKED");
+        setText("executionPlanRiskGuardValue", ps.riskActionGuardStatus || "BACKEND_PENDING");
+        setText("executionPlanNotExecutableReasonValue", ps.notExecutableReason || "PLAN_BOUNDARY_BACKEND_PENDING");
+        setText("executionPlanBoundaryReviewOnlyValue", "ExecutionPlan / BoundaryCandidate 是只读状态，不是交易信号，不可执行。");
+        setText("executionPlanBoundarySignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。");
+        setText("executionPlanBoundaryUpstreamValue", "Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score、DecisionResult 边界仍适用；Display Slots 不是候选池。");
+        setText("executionPlanBoundaryReasonValue", ps.reason || "—");
+    }
+
+    function fetchExecutionPlanBoundaryRuntimeStatus(symbol) {
+        if (!symbol) {
+            executionPlanBoundaryRuntimeStatus = resolveExecutionPlanBoundaryRuntimeStatus({});
+            window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
+            updateExecutionPlanBoundaryRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/execution-plan-boundary-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                executionPlanBoundaryRuntimeStatus = resolveExecutionPlanBoundaryRuntimeStatus(payload, symbol);
+                window.__executionPlanBoundaryReviewStatus = executionPlanBoundaryRuntimeStatus.status || EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
+                updateExecutionPlanBoundaryRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                executionPlanBoundaryRuntimeStatus = resolveExecutionPlanBoundaryRuntimeStatus({}, symbol);
+                window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
+                updateExecutionPlanBoundaryRuntimeStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -3495,6 +3614,7 @@
                 fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
                 fetchEvidenceScoreRuntimeStatus(selectedSymbol);
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
+                fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
             });
     }
 
@@ -3503,6 +3623,7 @@
         fetchMarketQuoteRuntimeStatus(symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
         fetchEvidenceScoreRuntimeStatus(symbol);
         fetchDecisionResultRuntimeStatus(symbol);
+        fetchExecutionPlanBoundaryRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })

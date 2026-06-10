@@ -3,6 +3,7 @@ package org.example.trademodel.controller;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
+import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
@@ -22,6 +23,7 @@ import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
 import org.example.trademodel.service.impl.RuntimeKlineContextAssemblyServiceImpl;
 import org.example.trademodel.vo.DecisionResultVO;
+import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
@@ -258,11 +260,61 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyExecutionPlanBoundaryRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/execution-plan-boundary-status");
+        assertThat(html).contains("executionPlanBoundaryStatusPanel");
+        assertThat(html).contains("executionPlanBoundaryRuntimeStatusValue");
+        assertThat(html).contains("executionPlanBoundarySymbolValue");
+        assertThat(html).contains("executionPlanBoundaryAnalysisIdValue");
+        assertThat(html).contains("planBoundaryStatusValue");
+        assertThat(html).contains("executionPlanStatusValue");
+        assertThat(html).contains("executionPlanSourceTraceValue");
+        assertThat(html).contains("executionPlanSourceHealthValue");
+        assertThat(html).contains("executionPlanRiskGuardValue");
+        assertThat(html).contains("executionPlanNotExecutableReasonValue");
+        assertThat(html).contains("executionPlanBoundaryReviewOnlyValue");
+        assertThat(html).contains("executionPlanBoundarySignalBoundaryValue");
+        assertThat(html).contains("executionPlanBoundaryUpstreamValue");
+        assertThat(html).contains("EXECUTIONPLAN_BOUNDARY_REVIEW_ONLY_READY");
+        assertThat(html).contains("PLAN_BOUNDARY_BACKEND_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("PLAN_BOUNDARY_INCOMPLETE_FAIL_CLOSED");
+        assertThat(html).contains("PLAN_BOUNDARY_WATCH_ONLY");
+        assertThat(html).contains("EXECUTIONPLAN_BOUNDARY_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("EXECUTIONPLAN_SOURCE_TRACE_PARTIAL");
+        assertThat(html).contains("EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("ExecutionPlan / BoundaryCandidate 是只读状态，不是交易信号，不可执行");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score、DecisionResult 边界仍适用");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
         RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> fallbackDisplay;
         PaperObservationDisplayAdapter paperObservationDisplayAdapter = (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay;
+        return controllerWith(
+                sourceTraceDetailAdapter,
+                planBoundaryDisplayAdapter,
+                executionPlanDisplayAdapter,
+                riskActionGuardDisplayAdapter,
+                paperObservationDisplayAdapter
+        );
+    }
+
+    private DashboardController controllerWith(
+            DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter,
+            PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
+            ExecutionPlanDisplayAdapter executionPlanDisplayAdapter,
+            RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter,
+            PaperObservationDisplayAdapter paperObservationDisplayAdapter
+    ) {
         return new DashboardController(
                 decisionService,
                 systemHealthService,
@@ -700,6 +752,155 @@ class DashboardControllerTest {
     }
 
     @Test
+    void executionPlanBoundaryStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        MockMvc executionPlanBoundaryMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        completeExecutionPlanBoundarySourceTrace(),
+                        null
+                ),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-execution-plan-ready");
+        decision.setAnalysisId("ana-execution-plan-ready");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-execution-plan-ready")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-execution-plan-ready")).thenReturn(Collections.emptyList());
+
+        executionPlanBoundaryMockMvc.perform(get("/api/dashboard/execution-plan-boundary-status")
+                        .param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EXECUTIONPLAN_BOUNDARY_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-execution-plan-ready"))
+                .andExpect(jsonPath("$.planBoundaryStatus").value("VALID"))
+                .andExpect(jsonPath("$.executionPlanStatus").value("READY_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.sourceTraceStatus").value("COMPLETE"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("OK"))
+                .andExpect(jsonPath("$.riskActionGuardStatus").value("MANUAL_REVIEW_REQUIRED"))
+                .andExpect(jsonPath("$.notExecutableReason").value("REVIEW_ONLY_NOT_EXECUTABLE"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.evidenceScoreChecked").value(true))
+                .andExpect(jsonPath("$.decisionResultChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void executionPlanBoundaryStatusEndpointFailsClosedWhenDecisionResultMissing() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("ETHUSDT")).thenReturn(null);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("ETHUSDT", null)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/dashboard/execution-plan-boundary-status").param("symbol", "ETHUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("ETHUSDT"))
+                .andExpect(jsonPath("$.analysisId").value(nullValue()))
+                .andExpect(jsonPath("$.planBoundaryStatus").value("BACKEND_PENDING"))
+                .andExpect(jsonPath("$.executionPlanStatus").value("BOUNDARY_PENDING"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.evidenceScoreChecked").value(true))
+                .andExpect(jsonPath("$.decisionResultChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("DECISIONRESULT_MISSING"));
+    }
+
+    @Test
+    void executionPlanBoundaryStatusEndpointFailsClosedWhenPlanBoundaryOwnerDataMissing() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-plan-boundary-missing");
+        decision.setAnalysisId("ana-plan-boundary-missing");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-plan-boundary-missing")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-plan-boundary-missing")).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/dashboard/execution-plan-boundary-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PLAN_BOUNDARY_BACKEND_PENDING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-plan-boundary-missing"))
+                .andExpect(jsonPath("$.planBoundaryStatus").value("BACKEND_PENDING"))
+                .andExpect(jsonPath("$.executionPlanStatus").value("BOUNDARY_PENDING"))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("PLAN_BOUNDARY_BACKEND_PENDING"));
+    }
+
+    @Test
+    void executionPlanBoundaryStatusEndpointDoesNotExposeExecutableCandidatePointOrTradingFields() throws Exception {
+        MockMvc executionPlanBoundaryMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        completeExecutionPlanBoundarySourceTrace(),
+                        null
+                ),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-execution-plan-safe");
+        decision.setAnalysisId("ana-execution-plan-safe");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-execution-plan-safe")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-execution-plan-safe")).thenReturn(Collections.emptyList());
+
+        executionPlanBoundaryMockMvc.perform(get("/api/dashboard/execution-plan-boundary-status")
+                        .param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
     void detail_json_exposesRuntimeKlineContextAsSeparateReadOnlyBoundaryWhenAssemblyIsSafe() throws Exception {
         MockMvc runtimeKlineMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
                 new DefaultDashboardSourceTraceDetailAdapter(
@@ -971,6 +1172,79 @@ class DashboardControllerTest {
         row.setAiPlanMode("AGGRESSIVE");
         row.setConfusedScore(3);
         return row;
+    }
+
+    private static SourceTraceDTO completeExecutionPlanBoundarySourceTrace() {
+        SourceTraceDTO sourceTrace = new SourceTraceDTO();
+        sourceTrace.setSymbol("BTCUSDT");
+        sourceTrace.setDecisionId("dec-execution-plan-ready");
+        sourceTrace.setAnalysisId("ana-execution-plan-ready");
+        sourceTrace.setTimeframe("1h");
+        sourceTrace.setMissingFields(Collections.emptyList());
+        sourceTrace.setEntryPriceSource(new BigDecimal("68000.00"));
+        sourceTrace.setEntrySourceType("REVIEW_ONLY_SOURCE");
+        sourceTrace.setEntrySourceTimeframe("1h");
+        sourceTrace.setEntrySourceReason("REVIEW_ONLY_BOUNDARY_SOURCE");
+        sourceTrace.setEntrySourceRef("source-trace-fixture");
+        sourceTrace.setStopPriceSource(new BigDecimal("66000.00"));
+        sourceTrace.setStopSourceType("REVIEW_ONLY_SOURCE");
+        sourceTrace.setStopSourceTimeframe("1h");
+        sourceTrace.setStopSourceReason("REVIEW_ONLY_BOUNDARY_SOURCE");
+        sourceTrace.setStopSourceRef("source-trace-fixture");
+        sourceTrace.setTpPriceSources(List.of(new BigDecimal("70000.00")));
+        sourceTrace.setTpSourceType("REVIEW_ONLY_SOURCE");
+        sourceTrace.setTpSourceTimeframe("1h");
+        sourceTrace.setTpSourceReason("REVIEW_ONLY_BOUNDARY_SOURCE");
+        sourceTrace.setTpSourceRef("source-trace-fixture");
+        sourceTrace.setRrSource(new BigDecimal("2.00"));
+        sourceTrace.setRrRuleRef("review-only-rr-rule");
+        sourceTrace.setLiquiditySource("review-only-liquidity-source");
+        sourceTrace.setMultiTimeframeSource("review-only-mtf-source");
+        sourceTrace.setEventSource("review-only-event-source");
+        sourceTrace.setWickSource("review-only-wick-source");
+        sourceTrace.setManualReviewRequired(true);
+        sourceTrace.setNotTradeInstruction(true);
+        return sourceTrace;
+    }
+
+    private static DashboardDetailResponseVO.PlanBoundaryDisplayVO readyPlanBoundaryDisplay() {
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO display = new DashboardDetailResponseVO.PlanBoundaryDisplayVO();
+        display.setPlanBoundaryStatus("VALID");
+        display.setPlanBoundaryStatusLabel("只读边界可复核");
+        display.setSourceTraceStatus("COMPLETE");
+        display.setBackendConnectionStatus("READY");
+        display.setIncompleteReasons(Collections.emptyList());
+        display.setBlockingReasons(Collections.emptyList());
+        display.setManualReviewRequired(true);
+        display.setNotTradeInstruction(true);
+        return display;
+    }
+
+    private static DashboardDetailResponseVO.ExecutionPlanDisplayVO readyExecutionPlanDisplay() {
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO display = new DashboardDetailResponseVO.ExecutionPlanDisplayVO();
+        display.setExecutionPlanStatus("READY_REVIEW_ONLY");
+        display.setExecutionPlanStatusLabel("只读执行计划状态可复核");
+        display.setExecutionPlanBoundaryAligned(true);
+        display.setPlanBoundaryStatus("VALID");
+        display.setNotExecutableReason("REVIEW_ONLY_NOT_EXECUTABLE");
+        display.setIncompleteReasons(Collections.emptyList());
+        display.setManualReviewRequired(true);
+        display.setNotTradeInstruction(true);
+        return display;
+    }
+
+    private static DashboardDetailResponseVO.RiskActionGuardDisplayVO manualReviewRiskActionGuardDisplay() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO display = new DashboardDetailResponseVO.RiskActionGuardDisplayVO();
+        display.setRiskActionGuardStatus("MANUAL_REVIEW_REQUIRED");
+        display.setRiskActionGuardStatusLabel("只读人工复核");
+        display.setRiskActionBlockingReason("MANUAL_REVIEW_REQUIRED");
+        display.setOpportunityPushAllowed(false);
+        display.setReverseTradeAllowed(false);
+        display.setNewPositionAllowed(false);
+        display.setMarketOrderExitAllowed(false);
+        display.setManualRiskReviewRequired(true);
+        display.setNotTradeInstruction(true);
+        return display;
     }
 
     private static PersistedOhlcvReadinessResult readiness(

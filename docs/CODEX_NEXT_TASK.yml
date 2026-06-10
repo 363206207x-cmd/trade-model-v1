@@ -1,4 +1,4 @@
-current_main: "b3e6d71 docs(wiring): design executionplan boundarycandidate runtime wiring"
+current_main: "a84a4aa docs(wiring): verify executionplan boundarycandidate implementation readiness"
 active_block: "Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation"
 phase: "implementation"
 module: "ExecutionPlan / BoundaryCandidate review-only display continuation"

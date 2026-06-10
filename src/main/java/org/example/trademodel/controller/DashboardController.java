@@ -62,6 +62,14 @@ public class DashboardController {
     private static final String DECISIONRESULT_AI_ROLE_PARTIAL = "DECISIONRESULT_AI_ROLE_PARTIAL";
     private static final String DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED = "DECISIONRESULT_STALE_OR_UNKNOWN_FAIL_CLOSED";
     private static final String DECISIONRESULT_BLOCKED_FAIL_CLOSED = "DECISIONRESULT_BLOCKED_FAIL_CLOSED";
+    private static final String EXECUTIONPLAN_BOUNDARY_READY = "EXECUTIONPLAN_BOUNDARY_REVIEW_ONLY_READY";
+    private static final String PLAN_BOUNDARY_BACKEND_PENDING_FAIL_CLOSED = "PLAN_BOUNDARY_BACKEND_PENDING_FAIL_CLOSED";
+    private static final String PLAN_BOUNDARY_INCOMPLETE_FAIL_CLOSED = "PLAN_BOUNDARY_INCOMPLETE_FAIL_CLOSED";
+    private static final String PLAN_BOUNDARY_WATCH_ONLY = "PLAN_BOUNDARY_WATCH_ONLY";
+    private static final String EXECUTIONPLAN_BOUNDARY_PENDING_FAIL_CLOSED = "EXECUTIONPLAN_BOUNDARY_PENDING_FAIL_CLOSED";
+    private static final String EXECUTIONPLAN_SOURCE_TRACE_PARTIAL = "EXECUTIONPLAN_SOURCE_TRACE_PARTIAL";
+    private static final String EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED = "EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED";
+    private static final String EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED = "EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -373,6 +381,44 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/execution-plan-boundary-status")
+    @ResponseBody
+    public Map<String, Object> executionPlanBoundaryStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseExecutionPlanBoundaryStatus(normalizedSymbol);
+        DashboardDetailResponseVO detail = dashboardDetail(normalizedSymbol);
+        DecisionResultVO decision = detail.getDecision();
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundary = detail.getPlanBoundaryDisplay();
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO executionPlan = detail.getExecutionPlanDisplay();
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO riskGuard = detail.getRiskActionGuardDisplay();
+        SourceTraceDTO sourceTrace = detail.getSourceTrace();
+
+        status.put("analysisId", decision != null ? decision.getAnalysisId() : null);
+        status.put("planBoundaryStatus", firstNonBlank(
+                planBoundary != null ? planBoundary.getPlanBoundaryStatus() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("executionPlanStatus", firstNonBlank(
+                executionPlan != null ? executionPlan.getExecutionPlanStatus() : null,
+                "BOUNDARY_PENDING"
+        ));
+        status.put("sourceTraceStatus", resolveExecutionPlanSourceTraceStatus(planBoundary, sourceTrace));
+        status.put("sourceTraceComplete", executionPlanSourceTraceComplete(sourceTrace));
+        status.put("riskActionGuardStatus", firstNonBlank(
+                riskGuard != null ? riskGuard.getRiskActionGuardStatus() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("notExecutableReason", firstNonBlank(
+                executionPlan != null ? executionPlan.getNotExecutableReason() : null,
+                "PLAN_BOUNDARY_BACKEND_PENDING"
+        ));
+        status.put("incompleteReasons", safeReasons(executionPlan != null ? executionPlan.getIncompleteReasons() : null));
+        status.put("blockingReasons", safeReasons(planBoundary != null ? planBoundary.getBlockingReasons() : null));
+
+        applyExecutionPlanBoundaryStatus(status, detail, planBoundary, executionPlan, riskGuard, sourceTrace);
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -458,6 +504,37 @@ public class DashboardController {
         return status;
     }
 
+    private Map<String, Object> baseExecutionPlanBoundaryStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("planBoundaryStatus", "BACKEND_PENDING");
+        status.put("executionPlanStatus", "BOUNDARY_PENDING");
+        status.put("sourceTraceStatus", "UNKNOWN");
+        status.put("sourceTraceComplete", false);
+        status.put("sourceHealth", "BLOCKED");
+        status.put("riskActionGuardStatus", "BACKEND_PENDING");
+        status.put("notExecutableReason", "PLAN_BOUNDARY_BACKEND_PENDING");
+        status.put("incompleteReasons", Collections.emptyList());
+        status.put("blockingReasons", Collections.emptyList());
+        status.put("reason", "EXECUTIONPLAN_BOUNDARY_STATUS_PENDING");
+        status.put("message", "ExecutionPlan / BoundaryCandidate 只读状态待确认；不是交易信号。");
+        status.put("reviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notExecutable", true);
+        status.put("watchlistBounded", true);
+        status.put("marketQuoteChecked", true);
+        status.put("evidenceScoreChecked", true);
+        status.put("decisionResultChecked", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        return status;
+    }
+
     private void applyEvidenceScoreStatus(Map<String, Object> status,
                                           String statusValue,
                                           String reason,
@@ -477,6 +554,135 @@ public class DashboardController {
                                            String message,
                                            boolean failClosed,
                                            String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyExecutionPlanBoundaryStatus(Map<String, Object> status,
+                                                  DashboardDetailResponseVO detail,
+                                                  DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundary,
+                                                  DashboardDetailResponseVO.ExecutionPlanDisplayVO executionPlan,
+                                                  DashboardDetailResponseVO.RiskActionGuardDisplayVO riskGuard,
+                                                  SourceTraceDTO sourceTrace) {
+        if (detail == null || detail.getDecision() == null) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                    "DECISIONRESULT_MISSING",
+                    "DecisionResult 缺失；ExecutionPlan / BoundaryCandidate 只读状态 fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+            return;
+        }
+
+        String planStatus = normalizedStatus(planBoundary != null ? planBoundary.getPlanBoundaryStatus() : null);
+        String executionStatus = normalizedStatus(executionPlan != null ? executionPlan.getExecutionPlanStatus() : null);
+        String riskStatus = normalizedStatus(riskGuard != null ? riskGuard.getRiskActionGuardStatus() : null);
+
+        if (!hasText(planStatus) || "BACKEND_PENDING".equals(planStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    PLAN_BOUNDARY_BACKEND_PENDING_FAIL_CLOSED,
+                    "PLAN_BOUNDARY_BACKEND_PENDING",
+                    "PlanBoundary owner path 仍是后端待接入；只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+        } else if (!executionPlanSourceTraceComplete(sourceTrace)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    EXECUTIONPLAN_SOURCE_TRACE_PARTIAL,
+                    "SOURCE_TRACE_PARTIAL",
+                    "ExecutionPlan / BoundaryCandidate source trace 不完整；只读展示，不生成点位或交易信号。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if ("INCOMPLETE".equals(planStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    PLAN_BOUNDARY_INCOMPLETE_FAIL_CLOSED,
+                    "PLAN_BOUNDARY_INCOMPLETE",
+                    "PlanBoundary 不完整；ExecutionPlan / BoundaryCandidate 保持 fail-closed。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if ("WATCH_ONLY".equals(planStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    PLAN_BOUNDARY_WATCH_ONLY,
+                    "PLAN_BOUNDARY_WATCH_ONLY",
+                    "PlanBoundary 仅观察；不是候选、决策生成、点位或交易信号。",
+                    true,
+                    "WATCH_ONLY"
+            );
+        } else if (executionPlanRiskGuardBlocked(riskGuard, riskStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED,
+                    firstNonBlank(riskGuard != null ? riskGuard.getRiskActionBlockingReason() : null,
+                            "RISK_ACTION_GUARD_BLOCKED"),
+                    "RiskActionGuard 未允许安全复核；ExecutionPlan / BoundaryCandidate 保持 fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (!hasText(executionStatus) || "BOUNDARY_PENDING".equals(executionStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    EXECUTIONPLAN_BOUNDARY_PENDING_FAIL_CLOSED,
+                    "EXECUTIONPLAN_BOUNDARY_PENDING",
+                    "ExecutionPlan 等待 PlanBoundary 对齐；只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+        } else if ("INCOMPLETE".equals(executionStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    PLAN_BOUNDARY_INCOMPLETE_FAIL_CLOSED,
+                    "EXECUTIONPLAN_INCOMPLETE",
+                    "ExecutionPlan 状态不完整；只读展示，不可执行。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if ("WATCH_ONLY".equals(executionStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    PLAN_BOUNDARY_WATCH_ONLY,
+                    "EXECUTIONPLAN_WATCH_ONLY",
+                    "ExecutionPlan 仅观察；不是交易信号。",
+                    true,
+                    "WATCH_ONLY"
+            );
+        } else if ("READY_REVIEW_ONLY".equals(executionStatus)) {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    EXECUTIONPLAN_BOUNDARY_READY,
+                    "EXECUTIONPLAN_BOUNDARY_OWNER_PATH_READ",
+                    "ExecutionPlan / BoundaryCandidate 只读状态可读；不可执行，不生成候选、点位或交易动作。",
+                    false,
+                    "OK"
+            );
+        } else {
+            applyExecutionPlanBoundaryStatus(
+                    status,
+                    EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                    "EXECUTIONPLAN_BOUNDARY_UNRECOGNIZED",
+                    "ExecutionPlan / BoundaryCandidate 状态未知；只读状态 fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+        }
+    }
+
+    private void applyExecutionPlanBoundaryStatus(Map<String, Object> status,
+                                                  String statusValue,
+                                                  String reason,
+                                                  String message,
+                                                  boolean failClosed,
+                                                  String sourceHealth) {
         status.put("status", statusValue);
         status.put("reason", reason);
         status.put("message", message);
@@ -504,6 +710,62 @@ public class DashboardController {
                 && hasText(decision.getAnalysisId())
                 && hasText(decision.getSymbol())
                 && createTime != null;
+    }
+
+    private boolean executionPlanSourceTraceComplete(SourceTraceDTO sourceTrace) {
+        return sourceTrace != null && sourceTrace.hasRequiredBoundarySources();
+    }
+
+    private String resolveExecutionPlanSourceTraceStatus(
+            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundary,
+            SourceTraceDTO sourceTrace) {
+        if (sourceTrace != null && sourceTrace.getFallbackStatus() != null) {
+            return sourceTrace.getFallbackStatus().name();
+        }
+        return firstNonBlank(planBoundary != null ? planBoundary.getSourceTraceStatus() : null, "UNKNOWN");
+    }
+
+    private boolean executionPlanRiskGuardBlocked(
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskGuard,
+            String normalizedRiskStatus) {
+        if (riskGuard == null) {
+            return true;
+        }
+        if (!hasText(normalizedRiskStatus) || "BACKEND_PENDING".equals(normalizedRiskStatus)) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(riskGuard.getOpportunityPushAllowed())
+                || Boolean.TRUE.equals(riskGuard.getReverseTradeAllowed())
+                || Boolean.TRUE.equals(riskGuard.getNewPositionAllowed())
+                || Boolean.TRUE.equals(riskGuard.getMarketOrderExitAllowed())) {
+            return true;
+        }
+        String blockingReason = riskGuard.getRiskActionBlockingReason();
+        return hasText(blockingReason) && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(blockingReason);
+    }
+
+    private List<String> safeReasons(List<String> rawReasons) {
+        if (rawReasons == null || rawReasons.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return rawReasons.stream()
+                .filter(this::hasText)
+                .map(this::safeReason)
+                .distinct()
+                .toList();
+    }
+
+    private String safeReason(String reason) {
+        String normalized = reason.trim();
+        String upper = normalized.toUpperCase();
+        if (upper.contains("ENTRY") || upper.contains("STOP") || upper.contains("TP") || upper.contains("RR")) {
+            return "NUMERIC_BOUNDARY_VALUES_NOT_GENERATED";
+        }
+        return normalized;
+    }
+
+    private String normalizedStatus(String value) {
+        return hasText(value) ? value.trim().toUpperCase() : null;
     }
 
     private boolean hasText(String value) {
