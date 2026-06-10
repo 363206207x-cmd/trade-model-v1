@@ -1,4 +1,4 @@
-current_main: "60e034a feat(wiring): show executionplan boundarycandidate review-only status"
+current_main: "85fb7ad chore(workflow): refresh executionplan boundarycandidate post-implementation state"
 active_block: "Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification"
 phase: "verification"
 module: "ExecutionPlan / BoundaryCandidate review-only display continuation"
