@@ -1,4 +1,4 @@
-current_head: "60e034a"
+current_head: "85fb7ad"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
 active_block: "Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification"
@@ -68,7 +68,7 @@ executionplan_boundarycandidate_review_only_display_source_read_status: "complet
 minimal_review_only_executionplan_boundarycandidate_runtime_wiring_design_status: "completed on main as b3e6d71; design fixes owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails without implementation"
 executionplan_boundarycandidate_runtime_wiring_implementation_readiness_status: "completed on main as a84a4aa; returns GO for minimal review-only ExecutionPlan / BoundaryCandidate implementation using existing DashboardController / dashboard detail / display adapters / BoundaryCandidate / ExecutionPlan owner assets without DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360 expansion"
 minimal_review_only_executionplan_boundarycandidate_runtime_wiring_implementation_status: "completed on main as 60e034a; implements one minimal read-only status endpoint and dashboard panel over existing DashboardController / dashboard detail / display adapters without executable trading semantics"
-minimal_review_only_executionplan_boundarycandidate_runtime_wiring_verification_status: "active; must verify 60e034a endpoint/dashboard review-only behavior, tests, forbidden semantics, and source-of-truth alignment before visual closure"
+minimal_review_only_executionplan_boundarycandidate_runtime_wiring_verification_status: "active; verifies 60e034a endpoint/dashboard review-only behavior, tests, forbidden semantics, and source-of-truth alignment from current main 85fb7ad before visual closure"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

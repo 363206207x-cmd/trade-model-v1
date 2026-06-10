@@ -37,7 +37,7 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `60e034a feat(wiring): show executionplan boundarycandidate review-only status`
+- Current merged main: `85fb7ad chore(workflow): refresh executionplan boundarycandidate post-implementation state`
 - Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this pack: implementation only for the selected review-only slice; still `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
@@ -53,6 +53,7 @@ The following do not count as completed:
 - `b3e6d71` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design and fixed future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
 - `a84a4aa` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate and returned GO for minimal implementation.
 - `60e034a` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation on main with one read-only status endpoint, dashboard panel, targeted tests, and source-of-truth updates.
+- `85fb7ad` completed the post-implementation state refresh and points the handoff to this verification package without changing business capability.
 - Current active package is the A-risk verification for ExecutionPlan / BoundaryCandidate review-only runtime status. It may update verification docs and source-of-truth only; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
@@ -82,6 +83,7 @@ DecisionResult chain history:
 - `b3e6d71` completed the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring design.
 - `a84a4aa` completed the implementation readiness gate and allowed minimal review-only implementation.
 - `60e034a` completed the minimal review-only implementation for ExecutionPlan / BoundaryCandidate review-only display continuation.
+- `85fb7ad` completed the source-of-truth refresh after that implementation and kept the next package as verification.
 - Current active package is the minimal review-only verification for ExecutionPlan / BoundaryCandidate review-only display continuation.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
