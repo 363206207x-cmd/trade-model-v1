@@ -6,11 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Source Read for Review / Replay result status`.
+- Current HEAD: `86b3ff3 docs(runtime): select next slice after executionplan boundarycandidate closure`.
+- Active stop-loss track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`.
 - Selected target: `Review / Replay result status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
 - Selected next minimal runtime slice: `Review / Replay result status`.
-- Next required action: `Design for Review / Replay result status`.
+- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -25,7 +26,9 @@ Current merged main:
 - `4a278b0` completed the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring verification.
 - `d907719` completed ExecutionPlan / BoundaryCandidate Visual Verification / Closure and confirms panel visibility, review-only / not executable copy, no panel entry / stop / TP / RR, negative-only signal boundary copy, and no layout overlap.
 - ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice, not an in-progress module.
-- Current package is Source Read for Review / Replay result status after this selection package selected it as the seventh minimal runtime target.
+- `86b3ff3` selected Review / Replay result status as the seventh minimal runtime target.
+- Source Read for Review / Replay result status is completed by this package: existing ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregateService / review page / replay summary assets exist, dedicated status endpoint/panel remains missing, and replay execution must be excluded.
+- Current package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Design.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`

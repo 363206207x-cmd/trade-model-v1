@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Source Read for Review / Replay result status`.
+- Active track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`.
 - Selected target: `Review / Replay result status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
 - Selected next minimal runtime slice: `Review / Replay result status`.
-- Next required action: `Design for Review / Replay result status`.
+- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -19,8 +19,9 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `4a278b0` completed verification of the `60e034a` implementation and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
 - `d907719` completed ExecutionPlan / BoundaryCandidate visual closure and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
 - ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice and is not the active in-progress module.
-- This selection package selected `Review / Replay result status` as the seventh minimal runtime target.
-- The active package is Source Read for Review / Replay result status and may update source-read docs/source-of-truth only.
+- `86b3ff3` selected `Review / Replay result status` as the seventh minimal runtime target.
+- This source-read package confirms the existing ReviewResult / ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregateService / review page / replay summary owner assets, while dedicated review-only status endpoint/panel remains missing and replay execution must be excluded.
+- The active package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Design and may update design docs/source-of-truth only.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
