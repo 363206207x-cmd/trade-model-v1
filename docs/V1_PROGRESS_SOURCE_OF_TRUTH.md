@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `86b3ff3 docs(runtime): select next slice after executionplan boundarycandidate closure`
-- Current active block: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`
+- Current merged main: `fb0263e docs(review): read review replay result status source path`
+- Current active block: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: selection only; still `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`
+- Capability movement from this pack: design only; still `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -59,8 +59,9 @@ The following do not count as completed:
 - `d907719` completed ExecutionPlan / BoundaryCandidate Visual Verification / Closure on main: browser verification confirmed the panel is visible, review-only and not executable copy is present, entry / stop / TP / RR are absent from the panel, trading/candidate/point signal language appears only as negative guardrail copy, and no sibling layout overlap was found.
 - ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice, not an in-progress module.
 - `86b3ff3` completed the A-risk next minimal runtime slice selection after ExecutionPlan / BoundaryCandidate closure and selected `Review / Replay result status` for the next source-read-only package.
-- This package completes Source Read for Review / Replay result status: it confirms the existing ReviewResult / ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregate / review page / replay summary owner assets, while dedicated review-only status endpoint and dashboard panel remain missing and replay execution must be excluded.
-- Current active package after this source read is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Design`. It may update design docs and source-of-truth only; it must not be mistaken for Push, Candidate, Decision generation, Point, replay execution, or trading progress.
+- `fb0263e` completed Source Read for Review / Replay result status: it confirms the existing ReviewResult / ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregate / review page / replay summary owner assets, while dedicated review-only status endpoint and dashboard panel remain missing and replay execution must be excluded.
+- This package completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Design. It fixes owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
+- Current active package after this design is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`. It may update readiness docs and source-of-truth only; it must not be mistaken for Push, Candidate, Decision generation, Point, replay execution, or trading progress.
 
 ## Runtime Slice History
 
@@ -95,8 +96,9 @@ DecisionResult chain history:
 - `caa45c9` completed the post-verification source-of-truth refresh.
 - `d907719` completed ExecutionPlan / BoundaryCandidate visual closure.
 - `Review / Replay result status` was selected on main as `86b3ff3` as the seventh minimal source-read-only runtime slice target.
-- Source Read for Review / Replay result status is completed by this package and returns GO to design.
-- Current active package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Design.
+- Source Read for Review / Replay result status is completed on main as `fb0263e` and returns GO to design.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed by this package.
+- Current active package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
