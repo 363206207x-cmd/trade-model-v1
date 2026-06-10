@@ -1,4 +1,4 @@
-current_main: "0079363 chore(workflow): repair drift in codex handoff automation (#877)"
+current_main: "a0a432b docs(decision): verify review-only runtime wiring"
 active_block: "DecisionResult Visual Verification / Closure"
 phase: "visual_closure"
 module: "DecisionResult Runtime Wiring"
