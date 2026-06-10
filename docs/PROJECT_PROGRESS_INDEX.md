@@ -6,11 +6,11 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Next minimal runtime slice selection`.
-- Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
-- Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `Source Read for selected next minimal runtime slice`.
+- Active stop-loss track: `Source Read for Review / Replay result status`.
+- Selected target: `Review / Replay result status`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
+- Selected next minimal runtime slice: `Review / Replay result status`.
+- Next required action: `Design for Review / Replay result status`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -23,8 +23,9 @@ Current merged main:
 - `a84a4aa` completed the implementation readiness gate and returned GO for minimal review-only implementation.
 - `60e034a` completed the minimal review-only ExecutionPlan / BoundaryCandidate status endpoint and dashboard panel implementation without changing business capability beyond `REVIEW_ONLY_RUNTIME partial`.
 - `4a278b0` completed the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring verification.
-- ExecutionPlan / BoundaryCandidate Visual Verification / Closure is completed by this package and confirms panel visibility, review-only / not executable copy, no panel entry / stop / TP / RR, negative-only signal boundary copy, and no layout overlap.
-- Current package is next minimal runtime slice selection after ExecutionPlan / BoundaryCandidate closure.
+- `d907719` completed ExecutionPlan / BoundaryCandidate Visual Verification / Closure and confirms panel visibility, review-only / not executable copy, no panel entry / stop / TP / RR, negative-only signal boundary copy, and no layout overlap.
+- ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice, not an in-progress module.
+- Current package is Source Read for Review / Replay result status after this selection package selected it as the seventh minimal runtime target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`

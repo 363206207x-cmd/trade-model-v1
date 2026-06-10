@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `caa45c9 chore(workflow): refresh executionplan boundarycandidate post-verification state`
-- Current active block: `Next minimal runtime slice selection`
+- Current merged main: `d907719 docs(wiring): record executionplan boundarycandidate visual closure`
+- Current active block: `Source Read for Review / Replay result status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this pack: selection only; still `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Source Read for selected next minimal runtime slice`
+- Next required action: `Design for Review / Replay result status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -56,8 +56,10 @@ The following do not count as completed:
 - `85fb7ad` completed the post-implementation state refresh and points the handoff to this verification package without changing business capability.
 - `4a278b0` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification and confirmed the endpoint/dashboard review-only behavior, tests, forbidden semantics, and source-of-truth alignment.
 - `caa45c9` completed the post-verification state refresh and pointed the handoff to visual closure.
-- ExecutionPlan / BoundaryCandidate Visual Verification / Closure is completed by this package: browser verification confirmed the panel is visible, review-only and not executable copy is present, entry / stop / TP / RR are absent from the panel, trading/candidate/point signal language appears only as negative guardrail copy, and no sibling layout overlap was found.
-- Current active package is the A-risk next minimal runtime slice selection after ExecutionPlan / BoundaryCandidate closure. It may update selection docs and source-of-truth only; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
+- `d907719` completed ExecutionPlan / BoundaryCandidate Visual Verification / Closure on main: browser verification confirmed the panel is visible, review-only and not executable copy is present, entry / stop / TP / RR are absent from the panel, trading/candidate/point signal language appears only as negative guardrail copy, and no sibling layout overlap was found.
+- ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice, not an in-progress module.
+- This package completed the A-risk next minimal runtime slice selection after ExecutionPlan / BoundaryCandidate closure and selected `Review / Replay result status` for the next source-read-only package.
+- Current active package is `Source Read for Review / Replay result status`. It may update source-read docs and source-of-truth only; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -68,6 +70,7 @@ Completed review-only runtime slices:
 3. `MarketQuote freshness / fallback / dashboard API status`: `REVIEW_ONLY_RUNTIME partial`
 4. `Evidence / Score review-only runtime status`: `REVIEW_ONLY_RUNTIME partial`
 5. `DecisionResult review-only dashboard/API status`: `REVIEW_ONLY_RUNTIME partial`
+6. `ExecutionPlan / BoundaryCandidate review-only runtime status`: `REVIEW_ONLY_RUNTIME partial`
 
 DecisionResult chain history:
 
@@ -89,8 +92,9 @@ DecisionResult chain history:
 - `85fb7ad` completed the source-of-truth refresh after that implementation and kept the next package as verification.
 - `4a278b0` completed the minimal review-only verification for ExecutionPlan / BoundaryCandidate review-only display continuation.
 - `caa45c9` completed the post-verification source-of-truth refresh.
-- ExecutionPlan / BoundaryCandidate visual closure is completed by this package and selects `Next minimal runtime slice selection`.
-- Current active package is the next minimal runtime slice selection after ExecutionPlan / BoundaryCandidate closure.
+- `d907719` completed ExecutionPlan / BoundaryCandidate visual closure.
+- `Review / Replay result status` is selected by this package as the seventh minimal source-read-only runtime slice target.
+- Current active package is Source Read for Review / Replay result status.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
