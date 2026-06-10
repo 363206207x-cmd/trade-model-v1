@@ -5,7 +5,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `2f98fc3 feat(review-replay): show review-only runtime status`
+- Current merged main: `791260f docs(review-replay): verify review-only runtime wiring`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
@@ -34,7 +34,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `4d17081` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Design and fixes the future Review / Replay result status owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
 - `650816c` completes the Review / Replay implementation readiness gate and returns GO for minimal implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets.
 - `2f98fc3` adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard status panel, targeted tests, and source-of-truth updates without DTO/Validator/Assembler, schema/config/pom, replay execution, review result generation, Push, Candidate, Decision generation, Point, or trading.
-- This verification package confirms the `2f98fc3` implementation with workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping grep, forbidden semantics classification, and source-of-truth alignment.
+- `791260f` confirms the `2f98fc3` implementation with workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping grep, forbidden semantics classification, and source-of-truth alignment.
+- This workflow improvement package adds one-command Codex runner and PR completion helpers only. It does not complete Review / Replay visual closure, does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.

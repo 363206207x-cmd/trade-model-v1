@@ -32,8 +32,19 @@ V1 Auto Operator（V1 自动操作台）
       示例:
       bash scripts/v1-auto.sh pr decisionresult-visual-verification-closure "docs(decision): record visual verification closure" A
 
-  bash scripts/v1-auto.sh check-pr <PR_NUMBER>
+  bash scripts/v1-auto.sh check-pr <PR_NUMBER> [A|B|B/C|C]
       中文检查 PR 状态、文件范围、checks、是否可以继续。
+      不传 risk 时保持旧行为：按 A-risk docs/scripts-only（文档/脚本）范围检查。
+      A-risk（低风险文档/脚本）: 只允许 docs/、scripts/ 等 workflow/doc 变更。
+      B-risk（实现包）: 允许当前最小实现常用路径，但不自动合并。
+      B/C-risk 或 C-risk（高风险）: 只检查并停止，需要人工复核。
+
+  bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<subject>"
+      一键完成 PR 检查 / 等 CI / ready / merge / next 的固定入口。
+      A-risk 可在检查通过后自动合并；B-risk 默认不合并，需 --confirm-reviewed。
+
+  bash scripts/v1-codex-run-next.sh
+      一键读取下一任务并尝试启动 Codex CLI；不自动提交、不创建 PR、不合并。
 
   bash scripts/v1-auto.sh merge <PR_NUMBER> "<title>" <risk> [--confirm]
       通过固定脚本合并并同步。A-risk 可直接执行；B/B/C/C 默认停止，必须加 --confirm 表示已有用户明确同意。
@@ -332,19 +343,133 @@ changed_files_for_pr() {
   fi
 }
 
-has_forbidden_business_path() {
-  grep -Eq '^(src/main/java|src/test/java|src/main/resources/templates/dashboard\.html|src/main/resources/.*schema|src/main/resources/application[^/]*\.(yml|yaml|properties)|config/|pom\.xml)'
+diff_for_pr() {
+  local pr_number="$1"
+  local head_ref="$2"
+  if git show-ref --verify --quiet "refs/heads/$head_ref"; then
+    git diff "main...$head_ref"
+  else
+    gh pr diff "$pr_number"
+  fi
+}
+
+is_a_risk_allowed_file() {
+  local file="$1"
+  case "$file" in
+    docs/*|scripts/*|AGENTS.md)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_b_risk_allowed_file() {
+  local file="$1"
+  case "$file" in
+    src/main/java/org/example/trademodel/controller/DashboardController.java|\
+src/main/resources/templates/dashboard.html|\
+src/test/java/org/example/trademodel/controller/DashboardControllerTest.java|\
+docs/*|scripts/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_schema_config_pom_path() {
+  local file="$1"
+  case "$file" in
+    pom.xml|config/*|src/main/resources/schema.sql|src/main/resources/db/*|src/main/resources/*schema*|src/main/resources/application*.yml|src/main/resources/application*.yaml|src/main/resources/application*.properties)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_dto_validator_assembler_path() {
+  local file="$1"
+  case "$file" in
+    *DTO*.java|*Validator*.java|*Assembler*.java)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+print_changed_files_with_prefix() {
+  local changed_files="$1"
+  if [[ -z "$changed_files" ]]; then
+    echo "- none（无变更文件）"
+    return
+  fi
+  printf '%s\n' "$changed_files" | sed 's/^/- /'
+}
+
+classify_changed_files_for_risk() {
+  local risk="$1"
+  local changed_files="$2"
+  local violations=()
+  local file
+
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    case "$risk" in
+      A|LEGACY)
+        if ! is_a_risk_allowed_file "$file"; then
+          violations+=("$file")
+        fi
+        ;;
+      B)
+        if ! is_b_risk_allowed_file "$file"; then
+          violations+=("$file")
+          continue
+        fi
+        if is_schema_config_pom_path "$file" || is_dto_validator_assembler_path "$file"; then
+          violations+=("$file")
+        fi
+        ;;
+      C)
+        ;;
+    esac
+  done <<<"$changed_files"
+
+  if [[ "${#violations[@]}" -gt 0 ]]; then
+    printf '%s\n' "${violations[@]}"
+  fi
+}
+
+diff_has_forbidden_positive_semantics() {
+  local diff_text="$1"
+  printf '%s\n' "$diff_text" | grep -E '\+.*(placeOrder|createOrder|submitOrder|autoTrading|finalDirection|candidateRanking|riskReward|positionSize|leverage|entryPrice|stopPrice|takeProfit|tpPrice|sendPush|executeReplay|runReplay|generateReviewResult)' || true
 }
 
 cmd_check_pr() {
-  if [[ "$#" -ne 1 ]]; then
-    echo "用法: bash scripts/v1-auto.sh check-pr <PR_NUMBER>" >&2
+  if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
+    echo "用法: bash scripts/v1-auto.sh check-pr <PR_NUMBER> [A|B|B/C|C]" >&2
     exit 1
   fi
   ensure_gh
 
   local pr_number="$1"
-  local state draft mergeable base head title checks changed_files forbidden="No"
+  local risk="${2:-LEGACY}"
+  local state draft mergeable base head title checks changed_files violations diff_text forbidden_hits=""
+  case "$risk" in
+    LEGACY|A|B|"B/C"|C)
+      ;;
+    *)
+      echo "STOP（停止）: unsupported risk（不支持的风险等级）: $risk" >&2
+      exit 1
+      ;;
+  esac
+
   title="$(gh pr view "$pr_number" --json title --jq '.title')"
   state="$(gh pr view "$pr_number" --json state --jq '.state')"
   draft="$(gh pr view "$pr_number" --json isDraft --jq '.isDraft')"
@@ -353,14 +478,20 @@ cmd_check_pr() {
   head="$(gh pr view "$pr_number" --json headRefName --jq '.headRefName')"
   checks="$(gh pr view "$pr_number" --json statusCheckRollup --jq '[.statusCheckRollup[]? | (.name // .context // "check") + "=" + (.conclusion // .state // .status // "unknown")] | if length == 0 then "no checks reported" else join(", ") end')"
   changed_files="$(changed_files_for_pr "$pr_number" "$head")"
-
-  if printf '%s\n' "$changed_files" | has_forbidden_business_path; then
-    forbidden="Yes"
+  violations="$(classify_changed_files_for_risk "$risk" "$changed_files")"
+  if [[ "$risk" == "B" ]]; then
+    diff_text="$(diff_for_pr "$pr_number" "$head")"
+    forbidden_hits="$(diff_has_forbidden_positive_semantics "$diff_text")"
   fi
 
   echo "PR 检查摘要（中文）"
   print_hr
   echo "PR: #$pr_number $title"
+  if [[ "$risk" == "LEGACY" ]]; then
+    echo "Risk（风险等级）: LEGACY（旧行为，等同 A-risk docs/scripts-only 文档/脚本检查）"
+  else
+    echo "Risk（风险等级）: $risk"
+  fi
   echo "State（状态）: $state"
   echo "Draft（草稿）: $draft"
   echo "Mergeable（可合并）: $mergeable"
@@ -369,11 +500,27 @@ cmd_check_pr() {
   echo "Checks（检查）: $checks"
   echo
   echo "Changed files（变更文件）:"
-  printf '%s\n' "$changed_files"
+  print_changed_files_with_prefix "$changed_files"
   echo
 
-  if [[ "$forbidden" == "Yes" ]]; then
-    echo "STOP（停止）: A-risk docs/scripts-only 自动流程发现 Java/tests/dashboard/schema/config/pom 等业务路径。"
+  if [[ "$risk" == "C" || "$risk" == "B/C" ]]; then
+    echo "STOP（停止）: $risk-risk（高风险）只做检查，不自动继续；需要人工复核。"
+    exit 1
+  fi
+  if [[ -n "$violations" ]]; then
+    echo "STOP（停止）: 文件范围与 $risk risk（风险等级）不匹配。"
+    echo "违规文件:"
+    print_changed_files_with_prefix "$violations"
+    if [[ "$risk" == "B" ]]; then
+      echo "B-risk（实现包）仅允许 DashboardController.java、dashboard.html、DashboardControllerTest.java、docs/*、scripts/*。"
+    else
+      echo "A-risk（低风险）仅允许 docs/*、scripts/* 等 workflow/doc 变更。"
+    fi
+    exit 1
+  fi
+  if [[ -n "$forbidden_hits" ]]; then
+    echo "STOP（停止）: B-risk diff（差异）中出现正向禁用语义，需要人工修正或重新拆包。"
+    echo "$forbidden_hits"
     exit 1
   fi
   if [[ "$state" != "OPEN" ]]; then
@@ -385,7 +532,15 @@ cmd_check_pr() {
     exit 1
   fi
 
-  echo "结果: PASS（通过）。未发现 A-risk 自动流程禁止的业务路径。"
+  case "$risk" in
+    B)
+      echo "结果: PASS（通过）。B-risk（实现包）文件范围通过；默认不自动合并，需要人工/助手复核后再合并。"
+      ;;
+    LEGACY|A)
+      echo "结果: PASS（通过）。未发现 A-risk（低风险）自动流程禁止的业务路径。"
+      ;;
+  esac
+  echo "是否允许继续: Yes（允许继续后续检查）；是否自动合并取决于 risk（风险等级）和 v1-pr-complete.sh 规则。"
 }
 
 cmd_merge() {
@@ -408,7 +563,7 @@ cmd_merge() {
     exit 1
   fi
 
-  cmd_check_pr "$pr_number"
+  cmd_check_pr "$pr_number" "$risk"
 
   local merge_args=(scripts/v1-merge-sync.sh "$pr_number" "$title" --risk "$risk")
   if [[ "$risk" != "A" || "$confirm" == "true" ]]; then

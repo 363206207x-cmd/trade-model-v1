@@ -1,4 +1,4 @@
-current_main: "2f98fc3 feat(review-replay): show review-only runtime status"
+current_main: "791260f docs(review-replay): verify review-only runtime wiring"
 active_block: "Review / Replay Result Status Visual Verification / Closure"
 phase: "visual_closure"
 module: "Review / Replay result status"

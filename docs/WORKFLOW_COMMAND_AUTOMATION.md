@@ -45,6 +45,26 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh` 不绕过固定脚本，只把状态、下一步、PR 检查和合并交接变成用户可读的中文操作台。
 
+One-command runner entry:
+
+```bash
+bash scripts/v1-codex-run-next.sh
+```
+
+This generates the next task through `v1-auto.sh next` and starts Codex CLI when available. It never stages, commits, pushes, creates PRs, or merges.
+
+一键执行入口通过 `v1-auto.sh next` 生成下一任务，并在 Codex CLI 可用时启动 Codex。它不会 stage、commit、push、创建 PR 或合并。
+
+One-command PR completion entry:
+
+```bash
+bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]
+```
+
+This runs `v1-auto.sh check-pr <PR_NUMBER> <risk>`, waits for required CI, and then uses `v1-merge-sync.sh` when the risk rule allows merge.
+
+PR 完成入口会先运行风险感知 PR 检查，等待必需 CI，再在风险规则允许时通过 `v1-merge-sync.sh` 合并。
+
 ## Create Draft PR / 创建 Draft PR
 
 Use:
