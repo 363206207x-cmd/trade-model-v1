@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next minimal runtime slice selection`.
-- Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
-- Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `Source Read for selected next minimal runtime slice`.
+- Active track: `Source Read for Review / Replay result status`.
+- Selected target: `Review / Replay result status`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
+- Selected next minimal runtime slice: `Review / Replay result status`.
+- Next required action: `Design for Review / Replay result status`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -17,8 +17,10 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `a84a4aa` completed the implementation readiness gate and returned GO for minimal review-only implementation.
 - `60e034a` completed the minimal review-only endpoint/panel/test/docs implementation slice and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
 - `4a278b0` completed verification of the `60e034a` implementation and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
-- ExecutionPlan / BoundaryCandidate visual closure is completed by this package and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
-- The active package selects the next minimal runtime slice and may update selection docs/source-of-truth only.
+- `d907719` completed ExecutionPlan / BoundaryCandidate visual closure and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
+- ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice and is not the active in-progress module.
+- This selection package selected `Review / Replay result status` as the seventh minimal runtime target.
+- The active package is Source Read for Review / Replay result status and may update source-read docs/source-of-truth only.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.

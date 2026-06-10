@@ -199,14 +199,20 @@ cmd_summary() {
 
   echo "项目总进度摘要（白话版）"
   print_hr
-  echo "已完成 5 个 Review-Only Runtime partial（只读运行时部分完成）小闭环:"
+  echo "已完成 6 个 Review-Only Runtime partial（只读运行时部分完成）小闭环:"
   echo "1. PositionSync（持仓同步）+ Dashboard（仪表盘）完整闭环。"
   echo "2. Watchlist + RuleConfig（观察列表 + 规则配置）+ Dashboard/API（仪表盘 / 接口）完整闭环。"
   echo "3. MarketQuote（行情报价）freshness/fallback/dashboard API（新鲜度 / 兜底 / 仪表盘接口）完整闭环。"
   echo "4. Evidence / Score（证据 / 评分）review-only runtime status（只读运行时状态）完整闭环。"
   echo "5. DecisionResult（决策结果）review-only dashboard/API status（只读仪表盘 / 接口状态）完整闭环。"
+  echo "6. ExecutionPlan / BoundaryCandidate（执行计划 / 边界候选）review-only runtime status（只读运行时状态）完整闭环。"
   echo
   echo "DecisionResult（决策结果）当前进度:"
+  echo "- implementation（实现）已完成并合并。"
+  echo "- verification（验证）已完成并合并。"
+  echo "- visual closure（视觉收口）已完成并合并。"
+  echo
+  echo "ExecutionPlan / BoundaryCandidate（执行计划 / 边界候选）当前进度:"
   echo "- implementation（实现）已完成并合并。"
   echo "- verification（验证）已完成并合并。"
   echo "- visual closure（视觉收口）已完成并合并。"
