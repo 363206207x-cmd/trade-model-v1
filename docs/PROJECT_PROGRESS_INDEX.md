@@ -6,7 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `2f98fc3 feat(review-replay): show review-only runtime status`.
+- Current HEAD: `791260f docs(review-replay): verify review-only runtime wiring`.
 - Active stop-loss track: `Review / Replay Result Status Visual Verification / Closure`.
 - Selected target: `Review / Replay result status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
@@ -31,7 +31,8 @@ Current merged main:
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed on main as `4d17081`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed on main as `650816c` and returns GO to minimal implementation.
 - `2f98fc3` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation with one read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard panel, targeted tests, and source-of-truth updates.
-- This package completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification with workflow contract, compile, test-compile, targeted/full tests, endpoint/panel/status mapping grep, and forbidden semantics classification.
+- `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification with workflow contract, compile, test-compile, targeted/full tests, endpoint/panel/status mapping grep, and forbidden semantics classification.
+- This workflow improvement package adds one-command Codex runner and PR completion helpers only; it does not complete Review / Replay visual closure and does not raise business capability.
 - Current package is Review / Replay Result Status Visual Verification / Closure.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`

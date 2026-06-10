@@ -1,4 +1,4 @@
-current_head: "2f98fc3"
+current_head: "791260f"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
 active_block: "Review / Replay Result Status Visual Verification / Closure"
@@ -61,6 +61,7 @@ minimal_review_only_decisionresult_runtime_wiring_implementation_status: "comple
 workflow_drift_repair_pack_status: "completed on main as #877; repairs workflow entry, fixed PR/open/merge commands, handoff evidence rules, Codex GH_NOT_AVAILABLE interpretation, next-task templates, and source-of-truth current-state structure without business capability changes"
 minimal_review_only_decisionresult_runtime_wiring_verification_status: "completed on main as a0a432b; verifies #876 endpoint/dashboard review-only behavior, full compile/test results, forbidden semantics classification, and source-of-truth drift after #877"
 v1_auto_operator_pack_status: "completed on main as b30c30e; adds scripts/v1-auto.sh as the Chinese workflow operator entry and docs, without business capability changes"
+v1_one_command_codex_runner_workflow_status: "completed by this package when merged; adds risk-aware PR completion and Codex runner helper scripts without changing business capability"
 decisionresult_visual_verification_closure_status: "completed on main as baa5cfe; browser-verifies #876 / a0a432b dashboard DecisionResult status panel visibility, safety copy, source trace / source health display, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
 v1_auto_operator_post_merge_state_refresh_status: "completed on main as 1b12cd5; refreshes the Chinese auto-operator summary and next-task handoff after DecisionResult visual closure without business capability changes"
 next_minimal_runtime_slice_selection_after_decisionresult_status: "completed on main as c75919c; selects ExecutionPlan / BoundaryCandidate review-only display continuation as the next source-read-only target after five REVIEW_ONLY_RUNTIME partial closures"
@@ -75,7 +76,7 @@ review_replay_result_status_source_read_status: "completed on main as fb0263e; s
 minimal_review_only_review_replay_result_status_runtime_wiring_design_status: "completed on main as 4d17081; designs a review-only, fail-closed Review / Replay status mapping over existing owner paths without implementation"
 review_replay_result_status_runtime_wiring_implementation_readiness_status: "completed on main as 650816c; returns GO for minimal review-only implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets, without DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, or trading"
 minimal_review_only_review_replay_result_status_runtime_wiring_implementation_status: "completed on main as 2f98fc3; implements one minimal read-only /api/dashboard/review-replay-result-status endpoint, dashboard Review / Replay result status panel, targeted DashboardControllerTest coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading"
-minimal_review_only_review_replay_result_status_runtime_wiring_verification_status: "completed by this package; verifies 2f98fc3 compile/test results, targeted DashboardControllerTest coverage, endpoint/panel/status mapping, forbidden semantics classification, source-of-truth alignment, and notes sandbox-blocked local HTTP smoke"
+minimal_review_only_review_replay_result_status_runtime_wiring_verification_status: "completed on main as 791260f; verifies 2f98fc3 compile/test results, targeted DashboardControllerTest coverage, endpoint/panel/status mapping, forbidden semantics classification, source-of-truth alignment, and notes sandbox-blocked local HTTP smoke"
 review_replay_result_status_visual_verification_closure_status: "active handoff; browser-verify dashboard Review / Replay status panel visibility, safety copy, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md

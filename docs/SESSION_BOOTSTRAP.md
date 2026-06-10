@@ -34,6 +34,23 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh` is a Chinese workflow operator. It summarizes state, progress, blockers, and the next Codex task while still delegating to the fixed workflow scripts.
 
+One-command Codex runner:
+
+```bash
+bash scripts/v1-codex-run-next.sh
+```
+
+This starts from clean/synced `main`, generates the next Codex task through `v1-auto.sh next`, and tries to launch Codex CLI. It does not stage, commit, push, create PRs, or merge.
+
+One-command PR completion helper:
+
+```bash
+bash scripts/v1-pr-complete.sh <PR_NUMBER> A "<SUBJECT>"
+bash scripts/v1-pr-complete.sh <PR_NUMBER> B "<SUBJECT>" --confirm-reviewed
+```
+
+This helper always checks through `v1-auto.sh check-pr` and merges only through `v1-merge-sync.sh`.
+
 1. Read `docs/ACTIVE_MAINLINE_STATUS.yml`.
 2. Read `docs/V1_CAPABILITY_MATRIX.md`.
 3. Read `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`.
@@ -57,6 +74,8 @@ If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub sta
 - Fallback new window command: `bash scripts/v1-session-bootstrap.sh`
 - Fixed status check: `bash scripts/v1-state.sh`
 - Chinese operator entry: `bash scripts/v1-auto.sh next`
+- One-command Codex runner: `bash scripts/v1-codex-run-next.sh`
+- PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
 - Fixed PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
 - Local merge sync after approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`

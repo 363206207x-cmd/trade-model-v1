@@ -37,7 +37,7 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `2f98fc3 feat(review-replay): show review-only runtime status`
+- Current merged main: `791260f docs(review-replay): verify review-only runtime wiring`
 - Current active block: `Review / Replay Result Status Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this pack: verification only; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
@@ -63,8 +63,9 @@ The following do not count as completed:
 - `4d17081` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Design. It fixes owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
 - `650816c` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate and returned GO for minimal implementation.
 - `2f98fc3` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation. It adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, a dashboard Review / Replay result status panel, targeted `DashboardControllerTest` coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading.
-- This package completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping, forbidden semantics classification, and source-of-truth drift from `650816c` to `2f98fc3`.
-- Current active package after this verification is `Review / Replay Result Status Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
+- `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping, forbidden semantics classification, and source-of-truth drift from `650816c` to `2f98fc3`.
+- This workflow improvement package adds one-command Codex runner and PR completion helpers only; it does not complete Review / Replay visual closure and does not change business capability.
+- Current active package after this workflow improvement remains `Review / Replay Result Status Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
 
 ## Runtime Slice History
 
@@ -103,7 +104,7 @@ DecisionResult chain history:
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed on main as `4d17081`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed on main as `650816c`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation is completed on main as `2f98fc3`.
-- Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification is completed by this package.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification is completed on main as `791260f`.
 - Current active package is Review / Replay Result Status Visual Verification / Closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
@@ -116,6 +117,8 @@ P359 remains not completed progress because PR #829 was closed unmerged. P360 is
 - State: `bash scripts/v1-state.sh`
 - Next task prompt: `bash scripts/codex-next-task.sh`
 - Chinese operator entry: `bash scripts/v1-auto.sh next`
+- One-command Codex runner: `bash scripts/v1-codex-run-next.sh`
+- PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
 - PR helper: `bash scripts/v1-pr-flow-helper.sh --branch <branch> --title "<title>" --risk <risk>`
 - Open PR: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Merge sync: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`
