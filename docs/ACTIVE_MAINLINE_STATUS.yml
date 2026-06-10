@@ -1,13 +1,13 @@
-current_head: "86b3ff3"
+current_head: "fb0263e"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Design"
-active_block_cn: "复盘 / 回放结果状态最小只读运行时接线设计"
+active_block: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate"
+active_block_cn: "复盘 / 回放结果状态最小只读运行时接线实现前就绪门"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-review-replay-result-status-runtime-wiring-design"
-merge_rule: "A-risk design docs/source-of-truth only; no Java, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, P359, or P360"
-next_required_action: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Design"
+current_branch: "review-replay-result-status-runtime-wiring-readiness-gate"
+merge_rule: "A-risk readiness-gate docs/source-of-truth only; no Java, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, P359, or P360"
+next_required_action: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -71,8 +71,9 @@ minimal_review_only_executionplan_boundarycandidate_runtime_wiring_implementatio
 minimal_review_only_executionplan_boundarycandidate_runtime_wiring_verification_status: "completed on main as 4a278b0; verifies 60e034a endpoint/dashboard review-only behavior, tests, forbidden semantics, and source-of-truth alignment"
 executionplan_boundarycandidate_visual_verification_closure_status: "completed on main as d907719; browser-verifies dashboard ExecutionPlan / BoundaryCandidate status panel visibility, safety copy, no entry/stop/TP/RR, no positive trading/candidate/point signal, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
 next_minimal_runtime_slice_selection_after_executionplan_boundarycandidate_status: "completed on main as 86b3ff3; selects Review / Replay result status as the seventh source-read-only target after six REVIEW_ONLY_RUNTIME partial closures"
-review_replay_result_status_source_read_status: "completed by this package; source-read confirms ReviewService / ReviewController / ReviewResultMapper / tm_review_result / ReviewAggregateService / review page / replay summary assets exist, while dedicated review-only status endpoint/panel remains missing and replay execution must be excluded"
-minimal_review_only_review_replay_result_status_runtime_wiring_design_status: "active handoff; must design a review-only, fail-closed Review / Replay status mapping over existing owner paths without implementation"
+review_replay_result_status_source_read_status: "completed on main as fb0263e; source-read confirms ReviewService / ReviewController / ReviewResultMapper / tm_review_result / ReviewAggregateService / review page / replay summary assets exist, while dedicated review-only status endpoint/panel remains missing and replay execution must be excluded"
+minimal_review_only_review_replay_result_status_runtime_wiring_design_status: "completed by this package; designs a review-only, fail-closed Review / Replay status mapping over existing owner paths without implementation"
+review_replay_result_status_runtime_wiring_implementation_readiness_status: "active handoff; must verify whether the design can enter minimal implementation without DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, or trading"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
