@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`.
+- Active track: `ExecutionPlan / BoundaryCandidate Visual Verification / Closure`.
 - Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
 - Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `ExecutionPlan / BoundaryCandidate Visual Verification / Closure`.
+- Next required action: `Next minimal runtime slice selection`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -16,7 +16,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `b3e6d71` completed the design pack and fixed the future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist without changing capability level.
 - `a84a4aa` completed the implementation readiness gate and returned GO for minimal review-only implementation.
 - `60e034a` completed the minimal review-only endpoint/panel/test/docs implementation slice and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
-- The active package verifies the `60e034a` implementation and may update verification docs/source-of-truth only.
+- `4a278b0` completed verification of the `60e034a` implementation and keeps capability level at `REVIEW_ONLY_RUNTIME partial`.
+- The active package visually verifies the dashboard panel and may update visual verification docs/source-of-truth only.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
