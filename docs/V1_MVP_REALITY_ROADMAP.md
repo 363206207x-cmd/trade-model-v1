@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`.
+- Active track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
 - Selected target: `Review / Replay result status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
 - Selected next minimal runtime slice: `Review / Replay result status`.
-- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`.
+- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -21,8 +21,9 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice and is not the active in-progress module.
 - `86b3ff3` selected `Review / Replay result status` as the seventh minimal runtime target.
 - `fb0263e` completed Source Read for Review / Replay result status and confirms the existing ReviewResult / ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregateService / review page / replay summary owner assets, while dedicated review-only status endpoint/panel remains missing and replay execution must be excluded.
-- This design package fixes the Review / Replay owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
-- The active package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate and may update readiness docs/source-of-truth only.
+- `4d17081` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Design and fixes the Review / Replay owner path, status mapping, dashboard/API surface, replay execution boundary, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
+- This readiness gate returns GO for minimal implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets, without DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, or trading.
+- The active package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation and may add only a minimal read-only status endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
