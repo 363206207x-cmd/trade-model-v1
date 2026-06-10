@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Source Read for Data Source Health dashboard/API status`.
+- Active track: `Design for Data Source Health dashboard/API status`.
 - Selected target: `Data Source Health dashboard/API status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
 - Selected next minimal runtime slice: `Data Source Health dashboard/API status`.
-- Next required action: `Source Read for Data Source Health dashboard/API status`.
+- Next required action: `Design for Data Source Health dashboard/API status`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -30,7 +30,9 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `91613bb` completes the V1 One-Command Runner Hotfix. It fixes one-command runner CI parsing and Codex GitHub status handoff only; it does not raise business capability.
 - Review / Replay result status is now the seventh completed Review-Only Runtime partial slice and is not the active in-progress module.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
-- The active package after this selection handoff is Source Read for Data Source Health dashboard/API status and may add only source-read docs and source-of-truth updates.
+- `5534b52` completes the selection handoff after Review / Replay closure and establishes Data Source Health dashboard/API status as the next source-read target.
+- Source Read for Data Source Health dashboard/API status is completed in the current package: `DataSourceHealthDO` exists but is unwired, existing `sourceHealth` signals are distributed across completed slice-local status endpoints/panels, and no aggregate Data Source Health API/panel/schema owner was found.
+- The active package after this source-read handoff is Design for Data Source Health dashboard/API status and may add only design docs and source-of-truth updates.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
