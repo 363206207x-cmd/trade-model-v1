@@ -4,13 +4,14 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Workflow Drift Repair Pack`.
+- Active track: `Next Minimal Runtime Slice Selection After DecisionResult Closure`.
 - Selected target: `PositionSync + Dashboard review-only status`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, and `Evidence / Score review-only runtime status`.
-- Selected next minimal runtime slice: `DecisionResult review-only dashboard/API status`.
-- Next required action: `Resume Minimal Review-Only DecisionResult Runtime Wiring Verification`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
+- Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
+- Next required action: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - P359/P360 remain frozen by default.
-- #876 DecisionResult minimal implementation is completed on main. This active pack only repairs workflow drift and does not change capability level.
+- #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
+- The active selection pack only chooses the next source-read target and does not change capability level.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
@@ -52,7 +53,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - #874 completed Minimal Review-Only DecisionResult Runtime Wiring Design and defines the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returns GO for one minimal read-only DecisionResult status endpoint, dashboard status panel, targeted tests, and source-of-truth updates.
 - #876 adds minimal DecisionResult review-only API/dashboard status over existing owner assets; it does not authorize DTO / Validator / Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, trading, P359, or P360.
-- The active Workflow Drift Repair Pack does not change Java business behavior, dashboard business logic, schema/config/pom, or runtime capability.
+- `a0a432b` completes DecisionResult runtime wiring verification, `baa5cfe` completes DecisionResult visual closure, and `1b12cd5` refreshes the auto-operator post-merge state without business capability movement.
+- The active selection pack does not change Java business behavior, dashboard business logic, schema/config/pom, or runtime capability.
 
 ## Roadmap
 
