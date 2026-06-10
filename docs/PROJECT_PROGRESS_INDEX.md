@@ -6,11 +6,11 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Active stop-loss track: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation`.
+- Active stop-loss track: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`.
 - Selected target: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, and `DecisionResult review-only dashboard/API status`.
 - Selected next minimal runtime slice: `ExecutionPlan / BoundaryCandidate review-only display continuation`.
-- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`.
+- Next required action: `ExecutionPlan / BoundaryCandidate Visual Verification / Closure`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -21,7 +21,8 @@ Current merged main:
 - `8f404cd` completed the source-read package and confirmed existing owner assets before design.
 - `b3e6d71` completed the design package and fixed owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist.
 - `a84a4aa` completed the implementation readiness gate and returned GO for minimal review-only implementation.
-- Current package implements the minimal review-only ExecutionPlan / BoundaryCandidate status endpoint and dashboard panel without changing business capability beyond `REVIEW_ONLY_RUNTIME partial`.
+- `60e034a` completed the minimal review-only ExecutionPlan / BoundaryCandidate status endpoint and dashboard panel implementation without changing business capability beyond `REVIEW_ONLY_RUNTIME partial`.
+- Current package verifies the `60e034a` implementation and may update verification docs/source-of-truth only.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`

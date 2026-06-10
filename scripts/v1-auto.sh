@@ -190,11 +190,12 @@ cmd_status() {
 }
 
 cmd_summary() {
-  local active_block next_action next_active next_branch
+  local active_block next_action next_active next_branch next_phase
   active_block="$(yaml_value "$ACTIVE_FILE" "active_block")"
   next_action="$(yaml_value "$ACTIVE_FILE" "next_required_action")"
   next_active="$(yaml_value "$NEXT_TASK_FILE" "active_block")"
   next_branch="$(yaml_value "$NEXT_TASK_FILE" "branch")"
+  next_phase="$(yaml_value "$NEXT_TASK_FILE" "phase")"
 
   echo "项目总进度摘要（白话版）"
   print_hr
@@ -211,7 +212,7 @@ cmd_summary() {
   echo "- visual closure（视觉收口）已完成并合并。"
   echo
   echo "当前模块: ${active_block:-UNKNOWN}"
-  echo "下一业务动作: ${next_active:-$next_action}（选择下一个最小运行时模块）"
+  echo "下一业务动作: ${next_active:-$next_action}（$(phase_label "${next_phase:-UNKNOWN}" "${next_active:-$active_block}")）"
   echo "建议下一任务分支: ${next_branch:-UNKNOWN}"
   echo
   echo "能力层级不变: REVIEW_ONLY_RUNTIME partial（只读运行时部分完成）。"

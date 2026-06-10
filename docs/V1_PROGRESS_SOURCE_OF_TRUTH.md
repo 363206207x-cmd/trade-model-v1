@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `a84a4aa docs(wiring): verify executionplan boundarycandidate implementation readiness`
-- Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation`
+- Current merged main: `60e034a feat(wiring): show executionplan boundarycandidate review-only status`
+- Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this pack: implementation only for the selected review-only slice; still `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`
+- Next required action: `ExecutionPlan / BoundaryCandidate Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -52,7 +52,8 @@ The following do not count as completed:
 - `8f404cd` completed Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation and confirmed the existing owner path, dashboard detail/display adapters, dashboard DOM slot, schema/mapper, and targeted tests before design.
 - `b3e6d71` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design and fixed future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
 - `a84a4aa` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate and returned GO for minimal implementation.
-- Current active package is the B-risk implementation for ExecutionPlan / BoundaryCandidate review-only runtime status. It must stay limited to a read-only status endpoint/panel, targeted tests, and source-of-truth updates; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
+- `60e034a` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation on main with one read-only status endpoint, dashboard panel, targeted tests, and source-of-truth updates.
+- Current active package is the A-risk verification for ExecutionPlan / BoundaryCandidate review-only runtime status. It may update verification docs and source-of-truth only; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -80,7 +81,8 @@ DecisionResult chain history:
 - `8f404cd` completed Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation.
 - `b3e6d71` completed the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring design.
 - `a84a4aa` completed the implementation readiness gate and allowed minimal review-only implementation.
-- Current active package is the minimal review-only implementation for ExecutionPlan / BoundaryCandidate review-only display continuation.
+- `60e034a` completed the minimal review-only implementation for ExecutionPlan / BoundaryCandidate review-only display continuation.
+- Current active package is the minimal review-only verification for ExecutionPlan / BoundaryCandidate review-only display continuation.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
