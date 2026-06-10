@@ -114,7 +114,7 @@ phase_label() {
   case "$phase" in
     source_read) echo "Source Read（源码读取）" ;;
     design) echo "Design（设计）" ;;
-    readiness_gate) echo "Readiness Gate（实现前就绪门）" ;;
+    readiness|readiness_gate) echo "Readiness Gate（实现前就绪门）" ;;
     implementation) echo "Implementation（实现）" ;;
     verification) echo "Verification（验证）" ;;
     visual_closure) echo "Visual Closure（视觉收口）" ;;

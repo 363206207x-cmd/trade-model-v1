@@ -1,8 +1,9 @@
-current_head: "6343a60"
+current_head: "c90fe98"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
 active_block: "Implementation readiness gate for Data Source Health dashboard/API status"
-active_block_cn: "数据源健康仪表盘 / API 状态实现就绪门"
+active_block_cn: "数据源健康仪表盘 / API 状态实现前就绪门"
+current_phase: "readiness_gate"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
 current_branch: "data-source-health-dashboard-status-readiness-gate"
@@ -81,7 +82,7 @@ review_replay_result_status_visual_verification_closure_status: "completed on ma
 v1_one_command_runner_hotfix_status: "completed on main as 91613bb; workflow hotfix only, fixes gh pr checks state parsing and --open-pr-none-confirmed handoff without changing business capability"
 next_minimal_runtime_slice_selection_after_review_replay_status: "selected Data Source Health dashboard/API status as the next source-read-only target after seven REVIEW_ONLY_RUNTIME partial closures; this selection package is docs/source-of-truth only and does not change business capability"
 data_source_health_dashboard_api_status_source_read_status: "completed on main as 6343a60; confirms DataSourceHealthDO exists as an unwired carrier, existing sourceHealth signals are distributed across MarketQuote / Evidence-Score / DecisionResult / ExecutionPlan-BoundaryCandidate / Review-Replay status endpoints and dashboard panels, no dedicated aggregate data-source-health API/panel/schema owner was found, and returns GO to design only without implementation"
-minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_design_status: "completed in current design package; selects a thin review-only aggregate over existing slice-local sourceHealth status surfaces, keeps DataSourceHealthDO inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping, dashboard/API boundary, fail-closed rules, and returns GO to implementation readiness gate without implementation"
+minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_design_status: "completed on main as c90fe98; selects a thin review-only aggregate over existing slice-local sourceHealth status surfaces, keeps DataSourceHealthDO inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping, dashboard/API boundary, fail-closed rules, and returns GO to implementation readiness gate without implementation"
 source_of_truth_files:
   - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_SOURCE_READ.md
   - docs/V1_MINIMAL_REVIEW_ONLY_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_RUNTIME_WIRING_DESIGN.md

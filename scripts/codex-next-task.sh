@@ -61,7 +61,7 @@ case "$phase" in
   design)
     template="$TEMPLATE_DIR/RUNTIME_DESIGN_TEMPLATE.md"
     ;;
-  readiness_gate)
+  readiness|readiness_gate)
     template="$TEMPLATE_DIR/RUNTIME_READINESS_GATE_TEMPLATE.md"
     ;;
   implementation)
