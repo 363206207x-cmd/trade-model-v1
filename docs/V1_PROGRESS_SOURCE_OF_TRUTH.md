@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `b3e6d71 docs(wiring): design executionplan boundarycandidate runtime wiring`
-- Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate`
+- Current merged main: `a84a4aa docs(wiring): verify executionplan boundarycandidate implementation readiness`
+- Current active block: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: none; readiness gate only
-- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation` if this gate remains GO
+- Capability movement from this pack: implementation only for the selected review-only slice; still `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Verification`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -51,7 +51,8 @@ The following do not count as completed:
 - `c75919c` completed Next Minimal Runtime Slice Selection After DecisionResult Closure and selected `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
 - `8f404cd` completed Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation and confirmed the existing owner path, dashboard detail/display adapters, dashboard DOM slot, schema/mapper, and targeted tests before design.
 - `b3e6d71` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design and fixed future owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, and readiness checklist without implementation.
-- Current active package is readiness-only for ExecutionPlan / BoundaryCandidate review-only runtime wiring. It decides whether the b3e6d71 design may enter minimal implementation; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
+- `a84a4aa` completed Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate and returned GO for minimal implementation.
+- Current active package is the B-risk implementation for ExecutionPlan / BoundaryCandidate review-only runtime status. It must stay limited to a read-only status endpoint/panel, targeted tests, and source-of-truth updates; it must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -78,7 +79,8 @@ DecisionResult chain history:
 - `c75919c` completed Next Minimal Runtime Slice Selection After DecisionResult Closure and selected `ExecutionPlan / BoundaryCandidate review-only display continuation`.
 - `8f404cd` completed Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation.
 - `b3e6d71` completed the minimal review-only ExecutionPlan / BoundaryCandidate runtime wiring design.
-- Current active package is the implementation readiness gate for ExecutionPlan / BoundaryCandidate review-only display continuation.
+- `a84a4aa` completed the implementation readiness gate and allowed minimal review-only implementation.
+- Current active package is the minimal review-only implementation for ExecutionPlan / BoundaryCandidate review-only display continuation.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
