@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `4d17081 docs(review-replay): design review-only runtime wiring`.
-- Active stop-loss track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
+- Current HEAD: `650816c docs(review-replay): verify runtime implementation readiness`.
+- Active stop-loss track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`.
 - Selected target: `Review / Replay result status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
 - Selected next minimal runtime slice: `Review / Replay result status`.
-- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -29,8 +29,9 @@ Current merged main:
 - `86b3ff3` selected Review / Replay result status as the seventh minimal runtime target.
 - `fb0263e` completed Source Read for Review / Replay result status: existing ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregateService / review page / replay summary assets exist, dedicated status endpoint/panel remains missing, and replay execution must be excluded.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed on main as `4d17081`.
-- Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed by this package and returns GO to minimal implementation.
-- Current package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed on main as `650816c` and returns GO to minimal implementation.
+- This package completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation with one read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard panel, targeted tests, and source-of-truth updates.
+- Current package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`

@@ -11,6 +11,8 @@ import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.ReviewAggregateService;
+import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.service.SystemHealthService;
@@ -27,6 +29,9 @@ import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
+import org.example.trademodel.vo.ReviewAggregateSummaryVO;
+import org.example.trademodel.vo.ReviewAggregateVO;
+import org.example.trademodel.vo.ReviewStateVO;
 import org.example.trademodel.vo.ScoreBriefVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -83,6 +88,10 @@ class DashboardControllerTest {
     private EvidenceService evidenceService;
     @Mock
     private ScoreService scoreService;
+    @Mock
+    private ReviewService reviewService;
+    @Mock
+    private ReviewAggregateService reviewAggregateService;
 
     private MockMvc mockMvc;
 
@@ -294,6 +303,37 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyReviewReplayRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/review-replay-result-status");
+        assertThat(html).contains("reviewReplayStatusPanel");
+        assertThat(html).contains("reviewReplayRuntimeStatusValue");
+        assertThat(html).contains("reviewReplayAnalysisIdValue");
+        assertThat(html).contains("reviewReplayResultValue");
+        assertThat(html).contains("reviewReplayAggregateValue");
+        assertThat(html).contains("reviewReplaySummaryValue");
+        assertThat(html).contains("reviewReplaySourceTraceValue");
+        assertThat(html).contains("reviewReplaySourceHealthValue");
+        assertThat(html).contains("reviewReplaySafetyBoundaryValue");
+        assertThat(html).contains("REVIEW_REPLAY_REVIEW_ONLY_READY");
+        assertThat(html).contains("REVIEW_RESULT_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("REVIEW_AGGREGATE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("REPLAY_SUMMARY_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("REVIEW_REPLAY_SOURCE_TRACE_PARTIAL");
+        assertThat(html).contains("REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("REVIEW_REPLAY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("Review / Replay 是只读状态，不是交易信号");
+        assertThat(html).contains("不触发 replay execution");
+        assertThat(html).contains("不生成复盘结果");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate 边界仍适用");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
@@ -324,6 +364,8 @@ class DashboardControllerTest {
                 marketEnvironmentSnapshotMapper,
                 evidenceService,
                 scoreService,
+                reviewService,
+                reviewAggregateService,
                 sourceTraceDetailAdapter,
                 planBoundaryDisplayAdapter,
                 executionPlanDisplayAdapter,
@@ -901,6 +943,152 @@ class DashboardControllerTest {
     }
 
     @Test
+    void reviewReplayStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        when(reviewService.getStateByAnalysisId("ana-review-ready"))
+                .thenReturn(reviewState("ana-review-ready"));
+        when(reviewAggregateService.getAggregateSummaryByAnalysisId("ana-review-ready"))
+                .thenReturn(Optional.of(reviewAggregateSummary("ana-review-ready", "BTCUSDT", 2, true, true)));
+
+        mockMvc.perform(get("/api/dashboard/review-replay-result-status")
+                        .param("analysisId", "ana-review-ready"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REVIEW_REPLAY_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.analysisId").value("ana-review-ready"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.reviewResultAvailable").value(true))
+                .andExpect(jsonPath("$.reviewAggregateAvailable").value(true))
+                .andExpect(jsonPath("$.reviewClosureAvailable").value(true))
+                .andExpect(jsonPath("$.replaySummaryAvailable").value(true))
+                .andExpect(jsonPath("$.replaySummaryCount").value(2))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("OK"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.watchlistBounded").value(true))
+                .andExpect(jsonPath("$.marketQuoteChecked").value(true))
+                .andExpect(jsonPath("$.evidenceScoreChecked").value(true))
+                .andExpect(jsonPath("$.decisionResultChecked").value(true))
+                .andExpect(jsonPath("$.executionPlanBoundaryChecked").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void reviewReplayStatusEndpointFailsClosedWhenReviewResultMissing() throws Exception {
+        when(reviewService.getStateByAnalysisId("ana-review-missing")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/review-replay-result-status")
+                        .param("analysisId", "ana-review-missing"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REVIEW_RESULT_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.analysisId").value("ana-review-missing"))
+                .andExpect(jsonPath("$.reviewResultAvailable").value(false))
+                .andExpect(jsonPath("$.reviewAggregateAvailable").value(false))
+                .andExpect(jsonPath("$.replaySummaryAvailable").value(false))
+                .andExpect(jsonPath("$.sourceTraceComplete").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("REVIEW_RESULT_MISSING"));
+    }
+
+    @Test
+    void reviewReplayStatusEndpointFailsClosedWhenAggregateMissing() throws Exception {
+        when(reviewService.getStateByAnalysisId("ana-aggregate-missing"))
+                .thenReturn(reviewState("ana-aggregate-missing"));
+        when(reviewAggregateService.getAggregateSummaryByAnalysisId("ana-aggregate-missing"))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/dashboard/review-replay-result-status")
+                        .param("analysisId", "ana-aggregate-missing"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REVIEW_AGGREGATE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reviewResultAvailable").value(true))
+                .andExpect(jsonPath("$.reviewAggregateAvailable").value(false))
+                .andExpect(jsonPath("$.replaySummaryAvailable").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("REVIEW_AGGREGATE_MISSING"));
+    }
+
+    @Test
+    void reviewReplayStatusEndpointFailsClosedWhenReplaySummaryMissing() throws Exception {
+        when(reviewService.getStateByAnalysisId("ana-replay-missing"))
+                .thenReturn(reviewState("ana-replay-missing"));
+        when(reviewAggregateService.getAggregateSummaryByAnalysisId("ana-replay-missing"))
+                .thenReturn(Optional.of(reviewAggregateSummary("ana-replay-missing", "BTCUSDT", 0, true, true)));
+
+        mockMvc.perform(get("/api/dashboard/review-replay-result-status")
+                        .param("analysisId", "ana-replay-missing"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REPLAY_SUMMARY_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reviewResultAvailable").value(true))
+                .andExpect(jsonPath("$.reviewAggregateAvailable").value(true))
+                .andExpect(jsonPath("$.reviewClosureAvailable").value(true))
+                .andExpect(jsonPath("$.replaySummaryAvailable").value(false))
+                .andExpect(jsonPath("$.replaySummaryCount").value(0))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("REPLAY_SUMMARY_MISSING"));
+    }
+
+    @Test
+    void reviewReplayStatusEndpointBlocksWhenReplaySummaryOwnerPathMissing() throws Exception {
+        when(reviewService.getStateByAnalysisId("ana-replay-owner-missing"))
+                .thenReturn(reviewState("ana-replay-owner-missing"));
+        when(reviewAggregateService.getAggregateSummaryByAnalysisId("ana-replay-owner-missing"))
+                .thenReturn(Optional.of(reviewAggregateSummary("ana-replay-owner-missing", "BTCUSDT", 0, true, false)));
+
+        mockMvc.perform(get("/api/dashboard/review-replay-result-status")
+                        .param("analysisId", "ana-replay-owner-missing"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reviewAggregateAvailable").value(true))
+                .andExpect(jsonPath("$.replaySummaryAvailable").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("REPLAY_SUMMARY_OWNER_PATH_MISSING"));
+    }
+
+    @Test
+    void reviewReplayStatusEndpointDoesNotExposeExecutableReplayCandidatePointOrTradingFields() throws Exception {
+        when(reviewService.getStateByAnalysisId("ana-review-safe"))
+                .thenReturn(reviewState("ana-review-safe"));
+        when(reviewAggregateService.getAggregateSummaryByAnalysisId("ana-review-safe"))
+                .thenReturn(Optional.of(reviewAggregateSummary("ana-review-safe", "BTCUSDT", 1, true, true)));
+
+        mockMvc.perform(get("/api/dashboard/review-replay-result-status")
+                        .param("analysisId", "ana-review-safe"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
     void detail_json_exposesRuntimeKlineContextAsSeparateReadOnlyBoundaryWhenAssemblyIsSafe() throws Exception {
         MockMvc runtimeKlineMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
                 new DefaultDashboardSourceTraceDetailAdapter(
@@ -1172,6 +1360,49 @@ class DashboardControllerTest {
         row.setAiPlanMode("AGGRESSIVE");
         row.setConfusedScore(3);
         return row;
+    }
+
+    private static ReviewStateVO reviewState(String analysisId) {
+        ReviewStateVO state = new ReviewStateVO();
+        state.setReviewId("review-" + analysisId);
+        state.setAnalysisId(analysisId);
+        state.setErrorType("NO_ERROR");
+        state.setActualOutcome("manual review recorded");
+        state.setAdjustmentSuggestion("keep review-only observation");
+        state.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        state.setUpdateTime(LocalDateTime.of(2026, 5, 17, 12, 30));
+        return state;
+    }
+
+    private static ReviewAggregateSummaryVO reviewAggregateSummary(
+            String analysisId,
+            String symbol,
+            int replaySummaryCount,
+            boolean includeClosure,
+            boolean includeReplayMeta) {
+        ReviewAggregateSummaryVO summary = new ReviewAggregateSummaryVO();
+        ReviewAggregateVO.ReviewRunSummary run = new ReviewAggregateVO.ReviewRunSummary();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setStatus("DONE");
+        run.setTraceId("trace-" + analysisId);
+        summary.setRun(run);
+        if (includeClosure) {
+            ReviewAggregateVO.ReviewClosureSummary closure = new ReviewAggregateVO.ReviewClosureSummary();
+            closure.setStageLabel("review-only closure");
+            closure.setDecisionConclusion("review-only conclusion available");
+            summary.setReviewClosure(closure);
+        }
+        if (includeReplayMeta) {
+            ReviewAggregateSummaryVO.DetailSectionMeta meta = new ReviewAggregateSummaryVO.DetailSectionMeta();
+            meta.setSection("pushRecheck");
+            meta.setTotal(replaySummaryCount);
+            meta.setRecommendedLimit(20);
+            summary.setDetailSections(List.of(meta));
+        } else {
+            summary.setDetailSections(Collections.emptyList());
+        }
+        return summary;
     }
 
     private static SourceTraceDTO completeExecutionPlanBoundarySourceTrace() {

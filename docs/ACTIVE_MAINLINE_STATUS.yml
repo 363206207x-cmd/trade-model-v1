@@ -1,13 +1,13 @@
-current_head: "4d17081"
+current_head: "650816c"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation"
-active_block_cn: "复盘 / 回放结果状态最小只读运行时接线实现"
+active_block: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification"
+active_block_cn: "复盘 / 回放结果状态最小只读运行时接线验证"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-review-replay-result-status-runtime-wiring-implementation"
-merge_rule: "B-risk minimal implementation; allow only scoped review-only endpoint/dashboard/status implementation, targeted tests, implementation docs, and source-of-truth updates; no DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, P359, or P360"
-next_required_action: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation"
+current_branch: "review-replay-result-status-runtime-wiring-verification"
+merge_rule: "A-risk verification after minimal implementation; allow only verification docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
+next_required_action: "Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -73,8 +73,9 @@ executionplan_boundarycandidate_visual_verification_closure_status: "completed o
 next_minimal_runtime_slice_selection_after_executionplan_boundarycandidate_status: "completed on main as 86b3ff3; selects Review / Replay result status as the seventh source-read-only target after six REVIEW_ONLY_RUNTIME partial closures"
 review_replay_result_status_source_read_status: "completed on main as fb0263e; source-read confirms ReviewService / ReviewController / ReviewResultMapper / tm_review_result / ReviewAggregateService / review page / replay summary assets exist, while dedicated review-only status endpoint/panel remains missing and replay execution must be excluded"
 minimal_review_only_review_replay_result_status_runtime_wiring_design_status: "completed on main as 4d17081; designs a review-only, fail-closed Review / Replay status mapping over existing owner paths without implementation"
-review_replay_result_status_runtime_wiring_implementation_readiness_status: "completed by this package; returns GO for minimal review-only implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets, without DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, or trading"
-minimal_review_only_review_replay_result_status_runtime_wiring_implementation_status: "active handoff; may add only a minimal read-only status endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates"
+review_replay_result_status_runtime_wiring_implementation_readiness_status: "completed on main as 650816c; returns GO for minimal review-only implementation using existing ReviewResult / ReviewService / ReviewController GET read paths / ReviewAggregate / read-only replay summary owner assets, without DTO/Validator/Assembler, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, or trading"
+minimal_review_only_review_replay_result_status_runtime_wiring_implementation_status: "completed by this package; implements one minimal read-only /api/dashboard/review-replay-result-status endpoint, dashboard Review / Replay result status panel, targeted DashboardControllerTest coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading"
+minimal_review_only_review_replay_result_status_runtime_wiring_verification_status: "active handoff; verify implementation compile/tests/API/dashboard smoke, forbidden semantics, and source-of-truth alignment"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md

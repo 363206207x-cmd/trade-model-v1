@@ -1114,6 +1114,19 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="executionPlanBoundaryReasonValue">EXECUTIONPLAN_BOUNDARY_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="reviewReplayStatusPanel" aria-label="Review Replay result review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Review / Replay 只读状态</span><span class="v" id="reviewReplayRuntimeStatusValue">REVIEW_REPLAY_BLOCKED_FAIL_CLOSED / Review / Replay result status 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="reviewReplaySymbolValue">—</span> · <span id="reviewReplayAnalysisIdValue">—</span></span></div>
+            <div class="kv"><span class="k">review result / aggregate</span><span class="v"><span id="reviewReplayResultValue">missing</span> · <span id="reviewReplayAggregateValue">missing</span></span></div>
+            <div class="kv"><span class="k">replay summary</span><span class="v" id="reviewReplaySummaryValue">missing · 不触发 replay execution</span></div>
+            <div class="kv"><span class="k">source trace / source health</span><span class="v"><span id="reviewReplaySourceTraceValue">partial</span> · <span id="reviewReplaySourceHealthValue">BLOCKED</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="reviewReplayReviewOnlyValue">Review / Replay 是只读状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="reviewReplaySignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不生成复盘结果。</span></div>
+            <div class="kv"><span class="k">Replay execution boundary</span><span class="v" id="reviewReplaySafetyBoundaryValue">不触发 replay execution；不重新计算 replay；不可执行。</span></div>
+            <div class="kv"><span class="k">Upstream boundary</span><span class="v" id="reviewReplayUpstreamValue">Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="reviewReplayReasonValue">REVIEW_REPLAY_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1330,6 +1343,13 @@
     var EXECUTIONPLAN_BOUNDARY_STATUS_SOURCE_TRACE_PARTIAL = "EXECUTIONPLAN_SOURCE_TRACE_PARTIAL";
     var EXECUTIONPLAN_BOUNDARY_STATUS_RISK_BLOCKED = "EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED";
     var EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED = "EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_REPLAY_STATUS_READY = "REVIEW_REPLAY_REVIEW_ONLY_READY";
+    var REVIEW_REPLAY_STATUS_REVIEW_MISSING = "REVIEW_RESULT_MISSING_FAIL_CLOSED";
+    var REVIEW_REPLAY_STATUS_AGGREGATE_MISSING = "REVIEW_AGGREGATE_MISSING_FAIL_CLOSED";
+    var REVIEW_REPLAY_STATUS_REPLAY_MISSING = "REPLAY_SUMMARY_MISSING_FAIL_CLOSED";
+    var REVIEW_REPLAY_STATUS_SOURCE_TRACE_PARTIAL = "REVIEW_REPLAY_SOURCE_TRACE_PARTIAL";
+    var REVIEW_REPLAY_STATUS_EXECUTION_BLOCKED = "REPLAY_EXECUTION_BLOCKED_FAIL_CLOSED";
+    var REVIEW_REPLAY_STATUS_BLOCKED = "REVIEW_REPLAY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1456,6 +1476,35 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var reviewReplayRuntimeStatus = {
+        status: REVIEW_REPLAY_STATUS_BLOCKED,
+        symbol: null,
+        analysisId: null,
+        reviewResultAvailable: false,
+        reviewAggregateAvailable: false,
+        reviewClosureAvailable: false,
+        replaySummaryAvailable: false,
+        replaySummaryCount: 0,
+        replaySummaryRecommendedLimit: null,
+        sourceTraceComplete: false,
+        sourceHealth: "BLOCKED",
+        reason: "REVIEW_REPLAY_STATUS_PENDING",
+        message: "Review / Replay result status 只读状态待确认；不是交易信号。",
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notReplayExecution: true,
+        notExecutable: true,
+        watchlistBounded: true,
+        marketQuoteChecked: true,
+        evidenceScoreChecked: true,
+        decisionResultChecked: true,
+        executionPlanBoundaryChecked: true,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -1463,6 +1512,7 @@
     window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
     window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
     window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
+    window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
     window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
@@ -2983,6 +3033,80 @@
             });
     }
 
+    function resolveReviewReplayRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, REVIEW_REPLAY_STATUS_BLOCKED).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            reviewResultAvailable: p.reviewResultAvailable === true,
+            reviewAggregateAvailable: p.reviewAggregateAvailable === true,
+            reviewClosureAvailable: p.reviewClosureAvailable === true,
+            replaySummaryAvailable: p.replaySummaryAvailable === true,
+            replaySummaryCount: Number(p.replaySummaryCount || 0),
+            replaySummaryRecommendedLimit: p.replaySummaryRecommendedLimit,
+            sourceTraceComplete: p.sourceTraceComplete === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "REVIEW_REPLAY_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Review / Replay result status 只读状态待确认；不是交易信号。"),
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notReplayExecution: true,
+            notExecutable: true,
+            watchlistBounded: p.watchlistBounded !== false,
+            marketQuoteChecked: p.marketQuoteChecked !== false,
+            evidenceScoreChecked: p.evidenceScoreChecked !== false,
+            decisionResultChecked: p.decisionResultChecked !== false,
+            executionPlanBoundaryChecked: p.executionPlanBoundaryChecked !== false,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateReviewReplayRuntimeStatusDisplay() {
+        var rs = reviewReplayRuntimeStatus || {};
+        var replayText = rs.replaySummaryAvailable
+            ? "available · count " + rs.replaySummaryCount
+            : "missing · 不触发 replay execution";
+        setText("reviewReplayRuntimeStatusValue", (rs.status || REVIEW_REPLAY_STATUS_BLOCKED) + " / " + (rs.message || "只读状态"));
+        setText("reviewReplaySymbolValue", rs.symbol || "—");
+        setText("reviewReplayAnalysisIdValue", rs.analysisId || "—");
+        setText("reviewReplayResultValue", rs.reviewResultAvailable ? "available" : "missing");
+        setText("reviewReplayAggregateValue", rs.reviewAggregateAvailable ? "available" : "missing");
+        setText("reviewReplaySummaryValue", replayText);
+        setText("reviewReplaySourceTraceValue", rs.sourceTraceComplete ? "complete" : "partial / missing");
+        setText("reviewReplaySourceHealthValue", rs.sourceHealth || "BLOCKED");
+        setText("reviewReplayReviewOnlyValue", "Review / Replay 是只读状态，不是交易信号。");
+        setText("reviewReplaySignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不生成复盘结果。");
+        setText("reviewReplaySafetyBoundaryValue", "不触发 replay execution；不重新计算 replay；不可执行。");
+        setText("reviewReplayUpstreamValue", "Watchlist Pool、MarketQuote freshness / fallback、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate 边界仍适用；Display Slots 不是候选池。");
+        setText("reviewReplayReasonValue", rs.reason || "—");
+    }
+
+    function fetchReviewReplayRuntimeStatus(symbol) {
+        if (!symbol) {
+            reviewReplayRuntimeStatus = resolveReviewReplayRuntimeStatus({});
+            window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
+            updateReviewReplayRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/review-replay-result-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                reviewReplayRuntimeStatus = resolveReviewReplayRuntimeStatus(payload, symbol);
+                window.__reviewReplayReviewStatus = reviewReplayRuntimeStatus.status || REVIEW_REPLAY_STATUS_BLOCKED;
+                updateReviewReplayRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                reviewReplayRuntimeStatus = resolveReviewReplayRuntimeStatus({}, symbol);
+                window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
+                updateReviewReplayRuntimeStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -3615,6 +3739,7 @@
                 fetchEvidenceScoreRuntimeStatus(selectedSymbol);
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
+                fetchReviewReplayRuntimeStatus(selectedSymbol);
             });
     }
 
@@ -3624,6 +3749,7 @@
         fetchEvidenceScoreRuntimeStatus(symbol);
         fetchDecisionResultRuntimeStatus(symbol);
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);
+        fetchReviewReplayRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -3769,6 +3895,9 @@
         updateWatchlistRuntimeStatusDisplay();
         updateMarketQuoteRuntimeStatusDisplay();
         updateEvidenceScoreRuntimeStatusDisplay();
+        updateDecisionResultRuntimeStatusDisplay();
+        updateExecutionPlanBoundaryRuntimeStatusDisplay();
+        updateReviewReplayRuntimeStatusDisplay();
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();
