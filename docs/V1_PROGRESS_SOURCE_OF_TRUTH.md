@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `c90fe98 docs(health): design data source health dashboard status wiring`
-- Current active block: `Implementation readiness gate for Data Source Health dashboard/API status`
+- Current merged main: `62843de chore(workflow): normalize data source health readiness phase`
+- Current active block: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this readiness phase normalization: none. Data Source Health dashboard/API status is not implemented; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Implementation readiness gate for Data Source Health dashboard/API status`
+- Capability movement from this readiness gate: none. Data Source Health dashboard/API status is not implemented yet; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -71,7 +71,9 @@ The following do not count as completed:
 - `5534b52` completes Next Minimal Runtime Slice Selection After Review / Replay Closure and selects `Data Source Health dashboard/API status` as the next source-read target.
 - `6343a60` completes Source Read for Data Source Health dashboard/API status: it confirms `DataSourceHealthDO` exists as an unwired carrier, local `sourceHealth` signals already exist across MarketQuote / Evidence-Score / DecisionResult / ExecutionPlan-BoundaryCandidate / Review-Replay status endpoints and dashboard panels, and no dedicated aggregate data-source-health API/panel/schema owner was found.
 - `c90fe98` completes Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design: it selects a thin review-only aggregate over existing slice-local source-health status surfaces, keeps `DataSourceHealthDO` inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping and fail-closed rules, and returns GO to implementation readiness gate without implementation.
-- Current active package after the `c90fe98` design handoff is `Implementation readiness gate for Data Source Health dashboard/API status`. It may decide whether a minimal review-only aggregate endpoint or dashboard composition is safe; it may not implement endpoint/dashboard/service/test changes.
+- `62843de` completes the workflow phase normalization that makes the Data Source Health readiness-gate handoff runnable by `v1-auto.sh next`.
+- This readiness-gate package returns GO to a minimal review-only Data Source Health Dashboard/API status implementation. It authorizes only a thin read-only endpoint/dashboard/status surface over existing slice-local `sourceHealth` values, targeted tests, implementation docs, and source-of-truth updates.
+- Data Source Health is not yet a completed runtime slice; the completed review-only runtime slice count remains 7.
 
 ## Runtime Slice History
 

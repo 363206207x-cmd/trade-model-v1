@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `c90fe98 docs(health): design data source health dashboard status wiring`
+- Current merged main: `62843de chore(workflow): normalize data source health readiness phase`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Implementation readiness gate for Data Source Health dashboard/API status`.
-- Current next required action is `Implementation readiness gate for Data Source Health dashboard/API status`.
+- Current active block is `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`.
+- Current next required action is `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -42,6 +42,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `5534b52` completes the selection handoff after Review / Replay closure and keeps capability at `REVIEW_ONLY_RUNTIME partial`.
 - Source Read for Data Source Health dashboard/API status is completed on main as `6343a60`: `DataSourceHealthDO` exists as an unwired carrier; existing `sourceHealth` signals are distributed across MarketQuote / Evidence-Score / DecisionResult / ExecutionPlan-BoundaryCandidate / Review-Replay status endpoints and dashboard panels; no dedicated aggregate Data Source Health API/panel/schema owner was found.
 - `c90fe98` completes Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design: it selects a thin review-only aggregate over existing slice-local source-health status surfaces, keeps DataSourceHealthDO inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping and fail-closed rules, and returns GO to implementation readiness gate without implementation.
+- `62843de` completes the Data Source Health readiness phase normalization workflow fix.
+- This readiness-gate package returns GO for the minimal Data Source Health implementation, limited to a review-only endpoint/dashboard/status surface over existing slice-local `sourceHealth` values, targeted tests, implementation docs, and source-of-truth updates. Data Source Health is not yet a completed runtime slice.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.
