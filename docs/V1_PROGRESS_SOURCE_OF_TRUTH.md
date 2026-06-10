@@ -37,17 +37,18 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `baa5cfe docs(decision): record visual verification closure`
-- Current active block: `Next minimal runtime slice selection`
+- Current merged main: `1b12cd5 chore(workflow): refresh auto operator post-merge state`
+- Current active block: `Next Minimal Runtime Slice Selection After DecisionResult Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this pack: none; selection/source-read-lite only
-- Next required action: `Next minimal runtime slice selection`
+- Next required action: `Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - V1 Auto Operator Pack is completed on main as `b30c30e`; it adds the Chinese workflow operator script and does not change business capability.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`; it browser-verifies the #876 / `a0a432b` DecisionResult dashboard status panel and read-only safety copy.
-- Current active package is selection/source-read-lite for the next minimal runtime slice. It must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
+- V1 Auto Operator Post-Merge State Refresh is completed on main as `1b12cd5`; it refreshes the Chinese auto-operator summary and next-task handoff after DecisionResult visual closure without changing business capability.
+- Current active package is selection/source-read-lite for the next minimal runtime slice after DecisionResult closure. It selects a next source-read target only and must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -70,7 +71,8 @@ DecisionResult chain history:
 - `a0a432b` completed DecisionResult review-only runtime wiring verification.
 - `b30c30e` completed the V1 Auto Operator Pack.
 - `baa5cfe` completed DecisionResult Visual Verification / Closure.
-- Current active package should select the next minimal runtime slice after DecisionResult closure.
+- `1b12cd5` completed the V1 Auto Operator Post-Merge State Refresh.
+- Current active package selects `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read-only runtime slice after DecisionResult closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
