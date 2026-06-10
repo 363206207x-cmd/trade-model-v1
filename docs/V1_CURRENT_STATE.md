@@ -5,17 +5,19 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `0c7d4d4 feat(decision): show review-only runtime status (#876)`
+- Current merged main: `b30c30e chore(workflow): add V1 auto operator`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Workflow Drift Repair Pack`.
-- Current next required action is `Resume Minimal Review-Only DecisionResult Runtime Wiring Verification`.
+- Current active block is `DecisionResult Visual Verification / Closure`.
+- Current next required action is `Next minimal runtime slice selection`.
 - #876 is completed on main and synced by user terminal handoff evidence.
-- The active workflow repair pack only fixes workflow entry, fixed commands, handoff evidence, and current-state drift; it does not raise business capability.
+- The workflow drift repair pack is completed on main as #877.
+- The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
+- The active DecisionResult visual closure only verifies existing review-only dashboard/API behavior and does not add Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, or trading behavior.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
 - The PositionSync Runtime Wiring Implementation Readiness Gate is completed on main as #837: it returned GO for a minimal dashboard-only implementation using existing `PositionSyncStatusVO` and `/api/system/position-sync-status`.
@@ -57,9 +59,10 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - #874 is completed on main as Minimal Review-Only DecisionResult Runtime Wiring Design: it defines the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is completed on main as Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate: it returns GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates.
 - #876 wires the existing DecisionResult owner path into a minimal review-only status endpoint and dashboard panel without adding DTO / Validator / Assembler, schema/config/pom changes, Push, Candidate, Decision generation, Point, trading, P359, or P360.
-- The active workflow repair pack does not change DecisionResult runtime behavior.
-- The selected next runtime slice remains `DecisionResult review-only dashboard/API status`.
-- The next allowed action is `Minimal Review-Only DecisionResult Runtime Wiring Verification`.
+- The completed workflow repair and V1 Auto Operator packs do not change DecisionResult runtime behavior.
+- The current visual-closure target is `DecisionResult review-only dashboard/API status`.
+- DecisionResult runtime wiring verification is completed on main as `a0a432b`.
+- The active package is `DecisionResult Visual Verification / Closure`; after it is merged, the next allowed action is `Next minimal runtime slice selection`.
 - Selected runtime wiring target is `PositionSync + Dashboard review-only status`.
 - The selected target reuses `PositionSyncService`, `PositionSyncScheduler`, `PositionProvider`, `SwitchablePositionProvider`, `BinancePositionProvider`, `SimulatedPositionProvider`, `RealPositionMapper`, `tm_real_position`, `DashboardController`, `dashboard.html`, and `/api/system/position-sync-status`.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.

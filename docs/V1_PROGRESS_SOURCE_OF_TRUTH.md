@@ -37,15 +37,16 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `a0a432b docs(decision): verify review-only runtime wiring`
-- Current active block: `V1 Auto Operator Pack`
+- Current merged main: `b30c30e chore(workflow): add V1 auto operator`
+- Current active block: `DecisionResult Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: none; workflow efficiency only
-- Next required action: `DecisionResult Visual Verification / Closure`
+- Capability movement from this pack: none; visual closure only confirms existing review-only runtime behavior
+- Next required action: `Next minimal runtime slice selection`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
-- This V1 Auto Operator Pack temporarily pauses business module progress to add a Chinese workflow operator script. It must not be mistaken for DecisionResult runtime capability, Push, Candidate, Decision generation, Point, or trading progress.
+- V1 Auto Operator Pack is completed on main as `b30c30e`; it adds the Chinese workflow operator script and does not change business capability.
+- Current active package browser-verifies the #876 / `a0a432b` DecisionResult dashboard status panel and read-only safety copy. It must not be mistaken for Push, Candidate, Decision generation, Point, or trading progress.
 
 ## Runtime Slice History
 
@@ -65,7 +66,8 @@ DecisionResult chain history:
 - #876 completed DecisionResult minimal review-only implementation.
 - #877 completed workflow drift repair and fixed the Codex handoff/task template flow.
 - `a0a432b` completed DecisionResult review-only runtime wiring verification.
-- Current active workflow package adds `scripts/v1-auto.sh`; after it is merged, business work should resume with DecisionResult Visual Verification / Closure.
+- `b30c30e` completed the V1 Auto Operator Pack.
+- Current active package is DecisionResult Visual Verification / Closure; after it is merged, the next package should select the next minimal runtime slice.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
