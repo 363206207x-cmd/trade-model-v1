@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `791260f docs(review-replay): verify review-only runtime wiring`.
-- Active stop-loss track: `Review / Replay Result Status Visual Verification / Closure`.
+- Current HEAD: `001cbf7 chore(workflow): add one-command codex runner`.
+- Active stop-loss track: `Next minimal runtime slice selection after Review / Replay result status closure`.
 - Selected target: `Review / Replay result status`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
 - Selected next minimal runtime slice: `Review / Replay result status`.
-- Next required action: `Review / Replay Result Status Visual Verification / Closure`.
+- Next required action: `Next minimal runtime slice selection after Review / Replay result status closure`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -32,8 +32,9 @@ Current merged main:
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed on main as `650816c` and returns GO to minimal implementation.
 - `2f98fc3` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation with one read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard panel, targeted tests, and source-of-truth updates.
 - `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification with workflow contract, compile, test-compile, targeted/full tests, endpoint/panel/status mapping grep, and forbidden semantics classification.
-- This workflow improvement package adds one-command Codex runner and PR completion helpers only; it does not complete Review / Replay visual closure and does not raise business capability.
-- Current package is Review / Replay Result Status Visual Verification / Closure.
+- `001cbf7` completes the V1 One-Command Codex Runner workflow improvement; it does not raise business capability.
+- This package completes Review / Replay Result Status Visual Verification / Closure and confirms Review / Replay result status as the seventh Review-Only Runtime partial slice.
+- Current package after this visual closure is Next minimal runtime slice selection after Review / Replay result status closure.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`
@@ -233,13 +234,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Review / Replay Result Status Visual Verification / Closure`.
+- Current active block is `Next minimal runtime slice selection after Review / Replay result status closure`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `Review / Replay result status`.
-- The next required action is `Review / Replay Result Status Visual Verification / Closure`.
+- The next required action is `Next minimal runtime slice selection after Review / Replay result status closure`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
