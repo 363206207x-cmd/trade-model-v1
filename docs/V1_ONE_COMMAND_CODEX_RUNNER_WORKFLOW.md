@@ -42,6 +42,14 @@ This command:
 
 It never stages, commits, pushes, creates a PR, or merges.
 
+If Codex shell cannot confirm Open PR status because local `gh` is unavailable, but GPT connector or the user's terminal has already confirmed Open PR none, use:
+
+```bash
+bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
+```
+
+This flag only handles `OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE`. It does not bypass non-main branches, dirty worktrees, explicit open PR evidence, failed main sync, `CAN_CONTINUE_NEXT_PACKAGE: NO` from other blockers, or any merge rule.
+
 ### Complete A-Risk PR
 
 ```bash
@@ -52,6 +60,8 @@ A-risk means low-risk docs/workflow-only scope. The command:
 
 - runs `bash scripts/v1-auto.sh check-pr <PR> A`;
 - waits for `quality-gate` and `workflow-contract` to pass;
+- accepts the `state` field returned by `gh pr checks` and remains compatible with a future `conclusion` field;
+- treats all matching `quality-gate` checks as required when both push and pull_request entries exist;
 - marks the PR ready if needed;
 - calls `bash scripts/v1-merge-sync.sh <PR> "<SUBJECT>" --risk A --confirm`;
 - runs `bash scripts/v1-state.sh`;
@@ -110,12 +120,12 @@ The one-command runner stops when:
 
 Codex shell `GH_NOT_AVAILABLE` remains GitHub status unknown. It is not project failure by itself, but the runner cannot auto-continue without open PR evidence.
 
+When GPT connector or the user's local terminal explicitly confirms Open PR none, the operator may use `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed`. The command prints a visible Chinese handoff notice and still requires clean `main`, clean worktree, `MAIN_SYNC: OK`, and no blocker other than `OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE`.
+
 ## 5. Non-Scope
 
 This workflow pack does not:
 
-- complete Review / Replay visual closure;
-- mark Review / Replay result status as a full closed runtime slice;
 - change business endpoints or dashboard business logic;
 - change Java business code;
 - change tests;
@@ -124,7 +134,7 @@ This workflow pack does not:
 - generate Candidate, Decision, Point, final direction, entry/stop/TP/RR, order/execution, or auto-trading behavior;
 - raise capability level beyond `REVIEW_ONLY_RUNTIME partial`.
 
-The next business action remains `Review / Replay Result Status Visual Verification / Closure`.
+After `5da301b`, Review / Replay result status is the seventh completed Review-Only Runtime partial slice. This hotfix does not change that business capability. The next business action remains `Next minimal runtime slice selection after Review / Replay result status closure`.
 
 ## 6. Verification
 

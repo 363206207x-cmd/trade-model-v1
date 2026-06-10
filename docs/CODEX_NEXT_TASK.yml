@@ -1,4 +1,4 @@
-current_main: "001cbf7 chore(workflow): add one-command codex runner"
+current_main: "5da301b docs(review-replay): record visual verification closure"
 active_block: "Next minimal runtime slice selection after Review / Replay result status closure"
 phase: "selection"
 module: "Next minimal runtime slice"

@@ -6,11 +6,11 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `001cbf7 chore(workflow): add one-command codex runner`.
+- Current HEAD: `5da301b docs(review-replay): record visual verification closure`.
 - Active stop-loss track: `Next minimal runtime slice selection after Review / Replay result status closure`.
-- Selected target: `Review / Replay result status`.
+- Selected target: pending; the next runtime slice must be selected by the active selection package.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
-- Selected next minimal runtime slice: `Review / Replay result status`.
+- Selected next minimal runtime slice: pending selection after Review / Replay result status closure.
 - Next required action: `Next minimal runtime slice selection after Review / Replay result status closure`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
@@ -33,7 +33,8 @@ Current merged main:
 - `2f98fc3` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation with one read-only `/api/dashboard/review-replay-result-status` endpoint, dashboard panel, targeted tests, and source-of-truth updates.
 - `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification with workflow contract, compile, test-compile, targeted/full tests, endpoint/panel/status mapping grep, and forbidden semantics classification.
 - `001cbf7` completes the V1 One-Command Codex Runner workflow improvement; it does not raise business capability.
-- This package completes Review / Replay Result Status Visual Verification / Closure and confirms Review / Replay result status as the seventh Review-Only Runtime partial slice.
+- `5da301b` completes Review / Replay Result Status Visual Verification / Closure and confirms Review / Replay result status as the seventh Review-Only Runtime partial slice.
+- This hotfix package fixes one-command runner CI parsing and Codex GitHub status handoff only; it does not raise business capability.
 - Current package after this visual closure is Next minimal runtime slice selection after Review / Replay result status closure.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
@@ -239,7 +240,7 @@ Current active capability movement:
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`, all `REVIEW_ONLY_RUNTIME partial`.
-- Selected next minimal runtime slice is `Review / Replay result status`.
+- Selected next minimal runtime slice is pending selection after Review / Replay result status closure.
 - The next required action is `Next minimal runtime slice selection after Review / Replay result status closure`.
 
 - P295 is merged on main.

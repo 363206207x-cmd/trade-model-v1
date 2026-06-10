@@ -37,10 +37,10 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `001cbf7 chore(workflow): add one-command codex runner`
+- Current merged main: `5da301b docs(review-replay): record visual verification closure`
 - Current active block: `Next minimal runtime slice selection after Review / Replay result status closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this pack: visual closure confirms Review / Replay result status as `REVIEW_ONLY_RUNTIME partial`; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Capability movement from this hotfix: none. Review / Replay result status was already confirmed as the seventh `REVIEW_ONLY_RUNTIME partial` slice on merged main; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
 - Next required action: `Next minimal runtime slice selection after Review / Replay result status closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
@@ -65,7 +65,8 @@ The following do not count as completed:
 - `2f98fc3` completed Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation. It adds one minimal read-only `/api/dashboard/review-replay-result-status` endpoint, a dashboard Review / Replay result status panel, targeted `DashboardControllerTest` coverage, and source-of-truth updates without replay execution, review result generation, DTO/Validator/Assembler, schema/config/pom, Push, Candidate, Decision generation, Point, or trading.
 - `791260f` completes Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/panel/status mapping, forbidden semantics classification, and source-of-truth drift from `650816c` to `2f98fc3`.
 - `001cbf7` completes the V1 One-Command Codex Runner workflow improvement. It adds one-command Codex runner and PR completion helpers only; it does not change business capability.
-- This package completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
+- `5da301b` completes Review / Replay Result Status Visual Verification / Closure with browser verification, endpoint/dashboard smoke, source-of-truth alignment, and no business code changes.
+- This hotfix package only fixes one-command runner CI parsing and Codex GitHub status handoff behavior; it does not change business capability.
 - Current active package after this visual closure is `Next minimal runtime slice selection after Review / Replay result status closure`. It may add only selection docs and source-of-truth updates.
 
 ## Runtime Slice History
@@ -108,7 +109,8 @@ DecisionResult chain history:
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation is completed on main as `2f98fc3`.
 - Minimal Review-Only Review / Replay Result Status Runtime Wiring Verification is completed on main as `791260f`.
 - V1 One-Command Codex Runner workflow improvement is completed on main as `001cbf7`.
-- Review / Replay Result Status Visual Verification / Closure is completed by this package when merged.
+- Review / Replay Result Status Visual Verification / Closure is completed on main as `5da301b`.
+- V1 One-Command Runner Hotfix is in progress on `v1-one-command-runner-hotfix`; it fixes `gh pr checks` state parsing and adds `--open-pr-none-confirmed` without changing business capability.
 - Current active package is Next minimal runtime slice selection after Review / Replay result status closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
@@ -122,6 +124,7 @@ P359 remains not completed progress because PR #829 was closed unmerged. P360 is
 - Next task prompt: `bash scripts/codex-next-task.sh`
 - Chinese operator entry: `bash scripts/v1-auto.sh next`
 - One-command Codex runner: `bash scripts/v1-codex-run-next.sh`
+- One-command Codex runner with Open PR none handoff evidence: `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed`
 - PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
 - PR helper: `bash scripts/v1-pr-flow-helper.sh --branch <branch> --title "<title>" --risk <risk>`
 - Open PR: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`

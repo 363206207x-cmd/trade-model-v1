@@ -100,22 +100,40 @@ print_pr_snapshot() {
 check_required_ci_once() {
   local pr_number="$1"
   local check_rows
-  check_rows="$(gh pr checks "$pr_number" --json name,state,conclusion,bucket --jq '.[] | [.name, (.state // ""), (.conclusion // ""), (.bucket // "")] | @tsv')"
+  if ! check_rows="$(gh pr checks "$pr_number" --json name,state,conclusion,bucket,workflow --jq '.[] | [.name, (.state // ""), (.conclusion // ""), (.bucket // ""), (.workflow // "")] | @tsv' 2>/dev/null)"; then
+    check_rows="$(gh pr checks "$pr_number" --json name,state,bucket,workflow --jq '.[] | [.name, (.state // ""), "", (.bucket // ""), (.workflow // "")] | @tsv')"
+  fi
 
-  local quality="missing"
-  local workflow="missing"
-  local name state conclusion bucket
+  local quality_seen=0
+  local quality_pending=0
+  local quality_failed=0
+  local workflow_seen=0
+  local workflow_pending=0
+  local workflow_failed=0
+  local name state conclusion bucket workflow_name status
 
-  while IFS=$'\t' read -r name state conclusion bucket; do
-    case "$name" in
-      quality-gate)
-        quality="$(classify_check "$state" "$conclusion" "$bucket")"
-        ;;
-      workflow-contract)
-        workflow="$(classify_check "$state" "$conclusion" "$bucket")"
-        ;;
-    esac
+  while IFS=$'\t' read -r name state conclusion bucket workflow_name; do
+    [[ -z "${name:-}" ]] && continue
+    status="$(classify_check "$state" "$conclusion" "$bucket")"
+    if is_quality_gate_check "$name" "$workflow_name"; then
+      quality_seen=$((quality_seen + 1))
+      case "$status" in
+        pending) quality_pending=$((quality_pending + 1)) ;;
+        failed) quality_failed=$((quality_failed + 1)) ;;
+      esac
+    fi
+    if is_workflow_contract_check "$name" "$workflow_name"; then
+      workflow_seen=$((workflow_seen + 1))
+      case "$status" in
+        pending) workflow_pending=$((workflow_pending + 1)) ;;
+        failed) workflow_failed=$((workflow_failed + 1)) ;;
+      esac
+    fi
   done <<<"$check_rows"
+
+  local quality workflow
+  quality="$(rollup_required_check "$quality_seen" "$quality_pending" "$quality_failed")"
+  workflow="$(rollup_required_check "$workflow_seen" "$workflow_pending" "$workflow_failed")"
 
   echo "quality-gate=$quality workflow-contract=$workflow"
 
@@ -128,16 +146,57 @@ check_required_ci_once() {
   return 1
 }
 
+is_quality_gate_check() {
+  local name="$1"
+  local workflow_name="${2:-}"
+  [[ "$name" == "quality-gate" || "$name" == "ci/quality-gate" || "$name" == */quality-gate || "$workflow_name" == "quality-gate" || "$workflow_name" == "ci/quality-gate" || "$workflow_name" == */quality-gate ]]
+}
+
+is_workflow_contract_check() {
+  local name="$1"
+  local workflow_name="${2:-}"
+  [[ "$name" == "workflow-contract" || "$name" == "ci/workflow-contract" || "$name" == */workflow-contract || "$workflow_name" == "workflow-contract" || "$workflow_name" == "ci/workflow-contract" || "$workflow_name" == */workflow-contract ]]
+}
+
+rollup_required_check() {
+  local seen="$1"
+  local pending="$2"
+  local failed="$3"
+  if (( seen == 0 )); then
+    echo "missing"
+  elif (( failed > 0 )); then
+    echo "failed"
+  elif (( pending > 0 )); then
+    echo "pending"
+  else
+    echo "success"
+  fi
+}
+
+normalize_check_value() {
+  printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr '-' '_'
+}
+
 classify_check() {
   local state="$1"
   local conclusion="$2"
   local bucket="$3"
-  if [[ "$conclusion" == "SUCCESS" || "$conclusion" == "success" || "$bucket" == "pass" ]]; then
+  local state_norm conclusion_norm bucket_norm combined_norm
+  state_norm="$(normalize_check_value "$state")"
+  conclusion_norm="$(normalize_check_value "$conclusion")"
+  bucket_norm="$(normalize_check_value "$bucket")"
+  combined_norm="${state_norm}+${conclusion_norm}"
+
+  if [[ "$state_norm" == "success" || "$state_norm" == "successful" || "$conclusion_norm" == "success" || "$conclusion_norm" == "successful" || "$bucket_norm" == "pass" || "$bucket_norm" == "success" || "$bucket_norm" == "successful" || "$combined_norm" == "completed+success" || "$combined_norm" == "completed+successful" ]]; then
     echo "success"
     return
   fi
-  if [[ "$state" == "IN_PROGRESS" || "$state" == "PENDING" || "$state" == "QUEUED" || "$state" == "in_progress" || "$state" == "pending" || "$state" == "queued" || "$bucket" == "pending" ]]; then
+  if [[ -z "$state_norm$conclusion_norm$bucket_norm" || "$state_norm" == "in_progress" || "$state_norm" == "pending" || "$state_norm" == "queued" || "$state_norm" == "waiting" || "$state_norm" == "requested" || "$state_norm" == "expected" || "$conclusion_norm" == "in_progress" || "$conclusion_norm" == "pending" || "$conclusion_norm" == "queued" || "$bucket_norm" == "pending" ]]; then
     echo "pending"
+    return
+  fi
+  if [[ "$state_norm" == "failing" || "$state_norm" == "failed" || "$state_norm" == "failure" || "$state_norm" == "cancelled" || "$state_norm" == "canceled" || "$state_norm" == "timed_out" || "$conclusion_norm" == "failing" || "$conclusion_norm" == "failed" || "$conclusion_norm" == "failure" || "$conclusion_norm" == "cancelled" || "$conclusion_norm" == "canceled" || "$conclusion_norm" == "timed_out" || "$bucket_norm" == "fail" || "$bucket_norm" == "failed" || "$bucket_norm" == "failure" ]]; then
+    echo "failed"
     return
   fi
   echo "failed"
