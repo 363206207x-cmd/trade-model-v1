@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `fb0263e docs(review): read review replay result status source path`.
-- Active stop-loss track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`.
+- Current HEAD: `4d17081 docs(review-replay): design review-only runtime wiring`.
+- Active stop-loss track: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
 - Selected target: `Review / Replay result status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`.
 - Selected next minimal runtime slice: `Review / Replay result status`.
-- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`.
+- Next required action: `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -28,8 +28,9 @@ Current merged main:
 - ExecutionPlan / BoundaryCandidate is now the sixth completed Review-Only Runtime partial slice, not an in-progress module.
 - `86b3ff3` selected Review / Replay result status as the seventh minimal runtime target.
 - `fb0263e` completed Source Read for Review / Replay result status: existing ReviewService / ReviewController / ReviewResultMapper / `tm_review_result` / ReviewAggregateService / review page / replay summary assets exist, dedicated status endpoint/panel remains missing, and replay execution must be excluded.
-- Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed by this package.
-- Current package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Design is completed on main as `4d17081`.
+- Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate is completed by this package and returns GO to minimal implementation.
+- Current package is Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
 - `d19b0e8 docs(decision): verify runtime wiring implementation readiness (#875)`
@@ -229,13 +230,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`.
+- Current active block is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, and `ExecutionPlan / BoundaryCandidate review-only runtime status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `Review / Replay result status`.
-- The next required action is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation Readiness Gate`.
+- The next required action is `Minimal Review-Only Review / Replay Result Status Runtime Wiring Implementation`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
