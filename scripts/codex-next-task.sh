@@ -73,6 +73,9 @@ case "$phase" in
   visual_closure)
     template="$TEMPLATE_DIR/RUNTIME_VISUAL_CLOSURE_TEMPLATE.md"
     ;;
+  selection)
+    template="$TEMPLATE_DIR/RUNTIME_SELECTION_TEMPLATE.md"
+    ;;
   *)
     echo "UNSUPPORTED_PHASE: $phase" >&2
     exit 1

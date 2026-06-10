@@ -21,3 +21,13 @@ Required sections in every template:
 - PR risk hint
 
 Use `bash scripts/codex-next-task.sh` to render the next task from `docs/CODEX_NEXT_TASK.yml`.
+
+Supported phases:
+
+- `source_read`
+- `design`
+- `readiness_gate`
+- `implementation`
+- `verification`
+- `visual_closure`
+- `selection`
