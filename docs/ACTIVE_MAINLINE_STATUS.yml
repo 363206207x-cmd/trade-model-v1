@@ -1,14 +1,14 @@
-current_head: "c90fe98"
+current_head: "62843de"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Implementation readiness gate for Data Source Health dashboard/API status"
-active_block_cn: "数据源健康仪表盘 / API 状态实现前就绪门"
-current_phase: "readiness_gate"
+active_block: "Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation"
+active_block_cn: "数据源健康仪表盘 / API 状态最小只读运行时接线实现"
+current_phase: "implementation"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "data-source-health-dashboard-status-readiness-gate"
-merge_rule: "A-risk readiness gate after Data Source Health dashboard/API status design; allow only readiness docs and source-of-truth updates unless a future task explicitly authorizes implementation; no Java business code, tests, dashboard business logic, schema/config/pom, replay execution, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
-next_required_action: "Implementation readiness gate for Data Source Health dashboard/API status"
+current_branch: "minimal-review-only-data-source-health-dashboard-status-runtime-wiring-implementation"
+merge_rule: "B-risk minimal Data Source Health dashboard/API status implementation; allow only minimal review-only endpoint/dashboard/status implementation, targeted tests, implementation docs, and source-of-truth updates; no schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
+next_required_action: "Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -83,9 +83,11 @@ v1_one_command_runner_hotfix_status: "completed on main as 91613bb; workflow hot
 next_minimal_runtime_slice_selection_after_review_replay_status: "selected Data Source Health dashboard/API status as the next source-read-only target after seven REVIEW_ONLY_RUNTIME partial closures; this selection package is docs/source-of-truth only and does not change business capability"
 data_source_health_dashboard_api_status_source_read_status: "completed on main as 6343a60; confirms DataSourceHealthDO exists as an unwired carrier, existing sourceHealth signals are distributed across MarketQuote / Evidence-Score / DecisionResult / ExecutionPlan-BoundaryCandidate / Review-Replay status endpoints and dashboard panels, no dedicated aggregate data-source-health API/panel/schema owner was found, and returns GO to design only without implementation"
 minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_design_status: "completed on main as c90fe98; selects a thin review-only aggregate over existing slice-local sourceHealth status surfaces, keeps DataSourceHealthDO inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping, dashboard/API boundary, fail-closed rules, and returns GO to implementation readiness gate without implementation"
+data_source_health_dashboard_api_status_implementation_readiness_gate_status: "completed in this readiness-gate package; returns GO for a minimal review-only DashboardController/dashboard aggregate over existing slice-local sourceHealth surfaces, forbids schema/service/DTO ownership, external refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, and trading; Data Source Health is not yet a completed runtime slice"
 source_of_truth_files:
   - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_SOURCE_READ.md
   - docs/V1_MINIMAL_REVIEW_ONLY_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_RUNTIME_WIRING_DESIGN.md
+  - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_IMPLEMENTATION_READINESS_GATE.md
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
   - docs/V1_DUPLICATE_SKELETON_FREEZE_RULE.md
