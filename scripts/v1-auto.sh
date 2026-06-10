@@ -454,9 +454,47 @@ classify_changed_files_for_risk() {
   fi
 }
 
+is_allowed_negative_safety_assertion() {
+  local line="$1"
+  printf '%s\n' "$line" | grep -Eiq 'doesNotExist|does not expose|does not contain|No final direction|No entry|No stop|No TP|No RR|notTradingSignal|notCandidateSignal|notDecisionGeneration|notPointSignal|notExecutable|externalRefreshTriggered[[:space:]]*[=:][[:space:]]*false|displaySlotsAreCandidatePool[[:space:]]*[=:][[:space:]]*false|failClosed|forbidden scope|Forbidden scope|forbidden-field absence|absence check|negative safety|negative guardrail|禁止范围|禁止|不得|不能|不触发|不生成|不接|不是|不可执行|只读|非交易'
+}
+
+is_forbidden_positive_semantic_line() {
+  local line="$1"
+  if printf '%s\n' "$line" | grep -Eq 'finalDirection|takeProfit|riskReward|positionSize|leverage|orderAction|executionAction|autoTradingAction|candidateRanking|pushSend|externalRefreshTriggered[[:space:]]*[=:][[:space:]]*true|schedulerTrigger|collectorTrigger|apiClientTrigger|API-client trigger|external API refresh trigger'; then
+    return 0
+  fi
+  if printf '%s\n' "$line" | grep -Eq "\"(entry|stop|tp|rr)\"[[:space:]]*[:=]|'(entry|stop|tp|rr)'[[:space:]]*[:=]|\\.put\\(\"(entry|stop|tp|rr)\""; then
+    return 0
+  fi
+  return 1
+}
+
+diff_allowed_negative_safety_assertions() {
+  local diff_text="$1"
+  local line
+  while IFS= read -r line; do
+    [[ "$line" == +* && "$line" != +++* ]] || continue
+    if is_allowed_negative_safety_assertion "$line"; then
+      printf '%s\n' "$line"
+    fi
+  done <<<"$diff_text"
+}
+
 diff_has_forbidden_positive_semantics() {
   local diff_text="$1"
-  printf '%s\n' "$diff_text" | grep -E '\+.*(placeOrder|createOrder|submitOrder|autoTrading|finalDirection|candidateRanking|riskReward|positionSize|leverage|entryPrice|stopPrice|takeProfit|tpPrice|sendPush|executeReplay|runReplay|generateReviewResult)' || true
+  local line
+  while IFS= read -r line; do
+    [[ "$line" == +* && "$line" != +++* ]] || continue
+    if is_allowed_negative_safety_assertion "$line"; then
+      continue
+    fi
+    if is_forbidden_positive_semantic_line "$line"; then
+      printf '%s\n' "$line"
+      continue
+    fi
+    printf '%s\n' "$line" | grep -E '\+.*(placeOrder|createOrder|submitOrder|autoTradingAction|entryPrice|stopPrice|tpPrice|sendPush|executeReplay|runReplay|generateReviewResult)' || true
+  done <<<"$diff_text"
 }
 
 cmd_check_pr() {
@@ -468,7 +506,7 @@ cmd_check_pr() {
 
   local pr_number="$1"
   local risk="${2:-LEGACY}"
-  local state draft mergeable base head title checks changed_files violations diff_text forbidden_hits=""
+  local state draft mergeable base head title checks changed_files violations diff_text forbidden_hits="" allowed_negative_hits=""
   case "$risk" in
     LEGACY|A|B|"B/C"|C)
       ;;
@@ -490,6 +528,7 @@ cmd_check_pr() {
   if [[ "$risk" == "B" ]]; then
     diff_text="$(diff_for_pr "$pr_number" "$head")"
     forbidden_hits="$(diff_has_forbidden_positive_semantics "$diff_text")"
+    allowed_negative_hits="$(diff_allowed_negative_safety_assertions "$diff_text")"
   fi
 
   echo "PR 检查摘要（中文）"
@@ -542,7 +581,13 @@ cmd_check_pr() {
 
   case "$risk" in
     B)
-      echo "结果: PASS（通过）。B-risk（实现包）文件范围通过；默认不自动合并，需要人工/助手复核后再合并。"
+      echo "结果: PASS（通过）。B-risk（实现包）文件范围与语义分类通过；默认不自动合并，需要人工/助手复核后再合并。"
+      if [[ -n "$allowed_negative_hits" ]]; then
+        echo "负向安全断言: 已识别为 allowed negative safety assertions（允许的负向安全断言），不会误判为正向越界。"
+      else
+        echo "负向安全断言: 本次 diff 未发现需要分类的 allowed negative safety assertions（允许的负向安全断言）。"
+      fi
+      echo "真正正向危险语义仍会 STOP（停止），例如 finalDirection / entryPrice / stopPrice / takeProfit / riskReward / orderAction / executionAction / autoTradingAction / candidateRanking / pushSend / externalRefreshTriggered=true。"
       ;;
     LEGACY|A)
       echo "结果: PASS（通过）。未发现 A-risk（低风险）自动流程禁止的业务路径。"

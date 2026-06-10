@@ -37,7 +37,7 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `9290c1b docs(health): verify data source health implementation readiness`
+- Current merged main: `2984e48 feat(health): show data source health review-only status`
 - Current active block: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this implementation: none. Data Source Health dashboard/API status has implementation wiring but is not verified or visually closed yet; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
@@ -73,7 +73,8 @@ The following do not count as completed:
 - `c90fe98` completes Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design: it selects a thin review-only aggregate over existing slice-local source-health status surfaces, keeps `DataSourceHealthDO` inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping and fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - `62843de` completes the workflow phase normalization that makes the Data Source Health readiness-gate handoff runnable by `v1-auto.sh next`.
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to a minimal review-only Data Source Health Dashboard/API status implementation.
-- This implementation package adds one minimal read-only `/api/dashboard/data-source-health-status` endpoint, a dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and implementation/source-of-truth docs. It does not trigger external API refresh, scheduler, collector, API client reads, Push, Candidate generation, Decision generation, Point generation, replay execution, review result generation, or trading.
+- `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, a dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and implementation/source-of-truth docs. It does not trigger external API refresh, scheduler, collector, API client reads, Push, Candidate generation, Decision generation, Point generation, replay execution, review result generation, or trading.
+- This workflow-only hotfix fixes B-risk negative safety assertion classification, Codex CLI failure task printing, and dirty work packaging tooling. It does not change Data Source Health business behavior, and the next business action remains Data Source Health runtime wiring verification.
 - Data Source Health is not yet a completed runtime slice; the completed review-only runtime slice count remains 7.
 
 ## Runtime Slice History
@@ -122,6 +123,7 @@ DecisionResult chain history:
 - Source Read for Data Source Health dashboard/API status is completed on main as `6343a60` and returned GO to design only.
 - Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design is completed on main as `c90fe98` and returns GO to implementation readiness gate.
 - Data Source Health implementation readiness gate is completed on main as `9290c1b`.
+- Data Source Health implementation is completed on main as `2984e48`; verification is still the active next package.
 - Current active package is Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
@@ -137,6 +139,7 @@ P359 remains not completed progress because PR #829 was closed unmerged. P360 is
 - One-command Codex runner: `bash scripts/v1-codex-run-next.sh`
 - One-command Codex runner with Open PR none handoff evidence: `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed`
 - PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
+- Dirty-work package helper: `bash scripts/v1-package-dirty-work.sh`
 - PR helper: `bash scripts/v1-pr-flow-helper.sh --branch <branch> --title "<title>" --risk <risk>`
 - Open PR: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Merge sync: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`

@@ -136,7 +136,53 @@ This workflow pack does not:
 
 After `5da301b`, Review / Replay result status is the seventh completed Review-Only Runtime partial slice. This hotfix does not change that business capability. The next business action remains `Next minimal runtime slice selection after Review / Replay result status closure`.
 
-## 6. Verification
+After `2984e48`, Data Source Health dashboard/API status has completed implementation only. It is not a completed runtime slice until verification and visual closure are merged. Completed Review-Only Runtime partial slices remain 7, and the next business action remains `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
+
+## 6. B-Risk Usability Hotfix
+
+`v1-auto.sh check-pr <PR> B` and `v1-pr-complete.sh <PR> B "<SUBJECT>"` now classify B-risk semantics instead of treating every forbidden word as positive overreach.
+
+Allowed negative safety assertions include:
+
+- `.doesNotExist()`;
+- `does not expose`;
+- `does not contain`;
+- `No final direction`, `No entry`, `No stop`, `No TP`, `No RR`;
+- `notTradingSignal`, `notCandidateSignal`, `notDecisionGeneration`, `notPointSignal`, `notExecutable`;
+- `externalRefreshTriggered=false`;
+- `displaySlotsAreCandidatePool=false`;
+- `failClosed`;
+- forbidden-scope documentation;
+- tests that assert forbidden fields are absent.
+
+These lines are allowed negative safety assertions（允许的负向安全断言）. They do not permit positive trading behavior.
+
+Positive additions still STOP（停止）, including `finalDirection`, `entryPrice`, `stopPrice`, `takeProfit`, `riskReward`, `positionSize`, `leverage`, `orderAction`, `executionAction`, `autoTradingAction`, `candidateRanking`, `pushSend`, scheduler / collector / API-client triggers, and `externalRefreshTriggered=true`.
+
+## 7. Codex CLI Failure Fallback
+
+If `v1-codex-run-next.sh` cannot start Codex CLI because of local session permissions, readonly database errors, or other `codex exec` failures, it now prints the full task text directly after the task file path.
+
+The user should copy the printed task into Codex. The script still does not stage, commit, push, create PRs, or merge.
+
+## 8. Dirty Work Packager
+
+New helper:
+
+```bash
+bash scripts/v1-package-dirty-work.sh
+```
+
+Use it only when Codex has written files but failed before branch / commit / PR packaging. It reads `docs/CODEX_NEXT_TASK.yml`, preserves the dirty worktree, switches or creates the configured branch, stages only files allowed by the declared risk, commits, pushes, and calls `v1-auto.sh pr`.
+
+Safety behavior:
+
+- A-risk stages only docs / scripts workflow files.
+- B-risk stages only the current minimal implementation paths plus docs / scripts.
+- C-risk stops.
+- Open PR, GitHub PR status unknown, forbidden staged paths, schema/config/pom, DTO/Validator/Assembler, and disallowed changed files stop the script.
+
+## 9. Verification
 
 Required checks for this pack:
 
@@ -147,6 +193,7 @@ Required checks for this pack:
 - `bash -n scripts/v1-auto.sh`
 - `bash -n scripts/v1-pr-complete.sh`
 - `bash -n scripts/v1-codex-run-next.sh`
+- `bash -n scripts/v1-package-dirty-work.sh`
 - `git diff --check`
 - `git diff --cached --check`
 

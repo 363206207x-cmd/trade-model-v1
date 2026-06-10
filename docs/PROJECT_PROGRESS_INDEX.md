@@ -6,7 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `9290c1b docs(health): verify data source health implementation readiness`.
+- Current HEAD: `2984e48 feat(health): show data source health review-only status`.
 - Active stop-loss track: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 - Selected target: `Data Source Health dashboard/API status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
@@ -40,7 +40,8 @@ Current merged main:
 - `c90fe98` completes Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design and returns GO to implementation readiness gate without implementation.
 - `62843de` completes the Data Source Health readiness phase normalization workflow fix.
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to minimal review-only implementation.
-- This implementation package adds one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and source-of-truth updates. The next package is verification.
+- `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and source-of-truth updates. The next package is verification.
+- This B-risk workflow usability hotfix is workflow-only: it fixes B-risk false positives for negative safety assertions, Codex CLI failure fallback output, and dirty work packaging. It does not change business capability.
 - Data Source Health is not yet a completed runtime slice; completed minimal runtime slices remain 7.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
