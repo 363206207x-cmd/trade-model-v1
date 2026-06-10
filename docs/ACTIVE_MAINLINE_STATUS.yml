@@ -1,13 +1,13 @@
-current_head: "c75919c"
+current_head: "8f404cd"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source Read for ExecutionPlan / BoundaryCandidate review-only display continuation"
-active_block_cn: "执行计划 / 边界候选只读展示延续源码读取"
+active_block: "Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design"
+active_block_cn: "执行计划 / 边界候选最小只读运行时接线设计"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "executionplan-boundarycandidate-review-only-display-source-read"
-merge_rule: "Source-read docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360; does not raise business capability"
-next_required_action: "Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Design"
+current_branch: "minimal-review-only-executionplan-boundarycandidate-runtime-wiring-design"
+merge_rule: "Design docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360; does not raise business capability"
+next_required_action: "Minimal Review-Only ExecutionPlan / BoundaryCandidate Runtime Wiring Implementation Readiness Gate"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -64,7 +64,8 @@ v1_auto_operator_pack_status: "completed on main as b30c30e; adds scripts/v1-aut
 decisionresult_visual_verification_closure_status: "completed on main as baa5cfe; browser-verifies #876 / a0a432b dashboard DecisionResult status panel visibility, safety copy, source trace / source health display, layout, and no Push / Candidate / Decision generation / Point / trading semantics"
 v1_auto_operator_post_merge_state_refresh_status: "completed on main as 1b12cd5; refreshes the Chinese auto-operator summary and next-task handoff after DecisionResult visual closure without business capability changes"
 next_minimal_runtime_slice_selection_after_decisionresult_status: "completed on main as c75919c; selects ExecutionPlan / BoundaryCandidate review-only display continuation as the next source-read-only target after five REVIEW_ONLY_RUNTIME partial closures"
-executionplan_boundarycandidate_review_only_display_source_read_status: "active on branch executionplan-boundarycandidate-review-only-display-source-read; source-read confirms existing BoundaryCandidateService / BoundaryCandidateDTO, PlanService / ExecutionPlanVO/DO/Mapper, tm_execution_plan, DashboardController /api/dashboard/detail, dashboard display adapters, planBoundaryPlaceholderCard, and targeted tests exist while dedicated review-only status endpoint / panel remains partial/missing; next step is design only"
+executionplan_boundarycandidate_review_only_display_source_read_status: "completed on main as 8f404cd; source-read confirms existing BoundaryCandidateService / BoundaryCandidateDTO, PlanService / ExecutionPlanVO/DO/Mapper, tm_execution_plan, DashboardController /api/dashboard/detail, dashboard display adapters, planBoundaryPlaceholderCard, and targeted tests exist while dedicated review-only status endpoint / panel remains partial/missing"
+minimal_review_only_executionplan_boundarycandidate_runtime_wiring_design_status: "active on branch minimal-review-only-executionplan-boundarycandidate-runtime-wiring-design; design fixes owner path, status mapping, dashboard/API surface, fail-closed rules, completed-slice boundaries, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails without implementation"
 source_of_truth_files:
   - docs/WORKFLOW_GITHUB_AUTH_AND_HANDOFF_RULE.md
   - docs/V1_PROGRESS_SOURCE_OF_TRUTH.md
