@@ -50,6 +50,10 @@ bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
 
 This only bypasses Codex GitHub status unknown. It does not bypass non-main branch, dirty worktree, explicit open PR, failed Main Sync, or other blockers.
 
+If Codex CLI fails after task generation because of local session permission, readonly database, or `codex exec` failure, `v1-codex-run-next.sh` prints the full task text directly. Copy the printed task into Codex; do not run extra business steps.
+
+如果 Codex CLI 因本地 session 权限、readonly database 或 `codex exec` 失败而无法启动，`v1-codex-run-next.sh` 会直接打印完整任务全文。复制打印出的任务给 Codex，不要额外执行业务步骤。
+
 One-command PR completion helper:
 
 ```bash
@@ -58,6 +62,20 @@ bash scripts/v1-pr-complete.sh <PR_NUMBER> B "<SUBJECT>" --confirm-reviewed
 ```
 
 This helper always checks through `v1-auto.sh check-pr` and merges only through `v1-merge-sync.sh`.
+
+B-risk checks allow negative safety assertions such as `.doesNotExist()`, `does not expose`, `notTradingSignal`, `notCandidateSignal`, `notDecisionGeneration`, `notPointSignal`, `notExecutable`, `externalRefreshTriggered=false`, `displaySlotsAreCandidatePool=false`, and `failClosed`. Positive forbidden additions still stop the flow.
+
+B-risk 检查允许 `.doesNotExist()`、`does not expose`、`notTradingSignal`、`notCandidateSignal`、`notDecisionGeneration`、`notPointSignal`、`notExecutable`、`externalRefreshTriggered=false`、`displaySlotsAreCandidatePool=false` 和 `failClosed` 等负向安全断言。正向禁用语义仍会停止流程。
+
+Dirty-work package helper:
+
+```bash
+bash scripts/v1-package-dirty-work.sh
+```
+
+Use it only when Codex wrote files but did not successfully create the task branch / commit / PR. It reads `docs/CODEX_NEXT_TASK.yml`, stages only files allowed by the declared risk, commits, pushes, and calls the fixed PR command. It stops for open PR, GitHub PR status unknown, C-risk, forbidden staged paths, or disallowed file paths.
+
+脏工作区打包入口只用于 Codex 已写文件但未成功创建分支 / commit / PR 的情况。它读取 `docs/CODEX_NEXT_TASK.yml`，只 stage 当前 risk 允许的文件，commit、push 并调用固定 PR 命令。遇到 open PR、GitHub PR 状态未知、C-risk、已 stage 禁止路径或不允许的文件路径时会停止。
 
 1. Read `docs/ACTIVE_MAINLINE_STATUS.yml`.
 2. Read `docs/V1_CAPABILITY_MATRIX.md`.
@@ -87,6 +105,7 @@ For one-command execution, use `bash scripts/v1-codex-run-next.sh --open-pr-none
 - One-command Codex runner: `bash scripts/v1-codex-run-next.sh`
 - One-command Codex runner with explicit Open PR none handoff: `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed`
 - PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
+- Dirty-work package helper: `bash scripts/v1-package-dirty-work.sh`
 - Fixed PR creation: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Fallback PR review input: `bash scripts/v1-pr-review-input.sh <PR_NUMBER>`
 - Local merge sync after approval: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`

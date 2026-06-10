@@ -52,7 +52,15 @@ stop_with_task_path() {
   echo "STOP（停止）: $reason"
   if [[ -n "$task_file" ]]; then
     echo "任务文件 task file（任务文件）: $task_file"
-    echo "请手动复制该任务给 Codex。"
+    if [[ -f "$task_file" ]]; then
+      echo
+      echo "请复制下方任务全文给 Codex:"
+      print_hr
+      cat "$task_file"
+      print_hr
+    else
+      echo "任务文件不存在，无法打印全文。"
+    fi
   fi
   exit 1
 }

@@ -1,4 +1,4 @@
-current_main: "9290c1b docs(health): verify data source health implementation readiness"
+current_main: "2984e48 feat(health): show data source health review-only status"
 active_block: "Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification"
 phase: "verification"
 module: "Data Source Health dashboard/API status"

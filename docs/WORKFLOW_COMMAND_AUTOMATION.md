@@ -79,6 +79,27 @@ PR 完成入口会先运行风险感知 PR 检查，等待必需 CI，再在风�
 
 `v1-pr-complete.sh` 兼容当前 `gh pr checks` 使用 `state` 字段的输出，也兼容未来可能出现的 `conclusion` 字段。当 push 和 pull_request 同时产生多个 `quality-gate` 时，所有同名检查都必须成功；`workflow-contract` 也必须成功后才允许 A-risk 自动合并。
 
+B-risk semantic checks distinguish positive forbidden behavior from negative safety assertions.
+（B-risk 语义检查会区分正向禁用行为和负向安全断言。）
+
+Allowed negative safety assertions include `.doesNotExist()`, `does not expose`, `does not contain`, `No final direction`, `No entry`, `No stop`, `No TP`, `No RR`, `notTradingSignal`, `notCandidateSignal`, `notDecisionGeneration`, `notPointSignal`, `notExecutable`, `externalRefreshTriggered=false`, `displaySlotsAreCandidatePool=false`, `failClosed`, forbidden-scope copy, and tests that assert forbidden fields are absent.
+
+允许的负向安全断言包括 `.doesNotExist()`、`does not expose`、`does not contain`、`No final direction`、`No entry`、`No stop`、`No TP`、`No RR`、`notTradingSignal`、`notCandidateSignal`、`notDecisionGeneration`、`notPointSignal`、`notExecutable`、`externalRefreshTriggered=false`、`displaySlotsAreCandidatePool=false`、`failClosed`、禁止范围文案，以及测试中的禁用字段不存在断言。
+
+Positive additions such as `finalDirection`, `entryPrice`, `stopPrice`, `takeProfit`, `riskReward`, `positionSize`, `leverage`, `orderAction`, `executionAction`, `autoTradingAction`, `candidateRanking`, `pushSend`, scheduler / collector / API-client triggers, or `externalRefreshTriggered=true` still stop the B-risk flow.
+
+正向新增 `finalDirection`、`entryPrice`、`stopPrice`、`takeProfit`、`riskReward`、`positionSize`、`leverage`、`orderAction`、`executionAction`、`autoTradingAction`、`candidateRanking`、`pushSend`、scheduler / collector / API-client trigger 或 `externalRefreshTriggered=true` 仍会停止 B-risk 流程。
+
+Dirty work package helper:
+
+```bash
+bash scripts/v1-package-dirty-work.sh
+```
+
+If Codex wrote files but did not create the branch / commit / PR, this helper reads `docs/CODEX_NEXT_TASK.yml`, switches or creates the configured task branch while preserving the dirty worktree, stages only the files allowed by the declared risk, commits, pushes, and calls `v1-auto.sh pr`. It stops for C-risk, forbidden staged paths, open PRs, unknown GitHub PR state, or disallowed changed files.
+
+如果 Codex 已写文件但没有成功创建分支 / commit / PR，该脚本会读取 `docs/CODEX_NEXT_TASK.yml`，保留 dirty worktree 并切换或创建目标任务分支，只 stage 当前 risk 允许的文件，commit、push，并调用 `v1-auto.sh pr`。遇到 C-risk、已 stage 禁止路径、open PR、GitHub PR 状态未知或不允许的变更文件时会停止。
+
 ## Create Draft PR / 创建 Draft PR
 
 Use:
