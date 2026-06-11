@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `b217b60 docs(alerts): verify notification policy runtime wiring (#941)`
-- Current active block: `Next minimal runtime slice selection after Alert Fatigue closure`
+- Current merged main: `a9ec1c9 docs(alerts): record notification policy visual closure`
+- Current active block: `Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from the Alert fatigue / notification policy status visual closure package: environment-limited visual closure only. Alert fatigue / notification policy status has implementation wiring, verification, and visual closure evidence; it is now the 12th completed review-only runtime partial slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Next minimal runtime slice selection after Alert Fatigue closure`
+- Capability movement from this selection package: none. Alert fatigue / notification policy status is already the 12th completed review-only runtime partial slice on merged main; this package only selects the next source-read target. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -112,7 +112,8 @@ The following do not count as completed:
 - Implementation readiness gate for Alert fatigue / notification policy status is completed on main as `17ab553`. It returns GO to B-risk minimal implementation over existing MonitorAlert read assets, with one minimal read-only dashboard status endpoint, minimal dashboard panel/copy/DOM, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates; it forbids `MonitorAlertWriteServiceImpl`, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, and P360.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation is completed on main as `9ec569c`. It adds one minimal read-only `/api/dashboard/alert-fatigue-policy-status` endpoint, dashboard `alertFatiguePolicyStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing `MonitorService#getRecentAlerts` / `MonitorAlertDO` read assets. It does not call `MonitorAlertWriteServiceImpl`, send Push, use external channels, execute recheck, trigger scheduler / collector / API-client refresh, generate Candidate / Decision / Point, output final direction / entry / stop / TP / RR, or touch schema/config/pom / DTO / Validator / Assembler / Orchestrator.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification is completed on main as `b217b60`. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/dashboard status mapping, safety fields, fail-closed/review-only states, Push/recheck/refresh boundaries, forbidden semantics classification, and source-of-truth alignment from `17ab553` to `9ec569c`.
-- Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `alertFatiguePolicyStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not Push/not external channel/not recheck/not scheduler/not collector/not API-client refresh/not alert write/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, no live UI success is claimed, and no Push / recheck / refresh / Candidate / Decision generation / Point / trading semantics are present. Alert fatigue / notification policy status is the 12th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed on main as `a9ec1c9`. Environment-limited evidence confirms `alertFatiguePolicyStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not Push/not external channel/not recheck/not scheduler/not collector/not API-client refresh/not alert write/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, no live UI success is claimed, and no Push / recheck / refresh / Candidate / Decision generation / Point / trading semantics are present. Alert fatigue / notification policy status is the 12th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- Next Minimal Runtime Slice Selection After Alert Fatigue Closure is completed by this package when merged and selects `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status` as the next source-read-only target. This selection does not implement SourceTrace, RuntimeKline, DataQuality, MultiTimeframe, Point, Candidate, Push, Decision generation, order/execution, or trading behavior.
 
 ## Runtime Slice History
 
@@ -194,7 +195,8 @@ DecisionResult chain history:
 - Implementation readiness gate for Alert fatigue / notification policy status is completed on main as `17ab553` and returns GO to `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation`.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation is completed on main as `9ec569c` and returns to `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification`.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification is completed on main as `b217b60` and returns to `Alert Fatigue / Notification Policy Status Visual Verification / Closure`.
-- Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed by this package when merged and returns to `Next minimal runtime slice selection after Alert Fatigue closure`.
+- Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed on main as `a9ec1c9` and returns to `Next minimal runtime slice selection after Alert Fatigue closure`.
+- Next Minimal Runtime Slice Selection After Alert Fatigue Closure is completed by this package when merged and returns to `Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
