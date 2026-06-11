@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `018a438 docs(risk): read risk action guard source path (#930)`.
-- Active stop-loss track: `Implementation readiness gate for RiskActionGuard read-only status`.
+- Current HEAD: `5d25e53 docs(risk): design risk action guard read-only wiring (#931)`.
+- Active stop-loss track: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation`.
 - Selected target: `RiskActionGuard read-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, and `Missed Opportunity / Review Archive status`.
 - Selected next minimal runtime slice: `RiskActionGuard read-only status`.
-- Next required action: `Implementation readiness gate for RiskActionGuard read-only status`.
+- Next required action: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -66,7 +66,8 @@ Current merged main:
 - Missed Opportunity / Review Archive Status Visual Verification / Closure is completed on main as `239664d` with environment-limited evidence over dashboard template/test coverage. Missed Opportunity / Review Archive status is the tenth completed Review-Only Runtime partial slice.
 - Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed on main as `095ade9` and selects `RiskActionGuard read-only status`.
 - Source Read for RiskActionGuard read-only status is completed on main as `018a438`. It confirms existing RiskActionGuard display adapter / VO / dashboard detail / dashboard placeholder assets and returns GO to design only without implementation or capability movement.
-- Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design is completed by this package when merged. It fixes owner path, dedicated-endpoint decision, status mapping, manual-review-only action wording guardrails, fail-closed rules, dashboard/API boundary, and readiness checklist without implementation or capability movement.
+- Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design is completed on main as `5d25e53`. It fixes owner path, dedicated-endpoint decision, status mapping, manual-review-only action wording guardrails, fail-closed rules, dashboard/API boundary, and readiness checklist without implementation or capability movement.
+- Implementation readiness gate for RiskActionGuard read-only status is completed by this package when merged. It returns GO to B-risk minimal implementation over existing Dashboard detail / RiskActionGuard display assets, with optional minimal DashboardController Map endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
