@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `f21ed5f docs(risk): verify risk action guard runtime wiring (#934)`
-- Current active block: `Next minimal runtime slice selection after RiskActionGuard closure`
+- Current merged main: `bab2325 docs(risk): record risk action guard visual closure (#935)`
+- Current active block: `Source Read for Alert fatigue / notification policy status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from the RiskActionGuard visual closure package: environment-limited visual closure only. RiskActionGuard read-only status has implementation wiring, verification, and visual closure evidence; it is now the 11th completed review-only runtime partial slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Next minimal runtime slice selection after RiskActionGuard closure`
+- Next required action: `Source Read for Alert fatigue / notification policy status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -105,7 +105,8 @@ The following do not count as completed:
 - Implementation readiness gate for RiskActionGuard read-only status is completed on main as `c7fb97e`. It returns GO to a B-risk minimal implementation over existing Dashboard detail / RiskActionGuard display assets, with optional minimal DashboardController Map endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation is completed on main as `06ca17f`. It adds one minimal read-only `/api/dashboard/risk-action-guard-status` endpoint, dashboard `riskActionGuardStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing Dashboard detail / RiskActionGuard display assets. It does not add DTO/Validator/Assembler/Orchestrator, schema/config/pom, Position Monitor execution, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification is completed on main as `f21ed5f`. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/dashboard status mapping, safety fields, fail-closed rules, forbidden semantics classification, and source-of-truth alignment from `c7fb97e` to `06ca17f`.
-- RiskActionGuard Read-Only Status Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `riskActionGuardStatusPanel` DOM/copy/safety copy, review-only/manual-review/fail-closed/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, action wording as guardrail/manual-review copy only, and no Position Monitor execution / Push / Candidate generation / Decision generation / Point / trading semantics. RiskActionGuard read-only status is the 11th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- RiskActionGuard Read-Only Status Visual Verification / Closure is completed on main as `bab2325`. Environment-limited evidence confirms `riskActionGuardStatusPanel` DOM/copy/safety copy, review-only/manual-review/fail-closed/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, action wording as guardrail/manual-review copy only, and no Position Monitor execution / Push / Candidate generation / Decision generation / Point / trading semantics. RiskActionGuard read-only status is the 11th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- Next Minimal Runtime Slice Selection After RiskActionGuard Closure is completed by this package when merged and selects `Alert fatigue / notification policy status` as the next source-read-only target after eleven completed review-only runtime slices. The next package is `Source Read for Alert fatigue / notification policy status`; no implementation or capability movement is included in this selection.
 
 ## Runtime Slice History
 
@@ -179,7 +180,8 @@ DecisionResult chain history:
 - Implementation readiness gate for RiskActionGuard read-only status is completed on main as `c7fb97e` and returns GO to `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation`.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation is completed on main as `06ca17f`.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification is completed on main as `f21ed5f`.
-- RiskActionGuard Read-Only Status Visual Verification / Closure is completed by this package when merged and returns to `Next minimal runtime slice selection after RiskActionGuard closure`.
+- RiskActionGuard Read-Only Status Visual Verification / Closure is completed on main as `bab2325` and returns to `Next minimal runtime slice selection after RiskActionGuard closure`.
+- Next Minimal Runtime Slice Selection After RiskActionGuard Closure is completed by this package when merged and selects `Alert fatigue / notification policy status` as the next source-read-only target.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
