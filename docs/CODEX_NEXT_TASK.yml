@@ -1,4 +1,4 @@
-current_main: "abc9d40 feat(ruleconfig): show review-only audit status"
+current_main: "028c598 docs(ruleconfig): verify runtime wiring"
 active_block: "RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure"
 phase: "visual_closure"
 module: "RuleConfig runtime audit / rule explainability"
