@@ -192,6 +192,40 @@ class DashboardControllerTest {
     }
 
     @Test
+    void dashboardTemplateShowsReviewOnlyRuleConfigAuditRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/rule/config-audit-status?ruleKey=push.watchlist.symbols");
+        assertThat(html).contains("ruleConfigAuditStatusPanel");
+        assertThat(html).contains("ruleConfigAuditRuntimeStatusValue");
+        assertThat(html).contains("ruleConfigAuditKeyValue");
+        assertThat(html).contains("ruleConfigAuditMetadataValue");
+        assertThat(html).contains("ruleConfigAuditSourceValue");
+        assertThat(html).contains("ruleConfigAuditEnabledOnlyValue");
+        assertThat(html).contains("ruleConfigAuditWatchlistValue");
+        assertThat(html).contains("ruleConfigAuditContextValue");
+        assertThat(html).contains("ruleConfigAuditReviewOnlyValue");
+        assertThat(html).contains("ruleConfigAuditSignalBoundaryValue");
+        assertThat(html).contains("ruleConfigAuditReloadBoundaryValue");
+        assertThat(html).contains("ruleConfigAuditReasonValue");
+        assertThat(html).contains("RULECONFIG_AUDIT_REVIEW_ONLY_READY");
+        assertThat(html).contains("RULECONFIG_WATCHLIST_KEY_READY_CONTEXT");
+        assertThat(html).contains("RULECONFIG_VERSION_OR_DESCRIPTION_PARTIAL");
+        assertThat(html).contains("RULECONFIG_CONFIG_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("RULECONFIG_VALUE_EMPTY_OR_PARSE_RISK_FAIL_CLOSED");
+        assertThat(html).contains("RULECONFIG_AUDIT_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RuleConfig 只读解释配置状态，不是交易信号");
+        assertThat(html).contains("RuleVersionLog context-only");
+        assertThat(html).contains("不是 current RuleConfig status owner");
+        assertThat(html).contains("不发送 Push");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("status path 不调用 /api/rule/reload");
+        assertThat(html).contains("不触发 schema/service expansion");
+    }
+
+    @Test
     void dashboardTemplateShowsReviewOnlyMarketQuoteFreshnessStatusMapping() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 

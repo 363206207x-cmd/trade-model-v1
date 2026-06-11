@@ -1067,6 +1067,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="watchlistReasonValue">WATCHLIST_CONFIG_MISSING</span></div>
         </div>
 
+        <div class="module-status-note" id="ruleConfigAuditStatusPanel" aria-label="RuleConfig audit explainability review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">RuleConfig 审计 / 解释只读状态</span><span class="v" id="ruleConfigAuditRuntimeStatusValue">RULECONFIG_CONFIG_MISSING_FAIL_CLOSED / RuleConfig 只读状态待确认</span></div>
+            <div class="kv"><span class="k">rule key / metadata</span><span class="v"><span id="ruleConfigAuditKeyValue">push.watchlist.symbols</span> · <span id="ruleConfigAuditMetadataValue">version/description partial</span></span></div>
+            <div class="kv"><span class="k">RuleConfig owner / source</span><span class="v"><span id="ruleConfigAuditSourceValue">MISSING</span> · <span id="ruleConfigAuditEnabledOnlyValue">enabled-only view</span></span></div>
+            <div class="kv"><span class="k">Watchlist key context</span><span class="v" id="ruleConfigAuditWatchlistValue">WATCHLIST_CONFIG_MISSING · symbols 0</span></div>
+            <div class="kv"><span class="k">RuleVersionLog context</span><span class="v" id="ruleConfigAuditContextValue">RuleVersionLog context-only；不是 current RuleConfig status owner。</span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="ruleConfigAuditReviewOnlyValue">RuleConfig 只读解释配置状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Push / Candidate / Decision / Point</span><span class="v" id="ruleConfigAuditSignalBoundaryValue">不发送 Push；不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。</span></div>
+            <div class="kv"><span class="k">Reload boundary</span><span class="v" id="ruleConfigAuditReloadBoundaryValue">status path 不调用 /api/rule/reload；不触发 schema/service expansion。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="ruleConfigAuditReasonValue">RULECONFIG_STATUS_PENDING</span></div>
+        </div>
+
         <div class="module-status-note" id="marketQuoteStatusPanel" aria-label="MarketQuote freshness review-only status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">MarketQuote 只读状态</span><span class="v" id="marketQuoteRuntimeStatusValue">MARKETQUOTE_MISSING_FAIL_CLOSED / 行情状态待确认</span></div>
             <div class="kv"><span class="k">样本标的</span><span class="v" id="marketQuoteSampleSymbolValue">BTCUSDT</span></div>
@@ -1330,6 +1342,12 @@
     var WATCHLIST_STATUS_EMPTY = "WATCHLIST_EMPTY_FAIL_CLOSED";
     var WATCHLIST_STATUS_MISSING = "WATCHLIST_CONFIG_MISSING";
     var WATCHLIST_STATUS_BLOCKED = "BLOCKED_FAIL_CLOSED";
+    var RULECONFIG_AUDIT_STATUS_READY = "RULECONFIG_AUDIT_REVIEW_ONLY_READY";
+    var RULECONFIG_AUDIT_STATUS_WATCHLIST_READY = "RULECONFIG_WATCHLIST_KEY_READY_CONTEXT";
+    var RULECONFIG_AUDIT_STATUS_METADATA_PARTIAL = "RULECONFIG_VERSION_OR_DESCRIPTION_PARTIAL";
+    var RULECONFIG_AUDIT_STATUS_MISSING = "RULECONFIG_CONFIG_MISSING_FAIL_CLOSED";
+    var RULECONFIG_AUDIT_STATUS_PARSE_RISK = "RULECONFIG_VALUE_EMPTY_OR_PARSE_RISK_FAIL_CLOSED";
+    var RULECONFIG_AUDIT_STATUS_BLOCKED = "RULECONFIG_AUDIT_BLOCKED_FAIL_CLOSED";
     var MARKETQUOTE_STATUS_READY = "MARKETQUOTE_REVIEW_ONLY_READY";
     var MARKETQUOTE_STATUS_STALE = "MARKETQUOTE_STALE_FAIL_CLOSED";
     var MARKETQUOTE_STATUS_MISSING = "MARKETQUOTE_MISSING_FAIL_CLOSED";
@@ -1402,6 +1420,33 @@
         displaySlotsAreCandidatePool: false,
         reason: WATCHLIST_STATUS_MISSING,
         message: "等待 DB Watchlist Pool 配置"
+    };
+    var ruleConfigAuditRuntimeStatus = {
+        status: RULECONFIG_AUDIT_STATUS_MISSING,
+        ruleKey: "push.watchlist.symbols",
+        ruleType: "UNKNOWN",
+        version: "UNKNOWN",
+        descriptionPresent: false,
+        ruleValuePresent: false,
+        ruleValueSummary: "empty",
+        enabledKnown: false,
+        enabledOnlyView: true,
+        source: "MISSING",
+        sourceRef: "RuleConfigService#getRuleConfigMap enabled-rule cache",
+        watchlistStatus: WATCHLIST_STATUS_MISSING,
+        watchlistSymbols: [],
+        auditContextStatus: "RULECONFIG_AUDIT_CONTEXT_PARTIAL",
+        ruleVersionLogContext: "RuleVersionLog context-only；不是 current RuleConfig status owner。",
+        reason: "RULECONFIG_STATUS_PENDING",
+        message: "RuleConfig 只读状态待确认；不是交易信号。",
+        failClosed: true,
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false
     };
     var marketQuoteRuntimeStatus = {
         status: MARKETQUOTE_STATUS_MISSING,
@@ -1560,6 +1605,7 @@
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
     window.__watchlistReviewStatus = WATCHLIST_STATUS_MISSING;
+    window.__ruleConfigAuditReviewStatus = RULECONFIG_AUDIT_STATUS_MISSING;
     window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
     window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
     window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
@@ -2828,6 +2874,76 @@
             });
     }
 
+    function resolveRuleConfigAuditRuntimeStatus(payload) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        var symbols = Array.isArray(p.watchlistSymbols)
+            ? p.watchlistSymbols.map(function (s) { return String(s || "").trim().toUpperCase(); }).filter(Boolean)
+            : [];
+        return {
+            status: firstNonEmpty(p.status, RULECONFIG_AUDIT_STATUS_MISSING).toUpperCase(),
+            ruleKey: firstNonEmpty(p.ruleKey, "push.watchlist.symbols"),
+            ruleType: firstNonEmpty(p.ruleType, "UNKNOWN"),
+            version: firstNonEmpty(p.version, "UNKNOWN"),
+            descriptionPresent: p.descriptionPresent === true,
+            ruleValuePresent: p.ruleValuePresent === true,
+            ruleValueSummary: firstNonEmpty(p.ruleValueSummary, "empty"),
+            enabledKnown: p.enabledKnown === true,
+            enabledOnlyView: p.enabledOnlyView !== false,
+            source: firstNonEmpty(p.source, "MISSING").toUpperCase(),
+            sourceRef: firstNonEmpty(p.sourceRef, "RuleConfigService#getRuleConfigMap enabled-rule cache"),
+            watchlistStatus: firstNonEmpty(p.watchlistStatus, "NOT_WATCHLIST_KEY"),
+            watchlistSymbols: symbols,
+            auditContextStatus: firstNonEmpty(p.auditContextStatus, "RULECONFIG_AUDIT_CONTEXT_PARTIAL"),
+            ruleVersionLogContext: firstNonEmpty(p.ruleVersionLogContext, "RuleVersionLog context-only；不是 current RuleConfig status owner。"),
+            reason: firstNonEmpty(p.reason, p.status, "RULECONFIG_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "RuleConfig 只读状态待确认；不是交易信号。"),
+            failClosed: p.failClosed !== false,
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false
+        };
+    }
+
+    function updateRuleConfigAuditRuntimeStatusDisplay() {
+        var rs = ruleConfigAuditRuntimeStatus || {};
+        var metadata = "version " + (rs.version || "UNKNOWN")
+            + " · description " + (rs.descriptionPresent ? "present" : "partial")
+            + " · value " + (rs.ruleValuePresent ? rs.ruleValueSummary : "empty");
+        var enabledText = rs.enabledOnlyView ? "enabled-only view" : "full view";
+        if (!rs.enabledKnown) enabledText += " · disabled-vs-missing partial";
+        setText("ruleConfigAuditRuntimeStatusValue", (rs.status || RULECONFIG_AUDIT_STATUS_MISSING) + " / " + (rs.message || "只读状态"));
+        setText("ruleConfigAuditKeyValue", rs.ruleKey || "push.watchlist.symbols");
+        setText("ruleConfigAuditMetadataValue", metadata);
+        setText("ruleConfigAuditSourceValue", (rs.source || "MISSING") + " · " + (rs.sourceRef || "RuleConfigService"));
+        setText("ruleConfigAuditEnabledOnlyValue", enabledText);
+        setText("ruleConfigAuditWatchlistValue", (rs.watchlistStatus || "NOT_WATCHLIST_KEY") + " · symbols " + (rs.watchlistSymbols ? rs.watchlistSymbols.length : 0));
+        setText("ruleConfigAuditContextValue", "RuleVersionLog context-only；" + (rs.auditContextStatus || "RULECONFIG_AUDIT_CONTEXT_PARTIAL") + "；不是 current RuleConfig status owner。");
+        setText("ruleConfigAuditReviewOnlyValue", "RuleConfig 只读解释配置状态，不是交易信号。");
+        setText("ruleConfigAuditSignalBoundaryValue", "不发送 Push；不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。");
+        setText("ruleConfigAuditReloadBoundaryValue", "status path 不调用 /api/rule/reload；不触发 schema/service expansion。");
+        setText("ruleConfigAuditReasonValue", rs.reason || "—");
+    }
+
+    function fetchRuleConfigAuditRuntimeStatus() {
+        return fetch("/api/rule/config-audit-status?ruleKey=push.watchlist.symbols")
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (resp) {
+                var payload = resp && typeof resp === "object" && resp.data ? resp.data : resp;
+                ruleConfigAuditRuntimeStatus = resolveRuleConfigAuditRuntimeStatus(payload);
+                window.__ruleConfigAuditReviewStatus = ruleConfigAuditRuntimeStatus.status || RULECONFIG_AUDIT_STATUS_MISSING;
+                updateRuleConfigAuditRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                ruleConfigAuditRuntimeStatus = resolveRuleConfigAuditRuntimeStatus({});
+                window.__ruleConfigAuditReviewStatus = RULECONFIG_AUDIT_STATUS_MISSING;
+                updateRuleConfigAuditRuntimeStatusDisplay();
+            });
+    }
+
     function normalizeMarketQuoteSampleSymbol(symbol) {
         var raw = (symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0] || "BTCUSDT").toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
         if (!raw) return "BTCUSDT";
@@ -3860,10 +3976,12 @@
                 document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchPositionProviderStatus();
                 fetchWatchlistRuntimeStatus();
+                fetchRuleConfigAuditRuntimeStatus();
             })
             .catch(function () {
                 document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchWatchlistRuntimeStatus();
+                fetchRuleConfigAuditRuntimeStatus();
                 fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
                 fetchEvidenceScoreRuntimeStatus(selectedSymbol);
                 fetchDecisionResultRuntimeStatus(selectedSymbol);

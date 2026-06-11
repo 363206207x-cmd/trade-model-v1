@@ -86,15 +86,150 @@ class RuleControllerTest {
         );
     }
 
+    @Test
+    void configAuditStatusEndpointReturnsReviewOnlyWatchlistContext() throws Exception {
+        MockMvc mockMvc = mockMvcWith(Map.of(
+                WATCHLIST_RULE_KEY,
+                ruleConfig(WATCHLIST_RULE_KEY, "BTCUSDT, ethusdt", "Manual review Watchlist Pool", "v1", "WATCHLIST")
+        ));
+
+        mockMvc.perform(get("/api/rule/config-audit-status")
+                        .param("ruleKey", WATCHLIST_RULE_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RULECONFIG_WATCHLIST_KEY_READY_CONTEXT"))
+                .andExpect(jsonPath("$.data.ruleKey").value(WATCHLIST_RULE_KEY))
+                .andExpect(jsonPath("$.data.ruleType").value("WATCHLIST"))
+                .andExpect(jsonPath("$.data.configKey").value(WATCHLIST_RULE_KEY))
+                .andExpect(jsonPath("$.data.version").value("v1"))
+                .andExpect(jsonPath("$.data.descriptionPresent").value(true))
+                .andExpect(jsonPath("$.data.ruleValuePresent").value(true))
+                .andExpect(jsonPath("$.data.ruleValueSummary").value("watchlistSymbols=2"))
+                .andExpect(jsonPath("$.data.enabledKnown").value(true))
+                .andExpect(jsonPath("$.data.enabledOnlyView").value(true))
+                .andExpect(jsonPath("$.data.source").value("DB"))
+                .andExpect(jsonPath("$.data.sourceRef").value("RuleConfigService#getRuleConfigMap enabled-rule cache"))
+                .andExpect(jsonPath("$.data.watchlistStatus").value("WATCHLIST_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.data.watchlistSymbols[0]").value("BTCUSDT"))
+                .andExpect(jsonPath("$.data.watchlistSymbols[1]").value("ETHUSDT"))
+                .andExpect(jsonPath("$.data.auditContextStatus").value("RULECONFIG_AUDIT_CONTEXT_PARTIAL"))
+                .andExpect(jsonPath("$.data.ruleVersionLogContext").value("RuleVersionLog is review/analysis audit context only; current RuleConfig status stays on RuleConfigService."))
+                .andExpect(jsonPath("$.data.failClosed").value(false))
+                .andExpect(jsonPath("$.data.reviewOnly").value(true))
+                .andExpect(jsonPath("$.data.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.data.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.data.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.data.notPointSignal").value(true))
+                .andExpect(jsonPath("$.data.notExecutable").value(true))
+                .andExpect(jsonPath("$.data.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.data.reason").value("RULECONFIG_WATCHLIST_KEY_READABLE"));
+    }
+
+    @Test
+    void configAuditStatusEndpointFailsClosedWhenEnabledRuleConfigMissing() throws Exception {
+        MockMvc mockMvc = mockMvcWith(Map.of());
+
+        mockMvc.perform(get("/api/rule/config-audit-status")
+                        .param("ruleKey", WATCHLIST_RULE_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RULECONFIG_CONFIG_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.data.ruleKey").value(WATCHLIST_RULE_KEY))
+                .andExpect(jsonPath("$.data.enabledKnown").value(false))
+                .andExpect(jsonPath("$.data.enabledOnlyView").value(true))
+                .andExpect(jsonPath("$.data.source").value("MISSING"))
+                .andExpect(jsonPath("$.data.watchlistStatus").value("WATCHLIST_CONFIG_MISSING"))
+                .andExpect(jsonPath("$.data.failClosed").value(true))
+                .andExpect(jsonPath("$.data.reviewOnly").value(true))
+                .andExpect(jsonPath("$.data.notExecutable").value(true))
+                .andExpect(jsonPath("$.data.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.data.reason").value("RULECONFIG_ENABLED_RULE_NOT_FOUND"));
+    }
+
+    @Test
+    void configAuditStatusEndpointFailsClosedWhenWatchlistValueIsUnsafeOrEmpty() throws Exception {
+        MockMvc mockMvc = mockMvcWith(Map.of(
+                WATCHLIST_RULE_KEY,
+                ruleConfig(WATCHLIST_RULE_KEY, " , ", "Manual review Watchlist Pool", "v1", "WATCHLIST")
+        ));
+
+        mockMvc.perform(get("/api/rule/config-audit-status")
+                        .param("ruleKey", WATCHLIST_RULE_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RULECONFIG_VALUE_EMPTY_OR_PARSE_RISK_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.data.watchlistStatus").value("WATCHLIST_EMPTY_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.data.ruleValueSummary").value("watchlistSymbols=0"))
+                .andExpect(jsonPath("$.data.failClosed").value(true))
+                .andExpect(jsonPath("$.data.reason").value("RULECONFIG_VALUE_EMPTY"));
+    }
+
+    @Test
+    void configAuditStatusEndpointMarksVersionOrDescriptionPartialAsFailClosed() throws Exception {
+        MockMvc mockMvc = mockMvcWith(Map.of(WATCHLIST_RULE_KEY, ruleConfig("BTCUSDT")));
+
+        mockMvc.perform(get("/api/rule/config-audit-status")
+                        .param("ruleKey", WATCHLIST_RULE_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RULECONFIG_VERSION_OR_DESCRIPTION_PARTIAL"))
+                .andExpect(jsonPath("$.data.watchlistStatus").value("WATCHLIST_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.data.descriptionPresent").value(false))
+                .andExpect(jsonPath("$.data.versionOrDescriptionPartial").value(true))
+                .andExpect(jsonPath("$.data.failClosed").value(true))
+                .andExpect(jsonPath("$.data.reason").value("RULECONFIG_VERSION_OR_DESCRIPTION_PARTIAL"));
+    }
+
+    @Test
+    void configAuditStatusEndpointDoesNotExposeExecutableOrMutationFields() throws Exception {
+        MockMvc mockMvc = mockMvcWith(Map.of(
+                WATCHLIST_RULE_KEY,
+                ruleConfig(WATCHLIST_RULE_KEY, "BTCUSDT", "Manual review Watchlist Pool", "v1", "WATCHLIST")
+        ));
+
+        MvcResult result = mockMvc.perform(get("/api/rule/config-audit-status")
+                        .param("ruleKey", WATCHLIST_RULE_KEY))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).contains("notTradingSignal", "notCandidateSignal", "notDecisionGeneration", "notPointSignal", "notExecutable");
+        assertThat(body).doesNotContain(
+                "candidateRanking",
+                "finalDirection",
+                "entryPrice",
+                "stopPrice",
+                "takeProfit",
+                "riskReward",
+                "positionSize",
+                "leverage",
+                "orderAction",
+                "executionAction",
+                "autoTradingAction",
+                "pushSend",
+                "externalRefreshTriggered",
+                "/api/rule/reload"
+        );
+    }
+
     private static MockMvc mockMvcWith(Map<String, RuleConfigDO> ruleConfigMap) {
         RuleConfigService service = new StubRuleConfigService(ruleConfigMap);
         return MockMvcBuilders.standaloneSetup(new RuleController(service)).build();
     }
 
     private static RuleConfigDO ruleConfig(String ruleValue) {
+        return ruleConfig(WATCHLIST_RULE_KEY, ruleValue, null, null, null);
+    }
+
+    private static RuleConfigDO ruleConfig(
+            String ruleKey,
+            String ruleValue,
+            String description,
+            String version,
+            String ruleType
+    ) {
         RuleConfigDO ruleConfig = new RuleConfigDO();
-        ruleConfig.setRuleKey(WATCHLIST_RULE_KEY);
+        ruleConfig.setRuleKey(ruleKey);
+        ruleConfig.setRuleType(ruleType);
         ruleConfig.setRuleValue(ruleValue);
+        ruleConfig.setDescription(description);
+        ruleConfig.setVersion(version);
         ruleConfig.setEnabled(true);
         return ruleConfig;
     }
