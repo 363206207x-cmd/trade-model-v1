@@ -1,14 +1,14 @@
-current_head: "c6b35b5"
+current_head: "d9f7817"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Next minimal runtime slice selection after Data Source Health closure"
-active_block_cn: "数据源健康闭环后的下一个最小运行时模块选择"
-current_phase: "selection"
+active_block: "Source Read for RuleConfig runtime audit / rule explainability"
+active_block_cn: "规则配置运行时审计 / 规则解释源码读取"
+current_phase: "source_read"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "next-minimal-runtime-slice-selection-after-data-source-health"
-merge_rule: "A-risk selection after Data Source Health dashboard/API status visual closure; allow only selection docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
-next_required_action: "Next minimal runtime slice selection"
+current_branch: "ruleconfig-runtime-audit-rule-explainability-source-read"
+merge_rule: "A-risk source-read after Data Source Health dashboard/API status visual closure and next-slice selection; allow only source-read docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
+next_required_action: "Source Read for RuleConfig runtime audit / rule explainability"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -16,7 +16,7 @@ p360_status: "not allowed to start"
 new_skeleton_default: "blocked unless it directly reduces duplication, selects canonical ownership, wires existing service/runtime/dashboard/API review-only path, or resolves #830 runtime wiring gap"
 ownership_map_status: "completed on main; maps Cursor-era dashboard/service/schema/provider assets to canonical owners and freezes duplicate Codex skeleton expansion"
 first_minimal_runtime_wiring_candidate: "PositionSync + Dashboard review-only status"
-selected_runtime_wiring_target: "pending next minimal runtime slice selection"
+selected_runtime_wiring_target: "RuleConfig runtime audit / rule explainability"
 runtime_wiring_target_selection_status: "completed on main; selects PositionSync + Dashboard review-only status and prepares source-read verification without implementation"
 positionsync_dashboard_source_read_status: "completed on main as #835; verified existing provider/service/scheduler/mapper/schema/dashboard/API path and confirmed dashboard provider/fallback visibility gaps without implementation"
 minimal_positionsync_runtime_wiring_design_status: "completed on main as #836; designs the minimal review-only status mapping over existing PositionSyncService / PositionSyncStatusVO / SystemController / dashboard.html without implementation"
@@ -88,7 +88,10 @@ minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_imple
 minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_verification_status: "completed on main as 85e8182; compile, test-compile, DashboardControllerTest 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and git diff --check passed; live HTTP smoke was attempted but sandbox socket bind was blocked with Operation not permitted"
 data_source_health_dashboard_api_status_visual_verification_closure_status: "completed on main as c6b35b5; dataSourceHealthStatusPanel DOM/copy/safety copy is present, MockMvc/template verification is reused, no live screenshot or live UI smoke success is claimed, and no Push / Candidate generation / Decision generation / Point / trading semantics are present; Data Source Health is the 8th completed REVIEW_ONLY_RUNTIME partial slice"
 v1_b_risk_workflow_usability_fix_status: "workflow-only hotfix history if present; not the current active business package and does not change business capability"
+v1_status_summary_accuracy_fix_status: "completed on main as d9f7817; workflow/status reporting fix only, aligns current main baseline and completed slice count without changing business capability"
+next_minimal_runtime_slice_selection_after_data_source_health_status: "selection package selects RuleConfig runtime audit / rule explainability as the next source-read-only target after eight REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 source_of_truth_files:
+  - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_DATA_SOURCE_HEALTH.md
   - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_SOURCE_READ.md
   - docs/V1_MINIMAL_REVIEW_ONLY_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_RUNTIME_WIRING_DESIGN.md
   - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_IMPLEMENTATION_READINESS_GATE.md
