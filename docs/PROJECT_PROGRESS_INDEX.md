@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `5903409 docs(ruleconfig): read runtime audit explainability source path`.
-- Active stop-loss track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
+- Current HEAD: `b4497e1 chore(workflow): add one-command operator orchestrator`.
+- Active stop-loss track: `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
 - Selected next minimal runtime slice: `RuleConfig runtime audit / rule explainability`.
-- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
+- Next required action: `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -47,8 +47,9 @@ Current merged main:
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target.
 - Any B-risk workflow usability hotfix is workflow-only history in this handoff; it does not change business capability or the current next action.
 - Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed minimal runtime slices are 8.
-- This source-read package confirms RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only without capability movement.
-- `5903409` completes the RuleConfig source-read package; this workflow orchestrator package only improves terminal automation and preserves the next business action.
+- `5903409` completes the RuleConfig source-read package. It confirms RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only without capability movement.
+- `b4497e1` completes the workflow-only V1 Operator One-Command Orchestrator package.
+- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed in the current design package; it preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines review-only status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
@@ -249,13 +250,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
+- Current active block is `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `RuleConfig runtime audit / rule explainability`.
-- The next required action is `Next minimal runtime slice selection`.
+- The next required action is `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
