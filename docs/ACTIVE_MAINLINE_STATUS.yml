@@ -1,14 +1,14 @@
-current_head: "8a2d8e7"
+current_head: "f4a274a"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design"
-active_block_cn: "来源追踪 / 运行时 K线 / 数据质量 / 多周期聚合最小只读运行时接线设计"
-current_phase: "design"
+active_block: "Implementation readiness gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status"
+active_block_cn: "来源追踪 / 运行时 K线 / 数据质量 / 多周期聚合只读状态实现前就绪门"
+current_phase: "readiness_gate"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-sourcetrace-runtimekline-dataquality-multitimeframe-status-runtime-wiring-design"
-merge_rule: "A-risk design after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe source read; allow design docs and source-of-truth updates only; no Java/test/dashboard business logic/schema/config/pom changes and no endpoint/panel implementation, external API refresh, scheduler/collector/API client trigger, Push send, external channel, recheck execution, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler/Orchestrator, Position Monitor execution, replay/recheck, P359, or P360"
-next_required_action: "Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design"
+current_branch: "sourcetrace-runtimekline-dataquality-multitimeframe-status-implementation-readiness-gate"
+merge_rule: "A-risk readiness gate after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe design; allow readiness-gate docs and source-of-truth updates only; no Java/test/dashboard business logic/schema/config/pom changes and no endpoint/panel implementation, external API refresh, scheduler/collector/API client trigger, Push send, external channel, recheck execution, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler/Orchestrator, Position Monitor execution, replay/recheck, P359, or P360"
+next_required_action: "Implementation readiness gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -121,8 +121,10 @@ minimal_review_only_alert_fatigue_notification_policy_status_runtime_wiring_impl
 minimal_review_only_alert_fatigue_notification_policy_status_runtime_wiring_verification_status: "completed on main as b217b60; verifies endpoint/dashboard review-only behavior, MonitorAlert read-only owner path, safety fields, fail-closed/review-only states, DashboardControllerTest, full tests, forbidden semantics classification, and source-of-truth alignment from 17ab553 to 9ec569c without Java/test/dashboard/schema/config/pom changes"
 alert_fatigue_notification_policy_status_visual_verification_closure_status: "completed on main as a9ec1c9; environment-limited visual closure confirms alertFatiguePolicyStatusPanel DOM/copy/safety copy, review-only/fail-closed/not Push/not external channel/not recheck/not scheduler/not collector/not API-client refresh/not alert write/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, no live UI success is claimed, and no Push / recheck / refresh / Candidate / Decision generation / Point / trading semantics are present; Alert fatigue / notification policy status is the 12th completed REVIEW_ONLY_RUNTIME partial slice"
 next_minimal_runtime_slice_selection_after_alert_fatigue_status: "completed on main as 8a2d8e7; selects SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status as the next source-read-only target after twelve REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
-sourcetrace_runtimekline_dataquality_multitimeframe_status_source_read_status: "completed by this package when merged; confirms existing /api/dashboard/detail SourceTrace and RuntimeKline owner path, DashboardSourceTraceDetailAdapter, DashboardRuntimeKlineContextAdapter, persisted OHLCV readiness read path, dashboard diagnostics, and tests; identifies missing dedicated aggregate endpoint/panel and frozen source-binding duplicate risk; returns GO to design only without implementation or capability movement"
+sourcetrace_runtimekline_dataquality_multitimeframe_status_source_read_status: "completed on main as f4a274a; confirms existing /api/dashboard/detail SourceTrace and RuntimeKline owner path, DashboardSourceTraceDetailAdapter, DashboardRuntimeKlineContextAdapter, persisted OHLCV readiness read path, dashboard diagnostics, and tests; identifies missing dedicated aggregate endpoint/panel and frozen source-binding duplicate risk; returns GO to design only without implementation or capability movement"
+minimal_review_only_sourcetrace_runtimekline_dataquality_multitimeframe_status_runtime_wiring_design_status: "completed by this package when merged; selects existing /api/dashboard/detail SourceTrace / RuntimeKline owner path, optional thin read-only Map endpoint only if readiness gate approves, status mapping, fail-closed rules, frozen source-binding boundary, and no refresh/generation/trading guardrails without implementation or capability movement"
 source_of_truth_files:
+  - docs/V1_MINIMAL_REVIEW_ONLY_SOURCETRACE_RUNTIMEKLINE_DATAQUALITY_MULTITIMEFRAME_STATUS_RUNTIME_WIRING_DESIGN.md
   - docs/V1_SOURCETRACE_RUNTIMEKLINE_DATAQUALITY_MULTITIMEFRAME_STATUS_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_ALERT_FATIGUE.md
   - docs/V1_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_VISUAL_VERIFICATION_CLOSURE.md
