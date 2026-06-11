@@ -37,10 +37,10 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `85e8182 docs(health): verify data source health runtime wiring`
+- Current merged main: `c6b35b5 docs(health): record data source health visual closure`
 - Current active block: `Next minimal runtime slice selection after Data Source Health closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this visual closure: Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice after this closure package is accepted; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Capability movement from the merged Data Source Health visual closure: Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
 - Next required action: `Next minimal runtime slice selection`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
@@ -74,10 +74,10 @@ The following do not count as completed:
 - `62843de` completes the workflow phase normalization that makes the Data Source Health readiness-gate handoff runnable by `v1-auto.sh next`.
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to a minimal review-only Data Source Health Dashboard/API status implementation.
 - `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, a dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and implementation/source-of-truth docs. It does not trigger external API refresh, scheduler, collector, API client reads, Push, Candidate generation, Decision generation, Point generation, replay execution, review result generation, or trading.
-- This verification package confirms compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` all passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
-- This visual closure package records environment-limited visual verification: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
+- `85e8182` completes Data Source Health runtime wiring verification: compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` all passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
+- `c6b35b5` completes Data Source Health visual closure with environment-limited evidence: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Data Source Health business behavior and is not the current active package.
-- Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice after this visual closure package is accepted. The completed review-only runtime slice count is 8.
+- Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice on merged main. The completed review-only runtime slice count is 8.
 
 ## Runtime Slice History
 
@@ -128,7 +128,7 @@ DecisionResult chain history:
 - Data Source Health implementation readiness gate is completed on main as `9290c1b`.
 - Data Source Health implementation is completed on main as `2984e48`.
 - Data Source Health runtime wiring verification is completed on main as `85e8182`.
-- Data Source Health visual closure is completed in this visual closure package with environment-limited evidence; after merge it is the eighth completed review-only runtime partial slice.
+- Data Source Health visual closure is completed on main as `c6b35b5`; it is the eighth completed review-only runtime partial slice.
 - Current active package is Next minimal runtime slice selection after Data Source Health closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.

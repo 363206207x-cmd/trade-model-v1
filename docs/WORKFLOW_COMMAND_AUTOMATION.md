@@ -45,6 +45,10 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh` 不绕过固定脚本，只把状态、下一步、PR 检查和合并交接变成用户可读的中文操作台。
 
+`v1-auto.sh summary` and `v1-auto.sh next` read completed Review-Only Runtime partial slice count from `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md` instead of hard-coding the count in the script.
+
+`v1-auto.sh summary` 和 `v1-auto.sh next` 从 `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md` 读取已完成 Review-Only Runtime partial（只读运行时部分完成）小闭环数量，不再在脚本中硬编码数量。
+
 One-command runner entry:
 
 ```bash
