@@ -12,8 +12,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
-- Current next required action is `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
+- Current active block is `Data Source Health Dashboard/API Status Visual Verification / Closure`.
+- Current next required action is `Data Source Health Dashboard/API Status Visual Verification / Closure`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -45,6 +45,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `62843de` completes the Data Source Health readiness phase normalization workflow fix.
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO for minimal implementation.
 - `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates. Data Source Health is not yet a completed runtime slice; verification is the next required action.
+- This verification package confirms compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` all passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
+- Data Source Health still requires visual verification / closure before becoming a completed runtime slice; completed review-only runtime slices remain 7.
 - This B-risk workflow usability hotfix fixes negative safety assertion classification, Codex CLI failure task printing, and dirty work packaging tooling only. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
