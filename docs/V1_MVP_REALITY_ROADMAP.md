@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design`.
+- Active track: `Implementation readiness gate for RiskActionGuard read-only status`.
 - Selected target: `RiskActionGuard read-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, and `Missed Opportunity / Review Archive status`.
 - Selected next minimal runtime slice: `RiskActionGuard read-only status`.
-- Next required action: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design`.
+- Next required action: `Implementation readiness gate for RiskActionGuard read-only status`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -59,7 +59,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification is completed on main as `09f6a9c`: it verifies compile/test, targeted controller/dashboard tests, endpoint/dashboard status mapping, safety fields, forbidden semantics classification, and source-of-truth alignment.
 - Missed Opportunity / Review Archive Status Visual Verification / Closure is completed on main as `239664d` with environment-limited evidence. Missed Opportunity / Review Archive status is the tenth completed Review-Only Runtime partial slice.
 - Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed on main as `095ade9` and selects `RiskActionGuard read-only status`.
-- Source Read for RiskActionGuard read-only status is completed by this package when merged. It confirms existing RiskActionGuard display adapter / VO / dashboard detail / dashboard placeholder assets and returns GO to design only without implementation or capability movement.
+- Source Read for RiskActionGuard read-only status is completed on main as `018a438`. It confirms existing RiskActionGuard display adapter / VO / dashboard detail / dashboard placeholder assets and returns GO to design only without implementation or capability movement.
+- Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design is completed by this package when merged. It fixes owner path, dedicated-endpoint decision, status mapping, manual-review-only action wording guardrails, fail-closed rules, dashboard/API boundary, and readiness checklist without implementation or capability movement.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
