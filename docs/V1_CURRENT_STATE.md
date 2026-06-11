@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `c6b35b5 docs(health): record data source health visual closure`
+- Current merged main: `d9f7817 chore(workflow): fix status summary baseline`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Next minimal runtime slice selection after Data Source Health closure`.
-- Current next required action is `Next minimal runtime slice selection`.
+- Current active block is `Source Read for RuleConfig runtime audit / rule explainability`.
+- Current next required action is `Source Read for RuleConfig runtime audit / rule explainability`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -47,6 +47,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates.
 - `85e8182` confirms Data Source Health runtime wiring verification: compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` all passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
 - `c6b35b5` records Data Source Health visual closure with environment-limited evidence: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
+- `d9f7817` completes the V1 status summary accuracy fix. It aligns current main and completed-slice reporting after Data Source Health visual closure without changing business capability.
 - Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed review-only runtime slices are 8.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
@@ -93,8 +94,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - The completed workflow repair and V1 Auto Operator packs do not change DecisionResult runtime behavior.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`.
-- The active package after this visual closure handoff is `Next minimal runtime slice selection after Data Source Health closure`; it may add only selection docs and source-of-truth updates.
-- Selected runtime wiring target is pending selection.
+- The active package after this selection handoff is `Source Read for RuleConfig runtime audit / rule explainability`; it may add only source-read docs and source-of-truth updates.
+- Selected runtime wiring target is `RuleConfig runtime audit / rule explainability`.
 - The completed Data Source Health slice inventoried `DataSourceHealthDO`, reused existing slice-local `sourceHealth` fields, added a minimal review-only endpoint/dashboard status panel, verified it, and visually closed it with environment-limited evidence; the next package must select the next minimal runtime target before any source read.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
 - P360 is not allowed to start.
