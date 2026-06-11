@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `36da811 docs(alerts): design notification policy status wiring (#938)`
+- Current merged main: `17ab553 docs(alerts): verify notification policy implementation readiness (#939)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation`.
-- Current next required action is `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation`.
+- Current active block is `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification`.
+- Current next required action is `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -191,7 +191,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - Next Minimal Runtime Slice Selection After RiskActionGuard Closure is completed on main as `cf4f2f1` and selects `Alert fatigue / notification policy status` as the next source-read-only target.
 - Source Read for Alert fatigue / notification policy status is completed on main as `14e0e07`. It confirms existing `MonitorAlertDO` / `MonitorAlertMapper` / `MonitorService` / dashboard alert center / review alert explanation assets, identifies missing dedicated status endpoint/panel and Push/recheck boundary gaps, and returns GO to design only.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Design is completed on main as `36da811`. It selects a future minimal read-only dashboard status endpoint/panel over existing MonitorAlert read assets, defines status mapping, safety fields, fail-closed rules, not-Push / not-external-channel / not-recheck / not-refresh boundaries, and returns GO to implementation readiness gate without implementation or capability movement.
-- Implementation readiness gate for Alert fatigue / notification policy status is completed by this package when merged. It returns GO to B-risk minimal implementation over existing MonitorAlert read assets, with one minimal read-only dashboard status endpoint, minimal dashboard panel/copy/DOM, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates; it forbids `MonitorAlertWriteServiceImpl`, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, and P360.
+- Implementation readiness gate for Alert fatigue / notification policy status is completed on main as `17ab553`. It returns GO to B-risk minimal implementation over existing MonitorAlert read assets, with one minimal read-only dashboard status endpoint, minimal dashboard panel/copy/DOM, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates; it forbids `MonitorAlertWriteServiceImpl`, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, and P360.
+- Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation is completed by this package when merged. It adds one minimal read-only `/api/dashboard/alert-fatigue-policy-status` endpoint, dashboard `alertFatiguePolicyStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing MonitorAlert read assets without notification send, external channel, recheck execution, refresh triggers, trading semantics, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, or P360.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.

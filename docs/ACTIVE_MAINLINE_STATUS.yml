@@ -1,14 +1,14 @@
-current_head: "36da811"
+current_head: "17ab553"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation"
-active_block_cn: "告警疲劳 / 通知策略状态最小只读运行时接线实现"
-current_phase: "implementation"
+active_block: "Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification"
+active_block_cn: "告警疲劳 / 通知策略状态最小只读运行时接线验证"
+current_phase: "verification"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-alert-fatigue-notification-policy-status-runtime-wiring-implementation"
-merge_rule: "B-risk implementation after Alert fatigue / notification policy status readiness gate; allow only minimal read-only DashboardController Map endpoint, dashboard status panel/copy/DOM, targeted DashboardControllerTest coverage, implementation docs, and source-of-truth updates; no MonitorAlertWriteServiceImpl invocation, no Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, schema/config/pom, DTO/Validator/Assembler/Orchestrator, Position Monitor execution, replay/recheck, P359, or P360"
-next_required_action: "Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation"
+current_branch: "alert-fatigue-notification-policy-status-runtime-wiring-verification"
+merge_rule: "A-risk verification after Alert fatigue / notification policy status implementation; allow verification docs and source-of-truth updates only; no Java/test/dashboard business logic/schema/config/pom changes and no Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler/Orchestrator, Position Monitor execution, replay/recheck, P359, or P360"
+next_required_action: "Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -116,9 +116,11 @@ riskactionguard_read_only_status_visual_verification_closure_status: "completed 
 next_minimal_runtime_slice_selection_after_riskactionguard_status: "completed on main as cf4f2f1; selects Alert fatigue / notification policy status as the next source-read-only target after eleven REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 alert_fatigue_notification_policy_status_source_read_status: "completed on main as 14e0e07; confirms existing MonitorAlert / MonitorService / MonitorAlertMapper / dashboard alert center / review alert explain assets, identifies missing dedicated status endpoint/panel and Push/recheck boundary gaps, and returns GO to design only without implementation or capability movement"
 minimal_review_only_alert_fatigue_notification_policy_status_runtime_wiring_design_status: "completed on main as 36da811; selects one future minimal read-only dashboard status endpoint/panel over existing MonitorAlert read assets, defines alert fatigue / notification policy status mapping, safety fields, fail-closed rules, not-Push / not-external-channel / not-recheck / not-refresh boundaries, and returns GO to implementation readiness gate without implementation or capability movement"
-alert_fatigue_notification_policy_status_implementation_readiness_gate_status: "completed by this package when merged; returns GO to B-risk minimal implementation using existing MonitorAlert read assets, one minimal read-only dashboard status endpoint, minimal dashboard panel/copy/DOM, targeted DashboardControllerTest coverage, implementation docs, and source-of-truth updates; forbids MonitorAlertWriteServiceImpl, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, and P360"
+alert_fatigue_notification_policy_status_implementation_readiness_gate_status: "completed on main as 17ab553; returns GO to B-risk minimal implementation using existing MonitorAlert read assets, one minimal read-only dashboard status endpoint, minimal dashboard panel/copy/DOM, targeted DashboardControllerTest coverage, implementation docs, and source-of-truth updates; forbids MonitorAlertWriteServiceImpl, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, and P360"
+minimal_review_only_alert_fatigue_notification_policy_status_runtime_wiring_implementation_status: "completed by this package when merged; adds one minimal read-only /api/dashboard/alert-fatigue-policy-status endpoint, dashboard alertFatiguePolicyStatusPanel, targeted DashboardControllerTest coverage, implementation docs, and source-of-truth updates over existing MonitorAlert read assets without MonitorAlertWriteServiceImpl, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, or P360"
 source_of_truth_files:
   - docs/V1_MINIMAL_REVIEW_ONLY_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_RUNTIME_WIRING_DESIGN.md
+  - docs/V1_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_RUNTIME_WIRING_IMPLEMENTATION.md
   - docs/V1_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_RISKACTIONGUARD.md
