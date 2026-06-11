@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `ed7faeb docs(missed): verify review archive implementation readiness`.
-- Active stop-loss track: `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification`.
+- Current HEAD: `452a8ac feat(missed): show review archive review-only status`.
+- Active stop-loss track: `Missed Opportunity / Review Archive Status Visual Verification / Closure`.
 - Selected target: `Missed Opportunity / Review Archive status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, and `RuleConfig runtime audit / rule explainability`.
 - Selected next minimal runtime slice: `Missed Opportunity / Review Archive status`.
-- Next required action: `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification`.
+- Next required action: `Missed Opportunity / Review Archive Status Visual Verification / Closure`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -61,7 +61,8 @@ Current merged main:
 - Source Read for Missed Opportunity / Review Archive status is completed on main before `83f191e`. It confirms existing MissedOpportunityController / MissedOpportunityServiceImpl read-query-count methods / MissedOpportunityMapper / `tm_missed_opportunity` / MissedReasonViewParser / ReviewAggregateServiceImpl / review page missed section / dashboard missed-count assets, identifies dedicated status/dashboard/fail-closed gaps, and returns GO to design only without implementation or capability movement.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design is completed on main as `83f191e`; it fixes owner path, status mapping, dashboard/API surface, fail-closed rules, generation/write exclusions, and returns GO to implementation readiness gate without implementation. The future implementation package is B-risk.
 - Implementation readiness gate for Missed Opportunity / Review Archive status is completed on main as `ed7faeb`; it returns GO for one minimal read-only status endpoint or existing status path reuse, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates over existing MissedOpportunity / ReviewAggregate / dashboard-count assets.
-- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed by this package when merged; it adds one minimal read-only `/api/missed-opportunity/review-archive-status` endpoint, dashboard `missedArchiveStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates. The active next package is A-risk verification.
+- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed on main as `452a8ac`; it adds one minimal read-only `/api/missed-opportunity/review-archive-status` endpoint, dashboard `missedArchiveStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates. The active verification package is A-risk docs/source-of-truth only.
+- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification is completed by this package when merged; it verifies compile/test results, endpoint/dashboard status mapping, safety fields, forbidden semantics, and source-of-truth alignment. The next package is visual closure.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
