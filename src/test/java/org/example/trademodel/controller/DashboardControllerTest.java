@@ -400,6 +400,41 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyMissedArchiveRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/missed-opportunity/review-archive-status");
+        assertThat(html).contains("missedArchiveStatusPanel");
+        assertThat(html).contains("missedArchiveRuntimeStatusValue");
+        assertThat(html).contains("missedArchiveScopeValue");
+        assertThat(html).contains("missedArchiveCountValue");
+        assertThat(html).contains("missedArchiveLatestValue");
+        assertThat(html).contains("missedArchiveReasonParseValue");
+        assertThat(html).contains("missedArchiveSourceHealthValue");
+        assertThat(html).contains("missedArchiveReviewOnlyValue");
+        assertThat(html).contains("missedArchiveSignalBoundaryValue");
+        assertThat(html).contains("missedArchiveGenerationBoundaryValue");
+        assertThat(html).contains("missedArchiveUpstreamValue");
+        assertThat(html).contains("missedArchiveReasonValue");
+        assertThat(html).contains("MISSED_ARCHIVE_REVIEW_ONLY_READY");
+        assertThat(html).contains("MISSED_ARCHIVE_COUNT_ONLY_PARTIAL");
+        assertThat(html).contains("MISSED_ARCHIVE_EMPTY_FAIL_CLOSED");
+        assertThat(html).contains("MISSED_REASON_EMPTY_OR_PARSE_PARTIAL");
+        assertThat(html).contains("MISSED_REASON_PARSE_FAILED_FAIL_CLOSED");
+        assertThat(html).contains("MISSED_ARCHIVE_LINKAGE_PARTIAL");
+        assertThat(html).contains("MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED");
+        assertThat(html).contains("MISSED_ARCHIVE_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("Missed Opportunity / Review Archive 是只读状态，不是交易信号");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("不触发 missed-opportunity generation/write");
+        assertThat(html).contains("不生成复盘结果");
+        assertThat(html).contains("不触发 replay / recheck execution");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
