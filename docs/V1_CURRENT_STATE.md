@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `5903409 docs(ruleconfig): read runtime audit explainability source path`
+- Current merged main: `b4497e1 chore(workflow): add one-command operator orchestrator`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
-- Current next required action is `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
+- Current active block is `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
+- Current next required action is `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -49,9 +49,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `c6b35b5` records Data Source Health visual closure with environment-limited evidence: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
 - `d9f7817` completes the V1 status summary accuracy fix. It aligns current main and completed-slice reporting after Data Source Health visual closure without changing business capability.
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target.
-- The RuleConfig runtime audit / rule explainability source-read package confirms reusable RuleConfig / Watchlist owner assets and adjacent RuleVersionLog audit context, identifies generic audit/explainability gaps, and returns GO to design only without capability movement.
-- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability and preserves the next business action as RuleConfig design.
-- V1 Operator One-Command Orchestrator is workflow-only: it adds a terminal total-control entry and does not execute RuleConfig design or change business capability.
+- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability: it confirms reusable RuleConfig / Watchlist owner assets and adjacent RuleVersionLog audit context, identifies generic audit/explainability gaps, and returns GO to design only without capability movement.
+- `b4497e1` completes V1 Operator One-Command Orchestrator as a workflow-only package; it adds a terminal total-control entry and does not execute RuleConfig design or change business capability.
+- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed in the current design package. It preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed review-only runtime slices are 8.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
@@ -98,7 +98,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - The completed workflow repair and V1 Auto Operator packs do not change DecisionResult runtime behavior.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`.
-- The active package after this source-read handoff is `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`; it may add only design docs and source-of-truth updates.
+- The active package after this design handoff is `Implementation readiness gate for RuleConfig runtime audit / rule explainability`; it may add only readiness docs and source-of-truth updates.
 - Selected runtime wiring target is `RuleConfig runtime audit / rule explainability`.
 - The completed Data Source Health slice inventoried `DataSourceHealthDO`, reused existing slice-local `sourceHealth` fields, added a minimal review-only endpoint/dashboard status panel, verified it, and visually closed it with environment-limited evidence; the next package must select the next minimal runtime target before any source read.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.

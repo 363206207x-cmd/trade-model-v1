@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `5903409 docs(ruleconfig): read runtime audit explainability source path`
-- Current active block: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`
+- Current merged main: `b4497e1 chore(workflow): add one-command operator orchestrator`
+- Current active block: `Implementation readiness gate for RuleConfig runtime audit / rule explainability`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from the merged Data Source Health visual closure: Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`
+- Capability movement from this RuleConfig design: none. Data Source Health dashboard/API status remains the 8th completed review-only runtime partial slice; RuleConfig runtime audit / rule explainability is not implemented; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Implementation readiness gate for RuleConfig runtime audit / rule explainability`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -80,9 +80,10 @@ The following do not count as completed:
 - Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice on merged main. The completed review-only runtime slice count is 8.
 - `d9f7817` completes the V1 status summary accuracy fix. It aligns the workflow/status reporting baseline after Data Source Health visual closure and does not change business capability.
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target after eight completed review-only runtime slices.
-- This source-read package confirms existing RuleConfig / Watchlist owner assets, the current Watchlist status panel/API pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only, with no implementation and no capability movement.
-- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability and keeps the next business action as Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design.
-- This workflow orchestration package may update terminal workflow docs/scripts only; it does not execute RuleConfig design and does not change business capability.
+- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability. It confirms existing RuleConfig / Watchlist owner assets, the current Watchlist status panel/API pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only, with no implementation and no capability movement.
+- `b4497e1` completes the V1 Operator One-Command Orchestrator workflow-only package; it does not execute RuleConfig design and does not change business capability.
+- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed in the current design package. It preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, and readiness checklist, and returns GO to implementation readiness gate without implementation.
+- Current active package after this design handoff is `Implementation readiness gate for RuleConfig runtime audit / rule explainability`. It may decide whether a minimal review-only RuleController endpoint or dashboard reuse is safe; it may not implement endpoint/dashboard/service/test changes.
 
 ## Runtime Slice History
 
@@ -134,7 +135,9 @@ DecisionResult chain history:
 - Data Source Health implementation is completed on main as `2984e48`.
 - Data Source Health runtime wiring verification is completed on main as `85e8182`.
 - Data Source Health visual closure is completed on main as `c6b35b5`; it is the eighth completed review-only runtime partial slice.
-- Current active package is Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design.
+- Source Read for RuleConfig runtime audit / rule explainability is completed on main as `5903409` and returned GO to design only.
+- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed in the current design package and returns GO to implementation readiness gate.
+- Current active package is Implementation readiness gate for RuleConfig runtime audit / rule explainability.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
