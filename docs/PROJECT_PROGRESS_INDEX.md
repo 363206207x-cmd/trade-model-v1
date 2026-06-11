@@ -6,7 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `2778b82 docsworkflow: implementation readiness gate for ruleconfig runtime audit / rule explainability`.
+- Current HEAD: `b298ee9 docs(ruleconfig): verify implementation readiness`.
 - Active stop-loss track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
@@ -50,7 +50,7 @@ Current merged main:
 - `5903409` completes the RuleConfig source-read package. It confirms RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only without capability movement.
 - `b4497e1` completes the workflow-only V1 Operator One-Command Orchestrator package.
 - `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main; it preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines review-only status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
-- RuleConfig runtime audit / rule explainability implementation readiness gate is completed in the current readiness package; it returns GO for one minimal read-only `RuleController` `Map` status endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only and forbids DTO / Validator / Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
+- `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main; it returns GO for one minimal read-only `RuleController` `Map` status endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only and forbids DTO / Validator / Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
