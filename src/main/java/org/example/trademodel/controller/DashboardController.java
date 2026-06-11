@@ -88,6 +88,18 @@ public class DashboardController {
     private static final String DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED = "DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED";
     private static final String DATA_SOURCE_HEALTH_WATCH_ONLY = "DATA_SOURCE_HEALTH_WATCH_ONLY_REVIEW";
     private static final String DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED = "DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_READY = "RISK_ACTION_GUARD_REVIEW_ONLY_READY";
+    private static final String RISK_ACTION_GUARD_BACKEND_PENDING_FAIL_CLOSED = "BACKEND_PENDING_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_DECISION_MISSING_FAIL_CLOSED = "DECISION_MISSING_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_PLAN_BOUNDARY_FAIL_CLOSED = "PLAN_BOUNDARY_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_EXECUTION_PLAN_NOT_READY_FAIL_CLOSED = "EXECUTION_PLAN_NOT_READY_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_LIQUIDITY_CONTEXT_MISSING_FAIL_CLOSED = "LIQUIDITY_CONTEXT_MISSING_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_LIQUIDITY_DETERIORATION_REVIEW_ONLY = "LIQUIDITY_DETERIORATION_REVIEW_ONLY";
+    private static final String RISK_ACTION_GUARD_STAMPEDE_REVIEW_ONLY_FAIL_CLOSED = "STAMPEDE_REVIEW_ONLY_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_WICK_ONLY_REVIEW_ONLY_FAIL_CLOSED = "WICK_ONLY_REVIEW_ONLY_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_HIGH_RISK_REVIEW_ONLY = "HIGH_RISK_REVIEW_ONLY";
+    private static final String RISK_ACTION_GUARD_ACTION_FLAGS_BLOCKED_FAIL_CLOSED = "ACTION_FLAGS_BLOCKED_FAIL_CLOSED";
+    private static final String RISK_ACTION_GUARD_ACTION_WORDING_BLOCKED_FAIL_CLOSED = "ACTION_WORDING_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -443,6 +455,72 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/risk-action-guard-status")
+    @ResponseBody
+    public Map<String, Object> riskActionGuardStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseRiskActionGuardStatus(normalizedSymbol);
+
+        DecisionResultVO decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+        DashboardDetailResponseVO detail = DashboardDetailResponseVO.withSafeDefaultDisplays();
+        detail.setSymbol(normalizedSymbol);
+        detail.setDecision(decision);
+
+        DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundary = planBoundaryDisplayAdapter.build(
+                normalizedSymbol,
+                decision,
+                detail.getPlanBoundaryDisplay()
+        );
+        DashboardDetailResponseVO.ExecutionPlanDisplayVO executionPlan = executionPlanDisplayAdapter.build(
+                decision,
+                planBoundary,
+                detail.getExecutionPlanDisplay(),
+                null
+        );
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO riskGuard = riskActionGuardDisplayAdapter.build(
+                decision,
+                planBoundary,
+                executionPlan,
+                detail.getRiskActionGuardDisplay()
+        );
+
+        status.put("analysisId", decision != null ? decision.getAnalysisId() : null);
+        status.put("riskActionGuardStatus", firstNonBlank(
+                riskGuard != null ? riskGuard.getRiskActionGuardStatus() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("riskActionGuardStatusLabel", firstNonBlank(
+                riskGuard != null ? riskGuard.getRiskActionGuardStatusLabel() : null,
+                "后端未接入"
+        ));
+        status.put("riskActionAdviceSummary", safeRiskActionAdviceSummary(
+                riskGuard != null ? riskGuard.getRiskActionAdvice() : null
+        ));
+        status.put("riskActionBlockingReason", firstNonBlank(
+                riskGuard != null ? riskGuard.getRiskActionBlockingReason() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("liquidityState", firstNonBlank(
+                riskGuard != null ? riskGuard.getLiquidityState() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("stampedeDetected", riskGuard != null && Boolean.TRUE.equals(riskGuard.getStampedeDetected()));
+        status.put("wickOnlyRisk", riskGuard != null && Boolean.TRUE.equals(riskGuard.getWickOnlyRisk()));
+        status.put("manualRiskReviewRequired", riskGuard == null || Boolean.TRUE.equals(riskGuard.getManualRiskReviewRequired()));
+        status.put("actionFlagsAllFalse", riskActionGuardActionFlagsAllFalse(riskGuard));
+        status.put("planBoundaryStatus", firstNonBlank(
+                planBoundary != null ? planBoundary.getPlanBoundaryStatus() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("executionPlanStatus", firstNonBlank(
+                executionPlan != null ? executionPlan.getExecutionPlanStatus() : null,
+                "BOUNDARY_PENDING"
+        ));
+
+        applyRiskActionGuardStatus(status, decision, planBoundary, executionPlan, riskGuard);
+        return status;
+    }
+
     @GetMapping("/api/dashboard/review-replay-result-status")
     @ResponseBody
     public Map<String, Object> reviewReplayResultStatus(
@@ -723,6 +801,42 @@ public class DashboardController {
         return status;
     }
 
+    private Map<String, Object> baseRiskActionGuardStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", RISK_ACTION_GUARD_BACKEND_PENDING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("riskActionGuardStatus", "BACKEND_PENDING");
+        status.put("riskActionGuardStatusLabel", "后端未接入");
+        status.put("riskActionAdviceSummary", "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号。");
+        status.put("riskActionBlockingReason", "BACKEND_PENDING");
+        status.put("liquidityState", "BACKEND_PENDING");
+        status.put("stampedeDetected", false);
+        status.put("wickOnlyRisk", false);
+        status.put("manualRiskReviewRequired", true);
+        status.put("actionFlagsAllFalse", false);
+        status.put("planBoundaryStatus", "BACKEND_PENDING");
+        status.put("executionPlanStatus", "BOUNDARY_PENDING");
+        status.put("sourceTraceComplete", false);
+        status.put("sourceHealth", "BLOCKED");
+        status.put("reason", "RISK_ACTION_GUARD_STATUS_PENDING");
+        status.put("message", "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号、候选、决策生成、点位或可执行动作。");
+        status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notExecutable", true);
+        status.put("notPositionMonitorExecution", true);
+        status.put("notExecutionPlanGeneration", true);
+        status.put("notBoundaryCandidateGeneration", true);
+        status.put("externalRefreshTriggered", false);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        return status;
+    }
+
     private Map<String, Object> baseReviewReplayStatus(String analysisId, String normalizedSymbol) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("status", REVIEW_REPLAY_BLOCKED_FAIL_CLOSED);
@@ -816,6 +930,156 @@ public class DashboardController {
                                            String message,
                                            boolean failClosed,
                                            String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyRiskActionGuardStatus(Map<String, Object> status,
+                                            DecisionResultVO decision,
+                                            DashboardDetailResponseVO.PlanBoundaryDisplayVO planBoundary,
+                                            DashboardDetailResponseVO.ExecutionPlanDisplayVO executionPlan,
+                                            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskGuard) {
+        if (decision == null) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_DECISION_MISSING_FAIL_CLOSED,
+                    "DECISION_MISSING",
+                    "DecisionResult 缺失；RiskActionGuard 只读状态 fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+            return;
+        }
+        if (riskGuard == null) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_BACKEND_PENDING_FAIL_CLOSED,
+                    "RISK_ACTION_GUARD_DISPLAY_MISSING",
+                    "RiskActionGuard display owner data 缺失；只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+            return;
+        }
+
+        String riskStatus = normalizedStatus(riskGuard.getRiskActionGuardStatus());
+        String blockingReason = normalizedStatus(riskGuard.getRiskActionBlockingReason());
+        String planStatus = normalizedStatus(planBoundary != null ? planBoundary.getPlanBoundaryStatus() : null);
+        String executionStatus = normalizedStatus(executionPlan != null ? executionPlan.getExecutionPlanStatus() : null);
+
+        if (!riskActionGuardActionFlagsAllFalse(riskGuard)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_ACTION_FLAGS_BLOCKED_FAIL_CLOSED,
+                    "RISK_ACTION_GUARD_ACTION_FLAGS_TRUE",
+                    "RiskActionGuard action flags 出现 true；已按只读 fail-closed 处理，不输出可执行动作。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (hasUnsafeActionWording(riskGuard.getRiskActionAdvice())) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_ACTION_WORDING_BLOCKED_FAIL_CLOSED,
+                    "RISK_ACTION_GUARD_ACTION_WORDING_UNSAFE",
+                    "RiskActionGuard advice 包含未加防护的动作措辞；已按只读 fail-closed 处理。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if ("PLAN_BOUNDARY_NOT_VALID".equals(blockingReason)
+                || (!"VALID".equals(planStatus) && hasText(planStatus))) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_PLAN_BOUNDARY_FAIL_CLOSED,
+                    firstNonBlank(riskGuard.getRiskActionBlockingReason(), "PLAN_BOUNDARY_NOT_VALID"),
+                    "PlanBoundary 未满足只读复核边界；RiskActionGuard fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if ("EXECUTION_PLAN_NOT_READY".equals(blockingReason)
+                || (!"READY_REVIEW_ONLY".equals(executionStatus) && hasText(executionStatus))) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_EXECUTION_PLAN_NOT_READY_FAIL_CLOSED,
+                    firstNonBlank(riskGuard.getRiskActionBlockingReason(), "EXECUTION_PLAN_NOT_READY"),
+                    "ExecutionPlan 未处于只读可复核状态；RiskActionGuard fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if ("LIQUIDITY_CONTEXT_MISSING".equals(blockingReason)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_LIQUIDITY_CONTEXT_MISSING_FAIL_CLOSED,
+                    "LIQUIDITY_CONTEXT_MISSING",
+                    "流动性上下文缺失；RiskActionGuard 只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+        } else if ("LIQUIDITY_DETERIORATION_REVIEW_ONLY".equals(blockingReason)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_LIQUIDITY_DETERIORATION_REVIEW_ONLY,
+                    "LIQUIDITY_DETERIORATION_REVIEW_ONLY",
+                    "流动性恶化仅允许人工复核；不生成可执行动作。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if ("STAMPEDE_REVIEW_ONLY".equals(blockingReason)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_STAMPEDE_REVIEW_ONLY_FAIL_CLOSED,
+                    "STAMPEDE_REVIEW_ONLY",
+                    "踩踏风险仅允许人工复核；RiskActionGuard fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if ("WICK_ONLY_REVIEW_ONLY".equals(blockingReason)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_WICK_ONLY_REVIEW_ONLY_FAIL_CLOSED,
+                    "WICK_ONLY_REVIEW_ONLY",
+                    "短线插针风险仅允许人工复核；RiskActionGuard fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if ("HIGH_RISK_REVIEW_ONLY".equals(blockingReason)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_HIGH_RISK_REVIEW_ONLY,
+                    "HIGH_RISK_REVIEW_ONLY",
+                    "高风险状态仅显示人工复核提醒；不是交易动作。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!hasText(riskStatus) || "BACKEND_PENDING".equals(riskStatus)) {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_BACKEND_PENDING_FAIL_CLOSED,
+                    "BACKEND_PENDING",
+                    "RiskActionGuard owner path 仍是后端待接入；只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+        } else {
+            applyRiskActionGuardStatus(
+                    status,
+                    RISK_ACTION_GUARD_READY,
+                    firstNonBlank(riskGuard.getRiskActionBlockingReason(), "MANUAL_REVIEW_REQUIRED"),
+                    "RiskActionGuard 只读状态可读；仅人工复核，不是交易信号、候选、决策生成、点位或可执行动作。",
+                    false,
+                    "OK"
+            );
+        }
+    }
+
+    private void applyRiskActionGuardStatus(Map<String, Object> status,
+                                            String statusValue,
+                                            String reason,
+                                            String message,
+                                            boolean failClosed,
+                                            String sourceHealth) {
         status.put("status", statusValue);
         status.put("reason", reason);
         status.put("message", message);
@@ -1184,6 +1448,59 @@ public class DashboardController {
         }
         String blockingReason = riskGuard.getRiskActionBlockingReason();
         return hasText(blockingReason) && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(blockingReason);
+    }
+
+    private boolean riskActionGuardActionFlagsAllFalse(DashboardDetailResponseVO.RiskActionGuardDisplayVO riskGuard) {
+        if (riskGuard == null) {
+            return false;
+        }
+        return !Boolean.TRUE.equals(riskGuard.getOpportunityPushAllowed())
+                && !Boolean.TRUE.equals(riskGuard.getReverseTradeAllowed())
+                && !Boolean.TRUE.equals(riskGuard.getNewPositionAllowed())
+                && !Boolean.TRUE.equals(riskGuard.getMarketOrderExitAllowed());
+    }
+
+    private String safeRiskActionAdviceSummary(String advice) {
+        if (!hasText(advice)) {
+            return "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号。";
+        }
+        if (hasUnsafeActionWording(advice)) {
+            return "RiskActionGuard advice 包含可执行动作措辞，已按只读 fail-closed 处理。";
+        }
+        return advice.trim();
+    }
+
+    private boolean hasUnsafeActionWording(String advice) {
+        if (!hasText(advice)) {
+            return false;
+        }
+        String normalized = advice.trim();
+        String lower = normalized.toLowerCase();
+        boolean hasActionWord = lower.contains("reduce")
+                || lower.contains("close")
+                || lower.contains("reverse")
+                || lower.contains("move stop")
+                || lower.contains("open")
+                || lower.contains("execute")
+                || normalized.contains("减仓")
+                || normalized.contains("平仓")
+                || normalized.contains("反手")
+                || normalized.contains("移动止损")
+                || normalized.contains("开仓")
+                || normalized.contains("执行");
+        if (!hasActionWord) {
+            return false;
+        }
+        return !(normalized.contains("不")
+                || normalized.contains("禁止")
+                || normalized.contains("关闭")
+                || normalized.contains("人工")
+                || normalized.contains("只读")
+                || lower.contains("not ")
+                || lower.contains("manual")
+                || lower.contains("review")
+                || lower.contains("blocked")
+                || lower.contains("disabled"));
     }
 
     private List<String> safeReasons(List<String> rawReasons) {

@@ -338,6 +338,48 @@ class DashboardControllerTest {
     }
 
     @Test
+    void dashboardTemplateShowsReviewOnlyRiskActionGuardRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/risk-action-guard-status");
+        assertThat(html).contains("riskActionGuardStatusPanel");
+        assertThat(html).contains("riskActionGuardRuntimeStatusValue");
+        assertThat(html).contains("riskActionGuardSymbolValue");
+        assertThat(html).contains("riskActionGuardAnalysisIdValue");
+        assertThat(html).contains("riskActionGuardStatusValue");
+        assertThat(html).contains("riskActionGuardLiquidityValue");
+        assertThat(html).contains("riskActionGuardManualReviewValue");
+        assertThat(html).contains("riskActionGuardActionFlagsValue");
+        assertThat(html).contains("riskActionGuardAdviceValue");
+        assertThat(html).contains("riskActionGuardSourceHealthValue");
+        assertThat(html).contains("riskActionGuardFailClosedValue");
+        assertThat(html).contains("riskActionGuardReviewOnlyValue");
+        assertThat(html).contains("riskActionGuardSignalBoundaryValue");
+        assertThat(html).contains("riskActionGuardActionBoundaryValue");
+        assertThat(html).contains("riskActionGuardUpstreamValue");
+        assertThat(html).contains("riskActionGuardReasonValue");
+        assertThat(html).contains("riskActionGuardDetailStatusPanel");
+        assertThat(html).contains("RISK_ACTION_GUARD_REVIEW_ONLY_READY");
+        assertThat(html).contains("BACKEND_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("DECISION_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("PLAN_BOUNDARY_FAIL_CLOSED");
+        assertThat(html).contains("EXECUTION_PLAN_NOT_READY_FAIL_CLOSED");
+        assertThat(html).contains("LIQUIDITY_CONTEXT_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("LIQUIDITY_DETERIORATION_REVIEW_ONLY");
+        assertThat(html).contains("STAMPEDE_REVIEW_ONLY_FAIL_CLOSED");
+        assertThat(html).contains("WICK_ONLY_REVIEW_ONLY_FAIL_CLOSED");
+        assertThat(html).contains("HIGH_RISK_REVIEW_ONLY");
+        assertThat(html).contains("ACTION_FLAGS_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("ACTION_WORDING_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RiskActionGuard 是只读状态，仅人工复核，不是交易信号");
+        assertThat(html).contains("不是 Candidate");
+        assertThat(html).contains("不是新的 Decision generation");
+        assertThat(html).contains("不是 Point");
+        assertThat(html).contains("reduce / close / reverse / move stop / open / execute 只能作为 guardrail / manual-review copy");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
+    @Test
     void dashboardTemplateShowsReviewOnlyReviewReplayRuntimeStatusMapping() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 
@@ -1044,6 +1086,157 @@ class DashboardControllerTest {
     }
 
     @Test
+    void riskActionGuardStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        MockMvc riskGuardMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-risk-guard-ready");
+        decision.setAnalysisId("ana-risk-guard-ready");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        riskGuardMockMvc.perform(get("/api/dashboard/risk-action-guard-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RISK_ACTION_GUARD_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-risk-guard-ready"))
+                .andExpect(jsonPath("$.riskActionGuardStatus").value("MANUAL_REVIEW_REQUIRED"))
+                .andExpect(jsonPath("$.planBoundaryStatus").value("VALID"))
+                .andExpect(jsonPath("$.executionPlanStatus").value("READY_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.manualRiskReviewRequired").value(true))
+                .andExpect(jsonPath("$.actionFlagsAllFalse").value(true))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.notPositionMonitorExecution").value(true))
+                .andExpect(jsonPath("$.notExecutionPlanGeneration").value(true))
+                .andExpect(jsonPath("$.notBoundaryCandidateGeneration").value(true))
+                .andExpect(jsonPath("$.externalRefreshTriggered").value(false))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void riskActionGuardStatusEndpointFailsClosedWhenDecisionMissing() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("ETHUSDT")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/risk-action-guard-status").param("symbol", "ETHUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECISION_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("ETHUSDT"))
+                .andExpect(jsonPath("$.analysisId").value(nullValue()))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("DECISION_MISSING"));
+    }
+
+    @Test
+    void riskActionGuardStatusEndpointFailsClosedWhenActionFlagsAreTrue() throws Exception {
+        MockMvc riskGuardMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> actionFlagRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-risk-guard-action-flag");
+        decision.setAnalysisId("ana-risk-guard-action-flag");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        riskGuardMockMvc.perform(get("/api/dashboard/risk-action-guard-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTION_FLAGS_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.actionFlagsAllFalse").value(false))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("RISK_ACTION_GUARD_ACTION_FLAGS_TRUE"));
+    }
+
+    @Test
+    void riskActionGuardStatusEndpointFailsClosedWhenActionWordingIsUnsafe() throws Exception {
+        MockMvc riskGuardMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> unsafeActionWordingRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-risk-guard-action-wording");
+        decision.setAnalysisId("ana-risk-guard-action-wording");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        riskGuardMockMvc.perform(get("/api/dashboard/risk-action-guard-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTION_WORDING_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.riskActionAdviceSummary").value("RiskActionGuard advice 包含可执行动作措辞，已按只读 fail-closed 处理。"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("RISK_ACTION_GUARD_ACTION_WORDING_UNSAFE"));
+    }
+
+    @Test
+    void riskActionGuardStatusEndpointDoesNotExposeExecutableCandidatePointOrTradingFields() throws Exception {
+        MockMvc riskGuardMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) -> fallbackDisplay
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-risk-guard-safe");
+        decision.setAnalysisId("ana-risk-guard-safe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+
+        riskGuardMockMvc.perform(get("/api/dashboard/risk-action-guard-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
     void reviewReplayStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
         when(reviewService.getStateByAnalysisId("ana-review-ready"))
                 .thenReturn(reviewState("ana-review-ready"));
@@ -1644,6 +1837,18 @@ class DashboardControllerTest {
         display.setMarketOrderExitAllowed(false);
         display.setManualRiskReviewRequired(true);
         display.setNotTradeInstruction(true);
+        return display;
+    }
+
+    private static DashboardDetailResponseVO.RiskActionGuardDisplayVO actionFlagRiskActionGuardDisplay() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO display = manualReviewRiskActionGuardDisplay();
+        display.setOpportunityPushAllowed(true);
+        return display;
+    }
+
+    private static DashboardDetailResponseVO.RiskActionGuardDisplayVO unsafeActionWordingRiskActionGuardDisplay() {
+        DashboardDetailResponseVO.RiskActionGuardDisplayVO display = manualReviewRiskActionGuardDisplay();
+        display.setRiskActionAdvice("execute close reverse open");
         return display;
     }
 
