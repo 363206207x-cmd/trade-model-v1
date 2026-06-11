@@ -1,14 +1,14 @@
-current_head: "b4497e1"
+current_head: "2778b82"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Implementation readiness gate for RuleConfig runtime audit / rule explainability"
-active_block_cn: "规则配置运行时审计 / 规则解释实现就绪门"
-current_phase: "readiness"
+active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation"
+active_block_cn: "规则配置运行时审计 / 规则解释最小只读运行时接线实现"
+current_phase: "implementation"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "ruleconfig-runtime-audit-rule-explainability-implementation-readiness-gate"
-merge_rule: "A-risk readiness gate after RuleConfig runtime audit / rule explainability design; allow only readiness docs and source-of-truth updates unless a future task explicitly authorizes implementation; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, review result generation, P359, or P360"
-next_required_action: "Implementation readiness gate for RuleConfig runtime audit / rule explainability"
+current_branch: "minimal-review-only-ruleconfig-runtime-audit-rule-explainability-implementation"
+merge_rule: "B-risk minimal RuleConfig runtime audit / rule explainability implementation; allow only one minimal read-only RuleController Map status endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets; no schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, review result generation, P359, or P360"
+next_required_action: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -92,8 +92,10 @@ v1_status_summary_accuracy_fix_status: "completed on main as d9f7817; workflow/s
 next_minimal_runtime_slice_selection_after_data_source_health_status: "selection package selects RuleConfig runtime audit / rule explainability as the next source-read-only target after eight REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 ruleconfig_runtime_audit_rule_explainability_source_read_status: "completed on main as 5903409; confirms RuleConfig / Watchlist owner assets, dashboard watchlist status panel, RuleVersionLog adjacent audit chain, and gaps; returns GO to design only without implementation or capability movement"
 v1_operator_one_command_orchestrator_status: "completed on main as b4497e1; workflow-only orchestration improvement adds scripts/v1-operator.sh as the preferred terminal entry, fixes dirty package branch detection, and preserves the next business action without changing capability"
-minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_design_status: "completed in current design package; preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, readiness checklist, and returns GO to implementation readiness gate without implementation"
+minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_design_status: "completed on main as 2778b82; preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, readiness checklist, and returns GO to implementation readiness gate without implementation"
+ruleconfig_runtime_audit_rule_explainability_implementation_readiness_gate_status: "completed in this readiness-gate package; returns GO for one minimal read-only RuleController Map status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets; keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360"
 source_of_truth_files:
+  - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_MINIMAL_REVIEW_ONLY_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_RUNTIME_WIRING_DESIGN.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_DATA_SOURCE_HEALTH.md

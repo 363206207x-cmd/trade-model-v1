@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
+- Active track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
 - Selected next minimal runtime slice: `RuleConfig runtime audit / rule explainability`.
-- Next required action: `Implementation readiness gate for RuleConfig runtime audit / rule explainability`.
+- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -44,7 +44,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Source Read for RuleConfig runtime audit / rule explainability confirms reusable RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic audit/explainability gaps.
 - `5903409` completes Source Read for RuleConfig runtime audit / rule explainability.
 - `b4497e1` completes the V1 Operator One-Command Orchestrator workflow-only package and preserves the RuleConfig business handoff.
-- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed in the current design package: it preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
+- `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main: it preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
+- RuleConfig runtime audit / rule explainability implementation readiness gate is completed in the current readiness package: it returns GO for one minimal read-only `RuleController` `Map` status endpoint, a minimal dashboard status/copy/DOM surface, targeted tests, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only and forbids DTO / Validator / Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
