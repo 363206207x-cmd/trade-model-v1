@@ -1126,6 +1126,20 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="executionPlanBoundaryReasonValue">EXECUTIONPLAN_BOUNDARY_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="riskActionGuardStatusPanel" aria-label="RiskActionGuard review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">RiskActionGuard 只读状态</span><span class="v" id="riskActionGuardRuntimeStatusValue">BACKEND_PENDING_FAIL_CLOSED / RiskActionGuard 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="riskActionGuardSymbolValue">—</span> · <span id="riskActionGuardAnalysisIdValue">—</span></span></div>
+            <div class="kv"><span class="k">Guard status / liquidity</span><span class="v"><span id="riskActionGuardStatusValue">BACKEND_PENDING</span> · <span id="riskActionGuardLiquidityValue">BACKEND_PENDING</span></span></div>
+            <div class="kv"><span class="k">manual review / action flags</span><span class="v"><span id="riskActionGuardManualReviewValue">true</span> · <span id="riskActionGuardActionFlagsValue">blocked</span></span></div>
+            <div class="kv"><span class="k">risk advice summary</span><span class="v" id="riskActionGuardAdviceValue">只读状态待确认；仅人工复核。</span></div>
+            <div class="kv"><span class="k">source health / fail-closed</span><span class="v"><span id="riskActionGuardSourceHealthValue">BLOCKED</span> · <span id="riskActionGuardFailClosedValue">true</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="riskActionGuardReviewOnlyValue">RiskActionGuard 是只读状态，仅人工复核，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="riskActionGuardSignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。</span></div>
+            <div class="kv"><span class="k">Action wording boundary</span><span class="v" id="riskActionGuardActionBoundaryValue">reduce / close / reverse / move stop / open / execute 只能作为 guardrail / manual-review copy，不能成为 executable action。</span></div>
+            <div class="kv"><span class="k">Upstream boundary</span><span class="v" id="riskActionGuardUpstreamValue">Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="riskActionGuardReasonValue">RISK_ACTION_GUARD_STATUS_PENDING</span></div>
+        </div>
+
         <div class="module-status-note" id="reviewReplayStatusPanel" aria-label="Review Replay result review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">Review / Replay 只读状态</span><span class="v" id="reviewReplayRuntimeStatusValue">REVIEW_REPLAY_BLOCKED_FAIL_CLOSED / Review / Replay result status 只读状态待确认</span></div>
             <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="reviewReplaySymbolValue">—</span> · <span id="reviewReplayAnalysisIdValue">—</span></span></div>
@@ -1271,12 +1285,14 @@
             <div class="alert-line">说明：仅展示 PlanBoundary 接入状态占位，不生成 entry / stop / take profit 数值。</div>
         </div>
         <div class="card module-status-card" id="riskActionGuardPlaceholderCard">
-            <h3>Risk Action Guard（占位）</h3>
-            <p class="module-status-note">只读风控动作分层（占位），后端未完全接入；非交易指令，需要人工复核。</p>
-            <div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge partial">READ_ONLY_PLACEHOLDER / 只读占位</span></span></div>
-            <div class="alert-line confused"><strong>Risk Reminder（只读）：</strong>不是交易指令，必须人工复核；不连接 order API，不触发自动交易动作，不生成真实点位。</div>
-            <div class="kv"><span class="k">风险建议</span><span class="v">等待后端 riskActionAdvice，只允许人工复核。</span></div>
-            <div class="kv"><span class="k">动作关闭</span><span class="v">自动平仓 / 自动反手 / 自动改止损关闭。</span></div>
+            <h3>Risk Action Guard（只读状态）</h3>
+            <p class="module-status-note">只读风控动作分层；非交易指令，只允许人工复核。</p>
+            <div id="riskActionGuardDetailStatusPanel">
+                <div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge partial">BACKEND_PENDING_FAIL_CLOSED / 只读待确认</span></span></div>
+                <div class="alert-line confused"><strong>Risk Reminder（只读）：</strong>不是交易指令，必须人工复核；不连接 order API，不触发自动交易动作，不生成真实点位。</div>
+                <div class="kv"><span class="k">风险建议</span><span class="v">等待后端 riskActionAdvice，只允许人工复核。</span></div>
+                <div class="kv"><span class="k">动作关闭</span><span class="v">自动平仓 / 自动反手 / 自动改止损关闭。</span></div>
+            </div>
             <div class="alert-line confused"><strong>通用约束：</strong>本区仅做风险提醒，不连接 order API，不触发自动交易动作。</div>
             <div class="alert-line"><strong>风险高但流动性正常：</strong>可考虑减仓 / 移动止损 / 降低杠杆；仅为风险提醒，不是自动交易动作。</div>
             <div class="alert-line hot"><strong>风险高且流动性恶化：</strong>不建议市价一次性砍仓，优先分批降风险 / 等待流动性恢复 / 只降杠杆，避免在流动性恶化时触发踩踏式错误执行。</div>
@@ -1387,6 +1403,18 @@
     var EXECUTIONPLAN_BOUNDARY_STATUS_SOURCE_TRACE_PARTIAL = "EXECUTIONPLAN_SOURCE_TRACE_PARTIAL";
     var EXECUTIONPLAN_BOUNDARY_STATUS_RISK_BLOCKED = "EXECUTIONPLAN_RISK_GUARD_BLOCKED_FAIL_CLOSED";
     var EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED = "EXECUTIONPLAN_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_READY = "RISK_ACTION_GUARD_REVIEW_ONLY_READY";
+    var RISK_ACTION_GUARD_STATUS_BACKEND_PENDING = "BACKEND_PENDING_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_DECISION_MISSING = "DECISION_MISSING_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_PLAN_BOUNDARY = "PLAN_BOUNDARY_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_EXECUTION_PLAN_NOT_READY = "EXECUTION_PLAN_NOT_READY_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_LIQUIDITY_MISSING = "LIQUIDITY_CONTEXT_MISSING_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_LIQUIDITY_DETERIORATION = "LIQUIDITY_DETERIORATION_REVIEW_ONLY";
+    var RISK_ACTION_GUARD_STATUS_STAMPEDE = "STAMPEDE_REVIEW_ONLY_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_WICK_ONLY = "WICK_ONLY_REVIEW_ONLY_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_HIGH_RISK = "HIGH_RISK_REVIEW_ONLY";
+    var RISK_ACTION_GUARD_STATUS_ACTION_FLAGS = "ACTION_FLAGS_BLOCKED_FAIL_CLOSED";
+    var RISK_ACTION_GUARD_STATUS_ACTION_WORDING = "ACTION_WORDING_BLOCKED_FAIL_CLOSED";
     var REVIEW_REPLAY_STATUS_READY = "REVIEW_REPLAY_REVIEW_ONLY_READY";
     var REVIEW_REPLAY_STATUS_REVIEW_MISSING = "REVIEW_RESULT_MISSING_FAIL_CLOSED";
     var REVIEW_REPLAY_STATUS_AGGREGATE_MISSING = "REVIEW_AGGREGATE_MISSING_FAIL_CLOSED";
@@ -1561,6 +1589,39 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var riskActionGuardRuntimeStatus = {
+        status: RISK_ACTION_GUARD_STATUS_BACKEND_PENDING,
+        symbol: null,
+        analysisId: null,
+        riskActionGuardStatus: "BACKEND_PENDING",
+        riskActionGuardStatusLabel: "后端未接入",
+        riskActionAdviceSummary: "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号。",
+        riskActionBlockingReason: "BACKEND_PENDING",
+        liquidityState: "BACKEND_PENDING",
+        stampedeDetected: false,
+        wickOnlyRisk: false,
+        manualRiskReviewRequired: true,
+        actionFlagsAllFalse: false,
+        planBoundaryStatus: "BACKEND_PENDING",
+        executionPlanStatus: "BOUNDARY_PENDING",
+        sourceTraceComplete: false,
+        sourceHealth: "BLOCKED",
+        reason: "RISK_ACTION_GUARD_STATUS_PENDING",
+        message: "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号。",
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notExecutable: true,
+        notPositionMonitorExecution: true,
+        notExecutionPlanGeneration: true,
+        notBoundaryCandidateGeneration: true,
+        externalRefreshTriggered: false,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     var reviewReplayRuntimeStatus = {
         status: REVIEW_REPLAY_STATUS_BLOCKED,
         symbol: null,
@@ -1665,6 +1726,7 @@
     window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
     window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
     window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
+    window.__riskActionGuardReviewStatus = RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
     window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
     window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
@@ -1999,15 +2061,16 @@
 
         var riskCard = document.getElementById("riskActionGuardPlaceholderCard");
         if (riskCard) {
-            riskCard.innerHTML = '<h3>Risk Action Guard（占位）</h3>' +
-                '<p class="module-status-note">只读风控动作分层（占位），后端未完全接入；非交易指令，需要人工复核。</p>' +
+            riskCard.innerHTML = '<h3>Risk Action Guard（只读状态）</h3>' +
+                '<p class="module-status-note">只读风控动作分层；非交易指令，只允许人工复核。</p>' +
+                '<div id="riskActionGuardDetailStatusPanel">' +
                 '<div class="kv"><span class="k">状态标记</span><span class="v"><span class="status-badge ' + statusBadgeClass(guardStatus) + '">' + escapeHtml(guardStatus + ' / ' + guardLabel) + '</span></span></div>' +
                 renderRiskReminderReadOnly(riskGuard) +
                 '<div class="kv"><span class="k">机会推送</span><span class="v">' + escapeHtml(allowPush) + '</span></div>' +
                 '<div class="kv"><span class="k">反手动作</span><span class="v">' + escapeHtml(allowReverse) + '</span></div>' +
                 '<div class="kv"><span class="k">新开仓动作</span><span class="v">' + escapeHtml(allowNewPos) + '</span></div>' +
                 '<div class="kv"><span class="k">Paper Observation</span><span class="v">' + escapeHtml(paperStatus + ' / ' + paperLabel) + '</span></div>' +
-                '<div class="kv"><span class="k">持仓属性</span><span class="v">' + escapeHtml(notRealPosition) + '</span></div>' +
+                '<div class="kv"><span class="k">持仓属性</span><span class="v">' + escapeHtml(notRealPosition) + '</span></div></div>' +
                 '<div class="alert-line confused"><strong>通用约束：</strong>本区仅做风险提醒，不连接 order API，不触发自动交易动作。</div>' +
                 '<div class="alert-line critical"><strong>硬约束：</strong>非交易指令，必须人工复核，不自动执行。</div>';
         }
@@ -3256,6 +3319,83 @@
             });
     }
 
+    function resolveRiskActionGuardRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, RISK_ACTION_GUARD_STATUS_BACKEND_PENDING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            riskActionGuardStatus: firstNonEmpty(p.riskActionGuardStatus, "BACKEND_PENDING").toUpperCase(),
+            riskActionGuardStatusLabel: firstNonEmpty(p.riskActionGuardStatusLabel, "后端未接入"),
+            riskActionAdviceSummary: firstNonEmpty(p.riskActionAdviceSummary, "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号。"),
+            riskActionBlockingReason: firstNonEmpty(p.riskActionBlockingReason, "BACKEND_PENDING"),
+            liquidityState: firstNonEmpty(p.liquidityState, "BACKEND_PENDING"),
+            stampedeDetected: p.stampedeDetected === true,
+            wickOnlyRisk: p.wickOnlyRisk === true,
+            manualRiskReviewRequired: p.manualRiskReviewRequired !== false,
+            actionFlagsAllFalse: p.actionFlagsAllFalse === true,
+            planBoundaryStatus: firstNonEmpty(p.planBoundaryStatus, "BACKEND_PENDING").toUpperCase(),
+            executionPlanStatus: firstNonEmpty(p.executionPlanStatus, "BOUNDARY_PENDING").toUpperCase(),
+            sourceTraceComplete: p.sourceTraceComplete === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "RISK_ACTION_GUARD_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "RiskActionGuard 只读状态待确认；仅人工复核，不是交易信号。"),
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notExecutable: true,
+            notPositionMonitorExecution: true,
+            notExecutionPlanGeneration: true,
+            notBoundaryCandidateGeneration: true,
+            externalRefreshTriggered: false,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateRiskActionGuardRuntimeStatusDisplay() {
+        var rg = riskActionGuardRuntimeStatus || {};
+        setText("riskActionGuardRuntimeStatusValue", (rg.status || RISK_ACTION_GUARD_STATUS_BACKEND_PENDING) + " / " + (rg.message || "只读状态"));
+        setText("riskActionGuardSymbolValue", rg.symbol || "—");
+        setText("riskActionGuardAnalysisIdValue", rg.analysisId || "—");
+        setText("riskActionGuardStatusValue", (rg.riskActionGuardStatus || "BACKEND_PENDING") + " / " + (rg.riskActionGuardStatusLabel || "后端未接入"));
+        setText("riskActionGuardLiquidityValue", rg.liquidityState || "BACKEND_PENDING");
+        setText("riskActionGuardManualReviewValue", rg.manualRiskReviewRequired ? "true / manual review only" : "false / fail-closed");
+        setText("riskActionGuardActionFlagsValue", rg.actionFlagsAllFalse ? "all false / blocked" : "unexpected true / fail-closed");
+        setText("riskActionGuardAdviceValue", rg.riskActionAdviceSummary || "只读状态待确认；仅人工复核。");
+        setText("riskActionGuardSourceHealthValue", rg.sourceHealth || "BLOCKED");
+        setText("riskActionGuardFailClosedValue", rg.failClosed ? "true" : "false");
+        setText("riskActionGuardReviewOnlyValue", "RiskActionGuard 是只读状态，仅人工复核，不是交易信号。");
+        setText("riskActionGuardSignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。");
+        setText("riskActionGuardActionBoundaryValue", "reduce / close / reverse / move stop / open / execute 只能作为 guardrail / manual-review copy，不能成为 executable action、order action 或 trading signal。");
+        setText("riskActionGuardUpstreamValue", "Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate 边界仍适用；Display Slots 不是候选池。");
+        setText("riskActionGuardReasonValue", rg.reason || "—");
+    }
+
+    function fetchRiskActionGuardRuntimeStatus(symbol) {
+        if (!symbol) {
+            riskActionGuardRuntimeStatus = resolveRiskActionGuardRuntimeStatus({});
+            window.__riskActionGuardReviewStatus = RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
+            updateRiskActionGuardRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/risk-action-guard-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                riskActionGuardRuntimeStatus = resolveRiskActionGuardRuntimeStatus(payload, symbol);
+                window.__riskActionGuardReviewStatus = riskActionGuardRuntimeStatus.status || RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
+                updateRiskActionGuardRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                riskActionGuardRuntimeStatus = resolveRiskActionGuardRuntimeStatus({}, symbol);
+                window.__riskActionGuardReviewStatus = RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
+                updateRiskActionGuardRuntimeStatusDisplay();
+            });
+    }
+
     function resolveReviewReplayRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -4119,6 +4259,7 @@
                 fetchEvidenceScoreRuntimeStatus(selectedSymbol);
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
+                fetchRiskActionGuardRuntimeStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
@@ -4131,6 +4272,7 @@
         fetchEvidenceScoreRuntimeStatus(symbol);
         fetchDecisionResultRuntimeStatus(symbol);
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);
+        fetchRiskActionGuardRuntimeStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
         fetchMissedArchiveRuntimeStatus(symbol);

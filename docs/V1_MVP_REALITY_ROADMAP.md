@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation`.
+- Active track: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification`.
 - Selected target: `RiskActionGuard read-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, and `Missed Opportunity / Review Archive status`.
 - Selected next minimal runtime slice: `RiskActionGuard read-only status`.
-- Next required action: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation`.
+- Next required action: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -61,7 +61,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed on main as `095ade9` and selects `RiskActionGuard read-only status`.
 - Source Read for RiskActionGuard read-only status is completed on main as `018a438`. It confirms existing RiskActionGuard display adapter / VO / dashboard detail / dashboard placeholder assets and returns GO to design only without implementation or capability movement.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design is completed on main as `5d25e53`. It fixes owner path, dedicated-endpoint decision, status mapping, manual-review-only action wording guardrails, fail-closed rules, dashboard/API boundary, and readiness checklist without implementation or capability movement.
-- Implementation readiness gate for RiskActionGuard read-only status is completed by this package when merged. It returns GO to B-risk minimal implementation over existing Dashboard detail / RiskActionGuard display assets, with optional minimal DashboardController Map endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates.
+- Implementation readiness gate for RiskActionGuard read-only status is completed on main as `c7fb97e`. It returns GO to B-risk minimal implementation over existing Dashboard detail / RiskActionGuard display assets, with optional minimal DashboardController Map endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates.
+- Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation is completed by this package when merged. It adds one minimal read-only `/api/dashboard/risk-action-guard-status` endpoint, dashboard `riskActionGuardStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates. RiskActionGuard remains `REVIEW_ONLY_RUNTIME partial` and still requires verification and visual closure before becoming a completed slice.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
