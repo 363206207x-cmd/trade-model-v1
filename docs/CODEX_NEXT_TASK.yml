@@ -1,4 +1,4 @@
-current_main: "028c598 docs(ruleconfig): verify runtime wiring"
+current_main: "e568ded docs(ruleconfig): sync verification baseline"
 active_block: "RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure"
 phase: "visual_closure"
 module: "RuleConfig runtime audit / rule explainability"

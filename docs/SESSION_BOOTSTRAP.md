@@ -48,6 +48,10 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh` is a Chinese workflow operator. It summarizes state, progress, blockers, and the next Codex task while still delegating to the fixed workflow scripts.
 
+Baseline sync packages are no longer a normal workflow step. If clean / synced `main` has no open PR and the actual HEAD is ahead of `docs/ACTIVE_MAINLINE_STATUS.yml` or `docs/CODEX_NEXT_TASK.yml`, use actual HEAD as the Effective execution baseline（实际执行基线）. The next business package should update source-of-truth docs within its own scoped changes.
+
+baseline sync 小包不再作为常规流程。若 clean / synced `main` 没有 open PR，且 actual HEAD 领先事实源文件，使用 actual HEAD 作为实际执行基线；下一业务包在自身范围内顺手更新事实源。
+
 One-command Codex runner:
 
 ```bash

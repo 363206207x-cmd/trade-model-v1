@@ -254,7 +254,7 @@ print_post_merge_baseline_note() {
   echo "最新 main HEAD（实际当前 HEAD）: ${actual_head:-UNKNOWN}"
   echo "Source of Truth current_head（事实源当前主线 HEAD）: ${source_head:-UNKNOWN}"
   if [[ -n "$actual_head" && -n "$source_head" && "$source_head" != "$actual_head" ]]; then
-    echo "提示: merge-sync 后如 Source of Truth current_head 滞后，下一包应更新 docs/ACTIVE_MAINLINE_STATUS.yml / docs/CODEX_NEXT_TASK.yml baseline。workflow-only commit 差异通常不阻塞，但业务包滞后必须修正。"
+    echo "提示: 不再创建 baseline sync（基线同步）小包。下一业务包将使用 actual HEAD（实际 HEAD）作为执行基线，并在业务包内顺手更新 source-of-truth（事实源）。"
   fi
 }
 

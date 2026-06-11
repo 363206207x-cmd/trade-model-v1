@@ -130,6 +130,14 @@ sync_main() {
   echo "MERGE_SYNC_DONE"
   echo "WORKTREE_CLEAN: $worktree_clean"
   echo "HEAD: $(git log -1 --oneline)"
+  local actual_head source_head
+  actual_head="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  source_head="$(awk -F': *' '$1 == "current_head" {value=$0; sub("^[^:]*:[[:space:]]*", "", value); gsub(/^"/, "", value); gsub(/"$/, "", value); print value; exit}' docs/ACTIVE_MAINLINE_STATUS.yml 2>/dev/null || true)"
+  echo "SOURCE_OF_TRUTH_HEAD: ${source_head:-UNKNOWN}"
+  echo "EFFECTIVE_EXECUTION_BASELINE: ${actual_head:-UNKNOWN}"
+  if [[ -n "$actual_head" && -n "$source_head" && "$source_head" != "$actual_head" ]]; then
+    echo "BASELINE_NOTE: 不再创建 baseline sync（基线同步）小包；下一业务包使用 actual HEAD（实际 HEAD）作为执行基线，并顺手更新 source-of-truth（事实源）。"
+  fi
 }
 
 if ! gh pr view "$PR_NUMBER" --json number >/dev/null 2>&1; then
