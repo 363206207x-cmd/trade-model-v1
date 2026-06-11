@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification`.
+- Active track: `Missed Opportunity / Review Archive Status Visual Verification / Closure`.
 - Selected target: `Missed Opportunity / Review Archive status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, and `RuleConfig runtime audit / rule explainability`.
 - Selected next minimal runtime slice: `Missed Opportunity / Review Archive status`.
-- Next required action: `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification`.
+- Next required action: `Missed Opportunity / Review Archive Status Visual Verification / Closure`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -55,7 +55,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Source Read for Missed Opportunity / Review Archive status is completed on main before `83f191e`: it confirms the MissedOpportunity read API/service/mapper/schema path, `MissedReasonViewParser`, `ReviewAggregateServiceImpl` missed archive linkage, review page `sec-missed`, and dashboard daily missed-count signal, while separating these from existing record/write behavior. It returns GO to design only, not implementation.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design is completed on main as `83f191e`: it preserves the owner path, defines status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate.
 - Implementation readiness gate for Missed Opportunity / Review Archive status is completed on main as `ed7faeb`: it returns GO to B-risk minimal implementation using existing MissedOpportunity / ReviewAggregate / dashboard-count assets only.
-- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed by this package when merged: it adds one minimal read-only `/api/missed-opportunity/review-archive-status` endpoint, dashboard `missedArchiveStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates without missed-opportunity generation/write behavior, review result generation, replay/recheck execution, Push, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler, schema/config/pom, P359, or P360.
+- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed on main as `452a8ac`: it adds one minimal read-only `/api/missed-opportunity/review-archive-status` endpoint, dashboard `missedArchiveStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates without missed-opportunity generation/write behavior, review result generation, replay/recheck execution, Push, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler, schema/config/pom, P359, or P360.
+- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification is completed by this package when merged: it verifies compile/test, targeted controller/dashboard tests, endpoint/dashboard status mapping, safety fields, forbidden semantics classification, and source-of-truth alignment. Visual closure is next.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
