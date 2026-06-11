@@ -1,14 +1,14 @@
-current_head: "cf4f2f1"
+current_head: "14e0e07"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Design"
-active_block_cn: "告警疲劳 / 通知策略状态最小只读运行时接线设计"
-current_phase: "design"
+active_block: "Implementation readiness gate for Alert fatigue / notification policy status"
+active_block_cn: "告警疲劳 / 通知策略状态实现前就绪门"
+current_phase: "readiness_gate"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-alert-fatigue-notification-policy-status-runtime-wiring-design"
-merge_rule: "A-risk design after Alert fatigue / notification policy source read; allow only design docs and source-of-truth updates; no Java/test/dashboard/schema/config/pom edits, no endpoint/panel implementation, no new DTO/Validator/Assembler/Orchestrator, no Position Monitor execution, Push send, external channel, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360"
-next_required_action: "Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Design"
+current_branch: "alert-fatigue-notification-policy-status-implementation-readiness-gate"
+merge_rule: "A-risk readiness gate after Alert fatigue / notification policy status design; allow only readiness-gate docs and source-of-truth updates; no Java/test/dashboard/schema/config/pom edits, no endpoint/panel implementation, no new DTO/Validator/Assembler/Orchestrator, no MonitorAlertWriteServiceImpl invocation, no scheduler/collector/API client refresh, no Position Monitor execution, Push send, external channel, recheck execution, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360"
+next_required_action: "Implementation readiness gate for Alert fatigue / notification policy status"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -114,8 +114,10 @@ minimal_review_only_riskactionguard_read_only_status_runtime_wiring_implementati
 minimal_review_only_riskactionguard_read_only_status_runtime_wiring_verification_status: "completed on main as f21ed5f; verifies endpoint/dashboard review-only behavior, safety fields, fail-closed rules, DashboardControllerTest, full tests, forbidden semantics classification, and source-of-truth alignment from c7fb97e to 06ca17f without Java/test/dashboard/schema/config/pom changes"
 riskactionguard_read_only_status_visual_verification_closure_status: "completed on main as bab2325; environment-limited visual closure confirms riskActionGuardStatusPanel DOM/copy/safety copy, review-only/manual-review/fail-closed/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, action wording guardrail/manual-review copy, and no Position Monitor execution / Push / Candidate generation / Decision generation / Point / trading semantics; RiskActionGuard read-only status is the 11th completed REVIEW_ONLY_RUNTIME partial slice"
 next_minimal_runtime_slice_selection_after_riskactionguard_status: "completed on main as cf4f2f1; selects Alert fatigue / notification policy status as the next source-read-only target after eleven REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
-alert_fatigue_notification_policy_status_source_read_status: "completed by this package when merged; confirms existing MonitorAlert / MonitorService / MonitorAlertMapper / dashboard alert center / review alert explain assets, identifies missing dedicated status endpoint/panel and Push/recheck boundary gaps, and returns GO to design only without implementation or capability movement"
+alert_fatigue_notification_policy_status_source_read_status: "completed on main as 14e0e07; confirms existing MonitorAlert / MonitorService / MonitorAlertMapper / dashboard alert center / review alert explain assets, identifies missing dedicated status endpoint/panel and Push/recheck boundary gaps, and returns GO to design only without implementation or capability movement"
+minimal_review_only_alert_fatigue_notification_policy_status_runtime_wiring_design_status: "completed by this package when merged; selects one future minimal read-only dashboard status endpoint/panel over existing MonitorAlert read assets, defines alert fatigue / notification policy status mapping, safety fields, fail-closed rules, not-Push / not-external-channel / not-recheck / not-refresh boundaries, and returns GO to implementation readiness gate without implementation or capability movement"
 source_of_truth_files:
+  - docs/V1_MINIMAL_REVIEW_ONLY_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_RUNTIME_WIRING_DESIGN.md
   - docs/V1_ALERT_FATIGUE_NOTIFICATION_POLICY_STATUS_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_RISKACTIONGUARD.md
   - docs/V1_RISKACTIONGUARD_READ_ONLY_STATUS_VISUAL_VERIFICATION_CLOSURE.md
