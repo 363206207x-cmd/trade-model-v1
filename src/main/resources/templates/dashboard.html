@@ -1153,6 +1153,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="dataSourceHealthReasonValue">DATA_SOURCE_HEALTH_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="missedArchiveStatusPanel" aria-label="Missed Opportunity Review Archive review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Missed Opportunity / Review Archive 只读状态</span><span class="v" id="missedArchiveRuntimeStatusValue">MISSED_ARCHIVE_EMPTY_FAIL_CLOSED / Missed Opportunity / Review Archive 只读状态待确认</span></div>
+            <div class="kv"><span class="k">scope / count</span><span class="v"><span id="missedArchiveScopeValue">today</span> · <span id="missedArchiveCountValue">0</span></span></div>
+            <div class="kv"><span class="k">latest archive row</span><span class="v" id="missedArchiveLatestValue">missing</span></div>
+            <div class="kv"><span class="k">reason parse / source health</span><span class="v"><span id="missedArchiveReasonParseValue">UNKNOWN</span> · <span id="missedArchiveSourceHealthValue">MISSING</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="missedArchiveReviewOnlyValue">Missed Opportunity / Review Archive 是只读状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="missedArchiveSignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。</span></div>
+            <div class="kv"><span class="k">Generation / replay boundary</span><span class="v" id="missedArchiveGenerationBoundaryValue">不触发 missed-opportunity generation/write；不生成复盘结果；不触发 replay / recheck execution。</span></div>
+            <div class="kv"><span class="k">Upstream boundary</span><span class="v" id="missedArchiveUpstreamValue">Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay、Data Source Health 边界仍适用；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="missedArchiveReasonValue">MISSED_ARCHIVE_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1388,6 +1400,14 @@
     var DATA_SOURCE_HEALTH_STATUS_MISSING = "DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED";
     var DATA_SOURCE_HEALTH_STATUS_WATCH_ONLY = "DATA_SOURCE_HEALTH_WATCH_ONLY_REVIEW";
     var DATA_SOURCE_HEALTH_STATUS_BLOCKED = "DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED";
+    var MISSED_ARCHIVE_STATUS_READY = "MISSED_ARCHIVE_REVIEW_ONLY_READY";
+    var MISSED_ARCHIVE_STATUS_COUNT_ONLY = "MISSED_ARCHIVE_COUNT_ONLY_PARTIAL";
+    var MISSED_ARCHIVE_STATUS_EMPTY = "MISSED_ARCHIVE_EMPTY_FAIL_CLOSED";
+    var MISSED_ARCHIVE_STATUS_REASON_EMPTY = "MISSED_REASON_EMPTY_OR_PARSE_PARTIAL";
+    var MISSED_ARCHIVE_STATUS_REASON_FAILED = "MISSED_REASON_PARSE_FAILED_FAIL_CLOSED";
+    var MISSED_ARCHIVE_STATUS_LINKAGE_PARTIAL = "MISSED_ARCHIVE_LINKAGE_PARTIAL";
+    var MISSED_ARCHIVE_STATUS_QUERY_UNAVAILABLE = "MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED";
+    var MISSED_ARCHIVE_STATUS_BLOCKED = "MISSED_ARCHIVE_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1601,6 +1621,40 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var missedArchiveRuntimeStatus = {
+        status: MISSED_ARCHIVE_STATUS_EMPTY,
+        analysisId: null,
+        symbol: null,
+        bizDate: null,
+        missedCount: 0,
+        todayMissedCount: 0,
+        latestMissedId: null,
+        latestCreateTime: null,
+        latestRuleVersion: null,
+        traceIdPresent: false,
+        reasonViewAvailable: false,
+        reasonParseStatus: "UNKNOWN",
+        archiveLinked: false,
+        reviewAggregateMissedAvailable: false,
+        queryAvailable: false,
+        countAvailable: false,
+        sourceHealth: "MISSING",
+        sourceRef: "tm_missed_opportunity",
+        reason: "MISSED_ARCHIVE_STATUS_PENDING",
+        message: "Missed Opportunity / Review Archive 只读状态待确认；不是交易信号。",
+        failClosed: true,
+        reviewOnly: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notReplayExecution: true,
+        notRecheckExecution: true,
+        notMissedOpportunityGeneration: true,
+        notReviewResultGeneration: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -1612,6 +1666,7 @@
     window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
     window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
     window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
+    window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -3352,6 +3407,84 @@
             });
     }
 
+    function resolveMissedArchiveRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, MISSED_ARCHIVE_STATUS_EMPTY).toUpperCase(),
+            analysisId: p.analysisId || null,
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            bizDate: p.bizDate || null,
+            missedCount: Number(p.missedCount || 0),
+            todayMissedCount: Number(p.todayMissedCount || 0),
+            latestMissedId: p.latestMissedId || null,
+            latestCreateTime: p.latestCreateTime || null,
+            latestRuleVersion: p.latestRuleVersion || null,
+            traceIdPresent: p.traceIdPresent === true,
+            reasonViewAvailable: p.reasonViewAvailable === true,
+            reasonParseStatus: firstNonEmpty(p.reasonParseStatus, "UNKNOWN").toUpperCase(),
+            archiveLinked: p.archiveLinked === true,
+            reviewAggregateMissedAvailable: p.reviewAggregateMissedAvailable === true,
+            queryAvailable: p.queryAvailable === true,
+            countAvailable: p.countAvailable === true,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            sourceRef: firstNonEmpty(p.sourceRef, "tm_missed_opportunity"),
+            reason: firstNonEmpty(p.reason, p.status, "MISSED_ARCHIVE_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Missed Opportunity / Review Archive 只读状态待确认；不是交易信号。"),
+            failClosed: p.failClosed !== false,
+            reviewOnly: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notReplayExecution: true,
+            notRecheckExecution: true,
+            notMissedOpportunityGeneration: true,
+            notReviewResultGeneration: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false
+        };
+    }
+
+    function updateMissedArchiveRuntimeStatusDisplay() {
+        var ms = missedArchiveRuntimeStatus || {};
+        var scope = ms.symbol && ms.symbol !== "—" ? ms.symbol : "today";
+        if (ms.analysisId) scope = scope + " · " + ms.analysisId;
+        if (ms.bizDate) scope = scope + " · " + ms.bizDate;
+        var latest = ms.latestMissedId
+            ? (ms.latestMissedId + " · " + (ms.latestRuleVersion || "rule version missing"))
+            : "missing";
+        setText("missedArchiveRuntimeStatusValue", (ms.status || MISSED_ARCHIVE_STATUS_EMPTY) + " / " + (ms.message || "只读状态"));
+        setText("missedArchiveScopeValue", scope);
+        setText("missedArchiveCountValue", "scoped " + (ms.missedCount || 0) + " · today " + (ms.todayMissedCount || 0));
+        setText("missedArchiveLatestValue", latest);
+        setText("missedArchiveReasonParseValue", ms.reasonParseStatus || "UNKNOWN");
+        setText("missedArchiveSourceHealthValue", ms.sourceHealth || "MISSING");
+        setText("missedArchiveReviewOnlyValue", "Missed Opportunity / Review Archive 是只读状态，不是交易信号。");
+        setText("missedArchiveSignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。");
+        setText("missedArchiveGenerationBoundaryValue", "不触发 missed-opportunity generation/write；不生成复盘结果；不触发 replay / recheck execution。");
+        setText("missedArchiveUpstreamValue", "Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay、Data Source Health 边界仍适用；Display Slots 不是候选池。");
+        setText("missedArchiveReasonValue", ms.reason || "—");
+    }
+
+    function fetchMissedArchiveRuntimeStatus(symbol) {
+        var url = "/api/missed-opportunity/review-archive-status";
+        if (symbol) {
+            url += "?symbol=" + encodeURIComponent(symbol);
+        }
+        return fetch(url)
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                missedArchiveRuntimeStatus = resolveMissedArchiveRuntimeStatus(payload, symbol);
+                window.__missedArchiveReviewStatus = missedArchiveRuntimeStatus.status || MISSED_ARCHIVE_STATUS_EMPTY;
+                updateMissedArchiveRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                missedArchiveRuntimeStatus = resolveMissedArchiveRuntimeStatus({}, symbol);
+                window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
+                updateMissedArchiveRuntimeStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -3988,6 +4121,7 @@
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
+                fetchMissedArchiveRuntimeStatus(selectedSymbol);
             });
     }
 
@@ -3999,6 +4133,7 @@
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
+        fetchMissedArchiveRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })

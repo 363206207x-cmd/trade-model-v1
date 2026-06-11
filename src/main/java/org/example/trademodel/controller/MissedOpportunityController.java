@@ -5,6 +5,7 @@ import org.example.trademodel.entity.MissedOpportunityDO;
 import org.example.trademodel.service.MissedOpportunityService;
 import org.example.trademodel.service.MissedReasonViewParser;
 import org.example.trademodel.vo.MissedOpportunityQueryItemVO;
+import org.example.trademodel.vo.MissedReasonViewVO;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,12 +14,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/missed-opportunity")
 public class MissedOpportunityController {
+    private static final String MISSED_ARCHIVE_READY = "MISSED_ARCHIVE_REVIEW_ONLY_READY";
+    private static final String MISSED_ARCHIVE_COUNT_ONLY_PARTIAL = "MISSED_ARCHIVE_COUNT_ONLY_PARTIAL";
+    private static final String MISSED_ARCHIVE_EMPTY_FAIL_CLOSED = "MISSED_ARCHIVE_EMPTY_FAIL_CLOSED";
+    private static final String MISSED_REASON_EMPTY_OR_PARSE_PARTIAL = "MISSED_REASON_EMPTY_OR_PARSE_PARTIAL";
+    private static final String MISSED_REASON_PARSE_FAILED_FAIL_CLOSED = "MISSED_REASON_PARSE_FAILED_FAIL_CLOSED";
+    private static final String MISSED_ARCHIVE_LINKAGE_PARTIAL = "MISSED_ARCHIVE_LINKAGE_PARTIAL";
+    private static final String MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED = "MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED";
 
     private final MissedOpportunityService missedOpportunityService;
 
@@ -47,11 +57,216 @@ public class MissedOpportunityController {
         return ApiResponse.success(data);
     }
 
+    @GetMapping("/review-archive-status")
+    public Map<String, Object> reviewArchiveStatus(
+            @RequestParam(required = false) String analysisId,
+            @RequestParam(required = false) String symbol,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bizDate,
+            @RequestParam(required = false) String missedId,
+            @RequestParam(required = false, defaultValue = "5") Integer limit) {
+        String normalizedAnalysisId = trimToNull(analysisId);
+        String normalizedSymbol = normalizeSymbol(symbol);
+        String normalizedMissedId = trimToNull(missedId);
+        LocalDate scopedBizDate = bizDate != null ? bizDate : LocalDate.now();
+        Map<String, Object> status = baseReviewArchiveStatus(
+                normalizedAnalysisId,
+                normalizedSymbol,
+                scopedBizDate
+        );
+
+        List<MissedOpportunityDO> rows;
+        try {
+            int count = missedOpportunityService.countByBizDate(scopedBizDate);
+            status.put("todayMissedCount", count);
+            status.put("countAvailable", true);
+            if (normalizedMissedId != null) {
+                MissedOpportunityDO row = missedOpportunityService.findByMissedId(normalizedMissedId);
+                rows = row == null ? Collections.emptyList() : List.of(row);
+            } else {
+                LocalDate queryBizDate = (normalizedAnalysisId == null && normalizedSymbol == null)
+                        ? scopedBizDate
+                        : bizDate;
+                rows = missedOpportunityService.query(normalizedAnalysisId, normalizedSymbol, queryBizDate, safeLimit(limit));
+            }
+            status.put("queryAvailable", true);
+        } catch (Exception ignored) {
+            applyReviewArchiveStatus(
+                    status,
+                    MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED,
+                    "MISSED_ARCHIVE_QUERY_UNAVAILABLE",
+                    "Missed Opportunity archive read owner path 不可用；只读状态 fail-closed。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        int missedCount = rows == null ? 0 : rows.size();
+        status.put("missedCount", missedCount);
+        if (missedCount <= 0) {
+            boolean countOnly = ((Integer) status.getOrDefault("todayMissedCount", 0)) > 0
+                    && normalizedMissedId == null
+                    && normalizedAnalysisId == null;
+            applyReviewArchiveStatus(
+                    status,
+                    countOnly ? MISSED_ARCHIVE_COUNT_ONLY_PARTIAL : MISSED_ARCHIVE_EMPTY_FAIL_CLOSED,
+                    countOnly ? "MISSED_ARCHIVE_COUNT_ONLY" : "MISSED_ARCHIVE_EMPTY",
+                    countOnly
+                            ? "Missed Opportunity 仅有 count 信号；archive detail 暂不可读，只读状态保持 partial。"
+                            : "Missed Opportunity archive row 未证明存在；只读状态 fail-closed。",
+                    true,
+                    countOnly ? "PARTIAL" : "MISSING"
+            );
+            return status;
+        }
+
+        MissedOpportunityDO latest = rows.get(0);
+        MissedReasonViewVO reasonView = MissedReasonViewParser.parse(latest.getReasonJson());
+        String parseStatus = firstNonBlank(reasonView.getParseStatus(), "UNKNOWN");
+        boolean reasonViewAvailable = "OK".equals(parseStatus);
+        boolean traceIdPresent = hasText(latest.getTraceId());
+        boolean archiveLinked = hasText(latest.getAnalysisId());
+
+        status.put("analysisId", firstNonBlank(latest.getAnalysisId(), normalizedAnalysisId));
+        status.put("symbol", firstNonBlank(latest.getSymbol(), normalizedSymbol));
+        status.put("bizDate", latest.getBizDate() != null ? latest.getBizDate() : scopedBizDate);
+        status.put("latestMissedId", latest.getMissedId());
+        status.put("latestCreateTime", latest.getCreateTime());
+        status.put("latestRuleVersion", latest.getRuleVersion());
+        status.put("traceIdPresent", traceIdPresent);
+        status.put("reasonViewAvailable", reasonViewAvailable);
+        status.put("reasonParseStatus", parseStatus);
+        status.put("archiveLinked", archiveLinked);
+        status.put("reviewAggregateMissedAvailable", false);
+        status.put("sourceRef", firstNonBlank(latest.getMissedId(), "tm_missed_opportunity"));
+
+        if ("PARSE_FAILED".equals(parseStatus)) {
+            applyReviewArchiveStatus(
+                    status,
+                    MISSED_REASON_PARSE_FAILED_FAIL_CLOSED,
+                    "MISSED_REASON_PARSE_FAILED",
+                    "Missed Opportunity reason_json 解析失败；只读状态 fail-closed，不生成复盘结论。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if ("EMPTY_REASON_JSON".equals(parseStatus)) {
+            applyReviewArchiveStatus(
+                    status,
+                    MISSED_REASON_EMPTY_OR_PARSE_PARTIAL,
+                    "MISSED_REASON_EMPTY",
+                    "Missed Opportunity reason_json 缺失；仅展示 archive count/detail，状态 partial。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!archiveLinked || !traceIdPresent) {
+            applyReviewArchiveStatus(
+                    status,
+                    MISSED_ARCHIVE_LINKAGE_PARTIAL,
+                    "MISSED_ARCHIVE_LINKAGE_PARTIAL",
+                    "Missed Opportunity archive linkage 或 trace id 不完整；只读展示，不生成交易动作。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applyReviewArchiveStatus(
+                    status,
+                    MISSED_ARCHIVE_READY,
+                    "MISSED_ARCHIVE_OWNER_PATH_READ",
+                    "Missed Opportunity / Review Archive 只读状态可读；不生成 missed opportunity、复盘结果或交易信号。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     private static int safeLimit(Integer limit) {
         if (limit == null || limit <= 0) {
             return 20;
         }
         return Math.min(limit, 200);
+    }
+
+    private static Map<String, Object> baseReviewArchiveStatus(
+            String analysisId,
+            String symbol,
+            LocalDate bizDate) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", MISSED_ARCHIVE_EMPTY_FAIL_CLOSED);
+        status.put("analysisId", analysisId);
+        status.put("symbol", symbol);
+        status.put("bizDate", bizDate);
+        status.put("missedCount", 0);
+        status.put("todayMissedCount", 0);
+        status.put("latestMissedId", null);
+        status.put("latestCreateTime", null);
+        status.put("latestRuleVersion", null);
+        status.put("traceIdPresent", false);
+        status.put("reasonViewAvailable", false);
+        status.put("reasonParseStatus", "UNKNOWN");
+        status.put("archiveLinked", false);
+        status.put("reviewAggregateMissedAvailable", false);
+        status.put("queryAvailable", false);
+        status.put("countAvailable", false);
+        status.put("sourceHealth", "MISSING");
+        status.put("sourceRef", "tm_missed_opportunity");
+        status.put("reason", "MISSED_ARCHIVE_STATUS_PENDING");
+        status.put("message", "Missed Opportunity / Review Archive 只读状态待确认；不是交易信号。");
+        status.put("failClosed", true);
+        status.put("reviewOnly", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notReplayExecution", true);
+        status.put("notRecheckExecution", true);
+        status.put("notMissedOpportunityGeneration", true);
+        status.put("notReviewResultGeneration", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        return status;
+    }
+
+    private static void applyReviewArchiveStatus(Map<String, Object> status,
+                                                 String statusValue,
+                                                 String reason,
+                                                 String message,
+                                                 boolean failClosed,
+                                                 String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private static String normalizeSymbol(String symbol) {
+        String trimmed = trimToNull(symbol);
+        return trimmed == null ? null : trimmed.toUpperCase();
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (hasText(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private static MissedOpportunityQueryItemVO toQueryItem(MissedOpportunityDO row) {
