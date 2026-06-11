@@ -26,7 +26,27 @@ Fallback bootstrap command:
 bash scripts/v1-session-bootstrap.sh
 ```
 
-Preferred user-facing operator command:
+Preferred human operator command:
+
+```bash
+bash scripts/v1-go.sh
+```
+
+This is the default one-command entry. It checks state, starts the existing operator path, copies the next Codex task to the macOS clipboard when Codex CLI cannot start, packages dirty work, reads PR numbers automatically, and routes A/B PR flow without manual long-command copy/paste.
+
+For reviewed B-risk PRs:
+
+```bash
+bash scripts/v1-go.sh --confirm-reviewed <PR_NUMBER>
+```
+
+Read-only status:
+
+```bash
+bash scripts/v1-go.sh --status
+```
+
+Underlying operator command:
 
 ```bash
 bash scripts/v1-operator.sh

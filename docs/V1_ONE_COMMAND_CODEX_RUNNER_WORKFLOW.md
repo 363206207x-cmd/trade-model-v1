@@ -23,6 +23,34 @@ It does not change Java business behavior, tests, dashboard business logic, sche
 
 ## 2. New Entry Points
 
+### Human Operator UX Entry
+
+```bash
+bash scripts/v1-go.sh
+```
+
+This is the default command for the human operator. It removes the remaining copy/paste steps by choosing the correct fixed workflow path:
+
+- on clean `main` with no Open PR（未合并 PR）, it delegates to `v1-operator.sh` and generates the next Codex task;
+- if Codex CLI cannot start, it copies the full task text to the macOS clipboard with `pbcopy` and prints `任务已复制到剪贴板，请直接到 Codex 对话框 Command + V。`;
+- if `pbcopy` is unavailable, it prints the full task text directly, so the user does not need to manually `cat` a task file;
+- on a dirty non-main task branch, it delegates to `v1-package-dirty-work.sh`, reads the created PR number, and continues the A/B risk flow;
+- when an Open PR already exists, it reads the PR number/title/risk and runs the correct A/B path without asking the user to replace `<PR_NUMBER>`.
+
+For reviewed B-risk PRs:
+
+```bash
+bash scripts/v1-go.sh --confirm-reviewed <PR_NUMBER>
+```
+
+For read-only status:
+
+```bash
+bash scripts/v1-go.sh --status
+```
+
+`v1-go.sh` does not bypass `v1-state.sh`, `v1-auto.sh`, `v1-operator.sh`, `v1-package-dirty-work.sh`, `v1-pr-complete.sh`, or `v1-merge-sync.sh`.
+
 ### One-Command Operator
 
 ```bash
