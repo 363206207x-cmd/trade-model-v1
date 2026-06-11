@@ -1,14 +1,14 @@
-current_head: "83f191e"
+current_head: "74556d4"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Implementation readiness gate for Missed Opportunity / Review Archive status"
-active_block_cn: "错失机会 / 复盘归档状态实现前就绪门"
-current_phase: "readiness_gate"
+active_block: "Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation"
+active_block_cn: "错失机会 / 复盘归档状态最小只读运行时接线实现"
+current_phase: "implementation"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "missed-opportunity-review-archive-status-implementation-readiness-gate"
-merge_rule: "A-risk readiness gate after Missed Opportunity / Review Archive status design; allow only readiness-gate docs and source-of-truth updates; future implementation is B-risk and must not start in this package; no Java business code, tests, dashboard business logic, schema/config/pom, endpoint/panel implementation, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, recheck execution, missed-opportunity generation/write behavior, review result generation, P359, or P360"
-next_required_action: "Implementation readiness gate for Missed Opportunity / Review Archive status"
+current_branch: "minimal-review-only-missed-opportunity-review-archive-status-runtime-wiring-implementation"
+merge_rule: "B-risk implementation after Missed Opportunity / Review Archive status readiness gate; allow only one minimal read-only status endpoint or existing status path reuse, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates; no DTO/Validator/Assembler, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck execution, missed-opportunity generation/write behavior, review result generation, P359, or P360"
+next_required_action: "Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -102,7 +102,9 @@ v1_completed_slice_fallback_name_hotfix_status: "completed on main as 2c3224f; w
 next_minimal_runtime_slice_selection_after_ruleconfig_status: "completed on main before 83f191e; selects Missed Opportunity / Review Archive status as the next source-read-only target after nine REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 missed_opportunity_review_archive_status_source_read_status: "completed on main before 83f191e; confirms MissedOpportunityController / MissedOpportunityServiceImpl read/query/count methods / MissedOpportunityMapper / tm_missed_opportunity / MissedReasonViewParser / ReviewAggregateServiceImpl / review page missed section / dashboard missed count assets exist; returns GO to design only without implementation or capability movement"
 minimal_review_only_missed_opportunity_review_archive_status_runtime_wiring_design_status: "completed on main as 83f191e; preserves existing MissedOpportunity / ReviewAggregate / dashboard missed-count owner path, defines review-only status mapping, dashboard/API boundary, fail-closed rules, generation/write exclusions, readiness checklist, and returns GO to implementation readiness gate without implementation or capability movement"
+missed_opportunity_review_archive_status_implementation_readiness_gate_status: "completed by this package when merged; returns GO for one minimal read-only status endpoint or existing status path reuse, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates over existing MissedOpportunity / ReviewAggregate / dashboard-count assets; next implementation is B-risk and remains review-only"
 source_of_truth_files:
+  - docs/V1_MISSED_OPPORTUNITY_REVIEW_ARCHIVE_STATUS_RUNTIME_WIRING_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_MISSED_OPPORTUNITY_REVIEW_ARCHIVE_STATUS_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_RULECONFIG.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_VISUAL_VERIFICATION_CLOSURE.md
