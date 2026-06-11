@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `e568ded docs(ruleconfig): sync verification baseline`
+- Current merged main: `a8acc70 chore(workflow): eliminate baseline sync packages`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`.
-- Current next required action is `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`.
+- Current active block is `Next minimal runtime slice selection after RuleConfig closure`.
+- Current next required action is `Next minimal runtime slice selection`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -54,9 +54,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main. It preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main. It returns GO for one minimal read-only `RuleController` `Map` status endpoint, a minimal dashboard status/copy/DOM surface, targeted tests, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only and forbids DTO / Validator / Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main. It adds one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates. It keeps RuleVersionLog context-only, does not call `/api/rule/reload` as status behavior, and does not add DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360.
-- `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It confirms workflow contract, compile, test-compile, `RuleControllerTest` 9 tests, `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and `git diff --check`; RuleConfig still requires visual closure before it can count as a completed review-only runtime slice.
+- `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It confirms workflow contract, compile, test-compile, `RuleControllerTest` 9 tests, `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and `git diff --check`.
 - `e568ded` is the final ordinary baseline sync package before the workflow stops creating standalone baseline sync PRs. Future packages use actual clean/synced main HEAD as the effective execution baseline and update source-of-truth inside the scoped business package.
-- Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed review-only runtime slices are 8.
+- Data Source Health dashboard/API status is the eighth completed Review-Only Runtime partial slice on merged main; RuleConfig runtime audit / rule explainability becomes the ninth completed Review-Only Runtime partial slice after this closure package is accepted.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
 - The Minimal Review-Only PositionSync Runtime Wiring Design track is completed on main as #836: it does not raise business capability level, but it fixes the future status mapping and implementation boundary before any minimal dashboard/API wiring.
@@ -102,7 +102,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - The completed workflow repair and V1 Auto Operator packs do not change DecisionResult runtime behavior.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
 - DecisionResult Visual Verification / Closure is completed on main as `baa5cfe`.
-- The active package after this verification handoff is `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`; it may visually verify only the scoped dashboard RuleConfig audit status panel, safety copy, RuleVersionLog context-only boundary, `/api/rule/reload` boundary copy, layout, and no forbidden semantics.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged with environment-limited evidence: it verifies only the scoped dashboard RuleConfig audit status panel, safety copy, RuleVersionLog context-only boundary, `/api/rule/reload` boundary copy, layout boundary, and no forbidden semantics.
+- The active package after this visual closure is `Next minimal runtime slice selection after RuleConfig closure`; it may add only selection docs and source-of-truth updates.
 - Selected runtime wiring target is `RuleConfig runtime audit / rule explainability`.
 - The completed Data Source Health slice inventoried `DataSourceHealthDO`, reused existing slice-local `sourceHealth` fields, added a minimal review-only endpoint/dashboard status panel, verified it, and visually closed it with environment-limited evidence; the next package must select the next minimal runtime target before any source read.
 - P359 is paused by default: the branch exists, but it was not merged; PR #829 was closed unmerged; it does not count as completed progress.
