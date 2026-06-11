@@ -38,6 +38,24 @@ If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and mu
 Preferred user-facing command:
 
 ```bash
+bash scripts/v1-operator.sh
+```
+
+`v1-operator.sh` is the preferred one-command terminal orchestrator. It checks state, reads `docs/CODEX_NEXT_TASK.yml`, creates or switches the task branch from clean `main`, starts Codex when available or prints the full task, packages dirty work, opens PRs, and delegates PR completion to `v1-pr-complete.sh`.
+
+`v1-operator.sh` 是首选一键总控入口。它检查状态、读取 `docs/CODEX_NEXT_TASK.yml`、从干净 `main` 创建或切换任务分支、在可用时启动 Codex 或打印完整任务、打包 dirty worktree（脏工作区）、创建 PR，并把 PR 完成流程交给 `v1-pr-complete.sh`。
+
+For reviewed B-risk merges:
+
+```bash
+bash scripts/v1-operator.sh --confirm-reviewed <PR_NUMBER>
+```
+
+B-risk（实现包）经 GPT / 人工明确复核后，使用该命令继续合并。总控入口不会绕过 `v1-merge-sync.sh`。
+
+Older direct status command:
+
+```bash
 bash scripts/v1-auto.sh next
 ```
 
@@ -103,6 +121,10 @@ bash scripts/v1-package-dirty-work.sh
 If Codex wrote files but did not create the branch / commit / PR, this helper reads `docs/CODEX_NEXT_TASK.yml`, switches or creates the configured task branch while preserving the dirty worktree, stages only the files allowed by the declared risk, commits, pushes, and calls `v1-auto.sh pr`. It stops for C-risk, forbidden staged paths, open PRs, unknown GitHub PR state, or disallowed changed files.
 
 如果 Codex 已写文件但没有成功创建分支 / commit / PR，该脚本会读取 `docs/CODEX_NEXT_TASK.yml`，保留 dirty worktree 并切换或创建目标任务分支，只 stage 当前 risk 允许的文件，commit、push，并调用 `v1-auto.sh pr`。遇到 C-risk、已 stage 禁止路径、open PR、GitHub PR 状态未知或不允许的变更文件时会停止。
+
+When the current branch is not `main` and the worktree is dirty, `v1-package-dirty-work.sh` treats the current branch as the current package branch. A dirty `CODEX_NEXT_TASK.yml` may already point to the next phase and must not override the current package branch.
+
+当当前分支不是 `main` 且工作区为 dirty（脏）时，`v1-package-dirty-work.sh` 优先把当前分支识别为当前包分支。dirty 的 `CODEX_NEXT_TASK.yml` 可能已经指向下一阶段，不得覆盖当前包分支。
 
 ## Create Draft PR / 创建 Draft PR
 

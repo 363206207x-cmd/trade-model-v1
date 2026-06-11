@@ -1,4 +1,4 @@
-current_head: "ed6def3"
+current_head: "5903409"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
 active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design"
@@ -91,6 +91,7 @@ v1_b_risk_workflow_usability_fix_status: "workflow-only hotfix history if presen
 v1_status_summary_accuracy_fix_status: "completed on main as d9f7817; workflow/status reporting fix only, aligns current main baseline and completed slice count without changing business capability"
 next_minimal_runtime_slice_selection_after_data_source_health_status: "selection package selects RuleConfig runtime audit / rule explainability as the next source-read-only target after eight REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 ruleconfig_runtime_audit_rule_explainability_source_read_status: "completed in this source-read package; confirms RuleConfig / Watchlist owner assets, dashboard watchlist status panel, RuleVersionLog adjacent audit chain, and gaps; returns GO to design only without implementation or capability movement"
+v1_operator_one_command_orchestrator_status: "workflow-only orchestration improvement; adds scripts/v1-operator.sh as the preferred terminal entry, fixes dirty package branch detection, and preserves the next business action without changing capability"
 source_of_truth_files:
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_DATA_SOURCE_HEALTH.md

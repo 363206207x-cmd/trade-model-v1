@@ -144,6 +144,13 @@ state_text="$(bash scripts/v1-state.sh 2>&1 || true)"
 current_branch="$(git branch --show-current)"
 open_prs="$(state_value "$state_text" "OPEN_PRS")"
 main_sync="$(state_value "$state_text" "MAIN_SYNC")"
+worktree_clean="$(state_value "$state_text" "WORKTREE_CLEAN")"
+
+if [[ "$current_branch" != "main" && "$worktree_clean" == "No" ]]; then
+  echo "Current package branch detected from current branch（已从当前分支识别当前任务包分支）: $current_branch"
+  echo "Dirty CODEX_NEXT_TASK may point to next phase and will not override current package branch（脏工作区中的 CODEX_NEXT_TASK 可能已指向下一阶段，不会覆盖当前任务包分支）。"
+  target_branch="$current_branch"
+fi
 
 echo "V1 Dirty Work Packager（脏工作区安全打包）"
 print_hr

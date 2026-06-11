@@ -5,7 +5,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `ed6def3 docs(runtime): select ruleconfig audit next slice`
+- Current merged main: `5903409 docs(ruleconfig): read runtime audit explainability source path`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
@@ -50,6 +50,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `d9f7817` completes the V1 status summary accuracy fix. It aligns current main and completed-slice reporting after Data Source Health visual closure without changing business capability.
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target.
 - The RuleConfig runtime audit / rule explainability source-read package confirms reusable RuleConfig / Watchlist owner assets and adjacent RuleVersionLog audit context, identifies generic audit/explainability gaps, and returns GO to design only without capability movement.
+- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability and preserves the next business action as RuleConfig design.
+- V1 Operator One-Command Orchestrator is workflow-only: it adds a terminal total-control entry and does not execute RuleConfig design or change business capability.
 - Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed review-only runtime slices are 8.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.

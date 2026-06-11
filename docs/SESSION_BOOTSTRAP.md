@@ -29,6 +29,20 @@ bash scripts/v1-session-bootstrap.sh
 Preferred user-facing operator command:
 
 ```bash
+bash scripts/v1-operator.sh
+```
+
+This is the preferred one-command terminal entry. It checks state, creates or switches the task branch, starts Codex or prints the full task, packages dirty work, opens PRs, and delegates merge flow to fixed scripts.
+
+For reviewed B-risk PRs:
+
+```bash
+bash scripts/v1-operator.sh --confirm-reviewed <PR_NUMBER>
+```
+
+Older status/task summary command:
+
+```bash
 bash scripts/v1-auto.sh next
 ```
 

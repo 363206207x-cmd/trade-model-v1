@@ -37,7 +37,7 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `ed6def3 docs(runtime): select ruleconfig audit next slice`
+- Current merged main: `5903409 docs(ruleconfig): read runtime audit explainability source path`
 - Current active block: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from the merged Data Source Health visual closure: Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
@@ -81,6 +81,8 @@ The following do not count as completed:
 - `d9f7817` completes the V1 status summary accuracy fix. It aligns the workflow/status reporting baseline after Data Source Health visual closure and does not change business capability.
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target after eight completed review-only runtime slices.
 - This source-read package confirms existing RuleConfig / Watchlist owner assets, the current Watchlist status panel/API pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only, with no implementation and no capability movement.
+- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability and keeps the next business action as Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design.
+- This workflow orchestration package may update terminal workflow docs/scripts only; it does not execute RuleConfig design and does not change business capability.
 
 ## Runtime Slice History
 
@@ -148,6 +150,8 @@ P359 remains not completed progress because PR #829 was closed unmerged. P360 is
 - One-command Codex runner with Open PR none handoff evidence: `bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed`
 - PR completion helper: `bash scripts/v1-pr-complete.sh <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]`
 - Dirty-work package helper: `bash scripts/v1-package-dirty-work.sh`
+- One-command operator orchestrator: `bash scripts/v1-operator.sh`
+- B-risk reviewed merge handoff: `bash scripts/v1-operator.sh --confirm-reviewed <PR_NUMBER>`
 - PR helper: `bash scripts/v1-pr-flow-helper.sh --branch <branch> --title "<title>" --risk <risk>`
 - Open PR: `bash scripts/v1-open-pr.sh <branch> "<title>" <risk> [--body-file <file>] [--draft|--ready]`
 - Merge sync: `bash scripts/v1-merge-sync.sh <PR_NUMBER> "<SUBJECT>" --risk <risk> [--confirm]`

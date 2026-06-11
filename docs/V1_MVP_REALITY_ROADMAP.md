@@ -42,6 +42,7 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `d9f7817` completes the V1 status summary accuracy fix without changing business capability.
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target.
 - Source Read for RuleConfig runtime audit / rule explainability confirms reusable RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic audit/explainability gaps. The next package is design only and must not implement it.
+- `5903409` completes Source Read for RuleConfig runtime audit / rule explainability. The current workflow orchestration package is scripts/docs only and preserves the next business action as RuleConfig design.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.

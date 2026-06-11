@@ -6,7 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `ed6def3 docs(runtime): select ruleconfig audit next slice`.
+- Current HEAD: `5903409 docs(ruleconfig): read runtime audit explainability source path`.
 - Active stop-loss track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
@@ -48,6 +48,7 @@ Current merged main:
 - Any B-risk workflow usability hotfix is workflow-only history in this handoff; it does not change business capability or the current next action.
 - Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed minimal runtime slices are 8.
 - This source-read package confirms RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only without capability movement.
+- `5903409` completes the RuleConfig source-read package; this workflow orchestrator package only improves terminal automation and preserves the next business action.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
