@@ -12,8 +12,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Source Read for Missed Opportunity / Review Archive status`.
-- Current next required action is `Source Read for Missed Opportunity / Review Archive status`.
+- Current active block is `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design`.
+- Current next required action is `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -59,6 +59,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `49cef5a` completes RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure with environment-limited evidence.
 - `2c3224f` completes a workflow-only completed-slice fallback naming fix.
 - Next Minimal Runtime Slice Selection After RuleConfig Closure selects `Missed Opportunity / Review Archive status` as the next source-read-only target after nine completed review-only runtime slices.
+- Source Read for Missed Opportunity / Review Archive status is completed by this package when merged. It confirms MissedOpportunityController / MissedOpportunityServiceImpl read-query-count methods / MissedOpportunityMapper / `tm_missed_opportunity` / MissedReasonViewParser / ReviewAggregateServiceImpl / review page missed section / dashboard missed-count assets, identifies the missing dedicated status mapping/dashboard panel and existing write/generation boundaries, and returns GO to design only.
 - Data Source Health dashboard/API status is the eighth completed Review-Only Runtime partial slice on merged main; RuleConfig runtime audit / rule explainability becomes the ninth completed Review-Only Runtime partial slice after this closure package is accepted.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
@@ -174,7 +175,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - #836 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Design.
 - #837 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate.
 - #840 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Verification.
-- The active block is now Source Read for Missed Opportunity / Review Archive status.
+- The active block is now Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
