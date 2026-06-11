@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `9ec569c feat(alerts): show notification policy review-only status (#940)`.
-- Active stop-loss track: `Alert Fatigue / Notification Policy Status Visual Verification / Closure`.
-- Selected target: `Alert fatigue / notification policy status`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, and `RiskActionGuard read-only status`.
-- Selected next minimal runtime slice: `Alert fatigue / notification policy status`.
-- Next required action: `Alert Fatigue / Notification Policy Status Visual Verification / Closure`.
+- Current HEAD: `b217b60 docs(alerts): verify notification policy runtime wiring (#941)`.
+- Active stop-loss track: `Next minimal runtime slice selection after Alert Fatigue closure`.
+- Selected target: `TBD by next minimal runtime slice selection`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, and `Alert fatigue / notification policy status`.
+- Selected next minimal runtime slice: `TBD by next minimal runtime slice selection after Alert Fatigue closure`.
+- Next required action: `Next minimal runtime slice selection after Alert Fatigue closure`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -76,7 +76,8 @@ Current merged main:
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Design is completed on main as `36da811`. It selects a future minimal read-only dashboard status endpoint/panel over existing MonitorAlert read assets, defines status mapping, safety fields, fail-closed rules, not-Push / not-external-channel / not-recheck / not-refresh boundaries, and returns GO to implementation readiness gate.
 - Implementation readiness gate for Alert fatigue / notification policy status is completed on main as `17ab553`. It returns GO to B-risk minimal implementation over existing MonitorAlert read assets, with one minimal read-only dashboard status endpoint, minimal dashboard panel/copy/DOM, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates; it forbids `MonitorAlertWriteServiceImpl`, Push send, external channel, recheck execution, scheduler/collector/API client refresh, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, and P360.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation is completed on main as `9ec569c`. It adds one minimal read-only `/api/dashboard/alert-fatigue-policy-status` endpoint, dashboard `alertFatiguePolicyStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates without notification send, external channel, recheck execution, refresh triggers, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, P359, or P360.
-- Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification is completed by this package when merged. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/dashboard status mapping, safety fields, fail-closed/review-only states, Push/recheck/refresh boundaries, forbidden semantics classification, and source-of-truth alignment from `17ab553` to `9ec569c`.
+- Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification is completed on main as `b217b60`. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/dashboard status mapping, safety fields, fail-closed/review-only states, Push/recheck/refresh boundaries, forbidden semantics classification, and source-of-truth alignment from `17ab553` to `9ec569c`.
+- Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed by this package when merged with environment-limited evidence. `alertFatiguePolicyStatusPanel` DOM/copy/safety copy is present, Push/recheck/refresh boundaries are negative-only, no live UI success is claimed, and no Push / Candidate generation / Decision generation / Point / trading semantics are present. Alert fatigue / notification policy status is the 12th completed Review-Only Runtime partial slice.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
@@ -277,13 +278,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Alert Fatigue / Notification Policy Status Visual Verification / Closure`.
+- Current active block is `Next minimal runtime slice selection after Alert Fatigue closure`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, and `RiskActionGuard read-only status`, all `REVIEW_ONLY_RUNTIME partial`.
-- Selected next minimal runtime slice is `Alert fatigue / notification policy status`.
-- The next required action is `Alert Fatigue / Notification Policy Status Visual Verification / Closure`.
+- Selected next minimal runtime slice is `TBD by next minimal runtime slice selection after Alert Fatigue closure`.
+- The next required action is `Next minimal runtime slice selection after Alert Fatigue closure`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
