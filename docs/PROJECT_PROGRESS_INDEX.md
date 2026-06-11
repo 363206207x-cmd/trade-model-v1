@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `2c3224f fix(workflow): handle completed slice fallback name`.
-- Active stop-loss track: `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design`.
+- Current HEAD: `83f191e docs(workflow): package minimal-review-only-missed-opportunity-review-archive-status-runtime-wiring-design`.
+- Active stop-loss track: `Implementation readiness gate for Missed Opportunity / Review Archive status`.
 - Selected target: `Missed Opportunity / Review Archive status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, and `RuleConfig runtime audit / rule explainability`.
 - Selected next minimal runtime slice: `Missed Opportunity / Review Archive status`.
-- Next required action: `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design`.
+- Next required action: `Implementation readiness gate for Missed Opportunity / Review Archive status`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -58,7 +58,8 @@ Current merged main:
 - RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed on main as `49cef5a` with environment-limited evidence. `ruleConfigAuditStatusPanel` DOM/copy/safety copy is present, RuleVersionLog remains context-only, `/api/rule/reload` remains a boundary, and no Push / Candidate generation / Decision generation / Point / trading semantics are present.
 - `2c3224f` completes a workflow-only completed-slice fallback naming fix.
 - Next Minimal Runtime Slice Selection After RuleConfig Closure selects `Missed Opportunity / Review Archive status` as the next source-read-only target. The selected source read must inventory existing Missed Opportunity / Review Archive owner assets and must not implement generation/write behavior, review result generation, replay/recheck execution, Push, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler, P359, or P360.
-- Source Read for Missed Opportunity / Review Archive status is completed by this package when merged. It confirms existing MissedOpportunityController / MissedOpportunityServiceImpl read-query-count methods / MissedOpportunityMapper / `tm_missed_opportunity` / MissedReasonViewParser / ReviewAggregateServiceImpl / review page missed section / dashboard missed-count assets, identifies dedicated status/dashboard/fail-closed gaps, and returns GO to design only without implementation or capability movement.
+- Source Read for Missed Opportunity / Review Archive status is completed on main before `83f191e`. It confirms existing MissedOpportunityController / MissedOpportunityServiceImpl read-query-count methods / MissedOpportunityMapper / `tm_missed_opportunity` / MissedReasonViewParser / ReviewAggregateServiceImpl / review page missed section / dashboard missed-count assets, identifies dedicated status/dashboard/fail-closed gaps, and returns GO to design only without implementation or capability movement.
+- Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Design is completed on main as `83f191e`; it preserves the existing read/query/count owner path, defines status mapping, dashboard/API boundary, fail-closed rules, generation/write exclusions, readiness checklist, and returns GO to implementation readiness gate without implementation or capability movement.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
