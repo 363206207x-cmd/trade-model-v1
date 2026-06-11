@@ -2,6 +2,7 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
+import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
@@ -100,6 +101,17 @@ public class DashboardController {
     private static final String RISK_ACTION_GUARD_HIGH_RISK_REVIEW_ONLY = "HIGH_RISK_REVIEW_ONLY";
     private static final String RISK_ACTION_GUARD_ACTION_FLAGS_BLOCKED_FAIL_CLOSED = "ACTION_FLAGS_BLOCKED_FAIL_CLOSED";
     private static final String RISK_ACTION_GUARD_ACTION_WORDING_BLOCKED_FAIL_CLOSED = "ACTION_WORDING_BLOCKED_FAIL_CLOSED";
+    private static final String ALERT_POLICY_READY = "ALERT_POLICY_REVIEW_ONLY_READY";
+    private static final String ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED = "ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED";
+    private static final String ALERT_READ_MODEL_MISSING_FAIL_CLOSED = "ALERT_READ_MODEL_MISSING_FAIL_CLOSED";
+    private static final String ALERT_RECENT_EMPTY_REVIEW_ONLY = "ALERT_RECENT_EMPTY_REVIEW_ONLY";
+    private static final String ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY = "ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY";
+    private static final String ALERT_COOLDOWN_ACTIVE_REVIEW_ONLY = "ALERT_COOLDOWN_ACTIVE_REVIEW_ONLY";
+    private static final String ALERT_DUPLICATE_RISK_REVIEW_ONLY = "ALERT_DUPLICATE_RISK_REVIEW_ONLY";
+    private static final String ALERT_FATIGUE_HIGH_REVIEW_ONLY = "ALERT_FATIGUE_HIGH_REVIEW_ONLY";
+    private static final String NOTIFICATION_POLICY_MISSING_FAIL_CLOSED = "NOTIFICATION_POLICY_MISSING_FAIL_CLOSED";
+    private static final String PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -521,6 +533,117 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/alert-fatigue-policy-status")
+    @ResponseBody
+    public Map<String, Object> alertFatiguePolicyStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseAlertFatiguePolicyStatus(normalizedSymbol);
+
+        List<MonitorAlertDO> recentAlerts;
+        try {
+            recentAlerts = monitorService != null ? monitorService.getRecentAlerts(20) : null;
+        } catch (RuntimeException ex) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED,
+                    "MONITOR_ALERT_READ_PATH_UNAVAILABLE",
+                    "MonitorAlert read path 不可用；Alert fatigue / notification policy 只读状态 fail-closed，不触发 Push、recheck、refresh 或写入。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        if (recentAlerts == null) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_READ_MODEL_MISSING_FAIL_CLOSED,
+                    "MONITOR_ALERT_READ_MODEL_MISSING",
+                    "MonitorAlert read model 缺失；不伪造告警疲劳或通知策略状态。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        List<MonitorAlertDO> scopedAlerts = recentAlerts.stream()
+                .filter(alert -> alertMatchesSymbol(alert, normalizedSymbol))
+                .toList();
+        long openCount = scopedAlerts.stream().filter(this::isOpenMonitorAlert).count();
+        long suppressedCount = scopedAlerts.stream().filter(this::isSuppressedMonitorAlert).count();
+        boolean cooldownActive = scopedAlerts.stream().anyMatch(alert -> hasText(alert.getCooldownUntil()));
+        boolean suppressionActive = suppressedCount > 0;
+        boolean duplicateRisk = duplicateAlertTypeRisk(scopedAlerts);
+        boolean fatigueHigh = scopedAlerts.size() >= 6 || openCount >= 3 || suppressedCount >= 3;
+
+        status.put("recentAlertCount", scopedAlerts.size());
+        status.put("openAlertCount", openCount);
+        status.put("suppressedAlertCount", suppressedCount);
+        status.put("cooldownActive", cooldownActive);
+        status.put("suppressionActive", suppressionActive);
+        status.put("duplicateRiskVisible", duplicateRisk);
+        status.put("fatigueHigh", fatigueHigh);
+        status.put("latestAlertType", latestAlertType(scopedAlerts));
+        status.put("latestAlertLevel", latestAlertLevel(scopedAlerts));
+
+        if (scopedAlerts.isEmpty()) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_RECENT_EMPTY_REVIEW_ONLY,
+                    "ALERT_RECENT_EMPTY",
+                    "最近告警为空；仅表示只读告警中心当前无可见样本，不代表推送策略或交易安全结论。",
+                    false,
+                    "WATCH_ONLY"
+            );
+        } else if (suppressionActive) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY,
+                    "ALERT_SUPPRESSION_ACTIVE",
+                    "告警抑制证据可见；仅展示只读状态，不发送 Push，不触发 recheck。",
+                    false,
+                    "PARTIAL"
+            );
+        } else if (cooldownActive) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_COOLDOWN_ACTIVE_REVIEW_ONLY,
+                    "ALERT_COOLDOWN_ACTIVE",
+                    "告警冷却证据可见；仅展示只读状态，不触发调度、采集或 API client refresh。",
+                    false,
+                    "PARTIAL"
+            );
+        } else if (duplicateRisk) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_DUPLICATE_RISK_REVIEW_ONLY,
+                    "ALERT_DUPLICATE_RISK",
+                    "重复告警风险可见；仅供人工复核，不发送通知或重跑复查。",
+                    false,
+                    "PARTIAL"
+            );
+        } else if (fatigueHigh) {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_FATIGUE_HIGH_REVIEW_ONLY,
+                    "ALERT_FATIGUE_HIGH",
+                    "告警疲劳偏高；仅供人工复核，不生成交易信号或推送动作。",
+                    false,
+                    "PARTIAL"
+            );
+        } else {
+            applyAlertFatiguePolicyStatus(
+                    status,
+                    ALERT_POLICY_READY,
+                    "MONITOR_ALERT_READ_MODEL_READY",
+                    "Alert fatigue / notification policy 只读状态可读；不发送 Push，不触发 recheck、refresh、写入或交易动作。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     @GetMapping("/api/dashboard/review-replay-result-status")
     @ResponseBody
     public Map<String, Object> reviewReplayResultStatus(
@@ -837,6 +960,54 @@ public class DashboardController {
         return status;
     }
 
+    private Map<String, Object> baseAlertFatiguePolicyStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("recentAlertCount", 0);
+        status.put("openAlertCount", 0);
+        status.put("suppressedAlertCount", 0);
+        status.put("cooldownActive", false);
+        status.put("suppressionActive", false);
+        status.put("duplicateRiskVisible", false);
+        status.put("fatigueHigh", false);
+        status.put("latestAlertType", null);
+        status.put("latestAlertLevel", null);
+        status.put("policySource", "MonitorAlert read model");
+        status.put("sourceHealth", "BLOCKED");
+        status.put("reason", "ALERT_POLICY_STATUS_PENDING");
+        status.put("message", "Alert fatigue / notification policy 只读状态待确认；不发送 Push，不触发 recheck 或刷新。");
+        status.put("reviewOnly", true);
+        status.put("notPushSend", true);
+        status.put("notExternalChannel", true);
+        status.put("notRecheckExecution", true);
+        status.put("notSchedulerTrigger", true);
+        status.put("notCollectorTrigger", true);
+        status.put("notApiClientRefresh", true);
+        status.put("notAlertWrite", true);
+        status.put("notTradingSignal", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                ALERT_POLICY_READY,
+                ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED,
+                ALERT_READ_MODEL_MISSING_FAIL_CLOSED,
+                ALERT_RECENT_EMPTY_REVIEW_ONLY,
+                ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY,
+                ALERT_COOLDOWN_ACTIVE_REVIEW_ONLY,
+                ALERT_DUPLICATE_RISK_REVIEW_ONLY,
+                ALERT_FATIGUE_HIGH_REVIEW_ONLY,
+                NOTIFICATION_POLICY_MISSING_FAIL_CLOSED,
+                PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
+        return status;
+    }
+
     private Map<String, Object> baseReviewReplayStatus(String analysisId, String normalizedSymbol) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("status", REVIEW_REPLAY_BLOCKED_FAIL_CLOSED);
@@ -1080,6 +1251,19 @@ public class DashboardController {
                                             String message,
                                             boolean failClosed,
                                             String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyAlertFatiguePolicyStatus(Map<String, Object> status,
+                                               String statusValue,
+                                               String reason,
+                                               String message,
+                                               boolean failClosed,
+                                               String sourceHealth) {
         status.put("status", statusValue);
         status.put("reason", reason);
         status.put("message", message);
@@ -1501,6 +1685,59 @@ public class DashboardController {
                 || lower.contains("review")
                 || lower.contains("blocked")
                 || lower.contains("disabled"));
+    }
+
+    private boolean alertMatchesSymbol(MonitorAlertDO alert, String normalizedSymbol) {
+        if (alert == null) {
+            return false;
+        }
+        String alertSymbol = alert.getAssetSymbol();
+        return !hasText(alertSymbol) || normalizedSymbol.equalsIgnoreCase(alertSymbol.trim());
+    }
+
+    private boolean isOpenMonitorAlert(MonitorAlertDO alert) {
+        if (alert == null || !hasText(alert.getStatus())) {
+            return true;
+        }
+        String status = alert.getStatus().trim().toUpperCase();
+        return !("CLOSED".equals(status) || "RESOLVED".equals(status) || "SUPPRESSED".equals(status));
+    }
+
+    private boolean isSuppressedMonitorAlert(MonitorAlertDO alert) {
+        if (alert == null) {
+            return false;
+        }
+        String status = normalizedStatus(alert.getStatus());
+        return "SUPPRESSED".equals(status) || hasText(alert.getSuppressReason());
+    }
+
+    private boolean duplicateAlertTypeRisk(List<MonitorAlertDO> alerts) {
+        if (alerts == null || alerts.size() < 2) {
+            return false;
+        }
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (MonitorAlertDO alert : alerts) {
+            String type = firstNonBlank(alert != null ? alert.getAlertType() : null, "UNKNOWN");
+            counts.put(type, counts.getOrDefault(type, 0) + 1);
+            if (counts.get(type) > 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String latestAlertType(List<MonitorAlertDO> alerts) {
+        if (alerts == null || alerts.isEmpty() || alerts.get(0) == null) {
+            return null;
+        }
+        return firstNonBlank(alerts.get(0).getAlertType(), "UNKNOWN");
+    }
+
+    private String latestAlertLevel(List<MonitorAlertDO> alerts) {
+        if (alerts == null || alerts.isEmpty() || alerts.get(0) == null) {
+            return null;
+        }
+        return firstNonBlank(alerts.get(0).getAlertLevel(), "UNKNOWN");
     }
 
     private List<String> safeReasons(List<String> rawReasons) {

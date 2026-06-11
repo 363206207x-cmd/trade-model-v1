@@ -6,6 +6,7 @@ import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
+import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.DecisionService;
@@ -376,6 +377,52 @@ class DashboardControllerTest {
         assertThat(html).contains("不是新的 Decision generation");
         assertThat(html).contains("不是 Point");
         assertThat(html).contains("reduce / close / reverse / move stop / open / execute 只能作为 guardrail / manual-review copy");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
+    @Test
+    void dashboardTemplateShowsReviewOnlyAlertFatiguePolicyRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/alert-fatigue-policy-status");
+        assertThat(html).contains("alertFatiguePolicyStatusPanel");
+        assertThat(html).contains("alertFatiguePolicyRuntimeStatusValue");
+        assertThat(html).contains("alertFatiguePolicySymbolValue");
+        assertThat(html).contains("alertFatiguePolicySourceHealthValue");
+        assertThat(html).contains("alertFatiguePolicyCountsValue");
+        assertThat(html).contains("alertFatiguePolicyCooldownValue");
+        assertThat(html).contains("alertFatiguePolicySuppressionValue");
+        assertThat(html).contains("alertFatiguePolicyDuplicateValue");
+        assertThat(html).contains("alertFatiguePolicyFatigueValue");
+        assertThat(html).contains("alertFatiguePolicySourceValue");
+        assertThat(html).contains("alertFatiguePolicyLatestValue");
+        assertThat(html).contains("alertFatiguePolicyReviewOnlyValue");
+        assertThat(html).contains("alertFatiguePolicyPushBoundaryValue");
+        assertThat(html).contains("alertFatiguePolicySignalBoundaryValue");
+        assertThat(html).contains("ALERT_POLICY_REVIEW_ONLY_READY");
+        assertThat(html).contains("ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("ALERT_READ_MODEL_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("ALERT_RECENT_EMPTY_REVIEW_ONLY");
+        assertThat(html).contains("ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY");
+        assertThat(html).contains("ALERT_COOLDOWN_ACTIVE_REVIEW_ONLY");
+        assertThat(html).contains("ALERT_DUPLICATE_RISK_REVIEW_ONLY");
+        assertThat(html).contains("ALERT_FATIGUE_HIGH_REVIEW_ONLY");
+        assertThat(html).contains("NOTIFICATION_POLICY_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("review-only，只读展示，不发送 Push");
+        assertThat(html).contains("not push send");
+        assertThat(html).contains("not external channel");
+        assertThat(html).contains("not recheck execution");
+        assertThat(html).contains("not scheduler trigger");
+        assertThat(html).contains("not collector trigger");
+        assertThat(html).contains("not API client refresh");
+        assertThat(html).contains("not alert write");
+        assertThat(html).contains("not trading");
+        assertThat(html).contains("not candidate");
+        assertThat(html).contains("not decision generation");
+        assertThat(html).contains("not point");
+        assertThat(html).contains("not executable");
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
@@ -1237,6 +1284,113 @@ class DashboardControllerTest {
     }
 
     @Test
+    void alertFatiguePolicyStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        when(monitorService.getRecentAlerts(20)).thenReturn(List.of(
+                monitorAlert("BTCUSDT", "RISK_ALERT", "WARN", "OPEN", null, null)
+        ));
+
+        mockMvc.perform(get("/api/dashboard/alert-fatigue-policy-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ALERT_POLICY_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.recentAlertCount").value(1))
+                .andExpect(jsonPath("$.openAlertCount").value(1))
+                .andExpect(jsonPath("$.suppressedAlertCount").value(0))
+                .andExpect(jsonPath("$.cooldownActive").value(false))
+                .andExpect(jsonPath("$.suppressionActive").value(false))
+                .andExpect(jsonPath("$.duplicateRiskVisible").value(false))
+                .andExpect(jsonPath("$.fatigueHigh").value(false))
+                .andExpect(jsonPath("$.policySource").value("MonitorAlert read model"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notExternalChannel").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notSchedulerTrigger").value(true))
+                .andExpect(jsonPath("$.notCollectorTrigger").value(true))
+                .andExpect(jsonPath("$.notApiClientRefresh").value(true))
+                .andExpect(jsonPath("$.notAlertWrite").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false))
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists());
+    }
+
+    @Test
+    void alertFatiguePolicyStatusEndpointFailsClosedWhenReadModelMissing() throws Exception {
+        when(monitorService.getRecentAlerts(20)).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/alert-fatigue-policy-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ALERT_READ_MODEL_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notAlertWrite").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void alertFatiguePolicyStatusEndpointShowsSuppressionAndCooldownAsReviewOnly() throws Exception {
+        when(monitorService.getRecentAlerts(20)).thenReturn(List.of(
+                monitorAlert("BTCUSDT", "RISK_ALERT", "WARN", "SUPPRESSED", "2026-06-12T12:15:00", "dedupe window")
+        ));
+
+        mockMvc.perform(get("/api/dashboard/alert-fatigue-policy-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.suppressionActive").value(true))
+                .andExpect(jsonPath("$.cooldownActive").value(true))
+                .andExpect(jsonPath("$.suppressedAlertCount").value(1))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notExternalChannel").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notSchedulerTrigger").value(true))
+                .andExpect(jsonPath("$.notCollectorTrigger").value(true))
+                .andExpect(jsonPath("$.notApiClientRefresh").value(true))
+                .andExpect(jsonPath("$.notAlertWrite").value(true))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void alertFatiguePolicyStatusEndpointDoesNotExposeExecutableSendRefreshCandidatePointOrTradingFields() throws Exception {
+        when(monitorService.getRecentAlerts(20)).thenReturn(List.of(
+                monitorAlert("BTCUSDT", "RISK_ALERT", "WARN", "OPEN", null, null)
+        ));
+
+        mockMvc.perform(get("/api/dashboard/alert-fatigue-policy-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSend").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.externalChannelAction").doesNotExist())
+                .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.schedulerTrigger").doesNotExist())
+                .andExpect(jsonPath("$.collectorTrigger").doesNotExist())
+                .andExpect(jsonPath("$.apiClientRefreshAction").doesNotExist())
+                .andExpect(jsonPath("$.alertWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
     void reviewReplayStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
         when(reviewService.getStateByAnalysisId("ana-review-ready"))
                 .thenReturn(reviewState("ana-review-ready"));
@@ -1850,6 +2004,26 @@ class DashboardControllerTest {
         DashboardDetailResponseVO.RiskActionGuardDisplayVO display = manualReviewRiskActionGuardDisplay();
         display.setRiskActionAdvice("execute close reverse open");
         return display;
+    }
+
+    private static MonitorAlertDO monitorAlert(String symbol,
+                                               String alertType,
+                                               String alertLevel,
+                                               String status,
+                                               String cooldownUntil,
+                                               String suppressReason) {
+        MonitorAlertDO alert = new MonitorAlertDO();
+        alert.setId("alert-" + alertType + "-" + status);
+        alert.setAssetSymbol(symbol);
+        alert.setAlertType(alertType);
+        alert.setAlertLevel(alertLevel);
+        alert.setAlertMessage("review-only alert fixture");
+        alert.setStatus(status);
+        alert.setCooldownUntil(cooldownUntil);
+        alert.setSuppressReason(suppressReason);
+        alert.setTraceId("trace-alert");
+        alert.setRuleVersion("v1");
+        return alert;
     }
 
     private static PersistedOhlcvReadinessResult readiness(

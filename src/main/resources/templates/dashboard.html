@@ -1140,6 +1140,19 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="riskActionGuardReasonValue">RISK_ACTION_GUARD_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="alertFatiguePolicyStatusPanel" aria-label="Alert fatigue notification policy review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Alert fatigue / Notification policy 只读状态</span><span class="v" id="alertFatiguePolicyRuntimeStatusValue">ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED / Alert fatigue / notification policy 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / source health</span><span class="v"><span id="alertFatiguePolicySymbolValue">—</span> · <span id="alertFatiguePolicySourceHealthValue">BLOCKED</span></span></div>
+            <div class="kv"><span class="k">recent / open / suppressed count</span><span class="v" id="alertFatiguePolicyCountsValue">0 / 0 / 0</span></div>
+            <div class="kv"><span class="k">cooldown / suppression</span><span class="v"><span id="alertFatiguePolicyCooldownValue">false</span> · <span id="alertFatiguePolicySuppressionValue">false</span></span></div>
+            <div class="kv"><span class="k">duplicate / fatigue</span><span class="v"><span id="alertFatiguePolicyDuplicateValue">false</span> · <span id="alertFatiguePolicyFatigueValue">false</span></span></div>
+            <div class="kv"><span class="k">policy source / latest alert</span><span class="v"><span id="alertFatiguePolicySourceValue">MonitorAlert read model</span> · <span id="alertFatiguePolicyLatestValue">—</span></span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="alertFatiguePolicyReviewOnlyValue">Alert fatigue / notification policy 是 review-only，只读展示，不发送 Push。</span></div>
+            <div class="kv"><span class="k">Push / recheck / refresh boundary</span><span class="v" id="alertFatiguePolicyPushBoundaryValue">not push send；not external channel；not recheck execution；not scheduler trigger；not collector trigger；not API client refresh；not alert write。</span></div>
+            <div class="kv"><span class="k">Not trading / candidate / decision / point</span><span class="v" id="alertFatiguePolicySignalBoundaryValue">not trading；not candidate；not decision generation；not point；not executable；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="alertFatiguePolicyReasonValue">ALERT_POLICY_STATUS_PENDING</span></div>
+        </div>
+
         <div class="module-status-note" id="reviewReplayStatusPanel" aria-label="Review Replay result review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">Review / Replay 只读状态</span><span class="v" id="reviewReplayRuntimeStatusValue">REVIEW_REPLAY_BLOCKED_FAIL_CLOSED / Review / Replay result status 只读状态待确认</span></div>
             <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="reviewReplaySymbolValue">—</span> · <span id="reviewReplayAnalysisIdValue">—</span></span></div>
@@ -1436,6 +1449,17 @@
     var MISSED_ARCHIVE_STATUS_LINKAGE_PARTIAL = "MISSED_ARCHIVE_LINKAGE_PARTIAL";
     var MISSED_ARCHIVE_STATUS_QUERY_UNAVAILABLE = "MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED";
     var MISSED_ARCHIVE_STATUS_BLOCKED = "MISSED_ARCHIVE_BLOCKED_FAIL_CLOSED";
+    var ALERT_POLICY_STATUS_READY = "ALERT_POLICY_REVIEW_ONLY_READY";
+    var ALERT_POLICY_STATUS_BACKEND_PENDING = "ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED";
+    var ALERT_POLICY_STATUS_READ_MODEL_MISSING = "ALERT_READ_MODEL_MISSING_FAIL_CLOSED";
+    var ALERT_POLICY_STATUS_RECENT_EMPTY = "ALERT_RECENT_EMPTY_REVIEW_ONLY";
+    var ALERT_POLICY_STATUS_SUPPRESSION_ACTIVE = "ALERT_SUPPRESSION_ACTIVE_REVIEW_ONLY";
+    var ALERT_POLICY_STATUS_COOLDOWN_ACTIVE = "ALERT_COOLDOWN_ACTIVE_REVIEW_ONLY";
+    var ALERT_POLICY_STATUS_DUPLICATE_RISK = "ALERT_DUPLICATE_RISK_REVIEW_ONLY";
+    var ALERT_POLICY_STATUS_FATIGUE_HIGH = "ALERT_FATIGUE_HIGH_REVIEW_ONLY";
+    var ALERT_POLICY_STATUS_NOTIFICATION_MISSING = "NOTIFICATION_POLICY_MISSING_FAIL_CLOSED";
+    var ALERT_POLICY_STATUS_PUSH_BLOCKED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ALERT_POLICY_STATUS_RECHECK_BLOCKED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1622,6 +1646,38 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var alertFatiguePolicyRuntimeStatus = {
+        status: ALERT_POLICY_STATUS_BACKEND_PENDING,
+        symbol: null,
+        recentAlertCount: 0,
+        openAlertCount: 0,
+        suppressedAlertCount: 0,
+        cooldownActive: false,
+        suppressionActive: false,
+        duplicateRiskVisible: false,
+        fatigueHigh: false,
+        latestAlertType: null,
+        latestAlertLevel: null,
+        policySource: "MonitorAlert read model",
+        sourceHealth: "BLOCKED",
+        reason: "ALERT_POLICY_STATUS_PENDING",
+        message: "Alert fatigue / notification policy 只读状态待确认；不发送 Push，不触发 recheck 或刷新。",
+        reviewOnly: true,
+        notPushSend: true,
+        notExternalChannel: true,
+        notRecheckExecution: true,
+        notSchedulerTrigger: true,
+        notCollectorTrigger: true,
+        notApiClientRefresh: true,
+        notAlertWrite: true,
+        notTradingSignal: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     var reviewReplayRuntimeStatus = {
         status: REVIEW_REPLAY_STATUS_BLOCKED,
         symbol: null,
@@ -1727,6 +1783,7 @@
     window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
     window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
     window.__riskActionGuardReviewStatus = RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
+    window.__alertFatiguePolicyReviewStatus = ALERT_POLICY_STATUS_BACKEND_PENDING;
     window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
     window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
@@ -3396,6 +3453,84 @@
             });
     }
 
+    function resolveAlertFatiguePolicyRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, ALERT_POLICY_STATUS_BACKEND_PENDING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            recentAlertCount: Number(p.recentAlertCount || 0),
+            openAlertCount: Number(p.openAlertCount || 0),
+            suppressedAlertCount: Number(p.suppressedAlertCount || 0),
+            cooldownActive: p.cooldownActive === true,
+            suppressionActive: p.suppressionActive === true,
+            duplicateRiskVisible: p.duplicateRiskVisible === true,
+            fatigueHigh: p.fatigueHigh === true,
+            latestAlertType: p.latestAlertType || null,
+            latestAlertLevel: p.latestAlertLevel || null,
+            policySource: firstNonEmpty(p.policySource, "MonitorAlert read model"),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "ALERT_POLICY_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Alert fatigue / notification policy 只读状态待确认；不发送 Push，不触发 recheck 或刷新。"),
+            reviewOnly: true,
+            notPushSend: true,
+            notExternalChannel: true,
+            notRecheckExecution: true,
+            notSchedulerTrigger: true,
+            notCollectorTrigger: true,
+            notApiClientRefresh: true,
+            notAlertWrite: true,
+            notTradingSignal: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateAlertFatiguePolicyRuntimeStatusDisplay() {
+        var ap = alertFatiguePolicyRuntimeStatus || {};
+        var latest = ap.latestAlertType
+            ? (ap.latestAlertType + " / " + (ap.latestAlertLevel || "UNKNOWN"))
+            : "—";
+        setText("alertFatiguePolicyRuntimeStatusValue", (ap.status || ALERT_POLICY_STATUS_BACKEND_PENDING) + " / " + (ap.message || "只读状态"));
+        setText("alertFatiguePolicySymbolValue", ap.symbol || "—");
+        setText("alertFatiguePolicySourceHealthValue", ap.sourceHealth || "BLOCKED");
+        setText("alertFatiguePolicyCountsValue", (ap.recentAlertCount || 0) + " / " + (ap.openAlertCount || 0) + " / " + (ap.suppressedAlertCount || 0));
+        setText("alertFatiguePolicyCooldownValue", ap.cooldownActive ? "true / review-only" : "false");
+        setText("alertFatiguePolicySuppressionValue", ap.suppressionActive ? "true / review-only" : "false");
+        setText("alertFatiguePolicyDuplicateValue", ap.duplicateRiskVisible ? "true / manual review" : "false");
+        setText("alertFatiguePolicyFatigueValue", ap.fatigueHigh ? "true / manual review" : "false");
+        setText("alertFatiguePolicySourceValue", ap.policySource || "MonitorAlert read model");
+        setText("alertFatiguePolicyLatestValue", latest);
+        setText("alertFatiguePolicyReviewOnlyValue", "Alert fatigue / notification policy 是 review-only，只读展示，不发送 Push。");
+        setText("alertFatiguePolicyPushBoundaryValue", "not push send；not external channel；not recheck execution；not scheduler trigger；not collector trigger；not API client refresh；not alert write。");
+        setText("alertFatiguePolicySignalBoundaryValue", "not trading；not candidate；not decision generation；not point；not executable；Display Slots 不是候选池。");
+        setText("alertFatiguePolicyReasonValue", ap.reason || "—");
+    }
+
+    function fetchAlertFatiguePolicyRuntimeStatus(symbol) {
+        if (!symbol) {
+            alertFatiguePolicyRuntimeStatus = resolveAlertFatiguePolicyRuntimeStatus({});
+            window.__alertFatiguePolicyReviewStatus = ALERT_POLICY_STATUS_BACKEND_PENDING;
+            updateAlertFatiguePolicyRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/alert-fatigue-policy-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                alertFatiguePolicyRuntimeStatus = resolveAlertFatiguePolicyRuntimeStatus(payload, symbol);
+                window.__alertFatiguePolicyReviewStatus = alertFatiguePolicyRuntimeStatus.status || ALERT_POLICY_STATUS_BACKEND_PENDING;
+                updateAlertFatiguePolicyRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                alertFatiguePolicyRuntimeStatus = resolveAlertFatiguePolicyRuntimeStatus({}, symbol);
+                window.__alertFatiguePolicyReviewStatus = ALERT_POLICY_STATUS_BACKEND_PENDING;
+                updateAlertFatiguePolicyRuntimeStatusDisplay();
+            });
+    }
+
     function resolveReviewReplayRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -4260,6 +4395,7 @@
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
                 fetchRiskActionGuardRuntimeStatus(selectedSymbol);
+                fetchAlertFatiguePolicyRuntimeStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
@@ -4273,6 +4409,7 @@
         fetchDecisionResultRuntimeStatus(symbol);
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);
         fetchRiskActionGuardRuntimeStatus(symbol);
+        fetchAlertFatiguePolicyRuntimeStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
         fetchMissedArchiveRuntimeStatus(symbol);
