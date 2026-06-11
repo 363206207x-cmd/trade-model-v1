@@ -6,7 +6,7 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `b298ee9 docs(ruleconfig): verify implementation readiness`.
+- Current HEAD: `abc9d40 feat(ruleconfig): show review-only audit status`.
 - Active stop-loss track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
@@ -51,7 +51,7 @@ Current merged main:
 - `b4497e1` completes the workflow-only V1 Operator One-Command Orchestrator package.
 - `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main; it preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines review-only status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main; it returns GO for one minimal read-only `RuleController` `Map` status endpoint, minimal dashboard status/copy/DOM, targeted tests, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only and forbids DTO / Validator / Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
-- This implementation package adds one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. Verification is the next required action before RuleConfig can count as a completed review-only runtime slice.
+- `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main with one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. Verification is the next required action before RuleConfig can count as a completed review-only runtime slice.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
