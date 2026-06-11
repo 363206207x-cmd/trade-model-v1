@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `09f6a9c docs(missed): verify review archive runtime wiring (#927)`.
-- Active stop-loss track: `Next minimal runtime slice selection after Missed Opportunity / Review Archive closure`.
-- Selected target: `Missed Opportunity / Review Archive status`.
+- Current HEAD: `239664d docs(missed): record review archive visual closure (#928)`.
+- Active stop-loss track: `Source Read for RiskActionGuard read-only status`.
+- Selected target: `RiskActionGuard read-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, and `Missed Opportunity / Review Archive status`.
-- Selected next minimal runtime slice: pending selection.
-- Next required action: `Next minimal runtime slice selection after Missed Opportunity / Review Archive closure`.
+- Selected next minimal runtime slice: `RiskActionGuard read-only status`.
+- Next required action: `Source Read for RiskActionGuard read-only status`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -63,7 +63,7 @@ Current merged main:
 - Implementation readiness gate for Missed Opportunity / Review Archive status is completed on main as `ed7faeb`; it returns GO for one minimal read-only status endpoint or existing status path reuse, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates over existing MissedOpportunity / ReviewAggregate / dashboard-count assets.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed on main as `452a8ac`; it adds one minimal read-only `/api/missed-opportunity/review-archive-status` endpoint, dashboard `missedArchiveStatusPanel`, targeted controller/dashboard tests, implementation docs, and source-of-truth updates. The active verification package is A-risk docs/source-of-truth only.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification is completed on main as `09f6a9c`; it verifies compile/test results, endpoint/dashboard status mapping, safety fields, forbidden semantics, and source-of-truth alignment.
-- Missed Opportunity / Review Archive Status Visual Verification / Closure is completed by this package when merged with environment-limited evidence over dashboard template/test coverage. Missed Opportunity / Review Archive status becomes the tenth completed Review-Only Runtime partial slice. The next package is minimal runtime slice selection.
+- Missed Opportunity / Review Archive Status Visual Verification / Closure is completed on main as `239664d` with environment-limited evidence over dashboard template/test coverage. Missed Opportunity / Review Archive status is the tenth completed Review-Only Runtime partial slice. This selection package selects `RiskActionGuard read-only status` as the next source-read-only target.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
@@ -269,7 +269,7 @@ Current active capability movement:
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, and `RuleConfig runtime audit / rule explainability`, all `REVIEW_ONLY_RUNTIME partial`.
-- Selected next minimal runtime slice is to be selected by the next package.
+- Selected next minimal runtime slice is `RiskActionGuard read-only status`; next action is source-read only.
 - The next required action is `Next minimal runtime slice selection`.
 
 - P295 is merged on main.
