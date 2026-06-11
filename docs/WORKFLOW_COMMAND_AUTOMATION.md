@@ -35,7 +35,33 @@ If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and mu
 
 ## V1 Auto Operator / V1 自动操作台
 
-Preferred user-facing command:
+Primary human-facing command:
+
+```bash
+bash scripts/v1-go.sh
+```
+
+`v1-go.sh` is the default human operator UX entry（人工总控体验入口）. It reuses the existing fixed scripts instead of replacing them:
+
+- clean `main` + no Open PR（未合并 PR）: delegates to `v1-operator.sh`, generates the next Codex task, and copies the full task to the macOS clipboard with `pbcopy` if Codex CLI cannot start;
+- dirty non-main task branch（脏任务分支）: delegates to `v1-package-dirty-work.sh`, reads the created Pull Request（拉取请求）number, and continues the A/B risk flow automatically;
+- existing Open PR（已有未合并 PR）: reads PR number/title/risk, auto-completes A-risk, and prints a B-risk GPT review summary without requiring manual PR-number substitution.
+
+For reviewed B-risk merges, use:
+
+```bash
+bash scripts/v1-go.sh --confirm-reviewed <PR_NUMBER>
+```
+
+For read-only status:
+
+```bash
+bash scripts/v1-go.sh --status
+```
+
+Users should not copy long commands, manually `cat` task files, or manually replace `<PR_NUMBER>` in the normal path. Codex task text is copied to the clipboard when possible; if `pbcopy` is unavailable, the full task text is printed directly.
+
+Underlying operator command:
 
 ```bash
 bash scripts/v1-operator.sh
