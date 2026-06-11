@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `f4a274a docs(runtime): read source trace data quality status path`
+- Current merged main: `2ae6a4c docs(runtime): design source trace data quality status wiring`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Implementation readiness gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
-- Current next required action is `Implementation readiness gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
+- Current active block is `Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation`.
+- Current next required action is `Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -197,7 +197,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed on main as `a9ec1c9`. Environment-limited evidence confirms `alertFatiguePolicyStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not Push/not external channel/not recheck/not scheduler/not collector/not API-client refresh/not alert write/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, no live UI success is claimed, and no Push / recheck / refresh / Candidate / Decision generation / Point / trading semantics are present. Alert fatigue / notification policy status is the 12th completed Review-Only Runtime partial slice.
 - Next Minimal Runtime Slice Selection After Alert Fatigue Closure is completed on main as `8a2d8e7` and selects `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status` as the next source-read-only target. This does not implement SourceTrace, RuntimeKline, DataQuality, MultiTimeframe, Point, Candidate, Push, Decision generation, order/execution, or trading behavior.
 - Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `f4a274a`. It confirms the existing `/api/dashboard/detail` SourceTrace / RuntimeKline owner path, persisted OHLCV readiness read path, dashboard diagnostics, and tests, and returns GO to design only without implementation or capability movement.
-- Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design is completed by this package when merged. It selects the existing dashboard detail owner path, defines the optional thin read-only Map endpoint boundary, status mapping, fail-closed rules, frozen source-binding boundary, and returns GO to implementation readiness gate without implementation or capability movement.
+- Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design is completed on main as `2ae6a4c`. It selects the existing dashboard detail owner path, defines the optional thin read-only Map endpoint boundary, status mapping, fail-closed rules, frozen source-binding boundary, and returns GO to implementation readiness gate without implementation or capability movement.
+- Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed by this package when merged. It returns GO to B-risk minimal implementation over the existing dashboard detail / adapter owner path and forbids new DTO / Validator / Assembler / Orchestrator, new source-binding family, refresh, generation, point, Push, external channel, order/execution, trading, P359, and P360.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
