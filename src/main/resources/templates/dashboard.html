@@ -1180,6 +1180,16 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="dataSourceHealthReasonValue">DATA_SOURCE_HEALTH_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="sourceRuntimeDataQualityStatusPanel" aria-label="SourceTrace RuntimeKline DataQuality MultiTimeframe review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">SourceTrace / RuntimeKline / DataQuality / MultiTimeframe 只读状态</span><span class="v" id="sourceRuntimeStatusValue">SOURCE_TRACE_MISSING_FAIL_CLOSED / Source runtime 只读状态待确认</span></div>
+            <div class="kv"><span class="k">source trace / runtime kline</span><span class="v"><span id="sourceTraceReadinessValue">missing</span> · <span id="runtimeKlineReadinessValue">missing</span></span></div>
+            <div class="kv"><span class="k">persisted OHLCV readiness</span><span class="v" id="persistedOhlcvReadinessValue">UNKNOWN</span></div>
+            <div class="kv"><span class="k">DataQuality / MultiTimeframe</span><span class="v"><span id="dataQualityStatusValue">DATA_QUALITY_BLOCKED_FAIL_CLOSED</span> · <span id="multiTimeframeStatusValue">MULTITIMEFRAME_MISSING_FAIL_CLOSED</span></span></div>
+            <div class="kv"><span class="k">Refresh boundary</span><span class="v" id="sourceRuntimeRefreshBoundaryValue">not scheduler trigger；not collector trigger；not API client refresh；not external refresh；not source-binding generation。</span></div>
+            <div class="kv"><span class="k">Signal boundary</span><span class="v" id="sourceRuntimeSignalBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="sourceRuntimeReasonValue">SOURCE_RUNTIME_STATUS_PENDING</span></div>
+        </div>
+
         <div class="module-status-note" id="missedArchiveStatusPanel" aria-label="Missed Opportunity Review Archive review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">Missed Opportunity / Review Archive 只读状态</span><span class="v" id="missedArchiveRuntimeStatusValue">MISSED_ARCHIVE_EMPTY_FAIL_CLOSED / Missed Opportunity / Review Archive 只读状态待确认</span></div>
             <div class="kv"><span class="k">scope / count</span><span class="v"><span id="missedArchiveScopeValue">today</span> · <span id="missedArchiveCountValue">0</span></span></div>
@@ -1460,6 +1470,21 @@
     var ALERT_POLICY_STATUS_NOTIFICATION_MISSING = "NOTIFICATION_POLICY_MISSING_FAIL_CLOSED";
     var ALERT_POLICY_STATUS_PUSH_BLOCKED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var ALERT_POLICY_STATUS_RECHECK_BLOCKED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var SOURCE_RUNTIME_STATUS_READY = "SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY";
+    var SOURCE_RUNTIME_STATUS_MISSING = "SOURCE_TRACE_MISSING_FAIL_CLOSED";
+    var SOURCE_RUNTIME_STATUS_PARTIAL = "SOURCE_TRACE_PARTIAL_REVIEW_ONLY";
+    var SOURCE_RUNTIME_KLINE_READY = "RUNTIME_KLINE_CONTEXT_READY_REVIEW_ONLY";
+    var SOURCE_RUNTIME_KLINE_MISSING = "RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED";
+    var SOURCE_RUNTIME_PERSISTED_READY = "PERSISTED_OHLCV_READY_REVIEW_ONLY";
+    var SOURCE_RUNTIME_PERSISTED_STALE = "PERSISTED_OHLCV_STALE_REVIEW_ONLY";
+    var SOURCE_RUNTIME_PERSISTED_MISSING = "PERSISTED_OHLCV_MISSING_FAIL_CLOSED";
+    var SOURCE_RUNTIME_DATA_QUALITY_PARTIAL = "DATA_QUALITY_PARTIAL_REVIEW_ONLY";
+    var SOURCE_RUNTIME_DATA_QUALITY_BLOCKED = "DATA_QUALITY_BLOCKED_FAIL_CLOSED";
+    var SOURCE_RUNTIME_MTF_ALIGNMENT = "MULTITIMEFRAME_ALIGNMENT_REVIEW_ONLY";
+    var SOURCE_RUNTIME_MTF_CONFLICT = "MULTITIMEFRAME_CONFLICT_REVIEW_ONLY";
+    var SOURCE_RUNTIME_MTF_MISSING = "MULTITIMEFRAME_MISSING_FAIL_CLOSED";
+    var SOURCE_RUNTIME_REFRESH_BLOCKED = "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var SOURCE_RUNTIME_GENERATION_BLOCKED = "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1738,6 +1763,41 @@
         displaySlotsAreCandidatePool: false,
         failClosed: true
     };
+    var sourceRuntimeDataQualityStatus = {
+        status: SOURCE_RUNTIME_STATUS_MISSING,
+        symbol: null,
+        analysisId: null,
+        sourceTraceAvailable: false,
+        runtimeKlineContextAvailable: false,
+        sourceTraceStatus: "SOURCE_TRACE_MISSING_FAIL_CLOSED",
+        runtimeKlineStatus: "RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED",
+        persistedOhlcvReadiness: "UNKNOWN",
+        persistedOhlcvStatus: "PERSISTED_OHLCV_MISSING_FAIL_CLOSED",
+        dataQualityAvailable: false,
+        dataQualityStatus: "DATA_QUALITY_BLOCKED_FAIL_CLOSED",
+        multiTimeframeAvailable: false,
+        multiTimeframeStatus: "MULTITIMEFRAME_MISSING_FAIL_CLOSED",
+        refreshBoundaryStatus: "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED",
+        generationBoundaryStatus: "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED",
+        sourceHealth: "MISSING",
+        reason: "SOURCE_RUNTIME_STATUS_PENDING",
+        message: "SourceTrace / RuntimeKline / DataQuality / MultiTimeframe 只读状态待确认；不刷新、不生成、不执行。",
+        reviewOnly: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        notSchedulerTrigger: true,
+        notCollectorTrigger: true,
+        notApiClientRefresh: true,
+        notExternalRefresh: true,
+        notSourceBindingGeneration: true,
+        displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
     var missedArchiveRuntimeStatus = {
         status: MISSED_ARCHIVE_STATUS_EMPTY,
         analysisId: null,
@@ -1785,6 +1845,7 @@
     window.__riskActionGuardReviewStatus = RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
     window.__alertFatiguePolicyReviewStatus = ALERT_POLICY_STATUS_BACKEND_PENDING;
     window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
+    window.__sourceRuntimeDataQualityReviewStatus = SOURCE_RUNTIME_STATUS_MISSING;
     window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
@@ -3682,6 +3743,80 @@
             });
     }
 
+    function resolveSourceRuntimeDataQualityStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, SOURCE_RUNTIME_STATUS_MISSING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            sourceTraceAvailable: p.sourceTraceAvailable === true,
+            runtimeKlineContextAvailable: p.runtimeKlineContextAvailable === true,
+            sourceTraceStatus: firstNonEmpty(p.sourceTraceStatus, "SOURCE_TRACE_MISSING_FAIL_CLOSED").toUpperCase(),
+            runtimeKlineStatus: firstNonEmpty(p.runtimeKlineStatus, "RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED").toUpperCase(),
+            persistedOhlcvReadiness: firstNonEmpty(p.persistedOhlcvReadiness, "UNKNOWN").toUpperCase(),
+            persistedOhlcvStatus: firstNonEmpty(p.persistedOhlcvStatus, "PERSISTED_OHLCV_MISSING_FAIL_CLOSED").toUpperCase(),
+            dataQualityAvailable: p.dataQualityAvailable === true,
+            dataQualityStatus: firstNonEmpty(p.dataQualityStatus, "DATA_QUALITY_BLOCKED_FAIL_CLOSED").toUpperCase(),
+            multiTimeframeAvailable: p.multiTimeframeAvailable === true,
+            multiTimeframeSummary: firstNonEmpty(p.multiTimeframeSummary, "missing"),
+            multiTimeframeStatus: firstNonEmpty(p.multiTimeframeStatus, "MULTITIMEFRAME_MISSING_FAIL_CLOSED").toUpperCase(),
+            refreshBoundaryStatus: firstNonEmpty(p.refreshBoundaryStatus, "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED").toUpperCase(),
+            generationBoundaryStatus: firstNonEmpty(p.generationBoundaryStatus, "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED").toUpperCase(),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "SOURCE_RUNTIME_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "SourceTrace / RuntimeKline / DataQuality / MultiTimeframe 只读状态待确认；不刷新、不生成、不执行。"),
+            reviewOnly: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            notSchedulerTrigger: true,
+            notCollectorTrigger: true,
+            notApiClientRefresh: true,
+            notExternalRefresh: true,
+            notSourceBindingGeneration: true,
+            displaySlotsAreCandidatePool: false,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateSourceRuntimeDataQualityStatusDisplay() {
+        var sr = sourceRuntimeDataQualityStatus || {};
+        setText("sourceRuntimeStatusValue", (sr.status || SOURCE_RUNTIME_STATUS_MISSING) + " / " + (sr.message || "只读状态"));
+        setText("sourceTraceReadinessValue", (sr.sourceTraceAvailable ? "available" : "missing") + " · " + (sr.sourceTraceStatus || "UNKNOWN"));
+        setText("runtimeKlineReadinessValue", (sr.runtimeKlineContextAvailable ? "available" : "missing") + " · " + (sr.runtimeKlineStatus || "UNKNOWN"));
+        setText("persistedOhlcvReadinessValue", (sr.persistedOhlcvReadiness || "UNKNOWN") + " · " + (sr.persistedOhlcvStatus || "PERSISTED_OHLCV_MISSING_FAIL_CLOSED"));
+        setText("dataQualityStatusValue", (sr.dataQualityAvailable ? "available" : "missing") + " · " + (sr.dataQualityStatus || "DATA_QUALITY_BLOCKED_FAIL_CLOSED"));
+        setText("multiTimeframeStatusValue", (sr.multiTimeframeSummary || "missing") + " · " + (sr.multiTimeframeStatus || "MULTITIMEFRAME_MISSING_FAIL_CLOSED"));
+        setText("sourceRuntimeRefreshBoundaryValue", "not scheduler trigger；not collector trigger；not API client refresh；not external refresh；not source-binding generation；" + (sr.refreshBoundaryStatus || "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED") + " / " + (sr.generationBoundaryStatus || "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED"));
+        setText("sourceRuntimeSignalBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。");
+        setText("sourceRuntimeReasonValue", sr.reason || "—");
+    }
+
+    function fetchSourceRuntimeDataQualityStatus(symbol) {
+        if (!symbol) {
+            sourceRuntimeDataQualityStatus = resolveSourceRuntimeDataQualityStatus({});
+            window.__sourceRuntimeDataQualityReviewStatus = SOURCE_RUNTIME_STATUS_MISSING;
+            updateSourceRuntimeDataQualityStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/source-runtime-data-quality-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                sourceRuntimeDataQualityStatus = resolveSourceRuntimeDataQualityStatus(payload, symbol);
+                window.__sourceRuntimeDataQualityReviewStatus = sourceRuntimeDataQualityStatus.status || SOURCE_RUNTIME_STATUS_MISSING;
+                updateSourceRuntimeDataQualityStatusDisplay();
+            })
+            .catch(function () {
+                sourceRuntimeDataQualityStatus = resolveSourceRuntimeDataQualityStatus({}, symbol);
+                window.__sourceRuntimeDataQualityReviewStatus = SOURCE_RUNTIME_STATUS_MISSING;
+                updateSourceRuntimeDataQualityStatusDisplay();
+            });
+    }
+
     function resolveMissedArchiveRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -4398,6 +4533,7 @@
                 fetchAlertFatiguePolicyRuntimeStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
+                fetchSourceRuntimeDataQualityStatus(selectedSymbol);
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
             });
     }
@@ -4412,6 +4548,7 @@
         fetchAlertFatiguePolicyRuntimeStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
+        fetchSourceRuntimeDataQualityStatus(symbol);
         fetchMissedArchiveRuntimeStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))

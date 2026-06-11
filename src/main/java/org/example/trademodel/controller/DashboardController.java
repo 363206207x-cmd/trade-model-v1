@@ -1,5 +1,6 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
@@ -112,6 +113,21 @@ public class DashboardController {
     private static final String NOTIFICATION_POLICY_MISSING_FAIL_CLOSED = "NOTIFICATION_POLICY_MISSING_FAIL_CLOSED";
     private static final String PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String SOURCE_RUNTIME_READY = "SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY";
+    private static final String SOURCE_TRACE_MISSING_FAIL_CLOSED = "SOURCE_TRACE_MISSING_FAIL_CLOSED";
+    private static final String SOURCE_TRACE_PARTIAL_REVIEW_ONLY = "SOURCE_TRACE_PARTIAL_REVIEW_ONLY";
+    private static final String RUNTIME_KLINE_CONTEXT_READY_REVIEW_ONLY = "RUNTIME_KLINE_CONTEXT_READY_REVIEW_ONLY";
+    private static final String RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED = "RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED";
+    private static final String PERSISTED_OHLCV_READY_REVIEW_ONLY = "PERSISTED_OHLCV_READY_REVIEW_ONLY";
+    private static final String PERSISTED_OHLCV_STALE_REVIEW_ONLY = "PERSISTED_OHLCV_STALE_REVIEW_ONLY";
+    private static final String PERSISTED_OHLCV_MISSING_FAIL_CLOSED = "PERSISTED_OHLCV_MISSING_FAIL_CLOSED";
+    private static final String DATA_QUALITY_PARTIAL_REVIEW_ONLY = "DATA_QUALITY_PARTIAL_REVIEW_ONLY";
+    private static final String DATA_QUALITY_BLOCKED_FAIL_CLOSED = "DATA_QUALITY_BLOCKED_FAIL_CLOSED";
+    private static final String MULTITIMEFRAME_ALIGNMENT_REVIEW_ONLY = "MULTITIMEFRAME_ALIGNMENT_REVIEW_ONLY";
+    private static final String MULTITIMEFRAME_CONFLICT_REVIEW_ONLY = "MULTITIMEFRAME_CONFLICT_REVIEW_ONLY";
+    private static final String MULTITIMEFRAME_MISSING_FAIL_CLOSED = "MULTITIMEFRAME_MISSING_FAIL_CLOSED";
+    private static final String REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED = "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED = "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -808,6 +824,127 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/source-runtime-data-quality-status")
+    @ResponseBody
+    public Map<String, Object> sourceRuntimeDataQualityStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseSourceRuntimeDataQualityStatus(normalizedSymbol);
+        DashboardDetailResponseVO detail = dashboardDetail(normalizedSymbol);
+        SourceTraceDTO sourceTrace = detail != null ? detail.getSourceTrace() : null;
+        RuntimeKlineContextDTO runtimeKline = detail != null ? detail.getRuntimeKlineContext() : null;
+
+        status.put("analysisId", detail != null && detail.getDecision() != null ? detail.getDecision().getAnalysisId() : null);
+        status.put("sourceTraceAvailable", sourceTrace != null);
+        status.put("runtimeKlineContextAvailable", runtimeKline != null);
+        status.put("sourceTraceStatus", resolveSourceTraceReadinessStatus(sourceTrace));
+        status.put("runtimeKlineStatus", resolveRuntimeKlineContextStatus(runtimeKline));
+
+        String persistedReadiness = resolvePersistedOhlcvReadiness(sourceTrace, runtimeKline);
+        String persistedStatus = resolvePersistedOhlcvStatus(persistedReadiness);
+        status.put("persistedOhlcvReadiness", persistedReadiness);
+        status.put("persistedOhlcvStatus", persistedStatus);
+        status.put("persistedOhlcvStaleReason", resolvePersistedOhlcvStaleReason(sourceTrace, runtimeKline));
+        status.put("persistedOhlcvMissingFields", resolvePersistedOhlcvMissingFields(sourceTrace, runtimeKline));
+
+        Object dataQualityScore = resolveDataQualityScore(sourceTrace, runtimeKline);
+        String dataQualityStatus = resolveDataQualityStatus(dataQualityScore, sourceTrace, runtimeKline);
+        status.put("dataQualityAvailable", dataQualityScore != null);
+        status.put("dataQualityScore", dataQualityScore);
+        status.put("dataQualityStatus", dataQualityStatus);
+
+        String multiTimeframeSource = resolveMultiTimeframeSource(sourceTrace, runtimeKline);
+        String multiTimeframeStatus = resolveMultiTimeframeStatus(multiTimeframeSource);
+        status.put("multiTimeframeAvailable", hasText(multiTimeframeSource));
+        status.put("multiTimeframeSummary", firstNonBlank(multiTimeframeSource, "missing"));
+        status.put("multiTimeframeStatus", multiTimeframeStatus);
+        status.put("refreshBoundaryStatus", REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("generationBoundaryStatus", GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+
+        if (sourceTrace == null) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    SOURCE_TRACE_MISSING_FAIL_CLOSED,
+                    "SOURCE_TRACE_MISSING",
+                    "SourceTrace owner path 缺失；只读状态 fail-closed，不生成来源绑定、候选、点位或交易动作。",
+                    true,
+                    "MISSING"
+            );
+        } else if (runtimeKline == null) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED,
+                    "RUNTIME_KLINE_CONTEXT_MISSING",
+                    "RuntimeKline context 缺失；只读状态 fail-closed，不触发采集、调度或 API client refresh。",
+                    true,
+                    "MISSING"
+            );
+        } else if (PERSISTED_OHLCV_MISSING_FAIL_CLOSED.equals(persistedStatus)) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    PERSISTED_OHLCV_MISSING_FAIL_CLOSED,
+                    "PERSISTED_OHLCV_MISSING",
+                    "Persisted OHLCV readiness 缺失；只读状态 fail-closed，不刷新外部 K 线。",
+                    true,
+                    "MISSING"
+            );
+        } else if (PERSISTED_OHLCV_STALE_REVIEW_ONLY.equals(persistedStatus)) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    PERSISTED_OHLCV_STALE_REVIEW_ONLY,
+                    "PERSISTED_OHLCV_STALE",
+                    "Persisted OHLCV 非 fresh；仅展示只读 stale 状态，不触发 refresh 或生成交易结论。",
+                    true,
+                    "STALE"
+            );
+        } else if (DATA_QUALITY_BLOCKED_FAIL_CLOSED.equals(dataQualityStatus)) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    DATA_QUALITY_BLOCKED_FAIL_CLOSED,
+                    "DATA_QUALITY_BLOCKED",
+                    "DataQuality metadata 缺失；只读状态 fail-closed，不把数据质量解释成交易折扣。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (MULTITIMEFRAME_MISSING_FAIL_CLOSED.equals(multiTimeframeStatus)) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    MULTITIMEFRAME_MISSING_FAIL_CLOSED,
+                    "MULTITIMEFRAME_MISSING",
+                    "MultiTimeframe 状态缺失；只读状态 fail-closed，不生成方向判断。",
+                    true,
+                    "MISSING"
+            );
+        } else if (MULTITIMEFRAME_CONFLICT_REVIEW_ONLY.equals(multiTimeframeStatus)) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    MULTITIMEFRAME_CONFLICT_REVIEW_ONLY,
+                    "MULTITIMEFRAME_CONFLICT",
+                    "MultiTimeframe 冲突仅作为只读诊断；不是方向、点位或交易信号。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (SOURCE_TRACE_PARTIAL_REVIEW_ONLY.equals(status.get("sourceTraceStatus"))) {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    SOURCE_TRACE_PARTIAL_REVIEW_ONLY,
+                    "SOURCE_TRACE_PARTIAL",
+                    "SourceTrace 部分可读；仅展示诊断状态，不生成来源绑定或候选。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applySourceRuntimeDataQualityStatus(
+                    status,
+                    SOURCE_RUNTIME_READY,
+                    "SOURCE_RUNTIME_OWNER_PATH_READ",
+                    "SourceTrace / RuntimeKline / DataQuality / MultiTimeframe 只读状态可读；不刷新、不生成、不执行。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -1079,6 +1216,65 @@ public class DashboardController {
         status.put("externalRefreshTriggered", false);
         status.put("displaySlotsAreCandidatePool", false);
         status.put("failClosed", true);
+        return status;
+    }
+
+    private Map<String, Object> baseSourceRuntimeDataQualityStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", SOURCE_TRACE_MISSING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("sourceTraceAvailable", false);
+        status.put("runtimeKlineContextAvailable", false);
+        status.put("sourceTraceStatus", SOURCE_TRACE_MISSING_FAIL_CLOSED);
+        status.put("runtimeKlineStatus", RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED);
+        status.put("persistedOhlcvReadiness", "UNKNOWN");
+        status.put("persistedOhlcvStatus", PERSISTED_OHLCV_MISSING_FAIL_CLOSED);
+        status.put("persistedOhlcvStaleReason", "UNKNOWN");
+        status.put("persistedOhlcvMissingFields", Collections.emptyList());
+        status.put("dataQualityAvailable", false);
+        status.put("dataQualityScore", null);
+        status.put("dataQualityStatus", DATA_QUALITY_BLOCKED_FAIL_CLOSED);
+        status.put("multiTimeframeAvailable", false);
+        status.put("multiTimeframeSummary", "missing");
+        status.put("multiTimeframeStatus", MULTITIMEFRAME_MISSING_FAIL_CLOSED);
+        status.put("refreshBoundaryStatus", REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("generationBoundaryStatus", GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("sourceHealth", "MISSING");
+        status.put("reason", "SOURCE_RUNTIME_STATUS_PENDING");
+        status.put("message", "SourceTrace / RuntimeKline / DataQuality / MultiTimeframe 只读状态待确认；不刷新、不生成、不执行。");
+        status.put("reviewOnly", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
+        status.put("notTradingSignal", true);
+        status.put("notExecutable", true);
+        status.put("notSchedulerTrigger", true);
+        status.put("notCollectorTrigger", true);
+        status.put("notApiClientRefresh", true);
+        status.put("notExternalRefresh", true);
+        status.put("notSourceBindingGeneration", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                SOURCE_RUNTIME_READY,
+                SOURCE_TRACE_MISSING_FAIL_CLOSED,
+                SOURCE_TRACE_PARTIAL_REVIEW_ONLY,
+                RUNTIME_KLINE_CONTEXT_READY_REVIEW_ONLY,
+                RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED,
+                PERSISTED_OHLCV_READY_REVIEW_ONLY,
+                PERSISTED_OHLCV_STALE_REVIEW_ONLY,
+                PERSISTED_OHLCV_MISSING_FAIL_CLOSED,
+                DATA_QUALITY_PARTIAL_REVIEW_ONLY,
+                DATA_QUALITY_BLOCKED_FAIL_CLOSED,
+                MULTITIMEFRAME_ALIGNMENT_REVIEW_ONLY,
+                MULTITIMEFRAME_CONFLICT_REVIEW_ONLY,
+                MULTITIMEFRAME_MISSING_FAIL_CLOSED,
+                REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
         return status;
     }
 
@@ -1545,6 +1741,19 @@ public class DashboardController {
         status.put("sourceHealth", sourceHealth);
     }
 
+    private void applySourceRuntimeDataQualityStatus(Map<String, Object> status,
+                                                     String statusValue,
+                                                     String reason,
+                                                     String message,
+                                                     boolean failClosed,
+                                                     String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
     private String normalizeSourceHealth(String sourceHealth) {
         String normalized = normalizedStatus(sourceHealth);
         if (normalized == null) {
@@ -1613,6 +1822,111 @@ public class DashboardController {
             return sourceTrace.getFallbackStatus().name();
         }
         return firstNonBlank(planBoundary != null ? planBoundary.getSourceTraceStatus() : null, "UNKNOWN");
+    }
+
+    private String resolveSourceTraceReadinessStatus(SourceTraceDTO sourceTrace) {
+        if (sourceTrace == null) {
+            return SOURCE_TRACE_MISSING_FAIL_CLOSED;
+        }
+        if ((sourceTrace.getMissingFields() != null && !sourceTrace.getMissingFields().isEmpty())
+                || (sourceTrace.getBlockingReasons() != null && !sourceTrace.getBlockingReasons().isEmpty())
+                || sourceTrace.getFallbackStatus() != null) {
+            return SOURCE_TRACE_PARTIAL_REVIEW_ONLY;
+        }
+        return SOURCE_RUNTIME_READY;
+    }
+
+    private String resolveRuntimeKlineContextStatus(RuntimeKlineContextDTO runtimeKline) {
+        if (runtimeKline == null) {
+            return RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED;
+        }
+        return RUNTIME_KLINE_CONTEXT_READY_REVIEW_ONLY;
+    }
+
+    private String resolvePersistedOhlcvReadiness(SourceTraceDTO sourceTrace, RuntimeKlineContextDTO runtimeKline) {
+        if (runtimeKline != null && hasText(runtimeKline.getPersistedOhlcvReadinessStatus())) {
+            return runtimeKline.getPersistedOhlcvReadinessStatus().trim().toUpperCase();
+        }
+        if (sourceTrace != null && hasText(sourceTrace.getRuntimeKlineReadinessStatus())) {
+            return sourceTrace.getRuntimeKlineReadinessStatus().trim().toUpperCase();
+        }
+        return "UNKNOWN";
+    }
+
+    private String resolvePersistedOhlcvStatus(String readiness) {
+        String normalized = normalizedStatus(readiness);
+        if ("FRESH".equals(normalized)) {
+            return PERSISTED_OHLCV_READY_REVIEW_ONLY;
+        }
+        if ("STALE".equals(normalized) || "PARTIAL".equals(normalized) || "INVALID".equals(normalized)) {
+            return PERSISTED_OHLCV_STALE_REVIEW_ONLY;
+        }
+        return PERSISTED_OHLCV_MISSING_FAIL_CLOSED;
+    }
+
+    private String resolvePersistedOhlcvStaleReason(SourceTraceDTO sourceTrace, RuntimeKlineContextDTO runtimeKline) {
+        if (runtimeKline != null && hasText(runtimeKline.getPersistedOhlcvStaleReasonText())) {
+            return runtimeKline.getPersistedOhlcvStaleReasonText();
+        }
+        if (sourceTrace != null && hasText(sourceTrace.getRuntimeKlineStaleReasonText())) {
+            return sourceTrace.getRuntimeKlineStaleReasonText();
+        }
+        if (runtimeKline != null && hasText(runtimeKline.getPersistedOhlcvStaleReasonCode())) {
+            return runtimeKline.getPersistedOhlcvStaleReasonCode();
+        }
+        if (sourceTrace != null && hasText(sourceTrace.getRuntimeKlineStaleReasonCode())) {
+            return sourceTrace.getRuntimeKlineStaleReasonCode();
+        }
+        return "UNKNOWN";
+    }
+
+    private List<String> resolvePersistedOhlcvMissingFields(SourceTraceDTO sourceTrace, RuntimeKlineContextDTO runtimeKline) {
+        if (runtimeKline != null && runtimeKline.getPersistedOhlcvMissingFields() != null
+                && !runtimeKline.getPersistedOhlcvMissingFields().isEmpty()) {
+            return runtimeKline.getPersistedOhlcvMissingFields();
+        }
+        if (sourceTrace != null && sourceTrace.getRuntimeKlineReadinessMissingFields() != null) {
+            return sourceTrace.getRuntimeKlineReadinessMissingFields();
+        }
+        return Collections.emptyList();
+    }
+
+    private Object resolveDataQualityScore(SourceTraceDTO sourceTrace, RuntimeKlineContextDTO runtimeKline) {
+        if (sourceTrace != null && sourceTrace.getDataQualityScore() != null) {
+            return sourceTrace.getDataQualityScore();
+        }
+        return runtimeKline != null ? runtimeKline.getDataQualityScore() : null;
+    }
+
+    private String resolveDataQualityStatus(Object dataQualityScore, SourceTraceDTO sourceTrace, RuntimeKlineContextDTO runtimeKline) {
+        if (dataQualityScore == null) {
+            return DATA_QUALITY_BLOCKED_FAIL_CLOSED;
+        }
+        if (sourceTrace == null || runtimeKline == null) {
+            return DATA_QUALITY_BLOCKED_FAIL_CLOSED;
+        }
+        return DATA_QUALITY_PARTIAL_REVIEW_ONLY;
+    }
+
+    private String resolveMultiTimeframeSource(SourceTraceDTO sourceTrace, RuntimeKlineContextDTO runtimeKline) {
+        if (sourceTrace != null && hasText(sourceTrace.getMultiTimeframeSource())) {
+            return sourceTrace.getMultiTimeframeSource();
+        }
+        return runtimeKline != null ? runtimeKline.getMultiTimeframeSource() : null;
+    }
+
+    private String resolveMultiTimeframeStatus(String multiTimeframeSource) {
+        if (!hasText(multiTimeframeSource)) {
+            return MULTITIMEFRAME_MISSING_FAIL_CLOSED;
+        }
+        String normalized = multiTimeframeSource.trim().toUpperCase();
+        if (normalized.contains("CONFLICT")
+                || normalized.contains("DIVERGENCE")
+                || normalized.contains("MISMATCH")
+                || normalized.contains("冲突")) {
+            return MULTITIMEFRAME_CONFLICT_REVIEW_ONLY;
+        }
+        return MULTITIMEFRAME_ALIGNMENT_REVIEW_ONLY;
     }
 
     private boolean executionPlanRiskGuardBlocked(

@@ -3,6 +3,7 @@ package org.example.trademodel.controller;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
@@ -521,6 +522,39 @@ class DashboardControllerTest {
         assertThat(html).contains("不触发 missed-opportunity generation/write");
         assertThat(html).contains("不生成复盘结果");
         assertThat(html).contains("不触发 replay / recheck execution");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
+    @Test
+    void dashboardTemplateShowsReviewOnlySourceRuntimeDataQualityStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/source-runtime-data-quality-status");
+        assertThat(html).contains("sourceRuntimeDataQualityStatusPanel");
+        assertThat(html).contains("sourceRuntimeStatusValue");
+        assertThat(html).contains("sourceTraceReadinessValue");
+        assertThat(html).contains("runtimeKlineReadinessValue");
+        assertThat(html).contains("persistedOhlcvReadinessValue");
+        assertThat(html).contains("dataQualityStatusValue");
+        assertThat(html).contains("multiTimeframeStatusValue");
+        assertThat(html).contains("sourceRuntimeRefreshBoundaryValue");
+        assertThat(html).contains("sourceRuntimeSignalBoundaryValue");
+        assertThat(html).contains("sourceRuntimeReasonValue");
+        assertThat(html).contains("SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY");
+        assertThat(html).contains("SOURCE_TRACE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("PERSISTED_OHLCV_STALE_REVIEW_ONLY");
+        assertThat(html).contains("DATA_QUALITY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("MULTITIMEFRAME_CONFLICT_REVIEW_ONLY");
+        assertThat(html).contains("REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("not scheduler trigger");
+        assertThat(html).contains("not collector trigger");
+        assertThat(html).contains("not API client refresh");
+        assertThat(html).contains("not external refresh");
+        assertThat(html).contains("not source-binding generation");
+        assertThat(html).contains("not final direction");
+        assertThat(html).contains("not entry / stop / TP / RR");
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
@@ -1605,6 +1639,199 @@ class DashboardControllerTest {
     }
 
     @Test
+    void sourceRuntimeDataQualityStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        MockMvc sourceRuntimeMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        sourceRuntimeTrace("5m/15m/1h alignment review-only", new BigDecimal("0.91"), false),
+                        sourceRuntimeKline("FRESH", "NONE", "Persisted OHLCV window is fresh.", List.of(),
+                                new BigDecimal("0.91"), "5m/15m/1h alignment review-only"),
+                        null
+                )
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-source-runtime-ready");
+        decision.setAnalysisId("ana-source-runtime-ready");
+        decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-source-runtime-ready")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-source-runtime-ready")).thenReturn(Collections.emptyList());
+
+        sourceRuntimeMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.analysisId").value("ana-source-runtime-ready"))
+                .andExpect(jsonPath("$.sourceTraceAvailable").value(true))
+                .andExpect(jsonPath("$.runtimeKlineContextAvailable").value(true))
+                .andExpect(jsonPath("$.sourceTraceStatus").value("SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.runtimeKlineStatus").value("RUNTIME_KLINE_CONTEXT_READY_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.persistedOhlcvStatus").value("PERSISTED_OHLCV_READY_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.dataQualityStatus").value("DATA_QUALITY_PARTIAL_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.multiTimeframeStatus").value("MULTITIMEFRAME_ALIGNMENT_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.refreshBoundaryStatus").value("REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.generationBoundaryStatus").value("GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notFinalDirection").value(true))
+                .andExpect(jsonPath("$.notEntryStopTpRr").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.notSchedulerTrigger").value(true))
+                .andExpect(jsonPath("$.notCollectorTrigger").value(true))
+                .andExpect(jsonPath("$.notApiClientRefresh").value(true))
+                .andExpect(jsonPath("$.notExternalRefresh").value(true))
+                .andExpect(jsonPath("$.notSourceBindingGeneration").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void sourceRuntimeDataQualityStatusEndpointFailsClosedForMissingSourceTraceAndRuntimeKline() throws Exception {
+        MockMvc sourceRuntimeMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null)
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-source-runtime-missing");
+        decision.setAnalysisId("ana-source-runtime-missing");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-source-runtime-missing")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-source-runtime-missing")).thenReturn(Collections.emptyList());
+
+        sourceRuntimeMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SOURCE_TRACE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceTraceAvailable").value(false))
+                .andExpect(jsonPath("$.runtimeKlineContextAvailable").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("SOURCE_TRACE_MISSING"));
+    }
+
+    @Test
+    void sourceRuntimeDataQualityStatusEndpointFailsClosedWhenRuntimeKlineMissing() throws Exception {
+        MockMvc sourceRuntimeMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        sourceRuntimeTrace("alignment review-only", new BigDecimal("0.88"), false),
+                        null,
+                        null
+                )
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-runtime-kline-missing");
+        decision.setAnalysisId("ana-runtime-kline-missing");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-runtime-kline-missing")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-runtime-kline-missing")).thenReturn(Collections.emptyList());
+
+        sourceRuntimeMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RUNTIME_KLINE_CONTEXT_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceTraceAvailable").value(true))
+                .andExpect(jsonPath("$.runtimeKlineContextAvailable").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("RUNTIME_KLINE_CONTEXT_MISSING"));
+    }
+
+    @Test
+    void sourceRuntimeDataQualityStatusEndpointCoversPersistedOhlcvDataQualityAndMultiTimeframeBoundaryStates() throws Exception {
+        MockMvc staleRuntimeMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        sourceRuntimeTrace("alignment review-only", new BigDecimal("0.77"), false),
+                        sourceRuntimeKline("STALE", "KLINE_STALE", "Latest persisted OHLCV bar is stale.",
+                                List.of("klineFreshness"), new BigDecimal("0.77"), "alignment review-only"),
+                        null
+                )
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-source-runtime-boundary");
+        decision.setAnalysisId("ana-source-runtime-boundary");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-source-runtime-boundary")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-source-runtime-boundary")).thenReturn(Collections.emptyList());
+
+        staleRuntimeMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PERSISTED_OHLCV_STALE_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.persistedOhlcvStatus").value("PERSISTED_OHLCV_STALE_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.sourceHealth").value("STALE"))
+                .andExpect(jsonPath("$.failClosed").value(true));
+
+        MockMvc dataQualityBlockedMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, row) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        sourceRuntimeTrace("alignment review-only", null, false),
+                        sourceRuntimeKline("FRESH", "NONE", "Persisted OHLCV window is fresh.", List.of(),
+                                null, "alignment review-only"),
+                        null
+                )
+        )).build();
+        dataQualityBlockedMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DATA_QUALITY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.dataQualityAvailable").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true));
+
+        MockMvc multiConflictMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, row) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        sourceRuntimeTrace("5m vs 1h CONFLICT review-only", new BigDecimal("0.82"), false),
+                        sourceRuntimeKline("FRESH", "NONE", "Persisted OHLCV window is fresh.", List.of(),
+                                new BigDecimal("0.82"), "5m vs 1h CONFLICT review-only"),
+                        null
+                )
+        )).build();
+        multiConflictMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("MULTITIMEFRAME_CONFLICT_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.multiTimeframeStatus").value("MULTITIMEFRAME_CONFLICT_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void sourceRuntimeDataQualityStatusEndpointDoesNotExposeExecutableRefreshGenerationCandidatePointOrTradingFields() throws Exception {
+        MockMvc sourceRuntimeMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(
+                        sourceRuntimeTrace("alignment review-only", new BigDecimal("0.91"), false),
+                        sourceRuntimeKline("FRESH", "NONE", "Persisted OHLCV window is fresh.", List.of(),
+                                new BigDecimal("0.91"), "alignment review-only"),
+                        null
+                )
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-source-runtime-safe");
+        decision.setAnalysisId("ana-source-runtime-safe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+        when(evidenceService.listTopEvidenceBriefByAnalysisId("ana-source-runtime-safe")).thenReturn(Collections.emptyList());
+        when(scoreService.listTopScoreBriefByAnalysisId("ana-source-runtime-safe")).thenReturn(Collections.emptyList());
+
+        sourceRuntimeMockMvc.perform(get("/api/dashboard/source-runtime-data-quality-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.externalRefreshAction").doesNotExist())
+                .andExpect(jsonPath("$.collectorTrigger").doesNotExist())
+                .andExpect(jsonPath("$.schedulerTrigger").doesNotExist())
+                .andExpect(jsonPath("$.apiClientTrigger").doesNotExist())
+                .andExpect(jsonPath("$.sourceBindingGenerationAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
     void detail_json_exposesRuntimeKlineContextAsSeparateReadOnlyBoundaryWhenAssemblyIsSafe() throws Exception {
         MockMvc runtimeKlineMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
                 new DefaultDashboardSourceTraceDetailAdapter(
@@ -1952,6 +2179,52 @@ class DashboardControllerTest {
         sourceTrace.setManualReviewRequired(true);
         sourceTrace.setNotTradeInstruction(true);
         return sourceTrace;
+    }
+
+    private static SourceTraceDTO sourceRuntimeTrace(String multiTimeframeSource,
+                                                     BigDecimal dataQualityScore,
+                                                     boolean partial) {
+        SourceTraceDTO sourceTrace = new SourceTraceDTO();
+        sourceTrace.setSymbol("BTCUSDT");
+        sourceTrace.setDecisionId("dec-source-runtime");
+        sourceTrace.setAnalysisId("ana-source-runtime");
+        sourceTrace.setTimeframe("1m");
+        sourceTrace.setSourceOwner("DashboardSourceTraceDetailAdapter");
+        sourceTrace.setSourceRef("dashboard-detail-owner-path");
+        sourceTrace.setRuntimeKlineContextStatus("READY_REVIEW_ONLY");
+        sourceTrace.setRuntimeKlineContextSource("DefaultDashboardRuntimeKlineContextAdapter");
+        sourceTrace.setRuntimeKlineReadinessStatus("FRESH");
+        sourceTrace.setRuntimeKlineStaleReasonCode("NONE");
+        sourceTrace.setRuntimeKlineStaleReasonText("Persisted OHLCV window is fresh.");
+        sourceTrace.setDataQualityScore(dataQualityScore);
+        sourceTrace.setDataQualityScoreSource(dataQualityScore != null ? "runtime-kline-readiness-metadata" : null);
+        sourceTrace.setMultiTimeframeSource(multiTimeframeSource);
+        sourceTrace.setMissingFields(partial ? List.of("runtimeKlineReadinessStatus") : Collections.emptyList());
+        sourceTrace.setManualReviewRequired(true);
+        sourceTrace.setNotTradeInstruction(true);
+        return sourceTrace;
+    }
+
+    private static RuntimeKlineContextDTO sourceRuntimeKline(String readiness,
+                                                            String staleReasonCode,
+                                                            String staleReasonText,
+                                                            List<String> missingFields,
+                                                            BigDecimal dataQualityScore,
+                                                            String multiTimeframeSource) {
+        RuntimeKlineContextDTO runtimeKline = new RuntimeKlineContextDTO();
+        runtimeKline.setSymbol("BTCUSDT");
+        runtimeKline.setTimeframe("1m");
+        runtimeKline.setLatestPrice(new BigDecimal("102.30"));
+        runtimeKline.setDataQualityScore(dataQualityScore);
+        runtimeKline.setPersistedOhlcvReadinessStatus(readiness);
+        runtimeKline.setPersistedOhlcvStaleReasonCode(staleReasonCode);
+        runtimeKline.setPersistedOhlcvStaleReasonText(staleReasonText);
+        runtimeKline.setPersistedOhlcvMissingFields(missingFields);
+        runtimeKline.setMultiTimeframeSource(multiTimeframeSource);
+        runtimeKline.setMissingFields(Collections.emptyList());
+        runtimeKline.setManualReviewRequired(true);
+        runtimeKline.setNotTradeInstruction(true);
+        return runtimeKline;
     }
 
     private static DashboardDetailResponseVO.PlanBoundaryDisplayVO readyPlanBoundaryDisplay() {
