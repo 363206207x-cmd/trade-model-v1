@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next minimal runtime slice selection after RiskActionGuard closure`.
-- Selected target: `to be selected by next minimal runtime slice selection after RiskActionGuard closure`.
+- Active track: `Source Read for Alert fatigue / notification policy status`.
+- Selected target: `Alert fatigue / notification policy status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, and `RiskActionGuard read-only status`.
-- Selected next minimal runtime slice: `to be selected`.
-- Next required action: `Next minimal runtime slice selection after RiskActionGuard closure`.
+- Selected next minimal runtime slice: `Alert fatigue / notification policy status`.
+- Next required action: `Source Read for Alert fatigue / notification policy status`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -64,7 +64,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Implementation readiness gate for RiskActionGuard read-only status is completed on main as `c7fb97e`. It returns GO to B-risk minimal implementation over existing Dashboard detail / RiskActionGuard display assets, with optional minimal DashboardController Map endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation is completed on main as `06ca17f`. It adds one minimal read-only `/api/dashboard/risk-action-guard-status` endpoint, dashboard `riskActionGuardStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification is completed on main as `f21ed5f`. It verifies compile/test coverage, endpoint/dashboard status mapping, safety fields, fail-closed rules, forbidden semantics classification, and source-of-truth alignment.
-- RiskActionGuard Read-Only Status Visual Verification / Closure is completed by this package when merged with environment-limited evidence. RiskActionGuard read-only status is the 11th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- RiskActionGuard Read-Only Status Visual Verification / Closure is completed on main as `bab2325` with environment-limited evidence. RiskActionGuard read-only status is the 11th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- Next Minimal Runtime Slice Selection After RiskActionGuard Closure selects `Alert fatigue / notification policy status` as the next source-read-only target. The next package is source-read only and does not implement notification behavior.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
