@@ -1,14 +1,14 @@
-current_head: "018a438"
+current_head: "5d25e53"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Implementation readiness gate for RiskActionGuard read-only status"
-active_block_cn: "RiskActionGuard 只读状态实现前就绪门"
-current_phase: "readiness_gate"
+active_block: "Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation"
+active_block_cn: "RiskActionGuard 只读状态最小只读运行时接线实现"
+current_phase: "implementation"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "riskactionguard-read-only-status-implementation-readiness-gate"
-merge_rule: "A-risk readiness gate after RiskActionGuard read-only status design; allow readiness-gate docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, endpoint/panel implementation, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler/Orchestrator, Position Monitor execution, replay/recheck, P359, or P360"
-next_required_action: "Implementation readiness gate for RiskActionGuard read-only status"
+current_branch: "minimal-review-only-riskactionguard-read-only-status-runtime-wiring-implementation"
+merge_rule: "B-risk implementation after RiskActionGuard readiness gate; allow only minimal review-only endpoint/dashboard/status implementation, targeted tests, implementation docs, and source-of-truth updates over existing Dashboard detail / RiskActionGuard display assets; no schema/config/pom, new DTO/Validator/Assembler/Orchestrator, Position Monitor execution, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360"
+next_required_action: "Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -108,8 +108,10 @@ minimal_review_only_missed_opportunity_review_archive_status_runtime_wiring_veri
 missed_opportunity_review_archive_status_visual_verification_closure_status: "completed on main as 239664d; environment-limited visual closure confirms missedArchiveStatusPanel DOM/copy/safety copy, review-only/fail-closed/not trading/not candidate/not decision generation/not point/not executable boundaries, no replay/recheck execution, no missed-opportunity generation/write behavior, no review result generation, and no Push / Candidate generation / Decision generation / Point / trading semantics; Missed Opportunity / Review Archive status is the 10th completed REVIEW_ONLY_RUNTIME partial slice"
 next_minimal_runtime_slice_selection_after_missed_opportunity_review_archive_status: "completed on main as 095ade9; selects RiskActionGuard read-only status as the next source-read-only target after ten REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 riskactionguard_read_only_status_source_read_status: "completed on main as 018a438; confirms existing RiskActionGuardDisplayAdapter / DefaultRiskActionGuardDisplayAdapter / RiskActionGuardDisplayVO / DashboardController dashboard detail / dashboard placeholder and tests, identifies missing dedicated endpoint/panel gaps, and returns GO to design only without implementation or capability movement"
-minimal_review_only_riskactionguard_read_only_status_runtime_wiring_design_status: "completed by this package when merged; fixes owner path, dedicated-endpoint decision, status mapping, manual-review-only wording, fail-closed rules, dashboard/API boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails without implementation or capability movement"
+minimal_review_only_riskactionguard_read_only_status_runtime_wiring_design_status: "completed on main as 5d25e53; fixes owner path, dedicated-endpoint decision, status mapping, manual-review-only wording, fail-closed rules, dashboard/API boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails without implementation or capability movement"
+riskactionguard_read_only_status_implementation_readiness_gate_status: "completed by this package when merged; returns GO for minimal review-only RiskActionGuard status implementation over existing Dashboard detail / RiskActionGuard display assets, with optional minimal DashboardController Map endpoint, minimal dashboard status/copy/DOM, targeted tests, no DTO/Validator/Assembler/Orchestrator, no schema/config/pom, no Position Monitor execution, no Push, no Candidate generation, no Decision generation, no Point, no final direction, no entry/stop/TP/RR, and no trading"
 source_of_truth_files:
+  - docs/V1_RISKACTIONGUARD_READ_ONLY_STATUS_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_MINIMAL_REVIEW_ONLY_RISKACTIONGUARD_READ_ONLY_STATUS_RUNTIME_WIRING_DESIGN.md
   - docs/V1_RISKACTIONGUARD_READ_ONLY_STATUS_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_MISSED_OPPORTUNITY_REVIEW_ARCHIVE.md
