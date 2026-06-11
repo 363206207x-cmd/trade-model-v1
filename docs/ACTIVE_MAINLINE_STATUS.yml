@@ -1,14 +1,14 @@
 current_head: "2984e48"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification"
-active_block_cn: "数据源健康仪表盘 / API 状态最小只读运行时接线验证"
-current_phase: "verification"
+active_block: "Data Source Health Dashboard/API Status Visual Verification / Closure"
+active_block_cn: "数据源健康仪表盘 / API 状态视觉验证 / 收口"
+current_phase: "visual_closure"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "data-source-health-dashboard-status-runtime-wiring-verification"
-merge_rule: "A-risk verification after Data Source Health dashboard/API status implementation; allow only verification docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
-next_required_action: "Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification"
+current_branch: "data-source-health-dashboard-status-visual-verification-closure"
+merge_rule: "A-risk visual closure after Data Source Health dashboard/API status verification; allow only visual verification docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
+next_required_action: "Data Source Health Dashboard/API Status Visual Verification / Closure"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -85,6 +85,7 @@ data_source_health_dashboard_api_status_source_read_status: "completed on main a
 minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_design_status: "completed on main as c90fe98; selects a thin review-only aggregate over existing slice-local sourceHealth status surfaces, keeps DataSourceHealthDO inventory-only, rejects new mapper/service/schema/DTO ownership, defines rollup/status mapping, dashboard/API boundary, fail-closed rules, and returns GO to implementation readiness gate without implementation"
 data_source_health_dashboard_api_status_implementation_readiness_gate_status: "completed on main as 9290c1b; returns GO for a minimal review-only DashboardController/dashboard aggregate over existing slice-local sourceHealth surfaces, forbids schema/service/DTO ownership, external refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, and trading; Data Source Health is not yet a completed runtime slice"
 minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_implementation_status: "completed on main as 2984e48; adds one minimal read-only /api/dashboard/data-source-health-status endpoint, dashboard dataSourceHealthStatusPanel, targeted DashboardControllerTest coverage, and source-of-truth updates without schema/config/pom, external refresh, scheduler/collector/API client trigger, DTO/Validator/Assembler, Push, Candidate generation, Decision generation, Point, or trading; Data Source Health still requires verification and visual closure before becoming a completed runtime slice"
+minimal_review_only_data_source_health_dashboard_api_status_runtime_wiring_verification_status: "completed in this verification package; compile, test-compile, DashboardControllerTest 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and git diff --check passed; live HTTP smoke was attempted but sandbox socket bind was blocked with Operation not permitted; Data Source Health still requires visual closure before becoming a completed runtime slice"
 v1_b_risk_workflow_usability_fix_status: "active workflow-only hotfix; fixes B-risk negative safety assertion classification, Codex CLI fallback task printing, and dirty work packaging tooling without changing business capability; next business action remains Data Source Health runtime wiring verification"
 source_of_truth_files:
   - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_SOURCE_READ.md

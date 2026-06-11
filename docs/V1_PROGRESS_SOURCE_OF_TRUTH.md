@@ -38,10 +38,10 @@ The following do not count as completed:
 ## Current Active Block
 
 - Current merged main: `2984e48 feat(health): show data source health review-only status`
-- Current active block: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`
+- Current active block: `Data Source Health Dashboard/API Status Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this implementation: none. Data Source Health dashboard/API status has implementation wiring but is not verified or visually closed yet; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`
+- Capability movement from this verification: none. Data Source Health dashboard/API status has implementation wiring and verification, but is not visually closed yet; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Data Source Health Dashboard/API Status Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -74,8 +74,9 @@ The following do not count as completed:
 - `62843de` completes the workflow phase normalization that makes the Data Source Health readiness-gate handoff runnable by `v1-auto.sh next`.
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to a minimal review-only Data Source Health Dashboard/API status implementation.
 - `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, a dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and implementation/source-of-truth docs. It does not trigger external API refresh, scheduler, collector, API client reads, Push, Candidate generation, Decision generation, Point generation, replay execution, review result generation, or trading.
+- This verification package confirms compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` all passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
 - This workflow-only hotfix fixes B-risk negative safety assertion classification, Codex CLI failure task printing, and dirty work packaging tooling. It does not change Data Source Health business behavior, and the next business action remains Data Source Health runtime wiring verification.
-- Data Source Health is not yet a completed runtime slice; the completed review-only runtime slice count remains 7.
+- Data Source Health is not yet a completed runtime slice; it still requires visual verification / closure. The completed review-only runtime slice count remains 7.
 
 ## Runtime Slice History
 
@@ -123,8 +124,9 @@ DecisionResult chain history:
 - Source Read for Data Source Health dashboard/API status is completed on main as `6343a60` and returned GO to design only.
 - Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Design is completed on main as `c90fe98` and returns GO to implementation readiness gate.
 - Data Source Health implementation readiness gate is completed on main as `9290c1b`.
-- Data Source Health implementation is completed on main as `2984e48`; verification is still the active next package.
-- Current active package is Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification.
+- Data Source Health implementation is completed on main as `2984e48`.
+- Data Source Health runtime wiring verification is completed in this verification package; visual closure is still required before Data Source Health can become a completed runtime slice.
+- Current active package is Data Source Health Dashboard/API Status Visual Verification / Closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
