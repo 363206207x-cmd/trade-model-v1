@@ -152,6 +152,36 @@ describe_can_continue() {
   echo "NO（不能继续）"
 }
 
+actual_head_short() {
+  git rev-parse --short HEAD 2>/dev/null || true
+}
+
+actual_head_line() {
+  git log -1 --oneline 2>/dev/null || true
+}
+
+is_safe_actual_head_baseline_state() {
+  local state_text="$1"
+  local branch worktree open_prs main_sync
+  branch="$(state_value "$state_text" "BRANCH")"
+  worktree="$(state_value "$state_text" "WORKTREE_CLEAN")"
+  open_prs="$(state_value "$state_text" "OPEN_PRS")"
+  main_sync="$(state_value "$state_text" "MAIN_SYNC")"
+  [[ "$branch" == "main" && "$worktree" == "Yes" && "$open_prs" == "none" && "$main_sync" == "OK" ]]
+}
+
+effective_execution_baseline() {
+  local state_text="$1"
+  local configured="$2"
+  local actual_line
+  actual_line="$(actual_head_line)"
+  if is_safe_actual_head_baseline_state "$state_text" && [[ -n "$actual_line" ]]; then
+    echo "$actual_line"
+    return
+  fi
+  echo "${configured:-UNKNOWN}"
+}
+
 completed_slice_entries() {
   if [[ ! -f "$PROGRESS_FILE" ]]; then
     return 0
@@ -212,6 +242,7 @@ current_status_summary() {
   local state_text="$1"
   local branch worktree head open_prs main_sync can_continue blockers
   local active_block active_block_cn current_level current_head next_action next_active next_phase next_branch next_main
+  local actual_short effective_baseline
 
   branch="$(state_value "$state_text" "BRANCH")"
   worktree="$(state_value "$state_text" "WORKTREE_CLEAN")"
@@ -231,6 +262,8 @@ current_status_summary() {
   next_phase="$(yaml_value "$NEXT_TASK_FILE" "phase")"
   next_branch="$(yaml_value "$NEXT_TASK_FILE" "branch")"
   next_main="$(yaml_value "$NEXT_TASK_FILE" "current_main")"
+  actual_short="$(actual_head_short)"
+  effective_baseline="$(effective_execution_baseline "$state_text" "$next_main")"
 
   echo "当前状态摘要（中文）"
   print_hr
@@ -239,8 +272,13 @@ current_status_summary() {
   echo "当前项目能力层级: ${current_level:-UNKNOWN}（Review-Only Runtime partial，只读运行时部分完成）"
   echo "ACTIVE current_head（Source of Truth 当前主线 HEAD）: ${current_head:-UNKNOWN}"
   echo "实际当前 HEAD: ${head:-UNKNOWN}"
-  if [[ -n "${current_head:-}" && -n "${head:-}" && "$head" != "$current_head"* ]]; then
-    echo "HEAD 差异说明: Source of Truth 当前主线 HEAD 与实际当前 HEAD 不一致。若差异来自 workflow-only（纯工作流）commit，通常不阻塞；若差异来自业务包滞后，需要修正 source-of-truth baseline（事实源基线）。"
+  echo "Effective execution baseline（实际执行基线）: ${effective_baseline:-UNKNOWN}"
+  if [[ -n "${current_head:-}" && -n "${actual_short:-}" && "$actual_short" != "$current_head" ]]; then
+    if is_safe_actual_head_baseline_state "$state_text"; then
+      echo "HEAD 差异说明: Source of Truth baseline（事实源基线）落后，但 main clean / synced / open PR none，因此本次使用 actual HEAD（实际 HEAD）作为实际执行基线。后续业务包会顺手更新 source-of-truth（事实源）。"
+    else
+      echo "HEAD 差异说明: Source of Truth 当前主线 HEAD 与实际当前 HEAD 不一致；当前还有分支、工作区或 GitHub 状态阻塞，因此仅作为提示，不作为继续依据。"
+    fi
   fi
   echo "当前分支: ${branch:-UNKNOWN}"
   echo "Worktree Clean（工作区干净）: $(translate_yes_no "${worktree:-UNKNOWN}")"
@@ -251,7 +289,8 @@ current_status_summary() {
   echo "下一业务动作: ${next_action:-UNKNOWN}"
   echo "CODEX_NEXT_TASK（下一任务配置）: ${next_active:-UNKNOWN}"
   echo "下一任务分支: ${next_branch:-UNKNOWN}"
-  echo "下一任务 main 基线: ${next_main:-UNKNOWN}"
+  echo "下一任务 main 基线（配置值）: ${next_main:-UNKNOWN}"
+  echo "下一任务实际执行基线: ${effective_baseline:-UNKNOWN}"
 }
 
 cmd_status() {

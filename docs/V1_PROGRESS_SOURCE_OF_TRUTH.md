@@ -20,6 +20,8 @@ If chat memory, branch names, local docs, PR state, and command output conflict,
 
 Codex shell `GH_NOT_AVAILABLE` means Codex GitHub status unknown. It is not, by itself, proof that project state failed. GPT connector evidence or the user's local terminal `gh` evidence may be used as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
 
+Baseline sync packages are no longer required for ordinary source-of-truth lag. If merged `main` is clean, synced, and has no open PR, actual HEAD is the effective execution baseline. The next scoped business package updates `ACTIVE_MAINLINE_STATUS.yml`, `CODEX_NEXT_TASK.yml`, and related source-of-truth docs as part of its normal handoff.
+
 The following do not count as completed:
 
 - open Issue
@@ -37,7 +39,7 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `028c598 docs(ruleconfig): verify runtime wiring`
+- Current merged main: `e568ded docs(ruleconfig): sync verification baseline`
 - Current active block: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this RuleConfig verification package: verification only. RuleConfig runtime audit / rule explainability has implementation wiring and verification, but is not visually closed yet. Data Source Health dashboard/API status remains the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
@@ -86,6 +88,7 @@ The following do not count as completed:
 - `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main. It returns GO for one minimal read-only `RuleController` `Map` status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main. It adds one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It does not add DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360.
 - `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It verifies workflow contract, compile, test-compile, targeted `RuleControllerTest` 9 tests, targeted `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and source-of-truth alignment.
+- `e568ded` is the last baseline sync package before baseline sync packages are removed from the normal workflow. After this workflow fix, clean / synced main with no open PR uses actual HEAD as the effective execution baseline, and the next business package updates source-of-truth opportunistically.
 - Current active package after this verification is `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
 
 ## Runtime Slice History

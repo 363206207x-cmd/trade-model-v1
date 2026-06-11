@@ -154,7 +154,23 @@ After `5da301b`, Review / Replay result status is the seventh completed Review-O
 
 After `2984e48`, Data Source Health dashboard/API status has completed implementation only. It is not a completed runtime slice until verification and visual closure are merged. Completed Review-Only Runtime partial slices remain 7, and the next business action remains `Minimal Review-Only Data Source Health Dashboard/API Status Runtime Wiring Verification`.
 
-## 6. B-Risk Usability Hotfix
+## 6. Effective Execution Baseline
+
+Baseline sync PRs（基线同步 PR） are not a normal workflow step anymore.
+
+When all of the following are true, the operator uses actual HEAD as the Effective execution baseline（实际执行基线）:
+
+- current branch is `main`;
+- worktree is clean;
+- `MAIN_SYNC` is `OK`;
+- `Open PR` is `none`;
+- actual HEAD is a merged `main` commit.
+
+If `docs/ACTIVE_MAINLINE_STATUS.yml` or `docs/CODEX_NEXT_TASK.yml` still shows an older Source of Truth baseline（事实源基线）, the scripts print a Chinese notice and continue with actual HEAD. The next business package updates source-of-truth docs as part of its normal scoped changes.
+
+Do not create a separate baseline sync branch / PR only because `current_head` or `current_main` lags behind actual HEAD.
+
+## 7. B-Risk Usability Hotfix
 
 `v1-auto.sh check-pr <PR> B` and `v1-pr-complete.sh <PR> B "<SUBJECT>"` now classify B-risk semantics instead of treating every forbidden word as positive overreach.
 
@@ -175,13 +191,13 @@ These lines are allowed negative safety assertions（允许的负向安全断言
 
 Positive additions still STOP（停止）, including `finalDirection`, `entryPrice`, `stopPrice`, `takeProfit`, `riskReward`, `positionSize`, `leverage`, `orderAction`, `executionAction`, `autoTradingAction`, `candidateRanking`, `pushSend`, scheduler / collector / API-client triggers, and `externalRefreshTriggered=true`.
 
-## 7. Codex CLI Failure Fallback
+## 8. Codex CLI Failure Fallback
 
 If `v1-codex-run-next.sh` cannot start Codex CLI because of local session permissions, readonly database errors, or other `codex exec` failures, it now prints the full task text directly after the task file path.
 
 The user should copy the printed task into Codex. The script still does not stage, commit, push, create PRs, or merge.
 
-## 8. Dirty Work Packager
+## 9. Dirty Work Packager
 
 New helper:
 
@@ -198,7 +214,7 @@ Safety behavior:
 - C-risk stops.
 - Open PR, GitHub PR status unknown, forbidden staged paths, schema/config/pom, DTO/Validator/Assembler, and disallowed changed files stop the script.
 
-## 9. Verification
+## 10. Verification
 
 Required checks for this pack:
 

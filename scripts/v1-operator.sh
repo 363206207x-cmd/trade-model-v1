@@ -161,15 +161,20 @@ main() {
   blockers="$(state_value "$state_text" BLOCKERS)"
 
   local task_branch risk active_block subject
+  local source_head actual_head
   task_branch="$(yaml_value "$TASK_FILE" branch)"
   risk="$(yaml_value "$TASK_FILE" risk)"
   active_block="$(yaml_value "$TASK_FILE" active_block)"
   subject="$(subject_from_task "${risk:-A}" "$task_branch" "$active_block")" || subject="docs(workflow): package $task_branch"
+  source_head="$(yaml_value "$ACTIVE_FILE" current_head)"
+  actual_head="$(git rev-parse --short HEAD 2>/dev/null || true)"
 
   echo "当前任务: ${active_block:-UNKNOWN}"
   echo "任务分支: ${task_branch:-UNKNOWN}"
   echo "Risk（风险等级）: ${risk:-UNKNOWN}"
   echo "Subject（提交/PR 标题）: $subject"
+  echo "Source of Truth 当前主线 HEAD: ${source_head:-UNKNOWN}"
+  echo "实际当前 HEAD: ${actual_head:-UNKNOWN}"
   print_hr
 
   if [[ "$worktree" == "No" ]]; then
@@ -233,6 +238,13 @@ main() {
 
   if [[ "$can_continue" != "YES" && "$blockers" != "OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE" ]]; then
     stop "CAN_CONTINUE_NEXT_PACKAGE 不是 YES。Blockers（阻塞）: ${blockers:-UNKNOWN}"
+  fi
+
+  if [[ -n "${source_head:-}" && -n "${actual_head:-}" && "$source_head" != "$actual_head" ]]; then
+    echo "Source of Truth baseline（事实源基线）落后，但当前 main clean / synced / open PR none。"
+    echo "本次使用 actual HEAD（实际 HEAD）作为 Effective execution baseline（实际执行基线）。"
+    echo "不再创建 baseline sync（基线同步）小包；后续业务包会顺手更新 source-of-truth（事实源）。"
+    print_hr
   fi
 
   [[ -n "$task_branch" ]] || stop "CODEX_NEXT_TASK.yml 缺少 branch。"

@@ -67,6 +67,12 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh summary` 和 `v1-auto.sh next` 从 `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md` 读取已完成 Review-Only Runtime partial（只读运行时部分完成）小闭环数量，不再在脚本中硬编码数量。
 
+Baseline sync PRs（基线同步 PR） are no longer part of the normal workflow.
+If `Source of Truth current_head` lags behind the actual clean / synced `main` HEAD, and `Open PR` is `none`, operators use actual HEAD as the Effective execution baseline（实际执行基线）.
+The next business package updates source-of-truth files opportunistically while doing its scoped work.
+
+baseline sync PR（基线同步 PR）不再作为常规流程。只要当前在 clean / synced main、Open PR none，脚本使用 actual HEAD（实际 HEAD）作为实际执行基线；后续业务包在自身范围内顺手更新 source-of-truth（事实源），不再单独创建同步小包。
+
 One-command runner entry:
 
 ```bash

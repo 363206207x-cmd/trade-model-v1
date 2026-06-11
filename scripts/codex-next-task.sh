@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 TASK_FILE="docs/CODEX_NEXT_TASK.yml"
+ACTIVE_FILE="docs/ACTIVE_MAINLINE_STATUS.yml"
 TEMPLATE_DIR="docs/CODEX_TASK_TEMPLATES"
 
 usage() {
@@ -41,6 +42,30 @@ yaml_value() {
   ' "$TASK_FILE"
 }
 
+state_value() {
+  local state_text="$1"
+  local key="$2"
+  printf '%s\n' "$state_text" | awk -F': ' -v key="$key" '$1 == key {print substr($0, length(key) + 3); exit}'
+}
+
+effective_current_main() {
+  local configured="$1"
+  local state_text branch worktree open_prs main_sync actual_line
+  state_text="$(bash scripts/v1-state.sh 2>/dev/null || true)"
+  branch="$(state_value "$state_text" BRANCH)"
+  worktree="$(state_value "$state_text" WORKTREE_CLEAN)"
+  open_prs="$(state_value "$state_text" OPEN_PRS)"
+  main_sync="$(state_value "$state_text" MAIN_SYNC)"
+  actual_line="$(git log -1 --oneline 2>/dev/null || true)"
+
+  if [[ "$branch" == "main" && "$worktree" == "Yes" && "$open_prs" == "none" && "$main_sync" == "OK" && -n "$actual_line" ]]; then
+    printf '%s\n' "$actual_line"
+    return
+  fi
+
+  printf '%s\n' "$configured"
+}
+
 current_main="$(yaml_value current_main)"
 active_block="$(yaml_value active_block)"
 phase="$(yaml_value phase)"
@@ -53,6 +78,7 @@ required_reads="$(yaml_value required_reads)"
 required_checks="$(yaml_value required_checks)"
 expected_output="$(yaml_value expected_output)"
 next_allowed_action="$(yaml_value next_allowed_action)"
+current_main="$(effective_current_main "$current_main")"
 
 case "$phase" in
   source_read)
