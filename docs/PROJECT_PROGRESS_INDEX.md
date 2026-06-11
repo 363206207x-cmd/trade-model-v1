@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `a8acc70 chore(workflow): eliminate baseline sync packages`.
-- Active stop-loss track: `Next minimal runtime slice selection after RuleConfig closure`.
-- Selected target: `RuleConfig runtime audit / rule explainability`.
+- Current HEAD: `2c3224f fix(workflow): handle completed slice fallback name`.
+- Active stop-loss track: `Source Read for Missed Opportunity / Review Archive status`.
+- Selected target: `Missed Opportunity / Review Archive status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, and `RuleConfig runtime audit / rule explainability`.
-- Selected next minimal runtime slice: to be selected by the next package.
-- Next required action: `Next minimal runtime slice selection`.
+- Selected next minimal runtime slice: `Missed Opportunity / Review Archive status`.
+- Next required action: `Source Read for Missed Opportunity / Review Archive status`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -55,7 +55,9 @@ Current merged main:
 - `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main with workflow contract, compile, test-compile, `RuleControllerTest` 9 tests, `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and `git diff --check`.
 - `e568ded` is the final ordinary baseline sync package before the workflow removes standalone baseline-sync PRs.
 - `a8acc70` completes the workflow-only baseline-sync removal; future execution uses actual clean/synced main HEAD as the effective baseline.
-- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged with environment-limited evidence. `ruleConfigAuditStatusPanel` DOM/copy/safety copy is present, RuleVersionLog remains context-only, `/api/rule/reload` remains a boundary, and no Push / Candidate generation / Decision generation / Point / trading semantics are present.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed on main as `49cef5a` with environment-limited evidence. `ruleConfigAuditStatusPanel` DOM/copy/safety copy is present, RuleVersionLog remains context-only, `/api/rule/reload` remains a boundary, and no Push / Candidate generation / Decision generation / Point / trading semantics are present.
+- `2c3224f` completes a workflow-only completed-slice fallback naming fix.
+- Next Minimal Runtime Slice Selection After RuleConfig Closure selects `Missed Opportunity / Review Archive status` as the next source-read-only target. The selected source read must inventory existing Missed Opportunity / Review Archive owner assets and must not implement generation/write behavior, review result generation, replay/recheck execution, Push, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler, P359, or P360.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`

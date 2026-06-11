@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Next minimal runtime slice selection after RuleConfig closure`.
-- Selected target: `RuleConfig runtime audit / rule explainability`.
+- Active track: `Source Read for Missed Opportunity / Review Archive status`.
+- Selected target: `Missed Opportunity / Review Archive status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, and `RuleConfig runtime audit / rule explainability`.
-- Selected next minimal runtime slice: to be selected by the next package.
-- Next required action: `Next minimal runtime slice selection`.
+- Selected next minimal runtime slice: `Missed Opportunity / Review Archive status`.
+- Next required action: `Source Read for Missed Opportunity / Review Archive status`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -50,7 +50,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It confirms workflow contract, compile, test-compile, `RuleControllerTest` 9 tests, `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and `git diff --check`.
 - `e568ded` is the final ordinary baseline sync package before the workflow removes standalone baseline sync PRs.
 - `a8acc70` completes the workflow-only baseline-sync removal; the operator now uses actual clean/synced main HEAD as the effective execution baseline.
-- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged with environment-limited evidence: `ruleConfigAuditStatusPanel` DOM/copy/safety copy is present, RuleVersionLog remains context-only, `/api/rule/reload` remains a boundary, and no Push / Candidate generation / Decision generation / Point / trading semantics are present. RuleConfig runtime audit / rule explainability is now the ninth completed Review-Only Runtime partial slice after this closure package is accepted.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed on main as `49cef5a` with environment-limited evidence: `ruleConfigAuditStatusPanel` DOM/copy/safety copy is present, RuleVersionLog remains context-only, `/api/rule/reload` remains a boundary, and no Push / Candidate generation / Decision generation / Point / trading semantics are present. RuleConfig runtime audit / rule explainability is now the ninth completed Review-Only Runtime partial slice.
+- Next Minimal Runtime Slice Selection After RuleConfig Closure selects `Missed Opportunity / Review Archive status` as the next source-read-only target. This selection reuses existing `MissedOpportunityController`, `MissedOpportunityServiceImpl`, `MissedOpportunityMapper`, `tm_missed_opportunity`, `ReviewAggregateServiceImpl`, and dashboard missed-count assets without implementation or capability movement.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.

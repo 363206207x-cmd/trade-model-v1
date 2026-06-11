@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `a8acc70 chore(workflow): eliminate baseline sync packages`
+- Current merged main: `2c3224f fix(workflow): handle completed slice fallback name`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Next minimal runtime slice selection after RuleConfig closure`.
-- Current next required action is `Next minimal runtime slice selection`.
+- Current active block is `Source Read for Missed Opportunity / Review Archive status`.
+- Current next required action is `Source Read for Missed Opportunity / Review Archive status`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -56,6 +56,9 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main. It adds one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates. It keeps RuleVersionLog context-only, does not call `/api/rule/reload` as status behavior, and does not add DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360.
 - `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It confirms workflow contract, compile, test-compile, `RuleControllerTest` 9 tests, `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and `git diff --check`.
 - `e568ded` is the final ordinary baseline sync package before the workflow stops creating standalone baseline sync PRs. Future packages use actual clean/synced main HEAD as the effective execution baseline and update source-of-truth inside the scoped business package.
+- `49cef5a` completes RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure with environment-limited evidence.
+- `2c3224f` completes a workflow-only completed-slice fallback naming fix.
+- Next Minimal Runtime Slice Selection After RuleConfig Closure selects `Missed Opportunity / Review Archive status` as the next source-read-only target after nine completed review-only runtime slices.
 - Data Source Health dashboard/API status is the eighth completed Review-Only Runtime partial slice on merged main; RuleConfig runtime audit / rule explainability becomes the ninth completed Review-Only Runtime partial slice after this closure package is accepted.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Java business code, tests, dashboard business logic, schema/config/pom, Push, Candidate, Decision generation, Point, trading, or capability level.
 - The PositionSync/Dashboard source-read verification track is completed on main as #835: it confirmed the existing provider/service/scheduler/mapper/schema/dashboard/API path and found provider/fallback dashboard visibility is still partial.
@@ -171,7 +174,7 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - #836 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Design.
 - #837 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Implementation Readiness Gate.
 - #840 is completed on main as Minimal Review-Only PositionSync Runtime Wiring Verification.
-- The active block is now Next Minimal Runtime Slice Selection After Evidence / Score Closure.
+- The active block is now Source Read for Missed Opportunity / Review Archive status.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
