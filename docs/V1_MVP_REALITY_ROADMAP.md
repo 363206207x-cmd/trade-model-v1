@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Source Read for RuleConfig runtime audit / rule explainability`.
+- Active track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
 - Selected next minimal runtime slice: `RuleConfig runtime audit / rule explainability`.
-- Next required action: `Source Read for RuleConfig runtime audit / rule explainability`.
+- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -40,7 +40,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `c6b35b5` records Data Source Health visual closure with environment-limited evidence: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
 - Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed minimal runtime slices are 8.
 - `d9f7817` completes the V1 status summary accuracy fix without changing business capability.
-- The next selected runtime target is `RuleConfig runtime audit / rule explainability`; the next package is source-read only and must not implement it.
+- `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target.
+- Source Read for RuleConfig runtime audit / rule explainability confirms reusable RuleConfig / Watchlist owner assets, the Watchlist status API/panel pattern, adjacent RuleVersionLog audit context, and generic audit/explainability gaps. The next package is design only and must not implement it.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
