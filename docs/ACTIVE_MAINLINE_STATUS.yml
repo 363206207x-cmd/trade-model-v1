@@ -1,14 +1,14 @@
 current_head: "b298ee9"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation"
-active_block_cn: "规则配置运行时审计 / 规则解释最小只读运行时接线实现"
-current_phase: "implementation"
+active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification"
+active_block_cn: "规则配置运行时审计 / 规则解释最小只读运行时接线验证"
+current_phase: "verification"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-ruleconfig-runtime-audit-rule-explainability-implementation"
-merge_rule: "B-risk minimal RuleConfig runtime audit / rule explainability implementation; allow only one minimal read-only RuleController Map status endpoint, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets; no schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, review result generation, P359, or P360"
-next_required_action: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation"
+current_branch: "minimal-review-only-ruleconfig-runtime-audit-rule-explainability-verification"
+merge_rule: "A-risk verification after B-risk minimal RuleConfig runtime audit / rule explainability implementation; allow only verification docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, review result generation, P359, or P360"
+next_required_action: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -94,7 +94,10 @@ ruleconfig_runtime_audit_rule_explainability_source_read_status: "completed on m
 v1_operator_one_command_orchestrator_status: "completed on main as b4497e1; workflow-only orchestration improvement adds scripts/v1-operator.sh as the preferred terminal entry, fixes dirty package branch detection, and preserves the next business action without changing capability"
 minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_design_status: "completed on main as 2778b82; preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, readiness checklist, and returns GO to implementation readiness gate without implementation"
 ruleconfig_runtime_audit_rule_explainability_implementation_readiness_gate_status: "completed on main as b298ee9; returns GO for one minimal read-only RuleController Map status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets; keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360"
+minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_implementation_status: "completed in this implementation package; adds one minimal read-only /api/rule/config-audit-status endpoint, dashboard ruleConfigAuditStatusPanel, RuleControllerTest and DashboardControllerTest coverage, and source-of-truth updates over existing RuleConfig / Watchlist assets without DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360; RuleConfig still requires verification before becoming a completed runtime slice"
+minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_verification_status: "active handoff; verify endpoint/dashboard review-only behavior, compile/test results, forbidden semantics, RuleVersionLog context-only boundary, and source-of-truth alignment"
 source_of_truth_files:
+  - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_RUNTIME_WIRING_IMPLEMENTATION.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_MINIMAL_REVIEW_ONLY_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_RUNTIME_WIRING_DESIGN.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_SOURCE_READ.md
