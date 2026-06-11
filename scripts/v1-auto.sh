@@ -239,6 +239,9 @@ current_status_summary() {
   echo "当前项目能力层级: ${current_level:-UNKNOWN}（Review-Only Runtime partial，只读运行时部分完成）"
   echo "ACTIVE current_head（Source of Truth 当前主线 HEAD）: ${current_head:-UNKNOWN}"
   echo "实际当前 HEAD: ${head:-UNKNOWN}"
+  if [[ -n "${current_head:-}" && -n "${head:-}" && "$head" != "$current_head"* ]]; then
+    echo "HEAD 差异说明: Source of Truth 当前主线 HEAD 与实际当前 HEAD 不一致。若差异来自 workflow-only（纯工作流）commit，通常不阻塞；若差异来自业务包滞后，需要修正 source-of-truth baseline（事实源基线）。"
+  fi
   echo "当前分支: ${branch:-UNKNOWN}"
   echo "Worktree Clean（工作区干净）: $(translate_yes_no "${worktree:-UNKNOWN}")"
   echo "Open PR（未合并 PR）: $(describe_open_pr "${open_prs:-UNKNOWN}")"

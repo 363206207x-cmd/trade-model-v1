@@ -1,4 +1,4 @@
-current_main: "ed6def3 docs(runtime): select ruleconfig audit next slice"
+current_main: "5903409 docs(ruleconfig): read runtime audit explainability source path"
 active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design"
 phase: "design"
 module: "RuleConfig runtime audit / rule explainability"

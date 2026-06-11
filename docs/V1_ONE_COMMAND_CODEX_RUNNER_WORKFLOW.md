@@ -23,6 +23,22 @@ It does not change Java business behavior, tests, dashboard business logic, sche
 
 ## 2. New Entry Points
 
+### One-Command Operator
+
+```bash
+bash scripts/v1-operator.sh
+```
+
+This is the preferred user entry after this pack. It checks state, creates or switches the task branch from clean `main`, starts Codex when available, prints the full task when Codex cannot start, packages dirty work, opens PRs, and delegates A/B/C PR completion to the existing fixed scripts.
+
+For B-risk after explicit GPT / human review:
+
+```bash
+bash scripts/v1-operator.sh --confirm-reviewed <PR_NUMBER>
+```
+
+Codex should not decide branch / commit / push / PR by itself when this operator is available; terminal scripts own Git packaging and PR flow.
+
 ### Run Next Codex Task
 
 ```bash

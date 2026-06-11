@@ -246,6 +246,18 @@ mark_ready_if_needed() {
   fi
 }
 
+print_post_merge_baseline_note() {
+  local actual_head
+  local source_head
+  actual_head="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  source_head="$(awk -F': *' '$1 == "current_head" {value=$0; sub("^[^:]*:[[:space:]]*", "", value); gsub(/^"/, "", value); gsub(/"$/, "", value); print value; exit}' docs/ACTIVE_MAINLINE_STATUS.yml 2>/dev/null || true)"
+  echo "最新 main HEAD（实际当前 HEAD）: ${actual_head:-UNKNOWN}"
+  echo "Source of Truth current_head（事实源当前主线 HEAD）: ${source_head:-UNKNOWN}"
+  if [[ -n "$actual_head" && -n "$source_head" && "$source_head" != "$actual_head" ]]; then
+    echo "提示: merge-sync 后如 Source of Truth current_head 滞后，下一包应更新 docs/ACTIVE_MAINLINE_STATUS.yml / docs/CODEX_NEXT_TASK.yml baseline。workflow-only commit 差异通常不阻塞，但业务包滞后必须修正。"
+  fi
+}
+
 ensure_gh
 
 echo "V1 PR Complete（一键 PR 完成）"
@@ -276,6 +288,7 @@ case "$RISK" in
     echo
     echo "合并后状态:"
     bash scripts/v1-state.sh || true
+    print_post_merge_baseline_note
     echo
     bash scripts/v1-auto.sh next || true
     ;;
@@ -294,6 +307,7 @@ case "$RISK" in
     bash scripts/v1-merge-sync.sh "$PR_NUMBER" "$SUBJECT" --risk B --confirm
     echo
     bash scripts/v1-state.sh || true
+    print_post_merge_baseline_note
     echo
     bash scripts/v1-auto.sh next || true
     ;;
