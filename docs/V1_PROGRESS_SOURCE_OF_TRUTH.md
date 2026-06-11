@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `a9ec1c9 docs(alerts): record notification policy visual closure`
-- Current active block: `Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`
+- Current merged main: `8a2d8e7 docs(runtime): select next slice after alert fatigue closure`
+- Current active block: `Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this selection package: none. Alert fatigue / notification policy status is already the 12th completed review-only runtime partial slice on merged main; this package only selects the next source-read target. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
-- Next required action: `Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`
+- Capability movement from this source-read package: none. Alert fatigue / notification policy status is already the 12th completed review-only runtime partial slice on merged main; this package only records the next source-read conclusion and hands off to design. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -196,7 +196,8 @@ DecisionResult chain history:
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Implementation is completed on main as `9ec569c` and returns to `Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification`.
 - Minimal Review-Only Alert Fatigue / Notification Policy Status Runtime Wiring Verification is completed on main as `b217b60` and returns to `Alert Fatigue / Notification Policy Status Visual Verification / Closure`.
 - Alert Fatigue / Notification Policy Status Visual Verification / Closure is completed on main as `a9ec1c9` and returns to `Next minimal runtime slice selection after Alert Fatigue closure`.
-- Next Minimal Runtime Slice Selection After Alert Fatigue Closure is completed by this package when merged and returns to `Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
+- Next Minimal Runtime Slice Selection After Alert Fatigue Closure is completed on main as `8a2d8e7` and selected `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status` as the next source-read-only target.
+- Source Read for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed by this package when merged. It confirms the existing `/api/dashboard/detail` SourceTrace / RuntimeKline owner path, persisted OHLCV readiness read path, dashboard diagnostics, and targeted tests, while keeping DataQuality / MultiTimeframe partial metadata and frozen source-binding skeletons out of implementation scope. Next is design only.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
