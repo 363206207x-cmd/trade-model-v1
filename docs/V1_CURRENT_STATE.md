@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `06ca17f feat(risk): show risk action guard review-only status`
+- Current merged main: `f21ed5f docs(risk): verify risk action guard runtime wiring (#934)`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `RiskActionGuard Read-Only Status Visual Verification / Closure`.
-- Current next required action is `RiskActionGuard Read-Only Status Visual Verification / Closure`.
+- Current active block is `Next minimal runtime slice selection after RiskActionGuard closure`.
+- Current next required action is `Next minimal runtime slice selection after RiskActionGuard closure`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -186,7 +186,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design is completed on main as `5d25e53`. It fixes owner path, status mapping, manual-review-only wording, fail-closed rules, dashboard/API boundary, and readiness checklist without implementation or capability movement.
 - Implementation readiness gate for RiskActionGuard read-only status is completed on main as `c7fb97e`. It returns GO to B-risk minimal implementation over existing Dashboard detail / RiskActionGuard display assets, without DTO / Validator / Assembler / Orchestrator, schema/config/pom, Position Monitor execution, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360.
 - Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Implementation is completed on main as `06ca17f`. It adds a minimal read-only `/api/dashboard/risk-action-guard-status` endpoint, dashboard `riskActionGuardStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates.
-- Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification is completed by this package when merged. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/dashboard status mapping, safety fields, fail-closed rules, forbidden semantics classification, and source-of-truth alignment from `c7fb97e` to `06ca17f`. RiskActionGuard still requires visual closure before it can count as a completed runtime slice.
+- Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Verification is completed on main as `f21ed5f`. It verifies workflow contract, compile, test-compile, targeted `DashboardControllerTest`, full tests, endpoint/dashboard status mapping, safety fields, fail-closed rules, forbidden semantics classification, and source-of-truth alignment from `c7fb97e` to `06ca17f`.
+- RiskActionGuard Read-Only Status Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `riskActionGuardStatusPanel` DOM/copy/safety copy, review-only/manual-review/fail-closed/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, action wording as guardrail/manual-review copy only, and no Position Monitor execution / Push / Candidate generation / Decision generation / Point / trading semantics. RiskActionGuard read-only status is the 11th completed Review-Only Runtime partial slice.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
