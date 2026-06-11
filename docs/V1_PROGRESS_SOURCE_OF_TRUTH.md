@@ -38,10 +38,10 @@ The following do not count as completed:
 ## Current Active Block
 
 - Current merged main: `abc9d40 feat(ruleconfig): show review-only audit status`
-- Current active block: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification`
+- Current active block: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this RuleConfig implementation package: minimal review-only RuleController/dashboard/API visibility is implemented, but RuleConfig runtime audit / rule explainability is not yet verified or visually closed. Data Source Health dashboard/API status remains the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification`
+- Capability movement from this RuleConfig verification package: verification only. RuleConfig runtime audit / rule explainability has implementation wiring and verification, but is not visually closed yet. Data Source Health dashboard/API status remains the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -85,7 +85,8 @@ The following do not count as completed:
 - `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main. It preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, and readiness checklist, and returns GO to implementation readiness gate without implementation.
 - `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main. It returns GO for one minimal read-only `RuleController` `Map` status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main. It adds one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It does not add DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360.
-- Current active package after this implementation handoff is `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification`. It may verify only the scoped read-only RuleController/dashboard/tests slice above.
+- This verification package completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification. It verifies workflow contract, compile, test-compile, targeted `RuleControllerTest` 9 tests, targeted `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and source-of-truth alignment.
+- Current active package after this verification is `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
 
 ## Runtime Slice History
 
@@ -140,8 +141,9 @@ DecisionResult chain history:
 - Source Read for RuleConfig runtime audit / rule explainability is completed on main as `5903409` and returned GO to design only.
 - Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed on main as `2778b82` and returns GO to implementation readiness gate.
 - RuleConfig runtime audit / rule explainability implementation readiness gate is completed on main as `b298ee9` and returns GO to minimal implementation.
-- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation is completed in this package and returns handoff to verification.
-- Current active package is Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification.
+- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation is completed on main as `abc9d40`.
+- Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification is completed in this verification package.
+- Current active package is RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 

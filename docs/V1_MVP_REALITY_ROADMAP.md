@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification`.
+- Active track: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`.
 - Selected target: `RuleConfig runtime audit / rule explainability`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
 - Selected next minimal runtime slice: `RuleConfig runtime audit / rule explainability`.
-- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification`.
+- Next required action: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -46,7 +46,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - `b4497e1` completes the V1 Operator One-Command Orchestrator workflow-only package and preserves the RuleConfig business handoff.
 - `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main: it preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog context-only, defines status mapping / dashboard/API boundary / fail-closed rules, and returns GO to implementation readiness gate without implementation.
 - `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main: it returns GO for one minimal read-only `RuleController` `Map` status endpoint, a minimal dashboard status/copy/DOM surface, targeted tests, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only and forbids DTO / Validator / Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
-- `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main with one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` and `DashboardControllerTest` coverage, and implementation/source-of-truth docs over existing RuleConfig / Watchlist owner assets. Verification is the next required action before this slice can be counted as completed.
+- `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main with one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` and `DashboardControllerTest` coverage, and implementation/source-of-truth docs over existing RuleConfig / Watchlist owner assets.
+- This verification package confirms workflow contract, compile, test-compile, `RuleControllerTest` 9 tests, `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and `git diff --check`. Visual closure is the next required action before this slice can be counted as completed.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
