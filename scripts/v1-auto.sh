@@ -232,8 +232,11 @@ slice_display_name() {
     "Data Source Health dashboard/API status")
       echo "$index. Data Source Health dashboard/API status（数据源健康仪表盘 / 接口状态）review-only runtime status（只读运行时状态）完整闭环。"
       ;;
+    "RuleConfig runtime audit / rule explainability")
+      echo "$index. RuleConfig runtime audit / rule explainability（规则配置运行时审计 / 规则解释）review-only runtime status（只读运行时状态）完整闭环。"
+      ;;
     *)
-      echo "$index. $name（已完成 Review-Only Runtime partial，只读运行时部分完成）完整闭环。"
+      echo "$index. ${name:-Unknown completed slice}（已完成 Review-Only Runtime partial，只读运行时部分完成）完整闭环。"
       ;;
   esac
 }
