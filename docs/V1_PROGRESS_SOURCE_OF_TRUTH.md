@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `a8acc70 chore(workflow): eliminate baseline sync packages`
-- Current active block: `Next minimal runtime slice selection after RuleConfig closure`
+- Current merged main: `2c3224f fix(workflow): handle completed slice fallback name`
+- Current active block: `Source Read for Missed Opportunity / Review Archive status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from the RuleConfig visual closure package: environment-limited visual closure only. RuleConfig runtime audit / rule explainability has implementation wiring, verification, and visual closure evidence; it is now the 9th completed review-only runtime partial slice after this package is accepted. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Next minimal runtime slice selection`
+- Capability movement from the RuleConfig visual closure package: environment-limited visual closure only. RuleConfig runtime audit / rule explainability has implementation wiring, verification, and visual closure evidence; it is now the 9th completed review-only runtime partial slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Source Read for Missed Opportunity / Review Archive status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -90,8 +90,10 @@ The following do not count as completed:
 - `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It verifies workflow contract, compile, test-compile, targeted `RuleControllerTest` 9 tests, targeted `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and source-of-truth alignment.
 - `e568ded` is the last baseline sync package before baseline sync packages are removed from the normal workflow.
 - `a8acc70` completes V1 Eliminate Baseline Sync Packages; clean / synced main with no open PR now uses actual HEAD as the effective execution baseline, and the next business package updates source-of-truth opportunistically.
-- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `ruleConfigAuditStatusPanel` DOM/copy/safety copy, RuleVersionLog context-only copy, `/api/rule/reload` boundary copy, and no Push / Candidate generation / Decision generation / Point / trading semantics. Live Spring Boot bind and Browser backend were unavailable in the sandbox, so no live screenshot or live UI smoke success is claimed.
-- Current active package after this visual closure is `Next minimal runtime slice selection after RuleConfig closure`. It may add only selection docs and source-of-truth updates.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed on main as `49cef5a`. Environment-limited evidence confirms `ruleConfigAuditStatusPanel` DOM/copy/safety copy, RuleVersionLog context-only copy, `/api/rule/reload` boundary copy, and no Push / Candidate generation / Decision generation / Point / trading semantics. Live Spring Boot bind and Browser backend were unavailable in the sandbox, so no live screenshot or live UI smoke success is claimed.
+- `2c3224f` completed the workflow-only completed-slice fallback naming hotfix; it does not change business capability.
+- This selection package selects `Missed Opportunity / Review Archive status` as the next source-read-only target after nine completed review-only runtime slices. It may add only selection docs and source-of-truth updates.
+- Current active package after this selection is `Source Read for Missed Opportunity / Review Archive status`. It may read existing owner assets and update docs only; it must not implement missed-opportunity generation, review result generation, replay/recheck execution, dashboard business logic, Java, tests, schema/config/pom, Push, Candidate generation, Decision generation, Point, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360.
 
 ## Runtime Slice History
 
@@ -149,7 +151,8 @@ DecisionResult chain history:
 - RuleConfig runtime audit / rule explainability implementation readiness gate is completed on main as `b298ee9` and returns GO to minimal implementation.
 - Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation is completed on main as `abc9d40`.
 - Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification is completed on main as `028c598`.
-- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged; current active package is Next minimal runtime slice selection after RuleConfig closure.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed on main as `49cef5a`.
+- Next Minimal Runtime Slice Selection After RuleConfig Closure is completed by this package when merged and selects `Missed Opportunity / Review Archive status` as the next source-read-only target.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
