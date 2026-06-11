@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `239664d docs(missed): record review archive visual closure (#928)`
-- Current active block: `Source Read for RiskActionGuard read-only status`
+- Current merged main: `095ade9 docs(runtime): select next slice after missed archive closure (#929)`
+- Current active block: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from the Missed Opportunity / Review Archive visual closure package: environment-limited visual closure only. Missed Opportunity / Review Archive status has implementation wiring, verification, and visual closure evidence; it is now the 10th completed review-only runtime partial slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Source Read for RiskActionGuard read-only status`
+- Next required action: `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -99,7 +99,8 @@ The following do not count as completed:
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed on main as `452a8ac`. It adds one minimal read-only `/api/missed-opportunity/review-archive-status` endpoint, dashboard `missedArchiveStatusPanel`, targeted `MissedOpportunityControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing MissedOpportunity / ReviewAggregate / dashboard-count assets. It does not call missed-opportunity generation/write behavior, review result generation, replay/recheck execution, Push, Candidate generation, Decision generation, Point, trading, DTO/Validator/Assembler, schema/config/pom, P359, or P360.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification is completed on main as `09f6a9c`. It verifies workflow contract, compile, test-compile, full tests, targeted `MissedOpportunityControllerTest` / `DashboardControllerTest`, endpoint/dashboard status mapping, forbidden semantics classification, and source-of-truth alignment from `ed7faeb` to `452a8ac`.
 - Missed Opportunity / Review Archive Status Visual Verification / Closure is completed on main as `239664d`. Environment-limited evidence confirms `missedArchiveStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not trading/not Candidate/not Decision generation/not Point/not executable boundaries, no replay/recheck execution, no missed-opportunity generation/write behavior, no review result generation, and no Push / Candidate generation / Decision generation / Point / trading semantics.
-- Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed by this package when merged and selects `RiskActionGuard read-only status` as the next source-read-only target. The next active package is `Source Read for RiskActionGuard read-only status`.
+- Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed on main as `095ade9` and selects `RiskActionGuard read-only status` as the next source-read-only target.
+- Source Read for RiskActionGuard read-only status is completed by this package when merged. It confirms existing `RiskActionGuardDisplayAdapter` / `DefaultRiskActionGuardDisplayAdapter` / `RiskActionGuardDisplayVO` / `DashboardController` dashboard detail / dashboard placeholder and tests, identifies missing dedicated endpoint/panel gaps, and returns GO to design only without implementation or capability movement.
 
 ## Runtime Slice History
 
@@ -166,7 +167,8 @@ DecisionResult chain history:
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Implementation is completed on main as `452a8ac` and returns to `Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification`.
 - Minimal Review-Only Missed Opportunity / Review Archive Status Runtime Wiring Verification is completed on main as `09f6a9c` and returns to `Missed Opportunity / Review Archive Status Visual Verification / Closure`.
 - Missed Opportunity / Review Archive Status Visual Verification / Closure is completed on main as `239664d` and returns to `Next minimal runtime slice selection after Missed Opportunity / Review Archive closure`.
-- Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed by this package when merged and selects `RiskActionGuard read-only status` as the next source-read-only target.
+- Next Minimal Runtime Slice Selection After Missed Opportunity / Review Archive Closure is completed on main as `095ade9` and selects `RiskActionGuard read-only status` as the next source-read-only target.
+- Source Read for RiskActionGuard read-only status is completed by this package when merged and returns GO to `Minimal Review-Only RiskActionGuard Read-Only Status Runtime Wiring Design`.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
