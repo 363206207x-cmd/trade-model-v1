@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 
 ACTIVE_FILE="docs/ACTIVE_MAINLINE_STATUS.yml"
 NEXT_TASK_FILE="docs/CODEX_NEXT_TASK.yml"
+PROGRESS_FILE="docs/V1_PROGRESS_SOURCE_OF_TRUTH.md"
 NEXT_TASK_CACHE="${TMPDIR:-/tmp}/v1-auto-next-task.txt"
 
 usage() {
@@ -151,6 +152,62 @@ describe_can_continue() {
   echo "NO（不能继续）"
 }
 
+completed_slice_entries() {
+  if [[ ! -f "$PROGRESS_FILE" ]]; then
+    return 0
+  fi
+  awk '
+    /^Completed review-only runtime slices:/ {in_list=1; next}
+    in_list && /^$/ {next}
+    in_list && /^[0-9]+[.][[:space:]]/ {print; next}
+    in_list && /^[^0-9]/ {exit}
+  ' "$PROGRESS_FILE"
+}
+
+completed_slice_count() {
+  local count
+  count="$(completed_slice_entries | awk 'END {print NR + 0}')"
+  echo "${count:-0}"
+}
+
+slice_display_name() {
+  local raw="$1"
+  local index name
+  index="${raw%%.*}"
+  name="${raw#*. }"
+  name="${name%%: *}"
+  name="${name//\`/}"
+  case "$name" in
+    "PositionSync + Dashboard review-only status")
+      echo "$index. PositionSync（持仓同步）+ Dashboard（仪表盘）review-only status（只读运行时状态）完整闭环。"
+      ;;
+    "Watchlist + RuleConfig + Dashboard/API review-only status")
+      echo "$index. Watchlist + RuleConfig（观察列表 + 规则配置）+ Dashboard/API（仪表盘 / 接口）review-only status（只读运行时状态）完整闭环。"
+      ;;
+    "MarketQuote freshness / fallback / dashboard API status")
+      echo "$index. MarketQuote（行情报价）freshness/fallback/dashboard API（新鲜度 / 兜底 / 仪表盘接口）完整闭环。"
+      ;;
+    "Evidence / Score review-only runtime status")
+      echo "$index. Evidence / Score（证据 / 评分）review-only runtime status（只读运行时状态）完整闭环。"
+      ;;
+    "DecisionResult review-only dashboard/API status")
+      echo "$index. DecisionResult（决策结果）review-only dashboard/API status（只读仪表盘 / 接口状态）完整闭环。"
+      ;;
+    "ExecutionPlan / BoundaryCandidate review-only runtime status")
+      echo "$index. ExecutionPlan / BoundaryCandidate（执行计划 / 边界候选）review-only runtime status（只读运行时状态）完整闭环。"
+      ;;
+    "Review / Replay result status")
+      echo "$index. Review / Replay result status（复盘 / 回放结果状态）review-only runtime status（只读运行时状态）完整闭环。"
+      ;;
+    "Data Source Health dashboard/API status")
+      echo "$index. Data Source Health dashboard/API status（数据源健康仪表盘 / 接口状态）review-only runtime status（只读运行时状态）完整闭环。"
+      ;;
+    *)
+      echo "$index. $name（已完成 Review-Only Runtime partial，只读运行时部分完成）完整闭环。"
+      ;;
+  esac
+}
+
 current_status_summary() {
   local state_text="$1"
   local branch worktree head open_prs main_sync can_continue blockers
@@ -180,7 +237,7 @@ current_status_summary() {
   echo "当前模块: ${active_block:-UNKNOWN}（${active_block_cn:-未记录中文名}）"
   echo "当前阶段: $(phase_label "${next_phase:-UNKNOWN}" "${next_active:-$active_block}")"
   echo "当前项目能力层级: ${current_level:-UNKNOWN}（Review-Only Runtime partial，只读运行时部分完成）"
-  echo "ACTIVE current_head（事实源记录的当前主线 HEAD）: ${current_head:-UNKNOWN}"
+  echo "ACTIVE current_head（Source of Truth 当前主线 HEAD）: ${current_head:-UNKNOWN}"
   echo "实际当前 HEAD: ${head:-UNKNOWN}"
   echo "当前分支: ${branch:-UNKNOWN}"
   echo "Worktree Clean（工作区干净）: $(translate_yes_no "${worktree:-UNKNOWN}")"
@@ -204,22 +261,26 @@ cmd_status() {
 
 cmd_summary() {
   local active_block next_action next_active next_branch next_phase
+  local slice_count slice_entries entry
   active_block="$(yaml_value "$ACTIVE_FILE" "active_block")"
   next_action="$(yaml_value "$ACTIVE_FILE" "next_required_action")"
   next_active="$(yaml_value "$NEXT_TASK_FILE" "active_block")"
   next_branch="$(yaml_value "$NEXT_TASK_FILE" "branch")"
   next_phase="$(yaml_value "$NEXT_TASK_FILE" "phase")"
+  slice_count="$(completed_slice_count)"
+  slice_entries="$(completed_slice_entries)"
 
   echo "项目总进度摘要（白话版）"
   print_hr
-  echo "已完成 7 个 Review-Only Runtime partial（只读运行时部分完成）小闭环:"
-  echo "1. PositionSync（持仓同步）+ Dashboard（仪表盘）完整闭环。"
-  echo "2. Watchlist + RuleConfig（观察列表 + 规则配置）+ Dashboard/API（仪表盘 / 接口）完整闭环。"
-  echo "3. MarketQuote（行情报价）freshness/fallback/dashboard API（新鲜度 / 兜底 / 仪表盘接口）完整闭环。"
-  echo "4. Evidence / Score（证据 / 评分）review-only runtime status（只读运行时状态）完整闭环。"
-  echo "5. DecisionResult（决策结果）review-only dashboard/API status（只读仪表盘 / 接口状态）完整闭环。"
-  echo "6. ExecutionPlan / BoundaryCandidate（执行计划 / 边界候选）review-only runtime status（只读运行时状态）完整闭环。"
-  echo "7. Review / Replay result status（复盘 / 回放结果状态）review-only runtime status（只读运行时状态）完整闭环。"
+  echo "已完成 ${slice_count:-0} 个 Review-Only Runtime partial（只读运行时部分完成）小闭环:"
+  if [[ -n "$slice_entries" ]]; then
+    while IFS= read -r entry; do
+      [[ -z "$entry" ]] && continue
+      slice_display_name "$entry"
+    done <<<"$slice_entries"
+  else
+    echo "- Source of Truth（事实源）未记录 completed slice list（已完成切片列表）。"
+  fi
   echo
   echo "DecisionResult（决策结果）当前进度:"
   echo "- implementation（实现）已完成并合并。"
@@ -232,6 +293,11 @@ cmd_summary() {
   echo "- visual closure（视觉收口）已完成并合并。"
   echo
   echo "Review / Replay result status（复盘 / 回放结果状态）当前进度:"
+  echo "- implementation（实现）已完成并合并。"
+  echo "- verification（验证）已完成并合并。"
+  echo "- visual closure（视觉收口）已完成并合并。"
+  echo
+  echo "Data Source Health dashboard/API status（数据源健康仪表盘 / 接口状态）当前进度:"
   echo "- implementation（实现）已完成并合并。"
   echo "- verification（验证）已完成并合并。"
   echo "- visual closure（视觉收口）已完成并合并。"

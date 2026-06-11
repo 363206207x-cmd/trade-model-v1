@@ -1,4 +1,4 @@
-current_main: "85e8182 docs(health): verify data source health runtime wiring"
+current_main: "c6b35b5 docs(health): record data source health visual closure"
 active_block: "Next minimal runtime slice selection after Data Source Health closure"
 phase: "selection"
 module: "Next minimal runtime slice after Data Source Health dashboard/API status closure"

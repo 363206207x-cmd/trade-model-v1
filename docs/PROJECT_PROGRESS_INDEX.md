@@ -6,9 +6,9 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `85e8182 docs(health): verify data source health runtime wiring`.
+- Current HEAD: `c6b35b5 docs(health): record data source health visual closure`.
 - Active stop-loss track: `Next minimal runtime slice selection after Data Source Health closure`.
-- Selected target: `Data Source Health dashboard/API status`.
+- Selected target: pending selection.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
 - Selected next minimal runtime slice: pending selection.
 - Next required action: `Next minimal runtime slice selection`.
@@ -41,10 +41,10 @@ Current merged main:
 - `62843de` completes the Data Source Health readiness phase normalization workflow fix.
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to minimal review-only implementation.
 - `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and source-of-truth updates.
-- This verification package confirms compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
-- This visual closure package records environment-limited visual verification: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
+- `85e8182` confirms Data Source Health runtime wiring verification: compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
+- `c6b35b5` records Data Source Health visual closure with environment-limited evidence: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
 - Any B-risk workflow usability hotfix is workflow-only history in this handoff; it does not change business capability or the current next action.
-- Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice after this closure package is accepted; completed minimal runtime slices are 8.
+- Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice on merged main; completed minimal runtime slices are 8.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
