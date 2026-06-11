@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `2984e48 feat(health): show data source health review-only status`.
-- Active stop-loss track: `Data Source Health Dashboard/API Status Visual Verification / Closure`.
+- Current HEAD: `85e8182 docs(health): verify data source health runtime wiring`.
+- Active stop-loss track: `Next minimal runtime slice selection after Data Source Health closure`.
 - Selected target: `Data Source Health dashboard/API status`.
-- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`.
-- Selected next minimal runtime slice: `Data Source Health dashboard/API status`.
-- Next required action: `Data Source Health Dashboard/API Status Visual Verification / Closure`.
+- Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`.
+- Selected next minimal runtime slice: pending selection.
+- Next required action: `Next minimal runtime slice selection`.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -42,8 +42,9 @@ Current merged main:
 - `9290c1b` completes the Data Source Health implementation readiness gate and returns GO to minimal review-only implementation.
 - `2984e48` completes the Data Source Health implementation package with one minimal read-only `/api/dashboard/data-source-health-status` endpoint, dashboard `dataSourceHealthStatusPanel`, targeted `DashboardControllerTest` coverage, and source-of-truth updates.
 - This verification package confirms compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
-- This B-risk workflow usability hotfix is workflow-only: it fixes B-risk false positives for negative safety assertions, Codex CLI failure fallback output, and dirty work packaging. It does not change business capability.
-- Data Source Health is not yet a completed runtime slice; visual closure is still required and completed minimal runtime slices remain 7.
+- This visual closure package records environment-limited visual verification: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
+- Any B-risk workflow usability hotfix is workflow-only history in this handoff; it does not change business capability or the current next action.
+- Data Source Health dashboard/API status is now the eighth completed Review-Only Runtime partial slice after this closure package is accepted; completed minimal runtime slices are 8.
 - Next Minimal Runtime Slice Selection After Review / Replay Closure selects `Data Source Health dashboard/API status` as the next source-read target.
 - Package count is not progress; future movement must reduce duplicate skeletons or move an existing Cursor-era service/runtime/dashboard/API path toward `REVIEW_ONLY_RUNTIME`.
 - `0c7d4d4 feat(decision): show review-only runtime status (#876)`
@@ -244,13 +245,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Data Source Health Dashboard/API Status Visual Verification / Closure`.
+- Current active block is `Next minimal runtime slice selection after Data Source Health closure`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
-- Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, and `Review / Replay result status`, all `REVIEW_ONLY_RUNTIME partial`.
-- Selected next minimal runtime slice is `Data Source Health dashboard/API status`.
-- The next required action is `Data Source Health Dashboard/API Status Visual Verification / Closure`.
+- Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, and `Data Source Health dashboard/API status`, all `REVIEW_ONLY_RUNTIME partial`.
+- Selected next minimal runtime slice is pending selection.
+- The next required action is `Next minimal runtime slice selection`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
