@@ -37,7 +37,7 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `2778b82 docsworkflow: implementation readiness gate for ruleconfig runtime audit / rule explainability`
+- Current merged main: `b298ee9 docs(ruleconfig): verify implementation readiness`
 - Current active block: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from this RuleConfig readiness gate: none. Data Source Health dashboard/API status remains the 8th completed review-only runtime partial slice; RuleConfig runtime audit / rule explainability is not implemented; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
@@ -83,7 +83,7 @@ The following do not count as completed:
 - `5903409` completes Source Read for RuleConfig runtime audit / rule explainability. It confirms existing RuleConfig / Watchlist owner assets, the current Watchlist status panel/API pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only, with no implementation and no capability movement.
 - `b4497e1` completes the V1 Operator One-Command Orchestrator workflow-only package; it does not execute RuleConfig design and does not change business capability.
 - `2778b82` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design on main. It preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, and readiness checklist, and returns GO to implementation readiness gate without implementation.
-- RuleConfig runtime audit / rule explainability implementation readiness gate is completed in the current readiness package. It returns GO for one minimal read-only `RuleController` `Map` status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
+- `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main. It returns GO for one minimal read-only `RuleController` `Map` status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - Current active package after this readiness handoff is `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation`. It may implement only the scoped read-only RuleController/dashboard/tests slice above.
 
 ## Runtime Slice History
@@ -138,7 +138,7 @@ DecisionResult chain history:
 - Data Source Health visual closure is completed on main as `c6b35b5`; it is the eighth completed review-only runtime partial slice.
 - Source Read for RuleConfig runtime audit / rule explainability is completed on main as `5903409` and returned GO to design only.
 - Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design is completed on main as `2778b82` and returns GO to implementation readiness gate.
-- RuleConfig runtime audit / rule explainability implementation readiness gate is completed in the current readiness package and returns GO to minimal implementation.
+- RuleConfig runtime audit / rule explainability implementation readiness gate is completed on main as `b298ee9` and returns GO to minimal implementation.
 - Current active package is Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.

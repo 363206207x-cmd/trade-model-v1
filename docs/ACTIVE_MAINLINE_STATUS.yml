@@ -1,4 +1,4 @@
-current_head: "2778b82"
+current_head: "b298ee9"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
 active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation"
@@ -93,7 +93,7 @@ next_minimal_runtime_slice_selection_after_data_source_health_status: "selection
 ruleconfig_runtime_audit_rule_explainability_source_read_status: "completed on main as 5903409; confirms RuleConfig / Watchlist owner assets, dashboard watchlist status panel, RuleVersionLog adjacent audit chain, and gaps; returns GO to design only without implementation or capability movement"
 v1_operator_one_command_orchestrator_status: "completed on main as b4497e1; workflow-only orchestration improvement adds scripts/v1-operator.sh as the preferred terminal entry, fixes dirty package branch detection, and preserves the next business action without changing capability"
 minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_design_status: "completed on main as 2778b82; preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, readiness checklist, and returns GO to implementation readiness gate without implementation"
-ruleconfig_runtime_audit_rule_explainability_implementation_readiness_gate_status: "completed in this readiness-gate package; returns GO for one minimal read-only RuleController Map status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets; keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360"
+ruleconfig_runtime_audit_rule_explainability_implementation_readiness_gate_status: "completed on main as b298ee9; returns GO for one minimal read-only RuleController Map status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets; keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360"
 source_of_truth_files:
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_MINIMAL_REVIEW_ONLY_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_RUNTIME_WIRING_DESIGN.md

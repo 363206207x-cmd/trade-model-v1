@@ -1,4 +1,4 @@
-current_main: "2778b82 docsworkflow: implementation readiness gate for ruleconfig runtime audit / rule explainability"
+current_main: "b298ee9 docs(ruleconfig): verify implementation readiness"
 active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation"
 phase: "implementation"
 module: "RuleConfig runtime audit / rule explainability"
