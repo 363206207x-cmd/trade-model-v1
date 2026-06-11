@@ -1,14 +1,14 @@
-current_head: "e568ded"
+current_head: "a8acc70"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure"
-active_block_cn: "规则配置运行时审计 / 规则解释视觉验证 / 收口"
-current_phase: "visual_closure"
+active_block: "Next minimal runtime slice selection after RuleConfig closure"
+active_block_cn: "规则配置闭环后的下一个最小运行时模块选择"
+current_phase: "selection"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "ruleconfig-runtime-audit-rule-explainability-visual-verification-closure"
-merge_rule: "A-risk visual closure after RuleConfig runtime audit / rule explainability verification; allow only visual verification docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, review result generation, RuleVersionLog as current status owner, /api/rule/reload status path, P359, or P360"
-next_required_action: "RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure"
+current_branch: "next-minimal-runtime-slice-selection-after-ruleconfig"
+merge_rule: "A-risk selection after RuleConfig runtime audit / rule explainability visual closure; allow only selection docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, replay execution, review result generation, P359, or P360"
+next_required_action: "Next minimal runtime slice selection"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -95,10 +95,11 @@ v1_operator_one_command_orchestrator_status: "completed on main as b4497e1; work
 minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_design_status: "completed on main as 2778b82; preserves the existing RuleConfig / Watchlist owner path, keeps RuleVersionLog as context-only audit evidence, defines review-only status mapping, dashboard/API boundary, fail-closed rules, readiness checklist, and returns GO to implementation readiness gate without implementation"
 ruleconfig_runtime_audit_rule_explainability_implementation_readiness_gate_status: "completed on main as b298ee9; returns GO for one minimal read-only RuleController Map status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets; keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360"
 minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_implementation_status: "completed on main as abc9d40; adds one minimal read-only /api/rule/config-audit-status endpoint, dashboard ruleConfigAuditStatusPanel, RuleControllerTest and DashboardControllerTest coverage, and source-of-truth updates over existing RuleConfig / Watchlist assets without DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360; RuleConfig still requires verification before becoming a completed runtime slice"
-minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_verification_status: "completed on main as 028c598; verifies workflow contract, compile, test-compile, RuleControllerTest 9 tests, DashboardControllerTest 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and git diff --check; RuleConfig still requires visual closure before becoming a completed runtime slice"
-v1_eliminate_baseline_sync_packages_status: "active workflow-only fix; removes baseline sync packages from the normal flow by treating actual clean synced main HEAD as the effective execution baseline and letting the next business package update source-of-truth opportunistically; does not change business capability"
-ruleconfig_runtime_audit_rule_explainability_visual_verification_closure_status: "active handoff; visually verify dashboard ruleConfigAuditStatusPanel visibility, safety copy, RuleVersionLog context-only copy, /api/rule/reload boundary copy, layout, and no Push / Candidate generation / Decision generation / Point / trading semantics"
+minimal_review_only_ruleconfig_runtime_audit_rule_explainability_runtime_wiring_verification_status: "completed on main as 028c598; verifies workflow contract, compile, test-compile, RuleControllerTest 9 tests, DashboardControllerTest 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and git diff --check; visual closure is completed by this package when merged"
+v1_eliminate_baseline_sync_packages_status: "completed on main as a8acc70; removes baseline sync packages from the normal flow by treating actual clean synced main HEAD as the effective execution baseline and letting the next business package update source-of-truth opportunistically; does not change business capability"
+ruleconfig_runtime_audit_rule_explainability_visual_verification_closure_status: "completed by this package when merged; environment-limited visual closure confirms ruleConfigAuditStatusPanel DOM/copy/safety copy, RuleVersionLog context-only copy, /api/rule/reload boundary copy, and no Push / Candidate generation / Decision generation / Point / trading semantics; live Spring Boot bind and Browser backend were unavailable in the sandbox"
 source_of_truth_files:
+  - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_VISUAL_VERIFICATION_CLOSURE.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_RUNTIME_WIRING_VERIFICATION.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_RUNTIME_WIRING_IMPLEMENTATION.md
   - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_IMPLEMENTATION_READINESS_GATE.md

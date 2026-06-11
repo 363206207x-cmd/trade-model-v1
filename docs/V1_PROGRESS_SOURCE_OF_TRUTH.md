@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `e568ded docs(ruleconfig): sync verification baseline`
-- Current active block: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`
+- Current merged main: `a8acc70 chore(workflow): eliminate baseline sync packages`
+- Current active block: `Next minimal runtime slice selection after RuleConfig closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this RuleConfig verification package: verification only. RuleConfig runtime audit / rule explainability has implementation wiring and verification, but is not visually closed yet. Data Source Health dashboard/API status remains the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`
+- Capability movement from the RuleConfig visual closure package: environment-limited visual closure only. RuleConfig runtime audit / rule explainability has implementation wiring, verification, and visual closure evidence; it is now the 9th completed review-only runtime partial slice after this package is accepted. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
+- Next required action: `Next minimal runtime slice selection`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -79,7 +79,7 @@ The following do not count as completed:
 - `85e8182` completes Data Source Health runtime wiring verification: compile, test-compile, `DashboardControllerTest` 45 tests, MockMvc/template endpoint-dashboard behavior, forbidden semantics grep, forbidden path check, and `git diff --check` all passed. Live HTTP smoke was attempted but sandbox socket bind was blocked with `Operation not permitted`.
 - `c6b35b5` completes Data Source Health visual closure with environment-limited evidence: `dataSourceHealthStatusPanel` DOM/copy/safety copy are present, no live screenshot or live UI smoke success is claimed, review-only/fail-closed/not executable semantics are clear, and no Push / Candidate generation / Decision generation / Point / trading action semantics are present.
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Data Source Health business behavior and is not the current active package.
-- Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice on merged main. The completed review-only runtime slice count is 8.
+- Data Source Health dashboard/API status is the 8th completed review-only runtime partial slice on merged main; RuleConfig runtime audit / rule explainability becomes the 9th completed review-only runtime partial slice after this closure package is accepted.
 - `d9f7817` completes the V1 status summary accuracy fix. It aligns the workflow/status reporting baseline after Data Source Health visual closure and does not change business capability.
 - `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target after eight completed review-only runtime slices.
 - `5903409` completes Source Read for RuleConfig runtime audit / rule explainability. It confirms existing RuleConfig / Watchlist owner assets, the current Watchlist status panel/API pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only, with no implementation and no capability movement.
@@ -88,8 +88,10 @@ The following do not count as completed:
 - `b298ee9` completes RuleConfig runtime audit / rule explainability implementation readiness gate on main. It returns GO for one minimal read-only `RuleController` `Map` status endpoint plus minimal dashboard status/copy/DOM and targeted tests over existing RuleConfig / Watchlist owner assets. It keeps RuleVersionLog context-only, disabled-vs-missing ambiguity partial/fail-closed, and forbids DTO/Validator/Assembler, schema/service ownership, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, and P360.
 - `abc9d40` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation on main. It adds one minimal read-only `/api/rule/config-audit-status` endpoint, dashboard `ruleConfigAuditStatusPanel`, targeted `RuleControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing RuleConfig / Watchlist owner assets. It does not add DTO/Validator/Assembler, schema/config/pom, Push, Candidate generation, Decision generation, Point, trading, replay execution, review result generation, P359, or P360.
 - `028c598` completes Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification on main. It verifies workflow contract, compile, test-compile, targeted `RuleControllerTest` 9 tests, targeted `DashboardControllerTest` 46 tests, MockMvc/template endpoint-dashboard behavior, RuleConfig owner path, Watchlist key status, RuleVersionLog context-only boundary, forbidden semantics grep, forbidden path check, and source-of-truth alignment.
-- `e568ded` is the last baseline sync package before baseline sync packages are removed from the normal workflow. After this workflow fix, clean / synced main with no open PR uses actual HEAD as the effective execution baseline, and the next business package updates source-of-truth opportunistically.
-- Current active package after this verification is `RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure`. It may add only visual verification docs and source-of-truth updates.
+- `e568ded` is the last baseline sync package before baseline sync packages are removed from the normal workflow.
+- `a8acc70` completes V1 Eliminate Baseline Sync Packages; clean / synced main with no open PR now uses actual HEAD as the effective execution baseline, and the next business package updates source-of-truth opportunistically.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `ruleConfigAuditStatusPanel` DOM/copy/safety copy, RuleVersionLog context-only copy, `/api/rule/reload` boundary copy, and no Push / Candidate generation / Decision generation / Point / trading semantics. Live Spring Boot bind and Browser backend were unavailable in the sandbox, so no live screenshot or live UI smoke success is claimed.
+- Current active package after this visual closure is `Next minimal runtime slice selection after RuleConfig closure`. It may add only selection docs and source-of-truth updates.
 
 ## Runtime Slice History
 
@@ -103,6 +105,7 @@ Completed review-only runtime slices:
 6. `ExecutionPlan / BoundaryCandidate review-only runtime status`: `REVIEW_ONLY_RUNTIME partial`
 7. `Review / Replay result status`: `REVIEW_ONLY_RUNTIME partial`
 8. `Data Source Health dashboard/API status`: `REVIEW_ONLY_RUNTIME partial`
+9. `RuleConfig runtime audit / rule explainability`: `REVIEW_ONLY_RUNTIME partial`
 
 DecisionResult chain history:
 
@@ -146,7 +149,7 @@ DecisionResult chain history:
 - RuleConfig runtime audit / rule explainability implementation readiness gate is completed on main as `b298ee9` and returns GO to minimal implementation.
 - Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Implementation is completed on main as `abc9d40`.
 - Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Verification is completed on main as `028c598`.
-- Current active package is RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure.
+- RuleConfig Runtime Audit / Rule Explainability Visual Verification / Closure is completed by this package when merged; current active package is Next minimal runtime slice selection after RuleConfig closure.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
