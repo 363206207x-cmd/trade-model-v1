@@ -37,11 +37,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `d9f7817 chore(workflow): fix status summary baseline`
-- Current active block: `Source Read for RuleConfig runtime audit / rule explainability`
+- Current merged main: `ed6def3 docs(runtime): select ruleconfig audit next slice`
+- Current active block: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
 - Capability movement from the merged Data Source Health visual closure: Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice; overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring
-- Next required action: `Source Read for RuleConfig runtime audit / rule explainability`
+- Next required action: `Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -79,7 +79,8 @@ The following do not count as completed:
 - Any B-risk workflow usability hotfix is workflow tooling history only in this handoff. It does not change Data Source Health business behavior and is not the current active package.
 - Data Source Health dashboard/API status is now the 8th completed review-only runtime partial slice on merged main. The completed review-only runtime slice count is 8.
 - `d9f7817` completes the V1 status summary accuracy fix. It aligns the workflow/status reporting baseline after Data Source Health visual closure and does not change business capability.
-- This selection package chooses `RuleConfig runtime audit / rule explainability` as the next source-read-only target after eight completed review-only runtime slices. It may add only selection docs and source-of-truth updates.
+- `ed6def3` completes Next Minimal Runtime Slice Selection After Data Source Health Closure and selects `RuleConfig runtime audit / rule explainability` as the next source-read-only target after eight completed review-only runtime slices.
+- This source-read package confirms existing RuleConfig / Watchlist owner assets, the current Watchlist status panel/API pattern, adjacent RuleVersionLog audit context, and generic RuleConfig audit/explainability gaps; it returns GO to design only, with no implementation and no capability movement.
 
 ## Runtime Slice History
 
@@ -131,7 +132,7 @@ DecisionResult chain history:
 - Data Source Health implementation is completed on main as `2984e48`.
 - Data Source Health runtime wiring verification is completed on main as `85e8182`.
 - Data Source Health visual closure is completed on main as `c6b35b5`; it is the eighth completed review-only runtime partial slice.
-- Current active package is Source Read for RuleConfig runtime audit / rule explainability.
+- Current active package is Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 

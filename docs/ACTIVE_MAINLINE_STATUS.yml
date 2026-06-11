@@ -1,14 +1,14 @@
-current_head: "d9f7817"
+current_head: "ed6def3"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Source Read for RuleConfig runtime audit / rule explainability"
-active_block_cn: "规则配置运行时审计 / 规则解释源码读取"
-current_phase: "source_read"
+active_block: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design"
+active_block_cn: "规则配置运行时审计 / 规则解释最小只读运行时接线设计"
+current_phase: "design"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "ruleconfig-runtime-audit-rule-explainability-source-read"
-merge_rule: "A-risk source-read after Data Source Health dashboard/API status visual closure and next-slice selection; allow only source-read docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
-next_required_action: "Source Read for RuleConfig runtime audit / rule explainability"
+current_branch: "minimal-review-only-ruleconfig-runtime-audit-rule-explainability-design"
+merge_rule: "A-risk design after RuleConfig runtime audit / rule explainability source-read returns GO; allow only design docs and source-of-truth updates; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler, P359, or P360"
+next_required_action: "Minimal Review-Only RuleConfig Runtime Audit / Rule Explainability Runtime Wiring Design"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -90,7 +90,9 @@ data_source_health_dashboard_api_status_visual_verification_closure_status: "com
 v1_b_risk_workflow_usability_fix_status: "workflow-only hotfix history if present; not the current active business package and does not change business capability"
 v1_status_summary_accuracy_fix_status: "completed on main as d9f7817; workflow/status reporting fix only, aligns current main baseline and completed slice count without changing business capability"
 next_minimal_runtime_slice_selection_after_data_source_health_status: "selection package selects RuleConfig runtime audit / rule explainability as the next source-read-only target after eight REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
+ruleconfig_runtime_audit_rule_explainability_source_read_status: "completed in this source-read package; confirms RuleConfig / Watchlist owner assets, dashboard watchlist status panel, RuleVersionLog adjacent audit chain, and gaps; returns GO to design only without implementation or capability movement"
 source_of_truth_files:
+  - docs/V1_RULECONFIG_RUNTIME_AUDIT_RULE_EXPLAINABILITY_SOURCE_READ.md
   - docs/V1_NEXT_MINIMAL_RUNTIME_SLICE_SELECTION_AFTER_DATA_SOURCE_HEALTH.md
   - docs/V1_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_SOURCE_READ.md
   - docs/V1_MINIMAL_REVIEW_ONLY_DATA_SOURCE_HEALTH_DASHBOARD_API_STATUS_RUNTIME_WIRING_DESIGN.md
