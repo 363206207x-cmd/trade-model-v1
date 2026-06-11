@@ -1,14 +1,14 @@
-current_head: "452a8ac"
+current_head: "09f6a9c"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Missed Opportunity / Review Archive Status Visual Verification / Closure"
-active_block_cn: "错失机会 / 复盘归档状态视觉验证 / 收口"
-current_phase: "visual_closure"
+active_block: "Next minimal runtime slice selection after Missed Opportunity / Review Archive closure"
+active_block_cn: "错失机会 / 复盘归档状态闭环后的下一个最小运行时模块选择"
+current_phase: "selection"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "missed-opportunity-review-archive-status-visual-verification-closure"
-merge_rule: "A-risk visual closure after Missed Opportunity / Review Archive status verification; allow visual verification docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck execution, missed-opportunity generation/write behavior, review result generation, P359, or P360"
-next_required_action: "Missed Opportunity / Review Archive Status Visual Verification / Closure"
+current_branch: "next-minimal-runtime-slice-selection-after-missed-opportunity-review-archive"
+merge_rule: "A-risk selection after Missed Opportunity / Review Archive status visual closure; allow selection docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, external API refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck execution, missed-opportunity generation/write behavior, review result generation, P359, or P360"
+next_required_action: "Next minimal runtime slice selection after Missed Opportunity / Review Archive closure"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -104,8 +104,10 @@ missed_opportunity_review_archive_status_source_read_status: "completed on main 
 minimal_review_only_missed_opportunity_review_archive_status_runtime_wiring_design_status: "completed on main as 83f191e; preserves existing MissedOpportunity / ReviewAggregate / dashboard missed-count owner path, defines review-only status mapping, dashboard/API boundary, fail-closed rules, generation/write exclusions, readiness checklist, and returns GO to implementation readiness gate without implementation or capability movement"
 missed_opportunity_review_archive_status_implementation_readiness_gate_status: "completed on main as ed7faeb; returns GO for one minimal read-only status endpoint or existing status path reuse, minimal dashboard status/copy/DOM, targeted tests, implementation docs, and source-of-truth updates over existing MissedOpportunity / ReviewAggregate / dashboard-count assets; next implementation is B-risk and remains review-only"
 minimal_review_only_missed_opportunity_review_archive_status_runtime_wiring_implementation_status: "completed on main as 452a8ac; adds one minimal read-only /api/missed-opportunity/review-archive-status endpoint, dashboard missedArchiveStatusPanel, targeted MissedOpportunityControllerTest and DashboardControllerTest coverage, and source-of-truth updates without DTO/Validator/Assembler, schema/config/pom, external refresh, scheduler/collector/API client trigger, Push, Candidate generation, Decision generation, Point, trading, replay/recheck execution, missed-opportunity generation/write behavior, review result generation, P359, or P360"
-minimal_review_only_missed_opportunity_review_archive_status_runtime_wiring_verification_status: "completed by this package when merged; verifies workflow contract, compile, test-compile, full tests, MissedOpportunityControllerTest, DashboardControllerTest, endpoint/dashboard status mapping, safety fields, forbidden semantics classification, source-of-truth baseline 452a8ac, and no Java/test/dashboard/schema/config/pom edits"
+minimal_review_only_missed_opportunity_review_archive_status_runtime_wiring_verification_status: "completed on main as 09f6a9c; verifies workflow contract, compile, test-compile, full tests, MissedOpportunityControllerTest, DashboardControllerTest, endpoint/dashboard status mapping, safety fields, forbidden semantics classification, source-of-truth baseline 452a8ac, and no Java/test/dashboard/schema/config/pom edits"
+missed_opportunity_review_archive_status_visual_verification_closure_status: "completed by this package when merged; environment-limited visual closure confirms missedArchiveStatusPanel DOM/copy/safety copy, review-only/fail-closed/not trading/not candidate/not decision generation/not point/not executable boundaries, no replay/recheck execution, no missed-opportunity generation/write behavior, no review result generation, and no Push / Candidate generation / Decision generation / Point / trading semantics; Missed Opportunity / Review Archive status becomes the 10th completed REVIEW_ONLY_RUNTIME partial slice"
 source_of_truth_files:
+  - docs/V1_MISSED_OPPORTUNITY_REVIEW_ARCHIVE_STATUS_VISUAL_VERIFICATION_CLOSURE.md
   - docs/V1_MISSED_OPPORTUNITY_REVIEW_ARCHIVE_STATUS_RUNTIME_WIRING_VERIFICATION.md
   - docs/V1_MINIMAL_REVIEW_ONLY_MISSED_OPPORTUNITY_REVIEW_ARCHIVE_STATUS_RUNTIME_WIRING_IMPLEMENTATION.md
   - docs/V1_MISSED_OPPORTUNITY_REVIEW_ARCHIVE_STATUS_RUNTIME_WIRING_IMPLEMENTATION_READINESS_GATE.md
