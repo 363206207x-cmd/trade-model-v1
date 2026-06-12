@@ -5,15 +5,17 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `1a83f6b docs(review): record review archive aggregate visual closure`
+- Current merged main: `b1f9e66 docs(runtime): select runtime readiness guardrail next slice`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Source Read for Runtime readiness / system guardrail status`.
-- Current next required action is `Source Read for Runtime readiness / system guardrail status`.
+- Current active block is `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`.
+- Current next required action is `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`.
+- `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status`.
+- Source Read for Runtime readiness / system guardrail status is completed by this package when merged: it inventories `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, dashboard summary/system surfaces, and existing tests; it identifies dedicated status contract/dashboard panel gaps and returns GO to design only.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.

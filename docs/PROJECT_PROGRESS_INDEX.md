@@ -6,12 +6,14 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `1a83f6b docs(review): record review archive aggregate visual closure`.
-- Active stop-loss track: `Source Read for Runtime readiness / system guardrail status`.
+- Current HEAD: `b1f9e66 docs(runtime): select runtime readiness guardrail next slice`.
+- Active stop-loss track: `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`.
 - Selected target: `Runtime readiness / system guardrail status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, `Paper Observation / Paper Trading Status review-only status`, and `Review Archive Analytics / Missed Opportunity Aggregate Status`.
 - Selected next minimal runtime slice: `Runtime readiness / system guardrail status`.
-- Next required action: `Source Read for Runtime readiness / system guardrail status`.
+- Next required action: `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`.
+- `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status`.
+- Source Read for Runtime readiness / system guardrail status is completed by this package when merged. It confirms existing `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, `DashboardSummaryResponseVO`, dashboard system surfaces, and existing dashboard summary tests; identifies missing dedicated readiness/guardrail status endpoint/panel; and returns GO to design only.
 - Previous SourceTrace / RuntimeKline / DataQuality / MultiTimeframe source read is completed on main as `f4a274a`; it confirms the existing `/api/dashboard/detail` SourceTrace / RuntimeKline owner path, persisted OHLCV readiness read path, dashboard diagnostics, and tests, and returns GO to design only.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design is completed on main as `2ae6a4c`; it fixes owner path, optional endpoint boundary, status mapping, fail-closed rules, frozen source-binding exclusions, and no-refresh / no-generation / no-trading boundaries.
 - Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `dec084b`; it returns GO to B-risk minimal implementation over the existing dashboard detail owner path and keeps the implementation boundary narrow.

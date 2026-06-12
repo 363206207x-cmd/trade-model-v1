@@ -39,11 +39,13 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `1a83f6b docs(review): record review archive aggregate visual closure`
-- Current active block: `Source Read for Runtime readiness / system guardrail status`
+- Current merged main: `b1f9e66 docs(runtime): select runtime readiness guardrail next slice`
+- Current active block: `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this selection package: none. Review Archive Analytics / Missed Opportunity Aggregate Status is the 15th completed review-only runtime partial slice on merged main, and the overall capability level remains `REVIEW_ONLY_RUNTIME partial`.
-- Next required action: `Source Read for Runtime readiness / system guardrail status`
+- Capability movement from this source-read package: none. Review Archive Analytics / Missed Opportunity Aggregate Status remains the 15th completed review-only runtime partial slice on merged main, and the overall capability level remains `REVIEW_ONLY_RUNTIME partial`.
+- Next required action: `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`
+- `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status` as the next source-read-only target after fifteen completed review-only runtime slices.
+- Source Read for Runtime readiness / system guardrail status is completed by this package when merged. It confirms existing `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, `DashboardSummaryResponseVO`, and dashboard system surfaces; identifies missing dedicated readiness/guardrail status contract and panel; and returns GO to design only without implementation or capability movement.
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
