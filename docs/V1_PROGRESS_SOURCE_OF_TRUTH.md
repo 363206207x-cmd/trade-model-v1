@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `f579b24 docs(runtime): record source trace data quality visual closure`
-- Current active block: `Source Read for Paper Observation / Paper Trading Status review-only status`
+- Current merged main: `df05213 docs(runtime): select paper observation status next slice`
+- Current active block: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this A-risk selection package: none. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is already the 13th completed review-only runtime partial slice on main as `f579b24`; this package only selects the next source-read target. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
-- Next required action: `Source Read for Paper Observation / Paper Trading Status review-only status`
+- Capability movement from this A-risk source-read package: none. Paper Observation / Paper Trading Status source read confirms existing display owner assets only; it does not complete a new runtime slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -211,7 +211,8 @@ DecisionResult chain history:
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation is completed on main as `71a8e2e`.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`.
 - SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`.
-- Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure is completed by this package when merged and selects `Paper Observation / Paper Trading Status review-only status` as the 14th source-read-only target.
+- Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure is completed on main as `df05213` and selects `Paper Observation / Paper Trading Status review-only status` as the 14th source-read-only target.
+- Source Read for Paper Observation / Paper Trading Status review-only status is completed by this package when merged. It confirms `PaperObservationDisplayAdapter`, `DefaultPaperObservationDisplayAdapter`, `DashboardDetailResponseVO.PaperObservationDisplayVO`, `DashboardController.dashboardDetail`, dashboard Paper Observation display, adapter tests, VO tests, controller wiring, and historical API smoke docs. It returns GO to design only and does not implement paper order, paper PnL, simulated execution, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, Push, order/execution, or trading.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 

@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Source Read for Paper Observation / Paper Trading Status review-only status`.
+- Active track: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design`.
 - Selected target: `Paper Observation / Paper Trading Status review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, and `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
 - Selected next minimal runtime slice: `Paper Observation / Paper Trading Status review-only status`.
-- Next required action: `Source Read for Paper Observation / Paper Trading Status review-only status`.
+- Next required action: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -79,7 +79,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation is completed on main as `71a8e2e`. It adds one minimal read-only `/api/dashboard/source-runtime-data-quality-status` endpoint, dashboard `sourceRuntimeDataQualityStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`. It verifies the endpoint/dashboard review-only behavior, safety fields, fail-closed/review-only states, refresh/generation boundary, tests, forbidden semantics classification, and source-of-truth alignment.
 - SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24` with environment-limited evidence. `sourceRuntimeDataQualityStatusPanel` DOM/copy/safety copy is present, refresh/generation boundaries are negative-only, no live UI success is claimed, and no refresh / generation / Candidate / Decision generation / Point / Push / trading semantics are present. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is the 13th completed Review-Only Runtime partial slice.
-- Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure selects `Paper Observation / Paper Trading Status review-only status` as the next source-read-only target when this package is merged.
+- Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure is completed on main as `df05213` and selects `Paper Observation / Paper Trading Status review-only status` as the next source-read-only target.
+- Source Read for Paper Observation / Paper Trading Status review-only status is completed by this package when merged. It confirms existing PaperObservation display owner assets and returns GO to design only; Paper Observation / Paper Trading status is not yet a completed runtime slice.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.
