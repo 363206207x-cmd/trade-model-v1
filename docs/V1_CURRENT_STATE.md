@@ -5,15 +5,16 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `614cd49 docs(runtime): verify hot reset event source status`
+- Current merged main: `9e9fd2f docs(runtime): close hot reset event source visual verification`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Next minimal runtime slice selection after Hot Reset / Event Impact Source closure`.
-- Current next required action is `Next minimal runtime slice selection after Hot Reset / Event Impact Source closure`.
+- Current active block is `Source Read for AI conflict / AI role convergence read-only status`.
+- Current next required action is `Source Read for AI conflict / AI role convergence read-only status`.
+- Next Minimal Runtime Slice Selection After Hot Reset / Event Impact Source Closure is completed by this package when merged. It selects `AI conflict / AI role convergence read-only status` as the next source-read-only target, narrowed from Three AI / AI conflict to existing AI conflict / DecisionResult / dashboard / review-page read-model assets only. It does not authorize Three AI provider orchestration, external AI calls, final arbiter behavior, Decision generation, final direction, entry/stop/TP/RR, Candidate generation, Point, Push, external channel, Recheck/Replay, order/execution, trading, Position Monitor execution, new skeleton owners, schema/config/pom, P359, or P360.
 - `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status`.
 - Source Read for Runtime readiness / system guardrail status is completed on main as `c5aba1a`: it inventories `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, dashboard summary/system surfaces, and existing tests; it identifies dedicated status contract/dashboard panel gaps and returns GO to design only.
 - `f6cc925` completes Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design: it reuses existing system health / run-baseline / runtime metric owner paths, defines review-only status mapping, fail-closed rules, safety fields, readiness/authorization boundary, dashboard/API options, and returns GO to implementation readiness gate only without implementation or capability movement.
