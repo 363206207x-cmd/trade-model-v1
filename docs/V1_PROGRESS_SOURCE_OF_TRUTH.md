@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `172a5c9 feat(paper): show paper observation review-only status`
-- Current active block: `Paper Observation / Paper Trading Status Visual Verification / Closure`
+- Current merged main: `4660534 docs(paper): verify paper observation runtime wiring`
+- Current active block: `Next minimal runtime slice selection after Paper Observation / Paper Trading Status closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this A-risk verification package: none. Paper Observation / Paper Trading Status implementation is now merged and verified as a review-only endpoint/panel over existing owner assets; it does not complete a new runtime slice until visual closure is merged. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
-- Next required action: `Paper Observation / Paper Trading Status Visual Verification / Closure`
+- Capability movement from this A-risk visual closure package: none. Paper Observation / Paper Trading Status is now closed as the 14th completed review-only runtime partial slice, but the overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Next minimal runtime slice selection after Paper Observation / Paper Trading Status closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -121,7 +121,8 @@ The following do not count as completed:
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`. It verifies the read-only endpoint, dashboard panel, safety fields, fail-closed/review-only status mapping, `DashboardControllerTest`, full tests, forbidden semantics classification, and source-of-truth alignment from `dec084b` to `71a8e2e`.
 - SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`. Environment-limited evidence confirms `sourceRuntimeDataQualityStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not scheduler/not collector/not API-client refresh/not external refresh/not source-binding generation/not Candidate/not Decision generation/not Point/not final direction/not entry-stop-TP-RR/not trading/not executable boundaries, no live UI success is claimed, and no refresh / generation / Candidate / Decision generation / Point / Push / trading semantics are present. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is the 13th completed `REVIEW_ONLY_RUNTIME partial` slice.
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed on main as `172a5c9`. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets. It does not add DTO / Validator / Assembler / Orchestrator, schema/config/pom, service/domain/mapper/repository ownership family, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, final direction, entry / stop / TP / RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, or P360.
-- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed by this package when merged. It verifies `/api/dashboard/paper-observation-status`, `paperObservationStatusPanel`, safety fields, fail-closed/review-only states, paper execution boundary, `DashboardControllerTest`, full tests, forbidden semantics classification, and source-of-truth alignment from `3a281e4` to `172a5c9` without Java/test/dashboard/schema/config/pom changes.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed on main as `4660534`. It verifies `/api/dashboard/paper-observation-status`, `paperObservationStatusPanel`, safety fields, fail-closed/review-only states, paper execution boundary, `DashboardControllerTest`, full tests, forbidden semantics classification, and source-of-truth alignment from `3a281e4` to `172a5c9` without Java/test/dashboard/schema/config/pom changes.
+- Paper Observation / Paper Trading Status Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `paperObservationStatusPanel` DOM/copy/safety copy, review-only/manual-review/fail-closed/not real position/not trade instruction/not paper order/not simulated execution/not paper PnL/not Position Monitor execution/not Candidate/not Decision generation/not Point/not final direction/not entry-stop-TP-RR/not trading/not executable boundaries, no live UI success is claimed, and no paper execution / Candidate / Decision generation / Point / Push / trading semantics are present. Paper Observation / Paper Trading status is the 14th completed `REVIEW_ONLY_RUNTIME partial` slice.
 
 ## Runtime Slice History
 
@@ -140,6 +141,7 @@ Completed review-only runtime slices:
 11. `RiskActionGuard read-only status`: `REVIEW_ONLY_RUNTIME partial`
 12. `Alert fatigue / notification policy status`: `REVIEW_ONLY_RUNTIME partial`
 13. `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`: `REVIEW_ONLY_RUNTIME partial`
+14. `Paper Observation / Paper Trading Status review-only status`: `REVIEW_ONLY_RUNTIME partial`
 
 DecisionResult chain history:
 
@@ -217,7 +219,8 @@ DecisionResult chain history:
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed on main as `0560ba2`. It selects the existing `/api/dashboard/detail` / `PaperObservationDisplayAdapter` owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement.
 - Implementation readiness gate for Paper Observation / Paper Trading Status review-only status is completed on main as `3a281e4`. It returns GO to B-risk minimal implementation over the existing dashboard detail / PaperObservation display owner path, optional one thin read-only Map endpoint if needed, minimal dashboard status/copy/DOM if needed, targeted tests, implementation docs, and source-of-truth updates. It forbids schema/config/pom, new DTO / Validator / Assembler / Orchestrator, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, final direction, entry / stop / TP / RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, and P360.
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed on main as `172a5c9`. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets. It does not add DTO / Validator / Assembler / Orchestrator, schema/config/pom, service/domain/mapper/repository ownership family, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, final direction, entry / stop / TP / RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, or P360.
-- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed by this package when merged and returns to `Paper Observation / Paper Trading Status Visual Verification / Closure`.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed on main as `4660534` and returns to `Paper Observation / Paper Trading Status Visual Verification / Closure`.
+- Paper Observation / Paper Trading Status Visual Verification / Closure is completed by this package when merged and returns to `Next minimal runtime slice selection after Paper Observation / Paper Trading Status closure`.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
