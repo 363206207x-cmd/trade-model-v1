@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `3a281e4 docs(paper): verify paper observation implementation readiness`.
-- Active stop-loss track: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- Current HEAD: `172a5c9 feat(paper): show paper observation review-only status`.
+- Active stop-loss track: `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - Selected target: `Paper Observation / Paper Trading Status review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, and `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
 - Selected next minimal runtime slice: `Paper Observation / Paper Trading Status review-only status`.
-- Next required action: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- Next required action: `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - Previous SourceTrace / RuntimeKline / DataQuality / MultiTimeframe source read is completed on main as `f4a274a`; it confirms the existing `/api/dashboard/detail` SourceTrace / RuntimeKline owner path, persisted OHLCV readiness read path, dashboard diagnostics, and tests, and returns GO to design only.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design is completed on main as `2ae6a4c`; it fixes owner path, optional endpoint boundary, status mapping, fail-closed rules, frozen source-binding exclusions, and no-refresh / no-generation / no-trading boundaries.
 - Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `dec084b`; it returns GO to B-risk minimal implementation over the existing dashboard detail owner path and keeps the implementation boundary narrow.
@@ -22,7 +22,8 @@ Current merged main:
 - Source Read for Paper Observation / Paper Trading Status review-only status is completed on main as `1625b52`. It confirms the existing PaperObservation display adapter, dashboard detail owner path, dashboard display, tests, and historical API smoke assets; it returns GO to design only without implementation or capability movement.
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed on main as `0560ba2`. It selects the existing `/api/dashboard/detail` / PaperObservation display adapter owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement.
 - Implementation readiness gate for Paper Observation / Paper Trading Status review-only status is completed on main as `3a281e4`. It returns GO to B-risk minimal implementation over the existing dashboard detail / PaperObservation display owner path while forbidding paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, final direction, entry / stop / TP / RR, Push, external channel, order/execution, auto-trading, schema/config/pom, and new DTO / Validator / Assembler / Orchestrator.
-- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed by this package when merged. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets. Verification is still required before visual closure and completed-slice credit.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed on main as `172a5c9`. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed by this package when merged. It verifies endpoint/dashboard review-only behavior, safety fields, fail-closed/review-only states, paper execution boundary, tests, forbidden semantics classification, and source-of-truth alignment. Visual closure is still required before completed-slice credit.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -290,13 +291,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- Current active block is `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, and `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `Paper Observation / Paper Trading Status review-only status`.
-- The next required action is `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- The next required action is `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
