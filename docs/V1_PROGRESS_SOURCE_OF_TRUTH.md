@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `8a4e594 docs(paper): record paper observation visual closure`
-- Current active block: `Source Read for Review Archive Analytics / Missed Opportunity Aggregate Status`
+- Current merged main: `2f535cf docs(runtime): select next slice after paper observation closure`
+- Current active block: `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Design`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this A-risk selection package: none. Paper Observation / Paper Trading Status is closed as the 14th completed review-only runtime partial slice, and the selected next target is source-read only.
-- Next required action: `Source Read for Review Archive Analytics / Missed Opportunity Aggregate Status`
+- Capability movement from this A-risk source-read package: none. Paper Observation / Paper Trading Status remains the 14th completed review-only runtime partial slice, and Review Archive Analytics / Missed Opportunity Aggregate Status has completed source read only.
+- Next required action: `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Design`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -222,7 +222,8 @@ DecisionResult chain history:
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed on main as `172a5c9`. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets. It does not add DTO / Validator / Assembler / Orchestrator, schema/config/pom, service/domain/mapper/repository ownership family, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, final direction, entry / stop / TP / RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, or P360.
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed on main as `4660534` and returns to `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - Paper Observation / Paper Trading Status Visual Verification / Closure is completed on main as `8a4e594` and returns to `Next minimal runtime slice selection after Paper Observation / Paper Trading Status closure`.
-- Next Minimal Runtime Slice Selection After Paper Observation / Paper Trading Status Closure selects `Review Archive Analytics / Missed Opportunity Aggregate Status` as the next source-read-only target.
+- Next Minimal Runtime Slice Selection After Paper Observation / Paper Trading Status Closure is completed on main as `2f535cf` and selects `Review Archive Analytics / Missed Opportunity Aggregate Status` as the next source-read-only target.
+- Source Read for Review Archive Analytics / Missed Opportunity Aggregate Status is completed by this package when merged. It confirms the existing MissedOpportunity read/query/count owner path, `/api/missed-opportunity/review-archive-status`, `ReviewAggregateService` missed summary/detail metadata, review page `sec-missed`, dashboard `missedArchiveStatusPanel`, and targeted tests; it returns GO to design only and does not implement archive analytics, missed opportunity aggregation, missed-opportunity generation/write behavior, review result generation, replay/recheck, Push, Candidate generation, Decision generation, Point, entry/stop/TP/RR, order/execution, auto-trading, DTO/Validator/Assembler/Orchestrator, schema/config/pom, new owner family, P359, or P360.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
