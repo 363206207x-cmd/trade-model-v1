@@ -6,12 +6,12 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `f5e7092 docs(review): read review archive aggregate source path`.
-- Active stop-loss track: `Implementation readiness gate for Review Archive Analytics / Missed Opportunity Aggregate Status`.
+- Current HEAD: `91332b7 docs(review): design review archive aggregate runtime wiring`.
+- Active stop-loss track: `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Implementation`.
 - Selected target: `Review Archive Analytics / Missed Opportunity Aggregate Status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, and `Paper Observation / Paper Trading Status review-only status`.
 - Selected next minimal runtime slice: `Review Archive Analytics / Missed Opportunity Aggregate Status`.
-- Next required action: `Implementation readiness gate for Review Archive Analytics / Missed Opportunity Aggregate Status`.
+- Next required action: `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Implementation`.
 - Previous SourceTrace / RuntimeKline / DataQuality / MultiTimeframe source read is completed on main as `f4a274a`; it confirms the existing `/api/dashboard/detail` SourceTrace / RuntimeKline owner path, persisted OHLCV readiness read path, dashboard diagnostics, and tests, and returns GO to design only.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design is completed on main as `2ae6a4c`; it fixes owner path, optional endpoint boundary, status mapping, fail-closed rules, frozen source-binding exclusions, and no-refresh / no-generation / no-trading boundaries.
 - Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `dec084b`; it returns GO to B-risk minimal implementation over the existing dashboard detail owner path and keeps the implementation boundary narrow.
@@ -27,7 +27,8 @@ Current merged main:
 - Paper Observation / Paper Trading Status Visual Verification / Closure is completed on main as `8a4e594`. Environment-limited evidence confirms `paperObservationStatusPanel` DOM/copy/safety copy and no paper execution / Candidate / Decision generation / Point / Push / trading semantics. Paper Observation / Paper Trading status is the 14th completed Review-Only Runtime partial slice.
 - Next Minimal Runtime Slice Selection After Paper Observation / Paper Trading Status Closure is completed on main as `2f535cf` and selects `Review Archive Analytics / Missed Opportunity Aggregate Status` as the next source-read-only target after fourteen completed review-only runtime partial slices. It keeps capability at `REVIEW_ONLY_RUNTIME partial` and does not implement archive analytics, missed opportunity aggregation, review result generation, replay/recheck, Push, Candidate generation, Decision generation, Point generation, Position Monitor execution, paper execution, order/execution, or trading behavior.
 - Source Read for Review Archive Analytics / Missed Opportunity Aggregate Status is completed on main as `f5e7092`. It confirms the existing MissedOpportunity read/query/count owner path, `/api/missed-opportunity/review-archive-status`, `ReviewAggregateService` missed summary/detail metadata, review page `sec-missed`, dashboard `missedArchiveStatusPanel`, and targeted tests; it returns GO to design only.
-- Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Design is completed by this package when merged. It reuses the existing missed archive status owner path, defines aggregate status mapping, fail-closed rules, generation/execution boundaries, and no-new-owner constraints, and returns GO to implementation readiness gate only.
+- Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Design is completed on main as `91332b7`. It reuses the existing missed archive status owner path, defines aggregate status mapping, fail-closed rules, generation/execution boundaries, and no-new-owner constraints, and returns GO to implementation readiness gate only.
+- Implementation readiness gate for Review Archive Analytics / Missed Opportunity Aggregate Status is completed by this package when merged. It returns GO to B-risk minimal implementation over the existing `/api/missed-opportunity/review-archive-status` and `missedArchiveStatusPanel` owner paths, while keeping generation/write/replay/recheck/Push/Candidate/Point/trading boundaries blocked.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -295,13 +296,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Implementation readiness gate for Review Archive Analytics / Missed Opportunity Aggregate Status`.
+- Current active block is `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Implementation`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, and `Paper Observation / Paper Trading Status review-only status`, all `REVIEW_ONLY_RUNTIME partial`.
 - Selected next minimal runtime slice is `Review Archive Analytics / Missed Opportunity Aggregate Status`.
-- The next required action is `Implementation readiness gate for Review Archive Analytics / Missed Opportunity Aggregate Status`.
+- The next required action is `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Implementation`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.
