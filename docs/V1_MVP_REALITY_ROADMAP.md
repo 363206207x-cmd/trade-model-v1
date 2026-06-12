@@ -4,11 +4,13 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Source Read for Runtime readiness / system guardrail status`.
+- Active track: `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`.
 - Selected target: `Runtime readiness / system guardrail status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, `Paper Observation / Paper Trading Status review-only status`, and `Review Archive Analytics / Missed Opportunity Aggregate Status`.
 - Selected next minimal runtime slice: `Runtime readiness / system guardrail status`.
-- Next required action: `Source Read for Runtime readiness / system guardrail status`.
+- Next required action: `Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design`.
+- `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status`.
+- Source Read for Runtime readiness / system guardrail status is completed by this package when merged: existing `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, dashboard summary/system surfaces, and existing tests are sufficient to proceed to design only; dedicated readiness/guardrail status contract and panel remain design gaps.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
