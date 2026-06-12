@@ -4,12 +4,15 @@ import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceEventSourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
+import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.DecisionService;
@@ -19,6 +22,7 @@ import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.ScoreService;
+import org.example.trademodel.service.SourceTraceEventSourceOwnershipService;
 import org.example.trademodel.service.SystemHealthService;
 import org.example.trademodel.service.dashboard.DefaultDashboardRuntimeKlineContextAdapter;
 import org.example.trademodel.service.dashboard.DefaultDashboardSourceTraceDetailAdapter;
@@ -58,6 +62,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -91,6 +96,10 @@ class DashboardControllerTest {
     private MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
     @Mock
     private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    @Mock
+    private HotResetEventMapper hotResetEventMapper;
+    @Mock
+    private SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService;
     @Mock
     private EvidenceService evidenceService;
     @Mock
@@ -735,6 +744,65 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyHotResetEventImpactSourceStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/hot-reset-event-impact-source-status");
+        assertThat(html).contains("hotResetEventImpactSourceStatusPanel");
+        assertThat(html).contains("hotResetEventSourceStatusValue");
+        assertThat(html).contains("eventImpactSourceStatusValue");
+        assertThat(html).contains("sourceTraceEventSourceOwnershipValue");
+        assertThat(html).contains("hotResetEventCountsValue");
+        assertThat(html).contains("hotResetEventLatestValue");
+        assertThat(html).contains("hotResetEventBoundaryValue");
+        assertThat(html).contains("hotResetExternalBoundaryValue");
+        assertThat(html).contains("hotResetSignalBoundaryValue");
+        assertThat(html).contains("hotResetEventReasonValue");
+        assertThat(html).contains("HotResetEventMapper.selectLatestByAnalysisId/countByAnalysisId");
+        assertThat(html).contains("SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED");
+        assertThat(html).contains("HOT_RESET_EVENT_SOURCE_REVIEW_ONLY_READY");
+        assertThat(html).contains("HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("EVENT_IMPACT_SOURCE_REVIEW_ONLY_READY");
+        assertThat(html).contains("EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("review-only");
+        assertThat(html).contains("manual review only");
+        assertThat(html).contains("fail-closed");
+        assertThat(html).contains("not Hot Reset execution");
+        assertThat(html).contains("not Hot Reset write");
+        assertThat(html).contains("not event generation");
+        assertThat(html).contains("not external API refresh");
+        assertThat(html).contains("not news fetch");
+        assertThat(html).contains("not scheduler trigger");
+        assertThat(html).contains("not collector trigger");
+        assertThat(html).contains("not Push send");
+        assertThat(html).contains("not external channel");
+        assertThat(html).contains("not Recheck execution");
+        assertThat(html).contains("not Replay execution");
+        assertThat(html).contains("not candidate");
+        assertThat(html).contains("not decision generation");
+        assertThat(html).contains("not point");
+        assertThat(html).contains("not final direction");
+        assertThat(html).contains("not entry / stop / TP / RR");
+        assertThat(html).contains("not order / execution / auto-trading");
+        assertThat(html).contains("not trading");
+        assertThat(html).contains("not executable");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
@@ -772,7 +840,9 @@ class DashboardControllerTest {
                 planBoundaryDisplayAdapter,
                 executionPlanDisplayAdapter,
                 riskActionGuardDisplayAdapter,
-                paperObservationDisplayAdapter
+                paperObservationDisplayAdapter,
+                hotResetEventMapper,
+                sourceTraceEventSourceOwnershipService
         );
     }
 
@@ -1902,6 +1972,177 @@ class DashboardControllerTest {
     }
 
     @Test
+    void hotResetEventImpactSourceStatusEndpointReturnsReviewOnlyEvidenceAndFailClosedOwnership() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-hot-ready");
+        decision.setTimeframe("1m");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(sourceTraceEventSourceOwnershipService.resolveEventSourceOwnership(any(RuntimeKlineContextDTO.class)))
+                .thenReturn(SourceTraceEventSourceOwnershipResult.missingSource("BTCUSDT", "1m"));
+        when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-ready"))
+                .thenReturn(hotResetEvent("ana-hot-ready", true));
+        when(hotResetEventMapper.countByAnalysisId("ana-hot-ready")).thenReturn(2);
+
+        mockMvc.perform(get("/api/dashboard/hot-reset-event-impact-source-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-hot-ready"))
+                .andExpect(jsonPath("$.timeframe").value("1m"))
+                .andExpect(jsonPath("$.hotResetEventAvailable").value(true))
+                .andExpect(jsonPath("$.hotResetEventSourceStatus").value("HOT_RESET_EVENT_SOURCE_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.eventImpactSourceStatus").value("EVENT_IMPACT_SOURCE_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.sourceTraceEventSourceOwnershipStatus").value("SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceTraceEventSourceOwnershipMissingReason").value("MISSING_SOURCE"))
+                .andExpect(jsonPath("$.hotResetEventCount").value(2))
+                .andExpect(jsonPath("$.hotResetTriggerType").value("MACRO_EVENT_IMPACT"))
+                .andExpect(jsonPath("$.hotResetTriggerReasonCode").value("EVENT_IMPACT_SOURCE_READ"))
+                .andExpect(jsonPath("$.ownerPath").value("DecisionResult.latest.analysisId -> HotResetEventMapper.selectLatestByAnalysisId/countByAnalysisId -> SourceTraceEventSourceOwnershipService.resolveEventSourceOwnership"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notHotResetExecution").value(true))
+                .andExpect(jsonPath("$.notHotResetWrite").value(true))
+                .andExpect(jsonPath("$.notEventGeneration").value(true))
+                .andExpect(jsonPath("$.notExternalApiRefresh").value(true))
+                .andExpect(jsonPath("$.notNewsFetch").value(true))
+                .andExpect(jsonPath("$.notSchedulerTrigger").value(true))
+                .andExpect(jsonPath("$.notCollectorTrigger").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notExternalChannel").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notFinalDirection").value(true))
+                .andExpect(jsonPath("$.notEntryStopTpRr").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.hotResetExecutionBoundaryStatus").value("HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.hotResetWriteBoundaryStatus").value("HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.eventGenerationBoundaryStatus").value("EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.externalApiRefreshBoundaryStatus").value("EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.newsFetchBoundaryStatus").value("NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.schedulerTriggerBoundaryStatus").value("SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.collectorTriggerBoundaryStatus").value("COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pushBoundaryStatus").value("PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.recheckReplayBoundaryStatus").value("RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.candidateBoundaryStatus").value("CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pointBoundaryStatus").value("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.tradingBoundaryStatus").value("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'HOT_RESET_EVENT_SOURCE_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'EVENT_IMPACT_SOURCE_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists());
+
+        verify(hotResetEventMapper).selectLatestByAnalysisId("ana-hot-ready");
+        verify(hotResetEventMapper).countByAnalysisId("ana-hot-ready");
+        verify(hotResetEventMapper, never()).insert(any(HotResetEventDO.class));
+    }
+
+    @Test
+    void hotResetEventImpactSourceStatusEndpointFailsClosedWhenEventMissing() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-hot-missing");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-missing")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/hot-reset-event-impact-source-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.hotResetEventSourceStatus").value("HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.eventImpactSourceStatus").value("EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.notHotResetExecution").value(true))
+                .andExpect(jsonPath("$.notHotResetWrite").value(true))
+                .andExpect(jsonPath("$.notEventGeneration").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void hotResetEventImpactSourceStatusEndpointFailsClosedWhenReadPathThrows() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-hot-error");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-error"))
+                .thenThrow(new RuntimeException("read unavailable"));
+
+        mockMvc.perform(get("/api/dashboard/hot-reset-event-impact-source-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reason").value("HOT_RESET_EVENT_READ_PATH_UNAVAILABLE"))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.notExternalApiRefresh").value(true))
+                .andExpect(jsonPath("$.notNewsFetch").value(true))
+                .andExpect(jsonPath("$.notSchedulerTrigger").value(true))
+                .andExpect(jsonPath("$.notCollectorTrigger").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void hotResetEventImpactSourceStatusEndpointMarksPartialEventAsReviewOnlySubstatus() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-hot-partial");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-partial"))
+                .thenReturn(hotResetEvent("ana-hot-partial", false));
+        when(hotResetEventMapper.countByAnalysisId("ana-hot-partial")).thenReturn(1);
+
+        mockMvc.perform(get("/api/dashboard/hot-reset-event-impact-source-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hotResetEventSourceStatus").value("HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.sourceTraceEventSourceOwnershipStatus").value("SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notHotResetExecution").value(true))
+                .andExpect(jsonPath("$.notEventGeneration").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void hotResetEventImpactSourceStatusEndpointDoesNotExposeExecutionRefreshSignalOrTradingFields() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-hot-safe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-safe"))
+                .thenReturn(hotResetEvent("ana-hot-safe", true));
+        when(hotResetEventMapper.countByAnalysisId("ana-hot-safe")).thenReturn(1);
+
+        mockMvc.perform(get("/api/dashboard/hot-reset-event-impact-source-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hotResetExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.hotResetWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.eventGenerationAction").doesNotExist())
+                .andExpect(jsonPath("$.externalApiRefreshAction").doesNotExist())
+                .andExpect(jsonPath("$.newsFetchAction").doesNotExist())
+                .andExpect(jsonPath("$.schedulerAction").doesNotExist())
+                .andExpect(jsonPath("$.collectorAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSend").doesNotExist())
+                .andExpect(jsonPath("$.externalChannelAction").doesNotExist())
+                .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist())
+                .andExpect(jsonPath("$.positionMonitorAction").doesNotExist());
+    }
+
+    @Test
     void reviewReplayStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
         when(reviewService.getStateByAnalysisId("ana-review-ready"))
                 .thenReturn(reviewState("ana-review-ready"));
@@ -2605,6 +2846,28 @@ class DashboardControllerTest {
         snapshot.setTraceId("trace-" + analysisId);
         snapshot.setCreateTime(LocalDateTime.of(2026, 6, 12, 12, 0));
         return snapshot;
+    }
+
+    private static HotResetEventDO hotResetEvent(String analysisId, boolean complete) {
+        HotResetEventDO event = new HotResetEventDO();
+        event.setEventId("hot-reset-" + analysisId);
+        event.setAnalysisId(analysisId);
+        event.setTraceId("trace-" + analysisId);
+        event.setSymbol("BTCUSDT");
+        event.setTriggerType(complete ? "MACRO_EVENT_IMPACT" : null);
+        event.setTriggerValue("event-impact-read-only");
+        event.setDecisionId("dec-" + analysisId);
+        event.setDecisionState("REVIEW_ONLY");
+        event.setConfusedScoreSnapshot(3);
+        event.setMultiTimeframeAlignedSnapshot(false);
+        event.setTriggerReasonCode(complete ? "EVENT_IMPACT_SOURCE_READ" : null);
+        event.setTriggerReasonText("Persisted Hot Reset event is read-only evidence.");
+        event.setEventVersion(1);
+        event.setEventTime(complete ? LocalDateTime.of(2026, 6, 12, 12, 30) : null);
+        event.setPreState("BEFORE_REVIEW_ONLY");
+        event.setPostState("AFTER_REVIEW_ONLY");
+        event.setCreateTime(LocalDateTime.of(2026, 6, 12, 12, 31));
+        return event;
     }
 
     private static ReviewStateVO reviewState(String analysisId) {
