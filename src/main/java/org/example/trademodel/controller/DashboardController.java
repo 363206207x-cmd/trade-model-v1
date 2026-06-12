@@ -128,6 +128,18 @@ public class DashboardController {
     private static final String MULTITIMEFRAME_MISSING_FAIL_CLOSED = "MULTITIMEFRAME_MISSING_FAIL_CLOSED";
     private static final String REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED = "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED = "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String PAPER_OBSERVATION_READY = "PAPER_OBSERVATION_REVIEW_ONLY_READY";
+    private static final String PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED = "PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED";
+    private static final String PAPER_OBSERVATION_MISSING_FAIL_CLOSED = "PAPER_OBSERVATION_MISSING_FAIL_CLOSED";
+    private static final String PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY = "PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY";
+    private static final String NOT_REAL_POSITION_REVIEW_ONLY = "NOT_REAL_POSITION_REVIEW_ONLY";
+    private static final String NOT_TRADE_INSTRUCTION_REVIEW_ONLY = "NOT_TRADE_INSTRUCTION_REVIEW_ONLY";
+    private static final String PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED = "PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED = "SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED = "PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED = "POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String POINT_BOUNDARY_BLOCKED_FAIL_CLOSED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -945,6 +957,42 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/paper-observation-status")
+    @ResponseBody
+    public Map<String, Object> paperObservationStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = basePaperObservationStatus(normalizedSymbol);
+        DashboardDetailResponseVO detail = dashboardDetail(normalizedSymbol);
+        DecisionResultVO decision = detail != null ? detail.getDecision() : null;
+        DashboardDetailResponseVO.PaperObservationDisplayVO paper =
+                detail != null ? detail.getPaperObservationDisplay() : null;
+
+        status.put("analysisId", decision != null ? decision.getAnalysisId() : null);
+        status.put("paperObservationStatus", firstNonBlank(
+                paper != null ? paper.getPaperObservationStatus() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("paperObservationStatusLabel", firstNonBlank(
+                paper != null ? paper.getPaperObservationStatusLabel() : null,
+                "后端未接入"
+        ));
+        status.put("paperObservationAvailable", paper != null && Boolean.TRUE.equals(paper.getPaperObservationAvailable()));
+        status.put("manualReviewSurfaceAvailable", paper != null && Boolean.TRUE.equals(paper.getManualReviewEntryAvailable()));
+        status.put("linkedPaperObservationCount", safeInteger(paper != null ? paper.getLinkedPaperObservationCount() : null));
+        status.put("linkedReviewCount", safeInteger(paper != null ? paper.getLinkedReviewCount() : null));
+        status.put("missedOpportunityFlag", paper != null && Boolean.TRUE.equals(paper.getMissedOpportunityFlag()));
+        status.put("reviewSummary", firstNonBlank(paper != null ? paper.getReviewSummary() : null, "missing"));
+        status.put("backendConnectionStatus", firstNonBlank(
+                paper != null ? paper.getBackendConnectionStatus() : null,
+                "BACKEND_PENDING"
+        ));
+        status.put("ownerPath", "dashboardDetail.paperObservationDisplay");
+        status.put("paperOwnerSafetyFlagsAllTrue", paperObservationSafetyFlagsAllTrue(paper));
+
+        applyPaperObservationStatus(status, decision, paper);
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -1274,6 +1322,65 @@ public class DashboardController {
                 MULTITIMEFRAME_MISSING_FAIL_CLOSED,
                 REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
+        return status;
+    }
+
+    private Map<String, Object> basePaperObservationStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("paperObservationStatus", "BACKEND_PENDING");
+        status.put("paperObservationStatusLabel", "后端未接入");
+        status.put("paperObservationAvailable", false);
+        status.put("manualReviewSurfaceAvailable", false);
+        status.put("linkedPaperObservationCount", 0);
+        status.put("linkedReviewCount", 0);
+        status.put("missedOpportunityFlag", false);
+        status.put("reviewSummary", "missing");
+        status.put("backendConnectionStatus", "BACKEND_PENDING");
+        status.put("ownerPath", "dashboardDetail.paperObservationDisplay");
+        status.put("sourceHealth", "BLOCKED");
+        status.put("reason", "PAPER_OBSERVATION_STATUS_PENDING");
+        status.put("message", "Paper Observation / Paper Trading 只读状态待确认；不是纸面订单、模拟执行、真实持仓或交易指令。");
+        status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
+        status.put("notRealPosition", true);
+        status.put("notTradeInstruction", true);
+        status.put("notPaperOrder", true);
+        status.put("notSimulatedExecution", true);
+        status.put("notPaperPnlGeneration", true);
+        status.put("notPositionMonitorExecution", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
+        status.put("notTradingSignal", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("paperExecutionBoundaryStatus", PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("simulatedExecutionBoundaryStatus", SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("paperPnlBoundaryStatus", PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("positionMonitorBoundaryStatus", POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pointBoundaryStatus", POINT_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("tradingBoundaryStatus", TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("paperOwnerSafetyFlagsAllTrue", false);
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                PAPER_OBSERVATION_READY,
+                PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED,
+                PAPER_OBSERVATION_MISSING_FAIL_CLOSED,
+                PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY,
+                NOT_REAL_POSITION_REVIEW_ONLY,
+                NOT_TRADE_INSTRUCTION_REVIEW_ONLY,
+                PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
         ));
         return status;
     }
@@ -1754,6 +1861,117 @@ public class DashboardController {
         status.put("sourceHealth", sourceHealth);
     }
 
+    private void applyPaperObservationStatus(Map<String, Object> status,
+                                             DecisionResultVO decision,
+                                             DashboardDetailResponseVO.PaperObservationDisplayVO paper) {
+        if (decision == null) {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED,
+                    "DECISION_MISSING",
+                    "DecisionResult 缺失；Paper Observation / Paper Trading 只读状态 fail-closed，不生成纸面订单、模拟执行或交易指令。",
+                    true,
+                    "BLOCKED"
+            );
+            return;
+        }
+        if (paper == null) {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_OBSERVATION_MISSING_FAIL_CLOSED,
+                    "PAPER_OBSERVATION_DISPLAY_MISSING",
+                    "PaperObservation display owner data 缺失；只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+            return;
+        }
+
+        boolean safetyFlagsAllTrue = paperObservationSafetyFlagsAllTrue(paper);
+        String displayStatus = normalizedStatus(paper.getPaperObservationStatus());
+        String reviewSummary = normalizedStatus(paper.getReviewSummary());
+
+        if (!Boolean.TRUE.equals(paper.getNotRealPosition())) {
+            applyPaperObservationStatus(
+                    status,
+                    POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                    "REAL_POSITION_BOUNDARY_UNSAFE",
+                    "Paper Observation owner path 未声明 notRealPosition；已按只读 fail-closed 处理，不执行真实持仓监控。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (!Boolean.TRUE.equals(paper.getNotTradeInstruction())) {
+            applyPaperObservationStatus(
+                    status,
+                    TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                    "TRADE_INSTRUCTION_BOUNDARY_UNSAFE",
+                    "Paper Observation owner path 未声明 notTradeInstruction；已按只读 fail-closed 处理，不输出交易指令。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (Boolean.TRUE.equals(paper.getPaperObservationAvailable())
+                || Boolean.TRUE.equals(paper.getManualReviewEntryAvailable())) {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                    "PAPER_EXECUTION_BOUNDARY_UNSAFE",
+                    "Paper Observation owner path 暴露可用入口；已阻断为只读状态，不生成纸面订单或模拟执行。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (!safetyFlagsAllTrue) {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY,
+                    "PAPER_OBSERVATION_SAFETY_PARTIAL",
+                    "Paper Observation 安全字段不完整；仅显示只读部分状态，不授予任何执行权限。",
+                    true,
+                    "PARTIAL"
+            );
+        } else if (!hasText(displayStatus) || "BACKEND_PENDING".equals(displayStatus)) {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED,
+                    firstNonBlank(paper.getReviewSummary(), "BACKEND_PENDING"),
+                    "Paper Observation owner path 仍是后端待接入或上游未满足；只读状态 fail-closed。",
+                    true,
+                    "MISSING"
+            );
+        } else if ("MANUAL_REVIEW_REQUIRED".equals(displayStatus)
+                && "AVAILABLE_REVIEW_ONLY".equals(reviewSummary)) {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_OBSERVATION_READY,
+                    "PAPER_OBSERVATION_OWNER_PATH_READ",
+                    "Paper Observation / Paper Trading 只读状态可读；仅人工复核，不是纸面订单、模拟执行、真实持仓或交易指令。",
+                    false,
+                    "OK"
+            );
+        } else {
+            applyPaperObservationStatus(
+                    status,
+                    PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY,
+                    firstNonBlank(paper.getReviewSummary(), "PAPER_OBSERVATION_PARTIAL"),
+                    "Paper Observation 只读状态部分可读；保持人工复核，不生成纸面订单、模拟执行、纸面盈亏或交易动作。",
+                    true,
+                    "PARTIAL"
+            );
+        }
+    }
+
+    private void applyPaperObservationStatus(Map<String, Object> status,
+                                             String statusValue,
+                                             String reason,
+                                             String message,
+                                             boolean failClosed,
+                                             String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
     private String normalizeSourceHealth(String sourceHealth) {
         String normalized = normalizedStatus(sourceHealth);
         if (normalized == null) {
@@ -1956,6 +2174,21 @@ public class DashboardController {
                 && !Boolean.TRUE.equals(riskGuard.getReverseTradeAllowed())
                 && !Boolean.TRUE.equals(riskGuard.getNewPositionAllowed())
                 && !Boolean.TRUE.equals(riskGuard.getMarketOrderExitAllowed());
+    }
+
+    private boolean paperObservationSafetyFlagsAllTrue(DashboardDetailResponseVO.PaperObservationDisplayVO paper) {
+        if (paper == null) {
+            return false;
+        }
+        return Boolean.TRUE.equals(paper.getNotRealPosition())
+                && Boolean.TRUE.equals(paper.getNotTradeInstruction())
+                && Boolean.TRUE.equals(paper.getManualReviewRequired())
+                && !Boolean.TRUE.equals(paper.getPaperObservationAvailable())
+                && !Boolean.TRUE.equals(paper.getManualReviewEntryAvailable());
+    }
+
+    private int safeInteger(Integer value) {
+        return value != null ? value : 0;
     }
 
     private String safeRiskActionAdviceSummary(String advice) {

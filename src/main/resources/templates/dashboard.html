@@ -1140,6 +1140,19 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="riskActionGuardReasonValue">RISK_ACTION_GUARD_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="paperObservationStatusPanel" aria-label="Paper Observation Paper Trading review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Paper Observation / Paper Trading 只读状态</span><span class="v" id="paperObservationRuntimeStatusValue">PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED / Paper Observation 只读状态待确认</span></div>
+            <div class="kv"><span class="k">当前标的 / analysisId</span><span class="v"><span id="paperObservationSymbolValue">—</span> · <span id="paperObservationAnalysisIdValue">—</span></span></div>
+            <div class="kv"><span class="k">paper status / backend</span><span class="v"><span id="paperObservationStatusValue">BACKEND_PENDING</span> · <span id="paperObservationBackendValue">BACKEND_PENDING</span></span></div>
+            <div class="kv"><span class="k">linked observation / review count</span><span class="v" id="paperObservationCountsValue">0 / 0</span></div>
+            <div class="kv"><span class="k">manual review / fail-closed</span><span class="v"><span id="paperObservationManualReviewValue">true</span> · <span id="paperObservationFailClosedValue">true</span></span></div>
+            <div class="kv"><span class="k">review summary</span><span class="v" id="paperObservationReviewSummaryValue">missing</span></div>
+            <div class="kv"><span class="k">只读边界</span><span class="v" id="paperObservationReviewOnlyValue">Paper Observation / Paper Trading 是 review-only，只读展示，仅人工复核。</span></div>
+            <div class="kv"><span class="k">Paper execution boundary</span><span class="v" id="paperObservationExecutionBoundaryValue">not real position；not trade instruction；not paper order；not simulated execution；not paper PnL generation；not Position Monitor execution。</span></div>
+            <div class="kv"><span class="k">Signal boundary</span><span class="v" id="paperObservationSignalBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="paperObservationReasonValue">PAPER_OBSERVATION_STATUS_PENDING</span></div>
+        </div>
+
         <div class="module-status-note" id="alertFatiguePolicyStatusPanel" aria-label="Alert fatigue notification policy review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">Alert fatigue / Notification policy 只读状态</span><span class="v" id="alertFatiguePolicyRuntimeStatusValue">ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED / Alert fatigue / notification policy 只读状态待确认</span></div>
             <div class="kv"><span class="k">当前标的 / source health</span><span class="v"><span id="alertFatiguePolicySymbolValue">—</span> · <span id="alertFatiguePolicySourceHealthValue">BLOCKED</span></span></div>
@@ -1485,6 +1498,16 @@
     var SOURCE_RUNTIME_MTF_MISSING = "MULTITIMEFRAME_MISSING_FAIL_CLOSED";
     var SOURCE_RUNTIME_REFRESH_BLOCKED = "REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var SOURCE_RUNTIME_GENERATION_BLOCKED = "GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var PAPER_OBSERVATION_STATUS_READY = "PAPER_OBSERVATION_REVIEW_ONLY_READY";
+    var PAPER_OBSERVATION_STATUS_BACKEND_PENDING = "PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED";
+    var PAPER_OBSERVATION_STATUS_MISSING = "PAPER_OBSERVATION_MISSING_FAIL_CLOSED";
+    var PAPER_OBSERVATION_STATUS_PARTIAL = "PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY";
+    var PAPER_OBSERVATION_PAPER_ORDER_BLOCKED = "PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var PAPER_OBSERVATION_SIMULATED_EXECUTION_BLOCKED = "SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var PAPER_OBSERVATION_PNL_BLOCKED = "PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var PAPER_OBSERVATION_POSITION_MONITOR_BLOCKED = "POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var PAPER_OBSERVATION_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var PAPER_OBSERVATION_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1669,6 +1692,47 @@
         notBoundaryCandidateGeneration: true,
         externalRefreshTriggered: false,
         displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
+    var paperObservationRuntimeStatus = {
+        status: PAPER_OBSERVATION_STATUS_BACKEND_PENDING,
+        symbol: null,
+        analysisId: null,
+        paperObservationStatus: "BACKEND_PENDING",
+        paperObservationStatusLabel: "后端未接入",
+        paperObservationAvailable: false,
+        manualReviewSurfaceAvailable: false,
+        linkedPaperObservationCount: 0,
+        linkedReviewCount: 0,
+        missedOpportunityFlag: false,
+        reviewSummary: "missing",
+        backendConnectionStatus: "BACKEND_PENDING",
+        sourceHealth: "BLOCKED",
+        reason: "PAPER_OBSERVATION_STATUS_PENDING",
+        message: "Paper Observation / Paper Trading 只读状态待确认；不是纸面订单、模拟执行、真实持仓或交易指令。",
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notRealPosition: true,
+        notTradeInstruction: true,
+        notPaperOrder: true,
+        notSimulatedExecution: true,
+        notPaperPnlGeneration: true,
+        notPositionMonitorExecution: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        paperExecutionBoundaryStatus: PAPER_OBSERVATION_PAPER_ORDER_BLOCKED,
+        simulatedExecutionBoundaryStatus: PAPER_OBSERVATION_SIMULATED_EXECUTION_BLOCKED,
+        paperPnlBoundaryStatus: PAPER_OBSERVATION_PNL_BLOCKED,
+        positionMonitorBoundaryStatus: PAPER_OBSERVATION_POSITION_MONITOR_BLOCKED,
+        pointBoundaryStatus: PAPER_OBSERVATION_POINT_BLOCKED,
+        tradingBoundaryStatus: PAPER_OBSERVATION_TRADING_BLOCKED,
+        paperOwnerSafetyFlagsAllTrue: false,
         failClosed: true
     };
     var alertFatiguePolicyRuntimeStatus = {
@@ -3514,6 +3578,89 @@
             });
     }
 
+    function resolvePaperObservationRuntimeStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, PAPER_OBSERVATION_STATUS_BACKEND_PENDING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            paperObservationStatus: firstNonEmpty(p.paperObservationStatus, "BACKEND_PENDING").toUpperCase(),
+            paperObservationStatusLabel: firstNonEmpty(p.paperObservationStatusLabel, "后端未接入"),
+            paperObservationAvailable: p.paperObservationAvailable === true,
+            manualReviewSurfaceAvailable: p.manualReviewSurfaceAvailable === true,
+            linkedPaperObservationCount: Number(p.linkedPaperObservationCount || 0),
+            linkedReviewCount: Number(p.linkedReviewCount || 0),
+            missedOpportunityFlag: p.missedOpportunityFlag === true,
+            reviewSummary: firstNonEmpty(p.reviewSummary, "missing"),
+            backendConnectionStatus: firstNonEmpty(p.backendConnectionStatus, "BACKEND_PENDING").toUpperCase(),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "PAPER_OBSERVATION_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Paper Observation / Paper Trading 只读状态待确认；不是纸面订单、模拟执行、真实持仓或交易指令。"),
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notRealPosition: true,
+            notTradeInstruction: true,
+            notPaperOrder: true,
+            notSimulatedExecution: true,
+            notPaperPnlGeneration: true,
+            notPositionMonitorExecution: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            paperExecutionBoundaryStatus: firstNonEmpty(p.paperExecutionBoundaryStatus, PAPER_OBSERVATION_PAPER_ORDER_BLOCKED).toUpperCase(),
+            simulatedExecutionBoundaryStatus: firstNonEmpty(p.simulatedExecutionBoundaryStatus, PAPER_OBSERVATION_SIMULATED_EXECUTION_BLOCKED).toUpperCase(),
+            paperPnlBoundaryStatus: firstNonEmpty(p.paperPnlBoundaryStatus, PAPER_OBSERVATION_PNL_BLOCKED).toUpperCase(),
+            positionMonitorBoundaryStatus: firstNonEmpty(p.positionMonitorBoundaryStatus, PAPER_OBSERVATION_POSITION_MONITOR_BLOCKED).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, PAPER_OBSERVATION_POINT_BLOCKED).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, PAPER_OBSERVATION_TRADING_BLOCKED).toUpperCase(),
+            paperOwnerSafetyFlagsAllTrue: p.paperOwnerSafetyFlagsAllTrue === true,
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updatePaperObservationRuntimeStatusDisplay() {
+        var po = paperObservationRuntimeStatus || {};
+        setText("paperObservationRuntimeStatusValue", (po.status || PAPER_OBSERVATION_STATUS_BACKEND_PENDING) + " / " + (po.message || "只读状态"));
+        setText("paperObservationSymbolValue", po.symbol || "—");
+        setText("paperObservationAnalysisIdValue", po.analysisId || "—");
+        setText("paperObservationStatusValue", (po.paperObservationStatus || "BACKEND_PENDING") + " / " + (po.paperObservationStatusLabel || "后端未接入"));
+        setText("paperObservationBackendValue", po.backendConnectionStatus || "BACKEND_PENDING");
+        setText("paperObservationCountsValue", (po.linkedPaperObservationCount || 0) + " / " + (po.linkedReviewCount || 0));
+        setText("paperObservationManualReviewValue", po.manualReviewOnly ? "true / manual review only" : "false / fail-closed");
+        setText("paperObservationFailClosedValue", po.failClosed ? "true" : "false");
+        setText("paperObservationReviewSummaryValue", po.reviewSummary || "missing");
+        setText("paperObservationReviewOnlyValue", "Paper Observation / Paper Trading 是 review-only，只读展示，仅人工复核。");
+        setText("paperObservationExecutionBoundaryValue", "not real position；not trade instruction；not paper order；not simulated execution；not paper PnL generation；not Position Monitor execution。");
+        setText("paperObservationSignalBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。");
+        setText("paperObservationReasonValue", po.reason || "—");
+    }
+
+    function fetchPaperObservationRuntimeStatus(symbol) {
+        if (!symbol) {
+            paperObservationRuntimeStatus = resolvePaperObservationRuntimeStatus({});
+            window.__paperObservationReviewStatus = PAPER_OBSERVATION_STATUS_BACKEND_PENDING;
+            updatePaperObservationRuntimeStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/paper-observation-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                paperObservationRuntimeStatus = resolvePaperObservationRuntimeStatus(payload, symbol);
+                window.__paperObservationReviewStatus = paperObservationRuntimeStatus.status || PAPER_OBSERVATION_STATUS_BACKEND_PENDING;
+                updatePaperObservationRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                paperObservationRuntimeStatus = resolvePaperObservationRuntimeStatus({}, symbol);
+                window.__paperObservationReviewStatus = PAPER_OBSERVATION_STATUS_BACKEND_PENDING;
+                updatePaperObservationRuntimeStatusDisplay();
+            });
+    }
+
     function resolveAlertFatiguePolicyRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -4530,6 +4677,7 @@
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
                 fetchRiskActionGuardRuntimeStatus(selectedSymbol);
+                fetchPaperObservationRuntimeStatus(selectedSymbol);
                 fetchAlertFatiguePolicyRuntimeStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
@@ -4545,6 +4693,7 @@
         fetchDecisionResultRuntimeStatus(symbol);
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);
         fetchRiskActionGuardRuntimeStatus(symbol);
+        fetchPaperObservationRuntimeStatus(symbol);
         fetchAlertFatiguePolicyRuntimeStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
