@@ -615,6 +615,66 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyRuntimeReadinessGuardrailStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/system/runtime-readiness-guardrail-status");
+        assertThat(html).contains("/api/system/run-baseline");
+        assertThat(html).contains("/api/system/health is static liveness only");
+        assertThat(html).contains("runtimeReadinessGuardrailStatusPanel");
+        assertThat(html).contains("runtimeReadinessStatusValue");
+        assertThat(html).contains("systemGuardrailStatusValue");
+        assertThat(html).contains("runBaselineStatusValue");
+        assertThat(html).contains("runtimeMetricStatusValue");
+        assertThat(html).contains("runtimeReadinessSourceHealthValue");
+        assertThat(html).contains("runtimeReadinessFailClosedValue");
+        assertThat(html).contains("runtimeReadinessReviewOnlyValue");
+        assertThat(html).contains("runtimeReadinessBoundaryValue");
+        assertThat(html).contains("runtimeReadinessSignalBoundaryValue");
+        assertThat(html).contains("runtimeReadinessReasonValue");
+        assertThat(html).contains("RUNTIME_READINESS_REVIEW_ONLY_READY");
+        assertThat(html).contains("RUNTIME_READINESS_BACKEND_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("RUNTIME_READINESS_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("RUNTIME_READINESS_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("SYSTEM_GUARDRAIL_REVIEW_ONLY_READY");
+        assertThat(html).contains("SYSTEM_GUARDRAIL_DEGRADED_REVIEW_ONLY");
+        assertThat(html).contains("SYSTEM_GUARDRAIL_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RUN_BASELINE_REVIEW_ONLY_READY");
+        assertThat(html).contains("RUN_BASELINE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("RUNTIME_METRIC_REVIEW_ONLY_READY");
+        assertThat(html).contains("RUNTIME_METRIC_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("EXECUTABLE_READINESS_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RECOVERY_REPAIR_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("EXTERNAL_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("review-only");
+        assertThat(html).contains("manual review only");
+        assertThat(html).contains("fail-closed");
+        assertThat(html).contains("readiness 只是 operational guardrail status，不是 executable readiness");
+        assertThat(html).contains("not executable readiness");
+        assertThat(html).contains("not trading authorization");
+        assertThat(html).contains("not recovery / repair / restart / auto-fix");
+        assertThat(html).contains("not scheduler trigger");
+        assertThat(html).contains("not collector trigger");
+        assertThat(html).contains("not API client refresh");
+        assertThat(html).contains("not external refresh");
+        assertThat(html).contains("not candidate");
+        assertThat(html).contains("not decision generation");
+        assertThat(html).contains("not point");
+        assertThat(html).contains("not final direction");
+        assertThat(html).contains("not entry / stop / TP / RR");
+        assertThat(html).contains("not trading");
+        assertThat(html).contains("not executable");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
