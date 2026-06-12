@@ -39,11 +39,12 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `614cd49 docs(runtime): verify hot reset event source status`
-- Current active block: `Next minimal runtime slice selection after Hot Reset / Event Impact Source closure`
+- Current merged main: `9e9fd2f docs(runtime): close hot reset event source visual verification`
+- Current active block: `Source Read for AI conflict / AI role convergence read-only status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this visual closure package: Hot Reset / Event Impact Source review-only status becomes the 18th completed Review-Only Runtime partial slice when this package is merged. The global level remains `REVIEW_ONLY_RUNTIME partial`.
-- Next required action: `Next minimal runtime slice selection after Hot Reset / Event Impact Source closure`.
+- Capability movement from this selection package: none. The global level remains `REVIEW_ONLY_RUNTIME partial` with 18 completed review-only runtime partial slices.
+- Next required action: `Source Read for AI conflict / AI role convergence read-only status`.
+- Next Minimal Runtime Slice Selection After Hot Reset / Event Impact Source Closure is completed by this package when merged. It selects `AI conflict / AI role convergence read-only status` as the next source-read-only target after eighteen completed review-only runtime partial closures. The selection narrows the Three AI / AI conflict candidate to existing `AiConflictResolverService`, `AiConflictResult`, DecisionResult `ai_role_results` / `ai_conflict_*` fields, dashboard AI role shell, and review-page display context. It does not implement Three AI provider orchestration, external AI calls, final arbiter behavior, Decision generation, final direction, entry/stop/TP/RR, Candidate generation, Point, Push, external channel, Recheck/Replay, order/execution, trading, Position Monitor execution, new skeleton owners, schema/config/pom, P359, or P360.
 - `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status` as the next source-read-only target after fifteen completed review-only runtime slices.
 - `c5aba1a` completes Source Read for Runtime readiness / system guardrail status. It confirms existing `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, `DashboardSummaryResponseVO`, and dashboard system surfaces; identifies missing dedicated readiness/guardrail status contract and panel; and returns GO to design only without implementation or capability movement.
 - `f6cc925` completes Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design. It selects existing `/api/system/run-baseline`, `SystemHealthService`, `RunBaselineService`, `RuntimeMetricService.snapshot()`, `DashboardSummaryResponseVO`, and dashboard system surfaces as the owner path; defines status mapping, safety fields, fail-closed rules, readiness/authorization boundary, optional thin read-only endpoint/panel constraints, and returns GO to implementation readiness gate only.

@@ -6,12 +6,13 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `614cd49 docs(runtime): verify hot reset event source status`.
-- Active stop-loss track: `Next minimal runtime slice selection after Hot Reset / Event Impact Source closure`.
-- Selected target: `TBD by next minimal runtime slice selection`.
+- Current HEAD: `9e9fd2f docs(runtime): close hot reset event source visual verification`.
+- Active stop-loss track: `Source Read for AI conflict / AI role convergence read-only status`.
+- Selected target: `AI conflict / AI role convergence read-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, `Paper Observation / Paper Trading Status review-only status`, `Review Archive Analytics / Missed Opportunity Aggregate Status`, `Runtime readiness / system guardrail status`, `Account risk / account exposure status`, and `Hot Reset / Event Impact Source review-only status`.
-- Selected next minimal runtime slice: `TBD by next minimal runtime slice selection`.
-- Next required action: `Next minimal runtime slice selection after Hot Reset / Event Impact Source closure`.
+- Selected next minimal runtime slice: `AI conflict / AI role convergence read-only status`.
+- Next required action: `Source Read for AI conflict / AI role convergence read-only status`.
+- Next Minimal Runtime Slice Selection After Hot Reset / Event Impact Source Closure is completed by this package when merged. It selects the narrowed AI conflict / AI role convergence read-only status source-read target over existing `AiConflictResolverService`, `AiConflictResult`, DecisionResult `ai_role_results` / `ai_conflict_*` read-model fields, dashboard AI shell, review-page display context, and tests. It rejects Three AI provider orchestration, external AI calls, final arbiter behavior, Decision generation, final direction, entry/stop/TP/RR, Candidate generation, Point, Push, external channel, Recheck/Replay, order/execution, trading, Position Monitor execution, new skeleton owners, schema/config/pom, P359, and P360.
 - `b1f9e66` completes Next Minimal Runtime Slice Selection After Review Archive Analytics / Missed Opportunity Aggregate Status Closure and selects `Runtime readiness / system guardrail status`.
 - Source Read for Runtime readiness / system guardrail status is completed on main as `c5aba1a`. It confirms existing `SystemController`, `SystemHealthService`, `RunBaselineService`, `RunBaselineVO`, `RuntimeMetricService`, `DashboardSummaryResponseVO`, dashboard system surfaces, and existing dashboard summary tests; identifies missing dedicated readiness/guardrail status endpoint/panel; and returns GO to design only.
 - `f6cc925` completes Minimal Review-Only Runtime Readiness / System Guardrail Status Runtime Wiring Design. It reuses existing system health / run-baseline / runtime metric owner paths, defines status mapping, safety fields, fail-closed rules, readiness/authorization boundary, and optional thin endpoint/panel constraints; it returns GO to implementation readiness gate only.
