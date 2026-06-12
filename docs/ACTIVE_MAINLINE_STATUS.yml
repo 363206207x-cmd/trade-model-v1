@@ -1,14 +1,14 @@
-current_head: "0560ba2"
+current_head: "3a281e4"
 active_mainline: "Readiness / Point Mainline"
 active_mainline_cn: "就绪 / 点位主线"
-active_block: "Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation"
-active_block_cn: "纸面观察 / 纸面交易状态最小只读运行时接线实现"
-current_phase: "implementation"
+active_block: "Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification"
+active_block_cn: "纸面观察 / 纸面交易状态最小只读运行时接线验证"
+current_phase: "verification"
 current_level: "REVIEW_ONLY_RUNTIME partial"
 current_pr: "none"
-current_branch: "minimal-review-only-paper-observation-paper-trading-status-runtime-wiring-implementation"
-merge_rule: "B-risk Paper Observation / Paper Trading Status implementation; create Draft PR and stop for review; allow only minimal review-only endpoint/dashboard/status implementation if needed, targeted tests, implementation docs, and source-of-truth updates; no schema/config/pom, new DTO/Validator/Assembler/Orchestrator, paper trading execution, paper backtest execution, generated paper trading result, paper order, paper PnL, simulated execution, real position monitoring, Position Monitor execution, Push send, external channel, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360"
-next_required_action: "Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation"
+current_branch: "paper-observation-paper-trading-status-runtime-wiring-verification"
+merge_rule: "A-risk Paper Observation / Paper Trading Status verification; allow verification docs and source-of-truth updates only; no Java business code, tests, dashboard business logic, schema/config/pom, new DTO/Validator/Assembler/Orchestrator, paper trading execution, paper backtest execution, generated paper trading result, paper order, paper PnL, simulated execution, real position monitoring, Position Monitor execution, Push send, external channel, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, auto-trading, replay/recheck, P359, or P360"
+next_required_action: "Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification"
 do_not_continue_to: "P359 / P360 / new DTO / new Validator / new Assembler / new Orchestrator / new docs-only plan / new source-binding family / service runtime / dashboard runtime / executable point generation / external channel / Push send / order execution"
 freeze_rule_active: true
 p359_status: "branch exists but not merged; PR #829 closed unmerged; not completed progress"
@@ -130,8 +130,10 @@ sourcetrace_runtimekline_dataquality_multitimeframe_status_visual_verification_c
 next_minimal_runtime_slice_selection_after_sourcetrace_runtimekline_dataquality_multitimeframe_status: "completed on main as df05213; selects Paper Observation / Paper Trading Status review-only status as the next source-read-only target after thirteen REVIEW_ONLY_RUNTIME partial closures; selection only, no capability movement"
 paper_observation_paper_trading_status_source_read_status: "completed on main as 1625b52; confirms PaperObservationDisplayAdapter, DefaultPaperObservationDisplayAdapter, DashboardDetailResponseVO.PaperObservationDisplayVO, DashboardController dashboard detail owner path, dashboard.html Paper Observation display, adapter tests, VO tests, and historical API smoke docs; returns GO to design only without implementation or capability movement"
 minimal_review_only_paper_observation_paper_trading_status_runtime_wiring_design_status: "completed on main as 0560ba2; selects the existing /api/dashboard/detail and PaperObservationDisplayAdapter owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement"
-paper_observation_paper_trading_status_implementation_readiness_gate_status: "completed by this package when merged; returns GO to B-risk minimal implementation using the existing dashboard detail / PaperObservation display owner path, optional one thin read-only Map endpoint if needed, minimal dashboard status/copy/DOM if needed, targeted tests, implementation docs, and source-of-truth updates; forbids schema/config/pom, new DTO/Validator/Assembler/Orchestrator, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, and P360"
+paper_observation_paper_trading_status_implementation_readiness_gate_status: "completed on main as 3a281e4; returns GO to B-risk minimal implementation using the existing dashboard detail / PaperObservation display owner path, optional one thin read-only Map endpoint if needed, minimal dashboard status/copy/DOM if needed, targeted tests, implementation docs, and source-of-truth updates; forbids schema/config/pom, new DTO/Validator/Assembler/Orchestrator, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, and P360"
+minimal_review_only_paper_observation_paper_trading_status_runtime_wiring_implementation_status: "completed by this package when merged; adds one minimal read-only /api/dashboard/paper-observation-status endpoint, dashboard paperObservationStatusPanel, targeted DashboardControllerTest coverage, implementation docs, and source-of-truth updates over existing dashboard detail / PaperObservation display owner assets without DTO/Validator/Assembler/Orchestrator, schema/config/pom, new service/domain/mapper/repository ownership family, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, or P360"
 source_of_truth_files:
+  - docs/V1_MINIMAL_REVIEW_ONLY_PAPER_OBSERVATION_PAPER_TRADING_STATUS_RUNTIME_WIRING_IMPLEMENTATION.md
   - docs/V1_PAPER_OBSERVATION_PAPER_TRADING_STATUS_IMPLEMENTATION_READINESS_GATE.md
   - docs/V1_MINIMAL_REVIEW_ONLY_PAPER_OBSERVATION_PAPER_TRADING_STATUS_RUNTIME_WIRING_DESIGN.md
   - docs/V1_PAPER_OBSERVATION_PAPER_TRADING_STATUS_SOURCE_READ.md

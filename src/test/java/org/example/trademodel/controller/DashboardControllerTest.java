@@ -382,6 +382,46 @@ class DashboardControllerTest {
     }
 
     @Test
+    void dashboardTemplateShowsReviewOnlyPaperObservationRuntimeStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/paper-observation-status");
+        assertThat(html).contains("paperObservationStatusPanel");
+        assertThat(html).contains("paperObservationRuntimeStatusValue");
+        assertThat(html).contains("paperObservationSymbolValue");
+        assertThat(html).contains("paperObservationAnalysisIdValue");
+        assertThat(html).contains("paperObservationStatusValue");
+        assertThat(html).contains("paperObservationBackendValue");
+        assertThat(html).contains("paperObservationCountsValue");
+        assertThat(html).contains("paperObservationManualReviewValue");
+        assertThat(html).contains("paperObservationFailClosedValue");
+        assertThat(html).contains("paperObservationReviewSummaryValue");
+        assertThat(html).contains("paperObservationReviewOnlyValue");
+        assertThat(html).contains("paperObservationExecutionBoundaryValue");
+        assertThat(html).contains("paperObservationSignalBoundaryValue");
+        assertThat(html).contains("paperObservationReasonValue");
+        assertThat(html).contains("PAPER_OBSERVATION_REVIEW_ONLY_READY");
+        assertThat(html).contains("PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("PAPER_OBSERVATION_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("PAPER_OBSERVATION_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("Paper Observation / Paper Trading 是 review-only，只读展示，仅人工复核");
+        assertThat(html).contains("not real position");
+        assertThat(html).contains("not trade instruction");
+        assertThat(html).contains("not paper order");
+        assertThat(html).contains("not simulated execution");
+        assertThat(html).contains("not paper PnL generation");
+        assertThat(html).contains("not Position Monitor execution");
+        assertThat(html).contains("not entry / stop / TP / RR");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
+    @Test
     void dashboardTemplateShowsReviewOnlyAlertFatiguePolicyRuntimeStatusMapping() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 
@@ -1311,6 +1351,148 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.rr").doesNotExist())
                 .andExpect(jsonPath("$.positionSize").doesNotExist())
                 .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
+    void paperObservationStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
+        MockMvc paperObservationMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) ->
+                        readyPaperObservationDisplay()
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-paper-observation-ready");
+        decision.setAnalysisId("ana-paper-observation-ready");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+
+        paperObservationMockMvc.perform(get("/api/dashboard/paper-observation-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAPER_OBSERVATION_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-paper-observation-ready"))
+                .andExpect(jsonPath("$.paperObservationStatus").value("MANUAL_REVIEW_REQUIRED"))
+                .andExpect(jsonPath("$.reviewSummary").value("AVAILABLE_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.paperObservationAvailable").value(false))
+                .andExpect(jsonPath("$.manualReviewSurfaceAvailable").value(false))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notRealPosition").value(true))
+                .andExpect(jsonPath("$.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.notPaperOrder").value(true))
+                .andExpect(jsonPath("$.notSimulatedExecution").value(true))
+                .andExpect(jsonPath("$.notPaperPnlGeneration").value(true))
+                .andExpect(jsonPath("$.notPositionMonitorExecution").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notFinalDirection").value(true))
+                .andExpect(jsonPath("$.notEntryStopTpRr").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.paperOwnerSafetyFlagsAllTrue").value(true))
+                .andExpect(jsonPath("$.failClosed").value(false));
+    }
+
+    @Test
+    void paperObservationStatusEndpointFailsClosedWhenDecisionMissing() throws Exception {
+        when(decisionService.getLatestDecisionResultBySymbol("ETHUSDT")).thenReturn(null);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("ETHUSDT", null)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/dashboard/paper-observation-status").param("symbol", "ETHUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAPER_OBSERVATION_BACKEND_PENDING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("ETHUSDT"))
+                .andExpect(jsonPath("$.analysisId").value(nullValue()))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notRealPosition").value(true))
+                .andExpect(jsonPath("$.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.notPaperOrder").value(true))
+                .andExpect(jsonPath("$.notSimulatedExecution").value(true))
+                .andExpect(jsonPath("$.notPaperPnlGeneration").value(true))
+                .andExpect(jsonPath("$.notPositionMonitorExecution").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("DECISION_MISSING"));
+    }
+
+    @Test
+    void paperObservationStatusEndpointFailsClosedWhenPaperExecutionBoundaryIsUnsafe() throws Exception {
+        MockMvc paperObservationMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) ->
+                        unsafePaperObservationDisplay()
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-paper-observation-unsafe");
+        decision.setAnalysisId("ana-paper-observation-unsafe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+
+        paperObservationMockMvc.perform(get("/api/dashboard/paper-observation-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAPER_ORDER_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.paperObservationAvailable").value(true))
+                .andExpect(jsonPath("$.manualReviewSurfaceAvailable").value(true))
+                .andExpect(jsonPath("$.paperOwnerSafetyFlagsAllTrue").value(false))
+                .andExpect(jsonPath("$.notPaperOrder").value(true))
+                .andExpect(jsonPath("$.notSimulatedExecution").value(true))
+                .andExpect(jsonPath("$.notPaperPnlGeneration").value(true))
+                .andExpect(jsonPath("$.notPositionMonitorExecution").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("PAPER_EXECUTION_BOUNDARY_UNSAFE"));
+    }
+
+    @Test
+    void paperObservationStatusEndpointDoesNotExposeExecutablePaperTradingCandidatePointOrTradingFields() throws Exception {
+        MockMvc paperObservationMockMvc = MockMvcBuilders.standaloneSetup(controllerWith(
+                (symbol, decision) -> new DashboardSourceTraceDetailAdapter.DashboardSourceTraceDetailContext(null, null),
+                (symbol, decision, fallbackDisplay) -> readyPlanBoundaryDisplay(),
+                (decision, planBoundaryDisplay, fallbackDisplay) -> readyExecutionPlanDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, fallbackDisplay) -> manualReviewRiskActionGuardDisplay(),
+                (decision, planBoundaryDisplay, executionPlanDisplay, riskActionGuardDisplay, fallbackDisplay) ->
+                        readyPaperObservationDisplay()
+        )).build();
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setDecisionId("dec-paper-observation-safe");
+        decision.setAnalysisId("ana-paper-observation-safe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote("BTCUSDT", null)).thenReturn(Optional.empty());
+
+        paperObservationMockMvc.perform(get("/api/dashboard/paper-observation-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.paperOrder").doesNotExist())
+                .andExpect(jsonPath("$.paperOrderAction").doesNotExist())
+                .andExpect(jsonPath("$.simulatedExecution").doesNotExist())
+                .andExpect(jsonPath("$.simulatedExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.paperPnl").doesNotExist())
+                .andExpect(jsonPath("$.manualReviewEntryAvailable").doesNotExist())
+                .andExpect(jsonPath("$.realPosition").doesNotExist())
+                .andExpect(jsonPath("$.positionMonitorAction").doesNotExist())
                 .andExpect(jsonPath("$.orderAction").doesNotExist())
                 .andExpect(jsonPath("$.executionAction").doesNotExist())
                 .andExpect(jsonPath("$.pushSendState").doesNotExist())
@@ -2276,6 +2458,30 @@ class DashboardControllerTest {
     private static DashboardDetailResponseVO.RiskActionGuardDisplayVO unsafeActionWordingRiskActionGuardDisplay() {
         DashboardDetailResponseVO.RiskActionGuardDisplayVO display = manualReviewRiskActionGuardDisplay();
         display.setRiskActionAdvice("execute close reverse open");
+        return display;
+    }
+
+    private static DashboardDetailResponseVO.PaperObservationDisplayVO readyPaperObservationDisplay() {
+        DashboardDetailResponseVO.PaperObservationDisplayVO display = new DashboardDetailResponseVO.PaperObservationDisplayVO();
+        display.setPaperObservationStatus("MANUAL_REVIEW_REQUIRED");
+        display.setPaperObservationStatusLabel("需要人工复核");
+        display.setPaperObservationAvailable(false);
+        display.setManualReviewEntryAvailable(false);
+        display.setLinkedPaperObservationCount(2);
+        display.setLinkedReviewCount(3);
+        display.setMissedOpportunityFlag(false);
+        display.setReviewSummary("AVAILABLE_REVIEW_ONLY");
+        display.setNotRealPosition(true);
+        display.setNotTradeInstruction(true);
+        display.setManualReviewRequired(true);
+        display.setBackendConnectionStatus("READY_REVIEW_ONLY");
+        return display;
+    }
+
+    private static DashboardDetailResponseVO.PaperObservationDisplayVO unsafePaperObservationDisplay() {
+        DashboardDetailResponseVO.PaperObservationDisplayVO display = readyPaperObservationDisplay();
+        display.setPaperObservationAvailable(true);
+        display.setManualReviewEntryAvailable(true);
         return display;
     }
 
