@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `df05213 docs(runtime): select paper observation status next slice`
-- Current active block: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design`
+- Current merged main: `1625b52 docs(paper): read paper observation status source path`
+- Current active block: `Implementation readiness gate for Paper Observation / Paper Trading Status review-only status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this A-risk source-read package: none. Paper Observation / Paper Trading Status source read confirms existing display owner assets only; it does not complete a new runtime slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
-- Next required action: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design`
+- Capability movement from this A-risk design package: none. Paper Observation / Paper Trading Status design selects the existing dashboard detail / display adapter owner path, status mapping, and readiness checklist only; it does not complete a new runtime slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Implementation readiness gate for Paper Observation / Paper Trading Status review-only status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -212,7 +212,8 @@ DecisionResult chain history:
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`.
 - SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`.
 - Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure is completed on main as `df05213` and selects `Paper Observation / Paper Trading Status review-only status` as the 14th source-read-only target.
-- Source Read for Paper Observation / Paper Trading Status review-only status is completed by this package when merged. It confirms `PaperObservationDisplayAdapter`, `DefaultPaperObservationDisplayAdapter`, `DashboardDetailResponseVO.PaperObservationDisplayVO`, `DashboardController.dashboardDetail`, dashboard Paper Observation display, adapter tests, VO tests, controller wiring, and historical API smoke docs. It returns GO to design only and does not implement paper order, paper PnL, simulated execution, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, Push, order/execution, or trading.
+- Source Read for Paper Observation / Paper Trading Status review-only status is completed on main as `1625b52`. It confirms `PaperObservationDisplayAdapter`, `DefaultPaperObservationDisplayAdapter`, `DashboardDetailResponseVO.PaperObservationDisplayVO`, `DashboardController.dashboardDetail`, dashboard Paper Observation display, adapter tests, VO tests, controller wiring, and historical API smoke docs. It returns GO to design only and does not implement paper order, paper PnL, simulated execution, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, Push, order/execution, or trading.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed by this package when merged. It selects the existing `/api/dashboard/detail` / `PaperObservationDisplayAdapter` owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
