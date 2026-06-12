@@ -4,11 +4,11 @@ This roadmap follows the user-facing business chain rather than P-number order.
 
 ## Current Stop-Loss Track
 
-- Active track: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- Active track: `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - Selected target: `Paper Observation / Paper Trading Status review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, and `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
 - Selected next minimal runtime slice: `Paper Observation / Paper Trading Status review-only status`.
-- Next required action: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- Next required action: `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - P359/P360 remain frozen by default.
 - #876 DecisionResult minimal implementation is completed on main; DecisionResult verification and visual closure are also completed on main.
 - `c75919c` completed the selection pack and chose `ExecutionPlan / BoundaryCandidate review-only display continuation` as the next source-read target.
@@ -83,7 +83,8 @@ This roadmap follows the user-facing business chain rather than P-number order.
 - Source Read for Paper Observation / Paper Trading Status review-only status is completed on main as `1625b52`. It confirms existing PaperObservation display owner assets and returns GO to design only.
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed on main as `0560ba2`. It selects the existing `/api/dashboard/detail` / PaperObservation display adapter owner path, defines review-only status mapping, fail-closed rules, paper execution boundary, and readiness checklist; Paper Observation / Paper Trading status is not yet a completed runtime slice.
 - Implementation readiness gate for Paper Observation / Paper Trading Status review-only status is completed on main as `3a281e4`. It returns GO to B-risk minimal implementation over the existing dashboard detail / PaperObservation display owner path, optional one thin read-only Map endpoint if needed, minimal dashboard status/copy/DOM if needed, targeted tests, implementation docs, and source-of-truth updates.
-- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed by this package when merged. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets; it does not complete the Paper Observation / Paper Trading runtime slice until verification and visual closure are merged.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed on main as `172a5c9`. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed by this package when merged. It verifies endpoint/dashboard review-only behavior, safety fields, fail-closed/review-only states, paper execution boundary, tests, forbidden semantics classification, and source-of-truth alignment; it does not complete the Paper Observation / Paper Trading runtime slice until visual closure is merged.
 - The source-read verification is completed on main as #835 and found the provider/service/scheduler/mapper/schema/dashboard/API path exists while provider/fallback dashboard visibility remains partial.
 - The wiring design is completed on main as #836; it defines minimal review-only status mapping over the existing PositionSync owner path.
 - The readiness gate is completed on main as #837 and returned GO for a minimal dashboard-only implementation.

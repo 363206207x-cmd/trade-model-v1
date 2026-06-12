@@ -5,15 +5,15 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 ## Current Main
 
 - Source branch baseline: `main`
-- Current merged main: `3a281e4 docs(paper): verify paper observation implementation readiness`
+- Current merged main: `172a5c9 feat(paper): show paper observation review-only status`
 - Evidence / Score Mainline has completed through `24e120b BACKEND-P295 Review-Only Scan Output to Evidence / Score Entry Slice (#721)`.
 - Workflow automation also includes `2efdd6b BACKEND-P291G Workflow Auto-Decision Runner Pack (#723)`, `58f69ef BACKEND-P291F Active Mainline Status Refresh Pack (#719)`, and `ba9cd2c BACKEND-P291E Workflow One-Command Runner Pack (#717)`.
 - Market Read Mainline has completed through `a61a86b BACKEND-P294 Review-Only MarketRead Output and Scan Output Slice (#713)`.
 - Evidence / Score Mainline has completed a review-only entry envelope through P295, review-only evidence normalization through P296, review-only score input / precheck through P297, and review-only score assembly through P298.
 - Candidate / Push Mainline has completed review-only score-to-candidate handoff through P299, review-only candidate attention through P300, review-only candidate preview / ranking guard through P301, review-only internal push preview / recheck handoff through P302, push preview closure before external channel through P303, dashboard / internal push preview display gate through P304, and Candidate / Push review-only MVP closure through P305.
 - Current active mainline is machine-readable in `docs/ACTIVE_MAINLINE_STATUS.yml`.
-- Current active block is `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
-- Current next required action is `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification`.
+- Current active block is `Paper Observation / Paper Trading Status Visual Verification / Closure`.
+- Current next required action is `Paper Observation / Paper Trading Status Visual Verification / Closure`.
 - #876 is completed on main and synced by user terminal handoff evidence.
 - The workflow drift repair pack is completed on main as #877.
 - The V1 Auto Operator Pack is completed on main as `b30c30e`; it only adds workflow efficiency tooling and does not raise business capability.
@@ -206,7 +206,8 @@ This file is a source-of-truth summary. Completion is based only on merged `main
 - Source Read for Paper Observation / Paper Trading Status review-only status is completed on main as `1625b52`. It confirms `PaperObservationDisplayAdapter`, `DefaultPaperObservationDisplayAdapter`, `DashboardDetailResponseVO.PaperObservationDisplayVO`, `DashboardController.dashboardDetail`, dashboard Paper Observation display, adapter tests, VO tests, controller wiring, and historical API smoke docs. It returns GO to design only without implementation or capability movement.
 - Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed on main as `0560ba2`. It selects the existing `/api/dashboard/detail` / `PaperObservationDisplayAdapter` owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement.
 - Implementation readiness gate for Paper Observation / Paper Trading Status review-only status is completed on main as `3a281e4`. It returns GO to B-risk minimal implementation over the existing dashboard detail / PaperObservation display owner path, optional one thin read-only Map endpoint if needed, minimal dashboard status/copy/DOM if needed, targeted tests, implementation docs, and source-of-truth updates.
-- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed by this package when merged. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets; Paper Observation / Paper Trading status is not yet a completed runtime slice.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation is completed on main as `172a5c9`. It adds one minimal read-only `/api/dashboard/paper-observation-status` endpoint, dashboard `paperObservationStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over the existing dashboard detail / PaperObservation display owner assets; Paper Observation / Paper Trading status is not yet a completed runtime slice.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Verification is completed by this package when merged. It verifies `/api/dashboard/paper-observation-status`, `paperObservationStatusPanel`, safety fields, fail-closed/review-only states, paper execution boundary, `DashboardControllerTest`, full tests, forbidden semantics classification, and source-of-truth alignment from `3a281e4` to `172a5c9`.
 - Candidate / Push review-only MVP is completed to dashboard / internal preview display only.
 - Readiness remains non-executable and review-only only.
 - Point proposal remains non-executable and review-only only.
