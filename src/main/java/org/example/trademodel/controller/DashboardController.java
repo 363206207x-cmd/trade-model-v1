@@ -1,17 +1,22 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceEventSourceOwnershipResult;
+import org.example.trademodel.dto.planboundary.SourceTraceEventSourceOwnershipStatusEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
+import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.ScoreService;
+import org.example.trademodel.service.SourceTraceEventSourceOwnershipService;
 import org.example.trademodel.service.dashboard.DashboardSourceTraceDetailAdapter;
 import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
@@ -155,6 +160,21 @@ public class DashboardController {
     private static final String POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED = "POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED = "REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String HOT_RESET_EVENT_SOURCE_READY = "HOT_RESET_EVENT_SOURCE_REVIEW_ONLY_READY";
+    private static final String HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED = "HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED";
+    private static final String HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY = "HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY";
+    private static final String EVENT_IMPACT_SOURCE_READY = "EVENT_IMPACT_SOURCE_REVIEW_ONLY_READY";
+    private static final String EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED = "EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED";
+    private static final String SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_READY = "SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_REVIEW_ONLY_READY";
+    private static final String SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED = "SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED";
+    private static final String HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED = "HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED = "HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED = "EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED = "EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED = "NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED = "SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED = "COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED = "RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -173,6 +193,8 @@ public class DashboardController {
     private final ExecutionPlanDisplayAdapter executionPlanDisplayAdapter;
     private final RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter;
     private final PaperObservationDisplayAdapter paperObservationDisplayAdapter;
+    private final HotResetEventMapper hotResetEventMapper;
+    private final SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService;
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -189,7 +211,9 @@ public class DashboardController {
                                PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter,
                                ExecutionPlanDisplayAdapter executionPlanDisplayAdapter,
                                RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter,
-                               PaperObservationDisplayAdapter paperObservationDisplayAdapter) {
+                               PaperObservationDisplayAdapter paperObservationDisplayAdapter,
+                               HotResetEventMapper hotResetEventMapper,
+                               SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -206,6 +230,8 @@ public class DashboardController {
         this.executionPlanDisplayAdapter = executionPlanDisplayAdapter;
         this.riskActionGuardDisplayAdapter = riskActionGuardDisplayAdapter;
         this.paperObservationDisplayAdapter = paperObservationDisplayAdapter;
+        this.hotResetEventMapper = hotResetEventMapper;
+        this.sourceTraceEventSourceOwnershipService = sourceTraceEventSourceOwnershipService;
     }
 
     @GetMapping("/dashboard")
@@ -1107,6 +1133,110 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/hot-reset-event-impact-source-status")
+    @ResponseBody
+    public Map<String, Object> hotResetEventImpactSourceStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseHotResetEventImpactSourceStatus(normalizedSymbol);
+        DecisionResultVO decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+        String analysisId = decision != null ? decision.getAnalysisId() : null;
+        String timeframe = firstNonBlank(decision != null ? decision.getTimeframe() : null, "UNKNOWN");
+        status.put("analysisId", analysisId);
+        status.put("timeframe", timeframe);
+
+        SourceTraceEventSourceOwnershipResult ownership = resolveEventSourceOwnership(normalizedSymbol, timeframe);
+        applySourceTraceEventSourceOwnership(status, ownership);
+
+        if (!hasText(analysisId)) {
+            applyHotResetEventImpactSourceStatus(
+                    status,
+                    HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED,
+                    "ANALYSIS_CONTEXT_MISSING",
+                    "DecisionResult analysisId 缺失；Hot Reset / Event Impact source status fail-closed，不伪造事件来源或执行入口。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        HotResetEventDO latestEvent;
+        Integer eventCount;
+        try {
+            latestEvent = hotResetEventMapper != null
+                    ? hotResetEventMapper.selectLatestByAnalysisId(analysisId)
+                    : null;
+            eventCount = latestEvent != null && hotResetEventMapper != null
+                    ? hotResetEventMapper.countByAnalysisId(analysisId)
+                    : 0;
+        } catch (RuntimeException ex) {
+            applyHotResetEventImpactSourceStatus(
+                    status,
+                    HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED,
+                    "HOT_RESET_EVENT_READ_PATH_UNAVAILABLE",
+                    "HotResetEvent read path 不可用；只读状态 fail-closed，不执行 Hot Reset、不写入、不生成事件或刷新外部来源。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        status.put("hotResetEventCount", safeInteger(eventCount));
+        if (latestEvent == null) {
+            status.put("eventImpactSourceStatus", EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED);
+            applyHotResetEventImpactSourceStatus(
+                    status,
+                    HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED,
+                    "HOT_RESET_EVENT_SOURCE_MISSING",
+                    "Hot Reset persisted event source 缺失；Event Impact source status fail-closed，不伪造 event impact。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        populateHotResetEventImpactSource(status, latestEvent);
+
+        boolean partialHotResetEvent = !hasText(latestEvent.getTriggerType())
+                || !hasText(latestEvent.getTriggerReasonCode())
+                || latestEvent.getEventTime() == null;
+        if (partialHotResetEvent) {
+            status.put("hotResetEventSourceStatus", HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY);
+        } else {
+            status.put("hotResetEventSourceStatus", HOT_RESET_EVENT_SOURCE_READY);
+        }
+        status.put("eventImpactSourceStatus", EVENT_IMPACT_SOURCE_READY);
+
+        if (SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED.equals(status.get("sourceTraceEventSourceOwnershipStatus"))) {
+            applyHotResetEventImpactSourceStatus(
+                    status,
+                    SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED,
+                    "SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE",
+                    "SourceTrace event-source ownership 未完成；保持 fail-closed，不伪造来源归属。",
+                    true,
+                    "BLOCKED"
+            );
+        } else if (partialHotResetEvent) {
+            applyHotResetEventImpactSourceStatus(
+                    status,
+                    HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY,
+                    "HOT_RESET_EVENT_SOURCE_PARTIAL",
+                    "Hot Reset event source 部分可读；仅作为只读 event source evidence，不作为 Hot Reset execution。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applyHotResetEventImpactSourceStatus(
+                    status,
+                    HOT_RESET_EVENT_SOURCE_READY,
+                    "HOT_RESET_EVENT_SOURCE_OWNER_PATH_READ",
+                    "Hot Reset event / Event Impact source 只读状态可读；不执行、不写入、不生成事件、不刷新外部来源。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -1568,6 +1698,88 @@ public class DashboardController {
                 TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
+        return status;
+    }
+
+    private Map<String, Object> baseHotResetEventImpactSourceStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("timeframe", "UNKNOWN");
+        status.put("hotResetEventAvailable", false);
+        status.put("hotResetEventSourceStatus", HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED);
+        status.put("eventImpactSourceStatus", EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED);
+        status.put("sourceTraceEventSourceOwnershipStatus", SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED);
+        status.put("sourceTraceEventSourceOwnershipMissingReason", "MISSING_SOURCE");
+        status.put("sourceTraceEventSourceOwnershipMissingFields", List.of("eventSource"));
+        status.put("hotResetEventCount", 0);
+        status.put("hotResetEventLatestTime", null);
+        status.put("hotResetTriggerType", "missing");
+        status.put("hotResetTriggerValue", "missing");
+        status.put("hotResetTriggerReasonCode", "missing");
+        status.put("hotResetTriggerReasonText", "missing");
+        status.put("eventImpactSource", "HotResetEventDO persisted event source evidence");
+        status.put("ownerPath", "DecisionResult.latest.analysisId -> HotResetEventMapper.selectLatestByAnalysisId/countByAnalysisId -> SourceTraceEventSourceOwnershipService.resolveEventSourceOwnership");
+        status.put("displayContext", "dashboard.html / review-page.js display context only; no event action or trading action");
+        status.put("sourceHealth", "MISSING");
+        status.put("reason", "HOT_RESET_EVENT_IMPACT_SOURCE_STATUS_PENDING");
+        status.put("message", "Hot Reset / Event Impact Source 只读状态待确认；不是热重置执行、事件生成或交易信号。");
+        status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
+        status.put("notHotResetExecution", true);
+        status.put("notHotResetWrite", true);
+        status.put("notEventGeneration", true);
+        status.put("notExternalApiRefresh", true);
+        status.put("notNewsFetch", true);
+        status.put("notSchedulerTrigger", true);
+        status.put("notCollectorTrigger", true);
+        status.put("notPushSend", true);
+        status.put("notExternalChannel", true);
+        status.put("notRecheckExecution", true);
+        status.put("notReplayExecution", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
+        status.put("notTradingSignal", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("hotResetExecutionBoundaryStatus", HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("hotResetWriteBoundaryStatus", HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("eventGenerationBoundaryStatus", EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("externalApiRefreshBoundaryStatus", EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("newsFetchBoundaryStatus", NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("schedulerTriggerBoundaryStatus", SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("collectorTriggerBoundaryStatus", COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pushBoundaryStatus", PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("recheckReplayBoundaryStatus", RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("candidateBoundaryStatus", CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pointBoundaryStatus", POINT_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("tradingBoundaryStatus", TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                HOT_RESET_EVENT_SOURCE_READY,
+                HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED,
+                HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY,
+                EVENT_IMPACT_SOURCE_READY,
+                EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED,
+                SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_READY,
+                SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED,
+                HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
@@ -2173,6 +2385,69 @@ public class DashboardController {
         status.put("message", message);
         status.put("failClosed", failClosed);
         status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyHotResetEventImpactSourceStatus(Map<String, Object> status,
+                                                      String statusValue,
+                                                      String reason,
+                                                      String message,
+                                                      boolean failClosed,
+                                                      String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private SourceTraceEventSourceOwnershipResult resolveEventSourceOwnership(String normalizedSymbol,
+                                                                             String timeframe) {
+        RuntimeKlineContextDTO context = new RuntimeKlineContextDTO();
+        context.setSymbol(normalizedSymbol);
+        context.setTimeframe(firstNonBlank(timeframe, "UNKNOWN"));
+        if (sourceTraceEventSourceOwnershipService == null) {
+            return SourceTraceEventSourceOwnershipResult.missingSource(normalizedSymbol, context.getTimeframe());
+        }
+        SourceTraceEventSourceOwnershipResult result =
+                sourceTraceEventSourceOwnershipService.resolveEventSourceOwnership(context);
+        return result != null ? result : SourceTraceEventSourceOwnershipResult.missingSource(normalizedSymbol, context.getTimeframe());
+    }
+
+    private void applySourceTraceEventSourceOwnership(Map<String, Object> status,
+                                                      SourceTraceEventSourceOwnershipResult ownership) {
+        boolean ready = ownership != null
+                && ownership.getOwnershipStatus() != SourceTraceEventSourceOwnershipStatusEnum.INCOMPLETE
+                && hasText(ownership.getEventSource());
+        status.put("sourceTraceEventSourceOwnershipStatus", ready
+                ? SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_READY
+                : SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED);
+        status.put("sourceTraceEventSourceOwnershipReviewMode",
+                ownership != null && ownership.getReviewMode() != null ? ownership.getReviewMode().name() : "REVIEW_ONLY");
+        status.put("sourceTraceEventSourceOwnershipMissingReason",
+                ownership != null && ownership.getMissingReason() != null ? ownership.getMissingReason().name() : "MISSING_SOURCE");
+        status.put("sourceTraceEventSourceOwnershipMissingFields",
+                ownership != null ? ownership.getMissingFields() : List.of("eventSource"));
+        status.put("sourceTraceEventSourceOwnershipManualReviewRequired",
+                ownership == null || ownership.isManualReviewRequired());
+        status.put("sourceTraceEventSourceOwnershipNotTradeInstruction",
+                ownership == null || ownership.isNotTradeInstruction());
+    }
+
+    private void populateHotResetEventImpactSource(Map<String, Object> status,
+                                                   HotResetEventDO latestEvent) {
+        status.put("hotResetEventAvailable", true);
+        status.put("hotResetEventId", latestEvent.getEventId());
+        status.put("hotResetTraceId", latestEvent.getTraceId());
+        status.put("hotResetDecisionId", latestEvent.getDecisionId());
+        status.put("hotResetDecisionState", firstNonBlank(latestEvent.getDecisionState(), "UNKNOWN"));
+        status.put("hotResetTriggerType", firstNonBlank(latestEvent.getTriggerType(), "missing"));
+        status.put("hotResetTriggerValue", firstNonBlank(latestEvent.getTriggerValue(), "missing"));
+        status.put("hotResetTriggerReasonCode", firstNonBlank(latestEvent.getTriggerReasonCode(), "missing"));
+        status.put("hotResetTriggerReasonText", firstNonBlank(latestEvent.getTriggerReasonText(), "missing"));
+        status.put("hotResetEventVersion", latestEvent.getEventVersion());
+        status.put("hotResetEventLatestTime", latestEvent.getEventTime());
+        status.put("hotResetEventMeaning", "read-only event source evidence only; not Hot Reset execution");
+        status.put("eventImpactMeaning", "read-only impact source status only; not event generation");
     }
 
     private String accountExposureStatus(TmAccountRiskSnapshotDO snapshot) {

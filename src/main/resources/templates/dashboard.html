@@ -1242,6 +1242,19 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="accountRiskReasonValue">ACCOUNT_RISK_EXPOSURE_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="hotResetEventImpactSourceStatusPanel" aria-label="Hot Reset Event Impact Source review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Hot Reset / Event Impact Source 只读状态</span><span class="v" id="hotResetEventSourceStatusValue">HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED / Hot Reset event source 只读状态待确认</span></div>
+            <div class="kv"><span class="k">Event Impact source</span><span class="v" id="eventImpactSourceStatusValue">EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED</span></div>
+            <div class="kv"><span class="k">SourceTrace event-source ownership</span><span class="v" id="sourceTraceEventSourceOwnershipValue">SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED / fail-closed，不伪造来源归属。</span></div>
+            <div class="kv"><span class="k">Hot Reset event count</span><span class="v" id="hotResetEventCountsValue">0</span></div>
+            <div class="kv"><span class="k">latest event evidence</span><span class="v" id="hotResetEventLatestValue">missing</span></div>
+            <div class="kv"><span class="k">只读 / 人工复核边界</span><span class="v">review-only；manual review only；fail-closed；Hot Reset event 仅作 read-only event source evidence。</span></div>
+            <div class="kv"><span class="k">Hot Reset / Event boundary</span><span class="v" id="hotResetEventBoundaryValue">not Hot Reset execution；not Hot Reset write；not event generation。</span></div>
+            <div class="kv"><span class="k">External / Push / Recheck boundary</span><span class="v" id="hotResetExternalBoundaryValue">not external API refresh；not news fetch；not scheduler trigger；not collector trigger；not Push send；not external channel；not Recheck execution；not Replay execution。</span></div>
+            <div class="kv"><span class="k">Signal / trading boundary</span><span class="v" id="hotResetSignalBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not order / execution / auto-trading；not Position Monitor execution；not trading；not executable；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="hotResetEventReasonValue">HOT_RESET_EVENT_IMPACT_SOURCE_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1581,6 +1594,25 @@
     var ACCOUNT_RISK_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var ACCOUNT_RISK_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var ACCOUNT_RISK_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_EVENT_SOURCE_READY = "HOT_RESET_EVENT_SOURCE_REVIEW_ONLY_READY";
+    var HOT_RESET_EVENT_SOURCE_MISSING = "HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED";
+    var HOT_RESET_EVENT_SOURCE_PARTIAL = "HOT_RESET_EVENT_SOURCE_PARTIAL_REVIEW_ONLY";
+    var EVENT_IMPACT_SOURCE_READY = "EVENT_IMPACT_SOURCE_REVIEW_ONLY_READY";
+    var EVENT_IMPACT_SOURCE_MISSING = "EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED";
+    var SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_READY = "SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_REVIEW_ONLY_READY";
+    var SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE = "SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE_FAIL_CLOSED";
+    var HOT_RESET_EXECUTION_BLOCKED = "HOT_RESET_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_WRITE_BLOCKED = "HOT_RESET_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var EVENT_GENERATION_BLOCKED = "EVENT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var EXTERNAL_API_REFRESH_BLOCKED = "EXTERNAL_API_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var NEWS_FETCH_BLOCKED = "NEWS_FETCH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_SCHEDULER_BLOCKED = "SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_COLLECTOR_BLOCKED = "COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_PUSH_BLOCKED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_RECHECK_REPLAY_BLOCKED = "RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var HOT_RESET_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -2084,6 +2116,59 @@
         tradingBoundaryStatus: ACCOUNT_RISK_TRADING_BLOCKED,
         failClosed: true
     };
+    var hotResetEventImpactSourceStatus = {
+        status: HOT_RESET_EVENT_SOURCE_MISSING,
+        symbol: null,
+        analysisId: null,
+        hotResetEventAvailable: false,
+        hotResetEventSourceStatus: HOT_RESET_EVENT_SOURCE_MISSING,
+        eventImpactSourceStatus: EVENT_IMPACT_SOURCE_MISSING,
+        sourceTraceEventSourceOwnershipStatus: SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE,
+        sourceTraceEventSourceOwnershipMissingReason: "MISSING_SOURCE",
+        hotResetEventCount: 0,
+        hotResetEventLatestTime: null,
+        hotResetTriggerType: "missing",
+        hotResetTriggerReasonCode: "missing",
+        hotResetTriggerReasonText: "missing",
+        ownerPath: "HotResetEventMapper.selectLatestByAnalysisId/countByAnalysisId",
+        sourceHealth: "MISSING",
+        reason: "HOT_RESET_EVENT_IMPACT_SOURCE_STATUS_PENDING",
+        message: "Hot Reset / Event Impact Source 只读状态待确认；不是热重置执行、事件生成或交易信号。",
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notHotResetExecution: true,
+        notHotResetWrite: true,
+        notEventGeneration: true,
+        notExternalApiRefresh: true,
+        notNewsFetch: true,
+        notSchedulerTrigger: true,
+        notCollectorTrigger: true,
+        notPushSend: true,
+        notExternalChannel: true,
+        notRecheckExecution: true,
+        notReplayExecution: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        hotResetExecutionBoundaryStatus: HOT_RESET_EXECUTION_BLOCKED,
+        hotResetWriteBoundaryStatus: HOT_RESET_WRITE_BLOCKED,
+        eventGenerationBoundaryStatus: EVENT_GENERATION_BLOCKED,
+        externalApiRefreshBoundaryStatus: EXTERNAL_API_REFRESH_BLOCKED,
+        newsFetchBoundaryStatus: NEWS_FETCH_BLOCKED,
+        schedulerTriggerBoundaryStatus: HOT_RESET_SCHEDULER_BLOCKED,
+        collectorTriggerBoundaryStatus: HOT_RESET_COLLECTOR_BLOCKED,
+        pushBoundaryStatus: HOT_RESET_PUSH_BLOCKED,
+        recheckReplayBoundaryStatus: HOT_RESET_RECHECK_REPLAY_BLOCKED,
+        candidateBoundaryStatus: HOT_RESET_CANDIDATE_BLOCKED,
+        pointBoundaryStatus: HOT_RESET_POINT_BLOCKED,
+        tradingBoundaryStatus: HOT_RESET_TRADING_BLOCKED,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -2101,6 +2186,7 @@
     window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
     window.__runtimeReadinessGuardrailReviewStatus = RUNTIME_READINESS_STATUS_BACKEND_PENDING;
     window.__accountRiskExposureReviewStatus = ACCOUNT_RISK_STATUS_BACKEND_PENDING;
+    window.__hotResetEventImpactSourceReviewStatus = HOT_RESET_EVENT_SOURCE_MISSING;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -4427,6 +4513,97 @@
             });
     }
 
+    function resolveHotResetEventImpactSourceStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, HOT_RESET_EVENT_SOURCE_MISSING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            hotResetEventAvailable: p.hotResetEventAvailable === true,
+            hotResetEventSourceStatus: firstNonEmpty(p.hotResetEventSourceStatus, HOT_RESET_EVENT_SOURCE_MISSING).toUpperCase(),
+            eventImpactSourceStatus: firstNonEmpty(p.eventImpactSourceStatus, EVENT_IMPACT_SOURCE_MISSING).toUpperCase(),
+            sourceTraceEventSourceOwnershipStatus: firstNonEmpty(p.sourceTraceEventSourceOwnershipStatus, SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE).toUpperCase(),
+            sourceTraceEventSourceOwnershipMissingReason: firstNonEmpty(p.sourceTraceEventSourceOwnershipMissingReason, "MISSING_SOURCE"),
+            hotResetEventCount: Number(p.hotResetEventCount || 0),
+            hotResetEventLatestTime: p.hotResetEventLatestTime || null,
+            hotResetTriggerType: firstNonEmpty(p.hotResetTriggerType, "missing"),
+            hotResetTriggerReasonCode: firstNonEmpty(p.hotResetTriggerReasonCode, "missing"),
+            hotResetTriggerReasonText: firstNonEmpty(p.hotResetTriggerReasonText, "missing"),
+            ownerPath: firstNonEmpty(p.ownerPath, "HotResetEventMapper.selectLatestByAnalysisId/countByAnalysisId"),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "HOT_RESET_EVENT_IMPACT_SOURCE_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Hot Reset / Event Impact Source 只读状态待确认；不是热重置执行、事件生成或交易信号。"),
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notHotResetExecution: true,
+            notHotResetWrite: true,
+            notEventGeneration: true,
+            notExternalApiRefresh: true,
+            notNewsFetch: true,
+            notSchedulerTrigger: true,
+            notCollectorTrigger: true,
+            notPushSend: true,
+            notExternalChannel: true,
+            notRecheckExecution: true,
+            notReplayExecution: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            hotResetExecutionBoundaryStatus: firstNonEmpty(p.hotResetExecutionBoundaryStatus, HOT_RESET_EXECUTION_BLOCKED).toUpperCase(),
+            hotResetWriteBoundaryStatus: firstNonEmpty(p.hotResetWriteBoundaryStatus, HOT_RESET_WRITE_BLOCKED).toUpperCase(),
+            eventGenerationBoundaryStatus: firstNonEmpty(p.eventGenerationBoundaryStatus, EVENT_GENERATION_BLOCKED).toUpperCase(),
+            externalApiRefreshBoundaryStatus: firstNonEmpty(p.externalApiRefreshBoundaryStatus, EXTERNAL_API_REFRESH_BLOCKED).toUpperCase(),
+            newsFetchBoundaryStatus: firstNonEmpty(p.newsFetchBoundaryStatus, NEWS_FETCH_BLOCKED).toUpperCase(),
+            schedulerTriggerBoundaryStatus: firstNonEmpty(p.schedulerTriggerBoundaryStatus, HOT_RESET_SCHEDULER_BLOCKED).toUpperCase(),
+            collectorTriggerBoundaryStatus: firstNonEmpty(p.collectorTriggerBoundaryStatus, HOT_RESET_COLLECTOR_BLOCKED).toUpperCase(),
+            pushBoundaryStatus: firstNonEmpty(p.pushBoundaryStatus, HOT_RESET_PUSH_BLOCKED).toUpperCase(),
+            recheckReplayBoundaryStatus: firstNonEmpty(p.recheckReplayBoundaryStatus, HOT_RESET_RECHECK_REPLAY_BLOCKED).toUpperCase(),
+            candidateBoundaryStatus: firstNonEmpty(p.candidateBoundaryStatus, HOT_RESET_CANDIDATE_BLOCKED).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, HOT_RESET_POINT_BLOCKED).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, HOT_RESET_TRADING_BLOCKED).toUpperCase(),
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateHotResetEventImpactSourceStatusDisplay() {
+        var hs = hotResetEventImpactSourceStatus || {};
+        setText("hotResetEventSourceStatusValue", (hs.status || HOT_RESET_EVENT_SOURCE_MISSING) + " / " + (hs.message || "只读状态"));
+        setText("eventImpactSourceStatusValue", hs.eventImpactSourceStatus || EVENT_IMPACT_SOURCE_MISSING);
+        setText("sourceTraceEventSourceOwnershipValue", (hs.sourceTraceEventSourceOwnershipStatus || SOURCE_TRACE_EVENT_SOURCE_OWNERSHIP_INCOMPLETE) + " / " + (hs.sourceTraceEventSourceOwnershipMissingReason || "MISSING_SOURCE") + "；fail-closed，不伪造来源归属。");
+        setText("hotResetEventCountsValue", hs.hotResetEventCount || 0);
+        setText("hotResetEventLatestValue", formatDateTime(hs.hotResetEventLatestTime) + " · " + (hs.hotResetTriggerType || "missing") + " · " + (hs.hotResetTriggerReasonCode || "missing"));
+        setText("hotResetEventBoundaryValue", (hs.hotResetExecutionBoundaryStatus || HOT_RESET_EXECUTION_BLOCKED) + " / " + (hs.hotResetWriteBoundaryStatus || HOT_RESET_WRITE_BLOCKED) + " / " + (hs.eventGenerationBoundaryStatus || EVENT_GENERATION_BLOCKED) + "；Hot Reset event 仅作 read-only event source evidence；Event Impact 仅作 read-only impact source status。");
+        setText("hotResetExternalBoundaryValue", (hs.externalApiRefreshBoundaryStatus || EXTERNAL_API_REFRESH_BLOCKED) + " / " + (hs.newsFetchBoundaryStatus || NEWS_FETCH_BLOCKED) + " / " + (hs.schedulerTriggerBoundaryStatus || HOT_RESET_SCHEDULER_BLOCKED) + " / " + (hs.collectorTriggerBoundaryStatus || HOT_RESET_COLLECTOR_BLOCKED) + " / " + (hs.pushBoundaryStatus || HOT_RESET_PUSH_BLOCKED) + " / " + (hs.recheckReplayBoundaryStatus || HOT_RESET_RECHECK_REPLAY_BLOCKED));
+        setText("hotResetSignalBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not order / execution / auto-trading；not Position Monitor execution；not trading；not executable；Display Slots 不是候选池。");
+        setText("hotResetEventReasonValue", hs.reason || "—");
+    }
+
+    function fetchHotResetEventImpactSourceStatus(symbol) {
+        if (!symbol) {
+            hotResetEventImpactSourceStatus = resolveHotResetEventImpactSourceStatus({});
+            window.__hotResetEventImpactSourceReviewStatus = HOT_RESET_EVENT_SOURCE_MISSING;
+            updateHotResetEventImpactSourceStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/hot-reset-event-impact-source-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                hotResetEventImpactSourceStatus = resolveHotResetEventImpactSourceStatus(payload, symbol);
+                window.__hotResetEventImpactSourceReviewStatus = hotResetEventImpactSourceStatus.status || HOT_RESET_EVENT_SOURCE_MISSING;
+                updateHotResetEventImpactSourceStatusDisplay();
+            })
+            .catch(function () {
+                hotResetEventImpactSourceStatus = resolveHotResetEventImpactSourceStatus({}, symbol);
+                window.__hotResetEventImpactSourceReviewStatus = HOT_RESET_EVENT_SOURCE_MISSING;
+                updateHotResetEventImpactSourceStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -5053,6 +5230,7 @@
                 fetchWatchlistRuntimeStatus();
                 fetchRuleConfigAuditRuntimeStatus();
                 fetchRuntimeReadinessGuardrailStatus();
+                fetchHotResetEventImpactSourceStatus(selectedSymbol);
             })
             .catch(function () {
                 document.getElementById("lastUpdatedText").textContent = nowText();
@@ -5071,6 +5249,7 @@
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
                 fetchRuntimeReadinessGuardrailStatus();
                 fetchAccountRiskExposureStatus(selectedSymbol);
+                fetchHotResetEventImpactSourceStatus(selectedSymbol);
             });
     }
 
@@ -5089,6 +5268,7 @@
         fetchSourceRuntimeDataQualityStatus(symbol);
         fetchMissedArchiveRuntimeStatus(symbol);
         fetchAccountRiskExposureStatus(symbol);
+        fetchHotResetEventImpactSourceStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
