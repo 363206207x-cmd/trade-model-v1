@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `b6f29ac docs(review): verify review archive aggregate readiness`
-- Current active block: `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Verification`
+- Current merged main: `8504cb1 feat(review): show review archive aggregate status`
+- Current active block: `Review Archive Analytics / Missed Opportunity Aggregate Status Visual Verification / Closure`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this B-risk implementation package: none beyond the scoped review-only runtime status surface. Paper Observation / Paper Trading Status remains the 14th completed review-only runtime partial slice, and Review Archive Analytics / Missed Opportunity Aggregate Status has completed source read, design, readiness, and implementation only.
-- Next required action: `Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Verification`
+- Capability movement from this verification package: none. Paper Observation / Paper Trading Status remains the 14th completed review-only runtime partial slice, and Review Archive Analytics / Missed Opportunity Aggregate Status has completed source read, design, readiness, implementation, and runtime wiring verification only.
+- Next required action: `Review Archive Analytics / Missed Opportunity Aggregate Status Visual Verification / Closure`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -127,7 +127,8 @@ The following do not count as completed:
 - `f5e7092` completes Source Read for Review Archive Analytics / Missed Opportunity Aggregate Status. It confirms existing MissedOpportunity read/query/count owner paths, `/api/missed-opportunity/review-archive-status`, ReviewAggregate missed detail/summary metadata, review page `sec-missed`, dashboard `missedArchiveStatusPanel`, and targeted tests; it returns GO to design only.
 - `91332b7` completes Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Design. It reuses existing owners, defines aggregate status mapping, safety fields, fail-closed rules, generation/write/replay/recheck/Push/Candidate/Point/trading boundaries, and returns GO to implementation readiness gate without implementation or capability movement.
 - `b6f29ac` completes Implementation readiness gate for Review Archive Analytics / Missed Opportunity Aggregate Status. It returns GO to B-risk minimal implementation over the existing `/api/missed-opportunity/review-archive-status` and `missedArchiveStatusPanel` owner paths, while forbidding new DTO / Validator / Assembler / Orchestrator, new service/domain/mapper/repository ownership family, schema/config/pom, missed-opportunity generation/write behavior, review result generation, replay/recheck execution, Push, Candidate generation, Decision generation, Point, final direction, entry/stop/TP/RR, order/execution, trading, Position Monitor execution, P359, and P360.
-- Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Implementation is completed by this package when merged. It reuses `/api/missed-opportunity/review-archive-status` and `missedArchiveStatusPanel`, adds aggregate review-only status/safety fields, targeted `MissedOpportunityControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates without generation/write/replay/recheck/Push/Candidate/Point/trading expansion or new owner skeletons.
+- `8504cb1` completes Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Implementation. It reuses `/api/missed-opportunity/review-archive-status` and `missedArchiveStatusPanel`, adds aggregate review-only status/safety fields, targeted `MissedOpportunityControllerTest` / `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates without generation/write/replay/recheck/Push/Candidate/Point/trading expansion or new owner skeletons.
+- Minimal Review-Only Review Archive Analytics / Missed Opportunity Aggregate Status Runtime Wiring Verification is completed by this package when merged. It verifies `/api/missed-opportunity/review-archive-status`, `missedArchiveStatusPanel`, safety fields, fail-closed/review-only states, generation/write/replay/recheck/Push/Candidate/Point/trading boundary, targeted tests, full tests, forbidden semantics classification, and source-of-truth alignment from `b6f29ac` to `8504cb1` without Java/test/dashboard/schema/config/pom changes.
 
 ## Runtime Slice History
 
