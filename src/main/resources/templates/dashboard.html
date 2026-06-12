@@ -1218,6 +1218,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="missedArchiveReasonValue">REVIEW_ARCHIVE_AGGREGATE_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="runtimeReadinessGuardrailStatusPanel" aria-label="Runtime readiness system guardrail review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Runtime readiness / System guardrail 只读状态</span><span class="v" id="runtimeReadinessStatusValue">RUNTIME_READINESS_BACKEND_PENDING_FAIL_CLOSED / Runtime readiness 只读状态待确认</span></div>
+            <div class="kv"><span class="k">System guardrail</span><span class="v" id="systemGuardrailStatusValue">SYSTEM_GUARDRAIL_BLOCKED_FAIL_CLOSED</span></div>
+            <div class="kv"><span class="k">Run baseline</span><span class="v" id="runBaselineStatusValue">RUN_BASELINE_MISSING_FAIL_CLOSED</span></div>
+            <div class="kv"><span class="k">Runtime metric</span><span class="v" id="runtimeMetricStatusValue">RUNTIME_METRIC_MISSING_FAIL_CLOSED</span></div>
+            <div class="kv"><span class="k">source health / fail-closed</span><span class="v"><span id="runtimeReadinessSourceHealthValue">MISSING</span> · <span id="runtimeReadinessFailClosedValue">true</span></span></div>
+            <div class="kv"><span class="k">只读 / 人工复核边界</span><span class="v" id="runtimeReadinessReviewOnlyValue">review-only；manual review only；fail-closed；readiness 只是 operational guardrail status，不是 executable readiness。</span></div>
+            <div class="kv"><span class="k">Readiness / authorization boundary</span><span class="v" id="runtimeReadinessBoundaryValue">not executable readiness；not trading authorization；not recovery / repair / restart / auto-fix；not scheduler trigger；not collector trigger；not API client refresh；not external refresh。</span></div>
+            <div class="kv"><span class="k">Signal / trading boundary</span><span class="v" id="runtimeReadinessSignalBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="runtimeReadinessReasonValue">RUNTIME_READINESS_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1519,6 +1531,27 @@
     var PAPER_OBSERVATION_POSITION_MONITOR_BLOCKED = "POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var PAPER_OBSERVATION_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var PAPER_OBSERVATION_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_STATUS_READY = "RUNTIME_READINESS_REVIEW_ONLY_READY";
+    var RUNTIME_READINESS_STATUS_BACKEND_PENDING = "RUNTIME_READINESS_BACKEND_PENDING_FAIL_CLOSED";
+    var RUNTIME_READINESS_STATUS_MISSING = "RUNTIME_READINESS_MISSING_FAIL_CLOSED";
+    var RUNTIME_READINESS_STATUS_PARTIAL = "RUNTIME_READINESS_PARTIAL_REVIEW_ONLY";
+    var SYSTEM_GUARDRAIL_STATUS_READY = "SYSTEM_GUARDRAIL_REVIEW_ONLY_READY";
+    var SYSTEM_GUARDRAIL_STATUS_DEGRADED = "SYSTEM_GUARDRAIL_DEGRADED_REVIEW_ONLY";
+    var SYSTEM_GUARDRAIL_STATUS_BLOCKED = "SYSTEM_GUARDRAIL_BLOCKED_FAIL_CLOSED";
+    var RUN_BASELINE_STATUS_READY = "RUN_BASELINE_REVIEW_ONLY_READY";
+    var RUN_BASELINE_STATUS_MISSING = "RUN_BASELINE_MISSING_FAIL_CLOSED";
+    var RUNTIME_METRIC_STATUS_READY = "RUNTIME_METRIC_REVIEW_ONLY_READY";
+    var RUNTIME_METRIC_STATUS_MISSING = "RUNTIME_METRIC_MISSING_FAIL_CLOSED";
+    var RUNTIME_READINESS_EXECUTABLE_BLOCKED = "EXECUTABLE_READINESS_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_TRADING_AUTH_BLOCKED = "TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_RECOVERY_BLOCKED = "RECOVERY_REPAIR_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_SCHEDULER_BLOCKED = "SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_COLLECTOR_BLOCKED = "COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_API_REFRESH_BLOCKED = "API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_EXTERNAL_REFRESH_BLOCKED = "EXTERNAL_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RUNTIME_READINESS_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -1925,6 +1958,55 @@
         tradingBoundaryStatus: REVIEW_ARCHIVE_TRADING_BOUNDARY_STATUS,
         displaySlotsAreCandidatePool: false
     };
+    var runtimeReadinessGuardrailStatus = {
+        status: RUNTIME_READINESS_STATUS_BACKEND_PENDING,
+        runtimeReadinessStatus: RUNTIME_READINESS_STATUS_BACKEND_PENDING,
+        systemGuardrailStatus: SYSTEM_GUARDRAIL_STATUS_BLOCKED,
+        runBaselineStatus: RUN_BASELINE_STATUS_MISSING,
+        runtimeMetricStatus: RUNTIME_METRIC_STATUS_MISSING,
+        windowMinutes: 60,
+        ownerPath: "SystemController -> /api/system/run-baseline -> RunBaselineService -> SystemHealthService + RuntimeMetricService.snapshot() -> RunBaselineVO",
+        runBaselineOwnerPath: "/api/system/run-baseline",
+        healthEndpointUse: "/api/system/health is static liveness only, not executable readiness",
+        systemHealthStaticLivenessOnly: true,
+        sourceHealth: "MISSING",
+        databaseStatus: "UNKNOWN",
+        schedulerObservationStatus: "UNKNOWN",
+        runtimeMetricHasSamples: false,
+        runtimeMetricSampleCount: 0,
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notExecutableReadiness: true,
+        notTradingAuthorization: true,
+        notRecoveryRepair: true,
+        notRestartAction: true,
+        notAutoFix: true,
+        notSchedulerTrigger: true,
+        notCollectorTrigger: true,
+        notApiClientRefresh: true,
+        notExternalRefresh: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        executableReadinessBoundaryStatus: RUNTIME_READINESS_EXECUTABLE_BLOCKED,
+        tradingAuthorizationBoundaryStatus: RUNTIME_READINESS_TRADING_AUTH_BLOCKED,
+        recoveryRepairBoundaryStatus: RUNTIME_READINESS_RECOVERY_BLOCKED,
+        schedulerTriggerBoundaryStatus: RUNTIME_READINESS_SCHEDULER_BLOCKED,
+        collectorTriggerBoundaryStatus: RUNTIME_READINESS_COLLECTOR_BLOCKED,
+        apiClientRefreshBoundaryStatus: RUNTIME_READINESS_API_REFRESH_BLOCKED,
+        externalRefreshBoundaryStatus: RUNTIME_READINESS_EXTERNAL_REFRESH_BLOCKED,
+        candidateBoundaryStatus: RUNTIME_READINESS_CANDIDATE_BLOCKED,
+        pointBoundaryStatus: RUNTIME_READINESS_POINT_BLOCKED,
+        tradingBoundaryStatus: RUNTIME_READINESS_TRADING_BLOCKED,
+        reason: "RUNTIME_READINESS_STATUS_PENDING",
+        message: "Runtime readiness / system guardrail 只读状态待确认；不是可执行就绪或交易授权。",
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -1940,6 +2022,7 @@
     window.__dataSourceHealthReviewStatus = DATA_SOURCE_HEALTH_STATUS_MISSING;
     window.__sourceRuntimeDataQualityReviewStatus = SOURCE_RUNTIME_STATUS_MISSING;
     window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
+    window.__runtimeReadinessGuardrailReviewStatus = RUNTIME_READINESS_STATUS_BACKEND_PENDING;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -4092,6 +4175,88 @@
             });
     }
 
+    function resolveRuntimeReadinessGuardrailStatus(payload) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, RUNTIME_READINESS_STATUS_BACKEND_PENDING).toUpperCase(),
+            runtimeReadinessStatus: firstNonEmpty(p.runtimeReadinessStatus, p.status, RUNTIME_READINESS_STATUS_BACKEND_PENDING).toUpperCase(),
+            systemGuardrailStatus: firstNonEmpty(p.systemGuardrailStatus, SYSTEM_GUARDRAIL_STATUS_BLOCKED).toUpperCase(),
+            runBaselineStatus: firstNonEmpty(p.runBaselineStatus, RUN_BASELINE_STATUS_MISSING).toUpperCase(),
+            runtimeMetricStatus: firstNonEmpty(p.runtimeMetricStatus, RUNTIME_METRIC_STATUS_MISSING).toUpperCase(),
+            windowMinutes: Number(p.windowMinutes || 60),
+            ownerPath: firstNonEmpty(p.ownerPath, "SystemController -> /api/system/run-baseline -> RunBaselineService -> SystemHealthService + RuntimeMetricService.snapshot() -> RunBaselineVO"),
+            runBaselineOwnerPath: firstNonEmpty(p.runBaselineOwnerPath, "/api/system/run-baseline"),
+            healthEndpointUse: firstNonEmpty(p.healthEndpointUse, "/api/system/health is static liveness only, not executable readiness"),
+            systemHealthStaticLivenessOnly: p.systemHealthStaticLivenessOnly !== false,
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            databaseStatus: firstNonEmpty(p.databaseStatus, "UNKNOWN").toUpperCase(),
+            schedulerObservationStatus: firstNonEmpty(p.schedulerObservationStatus, "UNKNOWN").toUpperCase(),
+            runtimeMetricHasSamples: p.runtimeMetricHasSamples === true,
+            runtimeMetricSampleCount: Number(p.runtimeMetricSampleCount || 0),
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notExecutableReadiness: true,
+            notTradingAuthorization: true,
+            notRecoveryRepair: true,
+            notRestartAction: true,
+            notAutoFix: true,
+            notSchedulerTrigger: true,
+            notCollectorTrigger: true,
+            notApiClientRefresh: true,
+            notExternalRefresh: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            executableReadinessBoundaryStatus: firstNonEmpty(p.executableReadinessBoundaryStatus, RUNTIME_READINESS_EXECUTABLE_BLOCKED).toUpperCase(),
+            tradingAuthorizationBoundaryStatus: firstNonEmpty(p.tradingAuthorizationBoundaryStatus, RUNTIME_READINESS_TRADING_AUTH_BLOCKED).toUpperCase(),
+            recoveryRepairBoundaryStatus: firstNonEmpty(p.recoveryRepairBoundaryStatus, RUNTIME_READINESS_RECOVERY_BLOCKED).toUpperCase(),
+            schedulerTriggerBoundaryStatus: firstNonEmpty(p.schedulerTriggerBoundaryStatus, RUNTIME_READINESS_SCHEDULER_BLOCKED).toUpperCase(),
+            collectorTriggerBoundaryStatus: firstNonEmpty(p.collectorTriggerBoundaryStatus, RUNTIME_READINESS_COLLECTOR_BLOCKED).toUpperCase(),
+            apiClientRefreshBoundaryStatus: firstNonEmpty(p.apiClientRefreshBoundaryStatus, RUNTIME_READINESS_API_REFRESH_BLOCKED).toUpperCase(),
+            externalRefreshBoundaryStatus: firstNonEmpty(p.externalRefreshBoundaryStatus, RUNTIME_READINESS_EXTERNAL_REFRESH_BLOCKED).toUpperCase(),
+            candidateBoundaryStatus: firstNonEmpty(p.candidateBoundaryStatus, RUNTIME_READINESS_CANDIDATE_BLOCKED).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, RUNTIME_READINESS_POINT_BLOCKED).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, RUNTIME_READINESS_TRADING_BLOCKED).toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "RUNTIME_READINESS_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Runtime readiness / system guardrail 只读状态待确认；不是可执行就绪或交易授权。"),
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateRuntimeReadinessGuardrailStatusDisplay() {
+        var rr = runtimeReadinessGuardrailStatus || {};
+        setText("runtimeReadinessStatusValue", (rr.runtimeReadinessStatus || rr.status || RUNTIME_READINESS_STATUS_BACKEND_PENDING) + " / " + (rr.message || "只读状态"));
+        setText("systemGuardrailStatusValue", (rr.systemGuardrailStatus || SYSTEM_GUARDRAIL_STATUS_BLOCKED) + " · db " + (rr.databaseStatus || "UNKNOWN") + " · scheduler " + (rr.schedulerObservationStatus || "UNKNOWN"));
+        setText("runBaselineStatusValue", (rr.runBaselineStatus || RUN_BASELINE_STATUS_MISSING) + " · " + (rr.runBaselineOwnerPath || "/api/system/run-baseline"));
+        setText("runtimeMetricStatusValue", (rr.runtimeMetricStatus || RUNTIME_METRIC_STATUS_MISSING) + " · samples " + (rr.runtimeMetricSampleCount || 0));
+        setText("runtimeReadinessSourceHealthValue", rr.sourceHealth || "MISSING");
+        setText("runtimeReadinessFailClosedValue", rr.failClosed === false ? "false" : "true");
+        setText("runtimeReadinessReviewOnlyValue", "review-only；manual review only；fail-closed；readiness 只是 operational guardrail status，不是 executable readiness；/api/system/health 只是 static liveness。");
+        setText("runtimeReadinessBoundaryValue", "not executable readiness；not trading authorization；not recovery / repair / restart / auto-fix；not scheduler trigger；not collector trigger；not API client refresh；not external refresh；" + (rr.executableReadinessBoundaryStatus || RUNTIME_READINESS_EXECUTABLE_BLOCKED) + " / " + (rr.tradingAuthorizationBoundaryStatus || RUNTIME_READINESS_TRADING_AUTH_BLOCKED));
+        setText("runtimeReadinessSignalBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。");
+        setText("runtimeReadinessReasonValue", rr.reason || "—");
+    }
+
+    function fetchRuntimeReadinessGuardrailStatus() {
+        return fetch("/api/system/runtime-readiness-guardrail-status")
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                runtimeReadinessGuardrailStatus = resolveRuntimeReadinessGuardrailStatus(payload);
+                window.__runtimeReadinessGuardrailReviewStatus = runtimeReadinessGuardrailStatus.status || RUNTIME_READINESS_STATUS_BACKEND_PENDING;
+                updateRuntimeReadinessGuardrailStatusDisplay();
+            })
+            .catch(function () {
+                runtimeReadinessGuardrailStatus = resolveRuntimeReadinessGuardrailStatus({});
+                window.__runtimeReadinessGuardrailReviewStatus = RUNTIME_READINESS_STATUS_BACKEND_PENDING;
+                updateRuntimeReadinessGuardrailStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -4717,6 +4882,7 @@
                 fetchPositionProviderStatus();
                 fetchWatchlistRuntimeStatus();
                 fetchRuleConfigAuditRuntimeStatus();
+                fetchRuntimeReadinessGuardrailStatus();
             })
             .catch(function () {
                 document.getElementById("lastUpdatedText").textContent = nowText();
@@ -4733,11 +4899,13 @@
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
                 fetchSourceRuntimeDataQualityStatus(selectedSymbol);
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
+                fetchRuntimeReadinessGuardrailStatus();
             });
     }
 
     function requestDetailForSelectedSymbol() {
         var symbol = selectedSymbol;
+        fetchRuntimeReadinessGuardrailStatus();
         fetchMarketQuoteRuntimeStatus(symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
         fetchEvidenceScoreRuntimeStatus(symbol);
         fetchDecisionResultRuntimeStatus(symbol);
