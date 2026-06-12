@@ -4,6 +4,8 @@ import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
@@ -140,6 +142,19 @@ public class DashboardController {
     private static final String POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED = "POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String POINT_BOUNDARY_BLOCKED_FAIL_CLOSED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String ACCOUNT_RISK_STATUS_READY = "ACCOUNT_RISK_STATUS_REVIEW_ONLY_READY";
+    private static final String ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED = "ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED";
+    private static final String ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED = "ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED";
+    private static final String ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY = "ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY";
+    private static final String ACCOUNT_EXPOSURE_READY = "ACCOUNT_EXPOSURE_REVIEW_ONLY_READY";
+    private static final String ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED = "ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED";
+    private static final String RISK_ALLOWED_READ_ONLY_EVIDENCE = "RISK_ALLOWED_READ_ONLY_EVIDENCE";
+    private static final String ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED = "ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED = "PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED = "TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED = "POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED = "REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -148,6 +163,7 @@ public class DashboardController {
     private final RuntimeMetricService runtimeMetricService;
     private final RealMarketEnvironmentService realMarketEnvironmentService;
     private final MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
+    private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
     private final ReviewService reviewService;
@@ -164,6 +180,7 @@ public class DashboardController {
                                RuntimeMetricService runtimeMetricService,
                                RealMarketEnvironmentService realMarketEnvironmentService,
                                MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
+                               AccountRiskSnapshotMapper accountRiskSnapshotMapper,
                                EvidenceService evidenceService,
                                ScoreService scoreService,
                                ReviewService reviewService,
@@ -179,6 +196,7 @@ public class DashboardController {
         this.runtimeMetricService = runtimeMetricService;
         this.realMarketEnvironmentService = realMarketEnvironmentService;
         this.marketEnvironmentSnapshotMapper = marketEnvironmentSnapshotMapper;
+        this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
         this.reviewService = reviewService;
@@ -993,6 +1011,102 @@ public class DashboardController {
         return status;
     }
 
+    @GetMapping("/api/dashboard/account-risk-exposure-status")
+    @ResponseBody
+    public Map<String, Object> accountRiskExposureStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseAccountRiskExposureStatus(normalizedSymbol);
+        DecisionResultVO decision = decisionService.getLatestDecisionResultBySymbol(normalizedSymbol);
+        String analysisId = decision != null ? decision.getAnalysisId() : null;
+        status.put("analysisId", analysisId);
+        if (!hasText(analysisId)) {
+            applyAccountRiskExposureStatus(
+                    status,
+                    ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED,
+                    "ANALYSIS_CONTEXT_MISSING",
+                    "Account risk snapshot analysis context 缺失；账户风险 / 暴露只读状态 fail-closed，不生成交易授权、仓位大小或账户动作。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        TmAccountRiskSnapshotDO snapshot;
+        try {
+            snapshot = accountRiskSnapshotMapper != null
+                    ? accountRiskSnapshotMapper.selectLatestByAnalysisId(analysisId)
+                    : null;
+        } catch (RuntimeException ex) {
+            applyAccountRiskExposureStatus(
+                    status,
+                    ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED,
+                    "ACCOUNT_RISK_SNAPSHOT_READ_PATH_UNAVAILABLE",
+                    "AccountRiskSnapshot read path 不可用；只读状态 fail-closed，不写入 account risk 或 PushSnapshot，不触发 Push / Recheck / Trading。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        if (snapshot == null) {
+            applyAccountRiskExposureStatus(
+                    status,
+                    ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED,
+                    "ACCOUNT_RISK_SNAPSHOT_MISSING",
+                    "AccountRiskSnapshot 缺失；不伪造 riskAllowed、exposure 或账户风险状态。",
+                    true,
+                    "MISSING"
+            );
+            return status;
+        }
+
+        status.put("snapshotId", snapshot.getId());
+        status.put("snapshotSymbol", firstNonBlank(snapshot.getSymbol(), normalizedSymbol));
+        status.put("riskLevelSnapshot", firstNonBlank(snapshot.getRiskLevelSnapshot(), "UNKNOWN"));
+        status.put("riskAllowedEvidence", snapshot.getRiskAllowed());
+        status.put("riskAllowedStatus", snapshot.getRiskAllowed() != null ? RISK_ALLOWED_READ_ONLY_EVIDENCE : ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY);
+        status.put("riskReasonCode", firstNonBlank(snapshot.getRiskReasonCode(), "UNKNOWN"));
+        status.put("riskReasonText", firstNonBlank(snapshot.getRiskReasonText(), "missing"));
+        status.put("positionExposure", snapshot.getPositionExposure());
+        status.put("maxAllowedExposure", snapshot.getMaxAllowedExposure());
+        status.put("accountExposureStatus", accountExposureStatus(snapshot));
+        status.put("snapshotSource", firstNonBlank(snapshot.getSnapshotSource(), "UNKNOWN"));
+        status.put("snapshotVersion", snapshot.getSnapshotVersion());
+        status.put("sourceNote", firstNonBlank(snapshot.getSourceNote(), "missing"));
+        status.put("traceId", firstNonBlank(snapshot.getTraceId(), "missing"));
+        status.put("snapshotCreateTime", snapshot.getCreateTime());
+
+        if (snapshot.getPositionExposure() == null || snapshot.getMaxAllowedExposure() == null) {
+            applyAccountRiskExposureStatus(
+                    status,
+                    ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED,
+                    "ACCOUNT_EXPOSURE_MISSING",
+                    "Account exposure / maxAllowedExposure 缺失；只读状态 fail-closed，不推导仓位大小或交易授权。",
+                    true,
+                    "MISSING"
+            );
+        } else if (snapshot.getRiskAllowed() == null || !hasText(snapshot.getRiskLevelSnapshot())) {
+            applyAccountRiskExposureStatus(
+                    status,
+                    ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY,
+                    "ACCOUNT_RISK_STATUS_PARTIAL",
+                    "Account risk snapshot 部分可读；riskAllowed 仅作只读证据，不生成账户动作。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applyAccountRiskExposureStatus(
+                    status,
+                    ACCOUNT_RISK_STATUS_READY,
+                    "ACCOUNT_RISK_SNAPSHOT_OWNER_PATH_READ",
+                    "Account risk / exposure 只读状态可读；riskAllowed 仅作只读证据，exposure 仅作状态，不是交易授权或仓位大小建议。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
     private List<EvidenceBriefVO> resolveEvidenceTopItems(DashboardDetailResponseVO body) {
         if (body == null || body.getDecision() == null || evidenceService == null) {
             return Collections.emptyList();
@@ -1379,6 +1493,82 @@ public class DashboardController {
                 SIMULATED_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 PAPER_PNL_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 POSITION_MONITOR_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
+        return status;
+    }
+
+    private Map<String, Object> baseAccountRiskExposureStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("analysisId", null);
+        status.put("snapshotId", null);
+        status.put("snapshotSymbol", normalizedSymbol);
+        status.put("riskLevelSnapshot", "UNKNOWN");
+        status.put("riskAllowedEvidence", null);
+        status.put("riskAllowedStatus", ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("riskReasonCode", "UNKNOWN");
+        status.put("riskReasonText", "missing");
+        status.put("positionExposure", null);
+        status.put("maxAllowedExposure", null);
+        status.put("accountExposureStatus", ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED);
+        status.put("snapshotSource", "UNKNOWN");
+        status.put("snapshotVersion", null);
+        status.put("sourceNote", "missing");
+        status.put("traceId", "missing");
+        status.put("snapshotCreateTime", null);
+        status.put("ownerPath", "AccountRiskSnapshotMapper.selectLatestByAnalysisId");
+        status.put("historicalSnapshotReadOnly", "AccountRiskSnapshotMapper.selectById is historical snapshot read only and not the runtime owner path");
+        status.put("displayContext", "ReviewAggregate / review-page account-risk fields are display context only, not execution entry");
+        status.put("sourceHealth", "BLOCKED");
+        status.put("reason", "ACCOUNT_RISK_EXPOSURE_STATUS_PENDING");
+        status.put("message", "Account risk / exposure 只读状态待确认；不是交易授权、仓位大小或账户动作。");
+        status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
+        status.put("notAccountRiskWrite", true);
+        status.put("notPushSnapshotWrite", true);
+        status.put("notPushSend", true);
+        status.put("notRecheckExecution", true);
+        status.put("notTradingAuthorization", true);
+        status.put("notPositionSizing", true);
+        status.put("notReduceCloseStopReverseGuidance", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
+        status.put("notTradingSignal", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("accountRiskWriteBoundaryStatus", ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pushSnapshotWriteBoundaryStatus", PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pushBoundaryStatus", PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("recheckBoundaryStatus", RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("tradingAuthorizationBoundaryStatus", TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("positionSizingBoundaryStatus", POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("reduceCloseStopReverseBoundaryStatus", REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("candidateBoundaryStatus", CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pointBoundaryStatus", POINT_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("tradingBoundaryStatus", TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                ACCOUNT_RISK_STATUS_READY,
+                ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED,
+                ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED,
+                ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY,
+                ACCOUNT_EXPOSURE_READY,
+                ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED,
+                RISK_ALLOWED_READ_ONLY_EVIDENCE,
+                ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
                 TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
         ));
@@ -1970,6 +2160,26 @@ public class DashboardController {
         status.put("message", message);
         status.put("failClosed", failClosed);
         status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyAccountRiskExposureStatus(Map<String, Object> status,
+                                                String statusValue,
+                                                String reason,
+                                                String message,
+                                                boolean failClosed,
+                                                String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private String accountExposureStatus(TmAccountRiskSnapshotDO snapshot) {
+        if (snapshot == null || snapshot.getPositionExposure() == null || snapshot.getMaxAllowedExposure() == null) {
+            return ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED;
+        }
+        return ACCOUNT_EXPOSURE_READY;
     }
 
     private String normalizeSourceHealth(String sourceHealth) {

@@ -1230,6 +1230,18 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="runtimeReadinessReasonValue">RUNTIME_READINESS_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="accountRiskExposureStatusPanel" aria-label="Account risk exposure review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">Account risk / exposure 只读状态</span><span class="v" id="accountRiskRuntimeStatusValue">ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED / Account risk 只读状态待确认</span></div>
+            <div class="kv"><span class="k">riskAllowed evidence</span><span class="v" id="accountRiskAllowedEvidenceValue">riskAllowed 仅作 read-only evidence，不是 trading authorization。</span></div>
+            <div class="kv"><span class="k">exposure status</span><span class="v" id="accountRiskExposureValue">positionExposure / maxAllowedExposure 仅作 read-only status，不是 position sizing。</span></div>
+            <div class="kv"><span class="k">snapshot source</span><span class="v" id="accountRiskSnapshotSourceValue">AccountRiskSnapshotMapper.selectLatestByAnalysisId / tm_account_risk_snapshot</span></div>
+            <div class="kv"><span class="k">只读 / 人工复核边界</span><span class="v" id="accountRiskReviewOnlyValue">review-only；manual review only；fail-closed；not account-risk write；not PushSnapshot write。</span></div>
+            <div class="kv"><span class="k">Write / Push / Recheck boundary</span><span class="v" id="accountRiskWriteBoundaryValue">not account-risk write；not PushSnapshot write；not Push send；not Recheck execution。</span></div>
+            <div class="kv"><span class="k">Account action boundary</span><span class="v" id="accountRiskPushRecheckBoundaryValue">not trading authorization；not position sizing；not reduce / close / stop / reverse guidance。</span></div>
+            <div class="kv"><span class="k">Signal / trading boundary</span><span class="v" id="accountRiskSignalBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="accountRiskReasonValue">ACCOUNT_RISK_EXPOSURE_STATUS_PENDING</span></div>
+        </div>
+
         <div class="card main-workbench-card" id="mainWorkbenchCard">
             <div class="workbench-head">
                 <div>
@@ -1552,6 +1564,23 @@
     var RUNTIME_READINESS_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var RUNTIME_READINESS_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var RUNTIME_READINESS_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_STATUS_READY = "ACCOUNT_RISK_STATUS_REVIEW_ONLY_READY";
+    var ACCOUNT_RISK_STATUS_BACKEND_PENDING = "ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED";
+    var ACCOUNT_RISK_STATUS_MISSING = "ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED";
+    var ACCOUNT_RISK_STATUS_PARTIAL = "ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY";
+    var ACCOUNT_EXPOSURE_STATUS_READY = "ACCOUNT_EXPOSURE_REVIEW_ONLY_READY";
+    var ACCOUNT_EXPOSURE_STATUS_MISSING = "ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED";
+    var ACCOUNT_RISK_ALLOWED_EVIDENCE = "RISK_ALLOWED_READ_ONLY_EVIDENCE";
+    var ACCOUNT_RISK_WRITE_BLOCKED = "ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_PUSH_SNAPSHOT_WRITE_BLOCKED = "PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_PUSH_SEND_BLOCKED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_RECHECK_BLOCKED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_TRADING_AUTH_BLOCKED = "TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_POSITION_SIZING_BLOCKED = "POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_ACTION_GUIDANCE_BLOCKED = "REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var ACCOUNT_RISK_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
     var searchQuery = "";
     var modeValue = "system";
@@ -2007,6 +2036,54 @@
         message: "Runtime readiness / system guardrail 只读状态待确认；不是可执行就绪或交易授权。",
         failClosed: true
     };
+    var accountRiskExposureStatus = {
+        status: ACCOUNT_RISK_STATUS_BACKEND_PENDING,
+        symbol: null,
+        analysisId: null,
+        snapshotId: null,
+        riskLevelSnapshot: "UNKNOWN",
+        riskAllowedEvidence: null,
+        riskAllowedStatus: ACCOUNT_RISK_STATUS_MISSING,
+        riskReasonCode: "UNKNOWN",
+        positionExposure: null,
+        maxAllowedExposure: null,
+        accountExposureStatus: ACCOUNT_EXPOSURE_STATUS_MISSING,
+        snapshotSource: "UNKNOWN",
+        ownerPath: "AccountRiskSnapshotMapper.selectLatestByAnalysisId",
+        historicalSnapshotReadOnly: "AccountRiskSnapshotMapper.selectById is historical snapshot read only and not the runtime owner path",
+        displayContext: "ReviewAggregate / review-page account-risk fields are display context only, not execution entry",
+        sourceHealth: "BLOCKED",
+        reason: "ACCOUNT_RISK_EXPOSURE_STATUS_PENDING",
+        message: "Account risk / exposure 只读状态待确认；不是交易授权、仓位大小或账户动作。",
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notAccountRiskWrite: true,
+        notPushSnapshotWrite: true,
+        notPushSend: true,
+        notRecheckExecution: true,
+        notTradingAuthorization: true,
+        notPositionSizing: true,
+        notReduceCloseStopReverseGuidance: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        accountRiskWriteBoundaryStatus: ACCOUNT_RISK_WRITE_BLOCKED,
+        pushSnapshotWriteBoundaryStatus: ACCOUNT_RISK_PUSH_SNAPSHOT_WRITE_BLOCKED,
+        pushBoundaryStatus: ACCOUNT_RISK_PUSH_SEND_BLOCKED,
+        recheckBoundaryStatus: ACCOUNT_RISK_RECHECK_BLOCKED,
+        tradingAuthorizationBoundaryStatus: ACCOUNT_RISK_TRADING_AUTH_BLOCKED,
+        positionSizingBoundaryStatus: ACCOUNT_RISK_POSITION_SIZING_BLOCKED,
+        reduceCloseStopReverseBoundaryStatus: ACCOUNT_RISK_ACTION_GUIDANCE_BLOCKED,
+        candidateBoundaryStatus: ACCOUNT_RISK_CANDIDATE_BLOCKED,
+        pointBoundaryStatus: ACCOUNT_RISK_POINT_BLOCKED,
+        tradingBoundaryStatus: ACCOUNT_RISK_TRADING_BLOCKED,
+        failClosed: true
+    };
     window.__providerStatusText = "状态待确认";
     window.__providerStatusClass = "neutral";
     window.__positionSyncReviewStatus = "INCOMPLETE";
@@ -2023,6 +2100,7 @@
     window.__sourceRuntimeDataQualityReviewStatus = SOURCE_RUNTIME_STATUS_MISSING;
     window.__missedArchiveReviewStatus = MISSED_ARCHIVE_STATUS_EMPTY;
     window.__runtimeReadinessGuardrailReviewStatus = RUNTIME_READINESS_STATUS_BACKEND_PENDING;
+    window.__accountRiskExposureReviewStatus = ACCOUNT_RISK_STATUS_BACKEND_PENDING;
     window.__lastLayer1State = { systemStatus: null, systemHealth: null, alerts: [], decisions: [], openPositionCount: 0 };
 
     function loadCustomSymbols() {
@@ -4257,6 +4335,98 @@
             });
     }
 
+    function resolveAccountRiskExposureStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, ACCOUNT_RISK_STATUS_BACKEND_PENDING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            analysisId: p.analysisId || null,
+            snapshotId: p.snapshotId || null,
+            riskLevelSnapshot: firstNonEmpty(p.riskLevelSnapshot, "UNKNOWN"),
+            riskAllowedEvidence: p.riskAllowedEvidence,
+            riskAllowedStatus: firstNonEmpty(p.riskAllowedStatus, ACCOUNT_RISK_STATUS_MISSING).toUpperCase(),
+            riskReasonCode: firstNonEmpty(p.riskReasonCode, "UNKNOWN"),
+            riskReasonText: firstNonEmpty(p.riskReasonText, "missing"),
+            positionExposure: p.positionExposure,
+            maxAllowedExposure: p.maxAllowedExposure,
+            accountExposureStatus: firstNonEmpty(p.accountExposureStatus, ACCOUNT_EXPOSURE_STATUS_MISSING).toUpperCase(),
+            snapshotSource: firstNonEmpty(p.snapshotSource, "UNKNOWN"),
+            ownerPath: firstNonEmpty(p.ownerPath, "AccountRiskSnapshotMapper.selectLatestByAnalysisId"),
+            historicalSnapshotReadOnly: firstNonEmpty(p.historicalSnapshotReadOnly, "AccountRiskSnapshotMapper.selectById is historical snapshot read only and not the runtime owner path"),
+            displayContext: firstNonEmpty(p.displayContext, "ReviewAggregate / review-page account-risk fields are display context only, not execution entry"),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "BLOCKED").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "ACCOUNT_RISK_EXPOSURE_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Account risk / exposure 只读状态待确认；不是交易授权、仓位大小或账户动作。"),
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notAccountRiskWrite: true,
+            notPushSnapshotWrite: true,
+            notPushSend: true,
+            notRecheckExecution: true,
+            notTradingAuthorization: true,
+            notPositionSizing: true,
+            notReduceCloseStopReverseGuidance: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            accountRiskWriteBoundaryStatus: firstNonEmpty(p.accountRiskWriteBoundaryStatus, ACCOUNT_RISK_WRITE_BLOCKED).toUpperCase(),
+            pushSnapshotWriteBoundaryStatus: firstNonEmpty(p.pushSnapshotWriteBoundaryStatus, ACCOUNT_RISK_PUSH_SNAPSHOT_WRITE_BLOCKED).toUpperCase(),
+            pushBoundaryStatus: firstNonEmpty(p.pushBoundaryStatus, ACCOUNT_RISK_PUSH_SEND_BLOCKED).toUpperCase(),
+            recheckBoundaryStatus: firstNonEmpty(p.recheckBoundaryStatus, ACCOUNT_RISK_RECHECK_BLOCKED).toUpperCase(),
+            tradingAuthorizationBoundaryStatus: firstNonEmpty(p.tradingAuthorizationBoundaryStatus, ACCOUNT_RISK_TRADING_AUTH_BLOCKED).toUpperCase(),
+            positionSizingBoundaryStatus: firstNonEmpty(p.positionSizingBoundaryStatus, ACCOUNT_RISK_POSITION_SIZING_BLOCKED).toUpperCase(),
+            reduceCloseStopReverseBoundaryStatus: firstNonEmpty(p.reduceCloseStopReverseBoundaryStatus, ACCOUNT_RISK_ACTION_GUIDANCE_BLOCKED).toUpperCase(),
+            candidateBoundaryStatus: firstNonEmpty(p.candidateBoundaryStatus, ACCOUNT_RISK_CANDIDATE_BLOCKED).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, ACCOUNT_RISK_POINT_BLOCKED).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, ACCOUNT_RISK_TRADING_BLOCKED).toUpperCase(),
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateAccountRiskExposureStatusDisplay() {
+        var ar = accountRiskExposureStatus || {};
+        var riskAllowedText = ar.riskAllowedEvidence === true ? "true / read-only evidence only"
+            : (ar.riskAllowedEvidence === false ? "false / read-only evidence only" : "missing / fail-closed");
+        var exposureText = "positionExposure=" + firstNonEmpty(ar.positionExposure, "missing")
+            + " · maxAllowedExposure=" + firstNonEmpty(ar.maxAllowedExposure, "missing")
+            + " · " + (ar.accountExposureStatus || ACCOUNT_EXPOSURE_STATUS_MISSING);
+        setText("accountRiskRuntimeStatusValue", (ar.status || ACCOUNT_RISK_STATUS_BACKEND_PENDING) + " / " + (ar.message || "只读状态"));
+        setText("accountRiskAllowedEvidenceValue", riskAllowedText + "；riskAllowed 仅作 read-only evidence，不是 trading authorization。");
+        setText("accountRiskExposureValue", exposureText + "；不是 position sizing，不生成 reduce / close / stop / reverse guidance。");
+        setText("accountRiskSnapshotSourceValue", (ar.ownerPath || "AccountRiskSnapshotMapper.selectLatestByAnalysisId") + " · " + (ar.snapshotSource || "UNKNOWN") + " · " + (ar.historicalSnapshotReadOnly || ""));
+        setText("accountRiskReviewOnlyValue", "review-only；manual review only；fail-closed；ReviewAggregate / review-page 仅为 display context，不是执行入口。");
+        setText("accountRiskWriteBoundaryValue", (ar.accountRiskWriteBoundaryStatus || ACCOUNT_RISK_WRITE_BLOCKED) + " / " + (ar.pushSnapshotWriteBoundaryStatus || ACCOUNT_RISK_PUSH_SNAPSHOT_WRITE_BLOCKED) + "；not Push send；not Recheck execution。");
+        setText("accountRiskPushRecheckBoundaryValue", (ar.tradingAuthorizationBoundaryStatus || ACCOUNT_RISK_TRADING_AUTH_BLOCKED) + " / " + (ar.positionSizingBoundaryStatus || ACCOUNT_RISK_POSITION_SIZING_BLOCKED) + " / " + (ar.reduceCloseStopReverseBoundaryStatus || ACCOUNT_RISK_ACTION_GUIDANCE_BLOCKED));
+        setText("accountRiskSignalBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。");
+        setText("accountRiskReasonValue", ar.reason || "—");
+    }
+
+    function fetchAccountRiskExposureStatus(symbol) {
+        if (!symbol) {
+            accountRiskExposureStatus = resolveAccountRiskExposureStatus({});
+            window.__accountRiskExposureReviewStatus = ACCOUNT_RISK_STATUS_BACKEND_PENDING;
+            updateAccountRiskExposureStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/account-risk-exposure-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                accountRiskExposureStatus = resolveAccountRiskExposureStatus(payload, symbol);
+                window.__accountRiskExposureReviewStatus = accountRiskExposureStatus.status || ACCOUNT_RISK_STATUS_BACKEND_PENDING;
+                updateAccountRiskExposureStatusDisplay();
+            })
+            .catch(function () {
+                accountRiskExposureStatus = resolveAccountRiskExposureStatus({}, symbol);
+                window.__accountRiskExposureReviewStatus = ACCOUNT_RISK_STATUS_BACKEND_PENDING;
+                updateAccountRiskExposureStatusDisplay();
+            });
+    }
+
     function fetchEvidenceScoreRuntimeStatus(symbol) {
         if (!symbol) {
             evidenceScoreRuntimeStatus = resolveEvidenceScoreRuntimeStatus({});
@@ -4900,6 +5070,7 @@
                 fetchSourceRuntimeDataQualityStatus(selectedSymbol);
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
                 fetchRuntimeReadinessGuardrailStatus();
+                fetchAccountRiskExposureStatus(selectedSymbol);
             });
     }
 
@@ -4917,6 +5088,7 @@
         fetchDataSourceHealthRuntimeStatus(symbol);
         fetchSourceRuntimeDataQualityStatus(symbol);
         fetchMissedArchiveRuntimeStatus(symbol);
+        fetchAccountRiskExposureStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })

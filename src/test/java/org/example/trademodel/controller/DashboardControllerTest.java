@@ -8,6 +8,8 @@ import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.DecisionService;
@@ -58,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -86,6 +89,8 @@ class DashboardControllerTest {
     private RealMarketEnvironmentService realMarketEnvironmentService;
     @Mock
     private MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper;
+    @Mock
+    private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     @Mock
     private EvidenceService evidenceService;
     @Mock
@@ -675,6 +680,61 @@ class DashboardControllerTest {
         assertThat(html).contains("Display Slots 不是候选池");
     }
 
+    @Test
+    void dashboardTemplateShowsReviewOnlyAccountRiskExposureStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/account-risk-exposure-status");
+        assertThat(html).contains("accountRiskExposureStatusPanel");
+        assertThat(html).contains("accountRiskRuntimeStatusValue");
+        assertThat(html).contains("accountRiskAllowedEvidenceValue");
+        assertThat(html).contains("accountRiskExposureValue");
+        assertThat(html).contains("accountRiskSnapshotSourceValue");
+        assertThat(html).contains("accountRiskReviewOnlyValue");
+        assertThat(html).contains("accountRiskWriteBoundaryValue");
+        assertThat(html).contains("accountRiskPushRecheckBoundaryValue");
+        assertThat(html).contains("accountRiskSignalBoundaryValue");
+        assertThat(html).contains("accountRiskReasonValue");
+        assertThat(html).contains("AccountRiskSnapshotMapper.selectLatestByAnalysisId");
+        assertThat(html).contains("AccountRiskSnapshotMapper.selectById is historical snapshot read only");
+        assertThat(html).contains("tm_account_risk_snapshot");
+        assertThat(html).contains("ACCOUNT_RISK_STATUS_REVIEW_ONLY_READY");
+        assertThat(html).contains("ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED");
+        assertThat(html).contains("ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("ACCOUNT_RISK_STATUS_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("ACCOUNT_EXPOSURE_REVIEW_ONLY_READY");
+        assertThat(html).contains("ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("RISK_ALLOWED_READ_ONLY_EVIDENCE");
+        assertThat(html).contains("ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("review-only");
+        assertThat(html).contains("manual review only");
+        assertThat(html).contains("fail-closed");
+        assertThat(html).contains("not account-risk write");
+        assertThat(html).contains("not PushSnapshot write");
+        assertThat(html).contains("not Push send");
+        assertThat(html).contains("not Recheck execution");
+        assertThat(html).contains("not trading authorization");
+        assertThat(html).contains("not position sizing");
+        assertThat(html).contains("not reduce / close / stop / reverse guidance");
+        assertThat(html).contains("not candidate");
+        assertThat(html).contains("not decision generation");
+        assertThat(html).contains("not point");
+        assertThat(html).contains("not final direction");
+        assertThat(html).contains("not entry / stop / TP / RR");
+        assertThat(html).contains("not trading");
+        assertThat(html).contains("not executable");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
     private DashboardController controllerWith(DashboardSourceTraceDetailAdapter sourceTraceDetailAdapter) {
         PlanBoundaryDisplayAdapter planBoundaryDisplayAdapter = (symbol, decision, fallbackDisplay) -> fallbackDisplay;
         ExecutionPlanDisplayAdapter executionPlanDisplayAdapter = (decision, planBoundaryDisplay, fallbackDisplay) -> fallbackDisplay;
@@ -703,6 +763,7 @@ class DashboardControllerTest {
                 runtimeMetricService,
                 realMarketEnvironmentService,
                 marketEnvironmentSnapshotMapper,
+                accountRiskSnapshotMapper,
                 evidenceService,
                 scoreService,
                 reviewService,
@@ -1684,6 +1745,163 @@ class DashboardControllerTest {
     }
 
     @Test
+    void accountRiskExposureStatusEndpointReturnsReviewOnlyReadyStatusFromLatestSnapshotOwnerPath() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-account-ready");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-account-ready"))
+                .thenReturn(accountRiskSnapshot("ana-account-ready", "BTCUSDT", true,
+                        "NORMAL", new BigDecimal("0.12"), new BigDecimal("0.30")));
+
+        mockMvc.perform(get("/api/dashboard/account-risk-exposure-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCOUNT_RISK_STATUS_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.analysisId").value("ana-account-ready"))
+                .andExpect(jsonPath("$.snapshotId").value(9001))
+                .andExpect(jsonPath("$.riskLevelSnapshot").value("NORMAL"))
+                .andExpect(jsonPath("$.riskAllowedEvidence").value(true))
+                .andExpect(jsonPath("$.riskAllowedStatus").value("RISK_ALLOWED_READ_ONLY_EVIDENCE"))
+                .andExpect(jsonPath("$.positionExposure").value(0.12))
+                .andExpect(jsonPath("$.maxAllowedExposure").value(0.30))
+                .andExpect(jsonPath("$.accountExposureStatus").value("ACCOUNT_EXPOSURE_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.ownerPath").value("AccountRiskSnapshotMapper.selectLatestByAnalysisId"))
+                .andExpect(jsonPath("$.historicalSnapshotReadOnly").value("AccountRiskSnapshotMapper.selectById is historical snapshot read only and not the runtime owner path"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notAccountRiskWrite").value(true))
+                .andExpect(jsonPath("$.notPushSnapshotWrite").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notTradingAuthorization").value(true))
+                .andExpect(jsonPath("$.notPositionSizing").value(true))
+                .andExpect(jsonPath("$.notReduceCloseStopReverseGuidance").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notFinalDirection").value(true))
+                .andExpect(jsonPath("$.notEntryStopTpRr").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.accountRiskWriteBoundaryStatus").value("ACCOUNT_RISK_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pushSnapshotWriteBoundaryStatus").value("PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pushBoundaryStatus").value("PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.recheckBoundaryStatus").value("RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.tradingAuthorizationBoundaryStatus").value("TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.positionSizingBoundaryStatus").value("POSITION_SIZING_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reduceCloseStopReverseBoundaryStatus").value("REDUCE_CLOSE_STOP_REVERSE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.candidateBoundaryStatus").value("CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pointBoundaryStatus").value("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.tradingBoundaryStatus").value("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.failClosed").value(false))
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'ACCOUNT_RISK_STATUS_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'ACCOUNT_EXPOSURE_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'TRADING_AUTHORIZATION_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists());
+
+        verify(accountRiskSnapshotMapper).selectLatestByAnalysisId("ana-account-ready");
+        verify(accountRiskSnapshotMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void accountRiskExposureStatusEndpointFailsClosedWhenSnapshotMissing() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-account-missing");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-account-missing")).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/account-risk-exposure-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCOUNT_RISK_STATUS_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.notAccountRiskWrite").value(true))
+                .andExpect(jsonPath("$.notPushSnapshotWrite").value(true))
+                .andExpect(jsonPath("$.notTradingAuthorization").value(true))
+                .andExpect(jsonPath("$.notPositionSizing").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void accountRiskExposureStatusEndpointFailsClosedWhenReadPathThrows() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-account-error");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-account-error"))
+                .thenThrow(new RuntimeException("read unavailable"));
+
+        mockMvc.perform(get("/api/dashboard/account-risk-exposure-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCOUNT_RISK_STATUS_BACKEND_PENDING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.notAccountRiskWrite").value(true))
+                .andExpect(jsonPath("$.notPushSnapshotWrite").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void accountRiskExposureStatusEndpointFailsClosedWhenExposureMissing() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-account-exposure-missing");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-account-exposure-missing"))
+                .thenReturn(accountRiskSnapshot("ana-account-exposure-missing", "BTCUSDT", true,
+                        "NORMAL", null, null));
+
+        mockMvc.perform(get("/api/dashboard/account-risk-exposure-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.accountExposureStatus").value("ACCOUNT_EXPOSURE_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.riskAllowedStatus").value("RISK_ALLOWED_READ_ONLY_EVIDENCE"))
+                .andExpect(jsonPath("$.notTradingAuthorization").value(true))
+                .andExpect(jsonPath("$.notPositionSizing").value(true))
+                .andExpect(jsonPath("$.notReduceCloseStopReverseGuidance").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true));
+    }
+
+    @Test
+    void accountRiskExposureStatusEndpointDoesNotExposeAccountActionCandidatePointOrTradingFields() throws Exception {
+        DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
+        decision.setAnalysisId("ana-account-safe");
+        when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
+        when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-account-safe"))
+                .thenReturn(accountRiskSnapshot("ana-account-safe", "BTCUSDT", true,
+                        "NORMAL", new BigDecimal("0.12"), new BigDecimal("0.30")));
+
+        mockMvc.perform(get("/api/dashboard/account-risk-exposure-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountRiskWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSnapshotWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSend").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.tradingAuthorization").doesNotExist())
+                .andExpect(jsonPath("$.positionSize").doesNotExist())
+                .andExpect(jsonPath("$.leverage").doesNotExist())
+                .andExpect(jsonPath("$.positionSizing").doesNotExist())
+                .andExpect(jsonPath("$.reduceGuidance").doesNotExist())
+                .andExpect(jsonPath("$.closeGuidance").doesNotExist())
+                .andExpect(jsonPath("$.stopGuidance").doesNotExist())
+                .andExpect(jsonPath("$.reverseGuidance").doesNotExist())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
     void reviewReplayStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
         when(reviewService.getStateByAnalysisId("ana-review-ready"))
                 .thenReturn(reviewState("ana-review-ready"));
@@ -2362,6 +2580,31 @@ class DashboardControllerTest {
         row.setAiPlanMode("AGGRESSIVE");
         row.setConfusedScore(3);
         return row;
+    }
+
+    private static TmAccountRiskSnapshotDO accountRiskSnapshot(
+            String analysisId,
+            String symbol,
+            Boolean riskAllowed,
+            String riskLevel,
+            BigDecimal positionExposure,
+            BigDecimal maxAllowedExposure) {
+        TmAccountRiskSnapshotDO snapshot = new TmAccountRiskSnapshotDO();
+        snapshot.setId(9001L);
+        snapshot.setAnalysisId(analysisId);
+        snapshot.setSymbol(symbol);
+        snapshot.setRiskAllowed(riskAllowed);
+        snapshot.setRiskLevelSnapshot(riskLevel);
+        snapshot.setRiskReasonCode("ACCOUNT_RISK_REVIEW_ONLY");
+        snapshot.setRiskReasonText("Account risk snapshot is review-only evidence.");
+        snapshot.setPositionExposure(positionExposure);
+        snapshot.setMaxAllowedExposure(maxAllowedExposure);
+        snapshot.setSnapshotSource("tm_account_risk_snapshot");
+        snapshot.setSnapshotVersion(1);
+        snapshot.setSourceNote("read-only account exposure snapshot");
+        snapshot.setTraceId("trace-" + analysisId);
+        snapshot.setCreateTime(LocalDateTime.of(2026, 6, 12, 12, 0));
+        return snapshot;
     }
 
     private static ReviewStateVO reviewState(String analysisId) {
