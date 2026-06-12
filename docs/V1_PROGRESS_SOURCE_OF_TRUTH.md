@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `1625b52 docs(paper): read paper observation status source path`
-- Current active block: `Implementation readiness gate for Paper Observation / Paper Trading Status review-only status`
+- Current merged main: `0560ba2 docs(paper): design paper observation status runtime wiring`
+- Current active block: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this A-risk design package: none. Paper Observation / Paper Trading Status design selects the existing dashboard detail / display adapter owner path, status mapping, and readiness checklist only; it does not complete a new runtime slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
-- Next required action: `Implementation readiness gate for Paper Observation / Paper Trading Status review-only status`
+- Capability movement from this A-risk readiness package: none. Paper Observation / Paper Trading Status readiness gate only authorizes a narrow future B-risk implementation; it does not complete a new runtime slice. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Implementation`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -213,7 +213,8 @@ DecisionResult chain history:
 - SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`.
 - Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure is completed on main as `df05213` and selects `Paper Observation / Paper Trading Status review-only status` as the 14th source-read-only target.
 - Source Read for Paper Observation / Paper Trading Status review-only status is completed on main as `1625b52`. It confirms `PaperObservationDisplayAdapter`, `DefaultPaperObservationDisplayAdapter`, `DashboardDetailResponseVO.PaperObservationDisplayVO`, `DashboardController.dashboardDetail`, dashboard Paper Observation display, adapter tests, VO tests, controller wiring, and historical API smoke docs. It returns GO to design only and does not implement paper order, paper PnL, simulated execution, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, Push, order/execution, or trading.
-- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed by this package when merged. It selects the existing `/api/dashboard/detail` / `PaperObservationDisplayAdapter` owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement.
+- Minimal Review-Only Paper Observation / Paper Trading Status Runtime Wiring Design is completed on main as `0560ba2`. It selects the existing `/api/dashboard/detail` / `PaperObservationDisplayAdapter` owner path, defines review-only status mapping, safety fields, fail-closed rules, paper execution boundary, dashboard/API options, and readiness checklist without implementation or capability movement.
+- Implementation readiness gate for Paper Observation / Paper Trading Status review-only status is completed by this package when merged. It returns GO to B-risk minimal implementation over the existing dashboard detail / PaperObservation display owner path, optional one thin read-only Map endpoint if needed, minimal dashboard status/copy/DOM if needed, targeted tests, implementation docs, and source-of-truth updates. It forbids schema/config/pom, new DTO / Validator / Assembler / Orchestrator, paper order, simulated execution, paper PnL, real position monitoring, Position Monitor execution, Candidate generation, Decision generation, Point generation, final direction, entry / stop / TP / RR, Push, external channel, order/execution, auto-trading, replay/recheck, P359, and P360.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
