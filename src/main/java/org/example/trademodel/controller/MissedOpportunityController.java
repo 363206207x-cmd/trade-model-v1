@@ -22,13 +22,21 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/missed-opportunity")
 public class MissedOpportunityController {
-    private static final String MISSED_ARCHIVE_READY = "MISSED_ARCHIVE_REVIEW_ONLY_READY";
-    private static final String MISSED_ARCHIVE_COUNT_ONLY_PARTIAL = "MISSED_ARCHIVE_COUNT_ONLY_PARTIAL";
-    private static final String MISSED_ARCHIVE_EMPTY_FAIL_CLOSED = "MISSED_ARCHIVE_EMPTY_FAIL_CLOSED";
-    private static final String MISSED_REASON_EMPTY_OR_PARSE_PARTIAL = "MISSED_REASON_EMPTY_OR_PARSE_PARTIAL";
-    private static final String MISSED_REASON_PARSE_FAILED_FAIL_CLOSED = "MISSED_REASON_PARSE_FAILED_FAIL_CLOSED";
-    private static final String MISSED_ARCHIVE_LINKAGE_PARTIAL = "MISSED_ARCHIVE_LINKAGE_PARTIAL";
-    private static final String MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED = "MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED";
+    private static final String REVIEW_ARCHIVE_AGGREGATE_READY = "REVIEW_ARCHIVE_AGGREGATE_REVIEW_ONLY_READY";
+    private static final String REVIEW_ARCHIVE_AGGREGATE_BACKEND_PENDING = "REVIEW_ARCHIVE_AGGREGATE_BACKEND_PENDING_FAIL_CLOSED";
+    private static final String REVIEW_ARCHIVE_AGGREGATE_MISSING = "REVIEW_ARCHIVE_AGGREGATE_MISSING_FAIL_CLOSED";
+    private static final String REVIEW_ARCHIVE_AGGREGATE_PARTIAL = "REVIEW_ARCHIVE_AGGREGATE_PARTIAL_REVIEW_ONLY";
+    private static final String MISSED_OPPORTUNITY_COUNT_REVIEW_ONLY = "MISSED_OPPORTUNITY_COUNT_REVIEW_ONLY";
+    private static final String REVIEW_ARCHIVE_COUNT_REVIEW_ONLY = "REVIEW_ARCHIVE_COUNT_REVIEW_ONLY";
+    private static final String MISSED_OPPORTUNITY_GENERATION_BOUNDARY_BLOCKED = "MISSED_OPPORTUNITY_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String MISSED_OPPORTUNITY_WRITE_BOUNDARY_BLOCKED = "MISSED_OPPORTUNITY_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String REVIEW_RESULT_GENERATION_BOUNDARY_BLOCKED = "REVIEW_RESULT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String REPLAY_BOUNDARY_BLOCKED = "REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String RECHECK_BOUNDARY_BLOCKED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String PUSH_BOUNDARY_BLOCKED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String CANDIDATE_BOUNDARY_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String POINT_BOUNDARY_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String TRADING_BOUNDARY_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
 
     private final MissedOpportunityService missedOpportunityService;
 
@@ -92,8 +100,8 @@ public class MissedOpportunityController {
         } catch (Exception ignored) {
             applyReviewArchiveStatus(
                     status,
-                    MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED,
-                    "MISSED_ARCHIVE_QUERY_UNAVAILABLE",
+                    REVIEW_ARCHIVE_AGGREGATE_BACKEND_PENDING,
+                    "REVIEW_ARCHIVE_AGGREGATE_BACKEND_PENDING",
                     "Missed Opportunity archive read owner path 不可用；只读状态 fail-closed。",
                     true,
                     "BLOCKED"
@@ -109,8 +117,8 @@ public class MissedOpportunityController {
                     && normalizedAnalysisId == null;
             applyReviewArchiveStatus(
                     status,
-                    countOnly ? MISSED_ARCHIVE_COUNT_ONLY_PARTIAL : MISSED_ARCHIVE_EMPTY_FAIL_CLOSED,
-                    countOnly ? "MISSED_ARCHIVE_COUNT_ONLY" : "MISSED_ARCHIVE_EMPTY",
+                    countOnly ? REVIEW_ARCHIVE_AGGREGATE_PARTIAL : REVIEW_ARCHIVE_AGGREGATE_MISSING,
+                    countOnly ? "REVIEW_ARCHIVE_AGGREGATE_PARTIAL_COUNT_ONLY" : "REVIEW_ARCHIVE_AGGREGATE_MISSING",
                     countOnly
                             ? "Missed Opportunity 仅有 count 信号；archive detail 暂不可读，只读状态保持 partial。"
                             : "Missed Opportunity archive row 未证明存在；只读状态 fail-closed。",
@@ -143,8 +151,8 @@ public class MissedOpportunityController {
         if ("PARSE_FAILED".equals(parseStatus)) {
             applyReviewArchiveStatus(
                     status,
-                    MISSED_REASON_PARSE_FAILED_FAIL_CLOSED,
-                    "MISSED_REASON_PARSE_FAILED",
+                    REVIEW_ARCHIVE_AGGREGATE_PARTIAL,
+                    "REVIEW_ARCHIVE_AGGREGATE_PARTIAL_REASON_PARSE_FAILED",
                     "Missed Opportunity reason_json 解析失败；只读状态 fail-closed，不生成复盘结论。",
                     true,
                     "BLOCKED"
@@ -152,8 +160,8 @@ public class MissedOpportunityController {
         } else if ("EMPTY_REASON_JSON".equals(parseStatus)) {
             applyReviewArchiveStatus(
                     status,
-                    MISSED_REASON_EMPTY_OR_PARSE_PARTIAL,
-                    "MISSED_REASON_EMPTY",
+                    REVIEW_ARCHIVE_AGGREGATE_PARTIAL,
+                    "REVIEW_ARCHIVE_AGGREGATE_PARTIAL_REASON_EMPTY",
                     "Missed Opportunity reason_json 缺失；仅展示 archive count/detail，状态 partial。",
                     true,
                     "PARTIAL"
@@ -161,8 +169,8 @@ public class MissedOpportunityController {
         } else if (!archiveLinked || !traceIdPresent) {
             applyReviewArchiveStatus(
                     status,
-                    MISSED_ARCHIVE_LINKAGE_PARTIAL,
-                    "MISSED_ARCHIVE_LINKAGE_PARTIAL",
+                    REVIEW_ARCHIVE_AGGREGATE_PARTIAL,
+                    "REVIEW_ARCHIVE_AGGREGATE_PARTIAL_LINKAGE",
                     "Missed Opportunity archive linkage 或 trace id 不完整；只读展示，不生成交易动作。",
                     true,
                     "PARTIAL"
@@ -170,8 +178,8 @@ public class MissedOpportunityController {
         } else {
             applyReviewArchiveStatus(
                     status,
-                    MISSED_ARCHIVE_READY,
-                    "MISSED_ARCHIVE_OWNER_PATH_READ",
+                    REVIEW_ARCHIVE_AGGREGATE_READY,
+                    "REVIEW_ARCHIVE_AGGREGATE_OWNER_PATH_READ",
                     "Missed Opportunity / Review Archive 只读状态可读；不生成 missed opportunity、复盘结果或交易信号。",
                     false,
                     "OK"
@@ -192,12 +200,15 @@ public class MissedOpportunityController {
             String symbol,
             LocalDate bizDate) {
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("status", MISSED_ARCHIVE_EMPTY_FAIL_CLOSED);
+        status.put("status", REVIEW_ARCHIVE_AGGREGATE_MISSING);
+        status.put("aggregateStatus", REVIEW_ARCHIVE_AGGREGATE_MISSING);
         status.put("analysisId", analysisId);
         status.put("symbol", symbol);
         status.put("bizDate", bizDate);
         status.put("missedCount", 0);
         status.put("todayMissedCount", 0);
+        status.put("missedOpportunityCountStatus", MISSED_OPPORTUNITY_COUNT_REVIEW_ONLY);
+        status.put("reviewArchiveCountStatus", REVIEW_ARCHIVE_COUNT_REVIEW_ONLY);
         status.put("latestMissedId", null);
         status.put("latestCreateTime", null);
         status.put("latestRuleVersion", null);
@@ -210,20 +221,35 @@ public class MissedOpportunityController {
         status.put("countAvailable", false);
         status.put("sourceHealth", "MISSING");
         status.put("sourceRef", "tm_missed_opportunity");
-        status.put("reason", "MISSED_ARCHIVE_STATUS_PENDING");
+        status.put("reason", "REVIEW_ARCHIVE_AGGREGATE_STATUS_PENDING");
         status.put("message", "Missed Opportunity / Review Archive 只读状态待确认；不是交易信号。");
         status.put("failClosed", true);
         status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
         status.put("notTradingSignal", true);
         status.put("notCandidateSignal", true);
         status.put("notDecisionGeneration", true);
         status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
         status.put("notReplayExecution", true);
         status.put("notRecheckExecution", true);
         status.put("notMissedOpportunityGeneration", true);
+        status.put("notMissedOpportunityWrite", true);
         status.put("notReviewResultGeneration", true);
+        status.put("notPushSend", true);
+        status.put("notExternalChannel", true);
         status.put("notExecutable", true);
         status.put("displaySlotsAreCandidatePool", false);
+        status.put("missedOpportunityGenerationBoundaryStatus", MISSED_OPPORTUNITY_GENERATION_BOUNDARY_BLOCKED);
+        status.put("missedOpportunityWriteBoundaryStatus", MISSED_OPPORTUNITY_WRITE_BOUNDARY_BLOCKED);
+        status.put("reviewResultGenerationBoundaryStatus", REVIEW_RESULT_GENERATION_BOUNDARY_BLOCKED);
+        status.put("replayBoundaryStatus", REPLAY_BOUNDARY_BLOCKED);
+        status.put("recheckBoundaryStatus", RECHECK_BOUNDARY_BLOCKED);
+        status.put("pushBoundaryStatus", PUSH_BOUNDARY_BLOCKED);
+        status.put("candidateBoundaryStatus", CANDIDATE_BOUNDARY_BLOCKED);
+        status.put("pointBoundaryStatus", POINT_BOUNDARY_BLOCKED);
+        status.put("tradingBoundaryStatus", TRADING_BOUNDARY_BLOCKED);
         return status;
     }
 
@@ -234,6 +260,7 @@ public class MissedOpportunityController {
                                                  boolean failClosed,
                                                  String sourceHealth) {
         status.put("status", statusValue);
+        status.put("aggregateStatus", statusValue);
         status.put("reason", reason);
         status.put("message", message);
         status.put("failClosed", failClosed);

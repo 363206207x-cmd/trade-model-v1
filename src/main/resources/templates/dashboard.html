@@ -1204,15 +1204,18 @@
         </div>
 
         <div class="module-status-note" id="missedArchiveStatusPanel" aria-label="Missed Opportunity Review Archive review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
-            <div class="kv"><span class="k">Missed Opportunity / Review Archive 只读状态</span><span class="v" id="missedArchiveRuntimeStatusValue">MISSED_ARCHIVE_EMPTY_FAIL_CLOSED / Missed Opportunity / Review Archive 只读状态待确认</span></div>
+            <div class="kv"><span class="k">Review Archive Aggregate 只读状态</span><span class="v" id="missedArchiveRuntimeStatusValue">REVIEW_ARCHIVE_AGGREGATE_MISSING_FAIL_CLOSED / Review Archive Aggregate 只读状态待确认</span></div>
             <div class="kv"><span class="k">scope / count</span><span class="v"><span id="missedArchiveScopeValue">today</span> · <span id="missedArchiveCountValue">0</span></span></div>
             <div class="kv"><span class="k">latest archive row</span><span class="v" id="missedArchiveLatestValue">missing</span></div>
             <div class="kv"><span class="k">reason parse / source health</span><span class="v"><span id="missedArchiveReasonParseValue">UNKNOWN</span> · <span id="missedArchiveSourceHealthValue">MISSING</span></span></div>
-            <div class="kv"><span class="k">只读边界</span><span class="v" id="missedArchiveReviewOnlyValue">Missed Opportunity / Review Archive 是只读状态，不是交易信号。</span></div>
-            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="missedArchiveSignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。</span></div>
-            <div class="kv"><span class="k">Generation / replay boundary</span><span class="v" id="missedArchiveGenerationBoundaryValue">不触发 missed-opportunity generation/write；不生成复盘结果；不触发 replay / recheck execution。</span></div>
+            <div class="kv"><span class="k">只读 / 人工复核边界</span><span class="v" id="missedArchiveReviewOnlyValue">Review Archive Aggregate 是 review-only / manual review only 状态，不是交易信号。</span></div>
+            <div class="kv"><span class="k">Manual review</span><span class="v" id="missedArchiveManualReviewValue">manualReviewOnly=true；仅人工复核，不生成执行建议。</span></div>
+            <div class="kv"><span class="k">Not Candidate / Decision generation / Point</span><span class="v" id="missedArchiveSignalBoundaryValue">不是 Candidate；不是新的 Decision generation；不是 Point；不是 final direction；不是 entry / stop / TP / RR；不可执行。</span></div>
+            <div class="kv"><span class="k">Generation / replay boundary</span><span class="v" id="missedArchiveGenerationBoundaryValue">不触发 missed-opportunity generation；不写入 missed opportunity；不生成复盘结果；不触发 replay / recheck execution。</span></div>
+            <div class="kv"><span class="k">Write / Push boundary</span><span class="v" id="missedArchiveWritePushBoundaryValue">not missed-opportunity write；not Push send；not external channel。</span></div>
+            <div class="kv"><span class="k">Execution boundary</span><span class="v" id="missedArchiveExecutionBoundaryValue">not order / execution / auto-trading；not Position Monitor execution。</span></div>
             <div class="kv"><span class="k">Upstream boundary</span><span class="v" id="missedArchiveUpstreamValue">Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay、Data Source Health 边界仍适用；Display Slots 不是候选池。</span></div>
-            <div class="kv"><span class="k">原因</span><span class="v" id="missedArchiveReasonValue">MISSED_ARCHIVE_STATUS_PENDING</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="missedArchiveReasonValue">REVIEW_ARCHIVE_AGGREGATE_STATUS_PENDING</span></div>
         </div>
 
         <div class="card main-workbench-card" id="mainWorkbenchCard">
@@ -1464,14 +1467,22 @@
     var DATA_SOURCE_HEALTH_STATUS_MISSING = "DATA_SOURCE_HEALTH_MISSING_FAIL_CLOSED";
     var DATA_SOURCE_HEALTH_STATUS_WATCH_ONLY = "DATA_SOURCE_HEALTH_WATCH_ONLY_REVIEW";
     var DATA_SOURCE_HEALTH_STATUS_BLOCKED = "DATA_SOURCE_HEALTH_BLOCKED_FAIL_CLOSED";
-    var MISSED_ARCHIVE_STATUS_READY = "MISSED_ARCHIVE_REVIEW_ONLY_READY";
-    var MISSED_ARCHIVE_STATUS_COUNT_ONLY = "MISSED_ARCHIVE_COUNT_ONLY_PARTIAL";
-    var MISSED_ARCHIVE_STATUS_EMPTY = "MISSED_ARCHIVE_EMPTY_FAIL_CLOSED";
-    var MISSED_ARCHIVE_STATUS_REASON_EMPTY = "MISSED_REASON_EMPTY_OR_PARSE_PARTIAL";
-    var MISSED_ARCHIVE_STATUS_REASON_FAILED = "MISSED_REASON_PARSE_FAILED_FAIL_CLOSED";
-    var MISSED_ARCHIVE_STATUS_LINKAGE_PARTIAL = "MISSED_ARCHIVE_LINKAGE_PARTIAL";
-    var MISSED_ARCHIVE_STATUS_QUERY_UNAVAILABLE = "MISSED_ARCHIVE_QUERY_UNAVAILABLE_FAIL_CLOSED";
-    var MISSED_ARCHIVE_STATUS_BLOCKED = "MISSED_ARCHIVE_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_AGGREGATE_STATUS_READY = "REVIEW_ARCHIVE_AGGREGATE_REVIEW_ONLY_READY";
+    var REVIEW_ARCHIVE_AGGREGATE_STATUS_BACKEND_PENDING = "REVIEW_ARCHIVE_AGGREGATE_BACKEND_PENDING_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_AGGREGATE_STATUS_MISSING = "REVIEW_ARCHIVE_AGGREGATE_MISSING_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_AGGREGATE_STATUS_PARTIAL = "REVIEW_ARCHIVE_AGGREGATE_PARTIAL_REVIEW_ONLY";
+    var REVIEW_ARCHIVE_MISSED_COUNT_STATUS = "MISSED_OPPORTUNITY_COUNT_REVIEW_ONLY";
+    var REVIEW_ARCHIVE_COUNT_STATUS = "REVIEW_ARCHIVE_COUNT_REVIEW_ONLY";
+    var REVIEW_ARCHIVE_GENERATION_BOUNDARY_STATUS = "MISSED_OPPORTUNITY_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_WRITE_BOUNDARY_STATUS = "MISSED_OPPORTUNITY_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_RESULT_BOUNDARY_STATUS = "REVIEW_RESULT_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_REPLAY_BOUNDARY_STATUS = "REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_RECHECK_BOUNDARY_STATUS = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_PUSH_BOUNDARY_STATUS = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_CANDIDATE_BOUNDARY_STATUS = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_POINT_BOUNDARY_STATUS = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var REVIEW_ARCHIVE_TRADING_BOUNDARY_STATUS = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var MISSED_ARCHIVE_STATUS_EMPTY = REVIEW_ARCHIVE_AGGREGATE_STATUS_MISSING;
     var ALERT_POLICY_STATUS_READY = "ALERT_POLICY_REVIEW_ONLY_READY";
     var ALERT_POLICY_STATUS_BACKEND_PENDING = "ALERT_POLICY_BACKEND_PENDING_FAIL_CLOSED";
     var ALERT_POLICY_STATUS_READ_MODEL_MISSING = "ALERT_READ_MODEL_MISSING_FAIL_CLOSED";
@@ -1864,11 +1875,14 @@
     };
     var missedArchiveRuntimeStatus = {
         status: MISSED_ARCHIVE_STATUS_EMPTY,
+        aggregateStatus: MISSED_ARCHIVE_STATUS_EMPTY,
         analysisId: null,
         symbol: null,
         bizDate: null,
         missedCount: 0,
         todayMissedCount: 0,
+        missedOpportunityCountStatus: REVIEW_ARCHIVE_MISSED_COUNT_STATUS,
+        reviewArchiveCountStatus: REVIEW_ARCHIVE_COUNT_STATUS,
         latestMissedId: null,
         latestCreateTime: null,
         latestRuleVersion: null,
@@ -1881,19 +1895,34 @@
         countAvailable: false,
         sourceHealth: "MISSING",
         sourceRef: "tm_missed_opportunity",
-        reason: "MISSED_ARCHIVE_STATUS_PENDING",
+        reason: "REVIEW_ARCHIVE_AGGREGATE_STATUS_PENDING",
         message: "Missed Opportunity / Review Archive 只读状态待确认；不是交易信号。",
         failClosed: true,
         reviewOnly: true,
+        manualReviewOnly: true,
         notTradingSignal: true,
         notCandidateSignal: true,
         notDecisionGeneration: true,
         notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
         notReplayExecution: true,
         notRecheckExecution: true,
         notMissedOpportunityGeneration: true,
+        notMissedOpportunityWrite: true,
         notReviewResultGeneration: true,
+        notPushSend: true,
+        notExternalChannel: true,
         notExecutable: true,
+        missedOpportunityGenerationBoundaryStatus: REVIEW_ARCHIVE_GENERATION_BOUNDARY_STATUS,
+        missedOpportunityWriteBoundaryStatus: REVIEW_ARCHIVE_WRITE_BOUNDARY_STATUS,
+        reviewResultGenerationBoundaryStatus: REVIEW_ARCHIVE_RESULT_BOUNDARY_STATUS,
+        replayBoundaryStatus: REVIEW_ARCHIVE_REPLAY_BOUNDARY_STATUS,
+        recheckBoundaryStatus: REVIEW_ARCHIVE_RECHECK_BOUNDARY_STATUS,
+        pushBoundaryStatus: REVIEW_ARCHIVE_PUSH_BOUNDARY_STATUS,
+        candidateBoundaryStatus: REVIEW_ARCHIVE_CANDIDATE_BOUNDARY_STATUS,
+        pointBoundaryStatus: REVIEW_ARCHIVE_POINT_BOUNDARY_STATUS,
+        tradingBoundaryStatus: REVIEW_ARCHIVE_TRADING_BOUNDARY_STATUS,
         displaySlotsAreCandidatePool: false
     };
     window.__providerStatusText = "状态待确认";
@@ -3968,11 +3997,14 @@
         var p = payload && typeof payload === "object" ? payload : {};
         return {
             status: firstNonEmpty(p.status, MISSED_ARCHIVE_STATUS_EMPTY).toUpperCase(),
+            aggregateStatus: firstNonEmpty(p.aggregateStatus, p.status, MISSED_ARCHIVE_STATUS_EMPTY).toUpperCase(),
             analysisId: p.analysisId || null,
             symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
             bizDate: p.bizDate || null,
             missedCount: Number(p.missedCount || 0),
             todayMissedCount: Number(p.todayMissedCount || 0),
+            missedOpportunityCountStatus: firstNonEmpty(p.missedOpportunityCountStatus, REVIEW_ARCHIVE_MISSED_COUNT_STATUS).toUpperCase(),
+            reviewArchiveCountStatus: firstNonEmpty(p.reviewArchiveCountStatus, REVIEW_ARCHIVE_COUNT_STATUS).toUpperCase(),
             latestMissedId: p.latestMissedId || null,
             latestCreateTime: p.latestCreateTime || null,
             latestRuleVersion: p.latestRuleVersion || null,
@@ -3985,19 +4017,34 @@
             countAvailable: p.countAvailable === true,
             sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
             sourceRef: firstNonEmpty(p.sourceRef, "tm_missed_opportunity"),
-            reason: firstNonEmpty(p.reason, p.status, "MISSED_ARCHIVE_STATUS_PENDING"),
+            reason: firstNonEmpty(p.reason, p.status, "REVIEW_ARCHIVE_AGGREGATE_STATUS_PENDING"),
             message: firstNonEmpty(p.message, "Missed Opportunity / Review Archive 只读状态待确认；不是交易信号。"),
             failClosed: p.failClosed !== false,
             reviewOnly: true,
+            manualReviewOnly: true,
             notTradingSignal: true,
             notCandidateSignal: true,
             notDecisionGeneration: true,
             notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
             notReplayExecution: true,
             notRecheckExecution: true,
             notMissedOpportunityGeneration: true,
+            notMissedOpportunityWrite: true,
             notReviewResultGeneration: true,
+            notPushSend: true,
+            notExternalChannel: true,
             notExecutable: true,
+            missedOpportunityGenerationBoundaryStatus: firstNonEmpty(p.missedOpportunityGenerationBoundaryStatus, REVIEW_ARCHIVE_GENERATION_BOUNDARY_STATUS).toUpperCase(),
+            missedOpportunityWriteBoundaryStatus: firstNonEmpty(p.missedOpportunityWriteBoundaryStatus, REVIEW_ARCHIVE_WRITE_BOUNDARY_STATUS).toUpperCase(),
+            reviewResultGenerationBoundaryStatus: firstNonEmpty(p.reviewResultGenerationBoundaryStatus, REVIEW_ARCHIVE_RESULT_BOUNDARY_STATUS).toUpperCase(),
+            replayBoundaryStatus: firstNonEmpty(p.replayBoundaryStatus, REVIEW_ARCHIVE_REPLAY_BOUNDARY_STATUS).toUpperCase(),
+            recheckBoundaryStatus: firstNonEmpty(p.recheckBoundaryStatus, REVIEW_ARCHIVE_RECHECK_BOUNDARY_STATUS).toUpperCase(),
+            pushBoundaryStatus: firstNonEmpty(p.pushBoundaryStatus, REVIEW_ARCHIVE_PUSH_BOUNDARY_STATUS).toUpperCase(),
+            candidateBoundaryStatus: firstNonEmpty(p.candidateBoundaryStatus, REVIEW_ARCHIVE_CANDIDATE_BOUNDARY_STATUS).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, REVIEW_ARCHIVE_POINT_BOUNDARY_STATUS).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, REVIEW_ARCHIVE_TRADING_BOUNDARY_STATUS).toUpperCase(),
             displaySlotsAreCandidatePool: false
         };
     }
@@ -4010,15 +4057,18 @@
         var latest = ms.latestMissedId
             ? (ms.latestMissedId + " · " + (ms.latestRuleVersion || "rule version missing"))
             : "missing";
-        setText("missedArchiveRuntimeStatusValue", (ms.status || MISSED_ARCHIVE_STATUS_EMPTY) + " / " + (ms.message || "只读状态"));
+        setText("missedArchiveRuntimeStatusValue", (ms.aggregateStatus || ms.status || MISSED_ARCHIVE_STATUS_EMPTY) + " / " + (ms.message || "只读状态"));
         setText("missedArchiveScopeValue", scope);
-        setText("missedArchiveCountValue", "scoped " + (ms.missedCount || 0) + " · today " + (ms.todayMissedCount || 0));
+        setText("missedArchiveCountValue", "scoped " + (ms.missedCount || 0) + " · today " + (ms.todayMissedCount || 0) + " · " + (ms.missedOpportunityCountStatus || REVIEW_ARCHIVE_MISSED_COUNT_STATUS) + " / " + (ms.reviewArchiveCountStatus || REVIEW_ARCHIVE_COUNT_STATUS));
         setText("missedArchiveLatestValue", latest);
         setText("missedArchiveReasonParseValue", ms.reasonParseStatus || "UNKNOWN");
         setText("missedArchiveSourceHealthValue", ms.sourceHealth || "MISSING");
-        setText("missedArchiveReviewOnlyValue", "Missed Opportunity / Review Archive 是只读状态，不是交易信号。");
-        setText("missedArchiveSignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不可执行。");
-        setText("missedArchiveGenerationBoundaryValue", "不触发 missed-opportunity generation/write；不生成复盘结果；不触发 replay / recheck execution。");
+        setText("missedArchiveReviewOnlyValue", "Review Archive Aggregate 是 review-only / manual review only 状态，不是交易信号。");
+        setText("missedArchiveManualReviewValue", "manualReviewOnly=true；仅人工复核，不生成执行建议。");
+        setText("missedArchiveSignalBoundaryValue", "不是 Candidate；不是新的 Decision generation；不是 Point；不是 final direction；不是 entry / stop / TP / RR；不可执行。");
+        setText("missedArchiveGenerationBoundaryValue", "不触发 missed-opportunity generation；不写入 missed opportunity；不生成复盘结果；不触发 replay / recheck execution。");
+        setText("missedArchiveWritePushBoundaryValue", (ms.missedOpportunityWriteBoundaryStatus || REVIEW_ARCHIVE_WRITE_BOUNDARY_STATUS) + " / " + (ms.pushBoundaryStatus || REVIEW_ARCHIVE_PUSH_BOUNDARY_STATUS) + "；not external channel。");
+        setText("missedArchiveExecutionBoundaryValue", (ms.tradingBoundaryStatus || REVIEW_ARCHIVE_TRADING_BOUNDARY_STATUS) + "；not order / execution / auto-trading；not Position Monitor execution。");
         setText("missedArchiveUpstreamValue", "Watchlist Pool、MarketQuote、Evidence / Score、DecisionResult、ExecutionPlan / BoundaryCandidate、Review / Replay、Data Source Health 边界仍适用；Display Slots 不是候选池。");
         setText("missedArchiveReasonValue", ms.reason || "—");
     }
