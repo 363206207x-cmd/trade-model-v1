@@ -6,18 +6,19 @@ Completion is based on merged `main` only.
 
 Current merged main:
 
-- Current HEAD: `58b1ab5 docs(runtime): verify source trace data quality runtime wiring`.
-- Active stop-loss track: `Next minimal runtime slice selection after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe closure`.
-- Selected target: TBD by the next A-risk selection package.
+- Current HEAD: `f579b24 docs(runtime): record source trace data quality visual closure`.
+- Active stop-loss track: `Source Read for Paper Observation / Paper Trading Status review-only status`.
+- Selected target: `Paper Observation / Paper Trading Status review-only status`.
 - Completed minimal runtime slices: `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, and `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`.
-- Selected next minimal runtime slice: TBD by the next A-risk selection package.
-- Next required action: `Next minimal runtime slice selection after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe closure`.
+- Selected next minimal runtime slice: `Paper Observation / Paper Trading Status review-only status`.
+- Next required action: `Source Read for Paper Observation / Paper Trading Status review-only status`.
 - Source Read for the selected slice is completed on main as `f4a274a`; it confirms the existing `/api/dashboard/detail` SourceTrace / RuntimeKline owner path, persisted OHLCV readiness read path, dashboard diagnostics, and tests, and returns GO to design only.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Design is completed on main as `2ae6a4c`; it fixes owner path, optional endpoint boundary, status mapping, fail-closed rules, frozen source-binding exclusions, and no-refresh / no-generation / no-trading boundaries.
 - Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `dec084b`; it returns GO to B-risk minimal implementation over the existing dashboard detail owner path and keeps the implementation boundary narrow.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation is completed on main as `71a8e2e`; it adds one minimal read-only `/api/dashboard/source-runtime-data-quality-status` endpoint, dashboard `sourceRuntimeDataQualityStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`; it verifies the endpoint/dashboard review-only behavior, safety fields, fail-closed/review-only states, refresh/generation boundary, tests, forbidden semantics classification, and source-of-truth alignment.
-- SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed by this package when merged; environment-limited evidence confirms `sourceRuntimeDataQualityStatusPanel` DOM/copy/safety copy and no refresh / generation / Candidate / Decision generation / Point / Push / trading semantics. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status becomes the 13th completed Review-Only Runtime partial slice.
+- SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`; environment-limited evidence confirms `sourceRuntimeDataQualityStatusPanel` DOM/copy/safety copy and no refresh / generation / Candidate / Decision generation / Point / Push / trading semantics. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is the 13th completed Review-Only Runtime partial slice.
+- This selection package selects `Paper Observation / Paper Trading Status review-only status` as the next source-read-only target after thirteen completed review-only runtime partial slices.
 - P359/P360 remain frozen by default.
 - Workflow repair and V1 Auto Operator packs do not raise business capability; they fix handoff and workflow efficiency after #876.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -285,13 +286,13 @@ Current active capability movement:
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Design and fixed the future DecisionResult review-only owner path, status mapping, dashboard/API surface, Watchlist / MarketQuote / Evidence / Score boundary, readiness checklist, and no-Push/no-Candidate/no-Decision-generation/no-Point/no-trading guardrails.
 - #875 is merged on main.
 - It completed Minimal Review-Only DecisionResult Runtime Wiring Implementation Readiness Gate and returned GO for one minimal read-only DecisionResult status endpoint, minimal dashboard status panel, targeted tests, and no new DTO / Validator / Assembler.
-- Current active block is `Next minimal runtime slice selection after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe closure`.
+- Current active block is `Source Read for Paper Observation / Paper Trading Status review-only status`.
 - New DTO / Validator / Assembler / Orchestrator / docs-only plan / verification-only packages are blocked by default.
 - P359 is not completed progress because it was not merged; PR #829 was closed unmerged.
 - P360 is not allowed to start.
 - Completed runtime slices are `PositionSync + Dashboard review-only status`, `Watchlist + RuleConfig + Dashboard/API review-only status`, `MarketQuote freshness / fallback / dashboard API status`, `Evidence / Score review-only runtime status`, `DecisionResult review-only dashboard/API status`, `ExecutionPlan / BoundaryCandidate review-only runtime status`, `Review / Replay result status`, `Data Source Health dashboard/API status`, `RuleConfig runtime audit / rule explainability`, `Missed Opportunity / Review Archive status`, `RiskActionGuard read-only status`, `Alert fatigue / notification policy status`, and `SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status`, all `REVIEW_ONLY_RUNTIME partial`.
-- Selected next minimal runtime slice is TBD by the next A-risk selection package.
-- The next required action is `Next minimal runtime slice selection after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe closure`.
+- Selected next minimal runtime slice is `Paper Observation / Paper Trading Status review-only status`.
+- The next required action is `Source Read for Paper Observation / Paper Trading Status review-only status`.
 
 - P295 is merged on main.
 - It moved the chain from `REVIEW_ONLY_SCAN_OUTPUT_SKELETON` to `REVIEW_ONLY_EVIDENCE_SCORE_ENTRY_SKELETON`.

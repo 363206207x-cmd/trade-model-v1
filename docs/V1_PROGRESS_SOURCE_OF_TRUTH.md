@@ -39,11 +39,11 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `58b1ab5 docs(runtime): verify source trace data quality runtime wiring`
-- Current active block: `Next minimal runtime slice selection after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe closure`
+- Current merged main: `f579b24 docs(runtime): record source trace data quality visual closure`
+- Current active block: `Source Read for Paper Observation / Paper Trading Status review-only status`
 - Current level: `REVIEW_ONLY_RUNTIME partial`
-- Capability movement from this A-risk visual closure package: SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status becomes the 13th completed review-only runtime partial slice after source read on main as `f4a274a`, design on main as `2ae6a4c`, implementation readiness on main as `dec084b`, implementation on main as `71a8e2e`, verification on main as `58b1ab5`, and this visual closure. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
-- Next required action: `Next minimal runtime slice selection after SourceTrace / RuntimeKline / DataQuality / MultiTimeframe closure`
+- Capability movement from this A-risk selection package: none. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is already the 13th completed review-only runtime partial slice on main as `f579b24`; this package only selects the next source-read target. Overall level remains `REVIEW_ONLY_RUNTIME partial`, not Production Wiring.
+- Next required action: `Source Read for Paper Observation / Paper Trading Status review-only status`
 - #876 is completed and synced on main by user terminal handoff evidence.
 - #877 is completed and synced on main; workflow drift repair is now history, not the active package.
 - DecisionResult runtime wiring verification is completed on main as `a0a432b`.
@@ -119,7 +119,8 @@ The following do not count as completed:
 - Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `dec084b`. It returns GO to B-risk minimal implementation, while forbidding DTO / Validator / Assembler / Orchestrator, new source-binding family, schema/config/pom, scheduler / collector / API client refresh, external refresh, Candidate generation, Decision generation, Point, final direction, entry / stop / TP / RR, Push, external channel, order / execution, auto-trading, P359, and P360.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation is completed on main as `71a8e2e`. It adds one minimal read-only `/api/dashboard/source-runtime-data-quality-status` endpoint, dashboard `sourceRuntimeDataQualityStatusPanel`, targeted `DashboardControllerTest` coverage, implementation docs, and source-of-truth updates over existing dashboard detail SourceTrace / RuntimeKline assets. It does not add DTO / Validator / Assembler / Orchestrator, source-binding family, schema/config/pom, refresh triggers, Candidate generation, Decision generation, Point, final direction, entry / stop / TP / RR, Push, external channel, order / execution, auto-trading, P359, or P360.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`. It verifies the read-only endpoint, dashboard panel, safety fields, fail-closed/review-only status mapping, `DashboardControllerTest`, full tests, forbidden semantics classification, and source-of-truth alignment from `dec084b` to `71a8e2e`.
-- SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed by this package when merged. Environment-limited evidence confirms `sourceRuntimeDataQualityStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not scheduler/not collector/not API-client refresh/not external refresh/not source-binding generation/not Candidate/not Decision generation/not Point/not final direction/not entry-stop-TP-RR/not trading/not executable boundaries, no live UI success is claimed, and no refresh / generation / Candidate / Decision generation / Point / Push / trading semantics are present. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is the 13th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`. Environment-limited evidence confirms `sourceRuntimeDataQualityStatusPanel` DOM/copy/safety copy, review-only/fail-closed/not scheduler/not collector/not API-client refresh/not external refresh/not source-binding generation/not Candidate/not Decision generation/not Point/not final direction/not entry-stop-TP-RR/not trading/not executable boundaries, no live UI success is claimed, and no refresh / generation / Candidate / Decision generation / Point / Push / trading semantics are present. SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is the 13th completed `REVIEW_ONLY_RUNTIME partial` slice.
+- This selection package selects `Paper Observation / Paper Trading Status review-only status` as the next source-read-only target after thirteen completed review-only runtime slices. It may add only selection docs and source-of-truth updates.
 
 ## Runtime Slice History
 
@@ -209,7 +210,8 @@ DecisionResult chain history:
 - Implementation Readiness Gate for SourceTrace / RuntimeKline / DataQuality / MultiTimeframe aggregate review-only status is completed on main as `dec084b`.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Implementation is completed on main as `71a8e2e`.
 - Minimal Review-Only SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Runtime Wiring Verification is completed on main as `58b1ab5`.
-- SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed by this package when merged. Next is selection only.
+- SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Aggregate Visual Verification / Closure is completed on main as `f579b24`.
+- Next Minimal Runtime Slice Selection After SourceTrace / RuntimeKline / DataQuality / MultiTimeframe Closure is completed by this package when merged and selects `Paper Observation / Paper Trading Status review-only status` as the 14th source-read-only target.
 
 Historical PRs are history only. They do not define the current active block unless `docs/ACTIVE_MAINLINE_STATUS.yml` and `scripts/v1-state.sh` agree.
 
