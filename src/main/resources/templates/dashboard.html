@@ -1301,6 +1301,17 @@
                 <span class="status-badge pending">Risk Action Guard required</span>
                 <span class="status-badge pending">External channel disabled</span>
             </div>
+            <div class="module-status-note" id="internalPushPreviewNotificationStatusPanel" aria-label="Internal push preview notification review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+                <div class="kv"><span class="k">Internal Push preview / Notification preview 只读状态</span><span class="v" id="internalPushPreviewRuntimeStatusValue">INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED / Internal Push preview 只读状态待确认</span></div>
+                <div class="kv"><span class="k">当前标的 / source health</span><span class="v"><span id="internalPushPreviewSymbolValue">—</span> · <span id="internalPushPreviewSourceHealthValue">MISSING</span></span></div>
+                <div class="kv"><span class="k">preview / notification status</span><span class="v"><span id="internalPushPreviewStatusValue">INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED</span> · <span id="internalPushNotificationPreviewStatusValue">NOTIFICATION_PREVIEW_REVIEW_ONLY_READY</span></span></div>
+                <div class="kv"><span class="k">assembler / no-op channel</span><span class="v"><span id="internalPushPreviewAssemblerValue">INTERNAL_PUSH_PREVIEW_ASSEMBLER_REVIEW_ONLY_READY</span> · <span id="internalPushExternalChannelPolicyValue">NO_OP_EXTERNAL_CHANNEL_POLICY_REVIEW_ONLY_READY</span></span></div>
+                <div class="kv"><span class="k">只读边界</span><span class="v" id="internalPushPreviewReviewOnlyValue">review-only；manual review only；fail-closed；只能 preview，不能 send。</span></div>
+                <div class="kv"><span class="k">Push / external channel boundary</span><span class="v" id="internalPushSendBoundaryValue">not Push send；not external channel；not sendable message；not provider payload。</span></div>
+                <div class="kv"><span class="k">Snapshot / Recheck / Replay boundary</span><span class="v" id="internalPushSnapshotRecheckBoundaryValue">not PushSnapshot write；not Recheck execution；not Replay execution。</span></div>
+                <div class="kv"><span class="k">Not trading / candidate / decision / point</span><span class="v" id="internalPushSignalBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。</span></div>
+                <div class="kv"><span class="k">原因</span><span class="v" id="internalPushPreviewReasonValue">INTERNAL_PUSH_PREVIEW_STATUS_PENDING</span></div>
+            </div>
             <div class="kv"><span class="k">Internal push preview status</span><span class="v">DASHBOARD_INTERNAL_PUSH_PREVIEW_DISPLAY_GATE / read-only placeholder</span></div>
             <div class="kv"><span class="k">Recheck required</span><span class="v">true / 二次确认必需</span></div>
             <div class="kv"><span class="k">Risk Action Guard required</span><span class="v">true / 风险动作保护必需</span></div>
@@ -1531,6 +1542,23 @@
     var ALERT_POLICY_STATUS_NOTIFICATION_MISSING = "NOTIFICATION_POLICY_MISSING_FAIL_CLOSED";
     var ALERT_POLICY_STATUS_PUSH_BLOCKED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var ALERT_POLICY_STATUS_RECHECK_BLOCKED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_PREVIEW_STATUS_READY = "INTERNAL_PUSH_PREVIEW_REVIEW_ONLY_READY";
+    var INTERNAL_PUSH_PREVIEW_STATUS_MISSING = "INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED";
+    var INTERNAL_PUSH_PREVIEW_STATUS_PARTIAL = "INTERNAL_PUSH_PREVIEW_PARTIAL_REVIEW_ONLY";
+    var INTERNAL_PUSH_NOTIFICATION_PREVIEW_READY = "NOTIFICATION_PREVIEW_REVIEW_ONLY_READY";
+    var INTERNAL_PUSH_NOTIFICATION_PREVIEW_MISSING = "NOTIFICATION_PREVIEW_MISSING_FAIL_CLOSED";
+    var INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY = "INTERNAL_PUSH_PREVIEW_ASSEMBLER_REVIEW_ONLY_READY";
+    var INTERNAL_PUSH_NO_OP_EXTERNAL_CHANNEL_READY = "NO_OP_EXTERNAL_CHANNEL_POLICY_REVIEW_ONLY_READY";
+    var INTERNAL_PUSH_DUPLICATE_ALERT_POLICY_REVIEW_REQUIRED = "DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED";
+    var INTERNAL_PUSH_SEND_BLOCKED = "PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_EXTERNAL_CHANNEL_BLOCKED = "EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_SNAPSHOT_WRITE_BLOCKED = "PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_RECHECK_BLOCKED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_REPLAY_BLOCKED = "REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_DECISION_BLOCKED = "DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var INTERNAL_PUSH_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var SOURCE_RUNTIME_STATUS_READY = "SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY";
     var SOURCE_RUNTIME_STATUS_MISSING = "SOURCE_TRACE_MISSING_FAIL_CLOSED";
     var SOURCE_RUNTIME_STATUS_PARTIAL = "SOURCE_TRACE_PARTIAL_REVIEW_ONLY";
@@ -1870,6 +1898,47 @@
         notPointSignal: true,
         notExecutable: true,
         displaySlotsAreCandidatePool: false,
+        failClosed: true
+    };
+    var internalPushPreviewNotificationStatus = {
+        status: INTERNAL_PUSH_PREVIEW_STATUS_MISSING,
+        symbol: null,
+        internalPushPreviewStatus: INTERNAL_PUSH_PREVIEW_STATUS_MISSING,
+        notificationPreviewStatus: INTERNAL_PUSH_NOTIFICATION_PREVIEW_READY,
+        assemblerStatus: INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY,
+        externalChannelPolicyStatus: INTERNAL_PUSH_NO_OP_EXTERNAL_CHANNEL_READY,
+        duplicateAlertNotificationPolicyStatus: INTERNAL_PUSH_DUPLICATE_ALERT_POLICY_REVIEW_REQUIRED,
+        previewOwnerInputAvailable: false,
+        internalPushPreviewAvailable: false,
+        sourceHealth: "MISSING",
+        reason: "INTERNAL_PUSH_PREVIEW_STATUS_PENDING",
+        message: "Internal Push preview / notification preview 只读状态待确认；不是 Push send 或外部通道。",
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notPushSend: true,
+        notExternalChannel: true,
+        notPushSnapshotWrite: true,
+        notRecheckExecution: true,
+        notReplayExecution: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        notSendableMessage: true,
+        notProviderPayload: true,
+        pushSendBoundaryStatus: INTERNAL_PUSH_SEND_BLOCKED,
+        externalChannelBoundaryStatus: INTERNAL_PUSH_EXTERNAL_CHANNEL_BLOCKED,
+        pushSnapshotWriteBoundaryStatus: INTERNAL_PUSH_SNAPSHOT_WRITE_BLOCKED,
+        recheckBoundaryStatus: INTERNAL_PUSH_RECHECK_BLOCKED,
+        replayBoundaryStatus: INTERNAL_PUSH_REPLAY_BLOCKED,
+        candidateBoundaryStatus: INTERNAL_PUSH_CANDIDATE_BLOCKED,
+        decisionGenerationBoundaryStatus: INTERNAL_PUSH_DECISION_BLOCKED,
+        pointBoundaryStatus: INTERNAL_PUSH_POINT_BLOCKED,
+        tradingBoundaryStatus: INTERNAL_PUSH_TRADING_BLOCKED,
         failClosed: true
     };
     var reviewReplayRuntimeStatus = {
@@ -4015,6 +4084,88 @@
             });
     }
 
+    function resolveInternalPushPreviewNotificationStatus(payload, requestedSymbol) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, INTERNAL_PUSH_PREVIEW_STATUS_MISSING).toUpperCase(),
+            symbol: firstNonEmpty(p.symbol, requestedSymbol, "—").toUpperCase(),
+            internalPushPreviewStatus: firstNonEmpty(p.internalPushPreviewStatus, INTERNAL_PUSH_PREVIEW_STATUS_MISSING).toUpperCase(),
+            notificationPreviewStatus: firstNonEmpty(p.notificationPreviewStatus, INTERNAL_PUSH_NOTIFICATION_PREVIEW_READY).toUpperCase(),
+            assemblerStatus: firstNonEmpty(p.assemblerStatus, INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY).toUpperCase(),
+            externalChannelPolicyStatus: firstNonEmpty(p.externalChannelPolicyStatus, INTERNAL_PUSH_NO_OP_EXTERNAL_CHANNEL_READY).toUpperCase(),
+            duplicateAlertNotificationPolicyStatus: firstNonEmpty(p.duplicateAlertNotificationPolicyStatus, INTERNAL_PUSH_DUPLICATE_ALERT_POLICY_REVIEW_REQUIRED).toUpperCase(),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            reason: firstNonEmpty(p.reason, p.status, "INTERNAL_PUSH_PREVIEW_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Internal Push preview / notification preview 只读状态待确认；不是 Push send 或外部通道。"),
+            previewOwnerInputAvailable: p.previewOwnerInputAvailable === true,
+            internalPushPreviewAvailable: p.internalPushPreviewAvailable === true,
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notPushSend: true,
+            notExternalChannel: true,
+            notPushSnapshotWrite: true,
+            notRecheckExecution: true,
+            notReplayExecution: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            notSendableMessage: true,
+            notProviderPayload: true,
+            pushSendBoundaryStatus: firstNonEmpty(p.pushSendBoundaryStatus, INTERNAL_PUSH_SEND_BLOCKED).toUpperCase(),
+            externalChannelBoundaryStatus: firstNonEmpty(p.externalChannelBoundaryStatus, INTERNAL_PUSH_EXTERNAL_CHANNEL_BLOCKED).toUpperCase(),
+            pushSnapshotWriteBoundaryStatus: firstNonEmpty(p.pushSnapshotWriteBoundaryStatus, INTERNAL_PUSH_SNAPSHOT_WRITE_BLOCKED).toUpperCase(),
+            recheckBoundaryStatus: firstNonEmpty(p.recheckBoundaryStatus, INTERNAL_PUSH_RECHECK_BLOCKED).toUpperCase(),
+            replayBoundaryStatus: firstNonEmpty(p.replayBoundaryStatus, INTERNAL_PUSH_REPLAY_BLOCKED).toUpperCase(),
+            candidateBoundaryStatus: firstNonEmpty(p.candidateBoundaryStatus, INTERNAL_PUSH_CANDIDATE_BLOCKED).toUpperCase(),
+            decisionGenerationBoundaryStatus: firstNonEmpty(p.decisionGenerationBoundaryStatus, INTERNAL_PUSH_DECISION_BLOCKED).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, INTERNAL_PUSH_POINT_BLOCKED).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, INTERNAL_PUSH_TRADING_BLOCKED).toUpperCase(),
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateInternalPushPreviewNotificationStatusDisplay() {
+        var ip = internalPushPreviewNotificationStatus || {};
+        setText("internalPushPreviewRuntimeStatusValue", (ip.status || INTERNAL_PUSH_PREVIEW_STATUS_MISSING) + " / " + (ip.message || "只读状态"));
+        setText("internalPushPreviewSymbolValue", ip.symbol || "—");
+        setText("internalPushPreviewSourceHealthValue", ip.sourceHealth || "MISSING");
+        setText("internalPushPreviewStatusValue", ip.internalPushPreviewStatus || INTERNAL_PUSH_PREVIEW_STATUS_MISSING);
+        setText("internalPushNotificationPreviewStatusValue", ip.notificationPreviewStatus || INTERNAL_PUSH_NOTIFICATION_PREVIEW_READY);
+        setText("internalPushPreviewAssemblerValue", ip.assemblerStatus || INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY);
+        setText("internalPushExternalChannelPolicyValue", ip.externalChannelPolicyStatus || INTERNAL_PUSH_NO_OP_EXTERNAL_CHANNEL_READY);
+        setText("internalPushPreviewReviewOnlyValue", "review-only；manual review only；fail-closed；只能 preview，不能 send；Alert fatigue / notification policy 只是重复性对照。");
+        setText("internalPushSendBoundaryValue", (ip.pushSendBoundaryStatus || INTERNAL_PUSH_SEND_BLOCKED) + " / " + (ip.externalChannelBoundaryStatus || INTERNAL_PUSH_EXTERNAL_CHANNEL_BLOCKED) + "；not Push send；not external channel；not sendable message；not provider payload。");
+        setText("internalPushSnapshotRecheckBoundaryValue", (ip.pushSnapshotWriteBoundaryStatus || INTERNAL_PUSH_SNAPSHOT_WRITE_BLOCKED) + " / " + (ip.recheckBoundaryStatus || INTERNAL_PUSH_RECHECK_BLOCKED) + " / " + (ip.replayBoundaryStatus || INTERNAL_PUSH_REPLAY_BLOCKED) + "；not PushSnapshot write；not Recheck execution；not Replay execution。");
+        setText("internalPushSignalBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not order / execution / auto-trading；not Position Monitor execution；not trading；not executable；Display Slots 不是候选池。");
+        setText("internalPushPreviewReasonValue", ip.reason || "—");
+    }
+
+    function fetchInternalPushPreviewNotificationStatus(symbol) {
+        if (!symbol) {
+            internalPushPreviewNotificationStatus = resolveInternalPushPreviewNotificationStatus({});
+            window.__internalPushPreviewNotificationReviewStatus = INTERNAL_PUSH_PREVIEW_STATUS_MISSING;
+            updateInternalPushPreviewNotificationStatusDisplay();
+            return Promise.resolve();
+        }
+        return fetch("/api/dashboard/internal-push-preview-notification-status?symbol=" + encodeURIComponent(symbol))
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                internalPushPreviewNotificationStatus = resolveInternalPushPreviewNotificationStatus(payload, symbol);
+                window.__internalPushPreviewNotificationReviewStatus = internalPushPreviewNotificationStatus.status || INTERNAL_PUSH_PREVIEW_STATUS_MISSING;
+                updateInternalPushPreviewNotificationStatusDisplay();
+            })
+            .catch(function () {
+                internalPushPreviewNotificationStatus = resolveInternalPushPreviewNotificationStatus({}, symbol);
+                window.__internalPushPreviewNotificationReviewStatus = INTERNAL_PUSH_PREVIEW_STATUS_MISSING;
+                updateInternalPushPreviewNotificationStatusDisplay();
+            });
+    }
+
     function resolveReviewReplayRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -5230,6 +5381,7 @@
                 fetchWatchlistRuntimeStatus();
                 fetchRuleConfigAuditRuntimeStatus();
                 fetchRuntimeReadinessGuardrailStatus();
+                fetchInternalPushPreviewNotificationStatus(selectedSymbol);
                 fetchHotResetEventImpactSourceStatus(selectedSymbol);
             })
             .catch(function () {
@@ -5243,6 +5395,7 @@
                 fetchRiskActionGuardRuntimeStatus(selectedSymbol);
                 fetchPaperObservationRuntimeStatus(selectedSymbol);
                 fetchAlertFatiguePolicyRuntimeStatus(selectedSymbol);
+                fetchInternalPushPreviewNotificationStatus(selectedSymbol);
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
                 fetchSourceRuntimeDataQualityStatus(selectedSymbol);
@@ -5263,6 +5416,7 @@
         fetchRiskActionGuardRuntimeStatus(symbol);
         fetchPaperObservationRuntimeStatus(symbol);
         fetchAlertFatiguePolicyRuntimeStatus(symbol);
+        fetchInternalPushPreviewNotificationStatus(symbol);
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
         fetchSourceRuntimeDataQualityStatus(symbol);

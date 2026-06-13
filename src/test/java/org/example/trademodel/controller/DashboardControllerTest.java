@@ -482,6 +482,59 @@ class DashboardControllerTest {
     }
 
     @Test
+    void dashboardTemplateShowsReviewOnlyInternalPushPreviewNotificationStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/internal-push-preview-notification-status");
+        assertThat(html).contains("internalPushPreviewNotificationStatusPanel");
+        assertThat(html).contains("internalPushPreviewRuntimeStatusValue");
+        assertThat(html).contains("internalPushPreviewSymbolValue");
+        assertThat(html).contains("internalPushPreviewSourceHealthValue");
+        assertThat(html).contains("internalPushPreviewStatusValue");
+        assertThat(html).contains("internalPushNotificationPreviewStatusValue");
+        assertThat(html).contains("internalPushPreviewAssemblerValue");
+        assertThat(html).contains("internalPushExternalChannelPolicyValue");
+        assertThat(html).contains("internalPushPreviewReviewOnlyValue");
+        assertThat(html).contains("internalPushSendBoundaryValue");
+        assertThat(html).contains("internalPushSnapshotRecheckBoundaryValue");
+        assertThat(html).contains("internalPushSignalBoundaryValue");
+        assertThat(html).contains("internalPushPreviewReasonValue");
+        assertThat(html).contains("INTERNAL_PUSH_PREVIEW_REVIEW_ONLY_READY");
+        assertThat(html).contains("INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("INTERNAL_PUSH_PREVIEW_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("NOTIFICATION_PREVIEW_REVIEW_ONLY_READY");
+        assertThat(html).contains("NOTIFICATION_PREVIEW_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("INTERNAL_PUSH_PREVIEW_ASSEMBLER_REVIEW_ONLY_READY");
+        assertThat(html).contains("NO_OP_EXTERNAL_CHANNEL_POLICY_REVIEW_ONLY_READY");
+        assertThat(html).contains("DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED");
+        assertThat(html).contains("PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("review-only");
+        assertThat(html).contains("manual review only");
+        assertThat(html).contains("fail-closed");
+        assertThat(html).contains("not Push send");
+        assertThat(html).contains("not external channel");
+        assertThat(html).contains("not sendable message");
+        assertThat(html).contains("not provider payload");
+        assertThat(html).contains("not PushSnapshot write");
+        assertThat(html).contains("not Recheck execution");
+        assertThat(html).contains("not Replay execution");
+        assertThat(html).contains("not candidate");
+        assertThat(html).contains("not decision generation");
+        assertThat(html).contains("not point");
+        assertThat(html).contains("not final direction");
+        assertThat(html).contains("not entry / stop / TP / RR");
+        assertThat(html).contains("not order / execution / auto-trading");
+        assertThat(html).contains("not trading");
+        assertThat(html).contains("not executable");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
+    @Test
     void dashboardTemplateShowsReviewOnlyReviewReplayRuntimeStatusMapping() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 
@@ -1812,6 +1865,95 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.apiClientRefreshAction").doesNotExist())
                 .andExpect(jsonPath("$.alertWriteAction").doesNotExist())
                 .andExpect(jsonPath("$.autoTradingAction").doesNotExist());
+    }
+
+    @Test
+    void internalPushPreviewNotificationStatusEndpointReturnsReviewOnlyFailClosedStatus() throws Exception {
+        mockMvc.perform(get("/api/dashboard/internal-push-preview-notification-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.internalPushPreviewStatus").value("INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.notificationPreviewStatus").value("NOTIFICATION_PREVIEW_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.assemblerStatus").value("INTERNAL_PUSH_PREVIEW_ASSEMBLER_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.externalChannelPolicyStatus").value("NO_OP_EXTERNAL_CHANNEL_POLICY_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.duplicateAlertNotificationPolicyStatus").value("DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED"))
+                .andExpect(jsonPath("$.ownerPath").value("ReviewOnlyCandidatePreviewGuardDTO -> ReviewOnlyInternalPushPreviewAssembler -> ReviewOnlyInternalPushPreviewDTO -> dashboard internalPushPreviewDisplay"))
+                .andExpect(jsonPath("$.previewOwnerInputAvailable").value(false))
+                .andExpect(jsonPath("$.internalPushPreviewAvailable").value(false))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notExternalChannel").value(true))
+                .andExpect(jsonPath("$.notPushSnapshotWrite").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notFinalDirection").value(true))
+                .andExpect(jsonPath("$.notEntryStopTpRr").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.notSendableMessage").value(true))
+                .andExpect(jsonPath("$.notProviderPayload").value(true))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("INTERNAL_PUSH_PREVIEW_OWNER_INPUT_MISSING"))
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'INTERNAL_PUSH_PREVIEW_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'NOTIFICATION_PREVIEW_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists());
+    }
+
+    @Test
+    void internalPushPreviewNotificationStatusEndpointExposesPushSendExternalChannelSnapshotAndReplayBoundaries() throws Exception {
+        mockMvc.perform(get("/api/dashboard/internal-push-preview-notification-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pushSendBoundaryStatus").value("PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.externalChannelBoundaryStatus").value("EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pushSnapshotWriteBoundaryStatus").value("PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.recheckBoundaryStatus").value("RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.replayBoundaryStatus").value("REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.candidateBoundaryStatus").value("CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.decisionGenerationBoundaryStatus").value("DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pointBoundaryStatus").value("POINT_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.tradingBoundaryStatus").value("TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED"));
+    }
+
+    @Test
+    void internalPushPreviewNotificationStatusEndpointDoesNotExposeSendableExecutableActionFields() throws Exception {
+        mockMvc.perform(get("/api/dashboard/internal-push-preview-notification-status").param("symbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sendableMessage").doesNotExist())
+                .andExpect(jsonPath("$.providerPayload").doesNotExist())
+                .andExpect(jsonPath("$.deliveryPayload").doesNotExist())
+                .andExpect(jsonPath("$.externalChannelAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSend").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.pushSnapshotWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.decisionGenerationAction").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist())
+                .andExpect(jsonPath("$.positionMonitorExecutionAction").doesNotExist());
     }
 
     @Test
