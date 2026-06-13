@@ -4,6 +4,7 @@ import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceEventSourceOwnershipResult;
 import org.example.trademodel.dto.planboundary.SourceTraceEventSourceOwnershipStatusEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
+import org.example.trademodel.dto.push.ReviewOnlyInternalPushPreviewDTO;
 import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
@@ -22,6 +23,7 @@ import org.example.trademodel.service.dashboard.ExecutionPlanDisplayAdapter;
 import org.example.trademodel.service.dashboard.PaperObservationDisplayAdapter;
 import org.example.trademodel.service.dashboard.PlanBoundaryDisplayAdapter;
 import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
+import org.example.trademodel.service.push.ReviewOnlyInternalPushPreviewAssembler;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ReviewAggregateSummaryVO;
@@ -120,6 +122,27 @@ public class DashboardController {
     private static final String NOTIFICATION_POLICY_MISSING_FAIL_CLOSED = "NOTIFICATION_POLICY_MISSING_FAIL_CLOSED";
     private static final String PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED = "PUSH_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED = "RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String INTERNAL_PUSH_PREVIEW_READY = "INTERNAL_PUSH_PREVIEW_REVIEW_ONLY_READY";
+    private static final String INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED =
+            "INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED";
+    private static final String INTERNAL_PUSH_PREVIEW_PARTIAL_REVIEW_ONLY =
+            "INTERNAL_PUSH_PREVIEW_PARTIAL_REVIEW_ONLY";
+    private static final String NOTIFICATION_PREVIEW_READY = "NOTIFICATION_PREVIEW_REVIEW_ONLY_READY";
+    private static final String NOTIFICATION_PREVIEW_MISSING_FAIL_CLOSED =
+            "NOTIFICATION_PREVIEW_MISSING_FAIL_CLOSED";
+    private static final String INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY =
+            "INTERNAL_PUSH_PREVIEW_ASSEMBLER_REVIEW_ONLY_READY";
+    private static final String NO_OP_EXTERNAL_CHANNEL_POLICY_READY =
+            "NO_OP_EXTERNAL_CHANNEL_POLICY_REVIEW_ONLY_READY";
+    private static final String DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED =
+            "DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED";
+    private static final String PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED = "REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String SOURCE_RUNTIME_READY = "SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY";
     private static final String SOURCE_TRACE_MISSING_FAIL_CLOSED = "SOURCE_TRACE_MISSING_FAIL_CLOSED";
     private static final String SOURCE_TRACE_PARTIAL_REVIEW_ONLY = "SOURCE_TRACE_PARTIAL_REVIEW_ONLY";
@@ -195,6 +218,8 @@ public class DashboardController {
     private final PaperObservationDisplayAdapter paperObservationDisplayAdapter;
     private final HotResetEventMapper hotResetEventMapper;
     private final SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService;
+    private final ReviewOnlyInternalPushPreviewAssembler internalPushPreviewAssembler =
+            new ReviewOnlyInternalPushPreviewAssembler();
 
     public DashboardController(DecisionService decisionService,
                                SystemHealthService systemHealthService,
@@ -709,6 +734,68 @@ public class DashboardController {
                     ALERT_POLICY_READY,
                     "MONITOR_ALERT_READ_MODEL_READY",
                     "Alert fatigue / notification policy 只读状态可读；不发送 Push，不触发 recheck、refresh、写入或交易动作。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
+    @GetMapping("/api/dashboard/internal-push-preview-notification-status")
+    @ResponseBody
+    public Map<String, Object> internalPushPreviewNotificationStatus(@RequestParam("symbol") String symbol) {
+        String normalizedSymbol = normalizeSymbol(symbol);
+        Map<String, Object> status = baseInternalPushPreviewNotificationStatus(normalizedSymbol);
+
+        ReviewOnlyInternalPushPreviewDTO preview;
+        try {
+            preview = internalPushPreviewAssembler.assemble(null);
+        } catch (RuntimeException ex) {
+            applyInternalPushPreviewNotificationStatus(
+                    status,
+                    INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED,
+                    "INTERNAL_PUSH_PREVIEW_ASSEMBLER_UNAVAILABLE",
+                    "Internal Push preview assembler 只读投影不可用；状态 fail-closed，不发送 Push，不接外部通道。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        populateInternalPushPreviewNotificationStatus(status, preview);
+        if (preview == null) {
+            applyInternalPushPreviewNotificationStatus(
+                    status,
+                    INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED,
+                    "INTERNAL_PUSH_PREVIEW_DTO_MISSING",
+                    "Internal Push preview DTO 缺失；不伪造通知预览，不生成 sendable message。",
+                    true,
+                    "MISSING"
+            );
+        } else if (preview.isFailClosed() || preview.isBlocked()) {
+            applyInternalPushPreviewNotificationStatus(
+                    status,
+                    INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED,
+                    "INTERNAL_PUSH_PREVIEW_OWNER_INPUT_MISSING",
+                    "Internal Push preview owner input 缺失；仅确认 existing assembler / DTO / no-op external channel policy 边界，不发送 Push。",
+                    true,
+                    "MISSING"
+            );
+        } else if (!preview.getRiskBlockers().isEmpty()) {
+            applyInternalPushPreviewNotificationStatus(
+                    status,
+                    INTERNAL_PUSH_PREVIEW_PARTIAL_REVIEW_ONLY,
+                    "INTERNAL_PUSH_PREVIEW_RISK_BLOCKERS_PRESENT",
+                    "Internal Push preview 只读投影部分可读；risk blockers 仅供人工复核，不触发 Recheck 或 Replay。",
+                    false,
+                    "PARTIAL"
+            );
+        } else {
+            applyInternalPushPreviewNotificationStatus(
+                    status,
+                    INTERNAL_PUSH_PREVIEW_READY,
+                    "INTERNAL_PUSH_PREVIEW_OWNER_PATH_READ",
+                    "Internal Push preview / notification preview 只读状态可读；不发送 Push，不接外部通道。",
                     false,
                     "OK"
             );
@@ -1437,6 +1524,78 @@ public class DashboardController {
         return status;
     }
 
+    private Map<String, Object> baseInternalPushPreviewNotificationStatus(String normalizedSymbol) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED);
+        status.put("symbol", normalizedSymbol);
+        status.put("internalPushPreviewStatus", INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED);
+        status.put("notificationPreviewStatus", NOTIFICATION_PREVIEW_READY);
+        status.put("assemblerStatus", INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY);
+        status.put("externalChannelPolicyStatus", NO_OP_EXTERNAL_CHANNEL_POLICY_READY);
+        status.put("duplicateAlertNotificationPolicyStatus", DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED);
+        status.put("ownerPath", "ReviewOnlyCandidatePreviewGuardDTO -> ReviewOnlyInternalPushPreviewAssembler -> ReviewOnlyInternalPushPreviewDTO -> dashboard internalPushPreviewDisplay");
+        status.put("displayContext", "dashboard internalPushPreviewDisplay review-only display gate");
+        status.put("noOpExternalChannelPolicy", "NoOpOpportunityPushExternalChannelPolicy disabled-channel evidence only");
+        status.put("previewOwnerInputAvailable", false);
+        status.put("internalPushPreviewAvailable", false);
+        status.put("sourceHealth", "MISSING");
+        status.put("reason", "INTERNAL_PUSH_PREVIEW_STATUS_PENDING");
+        status.put("message", "Internal Push preview / notification preview 只读状态待确认；不是 Push send 或外部通道。");
+        status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
+        status.put("notPushSend", true);
+        status.put("notExternalChannel", true);
+        status.put("notPushSnapshotWrite", true);
+        status.put("notRecheckExecution", true);
+        status.put("notReplayExecution", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
+        status.put("notTradingSignal", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("notSendableMessage", true);
+        status.put("notProviderPayload", true);
+        status.put("notPositionMonitorExecution", true);
+        status.put("notExternalApiRefresh", true);
+        status.put("notSchedulerTrigger", true);
+        status.put("notCollectorTrigger", true);
+        status.put("pushSendBoundaryStatus", PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("externalChannelBoundaryStatus", EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pushSnapshotWriteBoundaryStatus", PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("recheckBoundaryStatus", RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("replayBoundaryStatus", REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("candidateBoundaryStatus", CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("decisionGenerationBoundaryStatus", DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pointBoundaryStatus", POINT_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("tradingBoundaryStatus", TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("previewBlockingReasons", List.of());
+        status.put("previewRiskBlockers", List.of());
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                INTERNAL_PUSH_PREVIEW_READY,
+                INTERNAL_PUSH_PREVIEW_MISSING_FAIL_CLOSED,
+                INTERNAL_PUSH_PREVIEW_PARTIAL_REVIEW_ONLY,
+                NOTIFICATION_PREVIEW_READY,
+                NOTIFICATION_PREVIEW_MISSING_FAIL_CLOSED,
+                INTERNAL_PUSH_PREVIEW_ASSEMBLER_READY,
+                NO_OP_EXTERNAL_CHANNEL_POLICY_READY,
+                DUPLICATE_ALERT_NOTIFICATION_POLICY_REVIEW_REQUIRED,
+                PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                RECHECK_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
+        return status;
+    }
+
     private Map<String, Object> baseReviewReplayStatus(String analysisId, String normalizedSymbol) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("status", REVIEW_REPLAY_BLOCKED_FAIL_CLOSED);
@@ -1974,6 +2133,40 @@ public class DashboardController {
         status.put("message", message);
         status.put("failClosed", failClosed);
         status.put("sourceHealth", sourceHealth);
+    }
+
+    private void applyInternalPushPreviewNotificationStatus(Map<String, Object> status,
+                                                            String statusValue,
+                                                            String reason,
+                                                            String message,
+                                                            boolean failClosed,
+                                                            String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("internalPushPreviewStatus", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private void populateInternalPushPreviewNotificationStatus(Map<String, Object> status,
+                                                               ReviewOnlyInternalPushPreviewDTO preview) {
+        if (preview == null) {
+            return;
+        }
+        status.put("previewOwnerInputAvailable", preview.getCandidatePreviewGuardStatus() != null);
+        status.put("internalPushPreviewAvailable", !preview.isBlocked() && !preview.isFailClosed());
+        status.put("previewDtoStatus", firstNonBlank(preview.getInternalPushPreviewStatus(), "BLOCKED_FAIL_CLOSED"));
+        status.put("candidatePreviewGuardStatus", firstNonBlank(preview.getCandidatePreviewGuardStatus(), "MISSING"));
+        status.put("previewAllowedNextStep", firstNonBlank(preview.getAllowedNextStep(), "BLOCKED_BY_CANDIDATE_PREVIEW_GUARD"));
+        status.put("previewReviewOnlyMessage", firstNonBlank(preview.getReviewOnlyMessage(), "Review-only internal push preview remains fail-closed."));
+        status.put("previewDtoReviewOnly", preview.isReviewOnly());
+        status.put("previewDtoNotTradeInstruction", preview.isNotTradeInstruction());
+        status.put("previewDtoManualReviewRequired", preview.isManualReviewRequired());
+        status.put("previewDtoFailClosed", preview.isFailClosed());
+        status.put("previewDtoBlocked", preview.isBlocked());
+        status.put("previewBlockingReasons", preview.getBlockingReasons());
+        status.put("previewRiskBlockers", preview.getRiskBlockers());
     }
 
     private void applyExecutionPlanBoundaryStatus(Map<String, Object> status,
