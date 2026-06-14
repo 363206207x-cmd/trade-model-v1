@@ -9,11 +9,14 @@ import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.entity.MarketEnvironmentSnapshotDO;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.EvidenceService;
+import org.example.trademodel.service.PushRecheckService;
+import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.ScoreService;
@@ -26,6 +29,9 @@ import org.example.trademodel.service.dashboard.RiskActionGuardDisplayAdapter;
 import org.example.trademodel.service.push.ReviewOnlyInternalPushPreviewAssembler;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
+import org.example.trademodel.vo.PushRecheckLogItemVO;
+import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
+import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.example.trademodel.vo.ReviewAggregateSummaryVO;
 import org.example.trademodel.vo.ReviewStateVO;
 import org.example.trademodel.vo.ScoreBriefVO;
@@ -198,6 +204,30 @@ public class DashboardController {
     private static final String SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED = "SCHEDULER_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED = "COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED = "RECHECK_REPLAY_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String RECHECK_PREVIEW_READY = "RECHECK_PREVIEW_REVIEW_ONLY_READY";
+    private static final String RECHECK_PREVIEW_MISSING_FAIL_CLOSED = "RECHECK_PREVIEW_MISSING_FAIL_CLOSED";
+    private static final String RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY = "RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY";
+    private static final String RECHECK_STATUS_READY = "RECHECK_STATUS_REVIEW_ONLY_READY";
+    private static final String RECHECK_STATUS_MISSING_FAIL_CLOSED = "RECHECK_STATUS_MISSING_FAIL_CLOSED";
+    private static final String RECHECK_LOG_READ_MODEL_READY = "RECHECK_LOG_READ_MODEL_REVIEW_ONLY_READY";
+    private static final String REPLAY_SUMMARY_COUNTER_READY = "REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY";
+    private static final String DISPATCH_CONFIG_AUDIT_READY = "DISPATCH_CONFIG_AUDIT_REVIEW_ONLY_READY";
+    private static final String DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED =
+            "DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED";
+    private static final String DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED =
+            "DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED";
+    private static final String RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    private static final String DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED =
+            "DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
     private static final String READ_MODEL_FULL = "FULL";
 
     private final DecisionService decisionService;
@@ -218,6 +248,7 @@ public class DashboardController {
     private final PaperObservationDisplayAdapter paperObservationDisplayAdapter;
     private final HotResetEventMapper hotResetEventMapper;
     private final SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService;
+    private final PushRecheckService pushRecheckService;
     private final ReviewOnlyInternalPushPreviewAssembler internalPushPreviewAssembler =
             new ReviewOnlyInternalPushPreviewAssembler();
 
@@ -238,7 +269,8 @@ public class DashboardController {
                                RiskActionGuardDisplayAdapter riskActionGuardDisplayAdapter,
                                PaperObservationDisplayAdapter paperObservationDisplayAdapter,
                                HotResetEventMapper hotResetEventMapper,
-                               SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService) {
+                               SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService,
+                               PushRecheckService pushRecheckService) {
         this.decisionService = decisionService;
         this.systemHealthService = systemHealthService;
         this.monitorService = monitorService;
@@ -257,6 +289,7 @@ public class DashboardController {
         this.paperObservationDisplayAdapter = paperObservationDisplayAdapter;
         this.hotResetEventMapper = hotResetEventMapper;
         this.sourceTraceEventSourceOwnershipService = sourceTraceEventSourceOwnershipService;
+        this.pushRecheckService = pushRecheckService;
     }
 
     @GetMapping("/dashboard")
@@ -796,6 +829,84 @@ public class DashboardController {
                     INTERNAL_PUSH_PREVIEW_READY,
                     "INTERNAL_PUSH_PREVIEW_OWNER_PATH_READ",
                     "Internal Push preview / notification preview 只读状态可读；不发送 Push，不接外部通道。",
+                    false,
+                    "OK"
+            );
+        }
+        return status;
+    }
+
+    @GetMapping("/api/dashboard/recheck-preview-status")
+    @ResponseBody
+    public Map<String, Object> recheckPreviewStatus(
+            @RequestParam(value = "pushId", required = false) Long pushId,
+            @RequestParam(value = "dispatchBatchId", required = false) String dispatchBatchId,
+            @RequestParam(value = "dispatchInstructionId", required = false) String dispatchInstructionId) {
+        String normalizedDispatchBatchId = normalizeOptionalText(dispatchBatchId);
+        String normalizedDispatchInstructionId = normalizeOptionalText(dispatchInstructionId);
+        Map<String, Object> status = baseRecheckPreviewStatus(
+                pushId,
+                normalizedDispatchBatchId,
+                normalizedDispatchInstructionId
+        );
+
+        PushRecheckLogItemVO latestLog = null;
+        PushRecheckOpsOverviewVO opsOverview;
+        try {
+            if (pushId != null && pushRecheckService != null) {
+                latestLog = pushRecheckService.getLatestLog(pushId);
+            }
+            opsOverview = pushRecheckService != null
+                    ? pushRecheckService.getOpsOverview(
+                    normalizedDispatchBatchId,
+                    normalizedDispatchInstructionId,
+                    5,
+                    10
+            )
+                    : null;
+        } catch (RuntimeException ex) {
+            applyRecheckPreviewStatus(
+                    status,
+                    RECHECK_STATUS_MISSING_FAIL_CLOSED,
+                    "RECHECK_READ_PATH_UNAVAILABLE",
+                    "Recheck persisted log / status contract read path 不可用；只读状态 fail-closed，不执行 Recheck、Replay、scheduler dispatch 或行情刷新。",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
+
+        populateRecheckPreviewStatus(status, latestLog, opsOverview);
+        boolean latestLogAvailable = latestLog != null;
+        boolean opsOverviewAvailable = opsOverview != null;
+        boolean replaySummaryAvailable = opsOverview != null && opsOverview.getLatestReplaySummary() != null;
+        boolean dispatchAuditAvailable = opsOverview != null
+                && (opsOverview.getConfig() != null || opsOverview.getAuditSummary() != null);
+
+        if (!latestLogAvailable && !opsOverviewAvailable) {
+            applyRecheckPreviewStatus(
+                    status,
+                    RECHECK_PREVIEW_MISSING_FAIL_CLOSED,
+                    "RECHECK_PREVIEW_OWNER_EVIDENCE_MISSING",
+                    "Recheck preview owner evidence 缺失；仅返回 fail-closed 安全边界，不调用 recheck 或 replay。",
+                    true,
+                    "MISSING"
+            );
+        } else if (!latestLogAvailable || !replaySummaryAvailable || !dispatchAuditAvailable) {
+            applyRecheckPreviewStatus(
+                    status,
+                    RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY,
+                    "RECHECK_PREVIEW_PARTIAL_OWNER_EVIDENCE",
+                    "Recheck preview/status 部分只读证据可见；仅展示 persisted log / ops overview / replay counters，不触发执行。",
+                    true,
+                    "PARTIAL"
+            );
+        } else {
+            applyRecheckPreviewStatus(
+                    status,
+                    RECHECK_PREVIEW_READY,
+                    "RECHECK_PREVIEW_OWNER_PATH_READ",
+                    "Recheck preview/status 只读状态可读；status contract 仅作历史状态证据，不是可执行复查、回放或交易动作。",
                     false,
                     "OK"
             );
@@ -1596,6 +1707,100 @@ public class DashboardController {
         return status;
     }
 
+    private Map<String, Object> baseRecheckPreviewStatus(
+            Long pushId,
+            String dispatchBatchId,
+            String dispatchInstructionId) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", RECHECK_PREVIEW_MISSING_FAIL_CLOSED);
+        status.put("pushId", pushId);
+        status.put("dispatchBatchId", dispatchBatchId);
+        status.put("dispatchInstructionId", dispatchInstructionId);
+        status.put("recheckPreviewStatus", RECHECK_PREVIEW_MISSING_FAIL_CLOSED);
+        status.put("recheckStatusReadModelStatus", RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("recheckLogReadModelStatus", RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("replaySummaryCounterStatus", RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("dispatchConfigAuditStatus", RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("duplicateReviewReplayStatus", DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED);
+        status.put("duplicateInternalPushPreviewStatus", DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED);
+        status.put("ownerPath", "PushRecheckService.getLatestLog/getOpsOverview -> PushRecheckLogMapper persisted-log reads -> PushRecheckStatusContract -> replay-summary counters -> dispatch config/audit read evidence");
+        status.put("projectionScope", "persisted Recheck log / status contract / dispatch-read evidence review-only projection");
+        status.put("sourceHealth", "MISSING");
+        status.put("latestLogAvailable", false);
+        status.put("opsOverviewAvailable", false);
+        status.put("replaySummaryAvailable", false);
+        status.put("dispatchAuditAvailable", false);
+        status.put("recentLogCount", 0);
+        status.put("latestRecheckStatus", null);
+        status.put("latestPushStatusEvidence", "RECHECK_UNKNOWN");
+        status.put("latestRecheckReviewTag", "BLOCKED");
+        status.put("latestRecheckReviewTagLabel", "阻断");
+        status.put("statusContractMeaning", "persisted status label only; not executable readiness or trading authorization");
+        status.put("reason", "RECHECK_PREVIEW_STATUS_PENDING");
+        status.put("message", "Recheck preview/status 只读状态待确认；不执行 Recheck、Replay、scheduler dispatch、行情刷新或交易动作。");
+        status.put("reviewOnly", true);
+        status.put("manualReviewOnly", true);
+        status.put("notRecheckExecution", true);
+        status.put("notReplayExecution", true);
+        status.put("notSchedulerDispatch", true);
+        status.put("notCollectorTrigger", true);
+        status.put("notApiClientRefresh", true);
+        status.put("notMarketQuoteRefresh", true);
+        status.put("notPushSnapshotWrite", true);
+        status.put("notDispatchConfigWrite", true);
+        status.put("notPushSend", true);
+        status.put("notExternalChannel", true);
+        status.put("notCandidateSignal", true);
+        status.put("notDecisionGeneration", true);
+        status.put("notPointSignal", true);
+        status.put("notFinalDirection", true);
+        status.put("notEntryStopTpRr", true);
+        status.put("notTradingSignal", true);
+        status.put("notExecutable", true);
+        status.put("displaySlotsAreCandidatePool", false);
+        status.put("recheckExecutionBoundaryStatus", RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("replayExecutionBoundaryStatus", REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("schedulerDispatchBoundaryStatus", SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("collectorBoundaryStatus", COLLECTOR_TRIGGER_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("apiClientRefreshBoundaryStatus", API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("marketQuoteRefreshBoundaryStatus", MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pushSnapshotWriteBoundaryStatus", PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("dispatchConfigWriteBoundaryStatus", DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pushSendBoundaryStatus", PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("externalChannelBoundaryStatus", EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("candidateBoundaryStatus", CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("decisionGenerationBoundaryStatus", DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("pointBoundaryStatus", POINT_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("tradingBoundaryStatus", TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED);
+        status.put("failClosed", true);
+        status.put("statusMapping", List.of(
+                RECHECK_PREVIEW_READY,
+                RECHECK_PREVIEW_MISSING_FAIL_CLOSED,
+                RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY,
+                RECHECK_STATUS_READY,
+                RECHECK_STATUS_MISSING_FAIL_CLOSED,
+                RECHECK_LOG_READ_MODEL_READY,
+                REPLAY_SUMMARY_COUNTER_READY,
+                DISPATCH_CONFIG_AUDIT_READY,
+                DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED,
+                DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED,
+                RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                POINT_BOUNDARY_BLOCKED_FAIL_CLOSED,
+                TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED
+        ));
+        return status;
+    }
+
     private Map<String, Object> baseReviewReplayStatus(String analysisId, String normalizedSymbol) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("status", REVIEW_REPLAY_BLOCKED_FAIL_CLOSED);
@@ -2167,6 +2372,102 @@ public class DashboardController {
         status.put("previewDtoBlocked", preview.isBlocked());
         status.put("previewBlockingReasons", preview.getBlockingReasons());
         status.put("previewRiskBlockers", preview.getRiskBlockers());
+    }
+
+    private void applyRecheckPreviewStatus(Map<String, Object> status,
+                                           String statusValue,
+                                           String reason,
+                                           String message,
+                                           boolean failClosed,
+                                           String sourceHealth) {
+        status.put("status", statusValue);
+        status.put("recheckPreviewStatus", statusValue);
+        status.put("reason", reason);
+        status.put("message", message);
+        status.put("failClosed", failClosed);
+        status.put("sourceHealth", sourceHealth);
+    }
+
+    private void populateRecheckPreviewStatus(Map<String, Object> status,
+                                              PushRecheckLogItemVO latestLog,
+                                              PushRecheckOpsOverviewVO opsOverview) {
+        boolean latestLogAvailable = latestLog != null;
+        boolean opsOverviewAvailable = opsOverview != null;
+        status.put("latestLogAvailable", latestLogAvailable);
+        status.put("opsOverviewAvailable", opsOverviewAvailable);
+        status.put("recheckLogReadModelStatus", latestLogAvailable
+                ? RECHECK_LOG_READ_MODEL_READY
+                : RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("recheckStatusReadModelStatus", latestLogAvailable
+                ? RECHECK_STATUS_READY
+                : RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("latestLogId", latestLogAvailable ? latestLog.getLogId() : null);
+        status.put("latestPushId", latestLogAvailable ? latestLog.getPushId() : status.get("pushId"));
+        status.put("latestExecutionStatus", latestLogAvailable
+                ? firstNonBlank(latestLog.getExecutionStatus(), "UNKNOWN")
+                : null);
+        status.put("latestExecutionErrorCode", latestLogAvailable
+                ? firstNonBlank(latestLog.getExecutionErrorCode(), "NONE")
+                : null);
+        status.put("latestRecheckTime", latestLogAvailable ? latestLog.getRecheckTime() : null);
+        status.put("latestLogCreateTime", latestLogAvailable ? latestLog.getCreateTime() : null);
+        status.put("latestTriggerSource", latestLogAvailable
+                ? firstNonBlank(latestLog.getTriggerSource(), "UNKNOWN")
+                : null);
+        status.put("latestReplayFromLogId", latestLogAvailable ? latestLog.getReplayFromLogId() : null);
+        if (latestLogAvailable) {
+            String rawRecheckStatus = firstNonBlank(latestLog.getRecheckStatus(), "UNKNOWN");
+            RecheckStatusEnum parsedStatus = PushRecheckStatusContract.tryParseRecheckStatus(rawRecheckStatus);
+            PushRecheckStatusContract.ReviewTag reviewTag = PushRecheckStatusContract.toReviewTag(parsedStatus);
+            status.put("latestRecheckStatus", rawRecheckStatus);
+            status.put("latestPushStatusEvidence", PushRecheckStatusContract.toPushStatus(parsedStatus));
+            status.put("latestRecheckReviewTag", reviewTag.name());
+            status.put("latestRecheckReviewTagLabel", reviewTag.getZhLabel());
+        }
+
+        PushRecheckReplaySummaryVO replaySummary = opsOverview != null ? opsOverview.getLatestReplaySummary() : null;
+        boolean replaySummaryAvailable = replaySummary != null;
+        status.put("replaySummaryAvailable", replaySummaryAvailable);
+        status.put("replaySummaryCounterStatus", replaySummaryAvailable
+                ? REPLAY_SUMMARY_COUNTER_READY
+                : RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("replaySummaryTotalCount", replaySummaryAvailable ? safeInteger(replaySummary.getTotalCount()) : 0);
+        status.put("replaySummarySuccessCount", replaySummaryAvailable ? safeInteger(replaySummary.getSuccessCount()) : 0);
+        status.put("replaySummaryBlockingCount", replaySummaryAvailable ? safeInteger(replaySummary.getBlockingCount()) : 0);
+        status.put("replaySummaryWaitingCount", replaySummaryAvailable ? safeInteger(replaySummary.getWaitingCount()) : 0);
+        status.put("replaySummaryExpiredCount", replaySummaryAvailable ? safeInteger(replaySummary.getExpiredCount()) : 0);
+        status.put("replaySummaryReplayCount", replaySummaryAvailable ? safeInteger(replaySummary.getReplayCount()) : 0);
+        status.put("replaySummaryLatestExecutionStatus", replaySummaryAvailable
+                ? firstNonBlank(replaySummary.getLatestExecutionStatus(), "UNKNOWN")
+                : null);
+        status.put("replaySummaryLatestExecutionTime", replaySummaryAvailable
+                ? replaySummary.getLatestExecutionTime()
+                : null);
+        status.put("replaySummaryHasError", replaySummaryAvailable && Boolean.TRUE.equals(replaySummary.getHasError()));
+
+        PushRecheckOpsOverviewVO.ConfigSummary config = opsOverview != null ? opsOverview.getConfig() : null;
+        PushRecheckOpsOverviewVO.AuditSummary audit = opsOverview != null ? opsOverview.getAuditSummary() : null;
+        boolean dispatchAuditAvailable = config != null || audit != null;
+        status.put("dispatchAuditAvailable", dispatchAuditAvailable);
+        status.put("dispatchConfigAuditStatus", dispatchAuditAvailable
+                ? DISPATCH_CONFIG_AUDIT_READY
+                : RECHECK_STATUS_MISSING_FAIL_CLOSED);
+        status.put("dispatchConfigLimit", config != null ? config.getLimit() : null);
+        status.put("dispatchConfigMaxAttempts", config != null ? config.getMaxAttempts() : null);
+        status.put("dispatchConfigMinRetryMinutes", config != null ? config.getMinRetryMinutes() : null);
+        status.put("dispatchConfigUpdatedBy", config != null ? firstNonBlank(config.getUpdatedBy(), "UNKNOWN") : null);
+        status.put("dispatchConfigUpdatedTime", config != null ? config.getUpdatedTime() : null);
+        status.put("dispatchAuditCount", audit != null ? safeInteger(audit.getAuditCount()) : 0);
+        status.put("dispatchLatestAuditOperator", audit != null
+                ? firstNonBlank(audit.getLatestAuditOperator(), "UNKNOWN")
+                : null);
+        status.put("dispatchLatestAuditTime", audit != null ? audit.getLatestAuditTime() : null);
+        status.put("dispatchLatestAuditSummary", audit != null
+                ? firstNonBlank(audit.getLatestAuditSummary(), "missing")
+                : null);
+        status.put("recentLogCount", opsOverview != null && opsOverview.getRecentLogs() != null
+                ? opsOverview.getRecentLogs().size()
+                : 0);
     }
 
     private void applyExecutionPlanBoundaryStatus(Map<String, Object> status,
@@ -3053,5 +3354,12 @@ public class DashboardController {
             return null;
         }
         return analysisId.trim();
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 }

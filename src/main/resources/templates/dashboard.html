@@ -1290,6 +1290,33 @@
             <div class="kv"><span class="k">Display boundary</span><span class="v">review-only / manual review required / not trade instruction</span></div>
         </section>
 
+        <section class="card module-status-card review-display-card" id="recheckPreviewStatusPanel" aria-label="Recheck preview review-only runtime status">
+            <h3>Recheck Preview / Status（复查预览 / 状态）</h3>
+            <p class="module-status-note">Review-only / manual review only / fail-closed；只读展示 persisted Recheck log、status contract、dispatch-read evidence 与 replay-summary counters。</p>
+            <div class="workbench-badges" aria-label="Recheck preview safety labels" style="justify-content:flex-start;margin-bottom:8px;">
+                <span class="status-badge partial">Review-only</span>
+                <span class="status-badge pending">Manual review only</span>
+                <span class="status-badge pending">Fail-closed</span>
+                <span class="status-badge pending">Not Recheck execution</span>
+                <span class="status-badge pending">Not Replay execution</span>
+                <span class="status-badge pending">Not scheduler dispatch</span>
+            </div>
+            <div class="module-status-note" aria-label="Recheck preview status values" style="margin:0 0 12px 0;max-width:64rem;">
+                <div class="kv"><span class="k">Recheck preview 只读状态</span><span class="v" id="recheckPreviewRuntimeStatusValue">RECHECK_PREVIEW_MISSING_FAIL_CLOSED / Recheck preview 只读状态待确认</span></div>
+                <div class="kv"><span class="k">pushId / source health</span><span class="v"><span id="recheckPreviewPushIdValue">—</span> · <span id="recheckPreviewSourceHealthValue">MISSING</span></span></div>
+                <div class="kv"><span class="k">preview / status contract</span><span class="v"><span id="recheckPreviewStatusValue">RECHECK_PREVIEW_MISSING_FAIL_CLOSED</span> · <span id="recheckStatusReadModelValue">RECHECK_STATUS_MISSING_FAIL_CLOSED</span></span></div>
+                <div class="kv"><span class="k">latest log / replay counters</span><span class="v"><span id="recheckLatestLogValue">missing persisted log</span> · <span id="recheckReplaySummaryValue">RECHECK_STATUS_MISSING_FAIL_CLOSED</span></span></div>
+                <div class="kv"><span class="k">dispatch config / audit evidence</span><span class="v" id="recheckDispatchAuditValue">RECHECK_STATUS_MISSING_FAIL_CLOSED</span></div>
+                <div class="kv"><span class="k">只读边界</span><span class="v" id="recheckPreviewReviewOnlyValue">review-only；manual review only；fail-closed；status contract 仅作历史状态证据。</span></div>
+                <div class="kv"><span class="k">Recheck execution boundary</span><span class="v" id="recheckExecutionBoundaryValue">not Recheck execution；not executable；not order / execution / auto-trading。</span></div>
+                <div class="kv"><span class="k">Replay / scheduler / MarketQuote boundary</span><span class="v" id="recheckReplaySchedulerBoundaryValue">not Replay execution；not scheduler dispatch；not collector trigger；not API client refresh；not MarketQuote refresh。</span></div>
+                <div class="kv"><span class="k">PushSnapshot / Push / dispatch boundary</span><span class="v" id="recheckPushSnapshotBoundaryValue">not PushSnapshot write；not dispatch config write；not Push send；not external channel。</span></div>
+                <div class="kv"><span class="k">Signal / trading boundary</span><span class="v" id="recheckSignalTradingBoundaryValue">not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；Display Slots 不是候选池。</span></div>
+                <div class="kv"><span class="k">原因</span><span class="v" id="recheckPreviewReasonValue">RECHECK_PREVIEW_STATUS_PENDING</span></div>
+            </div>
+            <div class="alert-line confused">No recheck(...), replayByDispatch(...), scheduler dispatch, MarketQuote refresh, PushSnapshot write, dispatch config write, Push send, external channel, Candidate / Decision / Point generation, order, execution, or auto-trading action is available here.</div>
+        </section>
+
         <section class="card module-status-card review-display-card" id="internalPushPreviewDisplay" aria-label="Internal Push Preview display gate">
             <h3>Internal Push Preview（内部推送预览）</h3>
             <p class="module-status-note">Review-only preview / 只读预览；dashboard display gate only.</p>
@@ -1559,6 +1586,29 @@
     var INTERNAL_PUSH_DECISION_BLOCKED = "DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var INTERNAL_PUSH_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var INTERNAL_PUSH_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_PREVIEW_STATUS_READY = "RECHECK_PREVIEW_REVIEW_ONLY_READY";
+    var RECHECK_PREVIEW_STATUS_MISSING = "RECHECK_PREVIEW_MISSING_FAIL_CLOSED";
+    var RECHECK_PREVIEW_STATUS_PARTIAL = "RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY";
+    var RECHECK_STATUS_READY = "RECHECK_STATUS_REVIEW_ONLY_READY";
+    var RECHECK_STATUS_MISSING = "RECHECK_STATUS_MISSING_FAIL_CLOSED";
+    var RECHECK_LOG_READ_MODEL_READY = "RECHECK_LOG_READ_MODEL_REVIEW_ONLY_READY";
+    var RECHECK_REPLAY_COUNTER_READY = "REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY";
+    var RECHECK_DISPATCH_AUDIT_READY = "DISPATCH_CONFIG_AUDIT_REVIEW_ONLY_READY";
+    var RECHECK_DUPLICATE_REVIEW_REPLAY_REQUIRED = "DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED";
+    var RECHECK_DUPLICATE_INTERNAL_PUSH_REQUIRED = "DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED";
+    var RECHECK_EXECUTION_BLOCKED = "RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_REPLAY_EXECUTION_BLOCKED = "REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_SCHEDULER_DISPATCH_BLOCKED = "SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_API_CLIENT_REFRESH_BLOCKED = "API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_MARKET_QUOTE_REFRESH_BLOCKED = "MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_PUSH_SNAPSHOT_WRITE_BLOCKED = "PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_DISPATCH_CONFIG_WRITE_BLOCKED = "DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_PUSH_SEND_BLOCKED = "PUSH_SEND_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_EXTERNAL_CHANNEL_BLOCKED = "EXTERNAL_CHANNEL_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_CANDIDATE_BLOCKED = "CANDIDATE_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_DECISION_BLOCKED = "DECISION_GENERATION_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
+    var RECHECK_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var SOURCE_RUNTIME_STATUS_READY = "SOURCE_RUNTIME_STATUS_REVIEW_ONLY_READY";
     var SOURCE_RUNTIME_STATUS_MISSING = "SOURCE_TRACE_MISSING_FAIL_CLOSED";
     var SOURCE_RUNTIME_STATUS_PARTIAL = "SOURCE_TRACE_PARTIAL_REVIEW_ONLY";
@@ -1941,6 +1991,63 @@
         tradingBoundaryStatus: INTERNAL_PUSH_TRADING_BLOCKED,
         failClosed: true
     };
+    var recheckPreviewRuntimeStatus = {
+        status: RECHECK_PREVIEW_STATUS_MISSING,
+        pushId: null,
+        dispatchBatchId: null,
+        dispatchInstructionId: null,
+        recheckPreviewStatus: RECHECK_PREVIEW_STATUS_MISSING,
+        recheckStatusReadModelStatus: RECHECK_STATUS_MISSING,
+        recheckLogReadModelStatus: RECHECK_STATUS_MISSING,
+        replaySummaryCounterStatus: RECHECK_STATUS_MISSING,
+        dispatchConfigAuditStatus: RECHECK_STATUS_MISSING,
+        duplicateReviewReplayStatus: RECHECK_DUPLICATE_REVIEW_REPLAY_REQUIRED,
+        duplicateInternalPushPreviewStatus: RECHECK_DUPLICATE_INTERNAL_PUSH_REQUIRED,
+        sourceHealth: "MISSING",
+        latestLogAvailable: false,
+        opsOverviewAvailable: false,
+        replaySummaryAvailable: false,
+        dispatchAuditAvailable: false,
+        recentLogCount: 0,
+        latestRecheckStatus: null,
+        latestPushStatusEvidence: "RECHECK_UNKNOWN",
+        latestRecheckReviewTag: "BLOCKED",
+        reason: "RECHECK_PREVIEW_STATUS_PENDING",
+        message: "Recheck preview/status 只读状态待确认；不执行 Recheck、Replay、scheduler dispatch、行情刷新或交易动作。",
+        reviewOnly: true,
+        manualReviewOnly: true,
+        notRecheckExecution: true,
+        notReplayExecution: true,
+        notSchedulerDispatch: true,
+        notCollectorTrigger: true,
+        notApiClientRefresh: true,
+        notMarketQuoteRefresh: true,
+        notPushSnapshotWrite: true,
+        notDispatchConfigWrite: true,
+        notPushSend: true,
+        notExternalChannel: true,
+        notCandidateSignal: true,
+        notDecisionGeneration: true,
+        notPointSignal: true,
+        notFinalDirection: true,
+        notEntryStopTpRr: true,
+        notTradingSignal: true,
+        notExecutable: true,
+        displaySlotsAreCandidatePool: false,
+        recheckExecutionBoundaryStatus: RECHECK_EXECUTION_BLOCKED,
+        replayExecutionBoundaryStatus: RECHECK_REPLAY_EXECUTION_BLOCKED,
+        schedulerDispatchBoundaryStatus: RECHECK_SCHEDULER_DISPATCH_BLOCKED,
+        marketQuoteRefreshBoundaryStatus: RECHECK_MARKET_QUOTE_REFRESH_BLOCKED,
+        pushSnapshotWriteBoundaryStatus: RECHECK_PUSH_SNAPSHOT_WRITE_BLOCKED,
+        dispatchConfigWriteBoundaryStatus: RECHECK_DISPATCH_CONFIG_WRITE_BLOCKED,
+        pushSendBoundaryStatus: RECHECK_PUSH_SEND_BLOCKED,
+        externalChannelBoundaryStatus: RECHECK_EXTERNAL_CHANNEL_BLOCKED,
+        candidateBoundaryStatus: RECHECK_CANDIDATE_BLOCKED,
+        decisionGenerationBoundaryStatus: RECHECK_DECISION_BLOCKED,
+        pointBoundaryStatus: RECHECK_POINT_BLOCKED,
+        tradingBoundaryStatus: RECHECK_TRADING_BLOCKED,
+        failClosed: true
+    };
     var reviewReplayRuntimeStatus = {
         status: REVIEW_REPLAY_STATUS_BLOCKED,
         symbol: null,
@@ -2247,6 +2354,7 @@
     window.__evidenceScoreReviewStatus = EVIDENCE_SCORE_STATUS_INCOMPLETE;
     window.__decisionResultReviewStatus = DECISIONRESULT_STATUS_BLOCKED;
     window.__reviewReplayReviewStatus = REVIEW_REPLAY_STATUS_BLOCKED;
+    window.__recheckPreviewReviewStatus = RECHECK_PREVIEW_STATUS_MISSING;
     window.__executionPlanBoundaryReviewStatus = EXECUTIONPLAN_BOUNDARY_STATUS_BLOCKED;
     window.__riskActionGuardReviewStatus = RISK_ACTION_GUARD_STATUS_BACKEND_PENDING;
     window.__alertFatiguePolicyReviewStatus = ALERT_POLICY_STATUS_BACKEND_PENDING;
@@ -4166,6 +4274,107 @@
             });
     }
 
+    function resolveRecheckPreviewRuntimeStatus(payload) {
+        var p = payload && typeof payload === "object" ? payload : {};
+        return {
+            status: firstNonEmpty(p.status, RECHECK_PREVIEW_STATUS_MISSING).toUpperCase(),
+            pushId: p.pushId || null,
+            dispatchBatchId: p.dispatchBatchId || null,
+            dispatchInstructionId: p.dispatchInstructionId || null,
+            recheckPreviewStatus: firstNonEmpty(p.recheckPreviewStatus, RECHECK_PREVIEW_STATUS_MISSING).toUpperCase(),
+            recheckStatusReadModelStatus: firstNonEmpty(p.recheckStatusReadModelStatus, RECHECK_STATUS_MISSING).toUpperCase(),
+            recheckLogReadModelStatus: firstNonEmpty(p.recheckLogReadModelStatus, RECHECK_STATUS_MISSING).toUpperCase(),
+            replaySummaryCounterStatus: firstNonEmpty(p.replaySummaryCounterStatus, RECHECK_STATUS_MISSING).toUpperCase(),
+            dispatchConfigAuditStatus: firstNonEmpty(p.dispatchConfigAuditStatus, RECHECK_STATUS_MISSING).toUpperCase(),
+            duplicateReviewReplayStatus: firstNonEmpty(p.duplicateReviewReplayStatus, RECHECK_DUPLICATE_REVIEW_REPLAY_REQUIRED).toUpperCase(),
+            duplicateInternalPushPreviewStatus: firstNonEmpty(p.duplicateInternalPushPreviewStatus, RECHECK_DUPLICATE_INTERNAL_PUSH_REQUIRED).toUpperCase(),
+            sourceHealth: firstNonEmpty(p.sourceHealth, "MISSING").toUpperCase(),
+            latestLogAvailable: p.latestLogAvailable === true,
+            opsOverviewAvailable: p.opsOverviewAvailable === true,
+            replaySummaryAvailable: p.replaySummaryAvailable === true,
+            dispatchAuditAvailable: p.dispatchAuditAvailable === true,
+            recentLogCount: Number(p.recentLogCount || 0),
+            latestRecheckStatus: p.latestRecheckStatus || null,
+            latestPushStatusEvidence: firstNonEmpty(p.latestPushStatusEvidence, "RECHECK_UNKNOWN").toUpperCase(),
+            latestRecheckReviewTag: firstNonEmpty(p.latestRecheckReviewTag, "BLOCKED").toUpperCase(),
+            replaySummaryTotalCount: Number(p.replaySummaryTotalCount || 0),
+            dispatchAuditCount: Number(p.dispatchAuditCount || 0),
+            reason: firstNonEmpty(p.reason, p.status, "RECHECK_PREVIEW_STATUS_PENDING"),
+            message: firstNonEmpty(p.message, "Recheck preview/status 只读状态待确认；不执行 Recheck、Replay、scheduler dispatch、行情刷新或交易动作。"),
+            reviewOnly: true,
+            manualReviewOnly: true,
+            notRecheckExecution: true,
+            notReplayExecution: true,
+            notSchedulerDispatch: true,
+            notCollectorTrigger: true,
+            notApiClientRefresh: true,
+            notMarketQuoteRefresh: true,
+            notPushSnapshotWrite: true,
+            notDispatchConfigWrite: true,
+            notPushSend: true,
+            notExternalChannel: true,
+            notCandidateSignal: true,
+            notDecisionGeneration: true,
+            notPointSignal: true,
+            notFinalDirection: true,
+            notEntryStopTpRr: true,
+            notTradingSignal: true,
+            notExecutable: true,
+            displaySlotsAreCandidatePool: false,
+            recheckExecutionBoundaryStatus: firstNonEmpty(p.recheckExecutionBoundaryStatus, RECHECK_EXECUTION_BLOCKED).toUpperCase(),
+            replayExecutionBoundaryStatus: firstNonEmpty(p.replayExecutionBoundaryStatus, RECHECK_REPLAY_EXECUTION_BLOCKED).toUpperCase(),
+            schedulerDispatchBoundaryStatus: firstNonEmpty(p.schedulerDispatchBoundaryStatus, RECHECK_SCHEDULER_DISPATCH_BLOCKED).toUpperCase(),
+            marketQuoteRefreshBoundaryStatus: firstNonEmpty(p.marketQuoteRefreshBoundaryStatus, RECHECK_MARKET_QUOTE_REFRESH_BLOCKED).toUpperCase(),
+            pushSnapshotWriteBoundaryStatus: firstNonEmpty(p.pushSnapshotWriteBoundaryStatus, RECHECK_PUSH_SNAPSHOT_WRITE_BLOCKED).toUpperCase(),
+            dispatchConfigWriteBoundaryStatus: firstNonEmpty(p.dispatchConfigWriteBoundaryStatus, RECHECK_DISPATCH_CONFIG_WRITE_BLOCKED).toUpperCase(),
+            pushSendBoundaryStatus: firstNonEmpty(p.pushSendBoundaryStatus, RECHECK_PUSH_SEND_BLOCKED).toUpperCase(),
+            externalChannelBoundaryStatus: firstNonEmpty(p.externalChannelBoundaryStatus, RECHECK_EXTERNAL_CHANNEL_BLOCKED).toUpperCase(),
+            candidateBoundaryStatus: firstNonEmpty(p.candidateBoundaryStatus, RECHECK_CANDIDATE_BLOCKED).toUpperCase(),
+            decisionGenerationBoundaryStatus: firstNonEmpty(p.decisionGenerationBoundaryStatus, RECHECK_DECISION_BLOCKED).toUpperCase(),
+            pointBoundaryStatus: firstNonEmpty(p.pointBoundaryStatus, RECHECK_POINT_BLOCKED).toUpperCase(),
+            tradingBoundaryStatus: firstNonEmpty(p.tradingBoundaryStatus, RECHECK_TRADING_BLOCKED).toUpperCase(),
+            failClosed: p.failClosed !== false
+        };
+    }
+
+    function updateRecheckPreviewRuntimeStatusDisplay() {
+        var rs = recheckPreviewRuntimeStatus || {};
+        var latestLogText = rs.latestLogAvailable
+            ? (rs.latestRecheckStatus || "UNKNOWN") + " / " + (rs.latestPushStatusEvidence || "RECHECK_UNKNOWN") + " / " + (rs.latestRecheckReviewTag || "BLOCKED")
+            : "missing persisted log";
+        var replayText = (rs.replaySummaryCounterStatus || RECHECK_STATUS_MISSING) + " / count " + (rs.replaySummaryTotalCount || 0);
+        var dispatchText = (rs.dispatchConfigAuditStatus || RECHECK_STATUS_MISSING) + " / audit " + (rs.dispatchAuditCount || 0);
+        setText("recheckPreviewRuntimeStatusValue", (rs.status || RECHECK_PREVIEW_STATUS_MISSING) + " / " + (rs.message || "只读状态"));
+        setText("recheckPreviewPushIdValue", rs.pushId || "—");
+        setText("recheckPreviewSourceHealthValue", rs.sourceHealth || "MISSING");
+        setText("recheckPreviewStatusValue", rs.recheckPreviewStatus || RECHECK_PREVIEW_STATUS_MISSING);
+        setText("recheckStatusReadModelValue", rs.recheckStatusReadModelStatus || RECHECK_STATUS_MISSING);
+        setText("recheckLatestLogValue", latestLogText);
+        setText("recheckReplaySummaryValue", replayText);
+        setText("recheckDispatchAuditValue", dispatchText);
+        setText("recheckPreviewReviewOnlyValue", "review-only；manual review only；fail-closed；persisted Recheck log / status contract / dispatch-read evidence only。");
+        setText("recheckExecutionBoundaryValue", (rs.recheckExecutionBoundaryStatus || RECHECK_EXECUTION_BLOCKED) + "；not Recheck execution；not executable；not order / execution / auto-trading。");
+        setText("recheckReplaySchedulerBoundaryValue", (rs.replayExecutionBoundaryStatus || RECHECK_REPLAY_EXECUTION_BLOCKED) + " / " + (rs.schedulerDispatchBoundaryStatus || RECHECK_SCHEDULER_DISPATCH_BLOCKED) + " / " + (rs.apiClientRefreshBoundaryStatus || RECHECK_API_CLIENT_REFRESH_BLOCKED) + " / " + (rs.marketQuoteRefreshBoundaryStatus || RECHECK_MARKET_QUOTE_REFRESH_BLOCKED) + "；not Replay execution；not scheduler dispatch；not collector trigger；not API client refresh；not MarketQuote refresh。");
+        setText("recheckPushSnapshotBoundaryValue", (rs.pushSnapshotWriteBoundaryStatus || RECHECK_PUSH_SNAPSHOT_WRITE_BLOCKED) + " / " + (rs.dispatchConfigWriteBoundaryStatus || RECHECK_DISPATCH_CONFIG_WRITE_BLOCKED) + " / " + (rs.pushSendBoundaryStatus || RECHECK_PUSH_SEND_BLOCKED) + " / " + (rs.externalChannelBoundaryStatus || RECHECK_EXTERNAL_CHANNEL_BLOCKED) + "；not PushSnapshot write；not dispatch config write；not Push send；not external channel。");
+        setText("recheckSignalTradingBoundaryValue", "not candidate；not decision generation；not point；not final direction；not entry / stop / TP / RR；not trading；not executable；Display Slots 不是候选池。");
+        setText("recheckPreviewReasonValue", rs.reason || "—");
+    }
+
+    function fetchRecheckPreviewRuntimeStatus() {
+        return fetch("/api/dashboard/recheck-preview-status")
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (payload) {
+                recheckPreviewRuntimeStatus = resolveRecheckPreviewRuntimeStatus(payload);
+                window.__recheckPreviewReviewStatus = recheckPreviewRuntimeStatus.status || RECHECK_PREVIEW_STATUS_MISSING;
+                updateRecheckPreviewRuntimeStatusDisplay();
+            })
+            .catch(function () {
+                recheckPreviewRuntimeStatus = resolveRecheckPreviewRuntimeStatus({});
+                window.__recheckPreviewReviewStatus = RECHECK_PREVIEW_STATUS_MISSING;
+                updateRecheckPreviewRuntimeStatusDisplay();
+            });
+    }
+
     function resolveReviewReplayRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -5382,6 +5591,7 @@
                 fetchRuleConfigAuditRuntimeStatus();
                 fetchRuntimeReadinessGuardrailStatus();
                 fetchInternalPushPreviewNotificationStatus(selectedSymbol);
+                fetchRecheckPreviewRuntimeStatus();
                 fetchHotResetEventImpactSourceStatus(selectedSymbol);
             })
             .catch(function () {
@@ -5396,6 +5606,7 @@
                 fetchPaperObservationRuntimeStatus(selectedSymbol);
                 fetchAlertFatiguePolicyRuntimeStatus(selectedSymbol);
                 fetchInternalPushPreviewNotificationStatus(selectedSymbol);
+                fetchRecheckPreviewRuntimeStatus();
                 fetchReviewReplayRuntimeStatus(selectedSymbol);
                 fetchDataSourceHealthRuntimeStatus(selectedSymbol);
                 fetchSourceRuntimeDataQualityStatus(selectedSymbol);
@@ -5417,6 +5628,7 @@
         fetchPaperObservationRuntimeStatus(symbol);
         fetchAlertFatiguePolicyRuntimeStatus(symbol);
         fetchInternalPushPreviewNotificationStatus(symbol);
+        fetchRecheckPreviewRuntimeStatus();
         fetchReviewReplayRuntimeStatus(symbol);
         fetchDataSourceHealthRuntimeStatus(symbol);
         fetchSourceRuntimeDataQualityStatus(symbol);
@@ -5570,6 +5782,7 @@
         updateEvidenceScoreRuntimeStatusDisplay();
         updateDecisionResultRuntimeStatusDisplay();
         updateExecutionPlanBoundaryRuntimeStatusDisplay();
+        updateRecheckPreviewRuntimeStatusDisplay();
         updateReviewReplayRuntimeStatusDisplay();
         updateDataSourceHealthRuntimeStatusDisplay();
         wireNav();
