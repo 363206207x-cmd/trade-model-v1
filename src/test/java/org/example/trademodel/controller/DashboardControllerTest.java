@@ -18,6 +18,7 @@ import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.PushRecheckService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuntimeMetricService;
@@ -37,6 +38,9 @@ import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
+import org.example.trademodel.vo.PushRecheckLogItemVO;
+import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
+import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.example.trademodel.vo.ReviewAggregateSummaryVO;
 import org.example.trademodel.vo.ReviewAggregateVO;
 import org.example.trademodel.vo.ReviewStateVO;
@@ -100,6 +104,8 @@ class DashboardControllerTest {
     private HotResetEventMapper hotResetEventMapper;
     @Mock
     private SourceTraceEventSourceOwnershipService sourceTraceEventSourceOwnershipService;
+    @Mock
+    private PushRecheckService pushRecheckService;
     @Mock
     private EvidenceService evidenceService;
     @Mock
@@ -535,6 +541,64 @@ class DashboardControllerTest {
     }
 
     @Test
+    void dashboardTemplateShowsReviewOnlyRecheckPreviewStatusMapping() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("/api/dashboard/recheck-preview-status");
+        assertThat(html).contains("recheckPreviewStatusPanel");
+        assertThat(html).contains("recheckPreviewRuntimeStatusValue");
+        assertThat(html).contains("recheckPreviewPushIdValue");
+        assertThat(html).contains("recheckPreviewSourceHealthValue");
+        assertThat(html).contains("recheckPreviewStatusValue");
+        assertThat(html).contains("recheckStatusReadModelValue");
+        assertThat(html).contains("recheckLatestLogValue");
+        assertThat(html).contains("recheckReplaySummaryValue");
+        assertThat(html).contains("recheckDispatchAuditValue");
+        assertThat(html).contains("recheckPreviewReviewOnlyValue");
+        assertThat(html).contains("recheckExecutionBoundaryValue");
+        assertThat(html).contains("recheckReplaySchedulerBoundaryValue");
+        assertThat(html).contains("recheckPushSnapshotBoundaryValue");
+        assertThat(html).contains("recheckSignalTradingBoundaryValue");
+        assertThat(html).contains("recheckPreviewReasonValue");
+        assertThat(html).contains("RECHECK_PREVIEW_REVIEW_ONLY_READY");
+        assertThat(html).contains("RECHECK_PREVIEW_MISSING_FAIL_CLOSED");
+        assertThat(html).contains("RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY");
+        assertThat(html).contains("RECHECK_STATUS_REVIEW_ONLY_READY");
+        assertThat(html).contains("RECHECK_LOG_READ_MODEL_REVIEW_ONLY_READY");
+        assertThat(html).contains("REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY");
+        assertThat(html).contains("DISPATCH_CONFIG_AUDIT_REVIEW_ONLY_READY");
+        assertThat(html).contains("DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED");
+        assertThat(html).contains("DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED");
+        assertThat(html).contains("RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED");
+        assertThat(html).contains("review-only");
+        assertThat(html).contains("manual review only");
+        assertThat(html).contains("fail-closed");
+        assertThat(html).contains("not Recheck execution");
+        assertThat(html).contains("not Replay execution");
+        assertThat(html).contains("not scheduler dispatch");
+        assertThat(html).contains("not MarketQuote refresh");
+        assertThat(html).contains("not PushSnapshot write");
+        assertThat(html).contains("not dispatch config write");
+        assertThat(html).contains("not Push send");
+        assertThat(html).contains("not external channel");
+        assertThat(html).contains("not candidate");
+        assertThat(html).contains("not decision generation");
+        assertThat(html).contains("not point");
+        assertThat(html).contains("not final direction");
+        assertThat(html).contains("not entry / stop / TP / RR");
+        assertThat(html).contains("not order / execution / auto-trading");
+        assertThat(html).contains("not trading");
+        assertThat(html).contains("not executable");
+        assertThat(html).contains("Display Slots 不是候选池");
+    }
+
+    @Test
     void dashboardTemplateShowsReviewOnlyReviewReplayRuntimeStatusMapping() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 
@@ -895,7 +959,8 @@ class DashboardControllerTest {
                 riskActionGuardDisplayAdapter,
                 paperObservationDisplayAdapter,
                 hotResetEventMapper,
-                sourceTraceEventSourceOwnershipService
+                sourceTraceEventSourceOwnershipService,
+                pushRecheckService
         );
     }
 
@@ -1957,6 +2022,162 @@ class DashboardControllerTest {
     }
 
     @Test
+    void recheckPreviewStatusEndpointReturnsReviewOnlyReadyProjectionFromPersistedLogAndOpsOverview() throws Exception {
+        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "VALID_WAITING"));
+        when(pushRecheckService.getOpsOverview("batch-1", "inst-1", 5, 10)).thenReturn(recheckOpsOverview(true, true));
+
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status")
+                        .param("pushId", "101")
+                        .param("dispatchBatchId", "batch-1")
+                        .param("dispatchInstructionId", "inst-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.pushId").value(101))
+                .andExpect(jsonPath("$.dispatchBatchId").value("batch-1"))
+                .andExpect(jsonPath("$.dispatchInstructionId").value("inst-1"))
+                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.recheckStatusReadModelStatus").value("RECHECK_STATUS_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.recheckLogReadModelStatus").value("RECHECK_LOG_READ_MODEL_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.replaySummaryCounterStatus").value("REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.dispatchConfigAuditStatus").value("DISPATCH_CONFIG_AUDIT_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.latestLogAvailable").value(true))
+                .andExpect(jsonPath("$.latestRecheckStatus").value("VALID_WAITING"))
+                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_VALID_WAITING"))
+                .andExpect(jsonPath("$.latestRecheckReviewTag").value("WAITING"))
+                .andExpect(jsonPath("$.statusContractMeaning").value("persisted status label only; not executable readiness or trading authorization"))
+                .andExpect(jsonPath("$.replaySummaryTotalCount").value(3))
+                .andExpect(jsonPath("$.dispatchAuditAvailable").value(true))
+                .andExpect(jsonPath("$.reviewOnly").value(true))
+                .andExpect(jsonPath("$.manualReviewOnly").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notSchedulerDispatch").value(true))
+                .andExpect(jsonPath("$.notCollectorTrigger").value(true))
+                .andExpect(jsonPath("$.notApiClientRefresh").value(true))
+                .andExpect(jsonPath("$.notMarketQuoteRefresh").value(true))
+                .andExpect(jsonPath("$.notPushSnapshotWrite").value(true))
+                .andExpect(jsonPath("$.notDispatchConfigWrite").value(true))
+                .andExpect(jsonPath("$.notPushSend").value(true))
+                .andExpect(jsonPath("$.notExternalChannel").value(true))
+                .andExpect(jsonPath("$.notCandidateSignal").value(true))
+                .andExpect(jsonPath("$.notDecisionGeneration").value(true))
+                .andExpect(jsonPath("$.notPointSignal").value(true))
+                .andExpect(jsonPath("$.notFinalDirection").value(true))
+                .andExpect(jsonPath("$.notEntryStopTpRr").value(true))
+                .andExpect(jsonPath("$.notTradingSignal").value(true))
+                .andExpect(jsonPath("$.notExecutable").value(true))
+                .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
+                .andExpect(jsonPath("$.failClosed").value(false))
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_PREVIEW_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
+                .andExpect(jsonPath("$.statusMapping[?(@ == 'TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists());
+
+        verify(pushRecheckService).getLatestLog(101L);
+        verify(pushRecheckService).getOpsOverview("batch-1", "inst-1", 5, 10);
+        verify(pushRecheckService, never()).recheck(anyLong(), any(), any());
+        verify(pushRecheckService, never()).replayByDispatch(any(), any());
+    }
+
+    @Test
+    void recheckPreviewStatusEndpointFailsClosedWhenOwnerEvidenceMissing() throws Exception {
+        when(pushRecheckService.getOpsOverview(null, null, 5, 10)).thenReturn(null);
+
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.latestLogAvailable").value(false))
+                .andExpect(jsonPath("$.opsOverviewAvailable").value(false))
+                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("RECHECK_PREVIEW_OWNER_EVIDENCE_MISSING"))
+                .andExpect(jsonPath("$.recheckExecutionBoundaryStatus").value("RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.replayExecutionBoundaryStatus").value("REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.schedulerDispatchBoundaryStatus").value("SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.apiClientRefreshBoundaryStatus").value("API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.marketQuoteRefreshBoundaryStatus").value("MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pushSnapshotWriteBoundaryStatus").value("PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.dispatchConfigWriteBoundaryStatus").value("DISPATCH_CONFIG_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED"));
+
+        verify(pushRecheckService, never()).getLatestLog(anyLong());
+        verify(pushRecheckService, never()).recheck(anyLong(), any(), any());
+        verify(pushRecheckService, never()).replayByDispatch(any(), any());
+    }
+
+    @Test
+    void recheckPreviewStatusEndpointFailsClosedWhenReadPathThrows() throws Exception {
+        when(pushRecheckService.getLatestLog(101L)).thenThrow(new IllegalStateException("read unavailable"));
+
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("pushId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECHECK_STATUS_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.reason").value("RECHECK_READ_PATH_UNAVAILABLE"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.notRecheckExecution").value(true))
+                .andExpect(jsonPath("$.notReplayExecution").value(true))
+                .andExpect(jsonPath("$.notMarketQuoteRefresh").value(true))
+                .andExpect(jsonPath("$.notPushSnapshotWrite").value(true));
+
+        verify(pushRecheckService, never()).recheck(anyLong(), any(), any());
+        verify(pushRecheckService, never()).replayByDispatch(any(), any());
+    }
+
+    @Test
+    void recheckPreviewStatusEndpointMarksPartialWhenOnlyOpsEvidenceExists() throws Exception {
+        when(pushRecheckService.getOpsOverview("batch-1", null, 5, 10)).thenReturn(recheckOpsOverview(true, false));
+
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("dispatchBatchId", "batch-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY"))
+                .andExpect(jsonPath("$.latestLogAvailable").value(false))
+                .andExpect(jsonPath("$.opsOverviewAvailable").value(true))
+                .andExpect(jsonPath("$.replaySummaryCounterStatus").value("REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.dispatchConfigAuditStatus").value("RECHECK_STATUS_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.reason").value("RECHECK_PREVIEW_PARTIAL_OWNER_EVIDENCE"));
+    }
+
+    @Test
+    void recheckPreviewStatusEndpointDoesNotExposeExecutableActionFields() throws Exception {
+        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "VALID_EXECUTABLE"));
+        when(pushRecheckService.getOpsOverview(null, null, 5, 10)).thenReturn(recheckOpsOverview(true, true));
+
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("pushId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_VALID_EXECUTABLE"))
+                .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.schedulerAction").doesNotExist())
+                .andExpect(jsonPath("$.marketQuoteRefreshAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSnapshotWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.dispatchConfigWriteAction").doesNotExist())
+                .andExpect(jsonPath("$.pushSend").doesNotExist())
+                .andExpect(jsonPath("$.pushSendState").doesNotExist())
+                .andExpect(jsonPath("$.externalChannelAction").doesNotExist())
+                .andExpect(jsonPath("$.candidateRanking").doesNotExist())
+                .andExpect(jsonPath("$.candidateScore").doesNotExist())
+                .andExpect(jsonPath("$.decisionGenerationAction").doesNotExist())
+                .andExpect(jsonPath("$.finalDirection").doesNotExist())
+                .andExpect(jsonPath("$.entry").doesNotExist())
+                .andExpect(jsonPath("$.stop").doesNotExist())
+                .andExpect(jsonPath("$.takeProfit").doesNotExist())
+                .andExpect(jsonPath("$.tp").doesNotExist())
+                .andExpect(jsonPath("$.riskReward").doesNotExist())
+                .andExpect(jsonPath("$.rr").doesNotExist())
+                .andExpect(jsonPath("$.orderAction").doesNotExist())
+                .andExpect(jsonPath("$.executionAction").doesNotExist())
+                .andExpect(jsonPath("$.autoTradingAction").doesNotExist())
+                .andExpect(jsonPath("$.positionMonitorExecutionAction").doesNotExist())
+                .andExpect(jsonPath("$.executablePayload").doesNotExist())
+                .andExpect(jsonPath("$.providerPayload").doesNotExist());
+    }
+
+    @Test
     void accountRiskExposureStatusEndpointReturnsReviewOnlyReadyStatusFromLatestSnapshotOwnerPath() throws Exception {
         DecisionResultVO decision = newDecisionWithCoreDashboardTruthFields();
         decision.setAnalysisId("ana-account-ready");
@@ -3010,6 +3231,67 @@ class DashboardControllerTest {
         event.setPostState("AFTER_REVIEW_ONLY");
         event.setCreateTime(LocalDateTime.of(2026, 6, 12, 12, 31));
         return event;
+    }
+
+    private static PushRecheckLogItemVO recheckLog(Long pushId, String recheckStatus) {
+        PushRecheckLogItemVO log = new PushRecheckLogItemVO();
+        log.setLogId(7001L);
+        log.setPushId(pushId);
+        log.setDispatchBatchId("batch-1");
+        log.setDispatchInstructionId("inst-1");
+        log.setTriggerSource("MANUAL_REVIEW_ONLY");
+        log.setExecutionStatus("SUCCESS");
+        log.setRecheckStatus(recheckStatus);
+        log.setRecheckTime(LocalDateTime.of(2026, 6, 13, 9, 0));
+        log.setCreateTime(LocalDateTime.of(2026, 6, 13, 9, 1));
+        log.setTraceId("trace-recheck-" + pushId);
+        return log;
+    }
+
+    private static PushRecheckOpsOverviewVO recheckOpsOverview(boolean includeReplaySummary,
+                                                               boolean includeDispatchAudit) {
+        PushRecheckOpsOverviewVO overview = new PushRecheckOpsOverviewVO();
+        if (includeDispatchAudit) {
+            PushRecheckOpsOverviewVO.ConfigSummary config = new PushRecheckOpsOverviewVO.ConfigSummary();
+            config.setLimit(10);
+            config.setMaxAttempts(2);
+            config.setMinRetryMinutes(15);
+            config.setUpdatedBy("ops-review-only");
+            config.setUpdatedTime(LocalDateTime.of(2026, 6, 13, 8, 0));
+            overview.setConfig(config);
+
+            PushRecheckOpsOverviewVO.AuditSummary audit = new PushRecheckOpsOverviewVO.AuditSummary();
+            audit.setAuditCount(1);
+            audit.setLatestAuditOperator("ops-review-only");
+            audit.setLatestAuditSummary("dispatch config read-only evidence");
+            audit.setLatestAuditTime(LocalDateTime.of(2026, 6, 13, 8, 1));
+            overview.setAuditSummary(audit);
+        }
+        if (includeReplaySummary) {
+            PushRecheckReplaySummaryVO summary = new PushRecheckReplaySummaryVO();
+            summary.setDispatchBatchId("batch-1");
+            summary.setDispatchInstructionId("inst-1");
+            summary.setTriggerSource("MANUAL_REVIEW_ONLY");
+            summary.setTotalCount(3);
+            summary.setSuccessCount(1);
+            summary.setBlockingCount(1);
+            summary.setWaitingCount(1);
+            summary.setExpiredCount(0);
+            summary.setReplayCount(0);
+            summary.setLatestExecutionStatus("SUCCESS");
+            summary.setLatestExecutionTime(LocalDateTime.of(2026, 6, 13, 8, 30));
+            summary.setHasError(false);
+            overview.setLatestReplaySummary(summary);
+        }
+        PushRecheckOpsOverviewVO.RecentLogSummary recent = new PushRecheckOpsOverviewVO.RecentLogSummary();
+        recent.setLogId(7001L);
+        recent.setDispatchBatchId("batch-1");
+        recent.setDispatchInstructionId("inst-1");
+        recent.setTriggerSource("MANUAL_REVIEW_ONLY");
+        recent.setExecutionStatus("SUCCESS");
+        recent.setCreateTime(LocalDateTime.of(2026, 6, 13, 9, 1));
+        overview.setRecentLogs(List.of(recent));
+        return overview;
     }
 
     private static ReviewStateVO reviewState(String analysisId) {
