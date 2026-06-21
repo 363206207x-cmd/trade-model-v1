@@ -1,3 +1,23 @@
+# Contract-First Session Bootstrap
+
+Read these files first, in this order:
+
+1. `docs/PROJECT_DELIVERY_CONTRACT.md`
+2. `docs/PROJECT_CURRENT_STATE.md`
+3. `docs/DELIVERY_PROGRESS_MATRIX.md`
+4. `docs/CODEX_TASK_TEMPLATE.md`
+
+Then read compatibility and historical evidence as needed:
+
+- `docs/ACTIVE_MAINLINE_STATUS.yml` is `DERIVED_ONLY` and cannot override the contract/matrix/current state.
+- `docs/CODEX_NEXT_TASK.yml` is `DERIVED_ONLY` and cannot choose the next business phase by itself.
+- Legacy V1 docs are historical asset and audit evidence only.
+- Review-only slice count is not a delivery completion standard.
+
+Only merged `main` counts as completed. Open Issue, branch, Draft PR, open PR, CI-green unmerged PR, local commit, Codex output, or chat history does not count as completion.
+
+---
+
 # Session Bootstrap
 
 Use this file first in every new window.

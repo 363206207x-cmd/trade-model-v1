@@ -17,6 +17,10 @@ Use both English and Chinese labels. Do not answer only in English or only in Ch
 Current Mainline（当前主线）:
 Current Block（当前模块）:
 Current Level（当前层级）:
+Current Phase Status（当前阶段状态）:
+Existing Module Maturity（现有模块成熟度）:
+Production Deployment Readiness（生产部署就绪度）:
+Contract Sync（契约同步状态）:
 Done Criteria（完成标准）:
 Current PR（当前 PR）:
 Can Merge?（能否合并）:
@@ -34,3 +38,13 @@ Do Not Do（禁止事项）:
 - Open PR / branch / Issue does not count as done.
 - Merged `main` is the only completed state.
 - When current package is merged, main is synced, worktree is clean, CI passed, and no blocker exists, do not ask whether to continue; generate the next maximum safe Codex task prompt.
+
+
+## Contract-First Fields
+
+- `Current Phase Status（当前阶段状态）` must come from `docs/DELIVERY_PROGRESS_MATRIX.md`.
+- `Existing Module Maturity（现有模块成熟度）` must come from `docs/DELIVERY_PROGRESS_MATRIX.md`.
+- `Production Deployment Readiness（生产部署就绪度）` must come from `docs/PROJECT_CURRENT_STATE.md` / compatibility mirror.
+- `Contract Sync（契约同步状态）` must be based on agreement between contract, matrix, current state, and derived compatibility files.
+
+Legacy review-only slice count must not be used as project delivery completion.

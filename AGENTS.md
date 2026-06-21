@@ -1,3 +1,73 @@
+# Trade Model V1 Contract-First Agent Rules
+
+Before each task, read these files first:
+
+1. `docs/PROJECT_DELIVERY_CONTRACT.md`
+2. `docs/PROJECT_CURRENT_STATE.md`
+3. `docs/DELIVERY_PROGRESS_MATRIX.md`
+4. `docs/CODEX_TASK_TEMPLATE.md`
+
+Legacy V1 files, including `docs/ACTIVE_MAINLINE_STATUS.yml` and `docs/CODEX_NEXT_TASK.yml`, are historical or derived compatibility evidence only. They cannot define completion, select a business phase, or override the delivery contract and progress matrix.
+
+Rules:
+
+1. Do not redefine project completion from chat history, branch names, open PRs, or review-only slice count.
+2. Do not call docs-only, DTO-only, review-only, preview-only, dashboard-only, fallback-only, no-op, or mock-only work DONE for a business module.
+3. Do not start P0-1 until P0-0 is DONE in `docs/DELIVERY_PROGRESS_MATRIX.md` and that DONE commit is merged to `main`.
+4. Do not auto-open, auto-close, or auto-reverse trades.
+5. Do not treat `triggered` as opened.
+6. Do not treat `execution_plan` or `tm_real_position` as `user_position`.
+7. Do not let AI bypass the rule-layer base direction.
+8. Do not treat PushRecheck as trading authorization.
+9. Do not delete code without `docs/DEAD_CODE_CANDIDATES.md` evidence.
+10. Token leakage is a hard stop.
+
+---
+
+# Trade Model V1 Agent Rules
+
+All development must follow:
+
+1. `docs/PROJECT_DELIVERY_CONTRACT.md`
+2. `docs/DELIVERY_PROGRESS_MATRIX.md`
+3. `docs/PROJECT_CURRENT_STATE.md`
+4. `docs/CODEX_TASK_TEMPLATE.md`
+5. `docs/PROJECT_GLOBAL_AUDIT.md` when present
+
+Before any task, read:
+
+1. `docs/PROJECT_DELIVERY_CONTRACT.md`
+2. `docs/PROJECT_CURRENT_STATE.md`
+3. `docs/DELIVERY_PROGRESS_MATRIX.md`
+4. `docs/CODEX_TASK_TEMPLATE.md`
+5. `docs/CONTRACT_CHANGE_LOG.md`
+6. `AGENTS.md`
+
+Rules:
+
+1. Do not redefine project completion.
+2. Do not use chat history as source of truth.
+3. Do not skip the current phase.
+4. Do not call docs-only, DTO-only, review-only, preview-only, dashboard-only, fallback-only, no-op, mock-only, or placeholder-only work DONE for a business module.
+5. P0-0 is a governance phase; it can complete by P0-0 criteria only, and that exception cannot prove any business module DONE.
+6. Distinguish Phase Status from Existing Module Maturity.
+7. DONE only counts after the DONE commit is merged to `main`.
+8. Treat `docs/ACTIVE_MAINLINE_STATUS.yml` and `docs/CODEX_NEXT_TASK.yml` as compatibility files until migrated; they cannot override the delivery contract or matrix.
+9. Do not auto-open trades.
+10. Do not auto-close trades.
+11. Do not auto-reverse positions.
+12. Do not treat triggered as opened.
+13. Do not treat execution_plan as user_position.
+14. Do not treat tm_real_position as user_position.
+15. Do not let AI bypass rule-layer base direction.
+16. Do not treat PushRecheck as trading authorization.
+17. Do not delete code without DEAD_CODE_CANDIDATES.md evidence.
+18. After changes, run `./mvnw test -q` unless explicitly impossible.
+19. End every task by reporting whether the current phase is DONE.
+20. A later business phase cannot start until the current phase is DONE in `docs/DELIVERY_PROGRESS_MATRIX.md` and merged to `main`.
+
+---
+
 # Codex Project Rules
 
 Codex must read these files before each task:
