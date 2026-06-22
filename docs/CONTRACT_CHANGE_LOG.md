@@ -98,3 +98,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-gh-open-pr-gate-fix
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: Resolve GH_NOT_AVAILABLE gate after P0-2 merge.
+Before: Runtime state could keep `GH_NOT_AVAILABLE` or stale local-main sync blockers even when `gh CLI` was available, PR #1008 was merged, HEAD matched `origin/main`, and open PR count was zero.
+After: Runtime state reports open PR check source/count/status, treats `gh CLI` open PR count `0` as `OPEN_PR_STATUS=NONE`, keeps fail-closed behavior when `gh` is unavailable or open PRs exist, and accepts clean HEAD==origin/main verification as clean/synced main without weakening merged-main effectivity.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: No; A-risk workflow gate repair only.
