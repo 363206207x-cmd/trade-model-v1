@@ -84,3 +84,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p0-2-execution-plan-source-gate-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P0-2 ExecutionPlan Source Gate B-risk implementation package.
+Before: P0-2 ExecutionPlan Source Gate was NOT_STARTED/PARTIAL with existing SourceTrace and BoundaryCandidate assets but no exact ExecutionPlanSourceGate, BoundaryCandidateSourceGate, or NumericBoundarySourceValidator.
+After: P0-2 is a branch DONE candidate with ExecutionPlan Source Gate validation, BoundaryCandidate DTO.valid gate enforcement, numeric boundary source validation, fail-closed handling for missing evidence/fallback/incomplete/review-only/AI-only/numeric-without-source outputs, safety fields, schema fields, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

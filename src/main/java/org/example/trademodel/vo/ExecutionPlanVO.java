@@ -1,20 +1,38 @@
 package org.example.trademodel.vo;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ExecutionPlanVO {
     public static final String PLAN_MODE_ADVISORY = "ADVISORY";
     public static final String PLAN_MODE_SEMI_STRUCTURED = "SEMI_STRUCTURED";
+    public static final String EXECUTION_PLAN_STATUS_VALID = "VALID";
+    public static final String EXECUTION_PLAN_STATUS_INCOMPLETE = "INCOMPLETE";
+    public static final String EXECUTION_PLAN_STATUS_BLOCKED = "BLOCKED";
+    public static final String EXECUTION_PLAN_STATUS_REVIEW_ONLY = "REVIEW_ONLY";
+    public static final String EXECUTION_PLAN_STATUS_INVALID = "INVALID";
     public static final String READINESS_INCOMPLETE = "INCOMPLETE";
     public static final String READINESS_WATCH_ONLY = "WATCH_ONLY";
     public static final String READINESS_READY_REVIEW_ONLY = "READY_REVIEW_ONLY";
 
     private String planId;
     private String planMode;
+    private String executionPlanStatus = EXECUTION_PLAN_STATUS_INCOMPLETE;
     private String readinessStatus = READINESS_INCOMPLETE;
+    private String sourceGateStatus = EXECUTION_PLAN_STATUS_INCOMPLETE;
+    private Boolean sourceGateComplete = false;
+    private String sourceCompletenessSummary = "SOURCE_GATE_NOT_EVALUATED";
+    private List<String> missingSourceReasons = new ArrayList<>();
+    private List<String> sourceBlockerReasons = new ArrayList<>();
     private String sourceTraceStatus = "BACKEND_PENDING";
     private Boolean sourceTraceComplete = false;
     private String notExecutableReason = "SOURCE_TRACE_NOT_EVALUATED";
     private Boolean manualReviewRequired = true;
     private Boolean notTradeInstruction = true;
+    private Boolean notExecutable = true;
+    private Boolean notAutoTrading = true;
+    private Boolean notOrderExecution = true;
+    private Boolean notUserPositionCreation = true;
     private String riskActionGuardStatus = "BACKEND_PENDING";
     private String riskActionGuardBlockingReason;
     private Boolean riskActionGuardReady = false;
@@ -33,8 +51,24 @@ public class ExecutionPlanVO {
     public void setPlanId(String planId) { this.planId = planId; }
     public String getPlanMode() { return planMode; }
     public void setPlanMode(String planMode) { this.planMode = planMode; }
+    public String getExecutionPlanStatus() { return executionPlanStatus; }
+    public void setExecutionPlanStatus(String executionPlanStatus) { this.executionPlanStatus = executionPlanStatus; }
     public String getReadinessStatus() { return readinessStatus; }
     public void setReadinessStatus(String readinessStatus) { this.readinessStatus = readinessStatus; }
+    public String getSourceGateStatus() { return sourceGateStatus; }
+    public void setSourceGateStatus(String sourceGateStatus) { this.sourceGateStatus = sourceGateStatus; }
+    public Boolean getSourceGateComplete() { return sourceGateComplete; }
+    public void setSourceGateComplete(Boolean sourceGateComplete) { this.sourceGateComplete = sourceGateComplete; }
+    public String getSourceCompletenessSummary() { return sourceCompletenessSummary; }
+    public void setSourceCompletenessSummary(String sourceCompletenessSummary) { this.sourceCompletenessSummary = sourceCompletenessSummary; }
+    public List<String> getMissingSourceReasons() { return missingSourceReasons; }
+    public void setMissingSourceReasons(List<String> missingSourceReasons) {
+        this.missingSourceReasons = missingSourceReasons == null ? new ArrayList<>() : new ArrayList<>(missingSourceReasons);
+    }
+    public List<String> getSourceBlockerReasons() { return sourceBlockerReasons; }
+    public void setSourceBlockerReasons(List<String> sourceBlockerReasons) {
+        this.sourceBlockerReasons = sourceBlockerReasons == null ? new ArrayList<>() : new ArrayList<>(sourceBlockerReasons);
+    }
     public String getSourceTraceStatus() { return sourceTraceStatus; }
     public void setSourceTraceStatus(String sourceTraceStatus) { this.sourceTraceStatus = sourceTraceStatus; }
     public Boolean getSourceTraceComplete() { return sourceTraceComplete; }
@@ -45,6 +79,14 @@ public class ExecutionPlanVO {
     public void setManualReviewRequired(Boolean manualReviewRequired) { this.manualReviewRequired = manualReviewRequired; }
     public Boolean getNotTradeInstruction() { return notTradeInstruction; }
     public void setNotTradeInstruction(Boolean notTradeInstruction) { this.notTradeInstruction = notTradeInstruction; }
+    public Boolean getNotExecutable() { return notExecutable; }
+    public void setNotExecutable(Boolean notExecutable) { this.notExecutable = notExecutable; }
+    public Boolean getNotAutoTrading() { return notAutoTrading; }
+    public void setNotAutoTrading(Boolean notAutoTrading) { this.notAutoTrading = notAutoTrading; }
+    public Boolean getNotOrderExecution() { return notOrderExecution; }
+    public void setNotOrderExecution(Boolean notOrderExecution) { this.notOrderExecution = notOrderExecution; }
+    public Boolean getNotUserPositionCreation() { return notUserPositionCreation; }
+    public void setNotUserPositionCreation(Boolean notUserPositionCreation) { this.notUserPositionCreation = notUserPositionCreation; }
     public String getRiskActionGuardStatus() { return riskActionGuardStatus; }
     public void setRiskActionGuardStatus(String riskActionGuardStatus) { this.riskActionGuardStatus = riskActionGuardStatus; }
     public String getRiskActionGuardBlockingReason() { return riskActionGuardBlockingReason; }

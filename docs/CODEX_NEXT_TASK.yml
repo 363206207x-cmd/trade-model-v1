@@ -1,15 +1,15 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "P0-1 UserPosition Manual Workflow PR merge gate"
+active_block: "P0-2 ExecutionPlan Source Gate PR merge gate"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "UserPosition Manual Workflow"
-branch: "p0-1-user-position-full-implementation"
+module: "ExecutionPlan Source Gate"
+branch: "p0-2-execution-plan-source-gate-full-implementation"
 risk: "B"
-next_business_phase: "P0-2 ExecutionPlan Source Gate"
+next_business_phase: "P0-3 AccountRisk integrates UserPosition"
 next_business_phase_allowed: false
-next_allowed_action: "Review and merge-gate the P0-1 UserPosition B-risk PR. P0-2 remains blocked until this PR is reviewed, merged into main, local main is synced, the worktree is clean, and runtime state confirms P0-1 effective."
+next_allowed_action: "Review and merge-gate the P0-2 ExecutionPlan Source Gate B-risk PR. P0-3 remains blocked until this PR is reviewed, merged into main, local main is synced, the worktree is clean, and runtime state confirms P0-2 effective."
 current_package_pr: "DERIVED_BY_V1_STATE"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -17,17 +17,17 @@ a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
 pr_1004_boundary: "closed unrelated Draft dashboard PR; do not merge, modify, reopen, or include its code"
 
 allowed_scope:
-  - "tm_user_position schema"
-  - "UserPosition Java implementation"
-  - "UserPosition tests"
+  - "tm_execution_plan source gate schema"
+  - "ExecutionPlan / Boundary / SourceGate Java implementation"
+  - "ExecutionPlan Source Gate tests"
   - "compatibility fact files"
-  - "P0-1 status/matrix/change-log docs"
+  - "P0-2 status/matrix/change-log docs"
   - "checks and B-risk PR evidence"
 
 forbidden_scope:
   - "pom"
   - "Dashboard"
-  - "ExecutionPlan Source Gate implementation"
+  - "UserPosition implementation changes"
   - "AccountRisk implementation"
   - "PositionMonitor implementation"
   - "Review implementation"
@@ -53,7 +53,7 @@ checks:
 
 stop_conditions:
   - "White-list violation"
-  - "P0-2 task generation before P0-1 merged-main effectivity"
+  - "P0-3 task generation before P0-2 merged-main effectivity"
   - "forbidden business surface change"
   - "workflow contract failure"
   - "Maven failure"

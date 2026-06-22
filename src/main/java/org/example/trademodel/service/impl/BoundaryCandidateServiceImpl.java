@@ -219,6 +219,7 @@ public class BoundaryCandidateServiceImpl implements BoundaryCandidateService {
                 addWhenNull(takeProfit.getNumericSourceValue(), "TP numeric source value missing", blockingReasons);
                 addWhenBlank(takeProfit.getSourceTimeframe(), "TP source timeframe missing", blockingReasons);
                 addWhenBlank(takeProfit.getSourceRef(), "TP source ref missing", blockingReasons);
+                addWhenBlank(takeProfit.getReason(), "TP source reason missing", blockingReasons);
             }
         }
         if (sourceFields != null) {

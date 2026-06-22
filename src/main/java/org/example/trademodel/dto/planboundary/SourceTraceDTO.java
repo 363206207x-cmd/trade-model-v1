@@ -492,34 +492,7 @@ public class SourceTraceDTO implements SourceCompletenessContract {
     }
 
     public boolean hasRequiredBoundarySources() {
-        return isComplete()
-                && fallbackStatus == null
-                && entryPriceSource != null
-                && hasText(entrySourceType)
-                && hasText(entrySourceTimeframe)
-                && hasText(entrySourceReason)
-                && hasText(entrySourceRef)
-                && stopPriceSource != null
-                && hasText(stopSourceType)
-                && hasText(stopSourceTimeframe)
-                && hasText(stopSourceReason)
-                && hasText(stopSourceRef)
-                && tpPriceSources != null
-                && !tpPriceSources.isEmpty()
-                && hasText(tpSourceType)
-                && hasText(tpSourceTimeframe)
-                && hasText(tpSourceReason)
-                && hasText(tpSourceRef)
-                && rrSource != null
-                && hasText(rrRuleRef)
-                && hasText(liquiditySource)
-                && hasText(multiTimeframeSource)
-                && hasText(eventSource)
-                && hasText(wickSource);
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.trim().isEmpty();
+        return ExecutionPlanSourceGate.validate(this).isValid();
     }
 
     public boolean isManualReviewRequired() {
