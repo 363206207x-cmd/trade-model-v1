@@ -16,6 +16,7 @@ import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.opportunitylog.OpportunityLogCountRow;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
@@ -107,7 +108,8 @@ class OpportunityLogServiceImplTest {
     @Test
     void evaluate_longTargetFirstWithExactPlanUserPosition_returnsExecutedValidAndMfeMae() {
         OpportunityLogDO row = pendingLong();
-        UserPositionDO position = userPosition(77L, "plan-1");
+        UserPositionDO position = userPosition(77L, "plan-1",
+                LocalDateTime.of(2026, 6, 23, 10, 30));
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(position));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
@@ -123,6 +125,74 @@ class OpportunityLogServiceImplTest {
         assertThat(dto.getMfeRatio()).isEqualByComparingTo("0.2100000000");
         assertThat(dto.getMaePrice()).isEqualByComparingTo("98");
         assertThat(dto.getMaeRatio()).isEqualByComparingTo("0.0200000000");
+    }
+
+    @Test
+    void evaluate_userPositionOpenedAfterTargetHit_isNotExecutedEvidence() {
+        OpportunityLogDO row = pendingLong();
+        row.setPushPresent(false);
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
+                LocalDateTime.of(2026, 6, 23, 11, 30))));
+        when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
+                .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
+        when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
+
+        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+
+        assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_VALID);
+        assertThat(dto.getUserPositionPresent()).isFalse();
+        assertThat(dto.getUserPositionId()).isNull();
+        assertThat(dto.getReasonCodes()).contains("LINKED_USER_POSITION_OPENED_AFTER_OUTCOME");
+    }
+
+    @Test
+    void evaluate_userPositionOpenedAtTargetHit_isExecutionEvidence() {
+        OpportunityLogDO row = pendingLong();
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
+                LocalDateTime.of(2026, 6, 23, 11, 0))));
+        when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
+                .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
+        when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
+
+        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+
+        assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.EXECUTED_VALID);
+        assertThat(dto.getUserPositionId()).isEqualTo(77L);
+    }
+
+    @Test
+    void evaluate_userPositionOpenedAfterInvalidationHit_isNotExecutedEvidence() {
+        OpportunityLogDO row = pendingLong();
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
+                LocalDateTime.of(2026, 6, 23, 11, 30))));
+        when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
+                .thenReturn(List.of(bar(1, "100", "110", "89", "91")));
+        when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
+
+        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+
+        assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_INVALID);
+        assertThat(dto.getUserPositionPresent()).isFalse();
+        assertThat(dto.getReasonCodes()).contains("LINKED_USER_POSITION_OPENED_AFTER_OUTCOME");
+    }
+
+    @Test
+    void evaluate_linkedUserPositionMissingOpenedAtFailsClosed() {
+        OpportunityLogDO row = pendingLong();
+        UserPositionDO position = userPosition(77L, "plan-1", null);
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(position));
+        when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
+
+        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+
+        assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.REVIEW_REQUIRED);
+        assertThat(dto.getOpportunityStatus()).isNull();
+        assertThat(dto.getReasonCodes()).contains("LINKED_USER_POSITION_OPEN_TIME_MISSING");
+        verify(persistedOhlcvBarMapper, never()).selectClosedBarsBetween(any(), any(), anyLong(), anyLong(), anyInt());
     }
 
     @Test
@@ -225,6 +295,31 @@ class OpportunityLogServiceImplTest {
     }
 
     @Test
+    void evaluate_persistedInvalidationAfterAsOfIsIgnored() {
+        OpportunityLogDO row = pendingLong();
+        DecisionResult decision = new DecisionResult();
+        decision.setHotResetInvalidated(true);
+        decision.setHotResetInvalidatedAt(LocalDateTime.of(2026, 6, 23, 10, 30));
+        decision.setHotResetReasonCode("HOT_RESET_AFTER_AS_OF");
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of());
+        when(userPositionMapper.listByExactSourceRefId("ana-1")).thenReturn(List.of());
+        when(decisionResultMapper.selectByDecisionId("dec-1")).thenReturn(decision);
+        when(executionPlanMapper.selectByPlanId("plan-1")).thenReturn(null);
+        when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
+                .thenReturn(List.of());
+        when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
+
+        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1",
+                LocalDateTime.of(2026, 6, 23, 10, 5));
+
+        assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.MARKET_PATH_UNAVAILABLE);
+        assertThat(dto.getOpportunityStatus()).isNull();
+        assertThat(dto.getHitOrder()).isNull();
+        assertThat(dto.getReasonCodes()).contains("PERSISTED_INVALIDATION_AFTER_AS_OF_IGNORED");
+    }
+
+    @Test
     void evaluate_resolvedRecordIsImmutableAndDeduplicated() {
         OpportunityLogDO row = pendingLong();
         row.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
@@ -242,21 +337,23 @@ class OpportunityLogServiceImplTest {
 
     @Test
     void getStats_countsReviewOnlyOpportunityOutcomes() {
-        OpportunityLogDO valid = pendingLong();
-        valid.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
-        valid.setOpportunityStatus(OpportunityLogStatus.MISSED_VALID);
-        valid.setHitOrder(OpportunityLogStatus.TARGET_FIRST);
-        valid.setMfeRatio(new BigDecimal("0.20"));
-        valid.setMaeRatio(new BigDecimal("0.04"));
-        OpportunityLogDO invalid = pendingLong();
-        invalid.setOpportunityId("opp-2");
-        invalid.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
-        invalid.setOpportunityStatus(OpportunityLogStatus.MISSED_INVALID);
-        invalid.setHitOrder(OpportunityLogStatus.INVALIDATION_FIRST);
-        invalid.setMfeRatio(new BigDecimal("0.10"));
-        invalid.setMaeRatio(new BigDecimal("0.06"));
-        when(opportunityLogMapper.query(eq(null), eq(null), eq(null), eq("BTCUSDT"), eq(null), eq(null), any(), any(), eq(200)))
-                .thenReturn(List.of(valid, invalid));
+        OpportunityLogStatsDTO aggregate = new OpportunityLogStatsDTO();
+        aggregate.setTotalCount(2);
+        aggregate.setResolvedCount(2);
+        aggregate.setMissedValidCount(1);
+        aggregate.setMissedInvalidCount(1);
+        aggregate.setValidOpportunityCount(1);
+        aggregate.setInvalidOpportunityCount(1);
+        aggregate.setAverageMfeRatio(new BigDecimal("0.15000000"));
+        aggregate.setAverageMaeRatio(new BigDecimal("0.05000000"));
+        aggregate.setMaxMfeRatio(new BigDecimal("0.20000000"));
+        aggregate.setMaxMaeRatio(new BigDecimal("0.06000000"));
+        when(opportunityLogMapper.aggregateStats(eq("BTCUSDT"), any(), any())).thenReturn(aggregate);
+        when(opportunityLogMapper.countByStatus(eq("BTCUSDT"), any(), any()))
+                .thenReturn(List.of(countRow(OpportunityLogStatus.MISSED_VALID, 1),
+                        countRow(OpportunityLogStatus.MISSED_INVALID, 1)));
+        when(opportunityLogMapper.countBySource(eq("BTCUSDT"), any(), any()))
+                .thenReturn(List.of(countRow("AUTHORITATIVE_ANALYSIS", 2)));
 
         OpportunityLogStatsDTO stats = service.getStats("BTCUSDT", LocalDateTime.now().minusDays(1), LocalDateTime.now());
 
@@ -265,8 +362,13 @@ class OpportunityLogServiceImplTest {
         assertThat(stats.getMissedValidCount()).isEqualTo(1);
         assertThat(stats.getMissedInvalidCount()).isEqualTo(1);
         assertThat(stats.getValidRate()).isEqualByComparingTo("0.50000000");
+        assertThat(stats.getAverageMfeRatio()).isEqualByComparingTo("0.15000000");
+        assertThat(stats.getMaxMaeRatio()).isEqualByComparingTo("0.06000000");
+        assertThat(stats.getStatusCounts()).containsEntry(OpportunityLogStatus.MISSED_VALID, 1);
+        assertThat(stats.getSourceCounts()).containsEntry("AUTHORITATIVE_ANALYSIS", 2);
         assertThat(stats.getReviewOnly()).isTrue();
         assertThat(stats.getNotExecutable()).isTrue();
+        verify(opportunityLogMapper, never()).query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -362,12 +464,24 @@ class OpportunityLogServiceImplTest {
     }
 
     private static UserPositionDO userPosition(Long id, String sourceRefId) {
+        return userPosition(id, sourceRefId, LocalDateTime.of(2026, 6, 23, 10, 30));
+    }
+
+    private static UserPositionDO userPosition(Long id, String sourceRefId, LocalDateTime openedAt) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
         row.setSourceType("MANUAL");
         row.setSourceRefId(sourceRefId);
         row.setStatus("CLOSED");
+        row.setOpenedAt(openedAt);
         row.setClosedAt(LocalDateTime.of(2026, 6, 23, 11, 30));
+        return row;
+    }
+
+    private static OpportunityLogCountRow countRow(String name, int count) {
+        OpportunityLogCountRow row = new OpportunityLogCountRow();
+        row.setName(name);
+        row.setCount(count);
         return row;
     }
 

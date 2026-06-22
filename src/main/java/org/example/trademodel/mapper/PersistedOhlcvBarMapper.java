@@ -54,7 +54,7 @@ public interface PersistedOhlcvBarMapper {
     @Select(BASE_SELECT
             + "WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
             + "AND is_closed = TRUE AND is_deleted = 0 "
-            + "AND open_time_ms >= #{startTimeMs} AND open_time_ms <= #{endTimeMs} "
+            + "AND open_time_ms >= #{startTimeMs} AND close_time_ms <= #{endTimeMs} "
             + "ORDER BY open_time_ms ASC, id ASC LIMIT #{limit}")
     List<PersistedOhlcvBarDO> selectClosedBarsBetween(
             @Param("symbol") String symbol,

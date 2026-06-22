@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.OpportunityLogDO;
+import org.example.trademodel.opportunitylog.OpportunityLogCountRow;
+import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,6 +81,71 @@ public interface OpportunityLogMapper {
                                  @Param("from") LocalDateTime from,
                                  @Param("to") LocalDateTime to,
                                  @Param("limit") int limit);
+
+    @Select({
+            "<script>",
+            "SELECT",
+            "COUNT(*) AS totalCount,",
+            "COALESCE(SUM(CASE WHEN lifecycle_status = 'RESOLVED' THEN 1 ELSE 0 END), 0) AS resolvedCount,",
+            "COALESCE(SUM(CASE WHEN lifecycle_status &lt;&gt; 'RESOLVED' THEN 1 ELSE 0 END), 0) AS pendingCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status = 'EXECUTED_VALID' THEN 1 ELSE 0 END), 0) AS executedValidCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status = 'EXECUTED_INVALID' THEN 1 ELSE 0 END), 0) AS executedInvalidCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status = 'MISSED_VALID' THEN 1 ELSE 0 END), 0) AS missedValidCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status = 'MISSED_INVALID' THEN 1 ELSE 0 END), 0) AS missedInvalidCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status = 'PUSHED_NOT_FILLED_VALID' THEN 1 ELSE 0 END), 0) AS pushedNotFilledValidCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status = 'BLOCKED_BY_RISK_VALID' THEN 1 ELSE 0 END), 0) AS blockedByRiskValidCount,",
+            "COALESCE(SUM(CASE WHEN hit_order = 'TARGET_FIRST' THEN 1 ELSE 0 END), 0) AS targetFirstCount,",
+            "COALESCE(SUM(CASE WHEN hit_order = 'INVALIDATION_FIRST' THEN 1 ELSE 0 END), 0) AS invalidationFirstCount,",
+            "COALESCE(SUM(CASE WHEN hit_order = 'AMBIGUOUS_SAME_BAR' THEN 1 ELSE 0 END), 0) AS ambiguousCount,",
+            "COALESCE(AVG(mfe_ratio), 0) AS averageMfeRatio,",
+            "COALESCE(AVG(mae_ratio), 0) AS averageMaeRatio,",
+            "COALESCE(MAX(mfe_ratio), 0) AS maxMfeRatio,",
+            "COALESCE(MAX(mae_ratio), 0) AS maxMaeRatio,",
+            "COALESCE(SUM(CASE WHEN opportunity_status IN ('EXECUTED_VALID', 'MISSED_VALID',",
+            "'PUSHED_NOT_FILLED_VALID', 'BLOCKED_BY_RISK_VALID') THEN 1 ELSE 0 END), 0) AS validOpportunityCount,",
+            "COALESCE(SUM(CASE WHEN opportunity_status IN ('EXECUTED_INVALID', 'MISSED_INVALID') THEN 1 ELSE 0 END), 0) AS invalidOpportunityCount",
+            "FROM tm_opportunity_log",
+            "WHERE 1 = 1",
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "</script>"
+    })
+    OpportunityLogStatsDTO aggregateStats(@Param("symbol") String symbol,
+                                          @Param("from") LocalDateTime from,
+                                          @Param("to") LocalDateTime to);
+
+    @Select({
+            "<script>",
+            "SELECT COALESCE(opportunity_status, lifecycle_status, 'UNKNOWN') AS name, COUNT(*) AS count",
+            "FROM tm_opportunity_log",
+            "WHERE 1 = 1",
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "GROUP BY COALESCE(opportunity_status, lifecycle_status, 'UNKNOWN')",
+            "ORDER BY name ASC",
+            "</script>"
+    })
+    List<OpportunityLogCountRow> countByStatus(@Param("symbol") String symbol,
+                                               @Param("from") LocalDateTime from,
+                                               @Param("to") LocalDateTime to);
+
+    @Select({
+            "<script>",
+            "SELECT COALESCE(source_type, 'UNKNOWN') AS name, COUNT(*) AS count",
+            "FROM tm_opportunity_log",
+            "WHERE 1 = 1",
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "GROUP BY COALESCE(source_type, 'UNKNOWN')",
+            "ORDER BY name ASC",
+            "</script>"
+    })
+    List<OpportunityLogCountRow> countBySource(@Param("symbol") String symbol,
+                                               @Param("from") LocalDateTime from,
+                                               @Param("to") LocalDateTime to);
 
     @Update("UPDATE tm_opportunity_log SET user_position_id = #{userPositionId}, "
             + "user_position_present = #{userPositionPresent}, lifecycle_status = #{lifecycleStatus}, "

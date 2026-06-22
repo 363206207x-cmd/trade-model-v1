@@ -96,6 +96,20 @@ class PersistedOhlcvBarMapperIntegrationTest {
         assertThat(row.getIngestedAt()).isEqualTo(LocalDateTime.of(2026, 5, 17, 10, 5, 0));
     }
 
+    @Test
+    void selectClosedBarsBetween_excludesBarsNotClosedByHistoricalAsOf() {
+        insertBar("ASOFUSDT", "1h", 9_000L, 10_000L, "100.00", true, 0, "batch-asof", "trace-closed");
+        insertBar("ASOFUSDT", "1h", 10_000L, 11_000L, "110.00", true, 0, "batch-asof", "trace-future-high");
+
+        List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper
+                .selectClosedBarsBetween("ASOFUSDT", "1h", 9_000L, 10_500L, 10);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getOpenTimeMs()).isEqualTo(9_000L);
+        assertThat(rows.get(0).getCloseTimeMs()).isEqualTo(10_000L);
+        assertThat(rows.get(0).getSourceTraceId()).isEqualTo("trace-closed");
+    }
+
     private void insertBar(
             String symbol,
             String timeframe,

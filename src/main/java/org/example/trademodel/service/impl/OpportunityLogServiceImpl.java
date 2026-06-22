@@ -19,6 +19,7 @@ import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.opportunitylog.OpportunityLogCountRow;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
@@ -145,6 +146,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         LinkedUserPosition linked = resolveLinkedUserPosition(row);
         if (linked.reviewRequired) {
             row.setUserPositionPresent(false);
+            row.setUserPositionId(null);
             row.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
             row.setReasonCodes(appendReason(row, "MULTIPLE_LINKED_USER_POSITIONS"));
             row.setEvaluationAsOf(evaluationEnd);
@@ -153,21 +155,30 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             return OpportunityLogDTO.from(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
         }
         if (linked.position != null) {
-            row.setUserPositionPresent(true);
-            row.setUserPositionId(linked.position.getId());
+            if (linked.position.getOpenedAt() == null) {
+                row.setUserPositionPresent(false);
+                row.setUserPositionId(null);
+                row.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
+                row.setReasonCodes(appendReason(row, "LINKED_USER_POSITION_OPEN_TIME_MISSING"));
+                row.setEvaluationAsOf(evaluationEnd);
+                row.setUpdatedAt(now);
+                opportunityLogMapper.updateEvaluation(row);
+                return OpportunityLogDTO.from(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
+            }
             if (linked.position.getClosedAt() != null && linked.position.getClosedAt().isBefore(evaluationEnd)) {
                 evaluationEnd = linked.position.getClosedAt();
             }
-        } else {
-            row.setUserPositionPresent(false);
         }
+        row.setUserPositionPresent(false);
+        row.setUserPositionId(null);
         row.setEvaluationAsOf(evaluationEnd);
         if (evaluationEnd.isBefore(row.getAnchorTime())) {
             return updateNonFinal(row, OpportunityLogStatus.SOURCE_INCOMPLETE,
                     appendReason(row, "EVALUATION_AS_OF_BEFORE_ANCHOR"));
         }
 
-        InvalidationEvidence persistedInvalidation = persistedInvalidationEvidence(row);
+        InvalidationEvidence persistedInvalidation = persistedInvalidationEvidence(row, evaluationEnd);
+        row.setReasonCodes(appendReason(row, persistedInvalidation.ignoredReasonCode));
         MarketPathResult marketPath = scanMarketPath(row, evaluationEnd);
         if (!marketPath.available) {
             if (persistedInvalidation.time != null) {
@@ -203,6 +214,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             return updateNonFinal(row, OpportunityLogStatus.PENDING_EVALUATION,
                     appendReason(row, "NO_TARGET_OR_INVALIDATION_HIT"));
         }
+        applyExecutionEvidence(row, linked, marketPath);
 
         String finalStatus = classify(row, marketPath, risk);
         row.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
@@ -242,66 +254,24 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
 
     @Override
     public OpportunityLogStatsDTO getStats(String symbol, LocalDateTime from, LocalDateTime to) {
-        List<OpportunityLogDO> rows = opportunityLogMapper.query(null, null, null, trimToNull(symbol),
-                null, null, from, to, MAX_QUERY_LIMIT);
-        OpportunityLogStatsDTO stats = new OpportunityLogStatsDTO();
+        String normalizedSymbol = trimToNull(symbol);
+        OpportunityLogStatsDTO stats = opportunityLogMapper.aggregateStats(normalizedSymbol, from, to);
+        if (stats == null) {
+            stats = new OpportunityLogStatsDTO();
+        }
         stats.setGeneratedAt(LocalDateTime.now());
-        stats.setTotalCount(rows.size());
-        BigDecimal mfeSum = ZERO;
-        BigDecimal maeSum = ZERO;
-        int mfeCount = 0;
-        int maeCount = 0;
         Map<String, Integer> statusCounts = new LinkedHashMap<>();
         Map<String, Integer> sourceCounts = new LinkedHashMap<>();
-        for (OpportunityLogDO row : rows) {
-            if (OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus())) {
-                stats.setResolvedCount(stats.getResolvedCount() + 1);
-            } else {
-                stats.setPendingCount(stats.getPendingCount() + 1);
-            }
-            bump(statusCounts, row.getOpportunityStatus() != null ? row.getOpportunityStatus() : row.getLifecycleStatus());
-            bump(sourceCounts, row.getSourceType());
-            switch (safe(row.getOpportunityStatus())) {
-                case OpportunityLogStatus.EXECUTED_VALID -> stats.setExecutedValidCount(stats.getExecutedValidCount() + 1);
-                case OpportunityLogStatus.EXECUTED_INVALID -> stats.setExecutedInvalidCount(stats.getExecutedInvalidCount() + 1);
-                case OpportunityLogStatus.MISSED_VALID -> stats.setMissedValidCount(stats.getMissedValidCount() + 1);
-                case OpportunityLogStatus.MISSED_INVALID -> stats.setMissedInvalidCount(stats.getMissedInvalidCount() + 1);
-                case OpportunityLogStatus.PUSHED_NOT_FILLED_VALID -> stats.setPushedNotFilledValidCount(stats.getPushedNotFilledValidCount() + 1);
-                case OpportunityLogStatus.BLOCKED_BY_RISK_VALID -> stats.setBlockedByRiskValidCount(stats.getBlockedByRiskValidCount() + 1);
-                default -> {
-                }
-            }
-            if (OpportunityLogStatus.TARGET_FIRST.equals(row.getHitOrder())) {
-                stats.setTargetFirstCount(stats.getTargetFirstCount() + 1);
-            } else if (OpportunityLogStatus.INVALIDATION_FIRST.equals(row.getHitOrder())) {
-                stats.setInvalidationFirstCount(stats.getInvalidationFirstCount() + 1);
-            } else if (OpportunityLogStatus.AMBIGUOUS_SAME_BAR.equals(row.getHitOrder())) {
-                stats.setAmbiguousCount(stats.getAmbiguousCount() + 1);
-            }
-            if (row.getMfeRatio() != null) {
-                mfeSum = mfeSum.add(row.getMfeRatio());
-                mfeCount++;
-                stats.setMaxMfeRatio(max(stats.getMaxMfeRatio(), row.getMfeRatio()));
-            }
-            if (row.getMaeRatio() != null) {
-                maeSum = maeSum.add(row.getMaeRatio());
-                maeCount++;
-                stats.setMaxMaeRatio(max(stats.getMaxMaeRatio(), row.getMaeRatio()));
-            }
+        for (OpportunityLogCountRow row : safeList(opportunityLogMapper.countByStatus(normalizedSymbol, from, to))) {
+            statusCounts.put(blank(row.getName()) ? "UNKNOWN" : row.getName(), row.getCount() == null ? 0 : row.getCount());
         }
-        int valid = stats.getExecutedValidCount() + stats.getMissedValidCount()
-                + stats.getPushedNotFilledValidCount() + stats.getBlockedByRiskValidCount();
-        int invalid = stats.getExecutedInvalidCount() + stats.getMissedInvalidCount();
-        stats.setValidOpportunityCount(valid);
-        stats.setInvalidOpportunityCount(invalid);
+        for (OpportunityLogCountRow row : safeList(opportunityLogMapper.countBySource(normalizedSymbol, from, to))) {
+            sourceCounts.put(blank(row.getName()) ? "UNKNOWN" : row.getName(), row.getCount() == null ? 0 : row.getCount());
+        }
+        int valid = stats.getValidOpportunityCount();
+        int invalid = stats.getInvalidOpportunityCount();
         if (valid + invalid > 0) {
             stats.setValidRate(BigDecimal.valueOf(valid).divide(BigDecimal.valueOf(valid + invalid), 8, RoundingMode.HALF_UP));
-        }
-        if (mfeCount > 0) {
-            stats.setAverageMfeRatio(mfeSum.divide(BigDecimal.valueOf(mfeCount), 8, RoundingMode.HALF_UP));
-        }
-        if (maeCount > 0) {
-            stats.setAverageMaeRatio(maeSum.divide(BigDecimal.valueOf(maeCount), 8, RoundingMode.HALF_UP));
         }
         stats.setStatusCounts(statusCounts);
         stats.setSourceCounts(sourceCounts);
@@ -464,20 +434,65 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         return risk;
     }
 
-    private InvalidationEvidence persistedInvalidationEvidence(OpportunityLogDO row) {
+    private InvalidationEvidence persistedInvalidationEvidence(OpportunityLogDO row, LocalDateTime evaluationEnd) {
         InvalidationEvidence evidence = new InvalidationEvidence();
         DecisionResult decision = !blank(row.getDecisionId()) ? decisionResultMapper.selectByDecisionId(row.getDecisionId()) : null;
         if (decision != null && Boolean.TRUE.equals(decision.getHotResetInvalidated())
                 && decision.getHotResetInvalidatedAt() != null) {
-            evidence.time = decision.getHotResetInvalidatedAt();
-            evidence.reasonCode = firstNonBlank(decision.getHotResetReasonCode(), "DECISION_HOT_RESET_INVALIDATED");
+            applyPersistedInvalidationCandidate(evidence, decision.getHotResetInvalidatedAt(),
+                    firstNonBlank(decision.getHotResetReasonCode(), "DECISION_HOT_RESET_INVALIDATED"), evaluationEnd);
         }
         ExecutionPlanDO plan = !blank(row.getExecutionPlanId()) ? executionPlanMapper.selectByPlanId(row.getExecutionPlanId()) : null;
         if (plan != null && Boolean.TRUE.equals(plan.getNeedsRevalidation()) && plan.getRevalidationRequiredAt() != null) {
-            evidence.time = earlier(evidence.time, plan.getRevalidationRequiredAt());
-            evidence.reasonCode = appendReason(evidence.reasonCode, "EXECUTION_PLAN_NEEDS_REVALIDATION");
+            applyPersistedInvalidationCandidate(evidence, plan.getRevalidationRequiredAt(),
+                    "EXECUTION_PLAN_NEEDS_REVALIDATION", evaluationEnd);
         }
         return evidence;
+    }
+
+    private void applyPersistedInvalidationCandidate(InvalidationEvidence evidence,
+                                                     LocalDateTime candidateTime,
+                                                     String reasonCode,
+                                                     LocalDateTime evaluationEnd) {
+        if (candidateTime == null) {
+            return;
+        }
+        if (evaluationEnd != null && candidateTime.isAfter(evaluationEnd)) {
+            evidence.ignoredReasonCode = appendReason(evidence.ignoredReasonCode,
+                    "PERSISTED_INVALIDATION_AFTER_AS_OF_IGNORED");
+            return;
+        }
+        if (evidence.time == null || candidateTime.isBefore(evidence.time)) {
+            evidence.time = candidateTime;
+        }
+        evidence.reasonCode = appendReason(evidence.reasonCode, reasonCode);
+    }
+
+    private void applyExecutionEvidence(OpportunityLogDO row, LinkedUserPosition linked, MarketPathResult marketPath) {
+        if (linked.position == null) {
+            row.setUserPositionPresent(false);
+            row.setUserPositionId(null);
+            return;
+        }
+        LocalDateTime firstOutcomeTime = firstOutcomeTime(marketPath);
+        if (firstOutcomeTime != null && !linked.position.getOpenedAt().isAfter(firstOutcomeTime)) {
+            row.setUserPositionPresent(true);
+            row.setUserPositionId(linked.position.getId());
+            return;
+        }
+        row.setUserPositionPresent(false);
+        row.setUserPositionId(null);
+        row.setReasonCodes(appendReason(row, "LINKED_USER_POSITION_OPENED_AFTER_OUTCOME"));
+    }
+
+    private LocalDateTime firstOutcomeTime(MarketPathResult marketPath) {
+        if (OpportunityLogStatus.TARGET_FIRST.equals(marketPath.hitOrder)) {
+            return marketPath.targetHitAt;
+        }
+        if (OpportunityLogStatus.INVALIDATION_FIRST.equals(marketPath.hitOrder)) {
+            return marketPath.invalidationHitAt;
+        }
+        return null;
     }
 
     private String classify(OpportunityLogDO row, MarketPathResult marketPath, RiskEvidence risk) {
@@ -784,5 +799,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     private static final class InvalidationEvidence {
         private LocalDateTime time;
         private String reasonCode;
+        private String ignoredReasonCode;
     }
 }
