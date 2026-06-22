@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS tm_decision_result (
     ai_plan_mode VARCHAR(50),
     confused_score INT,
     asset_state_snapshot VARCHAR(512),
+    hot_reset_invalidated BOOLEAN NOT NULL DEFAULT FALSE,
+    hot_reset_event_id VARCHAR(64),
+    hot_reset_invalidated_at TIMESTAMP,
+    hot_reset_reason_code VARCHAR(64),
     create_time TIMESTAMP
 );
 
@@ -84,6 +88,10 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
     not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
     not_user_position_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    needs_revalidation BOOLEAN NOT NULL DEFAULT FALSE,
+    revalidation_reason VARCHAR(512),
+    hot_reset_event_id VARCHAR(64),
+    revalidation_required_at TIMESTAMP,
     create_time TIMESTAMP,
     CONSTRAINT ck_tm_execution_plan_status CHECK (
         execution_plan_status IN ('VALID', 'INCOMPLETE', 'BLOCKED', 'REVIEW_ONLY', 'INVALID')
@@ -486,21 +494,41 @@ CREATE TABLE IF NOT EXISTS tm_asset_state (
 -- 两者语义不同，避免混用；本表仍仅服务 Hot Reset，不扩展为通用事件平台。
 CREATE TABLE IF NOT EXISTS tm_hot_reset_event (
     event_id VARCHAR(64) PRIMARY KEY,
+    event_key VARCHAR(128) NOT NULL UNIQUE,
     analysis_id VARCHAR(64) NOT NULL,
+    rebuild_analysis_id VARCHAR(64),
     trace_id VARCHAR(64),
     symbol VARCHAR(20) NOT NULL,
+    timeframe VARCHAR(10),
     trigger_type VARCHAR(64) NOT NULL,
     trigger_value VARCHAR(128),
+    source_type VARCHAR(64),
+    source_reference VARCHAR(256),
+    severity_score INT,
     decision_id VARCHAR(64),
     decision_state VARCHAR(32),
+    decision_invalidated_count INT NOT NULL DEFAULT 0,
+    plan_revalidation_count INT NOT NULL DEFAULT 0,
+    push_invalidated_count INT NOT NULL DEFAULT 0,
     confused_score_snapshot INT,
+    confused_score_before INT,
+    confused_score_after INT,
     multi_timeframe_aligned_snapshot BOOLEAN,
+    account_risk_status VARCHAR(64),
+    account_risk_level VARCHAR(32),
+    account_risk_blocked BOOLEAN,
+    account_risk_snapshot CLOB,
+    rebuild_triggered BOOLEAN NOT NULL DEFAULT FALSE,
+    execution_status VARCHAR(32),
+    execution_error_code VARCHAR(64),
+    execution_error_message VARCHAR(512),
     trigger_reason_code VARCHAR(64),
     trigger_reason_text VARCHAR(512),
     event_version INT,
     event_time TIMESTAMP NOT NULL,
     pre_state VARCHAR(32),
     post_state VARCHAR(32),
+    completed_at TIMESTAMP,
     create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -74,6 +74,18 @@ public class DecisionResult {
     @Column(name = "asset_state_snapshot", length = 512)
     private String assetStateSnapshot;
 
+    @Column(name = "hot_reset_invalidated")
+    private Boolean hotResetInvalidated;
+
+    @Column(name = "hot_reset_event_id")
+    private String hotResetEventId;
+
+    @Column(name = "hot_reset_invalidated_at")
+    private LocalDateTime hotResetInvalidatedAt;
+
+    @Column(name = "hot_reset_reason_code")
+    private String hotResetReasonCode;
+
     @Column(name = "create_time")
     private LocalDateTime createTime;
 
@@ -259,6 +271,38 @@ public class DecisionResult {
 
     public void setAssetStateSnapshot(String assetStateSnapshot) {
         this.assetStateSnapshot = assetStateSnapshot;
+    }
+
+    public Boolean getHotResetInvalidated() {
+        return hotResetInvalidated;
+    }
+
+    public void setHotResetInvalidated(Boolean hotResetInvalidated) {
+        this.hotResetInvalidated = hotResetInvalidated;
+    }
+
+    public String getHotResetEventId() {
+        return hotResetEventId;
+    }
+
+    public void setHotResetEventId(String hotResetEventId) {
+        this.hotResetEventId = hotResetEventId;
+    }
+
+    public LocalDateTime getHotResetInvalidatedAt() {
+        return hotResetInvalidatedAt;
+    }
+
+    public void setHotResetInvalidatedAt(LocalDateTime hotResetInvalidatedAt) {
+        this.hotResetInvalidatedAt = hotResetInvalidatedAt;
+    }
+
+    public String getHotResetReasonCode() {
+        return hotResetReasonCode;
+    }
+
+    public void setHotResetReasonCode(String hotResetReasonCode) {
+        this.hotResetReasonCode = hotResetReasonCode;
     }
 
     public LocalDateTime getCreateTime() {

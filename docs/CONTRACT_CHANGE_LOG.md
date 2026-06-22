@@ -196,3 +196,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p1-3-hot-reset-real-action-done-candidate
+
+Date: 2026-06-23
+Changed by: Codex
+Reason: P1-3 HotReset real action B-risk implementation package.
+Before: P1-3 HotReset real action was NOT_STARTED/PARTIAL with HotReset event evidence, AssetState hot-reset flags, and a compatibility no-op path, but no real action invalidating candidate / waiting / triggered state, plan revalidation marking, risk/confused recalculation, event-key idempotency, or rebuild trigger.
+After: P1-3 is a branch DONE candidate with structured EXTREME_PRICE_MOVE / OI_COLLAPSE / LIQUIDITY_DRAIN / SYSTEMIC_SHOCK triggers, event-key idempotency, immediate CANDIDATE / WAITING_TRIGGER / TRIGGERED invalidation, safe AssetState transitions, ExecutionPlan needs_revalidation marking, Decision HotReset invalidation metadata, pending PushSnapshot invalidation, ConfusedState recalculation, AccountRisk recalculation, analysis rebuild after transaction commit, complete HotReset event persistence, rebuild failure evidence, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

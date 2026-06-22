@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.vo.DecisionResultVO;
 
@@ -93,6 +94,17 @@ public interface DecisionResultMapper {
 
     @Select("SELECT * FROM tm_decision_result WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
     DecisionResult selectLatestByAnalysisId(String analysisId);
+
+    @Update("UPDATE tm_decision_result SET hot_reset_invalidated = TRUE, hot_reset_event_id = #{eventId}, "
+            + "hot_reset_invalidated_at = #{invalidatedAt}, hot_reset_reason_code = #{reasonCode} "
+            + "WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol} "
+            + "AND (hot_reset_invalidated IS NULL OR hot_reset_invalidated = FALSE) "
+            + "AND (is_worth_opening = TRUE OR market_bias_hierarchy IN ('BULLISH', 'BEARISH'))")
+    int markHotResetInvalidatedBySymbol(
+            @Param("normalizedSymbol") String normalizedSymbol,
+            @Param("eventId") String eventId,
+            @Param("reasonCode") String reasonCode,
+            @Param("invalidatedAt") LocalDateTime invalidatedAt);
 
     /**
      * OPEN 持仓（每 symbol 一条代表行，多条 OPEN 时按 position_id 取首条）与每 symbol 最新决策（create_time DESC，并列时 decision_id DESC）；

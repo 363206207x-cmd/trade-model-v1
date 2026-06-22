@@ -120,22 +120,35 @@ public class AssetStateServiceImpl implements AssetStateService {
             return;
         }
         HotResetEventDO event = new HotResetEventDO();
-        event.setEventId("hre-" + UUID.randomUUID().toString().substring(0, 12));
+        String eventId = "hre-" + UUID.randomUUID().toString().substring(0, 12);
+        event.setEventId(eventId);
+        event.setEventKey("legacy-" + eventId);
         event.setAnalysisId(analysisId);
         event.setTraceId(traceId);
         event.setSymbol(sym);
+        event.setTimeframe(null);
         event.setTriggerType(triggerType);
         event.setTriggerValue(triggerValue);
+        event.setSourceType("LEGACY_ASSET_STATE_SERVICE");
+        event.setSourceReference("AssetStateService.recordHotResetEvent");
         event.setDecisionId(decisionId);
         event.setDecisionState(decisionState != null ? decisionState.name() : null);
+        event.setDecisionInvalidatedCount(0);
+        event.setPlanRevalidationCount(0);
+        event.setPushInvalidatedCount(0);
         event.setConfusedScoreSnapshot(confusedScoreSnapshot);
+        event.setConfusedScoreBefore(confusedScoreSnapshot);
+        event.setConfusedScoreAfter(confusedScoreSnapshot);
         event.setMultiTimeframeAlignedSnapshot(multiTimeframeAlignedSnapshot);
+        event.setRebuildTriggered(false);
+        event.setExecutionStatus("COMPLETED");
         event.setTriggerReasonCode(triggerReasonCode);
         event.setTriggerReasonText(triggerReasonText);
         event.setEventVersion(eventVersion);
         event.setEventTime(at);
         event.setPreState(preState != null ? preState.name() : null);
         event.setPostState(postState != null ? postState.name() : null);
+        event.setCompletedAt(LocalDateTime.now());
         event.setCreateTime(LocalDateTime.now());
         hotResetEventMapper.insert(event);
     }

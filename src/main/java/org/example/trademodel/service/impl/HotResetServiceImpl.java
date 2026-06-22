@@ -1,26 +1,410 @@
 package org.example.trademodel.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.DecisionResult;
+import org.example.trademodel.entity.HotResetEventDO;
+import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.enums.HotResetEventTypeEnum;
+import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
+import org.example.trademodel.mapper.HotResetEventMapper;
+import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.risk.UserPositionRiskAdapter;
+import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.service.AnalysisSchedulerService;
+import org.example.trademodel.service.ConfusedResult;
+import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
+import org.example.trademodel.service.HotResetCommand;
+import org.example.trademodel.service.HotResetPolicy;
+import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class HotResetServiceImpl implements HotResetService {
 
-    /**
-     * 在当前 {@link org.example.trademodel.service.impl.ConfusedStateServiceImpl} 加权下，困惑分上界约 48，
-     * 若与「进入 CONFUSED(70)」同一阈值则与 MTF 不对齐组合几乎永不触发。本轮 Hot Reset 取可触发的最小高分位。
-     */
-    static final int MIN_CONFUSED_SCORE_THRESHOLD = 40;
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final int LEGACY_MIN_CONFUSED_SCORE_THRESHOLD = 40;
+    private static final int DEFAULT_EVENT_VERSION = 3;
+
+    private final AssetStateMapper assetStateMapper;
+    private final HotResetEventMapper hotResetEventMapper;
+    private final DecisionResultMapper decisionResultMapper;
+    private final ExecutionPlanMapper executionPlanMapper;
+    private final PushSnapshotMapper pushSnapshotMapper;
+    private final ConfusedStateService confusedStateService;
+    private final UserPositionRiskAdapter userPositionRiskAdapter;
+    private final ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider;
+
+    public HotResetServiceImpl(AssetStateMapper assetStateMapper,
+                               HotResetEventMapper hotResetEventMapper,
+                               DecisionResultMapper decisionResultMapper,
+                               ExecutionPlanMapper executionPlanMapper,
+                               PushSnapshotMapper pushSnapshotMapper,
+                               ConfusedStateService confusedStateService,
+                               UserPositionRiskAdapter userPositionRiskAdapter,
+                               ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider) {
+        this.assetStateMapper = assetStateMapper;
+        this.hotResetEventMapper = hotResetEventMapper;
+        this.decisionResultMapper = decisionResultMapper;
+        this.executionPlanMapper = executionPlanMapper;
+        this.pushSnapshotMapper = pushSnapshotMapper;
+        this.confusedStateService = confusedStateService;
+        this.userPositionRiskAdapter = userPositionRiskAdapter;
+        this.analysisSchedulerServiceProvider = analysisSchedulerServiceProvider;
+    }
 
     @Override
     public boolean shouldTriggerHotReset(int confusedScore, boolean multiTimeframeAligned) {
-        return confusedScore >= MIN_CONFUSED_SCORE_THRESHOLD && !multiTimeframeAligned;
+        return confusedScore >= LEGACY_MIN_CONFUSED_SCORE_THRESHOLD && !multiTimeframeAligned;
+    }
+
+    @Override
+    public boolean shouldTriggerHotReset(HotResetCommand command) {
+        return HotResetPolicy.evaluate(command).isTriggered();
+    }
+
+    @Override
+    @Transactional
+    public HotResetResult evaluateAndExecute(HotResetCommand command) {
+        HotResetPolicy.Evaluation evaluation = HotResetPolicy.evaluate(command);
+        HotResetResult result = baseResult(command, evaluation);
+        if (!evaluation.isTriggered()) {
+            result.setExecutionStatus("NOT_TRIGGERED");
+            return result;
+        }
+
+        HotResetEventDO existing = hotResetEventMapper.selectByEventKey(command.getEventKey());
+        if (existing != null) {
+            return fromExistingEvent(existing);
+        }
+
+        String normalizedSymbol = normalizeSymbol(command.getSymbol());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime occurredAt = command.getOccurredAt() != null ? command.getOccurredAt() : now;
+        String eventId = "hre-" + UUID.randomUUID().toString().substring(0, 12);
+
+        AssetStateDO currentState = assetStateMapper.selectBySymbol(normalizedSymbol);
+        AssetStateEnum preState = currentState != null && currentState.getState() != null
+                ? currentState.getState()
+                : AssetStateEnum.OBSERVING;
+        int confusedScoreBefore = currentState != null && currentState.getConfusedScore() != null
+                ? currentState.getConfusedScore()
+                : 0;
+
+        DecisionContext confusedContext = buildConfusedContext(command);
+        ConfusedResult confusedResult = confusedStateService.calculateConfused(normalizedSymbol, confusedContext);
+        UserPositionRiskResult riskResult = currentRiskFailClosed();
+        AssetStateEnum postState = HotResetPolicy.resolvePostState(command, confusedResult, riskResult.isRiskBlocked());
+        if (HotResetPolicy.isUnsafePreState(postState)) {
+            postState = AssetStateEnum.INVALIDATED;
+        }
+
+        int confusedLowStreak = confusedResult != null ? confusedResult.getConfusedLowStreak() : 0;
+        int confusedScoreAfter = confusedResult != null ? confusedResult.getConfusedScore() : confusedScoreBefore;
+        persistAssetState(normalizedSymbol, postState, confusedScoreAfter, confusedLowStreak, command, occurredAt, preState);
+
+        String reasonCode = evaluation.getReasonCode();
+        int decisionCount = decisionResultMapper.markHotResetInvalidatedBySymbol(
+                normalizedSymbol, eventId, reasonCode, now);
+        int planCount = executionPlanMapper.markNeedsRevalidationForHotReset(
+                command.getAnalysisId(), normalizedSymbol, eventId,
+                command.getEventType().name() + ":" + reasonCode, now);
+        int pushCount = pushSnapshotMapper.invalidatePendingBySymbolForHotReset(normalizedSymbol);
+
+        HotResetEventDO event = buildEvent(command, eventId, evaluation, occurredAt, now, preState, postState,
+                confusedScoreBefore, confusedScoreAfter, confusedLowStreak, riskResult,
+                decisionCount, planCount, pushCount);
+        hotResetEventMapper.insert(event);
+
+        result.setEventId(eventId);
+        result.setTriggered(true);
+        result.setPreState(preState.name());
+        result.setPostState(postState.name());
+        result.setDecisionInvalidatedCount(decisionCount);
+        result.setPlanRevalidationCount(planCount);
+        result.setPushInvalidatedCount(pushCount);
+        result.setConfusedScoreBefore(confusedScoreBefore);
+        result.setConfusedScoreAfter(confusedScoreAfter);
+        result.setAccountRiskStatus(riskResult.getRiskStatus());
+        result.setAccountRiskLevel(riskResult.getRiskLevel());
+        result.setAccountRiskBlocked(riskResult.isRiskBlocked());
+        result.setRebuildTriggered(true);
+        result.setExecutionStatus("COMPLETED");
+        result.setCompletedAt(now);
+
+        runRebuildAfterCommit(event, result);
+        return result;
     }
 
     @Override
     public DecisionResult executeHotReset(DecisionContext context, DecisionResult currentResult) {
+        HotResetCommand command = new HotResetCommand();
+        command.setEventKey("legacy-hot-reset-" + (currentResult != null ? currentResult.getDecisionId() : "missing"));
+        command.setAnalysisId(currentResult != null ? currentResult.getAnalysisId() : null);
+        command.setSymbol(currentResult != null ? currentResult.getSymbol() : null);
+        command.setEventType(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
+        command.setDecisionContext(context);
+        evaluateAndExecute(command);
         return currentResult;
+    }
+
+    private HotResetResult baseResult(HotResetCommand command, HotResetPolicy.Evaluation evaluation) {
+        HotResetResult result = new HotResetResult();
+        if (command != null) {
+            result.setEventKey(command.getEventKey());
+            result.setEventType(command.getEventType());
+            result.setAnalysisId(command.getAnalysisId());
+            result.setSymbol(command.getSymbol());
+            result.setTimeframe(command.getTimeframe());
+            result.setOccurredAt(command.getOccurredAt());
+        }
+        result.setTriggered(false);
+        result.setDeduplicated(false);
+        result.setReasonCodes(evaluation.getReasonCodes());
+        result.setCompletedAt(LocalDateTime.now());
+        return result;
+    }
+
+    private HotResetResult fromExistingEvent(HotResetEventDO event) {
+        HotResetResult result = new HotResetResult();
+        result.setEventId(event.getEventId());
+        result.setEventKey(event.getEventKey());
+        result.setEventType(parseEventType(event.getTriggerType()));
+        result.setTriggered(true);
+        result.setDeduplicated(true);
+        result.setAnalysisId(event.getAnalysisId());
+        result.setRebuildAnalysisId(event.getRebuildAnalysisId());
+        result.setSymbol(event.getSymbol());
+        result.setTimeframe(event.getTimeframe());
+        result.setPreState(event.getPreState());
+        result.setPostState(event.getPostState());
+        result.setDecisionInvalidatedCount(zero(event.getDecisionInvalidatedCount()));
+        result.setPlanRevalidationCount(zero(event.getPlanRevalidationCount()));
+        result.setPushInvalidatedCount(zero(event.getPushInvalidatedCount()));
+        result.setConfusedScoreBefore(event.getConfusedScoreBefore());
+        result.setConfusedScoreAfter(event.getConfusedScoreAfter());
+        result.setAccountRiskStatus(event.getAccountRiskStatus());
+        result.setAccountRiskLevel(event.getAccountRiskLevel());
+        result.setAccountRiskBlocked(Boolean.TRUE.equals(event.getAccountRiskBlocked()));
+        result.setRebuildTriggered(Boolean.TRUE.equals(event.getRebuildTriggered()));
+        result.setExecutionStatus(event.getExecutionStatus());
+        result.setReasonCodes(List.of("EVENT_KEY_DEDUPLICATED"));
+        result.setOccurredAt(event.getEventTime());
+        result.setCompletedAt(event.getCompletedAt());
+        return result;
+    }
+
+    private void persistAssetState(String normalizedSymbol, AssetStateEnum postState, int confusedScore,
+                                   int confusedLowStreak, HotResetCommand command, LocalDateTime occurredAt,
+                                   AssetStateEnum preState) {
+        AssetStateDO core = new AssetStateDO();
+        core.setSymbol(normalizedSymbol);
+        core.setState(postState);
+        core.setConfusedScore(confusedScore);
+        core.setConfusedLowStreak(Math.max(0, confusedLowStreak));
+        core.setLastUpdateTime(LocalDateTime.now());
+        core.setTraceId(command.getTraceId());
+        assetStateMapper.mergeUpsertCore(core);
+
+        AssetStateDO hot = new AssetStateDO();
+        hot.setSymbol(normalizedSymbol);
+        hot.setHotResetFlag(true);
+        hot.setHotResetTriggerType(command.getEventType().name());
+        hot.setHotResetTriggerValue(command.getEventKey());
+        hot.setHotResetTime(occurredAt);
+        hot.setPreResetState(preState.name());
+        hot.setPostResetState(postState.name());
+        hot.setLastUpdateTime(LocalDateTime.now());
+        assetStateMapper.updateHotResetColumns(hot);
+    }
+
+    private HotResetEventDO buildEvent(HotResetCommand command, String eventId, HotResetPolicy.Evaluation evaluation,
+                                       LocalDateTime occurredAt, LocalDateTime completedAt,
+                                       AssetStateEnum preState, AssetStateEnum postState,
+                                       int confusedScoreBefore, int confusedScoreAfter, int confusedLowStreak,
+                                       UserPositionRiskResult riskResult, int decisionCount, int planCount, int pushCount) {
+        HotResetEventDO event = new HotResetEventDO();
+        event.setEventId(eventId);
+        event.setEventKey(command.getEventKey());
+        event.setAnalysisId(command.getAnalysisId());
+        event.setTraceId(command.getTraceId());
+        event.setSymbol(normalizeSymbol(command.getSymbol()));
+        event.setTimeframe(command.getTimeframe());
+        event.setTriggerType(command.getEventType().name());
+        event.setTriggerValue(String.join(";", evaluation.getReasonCodes()));
+        event.setSourceType(command.getSourceType());
+        event.setSourceReference(command.getSourceReference());
+        event.setSeverityScore(command.getSeverityScore());
+        event.setDecisionInvalidatedCount(decisionCount);
+        event.setPlanRevalidationCount(planCount);
+        event.setPushInvalidatedCount(pushCount);
+        event.setConfusedScoreSnapshot(confusedScoreAfter);
+        event.setConfusedScoreBefore(confusedScoreBefore);
+        event.setConfusedScoreAfter(confusedScoreAfter);
+        event.setMultiTimeframeAlignedSnapshot(command.getDecisionContext() != null
+                ? command.getDecisionContext().isMultiTimeframeAligned()
+                : null);
+        event.setAccountRiskStatus(riskResult.getRiskStatus());
+        event.setAccountRiskLevel(riskResult.getRiskLevel());
+        event.setAccountRiskBlocked(riskResult.isRiskBlocked());
+        event.setAccountRiskSnapshot(writeRiskSnapshot(riskResult));
+        event.setRebuildTriggered(true);
+        event.setExecutionStatus("COMPLETED");
+        event.setTriggerReasonCode(evaluation.getReasonCode());
+        event.setTriggerReasonText(String.join(" | ", evaluation.getReasonCodes()));
+        event.setEventVersion(DEFAULT_EVENT_VERSION);
+        event.setEventTime(occurredAt);
+        event.setPreState(preState.name());
+        event.setPostState(postState.name());
+        event.setCompletedAt(completedAt);
+        event.setCreateTime(LocalDateTime.now());
+        return event;
+    }
+
+    private void runRebuildAfterCommit(HotResetEventDO event, HotResetResult result) {
+        Runnable rebuild = () -> runRebuild(event, result);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    rebuild.run();
+                }
+            });
+        } else {
+            rebuild.run();
+        }
+    }
+
+    private void runRebuild(HotResetEventDO event, HotResetResult result) {
+        HotResetEventDO update = new HotResetEventDO();
+        update.setEventId(event.getEventId());
+        update.setRebuildTriggered(true);
+        update.setCompletedAt(LocalDateTime.now());
+        try {
+            AnalysisSchedulerService scheduler = analysisSchedulerServiceProvider.getIfAvailable();
+            if (scheduler == null) {
+                update.setExecutionStatus("REBUILD_FAILED");
+                update.setExecutionErrorCode("ANALYSIS_SCHEDULER_UNAVAILABLE");
+                update.setExecutionErrorMessage("AnalysisSchedulerService unavailable");
+            } else {
+                ApiResponse<AssetAnalysisVO> response = scheduler.executeAnalysis(
+                        event.getSymbol(), event.getTimeframe(), "HOT_RESET:" + event.getEventId());
+                AssetAnalysisVO rebuilt = response != null ? response.getData() : null;
+                String rebuildAnalysisId = rebuilt != null ? rebuilt.getAnalysisId() : null;
+                update.setRebuildAnalysisId(rebuildAnalysisId);
+                update.setExecutionStatus(rebuildAnalysisId != null ? "COMPLETED" : "REBUILD_FAILED");
+                if (rebuildAnalysisId == null) {
+                    update.setExecutionErrorCode("REBUILD_ANALYSIS_ID_MISSING");
+                    update.setExecutionErrorMessage("Analysis rebuild returned no analysisId");
+                }
+                result.setRebuildAnalysisId(rebuildAnalysisId);
+                result.setExecutionStatus(update.getExecutionStatus());
+            }
+        } catch (Exception e) {
+            update.setExecutionStatus("REBUILD_FAILED");
+            update.setExecutionErrorCode("REBUILD_EXCEPTION");
+            update.setExecutionErrorMessage(e.getMessage());
+            result.setExecutionStatus("REBUILD_FAILED");
+        }
+        hotResetEventMapper.updateRebuildOutcome(update);
+    }
+
+    private DecisionContext buildConfusedContext(HotResetCommand command) {
+        DecisionContext context = command.getDecisionContext() != null ? command.getDecisionContext() : new DecisionContext();
+        context.setSymbol(normalizeSymbol(command.getSymbol()));
+        int score = command.getSeverityScore() != null ? Math.max(0, Math.min(100, command.getSeverityScore()))
+                : defaultSeverity(command.getEventType());
+        if (context.getDriverConflictScore() == null) {
+            context.setDriverConflictScore(score);
+        }
+        if (context.getExecutionInstabilityScore() == null) {
+            context.setExecutionInstabilityScore(score);
+        }
+        if (context.getMicrostructureTrapScore() == null) {
+            context.setMicrostructureTrapScore(score);
+        }
+        if (context.getCauseEffectDivergenceScore() == null) {
+            context.setCauseEffectDivergenceScore(score);
+        }
+        if (context.getAiConflictScore() == null) {
+            context.setAiConflictScore(score);
+        }
+        return context;
+    }
+
+    private int defaultSeverity(HotResetEventTypeEnum type) {
+        if (type == HotResetEventTypeEnum.LIQUIDITY_DRAIN) {
+            return 54;
+        }
+        if (type == HotResetEventTypeEnum.SYSTEMIC_SHOCK) {
+            return 90;
+        }
+        if (type == HotResetEventTypeEnum.OI_COLLAPSE) {
+            return 75;
+        }
+        return 80;
+    }
+
+    private UserPositionRiskResult currentRiskFailClosed() {
+        try {
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            return result != null ? result : UserPositionRiskResult.failClosed("HOT_RESET_RISK_CONTEXT_UNAVAILABLE");
+        } catch (Exception e) {
+            return UserPositionRiskResult.failClosed("HOT_RESET_RISK_CONTEXT_UNAVAILABLE");
+        }
+    }
+
+    private String writeRiskSnapshot(UserPositionRiskResult riskResult) {
+        try {
+            Map<String, Object> snapshot = new LinkedHashMap<>();
+            snapshot.put("riskStatus", riskResult.getRiskStatus());
+            snapshot.put("riskLevel", riskResult.getRiskLevel());
+            snapshot.put("riskBlocked", riskResult.isRiskBlocked());
+            snapshot.put("aggregateRiskScore", riskResult.getAggregateRiskScore());
+            snapshot.put("reasonCodes", riskResult.getReasonCodes());
+            snapshot.put("calculatedAt", riskResult.getCalculatedAt() != null
+                    ? riskResult.getCalculatedAt().toString()
+                    : null);
+            return JSON.writeValueAsString(snapshot);
+        } catch (Exception e) {
+            return "{\"snapshotStatus\":\"SERIALIZATION_FAILED\"}";
+        }
+    }
+
+    private HotResetEventTypeEnum parseEventType(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return HotResetEventTypeEnum.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String normalizeSymbol(String symbol) {
+        return symbol == null ? null : symbol.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private int zero(Integer value) {
+        return value == null ? 0 : value;
     }
 }
