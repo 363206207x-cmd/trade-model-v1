@@ -54,6 +54,10 @@ bash scripts/v1-go.sh
 
 This is the default one-command entry. It checks state, starts the existing operator path, copies the next Codex task to the macOS clipboard when Codex CLI cannot start, packages dirty work, reads PR numbers automatically, and routes A/B PR flow without manual long-command copy/paste.
 
+Codex final answers must follow the Fixed Codex Output Contract（Codex 固定输出契约） in `docs/ANSWER_FORMAT_CONTRACT.md`.
+Every final answer must begin with `WHAT_THIS_STEP_DOES（这一步在做什么）` and `CURRENT_PROGRESS（当前进度）`, then state `NEXT_ALLOWED_ACTION（下一允许动作）`, `NEXT_BLOCKED_ACTION（下一禁止动作）`, `RISK_LEVEL（风险等级）`, and `OVERREACH_STATUS（越界状态）`.
+English technical terms must include Chinese explanations such as merged main（已合并主线）, clean/synced main（干净且已同步主线）, effective（已生效）, blocked（阻塞）, and allowed（允许）.
+
 For reviewed B-risk PRs:
 
 ```bash

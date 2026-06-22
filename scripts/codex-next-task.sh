@@ -126,6 +126,9 @@ main_sync="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "MAIN_SYNC" {print 
 open_prs="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PRS" {print substr($0, length("OPEN_PRS") + 3); exit}')"
 contract_sync="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CONTRACT_MATRIX_SYNC" {print $2; exit}')"
 next_allowed="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "NEXT_BUSINESS_PHASE_ALLOWED" {print $2; exit}')"
+next_phase="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "NEXT_BUSINESS_PHASE" {print $2; exit}')"
+current_package="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CURRENT_WORK_PACKAGE" {print $2; exit}')"
+blockers="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "BLOCKERS" {print $2; exit}')"
 current_phase_status="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CURRENT_PHASE_STATUS" {print $2; exit}')"
 completion_effective_state="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "COMPLETION_EFFECTIVE_STATE" {print $2; exit}')"
 
@@ -150,6 +153,15 @@ fi
 
 cat "$TEMPLATE_FILE"
 cat <<EOF
+
+---
+
+# Fixed Codex Output Contract Hints / Codex 固定输出契约提示
+
+WHAT_THIS_STEP_DOES（这一步在做什么）: Generate a user-readable task handoff without modifying files, staging, committing, pushing, creating PRs, merging, or starting a blocked package.
+CURRENT_PROGRESS（当前进度）: Branch=${branch:-UNKNOWN}; worktree（工作区） clean=${worktree:-UNKNOWN}; main sync=${main_sync:-UNKNOWN}; open PR（未合并 PR）=${open_prs:-UNKNOWN}; current package=${current_package:-UNKNOWN}; completion=${completion_effective_state:-UNKNOWN}; next phase=${next_phase:-UNKNOWN}; next allowed（允许）=${next_allowed:-UNKNOWN}; blockers=${blockers:-UNKNOWN}.
+NEXT_ALLOWED_ACTION（下一允许动作）: ${next_phase:-UNKNOWN} only when the runtime gate（门禁） reports allowed（允许） and the worktree（工作区） is clean/synced main（干净且已同步主线）.
+NEXT_BLOCKED_ACTION（下一禁止动作）: Do not start blocked（阻塞） packages, do not treat open PR（未合并 PR） as done, do not bypass PENDING_MERGED_MAIN（等待合并主线）, and do not auto-trade.
 
 ---
 

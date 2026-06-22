@@ -13,6 +13,59 @@ GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITH
 
 Use both English and Chinese labels. Do not answer only in English or only in Chinese.
 
+## Fixed Codex Output Contract / Codex 固定输出契约
+
+All Codex final outputs must include the fixed fields below.
+Every field name must keep both English and Chinese labels.
+The first two fields must always be:
+
+```text
+WHAT_THIS_STEP_DOES（这一步在做什么）:
+CURRENT_PROGRESS（当前进度）:
+CURRENT_PHASE（当前阶段）:
+CURRENT_BLOCK（当前模块）:
+CURRENT_BRANCH（当前分支）:
+CURRENT_PR（当前 PR）:
+MERGED_MAIN_STATUS（合并主线状态）:
+EFFECTIVE_STATUS（生效状态）:
+NEXT_ALLOWED_ACTION（下一允许动作）:
+NEXT_BLOCKED_ACTION（下一禁止动作）:
+WHY_BLOCKED_OR_ALLOWED（为什么允许或阻塞）:
+FILES_CHANGED（变更文件）:
+CHECKS（检查）:
+RISK_LEVEL（风险等级）:
+OVERREACH_STATUS（越界状态）:
+```
+
+Required bilingual technical terms:
+
+- merged main（已合并主线）
+- clean/synced main（干净且已同步主线）
+- open PR（未合并 PR）
+- Draft PR（草稿 PR）
+- A-risk（低风险）
+- B-risk（中风险）
+- effective（已生效）
+- blocked（阻塞）
+- allowed（允许）
+- worktree（工作区）
+- gate（门禁）
+- UserPosition（用户手动持仓）
+- ExecutionPlan（执行计划）
+- Source Gate（来源门禁）
+- AccountRisk（账户风险）
+- PositionMonitor（持仓监控）
+- Review（复盘）
+
+Rules:
+
+1. `WHAT_THIS_STEP_DOES（这一步在做什么）` and `CURRENT_PROGRESS（当前进度）` must appear first.
+2. `CURRENT_PROGRESS（当前进度）` must state the completed P stage, whether the current PR is merged main（已合并主线）, whether the current phase is effective（已生效）, and whether the next phase is allowed（允许）.
+3. `NEXT_ALLOWED_ACTION（下一允许动作）` must only name the next action allowed by the contract and runtime gate（门禁）.
+4. `NEXT_BLOCKED_ACTION（下一禁止动作）` must explicitly name work that must not be started.
+5. If there is an open PR（未合并 PR） or PENDING_MERGED_MAIN（等待合并主线）, the answer must say that open PR does not count as complete and only merged main（已合并主线） can become effective（已生效）.
+6. Codex must not output only technical logs; it must include user-readable phase progress and gate（门禁） status.
+
 ```text
 Current Mainline（当前主线）:
 Current Block（当前模块）:
