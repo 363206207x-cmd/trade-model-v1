@@ -26,6 +26,9 @@ public class DecisionBundleVO {
     private Integer aiConflictScore;
     private String aiPlanMode;
     private Integer confusedScore;
+    private Integer confusedLowStreak;
+    private boolean directionalPushBlocked;
+    private String directionalPushBlockReason;
     /** 本 run 合成权威状态，仅 {@link AssetStateEnum} */
     private AssetStateEnum assetState;
     /** 与 asset_state_snapshot 列一致，由引擎调用 AssetStateService 写入 */
@@ -83,6 +86,12 @@ public class DecisionBundleVO {
     public void setAiPlanMode(String aiPlanMode) { this.aiPlanMode = aiPlanMode; }
     public Integer getConfusedScore() { return confusedScore; }
     public void setConfusedScore(Integer confusedScore) { this.confusedScore = confusedScore; }
+    public Integer getConfusedLowStreak() { return confusedLowStreak; }
+    public void setConfusedLowStreak(Integer confusedLowStreak) { this.confusedLowStreak = confusedLowStreak; }
+    public boolean isDirectionalPushBlocked() { return directionalPushBlocked; }
+    public void setDirectionalPushBlocked(boolean directionalPushBlocked) { this.directionalPushBlocked = directionalPushBlocked; }
+    public String getDirectionalPushBlockReason() { return directionalPushBlockReason; }
+    public void setDirectionalPushBlockReason(String directionalPushBlockReason) { this.directionalPushBlockReason = directionalPushBlockReason; }
     public AssetStateEnum getAssetState() { return assetState; }
     public void setAssetState(AssetStateEnum assetState) { this.assetState = assetState; }
     public String getAssetStateSnapshot() { return assetStateSnapshot; }

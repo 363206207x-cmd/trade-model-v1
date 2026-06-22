@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P1-1 PushRecheck semantic hardening DONE candidate
-Next Business Phase: P1-2 ConfusedState + AiConflict hardening
+Current Work Package: P1-2 ConfusedState + AiConflict hardening DONE candidate
+Next Business Phase: P1-3 HotReset real action
 Next Business Phase Allowed: NO
 Production Deployment Readiness: BLOCKED
 
@@ -29,8 +29,10 @@ P0-5 PositionMonitorService is effective because its implementation is merged to
 
 P0-6 Review integrates UserPosition is effective because its implementation is merged to clean / synced `main` and the runtime gate allowed P1-1.
 
-P1-1 PushRecheck semantic hardening is only a branch DONE candidate in this worktree.
-It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P1-1 effectivity.
+P1-1 PushRecheck semantic hardening is effective because its implementation is merged to clean / synced `main` and the runtime gate allowed P1-2.
+
+P1-2 ConfusedState + AiConflict hardening is only a branch DONE candidate in this worktree.
+It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P1-2 effectivity.
 
 `bash scripts/v1-state.sh` must distinguish `CURRENT_PACKAGE_PR`, `UNRELATED_OPEN_PRS`, and `BLOCK_NEXT_BUSINESS_PHASE_ONLY`. An unrelated Draft PR must not block merging the current P0-0 package PR, but it still blocks the next business phase.
 
@@ -38,13 +40,13 @@ It is not effective until this branch commit is reviewed, merged to `main`, loca
 
 ## Current Allowed Work
 
-Only the following work is allowed after this P1-1 branch-candidate update:
+Only the following work is allowed after this P1-2 branch-candidate update:
 
-1. Checks, push, PR creation, and merge-gate handling for the P1-1 PushRecheck semantic hardening B-risk package.
-2. Main sync after the P1-1 PR is reviewed and merged.
-3. Runtime verification that P1-1 is effective on clean / synced main before any P1-2 work starts.
+1. Checks, push, PR creation, and merge-gate handling for the P1-2 ConfusedState + AiConflict hardening B-risk package.
+2. Main sync after the P1-2 PR is reviewed and merged.
+3. Runtime verification that P1-2 is effective on clean / synced main before any P1-3 work starts.
 
-P1-1 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
+P1-2 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
 
 PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into this package.
 
@@ -52,48 +54,47 @@ PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into 
 
 ## Current Forbidden Work
 
-The following work is blocked until P1-1 is effective on merged main:
+The following work is blocked until P1-2 is effective on merged main:
 
-1. ConfusedState + AiConflict hardening.
-2. HotReset real action.
-3. OpportunityLog.
-4. Macro / News / External Context.
-5. AI Orchestrator + AiCallLog.
-6. Scheduler / Idempotency / Trace.
-7. Dashboard Final.
-8. Auto-trading of any kind.
+1. HotReset real action.
+2. OpportunityLog.
+3. Macro / News / External Context.
+4. AI Orchestrator + AiCallLog.
+5. Scheduler / Idempotency / Trace.
+6. Dashboard Final.
+7. Auto-trading of any kind.
 
 ---
 
 ## Current Known Critical Gaps
 
-1. P1-1 PushRecheck semantic hardening is only a branch DONE candidate until merged main confirms it effective.
-2. ConfusedState + AiConflict hardening remains incomplete.
-3. P1-1 branch candidate must be merged main before P1-2 work is allowed.
-4. HotReset real action incomplete.
-5. OpportunityLog incomplete.
-6. Macro / News runtime not complete.
-7. AI orchestrator and ai call log incomplete.
-8. Dashboard Final must wait until business semantics are stable.
+1. P1-2 ConfusedState + AiConflict hardening is only a branch DONE candidate until merged main confirms it effective.
+2. HotReset real action incomplete.
+3. OpportunityLog incomplete.
+4. Macro / News runtime not complete.
+5. AI orchestrator and ai call log incomplete.
+6. Dashboard Final must wait until business semantics are stable.
 
-## P1-1 PushRecheck Semantic Hardening Branch Candidate
+## P1-2 ConfusedState + AiConflict Hardening Branch Candidate
 
-Branch: `p1-1-push-recheck-semantic-hardening`
+Branch: `p1-2-confused-state-ai-conflict-hardening`
 Risk: B
 Status: DONE candidate
 Effective State: pending merged main
 
 Implemented branch evidence:
 
-1. Canonical PushRecheck statuses are review-only: REVIEW_PASSED, REVIEW_WAITING, DRIFTED_FROM_ENTRY_ZONE, INVALIDATED, RISK_BLOCKED, CONFUSED_BLOCKED, and EXPIRED.
-2. RecheckResult fixes notTradeInstruction, notExecutable, notAutoTrading, notOrderExecution, notUserPositionCreation, notPositionMutation, and notTradingAuthorization safety fields to true.
-3. Legacy status reads remain compatible while new writes use canonical recheck and push statuses only.
-4. Scheduler and backlog reads include CAPTURED, RECHECK_REVIEW_WAITING, and the historical waiting status for compatibility.
-5. Replay summary and log APIs normalize historical statuses to safe canonical read models.
-6. Tests cover all canonical statuses, legacy compatibility, controller safety fields, scheduler/backlog compatibility, replay summary, and forbidden action field absence.
-7. No UserPosition creation or mutation, automatic open / close / reverse, order execution, auto-trading, Push send, external channel, Dashboard UI, P1-2, or PR #1004 changes are part of this package.
+1. ConfusedStatePolicy fixes enter, block, exit threshold, and required low-cycle constants.
+2. `tm_asset_state.confused_low_streak` persists per-symbol low-confused streak across analysis cycles.
+3. ConfusedStateService enters CONFUSED at score >= 70, blocks directional push at score >= 85, requires two consecutive scores below 55 to exit, and exits only to COOLING.
+4. AiConflictResolver preserves the rule-layer base direction and limits AI disagreement effects to adjusted confidence, risk adjustment, plan mode, and confused contribution.
+5. Single AI objection only reduces confidence / plan mode within a bounded result and cannot force infinite waiting or direct CONFUSED.
+6. DecisionEngine uses rule-layer base direction for marketBiasHierarchy, records directionalPushBlocked, and treats GPT / Gemini / Grok roles as advisory review / challenge only.
+7. PushSnapshotService explicitly skips directional snapshot writes when directionalPushBlocked=true.
+8. Tests cover ConfusedState thresholds/transitions, aligned / minor / major / extreme AI conflict, DecisionEngine integration, PushSnapshot block guard, safety fields, and no direct TRIGGERED exit.
+9. No external AI provider, UserPosition mutation, automatic open / close / reverse, order execution, auto-trading, Push send, external channel, Dashboard UI, HotReset real action, or P1-3 changes are part of this package.
 
-P1-2 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P1-1 effective.
+P1-3 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P1-2 effective.
 
 ---
 

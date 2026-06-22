@@ -18,6 +18,8 @@ public class AssetStateDO {
 
     private Integer confusedScore;
 
+    private Integer confusedLowStreak = 0;
+
     private Boolean hotResetFlag = false;
 
     private String hotResetTriggerType;
@@ -64,6 +66,14 @@ public class AssetStateDO {
 
     public void setConfusedScore(Integer confusedScore) {
         this.confusedScore = confusedScore;
+    }
+
+    public Integer getConfusedLowStreak() {
+        return confusedLowStreak;
+    }
+
+    public void setConfusedLowStreak(Integer confusedLowStreak) {
+        this.confusedLowStreak = confusedLowStreak;
     }
 
     public Boolean getHotResetFlag() {

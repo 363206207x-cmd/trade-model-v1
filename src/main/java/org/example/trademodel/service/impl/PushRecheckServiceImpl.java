@@ -11,6 +11,7 @@ import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.PushRecheckService;
 import org.example.trademodel.service.PushRecheckStatusContract;
@@ -42,10 +43,10 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private static final BigDecimal DRIFT_RATIO_THRESHOLD = new BigDecimal("0.02");
 
     /** 快照困惑分 ≥ 此值 → REVIEW_WAITING（仅建议人工复核等待） */
-    private static final int CONFUSED_WAIT_THRESHOLD = 70;
+    private static final int CONFUSED_WAIT_THRESHOLD = ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD;
 
     /** 快照困惑分 ≥ 此值 → CONFUSED_BLOCKED（困惑度过高，直接阻断） */
-    private static final int CONFUSED_BLOCK_THRESHOLD = 85;
+    private static final int CONFUSED_BLOCK_THRESHOLD = ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD;
 
     /** 快照执行可行性低于此值 → REVIEW_WAITING（若字段存在） */
     private static final int EXEC_FEASIBILITY_WAIT_THRESHOLD = 60;

@@ -15,10 +15,10 @@ import java.util.Map;
 import java.util.List;
 
 /**
- * V3 Multi-Agent 决策引擎 - 三角色协同版（真实K线 + 多时间框架）
- * 1. GPT-5.4：最终裁决官
- * 2. Gemini 2.5 Pro：冲突复核官
- * 3. Grok 4.20：快讯与反方挑战官
+ * V3 决策引擎 - 规则层基础方向 + AI advisory review（真实K线 + 多时间框架）。
+ * 1. GPT role：规则方向复核
+ * 2. Gemini role：冲突复核
+ * 3. Grok role：快讯与反方挑战
  *
  * <p>本 run 将 {@link DecisionContext} 接入 {@link AiConflictResolverService}、{@link ConfusedStateService}、
  * {@link AssetStateService}，供 {@link org.example.trademodel.service.impl.AnalysisAssemblerServiceImpl} 落库。</p>
@@ -47,9 +47,6 @@ public class DecisionEngineService {
     private static final String KEY_RISK_TIER_LOW_MIN_SCORE = "decision.risk_tier.low_min_score";
     private static final int DEFAULT_RISK_TIER_LOW_MIN_SCORE = 80;
 
-    private static final String KEY_CONFUSED_HIGH_MIN_SCORE = "decision.confused_high_min_score";
-    private static final int DEFAULT_CONFUSED_HIGH_MIN_SCORE = 70;
-
     private static final String KEY_RISK_LEVEL_HIGH_FINAL_SCORE_BELOW = "decision.risk_level.high_final_score_below";
     private static final int DEFAULT_RISK_LEVEL_HIGH_FINAL_SCORE_BELOW = 45;
 
@@ -68,7 +65,7 @@ public class DecisionEngineService {
         this.confusedStateService = confusedStateService;
         this.assetStateService = assetStateService;
         this.ruleConfigService = ruleConfigService;
-        logger.info("✅ DecisionEngineService V3 Multi-Agent (三角色协同 + 真实K线 + 多TF) initialized successfully");
+        logger.info("✅ DecisionEngineService V3 (规则层基础方向 + AI advisory review + 真实K线 + 多TF) initialized successfully");
     }
 
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId) {
@@ -94,7 +91,6 @@ public class DecisionEngineService {
             int confidenceHighMinScore = getInt(ruleMap, KEY_CONFIDENCE_HIGH_MIN_SCORE, DEFAULT_CONFIDENCE_HIGH_MIN_SCORE);
             int confidenceMediumMinScore = getInt(ruleMap, KEY_CONFIDENCE_MEDIUM_MIN_SCORE, DEFAULT_CONFIDENCE_MEDIUM_MIN_SCORE);
             int riskTierLowMinScore = getInt(ruleMap, KEY_RISK_TIER_LOW_MIN_SCORE, DEFAULT_RISK_TIER_LOW_MIN_SCORE);
-            int confusedHighMinScore = getInt(ruleMap, KEY_CONFUSED_HIGH_MIN_SCORE, DEFAULT_CONFUSED_HIGH_MIN_SCORE);
             int highFinalScoreBelow = getInt(ruleMap, KEY_RISK_LEVEL_HIGH_FINAL_SCORE_BELOW,
                     DEFAULT_RISK_LEVEL_HIGH_FINAL_SCORE_BELOW);
             int actionPriorityHighMinScoreExclusive = getInt(ruleMap,
@@ -117,24 +113,24 @@ public class DecisionEngineService {
             boolean multiTfConvergence = isBullish1m == isBullish5m;
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
-            // ==================== 2. 三角色协同 ====================
+            // ==================== 2. 规则层基础方向 + AI advisory review ====================
 
-            // Grok 4.20：快讯与反方挑战官
+            // Grok role：快讯与反方挑战，仅用于风险/置信度复核
             String grokOpinion = isBullish1m ? 
                 "快讯：1m K线阳线，短期情绪看涨。但反方挑战：5m 未完全收敛，需警惕假突破。" : 
                 "快讯：1m K线阴线，短期情绪偏空。但反方挑战：可能仅为洗盘，关注支撑位。";
 
-            // Gemini 2.5 Pro：冲突复核官
+            // Gemini role：冲突复核，仅能影响冲突等级与风险提示
             String geminiReview = multiTfConvergence ? 
                 "复核通过：1m与5m方向一致，无明显冲突，维持原判断。" : 
                 "复核警告：1m与5m方向冲突，建议降级置信度或转为观望。";
 
-            // GPT-5.4：最终裁决官（汇总打分）
+            // GPT role：规则方向复核，不覆盖 rule-layer base direction
             int baseScore = isBullish1m ? 82 : 58;
             int finalScore = baseScore + convergenceScore;
 
-            // finalBias 门槛：仅使用 decision.confidence.medium_min_score 作为 BULLISH 阈值
-            String finalBias = finalScore >= confidenceMediumMinScore ? "BULLISH" : "BEARISH";
+            String ruleMarketBias = isBullish1m ? "BULLISH" : "BEARISH";
+            String advisoryBias = finalScore >= confidenceMediumMinScore ? "BULLISH" : "BEARISH";
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
             boolean worthOpening = finalScore >= worthOpeningMinScore;
@@ -146,11 +142,10 @@ public class DecisionEngineService {
             }
 
             String conclusion = String.format(
-                "GPT-5.4 最终裁决：%s | 总分 %d | Gemini复核：%s | Grok快讯：%s | 多TF收敛：%s",
-                finalBias, finalScore, geminiReview, grokOpinion, multiTfConvergence ? "STRONG" : "WEAK");
+                "规则层基础方向：%s | AI复核方向：%s | 总分 %d | Gemini复核：%s | Grok快讯：%s | 多TF收敛：%s",
+                ruleMarketBias, advisoryBias, finalScore, geminiReview, grokOpinion, multiTfConvergence ? "STRONG" : "WEAK");
 
             // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
-            String ruleMarketBias = isBullish1m ? "BULLISH" : "BEARISH";
             String riskTier = finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM";
 
             DecisionContext ctx = new DecisionContext();
@@ -158,7 +153,9 @@ public class DecisionEngineService {
             ctx.setRuleMarketBias(ruleMarketBias);
             ctx.setRuleConfidenceLevel(confidenceLevel);
             ctx.setHasRuleBaseOutput(true);
-            ctx.setGptConsistentWithRule(ruleMarketBias.equals(finalBias));
+            ctx.setGptConsistentWithRule(ruleMarketBias.equals(advisoryBias));
+            ctx.setGeminiConsistentWithRule(multiTfConvergence);
+            ctx.setGrokConsistentWithRule(true);
             ctx.setMultiTimeframeAligned(multiTfConvergence);
             ctx.setRiskTier(riskTier);
             ctx.setDataQualityScore(dataQualityScore);
@@ -170,21 +167,26 @@ public class DecisionEngineService {
             ctx.setConsecutiveLowConfusedCount(0);
 
             AiConflictResult conflict = aiConflictResolverService.resolve(ctx);
+            ctx.setAiConflictScore(conflict.getConfusedContribution());
             ConfusedResult confused = confusedStateService.calculateConfused(symbol, ctx);
 
-            AssetStateEnum syntheticState;
-            if (confused.getConfusedScore() >= confusedHighMinScore) {
-                syntheticState = AssetStateEnum.CONFUSED;
-            } else if (worthOpening) {
-                syntheticState = AssetStateEnum.CANDIDATE;
-            } else {
-                syntheticState = AssetStateEnum.OBSERVING;
-            }
-            String snapshot = assetStateService.buildSnapshotAtDecision(symbol, analysisId != null ? analysisId : "",
-                    syntheticState, confused.getConfusedScore(), multiTfConvergence);
+            AssetStateEnum previousState = parseAssetState(confused.getPreviousState(), AssetStateEnum.OBSERVING);
+            AssetStateEnum syntheticState = parseAssetState(confused.getNextState(),
+                    worthOpening ? AssetStateEnum.CANDIDATE : AssetStateEnum.OBSERVING);
+            String snapshot = assetStateService.buildSnapshotAtDecision(
+                    symbol,
+                    analysisId != null ? analysisId : "",
+                    previousState,
+                    syntheticState,
+                    confused.getConfusedScore(),
+                    confused.getConfusedLowStreak(),
+                    confused.isDirectionalPushBlocked(),
+                    multiTfConvergence);
 
             String riskLevelLabel;
-            if (confused.getConfusedScore() >= confusedHighMinScore || finalScore < highFinalScoreBelow) {
+            if (confused.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD
+                    || finalScore < highFinalScoreBelow
+                    || "HIGH".equalsIgnoreCase(conflict.getRiskAdjustment())) {
                 riskLevelLabel = "HIGH";
             } else if (finalScore >= riskTierLowMinScore) {
                 riskLevelLabel = "LOW";
@@ -222,7 +224,7 @@ public class DecisionEngineService {
                         maxHigh = maxHigh == null ? high : maxHigh.max(high);
                     }
                 }
-                if ("BULLISH".equals(finalBias)) {
+                if ("BULLISH".equals(ruleMarketBias)) {
                     pushInvalidPriceBelow = minLow;
                     pushInvalidationSummary = "结构失效：当前价低于近端 1m 摆动低点";
                 } else {
@@ -234,21 +236,30 @@ public class DecisionEngineService {
             // ==================== 4. 输出最终决策 ====================
             DecisionBundleVO decision = new DecisionBundleVO();
             decision.setDecisionId(decisionId);
-            decision.setMarketBiasHierarchy(finalBias);
+            decision.setMarketBiasHierarchy(ruleMarketBias);
             decision.setTradeType("SPOT");
-            decision.setConfidenceLevel(confidenceLevel);
+            decision.setConfidenceLevel(conflict.getAdjustedConfidence() != null
+                    ? conflict.getAdjustedConfidence()
+                    : confidenceLevel);
             decision.setRiskLevel(riskLevelLabel);
             decision.setActionPriority(finalScore > actionPriorityHighMinScoreExclusive ? "HIGH" : "MEDIUM");
             decision.setConclusionSummary(conclusion);
-            decision.setIsWorthOpening(worthOpening);
+            decision.setIsWorthOpening(worthOpening && !confused.isDirectionalPushBlocked());
             decision.setMultiTfConvergence(multiTfLabel);
             decision.setAiRoleResults(
-                "Grok: " + grokOpinion + " | Gemini: " + geminiReview + " | GPT-5.4: 最终裁决 " + finalBias + " (Score=" + finalScore + ")");
+                "Grok advisory: " + grokOpinion + " | Gemini advisory: " + geminiReview
+                        + " | GPT advisory: rule-layer base direction preserved as "
+                        + ruleMarketBias + " (Score=" + finalScore + ")");
             decision.setReviewReasons(reviewJson);
             decision.setAiConflictLevel(conflict.getLevel() != null ? conflict.getLevel().name() : null);
             decision.setAiConflictScore(conflict.getAiConflictScore());
             decision.setAiPlanMode(conflict.getPlanMode());
             decision.setConfusedScore(confused.getConfusedScore());
+            decision.setConfusedLowStreak(confused.getConfusedLowStreak());
+            decision.setDirectionalPushBlocked(confused.isDirectionalPushBlocked());
+            decision.setDirectionalPushBlockReason(confused.isDirectionalPushBlocked()
+                    ? "CONFUSED_SCORE_BLOCK_THRESHOLD"
+                    : null);
             decision.setAssetState(syntheticState);
             decision.setAssetStateSnapshot(snapshot);
             decision.setMultiTimeframeAligned(multiTfConvergence);
@@ -259,7 +270,7 @@ public class DecisionEngineService {
             decision.setPushInvalidationSummary(pushInvalidationSummary);
 
             logger.info("[AI决策] 生成完成 → {} | ConfidenceLevel = {} | Score = {} | MultiTF = {} | Worth Open: {} | aiConflict={}/{} | confused={}",
-                    finalBias, confidenceLevel, finalScore, decision.getMultiTfConvergence(), worthOpening,
+                    ruleMarketBias, decision.getConfidenceLevel(), finalScore, decision.getMultiTfConvergence(), decision.getIsWorthOpening(),
                     decision.getAiConflictLevel(), decision.getAiConflictScore(), decision.getConfusedScore());
 
             return decision;
@@ -286,6 +297,17 @@ public class DecisionEngineService {
             return Integer.parseInt(raw);
         } catch (Exception ignored) {
             return defaultVal;
+        }
+    }
+
+    private static AssetStateEnum parseAssetState(String raw, AssetStateEnum fallback) {
+        if (raw == null || raw.isBlank()) {
+            return fallback;
+        }
+        try {
+            return AssetStateEnum.valueOf(raw.trim().toUpperCase());
+        } catch (Exception e) {
+            return fallback;
         }
     }
 }

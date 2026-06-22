@@ -13,6 +13,10 @@ public class DecisionContext {
     private Boolean worthOpening;
     private boolean hasRuleBaseOutput = true;
     private boolean gptConsistentWithRule = true;
+    private boolean geminiConsistentWithRule = true;
+    private boolean grokConsistentWithRule = true;
+    private Integer aiObjectionCount = 0;
+    private Integer aiSupportCount = 3;
     private Integer driverConflictScore;
     private Integer executionInstabilityScore;
     private Integer microstructureTrapScore;
@@ -85,6 +89,38 @@ public class DecisionContext {
 
     public void setGptConsistentWithRule(boolean gptConsistentWithRule) {
         this.gptConsistentWithRule = gptConsistentWithRule;
+    }
+
+    public boolean isGeminiConsistentWithRule() {
+        return geminiConsistentWithRule;
+    }
+
+    public void setGeminiConsistentWithRule(boolean geminiConsistentWithRule) {
+        this.geminiConsistentWithRule = geminiConsistentWithRule;
+    }
+
+    public boolean isGrokConsistentWithRule() {
+        return grokConsistentWithRule;
+    }
+
+    public void setGrokConsistentWithRule(boolean grokConsistentWithRule) {
+        this.grokConsistentWithRule = grokConsistentWithRule;
+    }
+
+    public Integer getAiObjectionCount() {
+        return aiObjectionCount;
+    }
+
+    public void setAiObjectionCount(Integer aiObjectionCount) {
+        this.aiObjectionCount = aiObjectionCount;
+    }
+
+    public Integer getAiSupportCount() {
+        return aiSupportCount;
+    }
+
+    public void setAiSupportCount(Integer aiSupportCount) {
+        this.aiSupportCount = aiSupportCount;
     }
 
     public Integer getDriverConflictScore() {

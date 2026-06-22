@@ -78,10 +78,29 @@ class AssetStateServiceImplTest {
 
     @Test
     void persistAuthoritativeState_trimsSymbolBeforeUpsert() {
-        service.persistAuthoritativeState(" SOLUSDT ", AssetStateEnum.CANDIDATE, 12, "tr-9");
+        service.persistAuthoritativeState(" SOLUSDT ", AssetStateEnum.CANDIDATE, 12, 1, "tr-9");
 
         ArgumentCaptor<AssetStateDO> captor = ArgumentCaptor.forClass(AssetStateDO.class);
         verify(assetStateMapper).mergeUpsertCore(captor.capture());
         assertThat(captor.getValue().getSymbol()).isEqualTo("SOLUSDT");
+        assertThat(captor.getValue().getConfusedLowStreak()).isEqualTo(1);
+    }
+
+    @Test
+    void buildSnapshotAtDecision_includesP12TransitionFields() {
+        String json = service.buildSnapshotAtDecision(
+                "BTCUSDT",
+                "ana-9",
+                AssetStateEnum.CONFUSED,
+                AssetStateEnum.COOLING,
+                54,
+                0,
+                false,
+                true);
+
+        assertThat(json).contains("\"previousState\":\"CONFUSED\"");
+        assertThat(json).contains("\"nextState\":\"COOLING\"");
+        assertThat(json).contains("\"confusedLowStreak\":0");
+        assertThat(json).contains("\"directionalPushBlocked\":false");
     }
 }

@@ -14,7 +14,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,17 +46,19 @@ class DecisionEngineServiceTest {
                 ruleConfigService
         );
         when(ruleConfigService.getRuleConfigMap()).thenReturn(Collections.emptyMap());
-        when(assetStateService.buildSnapshotAtDecision(anyString(), anyString(), any(AssetStateEnum.class), any(Integer.class), any(Boolean.class)))
+        when(assetStateService.buildSnapshotAtDecision(
+                anyString(), anyString(), any(AssetStateEnum.class), any(AssetStateEnum.class),
+                anyInt(), anyInt(), anyBoolean(), anyBoolean()))
                 .thenReturn("{\"state\":\"TEST\"}");
-        when(aiConflictResolverService.resolve(any(DecisionContext.class)))
+        lenient().when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
                         AiConflictLevelEnum.LEVEL_1_CONSISTENT,
                         "BULLISH",
                         "HIGH",
-                        "NORMAL",
+                        "CONFIRM",
                         20
                 ));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        lenient().when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, false, false, "none"));
         when(marketDataFetcher.fetchKlines(anyString(), anyString(), any(Integer.class)))
                 .thenAnswer(invocation -> "1m".equals(invocation.getArgument(1))
@@ -118,11 +123,110 @@ class DecisionEngineServiceTest {
         assertThat(dq85.getReviewReasons()).doesNotContain("DATA_QUALITY_INSUFFICIENT");
     }
 
+    @Test
+    void makeDecision_marketBiasHierarchyAlwaysUsesRuleLayerBaseDirection() {
+        when(marketDataFetcher.fetchKlines(anyString(), anyString(), any(Integer.class)))
+                .thenReturn(bearishKlines());
+        when(aiConflictResolverService.resolve(any(DecisionContext.class)))
+                .thenReturn(new AiConflictResult(
+                        AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                        "BEARISH",
+                        "LOW",
+                        "HIGH",
+                        "CONFUSED",
+                        90,
+                        3,
+                        false,
+                        90
+                ));
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(20, "OBSERVING", "OBSERVING",
+                        false, false, 0, false, "none", "base"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-11", 85, 65);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BEARISH");
+        assertThat(decision.getAiRoleResults()).contains("rule-layer base direction preserved as BEARISH");
+        assertThat(decision.getAiRoleResults()).doesNotContain("最终裁决");
+    }
+
+    @Test
+    void makeDecision_aiDisagreementDoesNotDirectlyChangeAssetState() {
+        when(aiConflictResolverService.resolve(any(DecisionContext.class)))
+                .thenReturn(new AiConflictResult(
+                        AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                        "BULLISH",
+                        "LOW",
+                        "HIGH",
+                        "CONFUSED",
+                        95,
+                        3,
+                        false,
+                        95
+                ));
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(20, "OBSERVING", "OBSERVING",
+                        false, false, 0, false, "none", "base"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-12", 85, 65);
+
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(decision.getAiPlanMode()).isEqualTo("CONFUSED");
+    }
+
+    @Test
+    void makeDecision_confusedScore70EntersConfused() {
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(70, "OBSERVING", "CONFUSED",
+                        true, false, 0, false, "threshold", "enter"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-13", 85, 65);
+
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(decision.getConfusedScore()).isEqualTo(70);
+        assertThat(decision.isDirectionalPushBlocked()).isFalse();
+    }
+
+    @Test
+    void makeDecision_confusedScore85BlocksDirectionalPushAndWorthOpening() {
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
+                        true, false, 0, true, "threshold", "block"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-14", 85, 65);
+
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(decision.isDirectionalPushBlocked()).isTrue();
+        assertThat(decision.getDirectionalPushBlockReason()).isEqualTo("CONFUSED_SCORE_BLOCK_THRESHOLD");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+    }
+
+    @Test
+    void makeDecision_secondLowCycleExitsToCoolingNotTriggered() {
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(54, "CONFUSED", "COOLING",
+                        false, true, 0, false, "low", "exit"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-15", 85, 65);
+
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.COOLING);
+        assertThat(decision.getAssetState()).isNotEqualTo(AssetStateEnum.TRIGGERED);
+        assertThat(decision.getAssetState()).isNotEqualTo(AssetStateEnum.WAITING_TRIGGER);
+    }
+
     private static List<String[]> bullishKlines() {
         return List.of(
                 new String[]{"0", "100", "110", "95", "108"},
                 new String[]{"0", "108", "112", "107", "110"},
                 new String[]{"0", "110", "118", "109", "117"}
+        );
+    }
+
+    private static List<String[]> bearishKlines() {
+        return List.of(
+                new String[]{"0", "110", "112", "105", "108"},
+                new String[]{"0", "108", "109", "101", "104"},
+                new String[]{"0", "104", "105", "98", "100"}
         );
     }
 }
