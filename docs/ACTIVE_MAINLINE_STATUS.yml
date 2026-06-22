@@ -12,17 +12,17 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P0-5 PositionMonitorService DONE candidate"
-active_block_cn: "P0-5 持仓监控服务 DONE candidate"
+active_block: "P0-6 Review integrates UserPosition DONE candidate"
+active_block_cn: "P0-6 复盘接入用户手动持仓 DONE candidate"
 
-next_required_action: "Review and merge-gate the P0-5 PositionMonitorService B-risk PR; do not start P0-6 before merged-main effectivity."
-next_business_phase: "P0-6 Review integrates UserPosition"
+next_required_action: "Review and merge-gate the P0-6 Review integrates UserPosition B-risk PR; do not start P1-1 before merged-main effectivity."
+next_business_phase: "P1-1 PushRecheck semantic hardening"
 next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "DERIVED_BY_V1_STATE"
-current_branch: "p0-5-position-monitor-service-full-implementation"
+current_branch: "p0-6-review-user-position-integration"
 current_package_pr: "DERIVED_BY_V1_STATE"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -43,9 +43,12 @@ p0_4_started: true
 p0_4_status: "DONE on merged main"
 p0_4_effective: true
 p0_5_started: true
-p0_5_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
-p0_5_effective: false
-p0_6_allowed: false
+p0_5_status: "DONE on merged main"
+p0_5_effective: true
+p0_6_started: true
+p0_6_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
+p0_6_effective: false
+p1_1_allowed: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -57,8 +60,9 @@ notes:
   - "P0-2 ExecutionPlan Source Gate is effective on merged main."
   - "P0-3 AccountRisk integrates UserPosition is effective on merged main."
   - "P0-4 PositionMonitorLog is effective on merged main."
-  - "P0-5 PositionMonitorService is now the active branch candidate."
-  - "P0-5 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
-  - "P0-6 remains blocked while P0-5 is only a branch candidate."
-  - "No dashboard UI, auto-trading, order execution, ReviewSummary, P0-6, or PR #1004 code is part of this package."
+  - "P0-5 PositionMonitorService is effective on merged main."
+  - "P0-6 Review integrates UserPosition is now the active branch candidate."
+  - "P0-6 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
+  - "P1-1 remains blocked while P0-6 is only a branch candidate."
+  - "No UserPosition mutation, ExecutionPlan mutation, PositionMonitor execution, automatic rule application, auto-trading, order execution, Dashboard UI, P1-1, or PR #1004 code is part of this package."
   - "Review-only slice count is no longer a delivery completion standard."

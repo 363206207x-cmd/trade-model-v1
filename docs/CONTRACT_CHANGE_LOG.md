@@ -154,3 +154,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p0-6-review-user-position-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P0-6 Review integrates UserPosition B-risk implementation package.
+Before: P0-6 Review integrates UserPosition was NOT_STARTED/PARTIAL with ReviewController, ReviewService, ReviewResultMapper, ReviewAggregateService, and PositionMonitorLog read assets, but no closed UserPosition review adapter, real user-position ReviewSummary, execution deviation, warning timeliness, ignored-warning judgment, or manual rule feedback endpoint tied to UserPosition.
+After: P0-6 is a branch DONE candidate with UserPositionReviewAdapter, closed UserPosition ReviewSummary, exact ExecutionPlan read, real user entry / close / stop-loss / take-profit / quantity / leverage reads, all PositionMonitorLog timeline reads, win / loss / breakeven calculation, execution deviation, plan invalidation, warning timeliness, ignored warning, manual rule feedback through existing ReviewService and rule-version audit owners, safety fields, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

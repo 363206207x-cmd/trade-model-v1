@@ -101,6 +101,14 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
     }
 
     @Override
+    public List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId) {
+        Long id = requirePositiveId(positionId, "position_id");
+        return positionMonitorLogMapper.listAllByPositionIdForReview(id).stream()
+                .map(PositionMonitorLogServiceImpl::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<PositionMonitorLogDTO> listByAnalysisId(String analysisId, Integer limit) {
         String id = requireText(analysisId, "analysis_id");
         int sanitizedLimit = sanitizeLimit(limit);

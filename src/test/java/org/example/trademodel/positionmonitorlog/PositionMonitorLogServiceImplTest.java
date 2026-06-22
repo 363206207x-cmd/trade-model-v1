@@ -162,6 +162,21 @@ class PositionMonitorLogServiceImplTest {
                 .hasMessageContaining("limit");
     }
 
+    @Test
+    void reviewTimelineQueryReturnsAllLogsInMapperOrderWithSafetyDtos() {
+        PositionMonitorLogDO first = logRow(1L, 7L, "ana-p0-6", "LOGIC_WEAKENED", "MANUAL_REVIEW",
+                LocalDateTime.of(2026, 6, 22, 8, 30));
+        PositionMonitorLogDO second = logRow(2L, 7L, "ana-p0-6", "PLAN_INVALIDATED", "RECHECK_PLAN",
+                LocalDateTime.of(2026, 6, 22, 9, 30));
+        when(positionMonitorLogMapper.listAllByPositionIdForReview(7L)).thenReturn(List.of(first, second));
+
+        List<PositionMonitorLogDTO> logs = service.listAllByPositionIdForReview(7L);
+
+        assertThat(logs).extracting(PositionMonitorLogDTO::getLogId).containsExactly(1L, 2L);
+        assertSafetyFields(logs.get(0));
+        verify(positionMonitorLogMapper).listAllByPositionIdForReview(7L);
+    }
+
     private static RecordPositionMonitorLogCommand command(String logicStatus, String riskLevel, String suggestedAction) {
         RecordPositionMonitorLogCommand command = new RecordPositionMonitorLogCommand();
         command.setPositionId(7L);
