@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     plan_id VARCHAR(64) PRIMARY KEY,
     analysis_id VARCHAR(64) NOT NULL,
     plan_mode VARCHAR(32) NOT NULL DEFAULT 'ADVISORY',
+    execution_plan_status VARCHAR(32) NOT NULL DEFAULT 'INCOMPLETE',
+    source_gate_status VARCHAR(32) NOT NULL DEFAULT 'INCOMPLETE',
+    source_gate_complete BOOLEAN NOT NULL DEFAULT FALSE,
+    source_missing_reasons TEXT,
+    source_blocker_reasons TEXT,
+    source_completeness_summary TEXT,
     recommended_action VARCHAR(50),
     entry_zone VARCHAR(100),
     stop_loss VARCHAR(100),
@@ -72,7 +78,27 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     position_suggestion VARCHAR(100),
     account_risk_json TEXT,
     invalid_condition TEXT,
-    create_time TIMESTAMP
+    manual_review_required BOOLEAN NOT NULL DEFAULT TRUE,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_executable BOOLEAN NOT NULL DEFAULT TRUE,
+    not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    create_time TIMESTAMP,
+    CONSTRAINT ck_tm_execution_plan_status CHECK (
+        execution_plan_status IN ('VALID', 'INCOMPLETE', 'BLOCKED', 'REVIEW_ONLY', 'INVALID')
+    ),
+    CONSTRAINT ck_tm_execution_plan_source_gate_status CHECK (
+        source_gate_status IN ('VALID', 'INCOMPLETE', 'BLOCKED', 'REVIEW_ONLY', 'INVALID')
+    ),
+    CONSTRAINT ck_tm_execution_plan_safety_flags CHECK (
+        manual_review_required = TRUE
+        AND not_trade_instruction = TRUE
+        AND not_executable = TRUE
+        AND not_auto_trading = TRUE
+        AND not_order_execution = TRUE
+        AND not_user_position_creation = TRUE
+    )
 );
 
 CREATE TABLE IF NOT EXISTS tm_market_environment_snapshot (

@@ -34,6 +34,7 @@ public class BoundaryCandidateDTO {
         requireNonEmpty(takeProfitLevels, "takeProfitLevels");
         requireNonNull(sourceFields, "sourceFields");
         requireNonNull(dataQualityScore, "dataQualityScore");
+        BoundaryCandidateSourceGate.requireValid(entry, stop, takeProfitLevels, sourceFields);
 
         BoundaryCandidateDTO candidate = new BoundaryCandidateDTO();
         candidate.setSymbol(symbol);

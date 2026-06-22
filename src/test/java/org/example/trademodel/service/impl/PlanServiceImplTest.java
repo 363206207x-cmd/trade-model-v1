@@ -41,9 +41,17 @@ class PlanServiceImplTest {
         assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_INCOMPLETE);
         assertThat(plan.getSourceTraceStatus()).isEqualTo(ExecutionPlanVO.READINESS_INCOMPLETE);
         assertThat(plan.getSourceTraceComplete()).isFalse();
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        assertThat(plan.getSourceGateComplete()).isFalse();
+        assertThat(plan.getMissingSourceReasons()).contains("sourceTrace missing");
         assertThat(plan.getNotExecutableReason()).isEqualTo("SOURCE_TRACE_MISSING");
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
+        assertThat(plan.getNotExecutable()).isTrue();
+        assertThat(plan.getNotAutoTrading()).isTrue();
+        assertThat(plan.getNotOrderExecution()).isTrue();
+        assertThat(plan.getNotUserPositionCreation()).isTrue();
     }
 
     @Test
@@ -60,6 +68,9 @@ class PlanServiceImplTest {
         assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
         assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_INCOMPLETE);
         assertThat(plan.getSourceTraceComplete()).isFalse();
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        assertThat(plan.getMissingSourceReasons()).contains("sourceTrace missingFields present");
         assertThat(plan.getNotExecutableReason()).isEqualTo("SOURCE_TRACE_INCOMPLETE");
     }
 
@@ -74,9 +85,17 @@ class PlanServiceImplTest {
         assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_READY_REVIEW_ONLY);
         assertThat(plan.getSourceTraceStatus()).isEqualTo("VALID");
         assertThat(plan.getSourceTraceComplete()).isTrue();
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+        assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+        assertThat(plan.getSourceGateComplete()).isTrue();
+        assertThat(plan.getSourceCompletenessSummary()).contains("source gate VALID");
         assertThat(plan.getNotExecutableReason()).isEqualTo("MANUAL_REVIEW_REQUIRED");
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
+        assertThat(plan.getNotExecutable()).isTrue();
+        assertThat(plan.getNotAutoTrading()).isTrue();
+        assertThat(plan.getNotOrderExecution()).isTrue();
+        assertThat(plan.getNotUserPositionCreation()).isTrue();
     }
 
     @Test

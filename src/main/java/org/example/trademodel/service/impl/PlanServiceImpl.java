@@ -1,5 +1,7 @@
 package org.example.trademodel.service.impl;
 
+import org.example.trademodel.dto.planboundary.ExecutionPlanSourceGate;
+import org.example.trademodel.dto.planboundary.ExecutionPlanSourceGateResultDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.PlanService;
@@ -20,6 +22,7 @@ public class PlanServiceImpl implements PlanService {
     private static final String SOURCE_TRACE_MISSING = "SOURCE_TRACE_MISSING";
     private static final String SOURCE_TRACE_INCOMPLETE = "SOURCE_TRACE_INCOMPLETE";
     private static final String SOURCE_TRACE_WATCH_ONLY = "SOURCE_TRACE_WATCH_ONLY";
+    private static final String SOURCE_TRACE_BLOCKED = "SOURCE_TRACE_BLOCKED";
     private static final String SOURCE_TRACE_SAFE_FAIL_CLOSED = "SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY";
     private static final String MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED";
     private static final String RISK_ACTION_GUARD_MISSING = "RISK_ACTION_GUARD_MISSING";
@@ -90,7 +93,23 @@ public class PlanServiceImpl implements PlanService {
     private static void applySourceTraceReadiness(ExecutionPlanVO plan, SourceTraceDTO sourceTrace) {
         plan.setManualReviewRequired(true);
         plan.setNotTradeInstruction(true);
+        plan.setNotExecutable(true);
+        plan.setNotAutoTrading(true);
+        plan.setNotOrderExecution(true);
+        plan.setNotUserPositionCreation(true);
         plan.setPlanMode(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+
+        ExecutionPlanSourceGateResultDTO sourceGate = ExecutionPlanSourceGate.validate(sourceTrace);
+        applySourceGateResult(plan, sourceGate);
+
+        if (sourceGate.isValid()) {
+            plan.setSourceTraceComplete(true);
+            plan.setSourceTraceStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_READY_REVIEW_ONLY);
+            plan.setNotExecutableReason(MANUAL_REVIEW_REQUIRED);
+            return;
+        }
+
         if (sourceTrace == null) {
             plan.setSourceTraceComplete(false);
             plan.setSourceTraceStatus(ExecutionPlanVO.READINESS_INCOMPLETE);
@@ -98,14 +117,20 @@ public class PlanServiceImpl implements PlanService {
             plan.setNotExecutableReason(SOURCE_TRACE_MISSING);
             return;
         }
-        if (sourceTrace.hasRequiredBoundarySources()) {
-            plan.setSourceTraceComplete(true);
-            plan.setSourceTraceStatus("VALID");
-            plan.setReadinessStatus(ExecutionPlanVO.READINESS_READY_REVIEW_ONLY);
-            plan.setNotExecutableReason(MANUAL_REVIEW_REQUIRED);
+        plan.setSourceTraceComplete(false);
+        if (ExecutionPlanSourceGateResultDTO.STATUS_REVIEW_ONLY.equals(sourceGate.getStatus())) {
+            plan.setSourceTraceStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_REVIEW_ONLY);
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
+            plan.setNotExecutableReason(SOURCE_TRACE_WATCH_ONLY);
             return;
         }
-        plan.setSourceTraceComplete(false);
+        if (ExecutionPlanSourceGateResultDTO.STATUS_BLOCKED.equals(sourceGate.getStatus())
+                || ExecutionPlanSourceGateResultDTO.STATUS_INVALID.equals(sourceGate.getStatus())) {
+            plan.setSourceTraceStatus(sourceGate.getStatus());
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
+            plan.setNotExecutableReason(SOURCE_TRACE_BLOCKED);
+            return;
+        }
         if (sourceTrace.getFallbackStatus() == SourceTraceFallbackStatusEnum.WATCH_ONLY) {
             plan.setSourceTraceStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
             plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
@@ -121,6 +146,21 @@ public class PlanServiceImpl implements PlanService {
         plan.setSourceTraceStatus(ExecutionPlanVO.READINESS_INCOMPLETE);
         plan.setReadinessStatus(ExecutionPlanVO.READINESS_INCOMPLETE);
         plan.setNotExecutableReason(SOURCE_TRACE_INCOMPLETE);
+    }
+
+    private static void applySourceGateResult(ExecutionPlanVO plan, ExecutionPlanSourceGateResultDTO sourceGate) {
+        plan.setExecutionPlanStatus(sourceGate.getStatus());
+        plan.setSourceGateStatus(sourceGate.getStatus());
+        plan.setSourceGateComplete(sourceGate.isSourceComplete());
+        plan.setSourceCompletenessSummary(sourceGate.getSourceCompletenessSummary());
+        plan.setMissingSourceReasons(sourceGate.getMissingSourceReasons());
+        plan.setSourceBlockerReasons(sourceGate.getBlockerReasons());
+        plan.setManualReviewRequired(sourceGate.isManualReviewRequired());
+        plan.setNotTradeInstruction(sourceGate.isNotTradeInstruction());
+        plan.setNotExecutable(sourceGate.isNotExecutable());
+        plan.setNotAutoTrading(sourceGate.isNotAutoTrading());
+        plan.setNotOrderExecution(sourceGate.isNotOrderExecution());
+        plan.setNotUserPositionCreation(sourceGate.isNotUserPositionCreation());
     }
 
     private static void applyRiskActionGuardReadiness(
