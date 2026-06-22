@@ -36,6 +36,9 @@ public interface UserPositionMapper {
             "ORDER BY opened_at DESC, id DESC")
     List<UserPositionDO> listOpenPositions();
 
+    @Select("SELECT COUNT(*) FROM tm_user_position WHERE status = 'CLOSED'")
+    int countClosedPositions();
+
     @Update("UPDATE tm_user_position SET " +
             "status = 'CLOSED', closed_at = #{closedAt}, close_price = #{closePrice}, close_reason = #{closeReason}, " +
             "updated_at = #{updatedAt} " +

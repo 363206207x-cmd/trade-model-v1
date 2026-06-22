@@ -6,6 +6,8 @@ import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.risk.UserPositionRiskAdapter;
+import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
@@ -26,6 +28,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +44,8 @@ class PushRecheckServiceImplTest {
     private PushRecheckLogMapper pushRecheckLogMapper;
     @Mock
     private PushRecheckDispatchConfigService dispatchConfigService;
+    @Mock
+    private UserPositionRiskAdapter userPositionRiskAdapter;
 
     private PushRecheckServiceImpl service;
 
@@ -50,7 +55,9 @@ class PushRecheckServiceImplTest {
                 pushSnapshotMapper,
                 accountRiskSnapshotMapper,
                 pushRecheckLogMapper,
-                dispatchConfigService);
+                dispatchConfigService,
+                userPositionRiskAdapter);
+        lenient().when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
     }
 
     @Test
@@ -192,6 +199,50 @@ class PushRecheckServiceImplTest {
 
         RecheckResult r = service.recheck(8L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_EXECUTABLE);
+    }
+
+    @Test
+    void pushRecheckConsumesAllowedUserPositionRiskResultReadOnly() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setConfusedScoreSnapshot(10);
+        s.setDataQualityScoreSnapshot(88);
+        when(pushSnapshotMapper.selectByPushId(81L)).thenReturn(s);
+        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+
+        RecheckResult r = service.recheck(81L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_EXECUTABLE);
+        assertThat(r.isValid()).isTrue();
+        verify(userPositionRiskAdapter).currentRisk();
+
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getCurrentAccountRiskAllowed()).isTrue();
+    }
+
+    @Test
+    void pushRecheckConsumesBlockedUserPositionRiskResultFailClosed() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setConfusedScoreSnapshot(10);
+        s.setDataQualityScoreSnapshot(88);
+        when(pushSnapshotMapper.selectByPushId(82L)).thenReturn(s);
+        UserPositionRiskResult blocked = UserPositionRiskResult.failClosed("HIGH_LEVERAGE_RISK");
+        when(userPositionRiskAdapter.currentRisk()).thenReturn(blocked);
+
+        RecheckResult r = service.recheck(82L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.RISK_BLOCKED);
+        assertThat(r.isValid()).isFalse();
+        verify(userPositionRiskAdapter).currentRisk();
+
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getCurrentAccountRiskAllowed()).isFalse();
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("USER_POSITION_RISK_BLOCKED");
+        assertThat(cap.getValue().getFailReasonJson()).contains("HIGH_LEVERAGE_RISK");
+        verify(pushSnapshotMapper).updatePushStatus(82L, "RECHECK_RISK_BLOCKED");
     }
 
     @Test
