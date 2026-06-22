@@ -2,6 +2,8 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
@@ -29,14 +31,17 @@ public class ReviewController {
     private final ReviewService reviewService;
     private final ReviewAggregateService reviewAggregateService;
     private final RuleVersionLogQueryService ruleVersionLogQueryService;
+    private final PositionMonitorLogService positionMonitorLogService;
 
     @Autowired
     public ReviewController(ReviewService reviewService,
                             ReviewAggregateService reviewAggregateService,
-                            RuleVersionLogQueryService ruleVersionLogQueryService) {
+                            RuleVersionLogQueryService ruleVersionLogQueryService,
+                            PositionMonitorLogService positionMonitorLogService) {
         this.reviewService = reviewService;
         this.reviewAggregateService = reviewAggregateService;
         this.ruleVersionLogQueryService = ruleVersionLogQueryService;
+        this.positionMonitorLogService = positionMonitorLogService;
     }
 
     /**
@@ -100,6 +105,21 @@ public class ReviewController {
                 analysisId, ruleVersion, operator, rollbackFlag, errorType,
                 changeCategory, keyword, createdAtFrom, createdAtTo, limit);
         return ResponseEntity.ok(ApiResponse.success(rows));
+    }
+
+    /**
+     * P0-4：Review 只读查询持仓监控日志，不触发监控运行或复盘摘要生成。
+     */
+    @GetMapping("/positions/{positionId}/monitor-logs")
+    public ResponseEntity<ApiResponse<java.util.List<PositionMonitorLogDTO>>> listPositionMonitorLogs(
+            @PathVariable Long positionId,
+            @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        try {
+            return ResponseEntity.ok(ApiResponse.success(positionMonitorLogService.listByPositionId(positionId, limit)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.badRequest(e.getMessage()));
+        }
     }
 
     /**

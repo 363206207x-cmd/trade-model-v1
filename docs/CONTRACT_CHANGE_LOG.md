@@ -126,3 +126,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p0-4-position-monitor-log-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P0-4 PositionMonitorLog B-risk implementation package.
+Before: P0-4 PositionMonitorLog was NOT_STARTED with no `tm_position_monitor_log`, DO, DTO, Mapper, Service, Review query path, or monitor-log tests.
+After: P0-4 is a branch DONE candidate with monitor-log persistence, one-log-per-recordMonitorRun service behavior, immutable read queries, Review read-only monitor-log query path, safety fields, forbidden action guardrails, and tests for normal, weakened, invalidated, and high-risk scenarios. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

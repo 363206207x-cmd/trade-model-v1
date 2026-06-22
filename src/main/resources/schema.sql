@@ -251,6 +251,36 @@ CREATE INDEX IF NOT EXISTS idx_tm_user_position_status_opened_at
 CREATE INDEX IF NOT EXISTS idx_tm_user_position_asset_status
     ON tm_user_position(asset_symbol, status);
 
+CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
+    log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    position_id BIGINT NOT NULL,
+    analysis_id VARCHAR(64) NOT NULL,
+    execution_plan_id VARCHAR(64),
+    current_price DECIMAL(20, 8) NOT NULL,
+    logic_status VARCHAR(32) NOT NULL,
+    risk_level VARCHAR(32) NOT NULL,
+    suggested_action VARCHAR(32) NOT NULL,
+    reason VARCHAR(1024),
+    evidence_snapshot TEXT,
+    score_snapshot TEXT,
+    decision_snapshot TEXT,
+    risk_snapshot TEXT,
+    trace_id VARCHAR(64),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_position_monitor_log_price CHECK (current_price > 0),
+    CONSTRAINT ck_tm_position_monitor_log_logic_status CHECK (
+        logic_status IN ('LOGIC_VALID', 'LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'HIGH_RISK')
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_suggested_action CHECK (
+        suggested_action IN ('HOLD', 'MANUAL_REVIEW', 'RECHECK_PLAN', 'RISK_REVIEW')
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_position_created
+    ON tm_position_monitor_log(position_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_analysis_created
+    ON tm_position_monitor_log(analysis_id, created_at);
+
 -- Push 快照 / 二次校验（与 tm_analysis_run.analysis_id 类型一致：VARCHAR(64)）
 -- 下列 CLOB JSON 列由 /api/review/aggregate 原样透出至复盘页文本展示，应用层不对其做解析或折叠 UI。
 CREATE TABLE IF NOT EXISTS tm_push_snapshot (
