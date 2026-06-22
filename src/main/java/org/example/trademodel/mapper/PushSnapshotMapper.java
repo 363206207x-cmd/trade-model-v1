@@ -79,4 +79,10 @@ public interface PushSnapshotMapper {
     int updatePushStatus(
             @Param("pushId") Long pushId,
             @Param("pushStatus") String pushStatus);
+
+    @Update("UPDATE tm_push_snapshot SET push_status = 'RECHECK_INVALIDATED' "
+            + "WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol} "
+            + "AND (push_status = 'CAPTURED' OR push_status = 'RECHECK_REVIEW_WAITING' "
+            + "OR push_status = 'RECHECK_VALID_WAITING')")
+    int invalidatePendingBySymbolForHotReset(@Param("normalizedSymbol") String normalizedSymbol);
 }

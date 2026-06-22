@@ -25,6 +25,10 @@ public class ExecutionPlanDO {
     private Boolean notAutoTrading;
     private Boolean notOrderExecution;
     private Boolean notUserPositionCreation;
+    private Boolean needsRevalidation;
+    private String revalidationReason;
+    private String hotResetEventId;
+    private LocalDateTime revalidationRequiredAt;
     private LocalDateTime createTime;
 
     public String getPlanId() { return planId; }
@@ -73,6 +77,14 @@ public class ExecutionPlanDO {
     public void setNotOrderExecution(Boolean notOrderExecution) { this.notOrderExecution = notOrderExecution; }
     public Boolean getNotUserPositionCreation() { return notUserPositionCreation; }
     public void setNotUserPositionCreation(Boolean notUserPositionCreation) { this.notUserPositionCreation = notUserPositionCreation; }
+    public Boolean getNeedsRevalidation() { return needsRevalidation; }
+    public void setNeedsRevalidation(Boolean needsRevalidation) { this.needsRevalidation = needsRevalidation; }
+    public String getRevalidationReason() { return revalidationReason; }
+    public void setRevalidationReason(String revalidationReason) { this.revalidationReason = revalidationReason; }
+    public String getHotResetEventId() { return hotResetEventId; }
+    public void setHotResetEventId(String hotResetEventId) { this.hotResetEventId = hotResetEventId; }
+    public LocalDateTime getRevalidationRequiredAt() { return revalidationRequiredAt; }
+    public void setRevalidationRequiredAt(LocalDateTime revalidationRequiredAt) { this.revalidationRequiredAt = revalidationRequiredAt; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }

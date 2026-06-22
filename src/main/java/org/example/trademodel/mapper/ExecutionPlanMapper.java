@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface ExecutionPlanMapper {
@@ -18,4 +19,15 @@ public interface ExecutionPlanMapper {
 
     @Select("SELECT * FROM tm_execution_plan WHERE plan_id = #{planId} ORDER BY create_time DESC LIMIT 1")
     ExecutionPlanDO selectByPlanId(@Param("planId") String planId);
+
+    @Update("UPDATE tm_execution_plan SET needs_revalidation = TRUE, revalidation_reason = #{reason}, "
+            + "hot_reset_event_id = #{eventId}, revalidation_required_at = #{requiredAt} "
+            + "WHERE analysis_id = #{analysisId} OR analysis_id IN ("
+            + "SELECT analysis_id FROM tm_decision_result WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol})")
+    int markNeedsRevalidationForHotReset(
+            @Param("analysisId") String analysisId,
+            @Param("normalizedSymbol") String normalizedSymbol,
+            @Param("eventId") String eventId,
+            @Param("reason") String reason,
+            @Param("requiredAt") java.time.LocalDateTime requiredAt);
 }

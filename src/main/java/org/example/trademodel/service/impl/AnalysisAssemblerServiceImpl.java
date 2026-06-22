@@ -8,6 +8,7 @@ import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.entity.*;
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.enums.HotResetEventTypeEnum;
 import org.example.trademodel.mapper.*;
 import org.example.trademodel.service.*;
 import org.example.trademodel.vo.*;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -202,6 +205,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                                 String marketEnvSourceType) {
         System.out.println("落库开始 - analysisId = " + analysis.getAnalysisId());
         String decisionInvalidCondition = null;
+        HotResetCommand hotResetCommand = null;
+        boolean hotWouldReset = false;
         try {
             // 1. AnalysisRun
             AnalysisRunDO run = new AnalysisRunDO();
@@ -295,7 +300,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 decisionResultMapper.insert(ddo);
 
                 int confused = decision.getConfusedScore() != null ? decision.getConfusedScore() : 0;
-                boolean hotWouldReset = hotResetService.shouldTriggerHotReset(confused, decision.isMultiTimeframeAligned());
+                hotResetCommand = buildStructuredHotResetCommand(analysis, decision, marketEnvSourceType, run.getTraceId());
+                hotWouldReset = hotResetCommand != null && hotResetService.shouldTriggerHotReset(hotResetCommand);
 
                 if (decision.getAssetState() != null) {
                     assetStateService.persistAuthoritativeState(
@@ -304,28 +310,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                             confused,
                             decision.getConfusedLowStreak() != null ? decision.getConfusedLowStreak() : 0,
                             run.getTraceId());
-
-                    if (hotWouldReset) {
-                        String triggerReasonCode = "CONFUSED_HIGH_MTF_MISALIGNED";
-                        String trigVal = "confusedScore=" + confused + ",multiTimeframeAligned="
-                                + decision.isMultiTimeframeAligned();
-                        assetStateService.recordHotResetEvent(
-                                analysis.getAnalysisId(),
-                                run.getTraceId(),
-                                analysis.getSymbol(),
-                                "HOT_RESET",
-                                trigVal,
-                                decision.getDecisionId(),
-                                decision.getAssetState(),
-                                confused,
-                                decision.isMultiTimeframeAligned(),
-                                triggerReasonCode,
-                                "Confused score is high and multi timeframe alignment is false; record Hot Reset evidence without overriding the P1-2 authoritative state.",
-                                2,
-                                LocalDateTime.now(),
-                                decision.getAssetState(),
-                                decision.getAssetState());
-                    }
                 }
 
                 missedOpportunityService.recordFromAuthoritativeAnalysisIfEligible(
@@ -363,6 +347,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 executionPlanMapper.insert(pdo);
             }
 
+            if (hotWouldReset && hotResetCommand != null) {
+                hotResetService.evaluateAndExecute(hotResetCommand);
+            }
+
             monitorAlertWriteService.emitAfterAnalysisPersist(run, analysis, decision);
 
             System.out.println("✅ 6张表落库全部完成！analysisId = " + analysis.getAnalysisId());
@@ -371,6 +359,151 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             ex.printStackTrace();
             throw ex;
         }
+    }
+
+    private HotResetCommand buildStructuredHotResetCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
+                                                           String marketEnvSourceType, String traceId) {
+        if (analysis == null || analysis.getMarketEnvironment() == null || decision == null) {
+            return null;
+        }
+        MarketEnvironmentVO env = analysis.getMarketEnvironment();
+        List<HotResetCommand> candidates = new ArrayList<>();
+        HotResetCommand systemic = systemicShockCommand(analysis, decision, env, traceId);
+        if (systemic != null) {
+            candidates.add(systemic);
+        }
+        HotResetCommand liquidity = liquidityDrainCommand(analysis, decision, env, traceId);
+        if (liquidity != null) {
+            candidates.add(liquidity);
+        }
+        HotResetCommand oi = oiCollapseCommand(analysis, decision, env, marketEnvSourceType, traceId);
+        if (oi != null) {
+            candidates.add(oi);
+        }
+        HotResetCommand price = priceMoveCommand(analysis, decision, env, marketEnvSourceType, traceId);
+        if (price != null) {
+            candidates.add(price);
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        for (HotResetCommand candidate : candidates) {
+            if (hotResetService.shouldTriggerHotReset(candidate)) {
+                return candidate;
+            }
+        }
+        return candidates.get(0);
+    }
+
+    private HotResetCommand priceMoveCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
+                                             MarketEnvironmentVO env, String sourceType, String traceId) {
+        if (env.getPriceChangePercent24h() == null) {
+            return null;
+        }
+        BigDecimal ratio = env.getPriceChangePercent24h().movePointLeft(2);
+        HotResetCommand command = baseHotResetCommand(analysis, decision, traceId,
+                HotResetEventTypeEnum.EXTREME_PRICE_MOVE, 80);
+        command.setPriceMoveRatio(ratio);
+        command.setSourceType(sourceType);
+        command.setSourceReference("tm_market_environment_snapshot.price_change_percent_24h");
+        command.setEventKey(hotResetEventKey(analysis, command.getEventType(), ratio.toPlainString()));
+        return command;
+    }
+
+    private HotResetCommand oiCollapseCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
+                                             MarketEnvironmentVO env, String sourceType, String traceId) {
+        if (env.getLastOpenInterest() == null || env.getOpenInterestDelta() == null) {
+            return null;
+        }
+        BigDecimal previous = env.getLastOpenInterest().subtract(env.getOpenInterestDelta());
+        if (previous.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        BigDecimal ratio = env.getOpenInterestDelta().divide(previous, 8, RoundingMode.HALF_UP);
+        HotResetCommand command = baseHotResetCommand(analysis, decision, traceId,
+                HotResetEventTypeEnum.OI_COLLAPSE, 75);
+        command.setCurrentOpenInterest(env.getLastOpenInterest());
+        command.setPreviousOpenInterest(previous);
+        command.setOpenInterestChangeRatio(ratio);
+        command.setSourceType(sourceType);
+        command.setSourceReference("tm_market_environment_snapshot.open_interest_delta");
+        command.setEventKey(hotResetEventKey(analysis, command.getEventType(), ratio.toPlainString()));
+        return command;
+    }
+
+    private HotResetCommand liquidityDrainCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
+                                                  MarketEnvironmentVO env, String traceId) {
+        if (env.getLiquidityChangeRatio() == null
+                && (env.getCurrentLiquidity() == null || env.getBaselineLiquidity() == null)) {
+            return null;
+        }
+        HotResetCommand command = baseHotResetCommand(analysis, decision, traceId,
+                HotResetEventTypeEnum.LIQUIDITY_DRAIN, 54);
+        command.setCurrentLiquidity(env.getCurrentLiquidity());
+        command.setBaselineLiquidity(env.getBaselineLiquidity());
+        command.setLiquidityChangeRatio(env.getLiquidityChangeRatio());
+        command.setSourceType("STRUCTURED_MARKET_ENVIRONMENT");
+        command.setSourceReference("MarketEnvironmentVO.liquidityChangeRatio");
+        String fingerprint = env.getLiquidityChangeRatio() != null
+                ? env.getLiquidityChangeRatio().toPlainString()
+                : String.valueOf(env.getCurrentLiquidity()) + ":" + env.getBaselineLiquidity();
+        command.setEventKey(hotResetEventKey(analysis, command.getEventType(), fingerprint));
+        return command;
+    }
+
+    private HotResetCommand systemicShockCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
+                                                 MarketEnvironmentVO env, String traceId) {
+        if (!Boolean.TRUE.equals(env.getSystemicShock()) && env.getSystemicShockSeverityScore() == null) {
+            return null;
+        }
+        HotResetCommand command = baseHotResetCommand(analysis, decision, traceId,
+                HotResetEventTypeEnum.SYSTEMIC_SHOCK,
+                env.getSystemicShockSeverityScore() != null ? env.getSystemicShockSeverityScore() : 0);
+        command.setSystemicShock(env.getSystemicShock());
+        command.setSourceType(env.getSystemicShockSourceType());
+        command.setSourceReference(env.getSystemicShockSourceReference());
+        command.setEventKey(hotResetEventKey(analysis, command.getEventType(),
+                String.valueOf(env.getSystemicShockSeverityScore())));
+        return command;
+    }
+
+    private HotResetCommand baseHotResetCommand(AssetAnalysisVO analysis, DecisionBundleVO decision, String traceId,
+                                                HotResetEventTypeEnum eventType, int severityScore) {
+        HotResetCommand command = new HotResetCommand();
+        command.setAnalysisId(analysis.getAnalysisId());
+        command.setTraceId(traceId);
+        command.setSymbol(analysis.getSymbol());
+        command.setTimeframe(analysis.getTimeframe());
+        command.setEventType(eventType);
+        command.setOccurredAt(LocalDateTime.now());
+        command.setSeverityScore(severityScore);
+        DecisionContext context = new DecisionContext();
+        context.setSymbol(analysis.getSymbol());
+        context.setWorthOpening(decision.getIsWorthOpening());
+        context.setMultiTimeframeAligned(decision.isMultiTimeframeAligned());
+        context.setRiskTier(decision.getRiskLevel());
+        context.setDriverConflictScore(severityScore);
+        context.setExecutionInstabilityScore(severityScore);
+        context.setMicrostructureTrapScore(severityScore);
+        context.setCauseEffectDivergenceScore(severityScore);
+        context.setAiConflictScore(severityScore);
+        command.setDecisionContext(context);
+        return command;
+    }
+
+    private static String hotResetEventKey(AssetAnalysisVO analysis, HotResetEventTypeEnum eventType, String fingerprint) {
+        String raw = "HOT_RESET:" + safeKeyPart(analysis.getSymbol()) + ":" + safeKeyPart(analysis.getTimeframe())
+                + ":" + eventType.name() + ":" + safeKeyPart(fingerprint);
+        String compact = raw.replaceAll("[^A-Za-z0-9:_\\-.]", "_");
+        String hash = Integer.toHexString(compact.hashCode());
+        if (compact.length() > 108) {
+            compact = compact.substring(0, 108);
+        }
+        return compact + ":" + hash;
+    }
+
+    private static String safeKeyPart(String raw) {
+        return raw == null || raw.isBlank() ? "NA" : raw.trim();
     }
 
     /**

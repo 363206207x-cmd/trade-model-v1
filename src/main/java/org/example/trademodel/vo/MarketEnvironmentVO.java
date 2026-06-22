@@ -35,6 +35,13 @@ public class MarketEnvironmentVO {
      * 仅在 OI 当前已应用且前值可得时写入；否则为 null。
      */
     private BigDecimal openInterestDelta;
+    private BigDecimal currentLiquidity;
+    private BigDecimal baselineLiquidity;
+    private BigDecimal liquidityChangeRatio;
+    private Boolean systemicShock;
+    private String systemicShockSourceType;
+    private String systemicShockSourceReference;
+    private Integer systemicShockSeverityScore;
     /**
      * OI/Funding 联合派生的最小离散标签：NEUTRAL / CROWDED_LONG / CROWDED_SHORT。
      */
@@ -70,6 +77,20 @@ public class MarketEnvironmentVO {
     public void setLastOpenInterest(BigDecimal lastOpenInterest) { this.lastOpenInterest = lastOpenInterest; }
     public BigDecimal getOpenInterestDelta() { return openInterestDelta; }
     public void setOpenInterestDelta(BigDecimal openInterestDelta) { this.openInterestDelta = openInterestDelta; }
+    public BigDecimal getCurrentLiquidity() { return currentLiquidity; }
+    public void setCurrentLiquidity(BigDecimal currentLiquidity) { this.currentLiquidity = currentLiquidity; }
+    public BigDecimal getBaselineLiquidity() { return baselineLiquidity; }
+    public void setBaselineLiquidity(BigDecimal baselineLiquidity) { this.baselineLiquidity = baselineLiquidity; }
+    public BigDecimal getLiquidityChangeRatio() { return liquidityChangeRatio; }
+    public void setLiquidityChangeRatio(BigDecimal liquidityChangeRatio) { this.liquidityChangeRatio = liquidityChangeRatio; }
+    public Boolean getSystemicShock() { return systemicShock; }
+    public void setSystemicShock(Boolean systemicShock) { this.systemicShock = systemicShock; }
+    public String getSystemicShockSourceType() { return systemicShockSourceType; }
+    public void setSystemicShockSourceType(String systemicShockSourceType) { this.systemicShockSourceType = systemicShockSourceType; }
+    public String getSystemicShockSourceReference() { return systemicShockSourceReference; }
+    public void setSystemicShockSourceReference(String systemicShockSourceReference) { this.systemicShockSourceReference = systemicShockSourceReference; }
+    public Integer getSystemicShockSeverityScore() { return systemicShockSeverityScore; }
+    public void setSystemicShockSeverityScore(Integer systemicShockSeverityScore) { this.systemicShockSeverityScore = systemicShockSeverityScore; }
     public String getDerivativesCrowdingState() { return derivativesCrowdingState; }
     public void setDerivativesCrowdingState(String derivativesCrowdingState) {
         this.derivativesCrowdingState = derivativesCrowdingState;

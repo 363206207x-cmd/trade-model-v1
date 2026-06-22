@@ -12,6 +12,10 @@ public interface HotResetService {
      */
     boolean shouldTriggerHotReset(int confusedScore, boolean multiTimeframeAligned);
 
+    boolean shouldTriggerHotReset(HotResetCommand command);
+
+    HotResetResult evaluateAndExecute(HotResetCommand command);
+
     /** 预留：当前主链仅写 tm_asset_state，不改写已落库的 {@link DecisionResult}。 */
     DecisionResult executeHotReset(DecisionContext context, DecisionResult currentResult);
 }
