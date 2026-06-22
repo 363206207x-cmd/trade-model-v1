@@ -87,6 +87,20 @@ Human confirmation required: Yes before B-risk PR merge.
 
 ---
 
+## v1.0-p0-5-position-monitor-service-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P0-5 PositionMonitorService B-risk implementation package.
+Before: P0-5 PositionMonitorService was NOT_STARTED/PARTIAL with PositionSync and provider observation assets, but no UserPosition monitor service, controller, single/batch monitor run, monitor judgment, or one-log-per-run integration.
+After: P0-5 is a branch DONE candidate with PositionMonitorService, PositionMonitorController, single and batch active UserPosition monitoring, LONG / SHORT logic, LOGIC_VALID / LOGIC_WEAKENED / PLAN_INVALIDATED / HIGH_RISK states, near stop loss, near take profit, risk increased detection, read-only MarketQuote / ExecutionPlan / AccountRisk context, one PositionMonitorLog write per successful run, safety fields, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.
+
+---
+
 ## v1.0-p0-2-execution-plan-source-gate-done-candidate
 
 Date: 2026-06-22

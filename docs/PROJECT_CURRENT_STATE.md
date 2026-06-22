@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P0-4 PositionMonitorLog DONE candidate
-Next Business Phase: P0-5 PositionMonitorService
+Current Work Package: P0-5 PositionMonitorService DONE candidate
+Next Business Phase: P0-6 Review integrates UserPosition
 Next Business Phase Allowed: NO
 Production Deployment Readiness: BLOCKED
 
@@ -23,8 +23,10 @@ P0-2 ExecutionPlan Source Gate is effective because its implementation is merged
 
 P0-3 AccountRisk integrates UserPosition is effective because its implementation is merged to clean / synced `main` and the runtime gate allowed P0-4.
 
-P0-4 PositionMonitorLog is only a branch DONE candidate in this worktree.
-It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P0-4 effectivity.
+P0-4 PositionMonitorLog is effective because its implementation is merged to clean / synced `main` and the runtime gate allowed P0-5.
+
+P0-5 PositionMonitorService is only a branch DONE candidate in this worktree.
+It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P0-5 effectivity.
 
 `bash scripts/v1-state.sh` must distinguish `CURRENT_PACKAGE_PR`, `UNRELATED_OPEN_PRS`, and `BLOCK_NEXT_BUSINESS_PHASE_ONLY`. An unrelated Draft PR must not block merging the current P0-0 package PR, but it still blocks the next business phase.
 
@@ -32,13 +34,13 @@ It is not effective until this branch commit is reviewed, merged to `main`, loca
 
 ## Current Allowed Work
 
-Only the following work is allowed after this P0-4 branch-candidate update:
+Only the following work is allowed after this P0-5 branch-candidate update:
 
-1. Checks, push, PR creation, and merge-gate handling for the P0-4 PositionMonitorLog B-risk package.
-2. Main sync after the P0-4 PR is reviewed and merged.
-3. Runtime verification that P0-4 is effective on clean / synced main before any P0-5 work starts.
+1. Checks, push, PR creation, and merge-gate handling for the P0-5 PositionMonitorService B-risk package.
+2. Main sync after the P0-5 PR is reviewed and merged.
+3. Runtime verification that P0-5 is effective on clean / synced main before any P0-6 work starts.
 
-P0-4 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
+P0-5 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
 
 PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into this package.
 
@@ -46,53 +48,52 @@ PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into 
 
 ## Current Forbidden Work
 
-The following work is blocked until P0-4 is effective on merged main:
+The following work is blocked until P0-5 is effective on merged main:
 
-1. PositionMonitorService implementation.
-2. Review UserPosition integration.
-3. PushRecheck semantic hardening beyond the read-only P0-3 risk consumption path.
-4. ConfusedState + AiConflict hardening.
-5. HotReset real action.
-6. OpportunityLog.
-7. Macro / News / External Context.
-8. AI Orchestrator + AiCallLog.
-9. Scheduler / Idempotency / Trace.
-10. Dashboard Final.
-11. Auto-trading of any kind.
+1. Review UserPosition integration.
+2. PushRecheck semantic hardening beyond the read-only P0-3 risk consumption path.
+3. ConfusedState + AiConflict hardening.
+4. HotReset real action.
+5. OpportunityLog.
+6. Macro / News / External Context.
+7. AI Orchestrator + AiCallLog.
+8. Scheduler / Idempotency / Trace.
+9. Dashboard Final.
+10. Auto-trading of any kind.
 
 ---
 
 ## Current Known Critical Gaps
 
-1. P0-4 PositionMonitorLog is only a branch DONE candidate until merged main confirms it effective.
-2. PositionMonitorService missing.
-3. Review does not fully integrate real user position.
-4. P0-4 branch candidate must be merged main before PositionMonitorService work is allowed.
-5. HotReset real action incomplete.
-6. OpportunityLog incomplete.
-7. Macro / News runtime not complete.
-8. AI orchestrator and ai call log incomplete.
-9. Dashboard Final must wait until business semantics are stable.
+1. P0-5 PositionMonitorService is only a branch DONE candidate until merged main confirms it effective.
+2. Review does not fully integrate real user position.
+3. P0-5 branch candidate must be merged main before Review integration work is allowed.
+4. HotReset real action incomplete.
+5. OpportunityLog incomplete.
+6. Macro / News runtime not complete.
+7. AI orchestrator and ai call log incomplete.
+8. Dashboard Final must wait until business semantics are stable.
 
-## P0-4 PositionMonitorLog Branch Candidate
+## P0-5 PositionMonitorService Branch Candidate
 
-Branch: `p0-4-position-monitor-log-full-implementation`
+Branch: `p0-5-position-monitor-service-full-implementation`
 Risk: B
 Status: DONE candidate
 Effective State: pending merged main
 
 Implemented branch evidence:
 
-1. `tm_position_monitor_log` persists each monitor run log.
-2. `PositionMonitorLogDO`, `PositionMonitorLogDTO`, `PositionMonitorLogMapper`, and `PositionMonitorLogService` define the single P0-4 owner.
-3. `recordMonitorRun` validates UserPosition existence and OPEN / PARTIALLY_CLOSED status, then writes exactly one immutable log row.
-4. The log stores `position_id`, `analysis_id`, optional `execution_plan_id`, `current_price`, `logic_status`, `risk_level`, `suggested_action`, reason, snapshots, trace id, and created time.
-5. Review exposes `GET /api/review/positions/{positionId}/monitor-logs` as a read-only query path.
-6. DTO output carries fixed safety fields and exposes no close / reduce / reverse / order / execution / auto-trading payload fields.
-7. Tests cover normal, logic weakened, plan invalidated, high-risk, CLOSED rejection, mapper persistence, Review read-only query, safe limit, and forbidden action-word rejection.
-8. No PositionMonitorService, monitor judgment logic, automatic reduce, close, reverse, order execution, auto-trading, Dashboard UI, ReviewSummary, P0-5, or PR #1004 changes are part of this package.
+1. `PositionMonitorService` and `PositionMonitorController` define the P0-5 owner.
+2. `POST /api/position-monitor/user-positions/{positionId}/run` monitors a single OPEN / PARTIALLY_CLOSED UserPosition.
+3. `POST /api/position-monitor/user-positions/open/run` monitors the active V1 UserPosition set and reports per-position failures without fabricating success.
+4. LONG / SHORT logic covers LOGIC_VALID, LOGIC_WEAKENED, PLAN_INVALIDATED, HIGH_RISK, near stop loss, near take profit, and risk increased.
+5. Each successful monitor run writes exactly one PositionMonitorLog through the P0-4 log service.
+6. The service reads MarketQuote, ExecutionPlan context, UserPositionRisk, and latest monitor log through read-only paths.
+7. DTO output carries fixed safety fields and exposes no reduce / close / reverse / order / execution / auto-trading payload fields.
+8. Tests cover single and batch monitoring, long / short logic, weakened / invalidated / high-risk states, near boundaries, risk increase, fail-closed quote handling, safety fields, controller endpoints, and no UserPosition mutation.
+9. No UserPosition mutation, automatic reduce, automatic close, automatic reverse, order execution, auto-trading, scheduler, Push send, Dashboard UI, ReviewSummary, P0-6, or PR #1004 changes are part of this package.
 
-P0-5 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P0-4 effective.
+P0-6 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P0-5 effective.
 
 ---
 

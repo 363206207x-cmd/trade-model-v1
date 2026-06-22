@@ -3,6 +3,7 @@ package org.example.trademodel.mapper;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -13,5 +14,8 @@ public interface ExecutionPlanMapper {
     int insert(ExecutionPlanDO plan);
 
     @Select("SELECT * FROM tm_execution_plan WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
-    ExecutionPlanDO selectLatestByAnalysisId(String analysisId);
+    ExecutionPlanDO selectLatestByAnalysisId(@Param("analysisId") String analysisId);
+
+    @Select("SELECT * FROM tm_execution_plan WHERE plan_id = #{planId} ORDER BY create_time DESC LIMIT 1")
+    ExecutionPlanDO selectByPlanId(@Param("planId") String planId);
 }
