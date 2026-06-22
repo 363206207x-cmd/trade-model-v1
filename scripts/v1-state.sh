@@ -135,6 +135,17 @@ branch="$(git branch --show-current)"
 status_short="$(git status --short)"
 head_commit="$(git log -1 --oneline)"
 
+head_matches_origin_main="UNKNOWN"
+if git rev-parse --verify HEAD >/dev/null 2>&1 && git rev-parse --verify origin/main >/dev/null 2>&1; then
+  head_sha="$(git rev-parse HEAD)"
+  origin_main_sha="$(git rev-parse origin/main)"
+  if [[ "$head_sha" == "$origin_main_sha" ]]; then
+    head_matches_origin_main="YES"
+  else
+    head_matches_origin_main="NO"
+  fi
+fi
+
 if [[ "$branch" == "main" ]]; then
   on_main_branch="YES"
 else
@@ -149,7 +160,9 @@ else
 fi
 
 main_sync="UNKNOWN"
-if git rev-parse --verify main >/dev/null 2>&1 && git rev-parse --verify origin/main >/dev/null 2>&1; then
+if [[ "$head_matches_origin_main" == "YES" ]]; then
+  main_sync="OK"
+elif git rev-parse --verify main >/dev/null 2>&1 && git rev-parse --verify origin/main >/dev/null 2>&1; then
   read -r main_ahead main_behind < <(git rev-list --left-right --count main...origin/main)
   if [[ "$main_behind" == "0" && "$main_ahead" == "0" ]]; then
     main_sync="OK"
@@ -189,24 +202,34 @@ fi
 current_package_branch="$(yaml_value "$TASK_FILE" branch)"
 [[ -n "$current_package_branch" ]] || current_package_branch="$branch"
 
+open_pr_check_source="not_checked"
+open_pr_count="UNKNOWN"
+open_pr_status="UNKNOWN"
 open_prs="none"
 current_package_pr="none"
 unrelated_open_prs="none"
 block_next_business_phase_only="NO"
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  open_pr_check_source="gh CLI"
   if ! pr_rows="$(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | [.number, .headRefName, .title, .isDraft] | @tsv' 2>/dev/null)"; then
     pr_rows=""
     open_prs="GH_NOT_AVAILABLE"
     current_package_pr="GH_NOT_AVAILABLE"
     unrelated_open_prs="GH_NOT_AVAILABLE"
+    open_pr_status="UNKNOWN"
     blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
+  else
+    open_pr_count="0"
+    open_pr_status="NONE"
   fi
   if [[ -n "${pr_rows:-}" ]]; then
+    open_pr_status="OPEN"
     open_pr_lines=()
     current_package_pr_lines=()
     unrelated_open_pr_lines=()
     while IFS=$'\t' read -r pr_number pr_head pr_title pr_draft; do
       [[ -z "${pr_number:-}" ]] && continue
+      ((open_pr_count+=1))
       pr_line="#$pr_number $pr_head $pr_title draft=$pr_draft"
       open_pr_lines+=("$pr_line")
       if [[ "$pr_head" == "$current_package_branch" || "$pr_head" == "$branch" ]]; then
@@ -226,9 +249,11 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     fi
   fi
 else
+  open_pr_check_source="unavailable"
   open_prs="GH_NOT_AVAILABLE"
   current_package_pr="GH_NOT_AVAILABLE"
   unrelated_open_prs="GH_NOT_AVAILABLE"
+  open_pr_status="UNKNOWN"
   blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
 fi
 
@@ -236,11 +261,15 @@ fi
 next_business_phase_allowed="NO"
 can_start_next_business_phase="NO"
 p0_0_effective="NO"
+clean_synced_main="NO"
+if [[ "$worktree_clean" == "Yes" && "$main_sync" == "OK" ]] && { [[ "$branch" == "main" ]] || [[ "$head_matches_origin_main" == "YES" ]]; }; then
+  clean_synced_main="YES"
+fi
 if [[ "$current_phase_status" == "DONE" && "$completion_effective_state" == "EFFECTIVE_MERGED_MAIN" ]]; then
   p0_0_effective="YES"
   # Require merged/synced main, clean main, no open PR, contract sync, and matrix test evidence.
   test_evidence="$(matrix_field P0-0 7)"
-  if [[ "$branch" == "main" && "$worktree_clean" == "Yes" && "$main_sync" == "OK" && "$current_package_pr" == "none" && "$unrelated_open_prs" == "none" && "$matrix_sync" == "OK" && "$test_evidence" != "None" && "$test_evidence" != "Pending" ]]; then
+  if [[ "$clean_synced_main" == "YES" && "$current_package_pr" == "none" && "$unrelated_open_prs" == "none" && "$open_pr_status" == "NONE" && "$matrix_sync" == "OK" && "$test_evidence" != "None" && "$test_evidence" != "Pending" ]]; then
     next_business_phase_allowed="YES"
     can_start_next_business_phase="YES"
   else
@@ -270,11 +299,16 @@ printf 'ON_MAIN_BRANCH: %s\n' "$on_main_branch"
 echo "RECENT_COMMITS:"
 git log --oneline -5
 printf 'OPEN_PRS: %s\n' "$open_prs"
+printf 'OPEN_PR_CHECK_SOURCE: %s\n' "$open_pr_check_source"
+printf 'OPEN_PR_COUNT: %s\n' "$open_pr_count"
+printf 'OPEN_PR_STATUS: %s\n' "$open_pr_status"
 printf 'CURRENT_PACKAGE_PR: %s\n' "$current_package_pr"
 printf 'UNRELATED_OPEN_PRS: %s\n' "$unrelated_open_prs"
 printf 'BLOCK_NEXT_BUSINESS_PHASE_ONLY: %s\n' "$block_next_business_phase_only"
 printf 'MAIN_SYNC: %s\n' "$main_sync"
 printf 'HEAD_IN_ORIGIN_MAIN: %s\n' "$head_in_origin_main"
+printf 'HEAD_MATCHES_ORIGIN_MAIN: %s\n' "$head_matches_origin_main"
+printf 'CLEAN_SYNCED_MAIN: %s\n' "$clean_synced_main"
 printf 'CONTRACT_FILES_PRESENT: %s\n' "$contract_files_present"
 printf 'CONTRACT_MATRIX_SYNC: %s\n' "$matrix_sync"
 printf 'CURRENT_PHASE: %s\n' "P0-0"

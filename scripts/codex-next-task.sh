@@ -124,6 +124,9 @@ branch="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "BRANCH" {print $2; ex
 worktree="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "WORKTREE_CLEAN" {print $2; exit}')"
 main_sync="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "MAIN_SYNC" {print $2; exit}')"
 open_prs="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PRS" {print substr($0, length("OPEN_PRS") + 3); exit}')"
+open_pr_source="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PR_CHECK_SOURCE" {print substr($0, length("OPEN_PR_CHECK_SOURCE") + 3); exit}')"
+open_pr_count="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PR_COUNT" {print substr($0, length("OPEN_PR_COUNT") + 3); exit}')"
+open_pr_status="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PR_STATUS" {print substr($0, length("OPEN_PR_STATUS") + 3); exit}')"
 contract_sync="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CONTRACT_MATRIX_SYNC" {print $2; exit}')"
 next_allowed="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "NEXT_BUSINESS_PHASE_ALLOWED" {print $2; exit}')"
 next_phase="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "NEXT_BUSINESS_PHASE" {print $2; exit}')"
@@ -159,7 +162,7 @@ cat <<EOF
 # Fixed Codex Output Contract Hints / Codex 固定输出契约提示
 
 WHAT_THIS_STEP_DOES（这一步在做什么）: Generate a user-readable task handoff without modifying files, staging, committing, pushing, creating PRs, merging, or starting a blocked package.
-CURRENT_PROGRESS（当前进度）: Branch=${branch:-UNKNOWN}; worktree（工作区） clean=${worktree:-UNKNOWN}; main sync=${main_sync:-UNKNOWN}; open PR（未合并 PR）=${open_prs:-UNKNOWN}; current package=${current_package:-UNKNOWN}; completion=${completion_effective_state:-UNKNOWN}; next phase=${next_phase:-UNKNOWN}; next allowed（允许）=${next_allowed:-UNKNOWN}; blockers=${blockers:-UNKNOWN}.
+CURRENT_PROGRESS（当前进度）: Branch=${branch:-UNKNOWN}; worktree（工作区） clean=${worktree:-UNKNOWN}; main sync=${main_sync:-UNKNOWN}; open PR（未合并 PR）=${open_prs:-UNKNOWN}; open PR source（未合并 PR 来源）=${open_pr_source:-UNKNOWN}; open PR count（未合并 PR 数量）=${open_pr_count:-UNKNOWN}; open PR status（未合并 PR 状态）=${open_pr_status:-UNKNOWN}; current package=${current_package:-UNKNOWN}; completion=${completion_effective_state:-UNKNOWN}; next phase=${next_phase:-UNKNOWN}; next allowed（允许）=${next_allowed:-UNKNOWN}; blockers=${blockers:-UNKNOWN}.
 NEXT_ALLOWED_ACTION（下一允许动作）: ${next_phase:-UNKNOWN} only when the runtime gate（门禁） reports allowed（允许） and the worktree（工作区） is clean/synced main（干净且已同步主线）.
 NEXT_BLOCKED_ACTION（下一禁止动作）: Do not start blocked（阻塞） packages, do not treat open PR（未合并 PR） as done, do not bypass PENDING_MERGED_MAIN（等待合并主线）, and do not auto-trade.
 
