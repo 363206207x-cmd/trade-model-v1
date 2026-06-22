@@ -112,3 +112,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: No; A-risk workflow gate repair only.
+
+---
+
+## v1.0-p0-3-account-risk-user-position-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P0-3 AccountRisk integrates UserPosition B-risk implementation package.
+Before: P0-3 AccountRisk had snapshot/read assets, but did not consume UserPosition as the manual position fact source and did not provide open / partially closed / closed UserPosition risk semantics.
+After: P0-3 is a branch DONE candidate with UserPositionRiskAdapter, read-only AccountRisk API, OPEN / PARTIALLY_CLOSED inclusion, CLOSED exclusion, leverage / position size / concentration / conservative directional correlation / drawdown-or-VaR proxy risk, high-risk blocking, PushRecheck read-only consumption, safety fields, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

@@ -12,17 +12,17 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P0-2 ExecutionPlan Source Gate DONE candidate"
-active_block_cn: "P0-2 执行计划来源门禁 DONE candidate"
+active_block: "P0-3 AccountRisk integrates UserPosition DONE candidate"
+active_block_cn: "P0-3 账户风险接入用户手动持仓 DONE candidate"
 
-next_required_action: "Review and merge-gate the P0-2 ExecutionPlan Source Gate B-risk PR; do not start P0-3 before merged-main effectivity."
-next_business_phase: "P0-3 AccountRisk integrates UserPosition"
+next_required_action: "Review and merge-gate the P0-3 AccountRisk integrates UserPosition B-risk PR; do not start P0-4 before merged-main effectivity."
+next_business_phase: "P0-4 PositionMonitorLog"
 next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "DERIVED_BY_V1_STATE"
-current_branch: "p0-2-execution-plan-source-gate-full-implementation"
+current_branch: "p0-3-account-risk-user-position-integration"
 current_package_pr: "DERIVED_BY_V1_STATE"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -34,9 +34,12 @@ p0_1_started: true
 p0_1_status: "DONE on merged main"
 p0_1_effective: true
 p0_2_started: true
-p0_2_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
-p0_2_effective: false
-p0_3_allowed: false
+p0_2_status: "DONE on merged main"
+p0_2_effective: true
+p0_3_started: true
+p0_3_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
+p0_3_effective: false
+p0_4_allowed: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -45,8 +48,9 @@ notes:
   - "This file is a derived compatibility mirror only."
   - "It cannot override PROJECT_DELIVERY_CONTRACT, DELIVERY_PROGRESS_MATRIX, or PROJECT_CURRENT_STATE."
   - "P0-0 runtime has reported effective merged main; P0-1 is effective on merged main."
-  - "P0-2 ExecutionPlan Source Gate is now the active branch candidate."
-  - "P0-2 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
-  - "P0-3 remains blocked while P0-2 is only a branch candidate."
-  - "No UserPosition implementation, dashboard UI, auto-trading, order execution, AccountRisk, PositionMonitor, Review, or PR #1004 code is part of this package."
+  - "P0-2 ExecutionPlan Source Gate is effective on merged main."
+  - "P0-3 AccountRisk integrates UserPosition is now the active branch candidate."
+  - "P0-3 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
+  - "P0-4 remains blocked while P0-3 is only a branch candidate."
+  - "No dashboard UI, auto-trading, order execution, PositionMonitor, Review, P0-4, or PR #1004 code is part of this package."
   - "Review-only slice count is no longer a delivery completion standard."

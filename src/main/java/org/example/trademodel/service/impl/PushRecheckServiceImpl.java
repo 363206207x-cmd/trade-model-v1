@@ -9,6 +9,8 @@ import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.risk.UserPositionRiskAdapter;
+import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.PushRecheckService;
 import org.example.trademodel.service.PushRecheckStatusContract;
@@ -52,15 +54,18 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final PushRecheckDispatchConfigService dispatchConfigService;
+    private final UserPositionRiskAdapter userPositionRiskAdapter;
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
                                   AccountRiskSnapshotMapper accountRiskSnapshotMapper,
                                   PushRecheckLogMapper pushRecheckLogMapper,
-                                  PushRecheckDispatchConfigService dispatchConfigService) {
+                                  PushRecheckDispatchConfigService dispatchConfigService,
+                                  UserPositionRiskAdapter userPositionRiskAdapter) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.dispatchConfigService = dispatchConfigService;
+        this.userPositionRiskAdapter = userPositionRiskAdapter;
     }
 
     @Override
@@ -91,6 +96,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         String failReasonJson = null;
         Boolean currentAccountRiskAllowed = null;
         TmAccountRiskSnapshotDO accountRiskSnapshot = null;
+        UserPositionRiskResult userPositionRiskResult = null;
 
         if (snap == null) {
             status = RecheckStatusEnum.INVALIDATED;
@@ -107,6 +113,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         } else {
             accountRiskSnapshot = resolveAccountRiskSnapshot(snap);
             currentAccountRiskAllowed = accountRiskSnapshot != null ? accountRiskSnapshot.getRiskAllowed() : null;
+            userPositionRiskResult = resolveUserPositionRiskResult();
+            currentAccountRiskAllowed = combineRiskAllowance(currentAccountRiskAllowed, userPositionRiskResult);
             String invHit = evaluateStructuredInvalidation(snap.getInvalidationConditionJson(), currentPrice);
             if (invHit != null) {
                 status = RecheckStatusEnum.INVALIDATED;
@@ -124,7 +132,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                 } else {
                     status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
                     message = statusMessage(status, currentAccountRiskAllowed);
-                    failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
+                    failReasonJson = failReasonForStatus(
+                            status, currentAccountRiskAllowed, snap, accountRiskSnapshot, userPositionRiskResult);
                 }
             } else {
                 priceDriftRatio = null;
@@ -132,7 +141,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                 message = status == RecheckStatusEnum.VALID_EXECUTABLE
                         ? "二次确认通过，可执行（未配置 trigger_price，跳过漂移检测）"
                         : statusMessage(status, currentAccountRiskAllowed);
-                failReasonJson = failReasonForStatus(status, currentAccountRiskAllowed, snap, accountRiskSnapshot);
+                failReasonJson = failReasonForStatus(
+                        status, currentAccountRiskAllowed, snap, accountRiskSnapshot, userPositionRiskResult);
             }
         }
 
@@ -378,8 +388,17 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private static String failReasonForStatus(RecheckStatusEnum status,
                                               Boolean currentAccountRiskAllowed,
                                               TmPushSnapshotDO snap,
-                                              TmAccountRiskSnapshotDO accountRiskSnapshot) {
+                                              TmAccountRiskSnapshotDO accountRiskSnapshot,
+                                              UserPositionRiskResult userPositionRiskResult) {
         if (status == RecheckStatusEnum.RISK_BLOCKED) {
+            if (userPositionRiskResult != null && userPositionRiskResult.isRiskBlocked()) {
+                String detail = "riskStatus=" + userPositionRiskResult.getRiskStatus()
+                        + ",riskLevel=" + userPositionRiskResult.getRiskLevel()
+                        + ",aggregateRiskScore=" + userPositionRiskResult.getAggregateRiskScore()
+                        + ",reasonCodes=" + userPositionRiskResult.getReasonCodes()
+                        + ",calculationMethod=" + userPositionRiskResult.getCalculationMethod();
+                return failJson("USER_POSITION_RISK_BLOCKED", detail);
+            }
             if (accountRiskSnapshot != null) {
                 String detail = "riskReasonCode=" + accountRiskSnapshot.getRiskReasonCode()
                         + ",riskReasonText=" + accountRiskSnapshot.getRiskReasonText()
@@ -399,6 +418,26 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             return failJson("RISK_UNKNOWN_WAIT", "currentAccountRiskAllowed=null");
         }
         return null;
+    }
+
+    private UserPositionRiskResult resolveUserPositionRiskResult() {
+        try {
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            return result != null ? result : UserPositionRiskResult.failClosed("USER_POSITION_RISK_UNAVAILABLE");
+        } catch (RuntimeException ex) {
+            return UserPositionRiskResult.failClosed("USER_POSITION_RISK_UNAVAILABLE");
+        }
+    }
+
+    private static Boolean combineRiskAllowance(Boolean accountRiskAllowed,
+                                                UserPositionRiskResult userPositionRiskResult) {
+        if (userPositionRiskResult != null && userPositionRiskResult.isRiskBlocked()) {
+            return Boolean.FALSE;
+        }
+        if (accountRiskAllowed != null) {
+            return accountRiskAllowed;
+        }
+        return userPositionRiskResult == null ? null : Boolean.TRUE;
     }
 
     private TmAccountRiskSnapshotDO resolveAccountRiskSnapshot(TmPushSnapshotDO snap) {
