@@ -61,6 +61,35 @@ Every task must end with:
 12. Whether files were staged
 13. Whether files were committed
 
+## Final Output Template / 最终输出模板
+
+All future Codex tasks must use this final output template:
+
+```text
+WHAT_THIS_STEP_DOES（这一步在做什么）:
+CURRENT_PROGRESS（当前进度）:
+CURRENT_PHASE（当前阶段）:
+CURRENT_BLOCK（当前模块）:
+CURRENT_BRANCH（当前分支）:
+CURRENT_PR（当前 PR）:
+MERGED_MAIN_STATUS（合并主线状态）:
+EFFECTIVE_STATUS（生效状态）:
+NEXT_ALLOWED_ACTION（下一允许动作）:
+NEXT_BLOCKED_ACTION（下一禁止动作）:
+WHY_BLOCKED_OR_ALLOWED（为什么允许或阻塞）:
+FILES_CHANGED（变更文件）:
+CHECKS（检查）:
+RISK_LEVEL（风险等级）:
+OVERREACH_STATUS（越界状态）:
+```
+
+The output must begin with `WHAT_THIS_STEP_DOES（这一步在做什么）` and `CURRENT_PROGRESS（当前进度）`.
+English technical terms must include Chinese explanations, for example merged main（已合并主线）, clean/synced main（干净且已同步主线）, open PR（未合并 PR）, Draft PR（草稿 PR）, A-risk（低风险）, B-risk（中风险）, effective（已生效）, blocked（阻塞）, allowed（允许）, worktree（工作区）, gate（门禁）, UserPosition（用户手动持仓）, ExecutionPlan（执行计划）, Source Gate（来源门禁）, AccountRisk（账户风险）, PositionMonitor（持仓监控）, and Review（复盘）.
+
+`NEXT_ALLOWED_ACTION（下一允许动作）` must only show the contract-allowed next step.
+`NEXT_BLOCKED_ACTION（下一禁止动作）` must say what must not be started.
+Open PR（未合并 PR） and PENDING_MERGED_MAIN（等待合并主线） do not count as complete; merged main（已合并主线） is required before effective（已生效） status.
+
 ---
 
 ## Required Language for Phase Completion

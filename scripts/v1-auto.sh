@@ -62,8 +62,11 @@ cmd_status() {
 }
 
 cmd_summary() {
-  local state_text current_phase current_status maturity effective package next_phase next_allowed prod contract_sync blockers
+  local state_text branch worktree open_prs current_phase current_status maturity effective package next_phase next_allowed prod contract_sync blockers
   state_text="$(capture_state)"
+  branch="$(state_value "$state_text" BRANCH)"
+  worktree="$(state_value "$state_text" WORKTREE_CLEAN)"
+  open_prs="$(state_value "$state_text" OPEN_PRS)"
   current_phase="$(state_value "$state_text" CURRENT_PHASE)"
   current_status="$(state_value "$state_text" CURRENT_PHASE_STATUS)"
   maturity="$(state_value "$state_text" EXISTING_MODULE_MATURITY)"
@@ -76,6 +79,11 @@ cmd_summary() {
   blockers="$(state_value "$state_text" BLOCKERS)"
 
   echo "项目交付契约摘要（Contract-first Summary）"
+  print_hr
+  echo "WHAT_THIS_STEP_DOES（这一步在做什么）: Summarize runtime gate（门禁） state without changing files or starting a business package."
+  echo "CURRENT_PROGRESS（当前进度）: ${current_phase:-UNKNOWN} is ${current_status:-UNKNOWN}; completion is ${effective:-UNKNOWN}; branch=${branch:-UNKNOWN}; worktree（工作区） clean=${worktree:-UNKNOWN}; open PR（未合并 PR）=${open_prs:-UNKNOWN}; next phase ${next_phase:-UNKNOWN} allowed（允许）=${next_allowed:-UNKNOWN}."
+  echo "NEXT_ALLOWED_ACTION（下一允许动作）: ${next_phase:-UNKNOWN} only when runtime gate（门禁） reports allowed（允许）."
+  echo "NEXT_BLOCKED_ACTION（下一禁止动作）: Do not bypass open PR（未合并 PR）, PENDING_MERGED_MAIN（等待合并主线）, dirty worktree（脏工作区）, or forbidden scope; do not auto-trade."
   print_hr
   echo "Current Phase: ${current_phase:-UNKNOWN}"
   echo "Current Phase Status: ${current_status:-UNKNOWN}"

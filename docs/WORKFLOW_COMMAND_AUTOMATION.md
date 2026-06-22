@@ -110,6 +110,15 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh summary` 和 `v1-auto.sh next` 读取项目交付契约、交付进度矩阵、当前状态和派生任务交接文件，不再用 Review-Only Runtime partial（只读运行时部分完成）小闭环数量判定交付进度或选择下一业务包。
 
+`v1-auto.sh summary`, `v1-auto.sh next`, and `codex-next-task.sh` must surface the Fixed Codex Output Contract（Codex 固定输出契约） hints:
+
+- `WHAT_THIS_STEP_DOES（这一步在做什么）`
+- `CURRENT_PROGRESS（当前进度）`
+- `NEXT_ALLOWED_ACTION（下一允许动作）`
+- `NEXT_BLOCKED_ACTION（下一禁止动作）`
+
+These hints are output guidance only. They must not change gate（门禁）判断规则, P0-2 allowed（允许）判断, merge rules, or business capability.
+
 Baseline sync PRs（基线同步 PR） are no longer part of the normal workflow.
 If `Source of Truth current_head` lags behind the actual clean / synced `main` HEAD, and `Open PR` is `none`, operators use actual HEAD as the Effective execution baseline（实际执行基线）.
 The next business package updates source-of-truth files opportunistically while doing its scoped work.

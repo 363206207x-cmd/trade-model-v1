@@ -209,6 +209,24 @@ P3-3：最终交付文档
 
 ---
 
+## 5A. Fixed Codex Output Contract / Codex 固定输出契约
+
+Every Codex task must finish with user-readable progress fields defined in `docs/ANSWER_FORMAT_CONTRACT.md`.
+The output must include:
+
+- WHAT_THIS_STEP_DOES（这一步在做什么）
+- CURRENT_PROGRESS（当前进度）
+- NEXT_ALLOWED_ACTION（下一允许动作）
+- NEXT_BLOCKED_ACTION（下一禁止动作）
+- OVERREACH_STATUS（越界状态）
+
+English technical terms must include Chinese explanations.
+Open PR（未合并 PR） and PENDING_MERGED_MAIN（等待合并主线） do not count as effective（已生效） completion.
+Only merged main（已合并主线） plus clean/synced main（干净且已同步主线） and a passing runtime gate（门禁） can make a package effective（已生效）.
+This output contract changes reporting only; it does not change phase order, Done Criteria, business logic, gate（门禁） rules, or safety boundaries.
+
+---
+
 ## 6. Phase Done Criteria / 阶段完成判定
 
 ### P0-0 Contract Lock + Baseline + Dead Code Candidate Report DONE
