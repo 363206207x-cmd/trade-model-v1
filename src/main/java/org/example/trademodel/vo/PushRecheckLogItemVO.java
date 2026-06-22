@@ -21,7 +21,7 @@ public class PushRecheckLogItemVO {
     private String executionErrorCode;
     private String executionErrorMessage;
     private LocalDateTime recheckTime;
-    /** 与 {@link org.example.trademodel.enums.RecheckStatusEnum#name()} 一致 */
+    /** 对外统一输出 canonical review-only status，历史落库值由服务层兼容映射。 */
     private String recheckStatus;
     private BigDecimal currentPrice;
     private BigDecimal priceDriftRatio;

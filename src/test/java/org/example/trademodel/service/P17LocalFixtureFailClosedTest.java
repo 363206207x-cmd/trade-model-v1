@@ -210,10 +210,10 @@ class P17LocalFixtureFailClosedTest {
     }
 
     @Test
-    void pushRecheckPositiveNamesRemainReviewLabelsOnly() {
-        assertThat(PushRecheckStatusContract.toPushStatus(RecheckStatusEnum.VALID_EXECUTABLE))
-                .isEqualTo("RECHECK_VALID_EXECUTABLE");
-        assertThat(PushRecheckStatusContract.toReviewTag(RecheckStatusEnum.VALID_EXECUTABLE))
+    void pushRecheckReviewPassedNamesRemainReviewLabelsOnly() {
+        assertThat(PushRecheckStatusContract.toPushStatus(RecheckStatusEnum.REVIEW_PASSED))
+                .isEqualTo("RECHECK_REVIEW_PASSED");
+        assertThat(PushRecheckStatusContract.toReviewTag(RecheckStatusEnum.REVIEW_PASSED))
                 .isEqualTo(PushRecheckStatusContract.ReviewTag.PASS);
         assertThat(PushRecheckStatusContract.isPendingPushStatusForScheduler("RECHECK_VALID_EXECUTABLE"))
                 .isFalse();

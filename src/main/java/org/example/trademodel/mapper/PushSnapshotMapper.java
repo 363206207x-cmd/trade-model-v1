@@ -31,10 +31,11 @@ public interface PushSnapshotMapper {
     List<TmPushSnapshotDO> listByAnalysisId(String analysisId);
 
     /**
-     * Dashboard 积压口径：未过期且仍处于 CAPTURED / RECHECK_VALID_WAITING 的 push 条数（非 scheduler 候选子集）。
+     * Dashboard 积压口径：未过期且仍处于 CAPTURED / RECHECK_REVIEW_WAITING 或历史等待状态的 push 条数。
      */
     @Select("SELECT COUNT(*) FROM tm_push_snapshot WHERE "
-            + "(push_status = 'CAPTURED' OR push_status = 'RECHECK_VALID_WAITING') "
+            + "(push_status = 'CAPTURED' OR push_status = 'RECHECK_REVIEW_WAITING' "
+            + "OR push_status = 'RECHECK_VALID_WAITING') "
             + "AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)")
     int countPendingRecheckBacklog();
 
@@ -49,7 +50,7 @@ public interface PushSnapshotMapper {
 
     /**
      * 最小可控的多轮 Recheck pending 选取：
-     * - push_status 仅允许 CAPTURED / RECHECK_VALID_WAITING
+     * - push_status 仅允许 CAPTURED / RECHECK_REVIEW_WAITING / 历史等待状态
      * - 未过期
      * - attempt 次数 < maxAttempts（基于 tm_push_recheck_log 行数）
      * - 距离最近一次 recheck_time >= minRetryMinutes
@@ -60,7 +61,7 @@ public interface PushSnapshotMapper {
             "  FROM tm_push_recheck_log " +
             "  GROUP BY push_id " +
             ") r ON r.push_id = s.push_id " +
-            "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB}) " +
+            "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB} OR s.push_status = #{statusC}) " +
             "AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP) " +
             "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
             "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= DATEADD('MINUTE', -#{minRetryMinutes}, CURRENT_TIMESTAMP)) " +
@@ -69,6 +70,7 @@ public interface PushSnapshotMapper {
     List<TmPushSnapshotDO> listPendingRecheckNext(
             @Param("statusA") String statusA,
             @Param("statusB") String statusB,
+            @Param("statusC") String statusC,
             @Param("maxAttempts") int maxAttempts,
             @Param("minRetryMinutes") int minRetryMinutes,
             @Param("limit") int limit);
