@@ -208,6 +208,42 @@ Auto-trading is not part of current V1.
 
 自动交易不属于当前 V1。
 
+## A-risk Auto Merge Rule / A-risk 自动合并规则
+
+A-risk docs / contract / workflow packages may be completed by Codex through stage, commit, push, PR check, CI wait, merge, main sync, and effective-state verification when all conditions below are true:
+
+- changed files only contain docs / workflow scripts / contract files;
+- no Java changes;
+- no tests changes;
+- no schema changes;
+- no dashboard changes;
+- no pom changes;
+- no runtime config changes;
+- Maven test passed;
+- workflow contract passed;
+- Codex task validation passed;
+- PR checks passed;
+- PR is not Draft;
+- target PR is the current package PR;
+- unrelated Draft PRs do not block current package merge;
+- unrelated Draft PRs still block the next business phase.
+
+A-risk 文档 / 契约 / 工作流包在以上条件全部满足时，可由 Codex 完成 stage、commit、push、PR check、CI wait、merge、main sync 和 effective-state verification。
+
+PR #1004 is an unrelated Draft PR. It must not be modified, merged, closed, reviewed, or used as the target of the current package merge flow. It must not block merging PR #1005, but while it remains open it still blocks entering P0-1 through the next-business-phase gate.
+
+PR #1004 是无关草稿 PR。它不得被当前流程修改、合并、关闭、review 或作为目标 PR。它不得阻止 PR #1005 合并，但只要仍 open，就必须继续阻止进入 P0-1。
+
+Codex merge path:
+
+- use `scripts/v1-pr-complete.sh` when possible;
+- use `scripts/v1-merge-sync.sh` for merge and local main sync;
+- if GitHub auth is unavailable, stop and print the exact command;
+- do not bypass GitHub permission;
+- do not manually merge with unsafe git commands.
+
+After merge, checkout / sync `main`, run `scripts/v1-state.sh`, and verify `COMPLETION_EFFECTIVE_STATE: EFFECTIVE_MERGED_MAIN` plus `P0_0_EFFECTIVE: YES`. If PR #1004 remains open, `NEXT_BUSINESS_PHASE_ALLOWED: NO` and `P0_1_ALLOWED: NO` remain expected.
+
 ## No Skip Rule / 禁止跳包规则
 
 Do not open the next package if any of these are true:

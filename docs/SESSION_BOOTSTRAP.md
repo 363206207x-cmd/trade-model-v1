@@ -121,6 +121,10 @@ bash scripts/v1-pr-complete.sh <PR_NUMBER> B "<SUBJECT>" --confirm-reviewed
 
 This helper always checks through `v1-auto.sh check-pr` and merges only through `v1-merge-sync.sh`.
 
+A-risk Auto Merge Rule（A-risk 自动合并规则） allows Codex to complete docs / contract / workflow packages by running PR check, CI wait, merge, main sync, and effective-state verification when the target PR is the current package PR, the PR is not Draft, Maven / workflow / Codex task validation passed, PR checks passed, and the changed files contain only docs / workflow scripts / contract files. Java, tests, schema, dashboard, pom, runtime config, business logic, order, execution, and auto-trading remain forbidden.
+
+PR #1004 is an unrelated Draft PR for this P0-0 package. It must not be modified, merged, closed, reviewed, or targeted by the completion helper. It must not block PR #1005 merge, but while open it still blocks P0-1.
+
 B-risk checks allow negative safety assertions such as `.doesNotExist()`, `does not expose`, `notTradingSignal`, `notCandidateSignal`, `notDecisionGeneration`, `notPointSignal`, `notExecutable`, `externalRefreshTriggered=false`, `displaySlotsAreCandidatePool=false`, and `failClosed`. Positive forbidden additions still stop the flow.
 
 B-risk 检查允许 `.doesNotExist()`、`does not expose`、`notTradingSignal`、`notCandidateSignal`、`notDecisionGeneration`、`notPointSignal`、`notExecutable`、`externalRefreshTriggered=false`、`displaySlotsAreCandidatePool=false` 和 `failClosed` 等负向安全断言。正向禁用语义仍会停止流程。

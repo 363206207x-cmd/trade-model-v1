@@ -186,29 +186,61 @@ if [[ "$current_phase_status" == "DONE" ]]; then
   fi
 fi
 
+current_package_branch="$(yaml_value "$TASK_FILE" branch)"
+[[ -n "$current_package_branch" ]] || current_package_branch="$branch"
+
 open_prs="none"
+current_package_pr="none"
+unrelated_open_prs="none"
+block_next_business_phase_only="NO"
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  if ! pr_lines="$(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | "#\(.number) \(.headRefName) \(.title) draft=\(.isDraft)"' 2>/dev/null)"; then
-    pr_lines=""
+  if ! pr_rows="$(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | [.number, .headRefName, .title, .isDraft] | @tsv' 2>/dev/null)"; then
+    pr_rows=""
     open_prs="GH_NOT_AVAILABLE"
+    current_package_pr="GH_NOT_AVAILABLE"
+    unrelated_open_prs="GH_NOT_AVAILABLE"
     blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
   fi
-  if [[ -n "$pr_lines" ]]; then
-    open_prs="$pr_lines"
-    blockers+=("OPEN_PR_EXISTS")
+  if [[ -n "${pr_rows:-}" ]]; then
+    open_pr_lines=()
+    current_package_pr_lines=()
+    unrelated_open_pr_lines=()
+    while IFS=$'\t' read -r pr_number pr_head pr_title pr_draft; do
+      [[ -z "${pr_number:-}" ]] && continue
+      pr_line="#$pr_number $pr_head $pr_title draft=$pr_draft"
+      open_pr_lines+=("$pr_line")
+      if [[ "$pr_head" == "$current_package_branch" || "$pr_head" == "$branch" ]]; then
+        current_package_pr_lines+=("$pr_line")
+      else
+        unrelated_open_pr_lines+=("$pr_line")
+        block_next_business_phase_only="YES"
+        blockers+=("UNRELATED_OPEN_PR_${pr_number}_BLOCKS_NEXT_BUSINESS_PHASE")
+      fi
+    done <<<"$pr_rows"
+    open_prs="$(printf '%s\n' "${open_pr_lines[@]}")"
+    if (( ${#current_package_pr_lines[@]} > 0 )); then
+      current_package_pr="$(printf '%s\n' "${current_package_pr_lines[@]}")"
+    fi
+    if (( ${#unrelated_open_pr_lines[@]} > 0 )); then
+      unrelated_open_prs="$(printf '%s\n' "${unrelated_open_pr_lines[@]}")"
+    fi
   fi
 else
   open_prs="GH_NOT_AVAILABLE"
+  current_package_pr="GH_NOT_AVAILABLE"
+  unrelated_open_prs="GH_NOT_AVAILABLE"
   blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
 fi
 
 # Phase gate.
 next_business_phase_allowed="NO"
 can_start_next_business_phase="NO"
+p0_0_effective="NO"
 if [[ "$current_phase_status" == "DONE" && "$completion_effective_state" == "EFFECTIVE_MERGED_MAIN" ]]; then
+  p0_0_effective="YES"
   # Require merged/synced main, clean main, no open PR, contract sync, and matrix test evidence.
   test_evidence="$(matrix_field P0-0 7)"
-  if [[ "$branch" == "main" && "$worktree_clean" == "Yes" && "$main_sync" == "OK" && "$open_prs" == "none" && "$matrix_sync" == "OK" && "$test_evidence" != "None" && "$test_evidence" != "Pending" ]]; then
+  if [[ "$branch" == "main" && "$worktree_clean" == "Yes" && "$main_sync" == "OK" && "$current_package_pr" == "none" && "$unrelated_open_prs" == "none" && "$matrix_sync" == "OK" && "$test_evidence" != "None" && "$test_evidence" != "Pending" ]]; then
     next_business_phase_allowed="YES"
     can_start_next_business_phase="YES"
   else
@@ -238,6 +270,9 @@ printf 'ON_MAIN_BRANCH: %s\n' "$on_main_branch"
 echo "RECENT_COMMITS:"
 git log --oneline -5
 printf 'OPEN_PRS: %s\n' "$open_prs"
+printf 'CURRENT_PACKAGE_PR: %s\n' "$current_package_pr"
+printf 'UNRELATED_OPEN_PRS: %s\n' "$unrelated_open_prs"
+printf 'BLOCK_NEXT_BUSINESS_PHASE_ONLY: %s\n' "$block_next_business_phase_only"
 printf 'MAIN_SYNC: %s\n' "$main_sync"
 printf 'HEAD_IN_ORIGIN_MAIN: %s\n' "$head_in_origin_main"
 printf 'CONTRACT_FILES_PRESENT: %s\n' "$contract_files_present"
@@ -246,9 +281,11 @@ printf 'CURRENT_PHASE: %s\n' "P0-0"
 printf 'CURRENT_PHASE_STATUS: %s\n' "$current_phase_status"
 printf 'EXISTING_MODULE_MATURITY: %s\n' "$existing_module_maturity"
 printf 'COMPLETION_EFFECTIVE_STATE: %s\n' "$completion_effective_state"
+printf 'P0_0_EFFECTIVE: %s\n' "$p0_0_effective"
 printf 'CURRENT_WORK_PACKAGE: %s\n' "$current_work_package"
 printf 'NEXT_BUSINESS_PHASE: %s\n' "$next_business_phase"
 printf 'NEXT_BUSINESS_PHASE_ALLOWED: %s\n' "$next_business_phase_allowed"
+printf 'P0_1_ALLOWED: %s\n' "$next_business_phase_allowed"
 printf 'PRODUCTION_DEPLOYMENT_READINESS: %s\n' "$production_deployment_readiness"
 printf 'CAN_START_NEXT_BUSINESS_PHASE: %s\n' "$can_start_next_business_phase"
 printf 'CAN_CONTINUE_NEXT_PACKAGE: %s\n' "$can_continue"

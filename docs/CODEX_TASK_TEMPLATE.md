@@ -102,3 +102,9 @@ If the current phase is P0-0 and the task is governance-only, business-module Do
 
 A local branch DONE candidate is not effective project completion.
 The next business phase remains blocked until the DONE candidate is merged to `main`, local `main` is synced, and the worktree is clean.
+
+## A-risk Auto Merge Note
+
+For P0-0 docs / contract / workflow packages only, Codex may complete the current package PR through the A-risk Auto Merge Rule when changed files are limited to docs / workflow scripts / contract files, Maven / workflow / task validation and PR checks passed, the PR is not Draft, and the target PR is the current package PR.
+
+Unrelated Draft PRs do not block current package merge. They still block the next business phase. PR #1004 is unrelated to the P0-0 package and must not be modified, merged, closed, reviewed, or targeted by this flow.

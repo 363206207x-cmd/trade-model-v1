@@ -153,6 +153,19 @@ PR 完成入口会先运行风险感知 PR 检查，等待必需 CI，再在风�
 B-risk semantic checks distinguish positive forbidden behavior from negative safety assertions.
 （B-risk 语义检查会区分正向禁用行为和负向安全断言。）
 
+A-risk Auto Merge Rule（A-risk 自动合并规则）:
+
+```bash
+bash scripts/v1-pr-complete.sh 1005 A "P0-0 Contract Delivery Package and Workflow Migration"
+bash scripts/v1-auto.sh complete-pr 1005 A "P0-0 Contract Delivery Package and Workflow Migration"
+```
+
+For A-risk docs / contract / workflow packages, the helper may complete PR check, CI wait, merge, local main sync, and effective-state verification only when the PR is not Draft, the target PR is the current package PR, Maven / workflow / task validation passed, PR checks passed, and changed files are limited to docs / workflow scripts / contract files. Java, tests, schema, dashboard, pom, runtime config, business logic, external channel, Push send, order, execution, and auto-trading remain forbidden.
+
+Unrelated Draft PRs do not block the current package merge. Unrelated Draft PRs still block the next business phase. PR #1004 is unrelated to the P0-0 package; it must not be modified, merged, closed, or used as the target PR, and it must still block P0-1 while open.
+
+A-risk 文档 / 契约 / 工作流包可以通过以上固定命令完成 PR 检查、CI 等待、合并、本地 main 同步和生效验证。无关 Draft PR 不阻止当前包合并，但仍阻止下一业务阶段；PR #1004 不得被处理。
+
 Allowed negative safety assertions include `.doesNotExist()`, `does not expose`, `does not contain`, `No final direction`, `No entry`, `No stop`, `No TP`, `No RR`, `notTradingSignal`, `notCandidateSignal`, `notDecisionGeneration`, `notPointSignal`, `notExecutable`, `externalRefreshTriggered=false`, `displaySlotsAreCandidatePool=false`, `failClosed`, forbidden-scope copy, and tests that assert forbidden fields are absent.
 
 允许的负向安全断言包括 `.doesNotExist()`、`does not expose`、`does not contain`、`No final direction`、`No entry`、`No stop`、`No TP`、`No RR`、`notTradingSignal`、`notCandidateSignal`、`notDecisionGeneration`、`notPointSignal`、`notExecutable`、`externalRefreshTriggered=false`、`displaySlotsAreCandidatePool=false`、`failClosed`、禁止范围文案，以及测试中的禁用字段不存在断言。

@@ -9,14 +9,19 @@ branch: "p0-0-global-audit-contract-reconciliation"
 risk: "A"
 next_business_phase: "P0-1 UserPosition"
 next_business_phase_allowed: false
-next_allowed_action: "Separately authorized stage / commit / push / A-risk PR creation for the P0-0 contract delivery package. P0-1 remains blocked until that PR is merged, main is synced, and the worktree is clean."
+next_allowed_action: "Complete current P0-0 package PR through the A-risk Auto Merge Rule when docs / contract / workflow scope, checks, and PR state pass. P0-1 remains blocked until that PR is merged, main is synced, the worktree is clean, and unrelated open PR blockers are resolved."
+current_package_pr: "DERIVED_BY_V1_STATE"
+unrelated_open_prs: "DERIVED_BY_V1_STATE"
+block_next_business_phase_only: true
+a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
+pr_1004_boundary: "unrelated Draft; do not modify, merge, close, review, or target; does not block PR #1005 merge; blocks P0-1 while open"
 
 allowed_scope:
   - "P0-0 contract/status/matrix/audit files"
   - "compatibility fact files"
   - "workflow scripts/docs"
   - "checks and closure evidence"
-  - "separately authorized package/merge commands in a later task"
+  - "A-risk Auto Merge Rule maintenance and current package PR completion"
 
 forbidden_scope:
   - "Java"

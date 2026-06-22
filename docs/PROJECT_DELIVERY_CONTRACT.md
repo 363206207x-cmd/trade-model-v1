@@ -1013,3 +1013,33 @@ The current repository evidence shows deployment blockers that must be cleared b
 P3-2 Full E2E Acceptance cannot be DONE until these production readiness blockers are either fixed or explicitly accepted by a human release gate.
 
 中文：生产部署就绪当前为 BLOCKED。P3-2 必须纳入生产配置、持久化数据库、认证、secret、health、migration、rollback、deployment smoke 等验收。
+
+---
+
+## 15. A-risk Auto Merge Rule / A-risk 自动合并规则
+
+P0-0 governance packages that are limited to docs / contract / workflow scripts may use the A-risk Auto Merge Rule.
+
+A-risk automatic completion is allowed only when all items below are true:
+
+1. Changed files only contain docs / workflow scripts / contract files.
+2. No Java changes.
+3. No tests changes.
+4. No schema changes.
+5. No dashboard changes.
+6. No pom changes.
+7. No runtime config changes.
+8. Maven test passed.
+9. Workflow contract passed.
+10. Codex task validation passed.
+11. PR checks passed.
+12. PR is not Draft.
+13. Target PR is the current package PR.
+14. Unrelated Draft PRs do not block current package merge.
+15. Unrelated Draft PRs still block the next business phase.
+
+PR #1004 is unrelated Draft PR evidence for this P0-0 package. It must not be modified, merged, closed, reviewed, or targeted by the P0-0 completion flow. It must not block merging PR #1005, but while open it still blocks P0-1 through the next-business-phase gate.
+
+Codex must use `scripts/v1-pr-complete.sh` when possible and `scripts/v1-merge-sync.sh` for merge plus local main sync. If GitHub auth is unavailable, Codex must stop and print the exact command. Codex must not bypass GitHub permission and must not manually merge with unsafe git commands.
+
+After merge, `main` must be checked out / synced, `scripts/v1-state.sh` must run, and P0-0 is effective only when `COMPLETION_EFFECTIVE_STATE: EFFECTIVE_MERGED_MAIN` and `P0_0_EFFECTIVE: YES` are reported. If PR #1004 remains open, `P0_1_ALLOWED: NO` remains expected.

@@ -21,8 +21,13 @@ next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "none for P0-0; unrelated Draft PR #1004 remains open"
+current_pr: "DERIVED_BY_V1_STATE; current package PR #1005 until merged; unrelated Draft PR #1004 remains open"
 current_branch: "p0-0-global-audit-contract-reconciliation"
+current_package_pr: "DERIVED_BY_V1_STATE"
+unrelated_open_prs: "DERIVED_BY_V1_STATE"
+block_next_business_phase_only: true
+a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
+pr_1004_boundary: "unrelated Draft; do not modify, merge, close, review, or target; does not block PR #1005 merge; blocks P0-1 while open"
 
 not_business_implementation: true
 p0_1_started: false
@@ -34,5 +39,7 @@ notes:
   - "This file is a derived compatibility mirror only."
   - "It cannot override PROJECT_DELIVERY_CONTRACT, DELIVERY_PROGRESS_MATRIX, or PROJECT_CURRENT_STATE."
   - "P0-0 DONE is a branch candidate only until v1-state runtime reports effective merged main."
+  - "A-risk Auto Merge Rule lets the current P0-0 package PR merge when docs / contract / workflow scope, checks, and PR state pass."
+  - "Unrelated Draft PRs do not block current package merge but still block the next business phase."
   - "P0-1 UserPosition has not started."
   - "Review-only slice count is no longer a delivery completion standard."

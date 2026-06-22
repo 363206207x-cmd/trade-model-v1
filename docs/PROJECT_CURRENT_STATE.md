@@ -20,6 +20,8 @@ It is not effective project completion until the commit containing this state is
 
 P0-1 UserPosition remains blocked until `bash scripts/v1-state.sh` reports `COMPLETION_EFFECTIVE_STATE: EFFECTIVE_MERGED_MAIN` and the next-business-phase gate allows it.
 
+`bash scripts/v1-state.sh` must distinguish `CURRENT_PACKAGE_PR`, `UNRELATED_OPEN_PRS`, and `BLOCK_NEXT_BUSINESS_PHASE_ONLY`. An unrelated Draft PR must not block merging the current P0-0 package PR, but it still blocks the next business phase.
+
 ---
 
 ## Current Allowed Work
@@ -30,8 +32,11 @@ Only the following work is allowed after this closure-readiness update:
 2. Separately authorized A-risk PR creation for the P0-0 contract delivery package.
 3. Review, checks, and merge of that P0-0 PR.
 4. Main sync after merge.
+5. A-risk Auto Merge Rule maintenance for docs / contract / workflow packages.
 
 No business module implementation is allowed in this phase.
+
+PR #1004 is unrelated Draft PR evidence. It must not be modified, merged, closed, reviewed, or targeted by this P0-0 flow. It must not block PR #1005 merge, but it still blocks P0-1 while open.
 
 ---
 

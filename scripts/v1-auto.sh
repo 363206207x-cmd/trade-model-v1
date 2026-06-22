@@ -31,6 +31,9 @@ V1 Auto Operator（V1 自动操作台）
   bash scripts/v1-auto.sh check-pr <PR_NUMBER> [risk]
       保留 PR 检查入口，优先委托 scripts/v1-pr-review-input.sh 并打印 gh checks（可用时）。
 
+  bash scripts/v1-auto.sh complete-pr <PR_NUMBER> <A|B|C> "<SUBJECT>" [--confirm-reviewed]
+      使用 scripts/v1-pr-complete.sh 完成 PR 检查、CI 等待、A-risk 合并和 main 同步。
+
   bash scripts/v1-auto.sh merge <PR_NUMBER> "<title>" <risk> [--confirm]
       保留合并 helper 行为，委托 scripts/v1-merge-sync.sh。
 
@@ -146,6 +149,10 @@ case "$cmd" in
   check-pr)
     shift
     cmd_check_pr "$@"
+    ;;
+  complete-pr)
+    shift
+    bash scripts/v1-pr-complete.sh "$@"
     ;;
   merge)
     shift

@@ -33,6 +33,7 @@ Do Not Do（禁止事项）:
 
 - `Current PR（当前 PR）` must say open / merged / none.
 - `Can Merge?（能否合并）` must mention risk level and approval rule.
+- For A-risk Auto Merge Rule（A-risk 自动合并规则） answers, include whether the target PR is the current package PR, whether unrelated Draft PRs only block the next business phase, and whether PR #1004 was untouched.
 - `Next Step（下一步）` must not skip an open required PR, unsynced main, dirty worktree, Draft PR, failed CI, or unresolved merge conflict.
 - `Do Not Do（禁止事项）` must include no auto-trading when trading paths are discussed.
 - Open PR / branch / Issue does not count as done.
