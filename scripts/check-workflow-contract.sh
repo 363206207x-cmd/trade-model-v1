@@ -49,11 +49,11 @@ yaml_value() {
 
 matrix_field() {
   local phase="$1"
-  local index="$2"
+  local field_index="$2"
   [[ -f docs/DELIVERY_PROGRESS_MATRIX.md ]] || return 0
-  awk -F'|' -v phase="$phase" -v index="$index" '
+  awk -F'|' -v phase="$phase" -v field_index="$field_index" '
     $2 ~ "^[[:space:]]*" phase "[[:space:]]*$" {
-      value=$index
+      value=$field_index
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
       print value
       exit
