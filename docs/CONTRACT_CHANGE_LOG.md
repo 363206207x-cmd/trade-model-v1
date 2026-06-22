@@ -1,0 +1,72 @@
+# Contract Change Log
+
+## v1.0
+
+Initial active project delivery contract.
+
+Rules:
+
+1. PROJECT_DELIVERY_CONTRACT.md cannot be silently changed.
+2. Any contract change must be recorded here.
+3. Any change that modifies phase order requires explicit human confirmation.
+4. Any change that modifies Done Criteria requires explicit human confirmation.
+5. Any change that weakens safety boundaries requires explicit human confirmation.
+
+---
+
+## Change Template
+
+Date:
+Changed by:
+Reason:
+Before:
+After:
+Does this change phase order:
+Does this change done criteria:
+Does this weaken safety boundaries:
+Human confirmation required:
+
+
+---
+
+## v1.0-p0-0-reconciliation-draft
+
+Date: 2026-06-20
+Changed by: Codex
+Reason: P0-0 Global Repository Audit Evidence + Contract Reconciliation Draft.
+Before: Local P0-0 draft did not explicitly separate Phase Status from Existing Module Maturity and did not mark machine-readable legacy files as compatibility-only.
+After: Draft adds P0-0 governance exception, Phase Status vs Existing Module Maturity, merged-main effectivity, fact-source priority, controlled emergency exception, production deployment readiness blockers, and automation migration list.
+Does this change phase order: No.
+Does this change done criteria: Clarifies only; business Done Criteria remain strict.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before merging to main.
+
+
+---
+
+## v1.0-p0-0-workflow-migration-draft
+
+Date: 2026-06-20
+Changed by: Codex
+Reason: P0-0 Contract Workflow Migration draft.
+Before: Workflow scripts and compatibility files could still use legacy V1 review-only runtime facts as the current-task driver.
+After: Workflow scripts and compatibility files are migrated to Project Delivery Contract / Delivery Progress Matrix / Project Current State priority, with ACTIVE_MAINLINE_STATUS and CODEX_NEXT_TASK marked DERIVED_ONLY.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before P0-0 closure.
+
+
+---
+
+## v1.0-p0-0-closure-readiness-candidate
+
+Date: 2026-06-21
+Changed by: Codex
+Reason: P0-0 Contract Delivery Closure Readiness.
+Before: P0-0 workflow migration draft remained IN_PROGRESS.
+After: P0-0 is marked DONE candidate with Completion Effective State = PENDING_MERGED_MAIN; P0-1 remains blocked until the package is separately staged, committed, pushed, reviewed, merged to main, main is synced, and the worktree is clean.
+Does this change phase order: No.
+Does this change done criteria: Strengthens P0-0 governance criteria by explicitly requiring PROJECT_GLOBAL_AUDIT.md and migrated workflow automation.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before staging / committing / pushing / PR creation.

@@ -95,15 +95,60 @@ if [[ "$DRY_RUN" == "true" ]]; then
   exit 0
 fi
 
+if [[ "$PR_NUMBER" == "1004" ]]; then
+  echo "PR_1004_PROTECTED: unrelated Draft PR #1004 must not be modified, closed, or merged by this flow." >&2
+  exit 1
+fi
+
 if ! command -v gh >/dev/null 2>&1; then
-  echo "GH_NOT_AVAILABLE" >&2
+  echo "GH_NOT_AVAILABLE_FOR_PR_MERGE" >&2
+  echo "NEXT_LOCAL_COMMAND: bash scripts/v1-pr-complete.sh $PR_NUMBER $RISK \"$SQUASH_SUBJECT\"" >&2
   exit 1
 fi
 
 if ! gh auth status >/dev/null 2>&1; then
-  echo "GH_NOT_AVAILABLE" >&2
+  echo "GH_NOT_AVAILABLE_FOR_PR_MERGE" >&2
+  echo "NEXT_LOCAL_COMMAND: bash scripts/v1-pr-complete.sh $PR_NUMBER $RISK \"$SQUASH_SUBJECT\"" >&2
   exit 1
 fi
+
+changed_files_for_pr() {
+  local pr_number="$1"
+  gh pr diff "$pr_number" --name-only
+}
+
+verify_a_risk_scope() {
+  local pr_number="$1"
+  local file
+  local forbidden=()
+
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    case "$file" in
+      AGENTS.md|docs/*|scripts/*.sh)
+        ;;
+      *)
+        forbidden+=("$file")
+        ;;
+    esac
+
+    case "$file" in
+      *.java|src/main/java/*|src/test/*|src/main/resources/schema.sql|src/main/resources/db/*|src/main/resources/templates/*|src/main/resources/static/*|pom.xml|src/main/resources/application.yml|src/main/resources/application.properties|src/main/resources/application-*.yml|src/main/resources/application-*.properties)
+        forbidden+=("$file")
+        ;;
+    esac
+
+    if printf '%s\n' "$file" | grep -Eiq '(^|/)schema|dashboard|pom\.xml|runtime config'; then
+      forbidden+=("$file")
+    fi
+  done < <(changed_files_for_pr "$pr_number")
+
+  if (( ${#forbidden[@]} > 0 )); then
+    echo "A_RISK_SCOPE_VIOLATION" >&2
+    printf '%s\n' "${forbidden[@]}" | awk '!seen[$0]++' | sed 's/^/- /' >&2
+    exit 1
+  fi
+}
 
 sync_main() {
   git switch main
@@ -147,6 +192,10 @@ fi
 
 echo "PR status before merge:"
 gh pr view "$PR_NUMBER" --json number,title,state,isDraft,mergeable,headRefName,baseRefName,statusCheckRollup
+
+if [[ "$RISK" == "A" ]]; then
+  verify_a_risk_scope "$PR_NUMBER"
+fi
 
 state="$(gh pr view "$PR_NUMBER" --json state --jq '.state')"
 if [[ "$state" == "MERGED" ]]; then

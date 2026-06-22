@@ -68,10 +68,14 @@ esac
 
 ensure_gh() {
   if ! command -v gh >/dev/null 2>&1; then
+    echo "GH_NOT_AVAILABLE_FOR_PR_MERGE"
+    echo "NEXT_LOCAL_COMMAND: bash scripts/v1-pr-complete.sh $PR_NUMBER $RISK \"$SUBJECT\""
     echo "STOP（停止）: gh 不可用，无法检查 Pull Request（拉取请求）。"
     exit 1
   fi
   if ! gh auth status >/dev/null 2>&1; then
+    echo "GH_NOT_AVAILABLE_FOR_PR_MERGE"
+    echo "NEXT_LOCAL_COMMAND: bash scripts/v1-pr-complete.sh $PR_NUMBER $RISK \"$SUBJECT\""
     echo "STOP（停止）: Codex shell gh auth 不可用。"
     echo "这表示 Codex GitHub status unknown（Codex GitHub 状态未知），不是项目 main 失败。"
     echo "请使用用户本机 gh 或 GPT connector 完成 PR 检查 / 合并。"
@@ -86,6 +90,85 @@ print_hr() {
 changed_files_for_pr() {
   local pr_number="$1"
   gh pr diff "$pr_number" --name-only
+}
+
+yaml_value() {
+  local file="$1"
+  local key="$2"
+  [[ -f "$file" ]] || return 0
+  awk -v key="$key" '
+    $0 ~ "^" key ":" {
+      value=$0
+      sub("^[^:]*:[[:space:]]*", "", value)
+      gsub(/^\"/, "", value)
+      gsub(/\"$/, "", value)
+      print value
+      exit
+    }
+  ' "$file"
+}
+
+verify_target_pr() {
+  local pr_number="$1"
+  local expected_subject="$2"
+  local expected_branch number title state is_draft base_ref head_ref
+
+  if [[ "$pr_number" == "1004" ]]; then
+    echo "STOP（停止）: PR #1004 is unrelated and protected; this flow must not modify, close, or merge it."
+    exit 1
+  fi
+
+  expected_branch="$(yaml_value docs/CODEX_NEXT_TASK.yml branch)"
+  [[ -n "$expected_branch" ]] || expected_branch="$(git branch --show-current)"
+
+  number="$(gh pr view "$pr_number" --json number --jq '.number')"
+  title="$(gh pr view "$pr_number" --json title --jq '.title')"
+  state="$(gh pr view "$pr_number" --json state --jq '.state')"
+  is_draft="$(gh pr view "$pr_number" --json isDraft --jq '.isDraft')"
+  base_ref="$(gh pr view "$pr_number" --json baseRefName --jq '.baseRefName')"
+  head_ref="$(gh pr view "$pr_number" --json headRefName --jq '.headRefName')"
+
+  [[ "$number" == "$pr_number" ]] || { echo "STOP（停止）: target PR mismatch: $number != $pr_number"; exit 1; }
+  [[ "$title" == "$expected_subject" ]] || { echo "STOP（停止）: target PR title mismatch: $title"; exit 1; }
+  [[ "$state" == "OPEN" ]] || { echo "STOP（停止）: target PR is not OPEN: $state"; exit 1; }
+  [[ "$is_draft" == "false" ]] || { echo "STOP（停止）: A-risk current package PR must not be Draft."; exit 1; }
+  [[ "$base_ref" == "main" ]] || { echo "STOP（停止）: target PR base is not main: $base_ref"; exit 1; }
+  [[ "$head_ref" == "$expected_branch" ]] || { echo "STOP（停止）: target PR head is not current package branch: $head_ref != $expected_branch"; exit 1; }
+}
+
+verify_a_risk_scope() {
+  local pr_number="$1"
+  local file
+  local forbidden=()
+
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    case "$file" in
+      AGENTS.md|docs/*|scripts/*.sh)
+        ;;
+      *)
+        forbidden+=("$file")
+        ;;
+    esac
+
+    case "$file" in
+      *.java|src/main/java/*|src/test/*|src/main/resources/schema.sql|src/main/resources/db/*|src/main/resources/templates/*|src/main/resources/static/*|pom.xml|src/main/resources/application.yml|src/main/resources/application.properties|src/main/resources/application-*.yml|src/main/resources/application-*.properties)
+        forbidden+=("$file")
+        ;;
+    esac
+
+    if printf '%s\n' "$file" | grep -Eiq '(^|/)schema|dashboard|pom\.xml|runtime config'; then
+      forbidden+=("$file")
+    fi
+  done < <(changed_files_for_pr "$pr_number")
+
+  if (( ${#forbidden[@]} > 0 )); then
+    echo "STOP（停止）: A-risk scope violation（低风险范围越界）:"
+    printf '%s\n' "${forbidden[@]}" | awk '!seen[$0]++' | sed 's/^/- /'
+    exit 1
+  fi
+
+  echo "A_RISK_SCOPE_OK"
 }
 
 print_pr_snapshot() {
@@ -265,6 +348,12 @@ print_hr
 echo "PR 编号: #$PR_NUMBER"
 echo "Risk（风险等级）: $RISK"
 echo "Subject（合并标题）: $SUBJECT"
+echo
+
+verify_target_pr "$PR_NUMBER" "$SUBJECT"
+if [[ "$RISK" == "A" ]]; then
+  verify_a_risk_scope "$PR_NUMBER"
+fi
 echo
 
 bash scripts/v1-auto.sh check-pr "$PR_NUMBER" "$RISK"

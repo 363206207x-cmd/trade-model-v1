@@ -1,3 +1,20 @@
+# Contract-First Workflow Automation
+
+Workflow automation must read facts in this priority order:
+
+1. `docs/PROJECT_DELIVERY_CONTRACT.md`
+2. `docs/DELIVERY_PROGRESS_MATRIX.md`
+3. `docs/PROJECT_CURRENT_STATE.md`
+4. derived compatibility files (`docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/CODEX_NEXT_TASK.yml`)
+5. legacy V1 documents as historical audit and asset evidence only
+
+`v1-auto.sh`, `v1-state.sh`, and `codex-next-task.sh` must not use review-only slice count as delivery progress or to select the next business package.
+`ACTIVE_MAINLINE_STATUS.yml` no longer independently defines the current task; it is a derived compatibility mirror.
+Fixed PR and merge helpers remain available, but they do not mark phases DONE.
+Token leakage remains a hard stop. No auto-trading is allowed.
+
+---
+
 # Workflow Command Automation
 
 This document defines the fixed local workflow commands for Trade Model V1 while keeping the default workflow GPT + Codex + GitHub-native.
@@ -89,9 +106,9 @@ bash scripts/v1-auto.sh next
 
 `v1-auto.sh` 不绕过固定脚本，只把状态、下一步、PR 检查和合并交接变成用户可读的中文操作台。
 
-`v1-auto.sh summary` and `v1-auto.sh next` read completed Review-Only Runtime partial slice count from `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md` instead of hard-coding the count in the script.
+`v1-auto.sh summary` and `v1-auto.sh next` read the Project Delivery Contract, Delivery Progress Matrix, Project Current State, and derived task handoff. They do not use Review-Only Runtime partial slice count as delivery progress or next-business-package selection.
 
-`v1-auto.sh summary` 和 `v1-auto.sh next` 从 `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md` 读取已完成 Review-Only Runtime partial（只读运行时部分完成）小闭环数量，不再在脚本中硬编码数量。
+`v1-auto.sh summary` 和 `v1-auto.sh next` 读取项目交付契约、交付进度矩阵、当前状态和派生任务交接文件，不再用 Review-Only Runtime partial（只读运行时部分完成）小闭环数量判定交付进度或选择下一业务包。
 
 Baseline sync PRs（基线同步 PR） are no longer part of the normal workflow.
 If `Source of Truth current_head` lags behind the actual clean / synced `main` HEAD, and `Open PR` is `none`, operators use actual HEAD as the Effective execution baseline（实际执行基线）.
@@ -135,6 +152,19 @@ PR 完成入口会先运行风险感知 PR 检查，等待必需 CI，再在风�
 
 B-risk semantic checks distinguish positive forbidden behavior from negative safety assertions.
 （B-risk 语义检查会区分正向禁用行为和负向安全断言。）
+
+A-risk Auto Merge Rule（A-risk 自动合并规则）:
+
+```bash
+bash scripts/v1-pr-complete.sh 1005 A "P0-0 Contract Delivery Package and Workflow Migration"
+bash scripts/v1-auto.sh complete-pr 1005 A "P0-0 Contract Delivery Package and Workflow Migration"
+```
+
+For A-risk docs / contract / workflow packages, the helper may complete PR check, CI wait, merge, local main sync, and effective-state verification only when the PR is not Draft, the target PR is the current package PR, Maven / workflow / task validation passed, PR checks passed, and changed files are limited to docs / workflow scripts / contract files. Java, tests, schema, dashboard, pom, runtime config, business logic, external channel, Push send, order, execution, and auto-trading remain forbidden.
+
+Unrelated Draft PRs do not block the current package merge. Unrelated Draft PRs still block the next business phase. PR #1004 is unrelated to the P0-0 package; it must not be modified, merged, closed, or used as the target PR, and it must still block P0-1 while open.
+
+A-risk 文档 / 契约 / 工作流包可以通过以上固定命令完成 PR 检查、CI 等待、合并、本地 main 同步和生效验证。无关 Draft PR 不阻止当前包合并，但仍阻止下一业务阶段；PR #1004 不得被处理。
 
 Allowed negative safety assertions include `.doesNotExist()`, `does not expose`, `does not contain`, `No final direction`, `No entry`, `No stop`, `No TP`, `No RR`, `notTradingSignal`, `notCandidateSignal`, `notDecisionGeneration`, `notPointSignal`, `notExecutable`, `externalRefreshTriggered=false`, `displaySlotsAreCandidatePool=false`, `failClosed`, forbidden-scope copy, and tests that assert forbidden fields are absent.
 
