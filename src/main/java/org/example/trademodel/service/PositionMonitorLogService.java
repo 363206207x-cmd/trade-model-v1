@@ -12,5 +12,7 @@ public interface PositionMonitorLogService {
 
     List<PositionMonitorLogDTO> listByPositionId(Long positionId, Integer limit);
 
+    List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId);
+
     List<PositionMonitorLogDTO> listByAnalysisId(String analysisId, Integer limit);
 }

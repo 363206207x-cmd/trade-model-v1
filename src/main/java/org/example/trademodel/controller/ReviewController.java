@@ -7,6 +7,10 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
+import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
+import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
+import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackResultDTO;
+import org.example.trademodel.userpositionreview.UserPositionReviewSummaryDTO;
 import org.example.trademodel.vo.ReviewAggregateDetailVO;
 import org.example.trademodel.vo.ReviewAggregateSummaryVO;
 import org.example.trademodel.vo.ReviewAggregateVO;
@@ -32,16 +36,19 @@ public class ReviewController {
     private final ReviewAggregateService reviewAggregateService;
     private final RuleVersionLogQueryService ruleVersionLogQueryService;
     private final PositionMonitorLogService positionMonitorLogService;
+    private final UserPositionReviewAdapter userPositionReviewAdapter;
 
     @Autowired
     public ReviewController(ReviewService reviewService,
                             ReviewAggregateService reviewAggregateService,
                             RuleVersionLogQueryService ruleVersionLogQueryService,
-                            PositionMonitorLogService positionMonitorLogService) {
+                            PositionMonitorLogService positionMonitorLogService,
+                            UserPositionReviewAdapter userPositionReviewAdapter) {
         this.reviewService = reviewService;
         this.reviewAggregateService = reviewAggregateService;
         this.ruleVersionLogQueryService = ruleVersionLogQueryService;
         this.positionMonitorLogService = positionMonitorLogService;
+        this.userPositionReviewAdapter = userPositionReviewAdapter;
     }
 
     /**
@@ -116,6 +123,29 @@ public class ReviewController {
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
         try {
             return ResponseEntity.ok(ApiResponse.success(positionMonitorLogService.listByPositionId(positionId, limit)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.badRequest(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/user-positions/{positionId}/summary")
+    public ResponseEntity<ApiResponse<UserPositionReviewSummaryDTO>> getUserPositionReviewSummary(
+            @PathVariable Long positionId) {
+        try {
+            return ResponseEntity.ok(ApiResponse.success(userPositionReviewAdapter.buildSummary(positionId)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.badRequest(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/user-positions/{positionId}/feedback")
+    public ResponseEntity<ApiResponse<UserPositionReviewFeedbackResultDTO>> recordUserPositionReviewFeedback(
+            @PathVariable Long positionId,
+            @RequestBody UserPositionReviewFeedbackReq request) {
+        try {
+            return ResponseEntity.ok(ApiResponse.success(userPositionReviewAdapter.recordFeedback(positionId, request)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.badRequest(e.getMessage()));

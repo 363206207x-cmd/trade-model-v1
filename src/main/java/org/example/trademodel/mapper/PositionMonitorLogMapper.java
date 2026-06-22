@@ -35,6 +35,9 @@ public interface PositionMonitorLogMapper {
     @Select(BASE_SELECT + "WHERE position_id = #{positionId} ORDER BY created_at DESC, log_id DESC LIMIT #{limit}")
     List<PositionMonitorLogDO> listByPositionId(@Param("positionId") Long positionId, @Param("limit") int limit);
 
+    @Select(BASE_SELECT + "WHERE position_id = #{positionId} ORDER BY created_at ASC, log_id ASC")
+    List<PositionMonitorLogDO> listAllByPositionIdForReview(@Param("positionId") Long positionId);
+
     @Select(BASE_SELECT + "WHERE analysis_id = #{analysisId} ORDER BY created_at DESC, log_id DESC LIMIT #{limit}")
     List<PositionMonitorLogDO> listByAnalysisId(@Param("analysisId") String analysisId, @Param("limit") int limit);
 }
