@@ -2,7 +2,9 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
+import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
@@ -16,6 +18,7 @@ import org.example.trademodel.vo.ReviewAggregateSummaryVO;
 import org.example.trademodel.vo.ReviewAggregateVO;
 import org.example.trademodel.vo.ReviewStateVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/review")
@@ -37,18 +41,21 @@ public class ReviewController {
     private final RuleVersionLogQueryService ruleVersionLogQueryService;
     private final PositionMonitorLogService positionMonitorLogService;
     private final UserPositionReviewAdapter userPositionReviewAdapter;
+    private final OpportunityLogService opportunityLogService;
 
     @Autowired
     public ReviewController(ReviewService reviewService,
                             ReviewAggregateService reviewAggregateService,
                             RuleVersionLogQueryService ruleVersionLogQueryService,
                             PositionMonitorLogService positionMonitorLogService,
-                            UserPositionReviewAdapter userPositionReviewAdapter) {
+                            UserPositionReviewAdapter userPositionReviewAdapter,
+                            OpportunityLogService opportunityLogService) {
         this.reviewService = reviewService;
         this.reviewAggregateService = reviewAggregateService;
         this.ruleVersionLogQueryService = ruleVersionLogQueryService;
         this.positionMonitorLogService = positionMonitorLogService;
         this.userPositionReviewAdapter = userPositionReviewAdapter;
+        this.opportunityLogService = opportunityLogService;
     }
 
     /**
@@ -150,6 +157,14 @@ public class ReviewController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.badRequest(e.getMessage()));
         }
+    }
+
+    @GetMapping("/opportunities/stats")
+    public ResponseEntity<ApiResponse<OpportunityLogStatsDTO>> getOpportunityStats(
+            @RequestParam(required = false) String symbol,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        return ResponseEntity.ok(ApiResponse.success(opportunityLogService.getStats(symbol, from, to)));
     }
 
     /**

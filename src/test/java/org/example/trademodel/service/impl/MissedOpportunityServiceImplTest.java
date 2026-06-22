@@ -3,18 +3,15 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.entity.MissedOpportunityDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.MissedOpportunityMapper;
-import org.example.trademodel.mapper.RealPositionMapper;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,53 +27,30 @@ class MissedOpportunityServiceImplTest {
 
     @Mock
     private MissedOpportunityMapper missedOpportunityMapper;
-    @Mock
-    private RealPositionMapper realPositionMapper;
 
     private MissedOpportunityServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new MissedOpportunityServiceImpl(missedOpportunityMapper, realPositionMapper);
+        service = new MissedOpportunityServiceImpl(missedOpportunityMapper);
     }
 
     @Test
-    void recordEligible_insertsMissedOpportunity() {
+    void recordFromAuthoritativeAnalysis_isFrozenCompatibilityAndDoesNotInsertMissedOpportunity() {
         DecisionBundleVO decision = baseDecision();
-        when(realPositionMapper.countOpenPositionsBySymbol("BTCUSDT")).thenReturn(0);
-        when(missedOpportunityMapper.listByDecisionId("d-1")).thenReturn(Collections.emptyList());
 
         service.recordFromAuthoritativeAnalysisIfEligible("a-1", " BTCUSDT ", "tr-1", decision, false);
-
-        ArgumentCaptor<MissedOpportunityDO> captor = ArgumentCaptor.forClass(MissedOpportunityDO.class);
-        verify(missedOpportunityMapper).insert(captor.capture());
-        MissedOpportunityDO row = captor.getValue();
-        assertThat(row.getAnalysisId()).isEqualTo("a-1");
-        assertThat(row.getDecisionId()).isEqualTo("d-1");
-        assertThat(row.getSymbol()).isEqualTo("BTCUSDT");
-        assertThat(row.getRuleVersion()).isEqualTo("missed-v1");
-        assertThat(row.getReasonJson()).contains("\"hotResetWouldFire\":false");
-    }
-
-    @Test
-    void recordWithOpenPosition_skipsInsert() {
-        DecisionBundleVO decision = baseDecision();
-        when(realPositionMapper.countOpenPositionsBySymbol("ETHUSDT")).thenReturn(1);
-
-        service.recordFromAuthoritativeAnalysisIfEligible("a-2", "ETHUSDT", "tr-2", decision, false);
 
         verify(missedOpportunityMapper, never()).insert(any());
     }
 
     @Test
-    void recordWhenPositionQueryThrows_treatsAsNoPositionAndInserts() {
+    void recordWithHotResetFlag_stillDoesNotInsertInLegacyPath() {
         DecisionBundleVO decision = baseDecision();
-        when(realPositionMapper.countOpenPositionsBySymbol("SOLUSDT")).thenThrow(new RuntimeException("db error"));
-        when(missedOpportunityMapper.listByDecisionId("d-1")).thenReturn(Collections.emptyList());
 
-        service.recordFromAuthoritativeAnalysisIfEligible("a-3", "SOLUSDT", "tr-3", decision, false);
+        service.recordFromAuthoritativeAnalysisIfEligible("a-2", "ETHUSDT", "tr-2", decision, true);
 
-        verify(missedOpportunityMapper).insert(any(MissedOpportunityDO.class));
+        verify(missedOpportunityMapper, never()).insert(any());
     }
 
     @Test

@@ -210,3 +210,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p1-4-opportunity-log-done-candidate
+
+Date: 2026-06-23
+Changed by: Codex
+Reason: P1-4 OpportunityLog B-risk implementation package.
+Before: P1-4 OpportunityLog was NOT_STARTED/PARTIAL with historical `tm_missed_opportunity` assets only, no authoritative `tm_opportunity_log`, no final opportunity outcome classification, no persisted OHLCV target/invalidation ordering, no MFE / MAE, and no Review opportunity stats.
+After: P1-4 is a branch DONE candidate with `tm_opportunity_log`, OpportunityLog DO / Mapper / Service / Controller, authoritative candidate creation after persisted analysis facts, exact MANUAL UserPosition source-ref execution evidence, legacy MissedOpportunity compatibility freeze, EXECUTED_VALID / EXECUTED_INVALID / MISSED_VALID / MISSED_INVALID / PUSHED_NOT_FILLED_VALID / BLOCKED_BY_RISK_VALID statuses, target / invalidation ordering, same-bar ambiguity, MFE / MAE from persisted OHLCV, Review opportunity stats, fixed safety fields, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

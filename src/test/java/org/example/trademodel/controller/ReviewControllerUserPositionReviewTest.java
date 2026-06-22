@@ -5,6 +5,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackResultDTO;
@@ -45,6 +46,8 @@ class ReviewControllerUserPositionReviewTest {
     private PositionMonitorLogService positionMonitorLogService;
     @Mock
     private UserPositionReviewAdapter userPositionReviewAdapter;
+    @Mock
+    private OpportunityLogService opportunityLogService;
 
     private MockMvc mockMvc;
 
@@ -55,7 +58,8 @@ class ReviewControllerUserPositionReviewTest {
                 reviewAggregateService,
                 ruleVersionLogQueryService,
                 positionMonitorLogService,
-                userPositionReviewAdapter)).build();
+                userPositionReviewAdapter,
+                opportunityLogService)).build();
     }
 
     @Test

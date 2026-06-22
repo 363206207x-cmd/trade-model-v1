@@ -57,6 +57,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private final MonitorAlertWriteService monitorAlertWriteService;
     private final HotResetService hotResetService;
     private final MissedOpportunityService missedOpportunityService;
+    private final OpportunityLogService opportunityLogService;
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -106,7 +107,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                                         PushSnapshotService pushSnapshotService,
                                         MonitorAlertWriteService monitorAlertWriteService,
                                         HotResetService hotResetService,
-                                        MissedOpportunityService missedOpportunityService) {
+                                        MissedOpportunityService missedOpportunityService,
+                                        OpportunityLogService opportunityLogService) {
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
         this.planService = planService;
@@ -125,6 +127,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.monitorAlertWriteService = monitorAlertWriteService;
         this.hotResetService = hotResetService;
         this.missedOpportunityService = missedOpportunityService;
+        this.opportunityLogService = opportunityLogService;
     }
 
     @Override
@@ -207,6 +210,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         String decisionInvalidCondition = null;
         HotResetCommand hotResetCommand = null;
         boolean hotWouldReset = false;
+        DecisionResult persistedDecision = null;
+        ExecutionPlanDO persistedPlan = null;
         try {
             // 1. AnalysisRun
             AnalysisRunDO run = new AnalysisRunDO();
@@ -298,6 +303,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 ddo.setAssetStateSnapshot(decision.getAssetStateSnapshot());
                 ddo.setCreateTime(decisionCreateTime);
                 decisionResultMapper.insert(ddo);
+                persistedDecision = ddo;
 
                 int confused = decision.getConfusedScore() != null ? decision.getConfusedScore() : 0;
                 hotResetCommand = buildStructuredHotResetCommand(analysis, decision, marketEnvSourceType, run.getTraceId());
@@ -311,13 +317,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                             decision.getConfusedLowStreak() != null ? decision.getConfusedLowStreak() : 0,
                             run.getTraceId());
                 }
-
-                missedOpportunityService.recordFromAuthoritativeAnalysisIfEligible(
-                        analysis.getAnalysisId(),
-                        analysis.getSymbol(),
-                        run.getTraceId(),
-                        decision,
-                        hotWouldReset);
             }
 
             persistMarketEnvironmentSnapshot(analysis, marketEnvSourceType);
@@ -332,6 +331,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setPlanId(plan.getPlanId());
                 pdo.setAnalysisId(analysis.getAnalysisId());
                 pdo.setPlanMode(plan.getPlanMode());
+                pdo.setExecutionPlanStatus(plan.getExecutionPlanStatus());
+                pdo.setSourceGateStatus(plan.getSourceGateStatus());
+                pdo.setSourceGateComplete(plan.getSourceGateComplete());
+                pdo.setSourceMissingReasons(joinReasons(plan.getMissingSourceReasons()));
+                pdo.setSourceBlockerReasons(joinReasons(plan.getSourceBlockerReasons()));
+                pdo.setSourceCompletenessSummary(plan.getSourceCompletenessSummary());
                 pdo.setRecommendedAction(plan.getRecommendedAction());
                 pdo.setEntryZone(plan.getEntryZone());
                 pdo.setStopLoss(plan.getStopLoss());
@@ -345,6 +350,16 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                         : null);
                 pdo.setCreateTime(LocalDateTime.now());
                 executionPlanMapper.insert(pdo);
+                persistedPlan = pdo;
+            }
+
+            if (!hotWouldReset && persistedDecision != null && persistedPlan != null) {
+                opportunityLogService.recordFromAuthoritativeAnalysis(
+                        run,
+                        persistedDecision,
+                        persistedPlan,
+                        accountRiskSnapshotId,
+                        run.getTraceId());
             }
 
             if (hotWouldReset && hotResetCommand != null) {
@@ -818,6 +833,18 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             return "[]";
         }
         return t;
+    }
+
+    private static String joinReasons(List<String> reasons) {
+        if (reasons == null || reasons.isEmpty()) {
+            return null;
+        }
+        String joined = reasons.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(","));
+        return joined.isEmpty() ? null : joined;
     }
 
     private String buildExecutionAccountRiskJson(String analysisId) {
