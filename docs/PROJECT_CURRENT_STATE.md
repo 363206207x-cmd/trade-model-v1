@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P0-0 Contract Delivery Package and Merge
-Next Business Phase: P0-1 UserPosition
+Current Work Package: P0-1 UserPosition Manual Workflow DONE candidate
+Next Business Phase: P0-2 ExecutionPlan Source Gate
 Next Business Phase Allowed: NO
 Production Deployment Readiness: BLOCKED
 
@@ -26,26 +26,23 @@ P0-1 UserPosition remains blocked until `bash scripts/v1-state.sh` reports `COMP
 
 ## Current Allowed Work
 
-Only the following work is allowed after this closure-readiness update:
+Only the following work is allowed after this P0-1 branch-candidate update:
 
-1. Separately authorized stage / commit / push for the P0-0 contract delivery package.
-2. Separately authorized A-risk PR creation for the P0-0 contract delivery package.
-3. Review, checks, and merge of that P0-0 PR.
-4. Main sync after merge.
-5. A-risk Auto Merge Rule maintenance for docs / contract / workflow packages.
+1. Review, checks, push, PR creation, and merge-gate handling for the P0-1 UserPosition B-risk package.
+2. Main sync after the P0-1 PR is reviewed and merged.
+3. Runtime verification that P0-1 is effective on clean / synced main before any P0-2 work starts.
 
-No business module implementation is allowed in this phase.
+P0-1 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
 
-PR #1004 is unrelated Draft PR evidence. It must not be modified, merged, closed, reviewed, or targeted by this P0-0 flow. It must not block PR #1005 merge, but it still blocks P0-1 while open.
+PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into this package.
 
 ---
 
 ## Current Forbidden Work
 
-The following work is blocked until P0-0 is effective on merged main:
+The following work is blocked until P0-1 is effective on merged main:
 
-1. UserPosition implementation.
-2. ExecutionPlan Source Gate implementation.
+1. ExecutionPlan Source Gate implementation.
 3. AccountRisk UserPosition integration.
 4. PositionMonitorLog implementation.
 5. PositionMonitorService implementation.
@@ -64,18 +61,35 @@ The following work is blocked until P0-0 is effective on merged main:
 
 ## Current Known Critical Gaps
 
-1. tm_user_position missing.
-2. UserPositionService missing.
-3. UserPositionController missing.
-4. PositionMonitorService missing.
-5. tm_position_monitor_log missing.
-6. Review does not fully integrate real user position.
-7. ExecutionPlan Source Gate not hardened.
-8. HotReset real action incomplete.
-9. OpportunityLog incomplete.
-10. Macro / News runtime not complete.
-11. AI orchestrator and ai call log incomplete.
-12. Dashboard Final must wait until business semantics are stable.
+1. P0-1 UserPosition is only a branch DONE candidate until merged main confirms it effective.
+2. PositionMonitorService missing.
+3. tm_position_monitor_log missing.
+4. Review does not fully integrate real user position.
+5. ExecutionPlan Source Gate not hardened.
+6. HotReset real action incomplete.
+7. OpportunityLog incomplete.
+8. Macro / News runtime not complete.
+9. AI orchestrator and ai call log incomplete.
+10. Dashboard Final must wait until business semantics are stable.
+
+## P0-1 UserPosition Branch Candidate
+
+Branch: `p0-1-user-position-full-implementation`
+Risk: B
+Status: DONE candidate
+Effective State: pending merged main
+
+Implemented branch evidence:
+
+1. `tm_user_position` persistence exists.
+2. Manual open endpoint creates only `MANUAL` + `OPEN` UserPosition rows.
+3. Manual close endpoint closes only `OPEN` / `PARTIALLY_CLOSED` rows and sets `CLOSED`.
+4. Open query excludes `CLOSED` rows.
+5. Output safety fields are fixed true: `manualReviewRequired`, `notTradeInstruction`, `notAutoTrading`, `notOrderExecution`, `notPositionSync`.
+6. ExecutionPlan, triggered state, and real_position sync sources are rejected and cannot auto-create UserPosition.
+7. No order, execution, auto-trading, dashboard UI, P0-2 Source Gate, AccountRisk, PositionMonitor, Review, or PR #1004 changes are part of this package.
+
+P0-2 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P0-1 effective.
 
 ---
 
@@ -105,4 +119,4 @@ Review-only slice count is no longer a delivery completion standard.
 
 ## Rule
 
-No later business phase may start until P0-0 DONE is merged to main and `Next Business Phase Allowed` becomes YES through the contract gate.
+No later business phase may start until the current branch candidate is merged to main and `Next Business Phase Allowed` becomes YES through the contract gate.

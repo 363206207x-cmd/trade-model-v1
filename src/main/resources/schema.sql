@@ -182,6 +182,49 @@ CREATE TABLE IF NOT EXISTS tm_real_position (
 
 CREATE INDEX IF NOT EXISTS idx_tm_real_position_symbol_status ON tm_real_position(symbol, position_status);
 
+CREATE TABLE IF NOT EXISTS tm_user_position (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    asset_symbol VARCHAR(32) NOT NULL,
+    side VARCHAR(10) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    entry_price DECIMAL(20, 8) NOT NULL,
+    quantity DECIMAL(28, 8) NOT NULL,
+    leverage DECIMAL(20, 8) NOT NULL,
+    stop_loss DECIMAL(20, 8),
+    take_profit DECIMAL(20, 8),
+    opened_at TIMESTAMP NOT NULL,
+    closed_at TIMESTAMP,
+    close_price DECIMAL(20, 8),
+    close_reason VARCHAR(512),
+    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL',
+    source_ref_id VARCHAR(128),
+    manual_review_required BOOLEAN NOT NULL DEFAULT TRUE,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    not_position_sync BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_user_position_side CHECK (side IN ('LONG', 'SHORT')),
+    CONSTRAINT ck_tm_user_position_status CHECK (status IN ('OPEN', 'PARTIALLY_CLOSED', 'CLOSED')),
+    CONSTRAINT ck_tm_user_position_source_type CHECK (source_type = 'MANUAL'),
+    CONSTRAINT ck_tm_user_position_entry_price CHECK (entry_price > 0),
+    CONSTRAINT ck_tm_user_position_quantity CHECK (quantity > 0),
+    CONSTRAINT ck_tm_user_position_leverage CHECK (leverage > 0),
+    CONSTRAINT ck_tm_user_position_safety_flags CHECK (
+        manual_review_required = TRUE
+        AND not_trade_instruction = TRUE
+        AND not_auto_trading = TRUE
+        AND not_order_execution = TRUE
+        AND not_position_sync = TRUE
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_user_position_status_opened_at
+    ON tm_user_position(status, opened_at);
+CREATE INDEX IF NOT EXISTS idx_tm_user_position_asset_status
+    ON tm_user_position(asset_symbol, status);
+
 -- Push 快照 / 二次校验（与 tm_analysis_run.analysis_id 类型一致：VARCHAR(64)）
 -- 下列 CLOB JSON 列由 /api/review/aggregate 原样透出至复盘页文本展示，应用层不对其做解析或折叠 UI。
 CREATE TABLE IF NOT EXISTS tm_push_snapshot (

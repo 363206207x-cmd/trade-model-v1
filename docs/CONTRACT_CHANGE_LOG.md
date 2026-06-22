@@ -70,3 +70,17 @@ Does this change phase order: No.
 Does this change done criteria: Strengthens P0-0 governance criteria by explicitly requiring PROJECT_GLOBAL_AUDIT.md and migrated workflow automation.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before staging / committing / pushing / PR creation.
+
+---
+
+## v1.0-p0-1-user-position-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P0-1 UserPosition Manual Workflow B-risk implementation package.
+Before: P0-1 UserPosition was NOT_STARTED with missing schema, DO, Mapper, DTO, Service, Controller, Req/VO/Enums, and tests.
+After: P0-1 is a branch DONE candidate with manual-only UserPosition persistence, manual open / manual close APIs, open-position query excluding CLOSED rows, fixed safety fields, fail-closed validation, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.
