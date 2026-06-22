@@ -1,4 +1,4 @@
-current_head: "c2f1bbb"
+current_head: "DERIVED_BY_GIT_HEAD"
 source_of_truth_contract: "docs/PROJECT_DELIVERY_CONTRACT.md"
 source_of_truth_matrix: "docs/DELIVERY_PROGRESS_MATRIX.md"
 source_of_truth_current_state: "docs/PROJECT_CURRENT_STATE.md"
@@ -12,25 +12,28 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P0-0 Contract Delivery Package and Merge"
-active_block_cn: "P0-0 契约交付打包与合并"
+active_block: "P0-1 UserPosition Manual Workflow DONE candidate"
+active_block_cn: "P0-1 用户手动持仓 DONE candidate"
 
-next_required_action: "P0-0 Contract Delivery Package and Merge"
-next_business_phase: "P0-1 UserPosition"
+next_required_action: "Review and merge-gate the P0-1 UserPosition B-risk PR; do not start P0-2 before merged-main effectivity."
+next_business_phase: "P0-2 ExecutionPlan Source Gate"
 next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "DERIVED_BY_V1_STATE; current package PR #1005 until merged; unrelated Draft PR #1004 remains open"
-current_branch: "p0-0-global-audit-contract-reconciliation"
+current_pr: "DERIVED_BY_V1_STATE"
+current_branch: "p0-1-user-position-full-implementation"
 current_package_pr: "DERIVED_BY_V1_STATE"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
-block_next_business_phase_only: true
+block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
-pr_1004_boundary: "unrelated Draft; do not modify, merge, close, review, or target; does not block PR #1005 merge; blocks P0-1 while open"
+pr_1004_boundary: "closed unrelated Draft dashboard PR; do not merge, modify, reopen, or include its code"
 
-not_business_implementation: true
-p0_1_started: false
+not_business_implementation: false
+p0_1_started: true
+p0_1_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
+p0_1_effective: false
+p0_2_allowed: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -38,8 +41,8 @@ merged_main_matrix_done_required: true
 notes:
   - "This file is a derived compatibility mirror only."
   - "It cannot override PROJECT_DELIVERY_CONTRACT, DELIVERY_PROGRESS_MATRIX, or PROJECT_CURRENT_STATE."
-  - "P0-0 DONE is a branch candidate only until v1-state runtime reports effective merged main."
-  - "A-risk Auto Merge Rule lets the current P0-0 package PR merge when docs / contract / workflow scope, checks, and PR state pass."
-  - "Unrelated Draft PRs do not block current package merge but still block the next business phase."
-  - "P0-1 UserPosition has not started."
+  - "P0-0 runtime has reported effective merged main; P0-1 is now the active branch candidate."
+  - "P0-1 UserPosition remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
+  - "P0-2 remains blocked while P0-1 is only a branch candidate."
+  - "No dashboard UI, auto-trading, order execution, P0-2 Source Gate, AccountRisk, PositionMonitor, Review, or PR #1004 code is part of this package."
   - "Review-only slice count is no longer a delivery completion standard."
