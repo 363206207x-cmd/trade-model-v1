@@ -302,6 +302,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                             analysis.getSymbol(),
                             decision.getAssetState(),
                             confused,
+                            decision.getConfusedLowStreak() != null ? decision.getConfusedLowStreak() : 0,
                             run.getTraceId());
 
                     if (hotWouldReset) {
@@ -319,13 +320,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                                 confused,
                                 decision.isMultiTimeframeAligned(),
                                 triggerReasonCode,
-                                "Confused score is high and multi timeframe alignment is false, trigger hot reset to OBSERVING.",
+                                "Confused score is high and multi timeframe alignment is false; record Hot Reset evidence without overriding the P1-2 authoritative state.",
                                 2,
                                 LocalDateTime.now(),
                                 decision.getAssetState(),
-                                AssetStateEnum.OBSERVING);
-                        assetStateService.persistAuthoritativeState(
-                                analysis.getSymbol(), AssetStateEnum.OBSERVING, 0, run.getTraceId());
+                                decision.getAssetState());
                     }
                 }
 

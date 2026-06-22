@@ -59,6 +59,9 @@ public class PushSnapshotService {
         if (!Boolean.TRUE.equals(decision.getIsWorthOpening())) {
             return;
         }
+        if (decision.isDirectionalPushBlocked()) {
+            return;
+        }
 
         LocalDateTime now = LocalDateTime.now();
         TmPushSnapshotDO row = new TmPushSnapshotDO();

@@ -32,12 +32,24 @@ public class AssetStateServiceImpl implements AssetStateService {
     @Override
     public String buildSnapshotAtDecision(String symbol, String analysisId, AssetStateEnum state, int confusedScore,
                                           boolean multiTimeframeAligned) {
+        return buildSnapshotAtDecision(symbol, analysisId, null, state, confusedScore, 0,
+                false, multiTimeframeAligned);
+    }
+
+    @Override
+    public String buildSnapshotAtDecision(String symbol, String analysisId, AssetStateEnum previousState,
+                                          AssetStateEnum nextState, int confusedScore, int confusedLowStreak,
+                                          boolean directionalPushBlocked, boolean multiTimeframeAligned) {
         ObjectNode n = MAPPER.createObjectNode();
         n.put("source", "synthetic_at_decision");
         n.put("symbol", symbol != null ? symbol : "");
         n.put("analysisId", analysisId != null ? analysisId : "");
-        n.put("state", state != null ? state.name() : "");
+        n.put("previousState", previousState != null ? previousState.name() : "");
+        n.put("nextState", nextState != null ? nextState.name() : "");
+        n.put("state", nextState != null ? nextState.name() : "");
         n.put("confusedScore", confusedScore);
+        n.put("confusedLowStreak", Math.max(0, confusedLowStreak));
+        n.put("directionalPushBlocked", directionalPushBlocked);
         n.put("multiTimeframeAligned", multiTimeframeAligned);
         String json = n.toString();
         if (json.length() > 512) {
@@ -48,6 +60,12 @@ public class AssetStateServiceImpl implements AssetStateService {
 
     @Override
     public void persistAuthoritativeState(String symbol, AssetStateEnum state, int confusedScore, String traceId) {
+        persistAuthoritativeState(symbol, state, confusedScore, 0, traceId);
+    }
+
+    @Override
+    public void persistAuthoritativeState(String symbol, AssetStateEnum state, int confusedScore,
+                                          int confusedLowStreak, String traceId) {
         if (symbol == null || symbol.isBlank()) {
             return;
         }
@@ -55,6 +73,7 @@ public class AssetStateServiceImpl implements AssetStateService {
         row.setSymbol(symbol.trim());
         row.setState(state);
         row.setConfusedScore(confusedScore);
+        row.setConfusedLowStreak(Math.max(0, confusedLowStreak));
         row.setLastUpdateTime(LocalDateTime.now());
         row.setTraceId(traceId);
         assetStateMapper.mergeUpsertCore(row);
@@ -81,6 +100,7 @@ public class AssetStateServiceImpl implements AssetStateService {
             seed.setSymbol(sym);
             seed.setState(postState != null ? postState : AssetStateEnum.OBSERVING);
             seed.setConfusedScore(0);
+            seed.setConfusedLowStreak(0);
             seed.setLastUpdateTime(LocalDateTime.now());
             seed.setTraceId(null);
             assetStateMapper.mergeUpsertCore(seed);

@@ -470,6 +470,7 @@ CREATE TABLE IF NOT EXISTS tm_asset_state (
     symbol VARCHAR(20) NOT NULL UNIQUE,
     state VARCHAR(32),
     confused_score INT,
+    confused_low_streak INT NOT NULL DEFAULT 0,
     hot_reset_flag BOOLEAN DEFAULT FALSE,
     hot_reset_trigger_type VARCHAR(64),
     hot_reset_trigger_value VARCHAR(128),

@@ -12,17 +12,17 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P1-1 PushRecheck semantic hardening DONE candidate"
-active_block_cn: "P1-1 复查语义收紧 DONE candidate"
+active_block: "P1-2 ConfusedState + AiConflict hardening DONE candidate"
+active_block_cn: "P1-2 困惑状态与 AI 冲突硬化 DONE candidate"
 
-next_required_action: "Review and merge-gate the P1-1 PushRecheck semantic hardening B-risk PR; do not start P1-2 before merged-main effectivity."
-next_business_phase: "P1-2 ConfusedState + AiConflict hardening"
+next_required_action: "Review and merge-gate the P1-2 ConfusedState + AiConflict hardening B-risk PR; do not start P1-3 before merged-main effectivity."
+next_business_phase: "P1-3 HotReset real action"
 next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "DERIVED_BY_V1_STATE"
-current_branch: "p1-1-push-recheck-semantic-hardening"
+current_branch: "p1-2-confused-state-ai-conflict-hardening"
 current_package_pr: "DERIVED_BY_V1_STATE"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -49,9 +49,12 @@ p0_6_started: true
 p0_6_status: "DONE on merged main"
 p0_6_effective: true
 p1_1_started: true
-p1_1_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
-p1_1_effective: false
-p1_2_allowed: false
+p1_1_status: "DONE on merged main"
+p1_1_effective: true
+p1_2_started: true
+p1_2_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
+p1_2_effective: false
+p1_3_allowed: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -65,8 +68,9 @@ notes:
   - "P0-4 PositionMonitorLog is effective on merged main."
   - "P0-5 PositionMonitorService is effective on merged main."
   - "P0-6 Review integrates UserPosition is effective on merged main."
-  - "P1-1 PushRecheck semantic hardening is now the active branch candidate."
-  - "P1-1 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
-  - "P1-2 remains blocked while P1-1 is only a branch candidate."
-  - "No UserPosition creation or mutation, automatic open / close / reverse, order execution, auto-trading, Push send, external channel, Dashboard UI, P1-2, or PR #1004 code is part of this package."
+  - "P1-1 PushRecheck semantic hardening is effective on merged main."
+  - "P1-2 ConfusedState + AiConflict hardening is now the active branch candidate."
+  - "P1-2 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
+  - "P1-3 remains blocked while P1-2 is only a branch candidate."
+  - "No external AI provider, UserPosition mutation, automatic open / close / reverse, order execution, auto-trading, Push send, external channel, Dashboard UI, HotReset real action, or PR #1004 code is part of this package."
   - "Review-only slice count is no longer a delivery completion standard."

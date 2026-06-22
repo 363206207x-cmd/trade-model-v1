@@ -87,6 +87,20 @@ Human confirmation required: Yes before B-risk PR merge.
 
 ---
 
+## v1.0-p1-2-confused-state-ai-conflict-hardening-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P1-2 ConfusedState + AiConflict hardening B-risk implementation package.
+Before: P1-2 ConfusedState + AiConflict hardening was NOT_STARTED/PARTIAL with existing DecisionEngine, ConfusedState, AiConflict, AssetState, and AI role display assets, but no contract-hard confused thresholds, persisted low-streak exit semantics, directional push block, or rule-layer direction preservation proof.
+After: P1-2 is a branch DONE candidate with ConfusedStatePolicy thresholds, confused_score >= 70 CONFUSED entry, confused_score >= 85 directional push block, two consecutive low cycles below 55 before COOLING exit, per-symbol persisted confused_low_streak, no direct TRIGGERED / WAITING_TRIGGER after exit, bounded single-AI-objection behavior, rule-layer direction preservation, GPT / Gemini / Grok advisory-only handling, allowed AI effects limited to confidence / risk / plan mode / confused state, PushSnapshot directional guard, and tests for aligned, minor, major, and extreme conflicts. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.
+
+---
+
 ## v1.0-p0-5-position-monitor-service-done-candidate
 
 Date: 2026-06-22
