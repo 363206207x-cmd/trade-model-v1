@@ -26,12 +26,14 @@ public class PushRecheckScheduler {
     /**
      * 最小可控多轮 pending 集合：
      * - 首次：CAPTURED
-     * - 下一轮：RECHECK_VALID_WAITING
+     * - 下一轮：RECHECK_REVIEW_WAITING
+     * - 历史兼容：RECHECK_VALID_WAITING
      *
      * 其它 RECHECK_* 属于终止态（不自动恢复）。
      */
-    private static final String PENDING_PUSH_STATUS_CAPTURED = "CAPTURED";
-    private static final String PENDING_PUSH_STATUS_WAITING = "RECHECK_VALID_WAITING";
+    private static final String PENDING_PUSH_STATUS_CAPTURED = PushRecheckStatusContract.PUSH_STATUS_CAPTURED;
+    private static final String PENDING_PUSH_STATUS_WAITING = PushRecheckStatusContract.PUSH_STATUS_REVIEW_WAITING;
+    private static final String PENDING_PUSH_STATUS_LEGACY_WAITING = "RECHECK_VALID_WAITING";
 
     private volatile int defaultLimit;
     private volatile int maxAttempts;
@@ -65,14 +67,16 @@ public class PushRecheckScheduler {
         try {
             refreshRuntimeConfigFromStore();
             if (!PushRecheckStatusContract.isPendingPushStatusForScheduler(PENDING_PUSH_STATUS_CAPTURED)
-                    || !PushRecheckStatusContract.isPendingPushStatusForScheduler(PENDING_PUSH_STATUS_WAITING)) {
-                log.warn("[push-recheck-scheduler] pending status contract mismatch: {}/{}",
-                        PENDING_PUSH_STATUS_CAPTURED, PENDING_PUSH_STATUS_WAITING);
+                    || !PushRecheckStatusContract.isPendingPushStatusForScheduler(PENDING_PUSH_STATUS_WAITING)
+                    || !PushRecheckStatusContract.isPendingPushStatusForScheduler(PENDING_PUSH_STATUS_LEGACY_WAITING)) {
+                log.warn("[push-recheck-scheduler] pending status contract mismatch: {}/{}/{}",
+                        PENDING_PUSH_STATUS_CAPTURED, PENDING_PUSH_STATUS_WAITING, PENDING_PUSH_STATUS_LEGACY_WAITING);
                 return;
             }
             List<TmPushSnapshotDO> pending = pushSnapshotMapper.listPendingRecheckNext(
                     PENDING_PUSH_STATUS_CAPTURED,
                     PENDING_PUSH_STATUS_WAITING,
+                    PENDING_PUSH_STATUS_LEGACY_WAITING,
                     maxAttempts,
                     minRetryMinutes,
                     defaultLimit);
@@ -82,10 +86,11 @@ public class PushRecheckScheduler {
 
             String batchId = "SCH-" + UUID.randomUUID().toString().replace("-", "");
 
-            log.info("[push-recheck-scheduler] pendingPushes={} (statuses={}/{}, maxAttempts={}, minRetryMinutes={})",
+            log.info("[push-recheck-scheduler] pendingPushes={} (statuses={}/{}/{}, maxAttempts={}, minRetryMinutes={})",
                     pending.size(),
                     PENDING_PUSH_STATUS_CAPTURED,
                     PENDING_PUSH_STATUS_WAITING,
+                    PENDING_PUSH_STATUS_LEGACY_WAITING,
                     maxAttempts,
                     minRetryMinutes);
             for (TmPushSnapshotDO push : pending) {
@@ -176,4 +181,3 @@ public class PushRecheckScheduler {
         return cnt == null ? 1 : cnt + 1;
     }
 }
-

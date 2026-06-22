@@ -168,3 +168,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p1-1-push-recheck-semantic-hardening-done-candidate
+
+Date: 2026-06-22
+Changed by: Codex
+Reason: P1-1 PushRecheck semantic hardening B-risk implementation package.
+Before: P1-1 PushRecheck semantic hardening was NOT_STARTED/PARTIAL with Recheck assets that still used legacy status names that could be misread as trading authorization.
+After: P1-1 is a branch DONE candidate with review-only canonical Recheck statuses, fixed RecheckResult safety fields, EXPIRED / DRIFTED_FROM_ENTRY_ZONE / RISK_BLOCKED / CONFUSED_BLOCKED semantics, legacy status compatibility reads, scheduler/backlog compatibility, replay/log canonical status output, and tests proving Recheck cannot create UserPosition or trigger trade actions. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

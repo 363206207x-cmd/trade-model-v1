@@ -2023,7 +2023,7 @@ class DashboardControllerTest {
 
     @Test
     void recheckPreviewStatusEndpointReturnsReviewOnlyReadyProjectionFromPersistedLogAndOpsOverview() throws Exception {
-        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "VALID_WAITING"));
+        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "REVIEW_WAITING"));
         when(pushRecheckService.getOpsOverview("batch-1", "inst-1", 5, 10)).thenReturn(recheckOpsOverview(true, true));
 
         mockMvc.perform(get("/api/dashboard/recheck-preview-status")
@@ -2041,8 +2041,8 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.replaySummaryCounterStatus").value("REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY"))
                 .andExpect(jsonPath("$.dispatchConfigAuditStatus").value("DISPATCH_CONFIG_AUDIT_REVIEW_ONLY_READY"))
                 .andExpect(jsonPath("$.latestLogAvailable").value(true))
-                .andExpect(jsonPath("$.latestRecheckStatus").value("VALID_WAITING"))
-                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_VALID_WAITING"))
+                .andExpect(jsonPath("$.latestRecheckStatus").value("REVIEW_WAITING"))
+                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_REVIEW_WAITING"))
                 .andExpect(jsonPath("$.latestRecheckReviewTag").value("WAITING"))
                 .andExpect(jsonPath("$.statusContractMeaning").value("persisted status label only; not executable readiness or trading authorization"))
                 .andExpect(jsonPath("$.replaySummaryTotalCount").value(3))
@@ -2144,12 +2144,12 @@ class DashboardControllerTest {
 
     @Test
     void recheckPreviewStatusEndpointDoesNotExposeExecutableActionFields() throws Exception {
-        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "VALID_EXECUTABLE"));
+        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "REVIEW_PASSED"));
         when(pushRecheckService.getOpsOverview(null, null, 5, 10)).thenReturn(recheckOpsOverview(true, true));
 
         mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("pushId", "101"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_VALID_EXECUTABLE"))
+                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_REVIEW_PASSED"))
                 .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
                 .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
                 .andExpect(jsonPath("$.schedulerAction").doesNotExist())

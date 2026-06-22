@@ -41,13 +41,13 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     /** 相对 trigger_price 的漂移比例上限（例如 0.02 = 2%） */
     private static final BigDecimal DRIFT_RATIO_THRESHOLD = new BigDecimal("0.02");
 
-    /** 快照困惑分 ≥ 此值 → VALID_WAITING（仍认为计划可读，但建议暂缓） */
+    /** 快照困惑分 ≥ 此值 → REVIEW_WAITING（仅建议人工复核等待） */
     private static final int CONFUSED_WAIT_THRESHOLD = 70;
 
     /** 快照困惑分 ≥ 此值 → CONFUSED_BLOCKED（困惑度过高，直接阻断） */
     private static final int CONFUSED_BLOCK_THRESHOLD = 85;
 
-    /** 快照执行可行性低于此值 → VALID_WAITING（若字段存在） */
+    /** 快照执行可行性低于此值 → REVIEW_WAITING（若字段存在） */
     private static final int EXEC_FEASIBILITY_WAIT_THRESHOLD = 60;
 
     private final PushSnapshotMapper pushSnapshotMapper;
@@ -83,7 +83,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             early.setRecheckStatus(RecheckStatusEnum.INVALIDATED);
             early.setCurrentPrice(currentPrice);
             early.setValid(false);
-            early.setMessage("push_id 不能为空");
+            early.setReviewPassed(false);
+            early.setMessage("复查上下文无效，不得作为当前交易依据");
             return early;
         }
 
@@ -100,15 +101,15 @@ public class PushRecheckServiceImpl implements PushRecheckService {
 
         if (snap == null) {
             status = RecheckStatusEnum.INVALIDATED;
-            message = "未找到推送快照，无法二次校验";
+            message = "复查上下文无效，不得作为当前交易依据";
             failReasonJson = failJson("SNAPSHOT_NOT_FOUND", "push_id=" + pushId);
         } else if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
             status = RecheckStatusEnum.INVALIDATED;
-            message = "当前价格无效，无法二次校验";
+            message = "复查上下文无效，不得作为当前交易依据";
             failReasonJson = failJson("PRICE_REQUIRED", "current_price null or non-positive");
         } else if (snap.getExpiresAt() != null && now.isAfter(snap.getExpiresAt())) {
             status = RecheckStatusEnum.EXPIRED;
-            message = "推送已过期";
+            message = "推送已过期，不得作为当前交易依据";
             failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
         } else {
             accountRiskSnapshot = resolveAccountRiskSnapshot(snap);
@@ -125,9 +126,9 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                 priceDriftRatio = currentPrice.subtract(snap.getTriggerPrice()).abs()
                         .divide(snap.getTriggerPrice(), 8, RoundingMode.HALF_UP);
                 if (priceDriftRatio.compareTo(DRIFT_RATIO_THRESHOLD) > 0) {
-                    status = RecheckStatusEnum.DRIFTED;
-                    message = "相对快照基准价漂移超过阈值";
-                    failReasonJson = failJson("DRIFT",
+                    status = RecheckStatusEnum.DRIFTED_FROM_ENTRY_ZONE;
+                    message = "当前价格已偏离原入场区域，需要人工复核";
+                    failReasonJson = failJson("DRIFTED_FROM_ENTRY_ZONE",
                             "threshold=" + DRIFT_RATIO_THRESHOLD + ",ratio=" + priceDriftRatio);
                 } else {
                     status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
@@ -138,20 +139,20 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             } else {
                 priceDriftRatio = null;
                 status = classifyPostPriceChecks(snap, currentAccountRiskAllowed);
-                message = status == RecheckStatusEnum.VALID_EXECUTABLE
-                        ? "二次确认通过，可执行（未配置 trigger_price，跳过漂移检测）"
+                message = status == RecheckStatusEnum.REVIEW_PASSED
+                        ? "复查条件通过，仅供人工复核，不是交易指令"
                         : statusMessage(status, currentAccountRiskAllowed);
                 failReasonJson = failReasonForStatus(
                         status, currentAccountRiskAllowed, snap, accountRiskSnapshot, userPositionRiskResult);
             }
         }
 
-        boolean executable = status == RecheckStatusEnum.VALID_EXECUTABLE;
         RecheckResult result = new RecheckResult();
         result.setPushId(pushId);
         result.setRecheckStatus(status);
         result.setCurrentPrice(currentPrice);
-        result.setValid(executable);
+        result.setValid(false);
+        result.setReviewPassed(PushRecheckStatusContract.isReviewPassed(status));
         result.setMessage(message);
 
         TmPushRecheckLogDO row = new TmPushRecheckLogDO();
@@ -251,13 +252,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             if (row == null) {
                 continue;
             }
-            if ("VALID_EXECUTABLE".equalsIgnoreCase(trimToNull(row.getRecheckStatus()))) {
+            RecheckStatusEnum canonicalStatus = PushRecheckStatusContract.tryParseRecheckStatus(row.getRecheckStatus());
+            if (PushRecheckStatusContract.isReviewPassed(canonicalStatus)) {
                 success++;
-            } else if ("VALID_WAITING".equalsIgnoreCase(trimToNull(row.getRecheckStatus()))) {
+            } else if (PushRecheckStatusContract.isWaiting(canonicalStatus)) {
                 waiting++;
-            } else if ("EXPIRED".equalsIgnoreCase(trimToNull(row.getRecheckStatus()))) {
+            } else if (canonicalStatus == RecheckStatusEnum.EXPIRED) {
                 expired++;
-            } else if (isBlockingStatus(row.getRecheckStatus())) {
+            } else if (PushRecheckStatusContract.isBlocking(canonicalStatus)) {
                 blocking++;
             }
             if ("REPLAY".equalsIgnoreCase(trimToNull(row.getTriggerSource()))) {
@@ -329,7 +331,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         vo.setExecutionErrorCode(row.getExecutionErrorCode());
         vo.setExecutionErrorMessage(row.getExecutionErrorMessage());
         vo.setRecheckTime(row.getRecheckTime());
-        vo.setRecheckStatus(row.getRecheckStatus());
+        vo.setRecheckStatus(PushRecheckStatusContract.canonicalizeRecheckStatusName(row.getRecheckStatus()));
         vo.setCurrentPrice(row.getCurrentPrice());
         vo.setPriceDriftRatio(row.getPriceDriftRatio());
         vo.setCurrentSlippageEstimation(row.getCurrentSlippageEstimation());
@@ -360,29 +362,29 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             return RecheckStatusEnum.CONFUSED_BLOCKED;
         }
         if (confused != null && confused >= CONFUSED_WAIT_THRESHOLD) {
-            return RecheckStatusEnum.VALID_WAITING;
+            return RecheckStatusEnum.REVIEW_WAITING;
         }
         Integer execFeas = snap.getExecutionFeasibilitySnapshot();
         if (execFeas != null && execFeas < EXEC_FEASIBILITY_WAIT_THRESHOLD) {
-            return RecheckStatusEnum.VALID_WAITING;
+            return RecheckStatusEnum.REVIEW_WAITING;
         }
-        return RecheckStatusEnum.VALID_EXECUTABLE;
+        return RecheckStatusEnum.REVIEW_PASSED;
     }
 
     private static String statusMessage(RecheckStatusEnum status, Boolean currentAccountRiskAllowed) {
         if (status == RecheckStatusEnum.RISK_BLOCKED) {
-            return "账户风险状态不允许执行，已阻断";
+            return "账户或持仓风险阻断，仅供人工复核";
         }
         if (status == RecheckStatusEnum.CONFUSED_BLOCKED) {
-            return "快照困惑度过高，已阻断执行";
+            return "困惑度过高，方向性结论已阻断";
         }
-        if (status == RecheckStatusEnum.VALID_WAITING) {
+        if (status == RecheckStatusEnum.REVIEW_WAITING) {
             if (currentAccountRiskAllowed == null) {
-                return "计划仍有效，但账户风险状态未知，建议继续等待";
+                return "复查结果建议等待，仅供人工复核";
             }
-            return "计划仍有效，但快照指标建议继续等待";
+            return "复查结果建议等待，仅供人工复核";
         }
-        return "二次确认通过，可执行";
+        return "复查条件通过，仅供人工复核，不是交易指令";
     }
 
     private static String failReasonForStatus(RecheckStatusEnum status,
@@ -414,7 +416,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             return failJson("CONFUSED_BLOCKED", "confusedScoreSnapshot=" + snap.getConfusedScoreSnapshot()
                     + ",threshold=" + CONFUSED_BLOCK_THRESHOLD);
         }
-        if (status == RecheckStatusEnum.VALID_WAITING && currentAccountRiskAllowed == null) {
+        if (status == RecheckStatusEnum.REVIEW_WAITING && currentAccountRiskAllowed == null) {
             return failJson("RISK_UNKNOWN_WAIT", "currentAccountRiskAllowed=null");
         }
         return null;
@@ -583,17 +585,6 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             return "REPLAY-" + fallbackInstructionId.trim();
         }
         return "REPLAY-LOG-" + row.getLogId();
-    }
-
-    private static boolean isBlockingStatus(String status) {
-        String v = trimToNull(status);
-        if (v == null) {
-            return false;
-        }
-        return "INVALIDATED".equalsIgnoreCase(v)
-                || "DRIFTED".equalsIgnoreCase(v)
-                || "RISK_BLOCKED".equalsIgnoreCase(v)
-                || "CONFUSED_BLOCKED".equalsIgnoreCase(v);
     }
 
     private static String trimToNull(String value) {

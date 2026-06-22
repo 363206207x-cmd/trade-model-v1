@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,6 +67,8 @@ class PushRecheckServiceImplTest {
         RecheckResult r = service.recheck(1L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isValid()).isFalse();
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
         verify(pushRecheckLogMapper).insert(any());
         verify(pushSnapshotMapper).updatePushStatus(1L, "RECHECK_INVALIDATED");
     }
@@ -77,6 +80,8 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(2L)).thenReturn(s);
         RecheckResult r = service.recheck(2L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
         verify(pushRecheckLogMapper).insert(any());
         verify(pushSnapshotMapper).updatePushStatus(2L, "RECHECK_EXPIRED");
     }
@@ -89,14 +94,16 @@ class PushRecheckServiceImplTest {
         s.setDataQualityScoreSnapshot(72);
         when(pushSnapshotMapper.selectByPushId(3L)).thenReturn(s);
         RecheckResult r = service.recheck(3L, new BigDecimal("110"));
-        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.DRIFTED);
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.DRIFTED_FROM_ENTRY_ZONE);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
         verify(pushRecheckLogMapper).insert(cap.capture());
         assertThat(cap.getValue().getPriceDriftRatio()).isNotNull();
         assertThat(cap.getValue().getCurrentConfusedScore()).isEqualTo(22);
         assertThat(cap.getValue().getCurrentDataQualityScore()).isEqualTo(72);
-        verify(pushSnapshotMapper).updatePushStatus(3L, "RECHECK_DRIFTED");
+        verify(pushSnapshotMapper).updatePushStatus(3L, "RECHECK_DRIFTED_FROM_ENTRY_ZONE");
     }
 
     @Test
@@ -106,24 +113,55 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(4L)).thenReturn(s);
         RecheckResult r = service.recheck(4L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertSafeReviewOnlyResult(r);
         verify(pushSnapshotMapper).updatePushStatus(4L, "RECHECK_INVALIDATED");
     }
 
     @Test
-    void validWaiting_highConfused() {
+    void invalidCurrentPrice_invalidated() {
+        TmPushSnapshotDO s = baseSnap();
+        when(pushSnapshotMapper.selectByPushId(41L)).thenReturn(s);
+
+        RecheckResult r = service.recheck(41L, BigDecimal.ZERO);
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
+        verify(pushSnapshotMapper).updatePushStatus(41L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void reviewWaiting_highConfused() {
         TmPushSnapshotDO s = baseSnap();
         s.setConfusedScoreSnapshot(75);
         s.setDataQualityScoreSnapshot(65);
         when(pushSnapshotMapper.selectByPushId(5L)).thenReturn(s);
         RecheckResult r = service.recheck(5L, new BigDecimal("100"));
-        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_WAITING);
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_WAITING);
         assertThat(r.isValid()).isFalse();
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
         verify(pushRecheckLogMapper).insert(cap.capture());
         assertThat(cap.getValue().getCurrentConfusedScore()).isEqualTo(75);
         assertThat(cap.getValue().getCurrentDataQualityScore()).isEqualTo(65);
-        verify(pushSnapshotMapper).updatePushStatus(5L, "RECHECK_VALID_WAITING");
+        verify(pushSnapshotMapper).updatePushStatus(5L, "RECHECK_REVIEW_WAITING");
+    }
+
+    @Test
+    void reviewWaiting_lowExecutionFeasibility() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setConfusedScoreSnapshot(20);
+        s.setExecutionFeasibilitySnapshot(55);
+        when(pushSnapshotMapper.selectByPushId(52L)).thenReturn(s);
+
+        RecheckResult r = service.recheck(52L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_WAITING);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
+        verify(pushSnapshotMapper).updatePushStatus(52L, "RECHECK_REVIEW_WAITING");
     }
 
     @Test
@@ -135,37 +173,41 @@ class PushRecheckServiceImplTest {
         RecheckResult r = service.recheck(51L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.CONFUSED_BLOCKED);
         assertThat(r.isValid()).isFalse();
+        assertSafeReviewOnlyResult(r);
         verify(pushSnapshotMapper).updatePushStatus(51L, "RECHECK_CONFUSED_BLOCKED");
     }
 
     @Test
-    void validExecutable() {
+    void reviewPassed() {
         TmPushSnapshotDO s = baseSnap();
         s.setConfusedScoreSnapshot(10);
         s.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(6L)).thenReturn(s);
         RecheckResult r = service.recheck(6L, new BigDecimal("100"));
-        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_EXECUTABLE);
-        assertThat(r.isValid()).isTrue();
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
+        assertThat(r.isValid()).isFalse();
+        assertThat(r.isReviewPassed()).isTrue();
+        assertSafeReviewOnlyResult(r);
+        assertThat(r.getMessage()).isEqualTo("复查条件通过，仅供人工复核，不是交易指令");
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
         verify(pushRecheckLogMapper).insert(cap.capture());
         assertThat(cap.getValue().getCurrentConfusedScore()).isEqualTo(10);
         assertThat(cap.getValue().getCurrentDataQualityScore()).isEqualTo(88);
-        verify(pushSnapshotMapper).updatePushStatus(6L, "RECHECK_VALID_EXECUTABLE");
+        verify(pushSnapshotMapper).updatePushStatus(6L, "RECHECK_REVIEW_PASSED");
     }
 
     @Test
-    void validExecutable_shouldUpdatePushStatus() {
+    void reviewPassed_shouldUpdatePushStatus() {
         TmPushSnapshotDO s = baseSnap();
         s.setConfusedScoreSnapshot(10);
         s.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(6L)).thenReturn(s);
 
         RecheckResult r = service.recheck(6L, new BigDecimal("100"));
-        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_EXECUTABLE);
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
 
-        verify(pushSnapshotMapper).updatePushStatus(6L, "RECHECK_VALID_EXECUTABLE");
+        verify(pushSnapshotMapper).updatePushStatus(6L, "RECHECK_REVIEW_PASSED");
     }
 
     @Test
@@ -181,6 +223,7 @@ class PushRecheckServiceImplTest {
         RecheckResult r = service.recheck(7L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.RISK_BLOCKED);
         assertThat(r.isValid()).isFalse();
+        assertSafeReviewOnlyResult(r);
 
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
@@ -198,7 +241,8 @@ class PushRecheckServiceImplTest {
         when(accountRiskSnapshotMapper.selectById(100L)).thenReturn(null);
 
         RecheckResult r = service.recheck(8L, new BigDecimal("100"));
-        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_EXECUTABLE);
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
+        assertSafeReviewOnlyResult(r);
     }
 
     @Test
@@ -211,8 +255,10 @@ class PushRecheckServiceImplTest {
 
         RecheckResult r = service.recheck(81L, new BigDecimal("100"));
 
-        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.VALID_EXECUTABLE);
-        assertThat(r.isValid()).isTrue();
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
+        assertThat(r.isValid()).isFalse();
+        assertThat(r.isReviewPassed()).isTrue();
+        assertSafeReviewOnlyResult(r);
         verify(userPositionRiskAdapter).currentRisk();
 
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
@@ -234,6 +280,7 @@ class PushRecheckServiceImplTest {
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.RISK_BLOCKED);
         assertThat(r.isValid()).isFalse();
+        assertSafeReviewOnlyResult(r);
         verify(userPositionRiskAdapter).currentRisk();
 
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
@@ -337,6 +384,38 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
+    void getLatestLog_shouldCanonicalizeLegacyStatusForReadApi() {
+        org.example.trademodel.entity.TmPushRecheckLogDO old = new org.example.trademodel.entity.TmPushRecheckLogDO();
+        old.setLogId(4001L);
+        old.setPushId(12L);
+        old.setRecheckStatus("DRIFTED");
+        when(pushRecheckLogMapper.selectByPushId(12L)).thenReturn(List.of(old));
+
+        assertThat(service.getLatestLog(12L).getRecheckStatus())
+                .isEqualTo("DRIFTED_FROM_ENTRY_ZONE");
+    }
+
+    @Test
+    void recheckResult_shouldNotExposeExecutableActionFields() {
+        List<String> fieldNames = Arrays.stream(RecheckResult.class.getDeclaredFields())
+                .map(java.lang.reflect.Field::getName)
+                .toList();
+
+        assertThat(fieldNames).doesNotContain(
+                "executable",
+                "tradeAllowed",
+                "orderAllowed",
+                "openAllowed",
+                "executionAuthorized",
+                "tradingAuthorized",
+                "sendablePayload",
+                "providerPayload",
+                "orderAction",
+                "executionAction",
+                "autoTradingAction");
+    }
+
+    @Test
     void summarizeReplayByDispatch_shouldReturnZeroSummaryWhenNoLogs() {
         when(pushRecheckLogMapper.selectByBatchId("SCH-EMPTY")).thenReturn(List.of());
 
@@ -417,5 +496,20 @@ class PushRecheckServiceImplTest {
         TmPushSnapshotDO s = new TmPushSnapshotDO();
         s.setExpiresAt(LocalDateTime.now().plusHours(1));
         return s;
+    }
+
+    private static void assertSafeReviewOnlyResult(RecheckResult result) {
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.isReviewOnly()).isTrue();
+        assertThat(result.isManualReviewOnly()).isTrue();
+        assertThat(result.isNotTradeInstruction()).isTrue();
+        assertThat(result.isNotExecutable()).isTrue();
+        assertThat(result.isNotAutoTrading()).isTrue();
+        assertThat(result.isNotOrderExecution()).isTrue();
+        assertThat(result.isNotUserPositionCreation()).isTrue();
+        assertThat(result.isNotPositionMutation()).isTrue();
+        assertThat(result.isNotTradingAuthorization()).isTrue();
+        assertThat(result.getMessage()).doesNotContain("可执行", "允许执行", "可以交易", "允许交易",
+                "可以买入", "可以卖出", "可以开仓", "交易授权", "下单授权");
     }
 }
