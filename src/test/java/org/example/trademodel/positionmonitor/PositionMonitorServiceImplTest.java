@@ -16,6 +16,9 @@ import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
+import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -63,6 +66,8 @@ class PositionMonitorServiceImplTest {
     private ScoreItemMapper scoreItemMapper;
     @Mock
     private DecisionResultMapper decisionResultMapper;
+    @Mock
+    private ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
 
     private PositionMonitorServiceImpl service;
     private final AtomicLong logIds = new AtomicLong(100L);
@@ -271,6 +276,43 @@ class PositionMonitorServiceImplTest {
         assertThat(batch.getResults()).extracting(PositionMonitorResultDTO::getPositionId).containsExactly(21L);
         assertThat(batch.getFailures()).hasSize(1);
         verify(positionMonitorLogService).recordMonitorRun(any());
+    }
+
+    @Test
+    void activeBlockingExternalContextMakesHighRiskReviewWithoutPositionMutation() {
+        service = new PositionMonitorServiceImpl(
+                userPositionMapper,
+                marketQuoteClient,
+                userPositionRiskAdapter,
+                executionPlanMapper,
+                positionMonitorLogService,
+                evidenceItemMapper,
+                scoreItemMapper,
+                decisionResultMapper,
+                new ObjectMapper(),
+                externalContextEvidenceBuilder);
+        UserPositionDO position = position(30L, "LONG", "OPEN", "plan-external-block", "90", "120");
+        arrange(position, "100", risk("LOW", false), plan("plan-external-block", "ana-30", "VALID", true));
+        ExternalContextSnapshot snapshot = new ExternalContextSnapshot();
+        snapshot.setStatus("BLOCKED");
+        snapshot.setRiskLevel("HIGH");
+        snapshot.setExternalContextBlocked(true);
+        snapshot.setSourceHealth(ExternalContextPolicy.SOURCE_HEALTH_OK);
+        snapshot.setActiveExternalEventCount(1);
+        snapshot.setActiveNewsEventCount(1);
+        snapshot.addEventId("NEWS:major-event");
+        snapshot.addReason(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
+        when(externalContextEvidenceBuilder.buildSnapshot(eq("ana-30"), eq("BTC"), eq(null), any(), eq(null)))
+                .thenReturn(snapshot);
+
+        PositionMonitorResultDTO result = service.monitorUserPosition(30L);
+
+        assertThat(result.getLogicStatus()).isEqualTo("HIGH_RISK");
+        assertThat(result.getSuggestedAction()).isEqualTo("RISK_REVIEW");
+        assertThat(result.getExternalContextBlocked()).isTrue();
+        assertThat(result.getReasonCodes()).contains(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
+        assertSafetyFields(result);
+        verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
     }
 
     private void arrange(UserPositionDO position,

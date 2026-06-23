@@ -1242,6 +1242,22 @@
             <div class="kv"><span class="k">原因</span><span class="v" id="accountRiskReasonValue">ACCOUNT_RISK_EXPOSURE_STATUS_PENDING</span></div>
         </div>
 
+        <div class="module-status-note" id="externalContextPanel" aria-label="External context review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
+            <div class="kv"><span class="k">External context 只读状态</span><span class="v" id="externalContextRuntimeStatusValue">EXTERNAL_CONTEXT_STATUS_PENDING</span></div>
+            <div class="kv"><span class="k">source health</span><span class="v" id="externalContextSourceHealthValue">UNKNOWN</span></div>
+            <div class="kv"><span class="k">active event count</span><span class="v" id="externalContextActiveCountValue">0</span></div>
+            <div class="kv"><span class="k">macro event count</span><span class="v" id="externalContextMacroCountValue">0</span></div>
+            <div class="kv"><span class="k">news event count</span><span class="v" id="externalContextNewsCountValue">0</span></div>
+            <div class="kv"><span class="k">risk level</span><span class="v" id="externalContextRiskLevelValue">LOW</span></div>
+            <div class="kv"><span class="k">blocking</span><span class="v" id="externalContextBlockingValue">false</span></div>
+            <div class="kv"><span class="k">next event</span><span class="v" id="externalContextNextEventValue">—</span></div>
+            <div class="kv"><span class="k">latest event</span><span class="v" id="externalContextLatestEventValue">—</span></div>
+            <div class="kv"><span class="k">event window</span><span class="v" id="externalContextEventWindowValue">—</span></div>
+            <div class="kv"><span class="k">只读 / 人工复核边界</span><span class="v" id="externalContextReviewOnlyValue">review-only；manual review only；not trade instruction。</span></div>
+            <div class="kv"><span class="k">Execution boundary</span><span class="v" id="externalContextExecutionBoundaryValue">not executable；not auto trading；not order execution；not Push send；not external channel；not external fetch。</span></div>
+            <div class="kv"><span class="k">原因</span><span class="v" id="externalContextReasonValue">EXTERNAL_CONTEXT_STATUS_PENDING</span></div>
+        </div>
+
         <div class="module-status-note" id="hotResetEventImpactSourceStatusPanel" aria-label="Hot Reset Event Impact Source review-only runtime status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">Hot Reset / Event Impact Source 只读状态</span><span class="v" id="hotResetEventSourceStatusValue">HOT_RESET_EVENT_SOURCE_MISSING_FAIL_CLOSED / Hot Reset event source 只读状态待确认</span></div>
             <div class="kv"><span class="k">Event Impact source</span><span class="v" id="eventImpactSourceStatusValue">EVENT_IMPACT_SOURCE_MISSING_FAIL_CLOSED</span></div>
@@ -4873,6 +4889,31 @@
             });
     }
 
+    function updateExternalContextDisplay(p) {
+        p = p && typeof p === "object" ? p : {};
+        setText("externalContextRuntimeStatusValue", firstNonEmpty(p.runtimeStatus, p.status, "READY"));
+        setText("externalContextSourceHealthValue", firstNonEmpty(p.sourceHealth, "OK"));
+        setText("externalContextActiveCountValue", p.activeExternalEventCount || 0);
+        setText("externalContextMacroCountValue", p.activeMacroEventCount || 0);
+        setText("externalContextNewsCountValue", p.activeNewsEventCount || 0);
+        setText("externalContextRiskLevelValue", firstNonEmpty(p.externalContextRiskLevel, "LOW"));
+        setText("externalContextBlockingValue", String(p.externalContextBlocked === true));
+        setText("externalContextNextEventValue", formatDateTime(p.nextExternalEventTime));
+        setText("externalContextLatestEventValue", firstNonEmpty(p.latestEvent, p.latestExternalEventLabel, "—"));
+        setText("externalContextEventWindowValue", firstNonEmpty(p.eventWindow, "—"));
+        setText("externalContextReviewOnlyValue", "review-only；manual review only；not trade instruction。");
+        setText("externalContextExecutionBoundaryValue", firstNonEmpty(p.executionBoundary, "not executable；not auto trading；not order execution；not Push send；not external channel；not external fetch。"));
+        setText("externalContextReasonValue", Array.isArray(p.reasonCodes) ? p.reasonCodes.join(",") : "—");
+    }
+
+    function fetchExternalContextStatus(symbol) {
+        var url = "/api/external-context/dashboard-status" + (symbol ? "?symbol=" + encodeURIComponent(symbol) : "");
+        return fetch(url)
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(updateExternalContextDisplay)
+            .catch(function () { updateExternalContextDisplay({ status: "EXTERNAL_CONTEXT_STATUS_UNAVAILABLE", sourceHealth: "BLOCKED", reasonCodes: ["MISSING_EXTERNAL_EVENT_SOURCE"] }); });
+    }
+
     function resolveHotResetEventImpactSourceStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
         return {
@@ -5592,6 +5633,7 @@
                 fetchRuntimeReadinessGuardrailStatus();
                 fetchInternalPushPreviewNotificationStatus(selectedSymbol);
                 fetchRecheckPreviewRuntimeStatus();
+                fetchExternalContextStatus(selectedSymbol);
                 fetchHotResetEventImpactSourceStatus(selectedSymbol);
             })
             .catch(function () {
@@ -5613,6 +5655,7 @@
                 fetchMissedArchiveRuntimeStatus(selectedSymbol);
                 fetchRuntimeReadinessGuardrailStatus();
                 fetchAccountRiskExposureStatus(selectedSymbol);
+                fetchExternalContextStatus(selectedSymbol);
                 fetchHotResetEventImpactSourceStatus(selectedSymbol);
             });
     }
@@ -5634,6 +5677,7 @@
         fetchSourceRuntimeDataQualityStatus(symbol);
         fetchMissedArchiveRuntimeStatus(symbol);
         fetchAccountRiskExposureStatus(symbol);
+        fetchExternalContextStatus(symbol);
         fetchHotResetEventImpactSourceStatus(symbol);
         if (!symbol) return;
         fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))

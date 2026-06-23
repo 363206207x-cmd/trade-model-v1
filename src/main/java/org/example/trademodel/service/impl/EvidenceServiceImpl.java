@@ -1,6 +1,7 @@
 package org.example.trademodel.service.impl;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -11,6 +12,8 @@ import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.service.EvidenceService;
+import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.service.support.ExternalContextEvidenceBundle;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.EvidenceBriefVO;
 import org.example.trademodel.vo.EvidenceItemVO;
@@ -40,16 +43,24 @@ public class EvidenceServiceImpl implements EvidenceService {
 
     private final EvidenceItemMapper evidenceItemMapper;
     private final HotResetEventMapper hotResetEventMapper;
+    private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
 
     public EvidenceServiceImpl(EvidenceItemMapper evidenceItemMapper) {
-        this(evidenceItemMapper, null);
+        this(evidenceItemMapper, null, null);
+    }
+
+    public EvidenceServiceImpl(EvidenceItemMapper evidenceItemMapper,
+                               HotResetEventMapper hotResetEventMapper) {
+        this(evidenceItemMapper, hotResetEventMapper, null);
     }
 
     @Autowired
     public EvidenceServiceImpl(EvidenceItemMapper evidenceItemMapper,
-                               HotResetEventMapper hotResetEventMapper) {
+                               HotResetEventMapper hotResetEventMapper,
+                               ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
         this.evidenceItemMapper = evidenceItemMapper;
         this.hotResetEventMapper = hotResetEventMapper;
+        this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
     }
 
     @Override
@@ -58,6 +69,7 @@ public class EvidenceServiceImpl implements EvidenceService {
         list.add(buildPriceStructureEvidence(marketEnv));
         appendHotResetEventEvidenceIfExists(list, assetAnalysis);
         populateEventImpactInputFromHotReset(assetAnalysis);
+        appendExternalContextEvidenceIfExists(list, assetAnalysis);
         appendMacroEvidenceFromMarketEnvIfExists(list, marketEnv);
 
         if (marketEnv != null && marketEnv.getRangePct24h() != null
@@ -147,6 +159,37 @@ public class EvidenceServiceImpl implements EvidenceService {
             input.setEventTraceId(latest.getTraceId());
         }
         assetAnalysis.setEventImpactInput(input);
+    }
+
+    private void appendExternalContextEvidenceIfExists(List<EvidenceItemVO> list, AssetAnalysisVO assetAnalysis) {
+        if (externalContextEvidenceBuilder == null || assetAnalysis == null) {
+            return;
+        }
+        String analysisId = assetAnalysis.getAnalysisId();
+        if (analysisId == null || analysisId.isBlank()) {
+            return;
+        }
+        LocalDateTime contextTime = parseAnalysisTime(assetAnalysis.getAnalysisTime());
+        ExternalContextEvidenceBundle bundle = externalContextEvidenceBuilder.build(
+                analysisId.trim(),
+                assetAnalysis.getSymbol(),
+                assetAnalysis.getTimeframe(),
+                contextTime,
+                null);
+        list.addAll(bundle.getEvidenceItems());
+        assetAnalysis.setEventImpactInput(ExternalContextEvidenceBuilder.toEventImpactInput(
+                assetAnalysis.getEventImpactInput(), bundle.getSnapshot()));
+    }
+
+    private static LocalDateTime parseAnalysisTime(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return LocalDateTime.now();
+        }
+        try {
+            return LocalDateTime.parse(raw.trim());
+        } catch (Exception ignored) {
+            return LocalDateTime.now();
+        }
     }
 
     private void appendMacroEvidenceFromMarketEnvIfExists(List<EvidenceItemVO> list, MarketEnvironmentVO marketEnv) {

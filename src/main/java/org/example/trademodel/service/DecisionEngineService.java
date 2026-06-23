@@ -3,7 +3,9 @@ package org.example.trademodel.service;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.EventImpactInputVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -78,6 +80,12 @@ public class DecisionEngineService {
 
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId,
                                          Integer dataQualityScore, Integer trendStructureScore) {
+        return makeDecision(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore, null);
+    }
+
+    public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId,
+                                         Integer dataQualityScore, Integer trendStructureScore,
+                                         EventImpactInputVO externalContextInput) {
         String decisionId = "dec-" + Instant.now().toEpochMilli();
         logger.info("[AI决策] === 开始为 {} {} analysisId={} 生成决策 ===", symbol, timeframe, analysisId);
 
@@ -160,6 +168,11 @@ public class DecisionEngineService {
             ctx.setRiskTier(riskTier);
             ctx.setDataQualityScore(dataQualityScore);
             ctx.setWorthOpening(worthOpening);
+            if (externalContextInput != null) {
+                ctx.setExternalContextRiskLevel(externalContextInput.getExternalContextRiskLevel());
+                ctx.setExternalContextBlocked(externalContextInput.getExternalContextBlocked());
+                ctx.setExternalContextSourceHealth(externalContextInput.getExternalContextSourceHealth());
+            }
             ctx.setDriverConflictScore(multiTfConvergence ? 18 : 48);
             ctx.setExecutionInstabilityScore(26);
             ctx.setMicrostructureTrapScore(multiTfConvergence ? 22 : 38);
@@ -268,6 +281,7 @@ public class DecisionEngineService {
             decision.setPushInvalidPriceBelow(pushInvalidPriceBelow);
             decision.setPushInvalidPriceAbove(pushInvalidPriceAbove);
             decision.setPushInvalidationSummary(pushInvalidationSummary);
+            applyExternalContext(decision, externalContextInput);
 
             logger.info("[AI决策] 生成完成 → {} | ConfidenceLevel = {} | Score = {} | MultiTF = {} | Worth Open: {} | aiConflict={}/{} | confused={}",
                     ruleMarketBias, decision.getConfidenceLevel(), finalScore, decision.getMultiTfConvergence(), decision.getIsWorthOpening(),
@@ -309,5 +323,60 @@ public class DecisionEngineService {
         } catch (Exception e) {
             return fallback;
         }
+    }
+
+    private static void applyExternalContext(DecisionBundleVO decision, EventImpactInputVO input) {
+        if (decision == null || input == null) {
+            return;
+        }
+        decision.setExternalContextStatus(input.getExternalContextStatus());
+        decision.setActiveExternalEventCount(input.getActiveExternalEventCount());
+        decision.setActiveMacroEventCount(input.getActiveMacroEventCount());
+        decision.setActiveNewsEventCount(input.getActiveNewsEventCount());
+        decision.setExternalContextRiskLevel(input.getExternalContextRiskLevel());
+        decision.setExternalContextBlocked(input.getExternalContextBlocked());
+        decision.setExternalEventIds(input.getExternalEventIds());
+        decision.setExternalContextReasonCodes(input.getExternalContextReasonCodes());
+        decision.setNextExternalEventTime(input.getNextExternalEventTime());
+        decision.setLatestExternalEventTime(input.getLatestExternalEventTime());
+        decision.setLatestExternalEventLabel(input.getLatestExternalEventLabel());
+        decision.setExternalEventWindowStart(input.getExternalEventWindowStart());
+        decision.setExternalEventWindowEnd(input.getExternalEventWindowEnd());
+        decision.setExternalContextSourceHealth(input.getExternalContextSourceHealth());
+        boolean sourceBlocked = ExternalContextPolicy.SOURCE_HEALTH_BLOCKED.equalsIgnoreCase(input.getExternalContextSourceHealth());
+        boolean externallyBlocked = Boolean.TRUE.equals(input.getExternalContextBlocked()) || sourceBlocked;
+        boolean highRisk = ExternalContextPolicy.RISK_HIGH.equalsIgnoreCase(input.getExternalContextRiskLevel()) || externallyBlocked;
+        if (highRisk) {
+            decision.setRiskLevel("HIGH");
+            decision.setConfidenceLevel(ExternalContextPolicy.lowerConfidenceOneLevel(decision.getConfidenceLevel()));
+            decision.setReviewReasons(appendExternalReviewReasons(decision.getReviewReasons(), input));
+            decision.setConclusionSummary(decision.getConclusionSummary() + " | External context risk="
+                    + input.getExternalContextRiskLevel() + " reasonCodes=" + input.getExternalContextReasonCodes());
+        }
+        if (externallyBlocked) {
+            decision.setIsWorthOpening(false);
+        }
+    }
+
+    private static String appendExternalReviewReasons(String reviewReasons, EventImpactInputVO input) {
+        List<String> codes = input.getExternalContextReasonCodes();
+        if (codes == null || codes.isEmpty()) {
+            return reviewReasons == null || reviewReasons.isBlank() ? "[]" : reviewReasons;
+        }
+        StringBuilder additions = new StringBuilder();
+        for (String code : codes) {
+            if (additions.length() > 0) {
+                additions.append(',');
+            }
+            additions.append("{\"code\":\"").append(code.replace("\"", "")).append("\",\"source\":\"EXTERNAL_CONTEXT\"}");
+        }
+        if (reviewReasons == null || reviewReasons.isBlank() || "[]".equals(reviewReasons.trim())) {
+            return "[" + additions + "]";
+        }
+        String trimmed = reviewReasons.trim();
+        if (trimmed.endsWith("]")) {
+            return trimmed.substring(0, trimmed.length() - 1) + "," + additions + "]";
+        }
+        return "[" + additions + "]";
     }
 }

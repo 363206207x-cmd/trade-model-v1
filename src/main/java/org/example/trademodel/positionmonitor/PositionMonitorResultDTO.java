@@ -27,6 +27,16 @@ public class PositionMonitorResultDTO {
     private boolean takeProfitReached;
     private String suggestedAction;
     private List<String> reasonCodes = new ArrayList<>();
+    private String externalContextStatus;
+    private Integer activeExternalEventCount;
+    private Integer activeMacroEventCount;
+    private Integer activeNewsEventCount;
+    private String externalContextRiskLevel;
+    private Boolean externalContextBlocked;
+    private List<String> externalEventIds = new ArrayList<>();
+    private List<String> externalContextReasonCodes = new ArrayList<>();
+    private LocalDateTime nextExternalEventTime;
+    private String externalContextSourceHealth;
     private Long monitorLogId;
     private LocalDateTime monitoredAt;
     private boolean reviewOnly = true;
@@ -80,6 +90,26 @@ public class PositionMonitorResultDTO {
     public void setSuggestedAction(String suggestedAction) { this.suggestedAction = suggestedAction; }
     public List<String> getReasonCodes() { return Collections.unmodifiableList(reasonCodes); }
     public void setReasonCodes(List<String> reasonCodes) { this.reasonCodes = reasonCodes == null ? new ArrayList<>() : new ArrayList<>(reasonCodes); }
+    public String getExternalContextStatus() { return externalContextStatus; }
+    public void setExternalContextStatus(String externalContextStatus) { this.externalContextStatus = externalContextStatus; }
+    public Integer getActiveExternalEventCount() { return activeExternalEventCount; }
+    public void setActiveExternalEventCount(Integer activeExternalEventCount) { this.activeExternalEventCount = activeExternalEventCount; }
+    public Integer getActiveMacroEventCount() { return activeMacroEventCount; }
+    public void setActiveMacroEventCount(Integer activeMacroEventCount) { this.activeMacroEventCount = activeMacroEventCount; }
+    public Integer getActiveNewsEventCount() { return activeNewsEventCount; }
+    public void setActiveNewsEventCount(Integer activeNewsEventCount) { this.activeNewsEventCount = activeNewsEventCount; }
+    public String getExternalContextRiskLevel() { return externalContextRiskLevel; }
+    public void setExternalContextRiskLevel(String externalContextRiskLevel) { this.externalContextRiskLevel = externalContextRiskLevel; }
+    public Boolean getExternalContextBlocked() { return externalContextBlocked; }
+    public void setExternalContextBlocked(Boolean externalContextBlocked) { this.externalContextBlocked = externalContextBlocked; }
+    public List<String> getExternalEventIds() { return Collections.unmodifiableList(externalEventIds); }
+    public void setExternalEventIds(List<String> externalEventIds) { this.externalEventIds = externalEventIds == null ? new ArrayList<>() : new ArrayList<>(externalEventIds); }
+    public List<String> getExternalContextReasonCodes() { return Collections.unmodifiableList(externalContextReasonCodes); }
+    public void setExternalContextReasonCodes(List<String> externalContextReasonCodes) { this.externalContextReasonCodes = externalContextReasonCodes == null ? new ArrayList<>() : new ArrayList<>(externalContextReasonCodes); }
+    public LocalDateTime getNextExternalEventTime() { return nextExternalEventTime; }
+    public void setNextExternalEventTime(LocalDateTime nextExternalEventTime) { this.nextExternalEventTime = nextExternalEventTime; }
+    public String getExternalContextSourceHealth() { return externalContextSourceHealth; }
+    public void setExternalContextSourceHealth(String externalContextSourceHealth) { this.externalContextSourceHealth = externalContextSourceHealth; }
     public Long getMonitorLogId() { return monitorLogId; }
     public void setMonitorLogId(Long monitorLogId) { this.monitorLogId = monitorLogId; }
     public LocalDateTime getMonitoredAt() { return monitoredAt; }

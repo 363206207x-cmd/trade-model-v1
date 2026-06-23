@@ -11,9 +11,10 @@ public final class EvidenceTypeConstants {
     public static final String EVENT = "事件";
     public static final String RISK = "风险";
     public static final String MACRO = "宏观";
+    public static final String NEWS = "新闻";
 
     public static final Set<String> ALLOWED_EVIDENCE_TYPES = Collections.unmodifiableSet(
-            new LinkedHashSet<>(Set.of(PRICE_STRUCTURE, LEVERAGE, FUNDING, EVENT, RISK, MACRO))
+            new LinkedHashSet<>(Set.of(PRICE_STRUCTURE, LEVERAGE, FUNDING, EVENT, RISK, MACRO, NEWS))
     );
     public static final String EVIDENCE_DIRECTION_BULLISH = "BULLISH";
     public static final String EVIDENCE_DIRECTION_BEARISH = "BEARISH";
@@ -28,11 +29,13 @@ public final class EvidenceTypeConstants {
     public static final String EVIDENCE_SOURCE_SYSTEM_GENERATED = "SYSTEM_GENERATED";
     public static final String EVIDENCE_SOURCE_MARKET_HEURISTIC = "MARKET_HEURISTIC";
     public static final String EVIDENCE_SOURCE_MANUAL_INPUT = "MANUAL_INPUT";
+    public static final String EVIDENCE_SOURCE_EXTERNAL_CONTEXT = "EXTERNAL_CONTEXT";
     public static final Set<String> ALLOWED_EVIDENCE_SOURCES = Collections.unmodifiableSet(
             new LinkedHashSet<>(Set.of(
                     EVIDENCE_SOURCE_SYSTEM_GENERATED,
                     EVIDENCE_SOURCE_MARKET_HEURISTIC,
-                    EVIDENCE_SOURCE_MANUAL_INPUT
+                    EVIDENCE_SOURCE_MANUAL_INPUT,
+                    EVIDENCE_SOURCE_EXTERNAL_CONTEXT
             ))
     );
     public static final String EVENT_TRIGGER_TYPE_CIRCUIT_BREAKER = "CIRCUIT_BREAKER";

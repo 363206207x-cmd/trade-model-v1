@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
@@ -214,6 +215,25 @@ class PlanServiceImplTest {
         assertThat(plan.getNotExecutableReason()).isEqualTo("RISK_ACTION_GUARD_BLOCKED");
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void generateExecutionPlan_externalBlockingWindowBlocksSourceGateAndPlan() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        decision.setExternalContextBlocked(true);
+        decision.setExternalContextRiskLevel("HIGH");
+        decision.setExternalContextSourceHealth(ExternalContextPolicy.SOURCE_HEALTH_OK);
+        decision.setExternalEventIds(List.of("NEWS:major-event"));
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(decision, null, null, null, validSourceTrace(), readyRiskActionGuard());
+
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+        assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+        assertThat(plan.getSourceGateComplete()).isFalse();
+        assertThat(plan.getNotExecutable()).isTrue();
+        assertThat(plan.getNotExecutableReason()).isEqualTo(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
+        assertThat(plan.getSourceBlockerReasons()).contains(ExternalContextPolicy.REASON_WINDOW_BLOCKED, "NEWS:major-event");
     }
 
     private SourceTraceDTO validSourceTrace() {

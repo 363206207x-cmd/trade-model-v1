@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS tm_evidence_item (
     strength DOUBLE,
     confidence DOUBLE,
     source VARCHAR(100),
+    source_provider VARCHAR(100),
+    source_reference VARCHAR(512),
+    source_trace_id VARCHAR(128),
+    external_event_id VARCHAR(64),
+    external_event_type VARCHAR(32),
+    event_window_start TIMESTAMP,
+    event_window_end TIMESTAMP,
+    impact_score INT,
+    severity VARCHAR(32),
     create_time TIMESTAMP
 );
 
@@ -32,6 +41,92 @@ CREATE TABLE IF NOT EXISTS tm_score_item (
     direction VARCHAR(20),
     description TEXT
 );
+
+CREATE TABLE IF NOT EXISTS tm_macro_event (
+    event_id VARCHAR(64) PRIMARY KEY,
+    event_type VARCHAR(64) NOT NULL,
+    title VARCHAR(256) NOT NULL,
+    description TEXT,
+    affected_symbols VARCHAR(512),
+    market_scope VARCHAR(64),
+    event_time TIMESTAMP NOT NULL,
+    window_start TIMESTAMP NOT NULL,
+    window_end TIMESTAMP NOT NULL,
+    impact_score INT NOT NULL,
+    severity VARCHAR(32) NOT NULL,
+    direction VARCHAR(20) NOT NULL,
+    provider VARCHAR(100) NOT NULL,
+    source_type VARCHAR(64) NOT NULL,
+    source_reference VARCHAR(512) NOT NULL,
+    source_trace_id VARCHAR(128) NOT NULL,
+    source_event_id VARCHAR(128),
+    source_hash VARCHAR(128),
+    source_published_at TIMESTAMP NOT NULL,
+    source_published_at_reason_code VARCHAR(64),
+    status VARCHAR(32) NOT NULL,
+    execution_blocking BOOLEAN NOT NULL DEFAULT FALSE,
+    dedupe_key VARCHAR(256) NOT NULL,
+    review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    manual_review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_executable BOOLEAN NOT NULL DEFAULT TRUE,
+    not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_mutation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_push_send BOOLEAN NOT NULL DEFAULT TRUE,
+    not_external_channel BOOLEAN NOT NULL DEFAULT TRUE,
+    not_external_fetch BOOLEAN NOT NULL DEFAULT TRUE,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_macro_event_dedupe ON tm_macro_event(dedupe_key);
+CREATE INDEX IF NOT EXISTS idx_tm_macro_event_window ON tm_macro_event(window_start, window_end);
+CREATE INDEX IF NOT EXISTS idx_tm_macro_event_scope ON tm_macro_event(market_scope, status);
+CREATE INDEX IF NOT EXISTS idx_tm_macro_event_source_trace ON tm_macro_event(source_trace_id);
+
+CREATE TABLE IF NOT EXISTS tm_news_event (
+    event_id VARCHAR(64) PRIMARY KEY,
+    headline VARCHAR(256) NOT NULL,
+    summary TEXT,
+    affected_symbols VARCHAR(512),
+    market_scope VARCHAR(64),
+    event_time TIMESTAMP NOT NULL,
+    window_start TIMESTAMP NOT NULL,
+    window_end TIMESTAMP NOT NULL,
+    impact_score INT NOT NULL,
+    severity VARCHAR(32) NOT NULL,
+    direction VARCHAR(20) NOT NULL,
+    provider VARCHAR(100) NOT NULL,
+    source_type VARCHAR(64) NOT NULL,
+    source_reference VARCHAR(512) NOT NULL,
+    source_trace_id VARCHAR(128) NOT NULL,
+    source_event_id VARCHAR(128),
+    source_hash VARCHAR(128),
+    source_published_at TIMESTAMP NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    execution_blocking BOOLEAN NOT NULL DEFAULT FALSE,
+    dedupe_key VARCHAR(256) NOT NULL,
+    review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    manual_review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_executable BOOLEAN NOT NULL DEFAULT TRUE,
+    not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_mutation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_push_send BOOLEAN NOT NULL DEFAULT TRUE,
+    not_external_channel BOOLEAN NOT NULL DEFAULT TRUE,
+    not_external_fetch BOOLEAN NOT NULL DEFAULT TRUE,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_news_event_dedupe ON tm_news_event(dedupe_key);
+CREATE INDEX IF NOT EXISTS idx_tm_news_event_window ON tm_news_event(window_start, window_end);
+CREATE INDEX IF NOT EXISTS idx_tm_news_event_scope ON tm_news_event(market_scope, status);
+CREATE INDEX IF NOT EXISTS idx_tm_news_event_source_trace ON tm_news_event(source_trace_id);
 
 CREATE TABLE IF NOT EXISTS tm_decision_result (
     decision_id VARCHAR(64) PRIMARY KEY,
