@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.trademodel.analysisrun.AnalysisExecutionContext;
 import org.example.trademodel.analysisrun.AnalysisRunIds;
+import org.example.trademodel.analysisrun.AnalysisRunInputException;
+import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.common.EvidenceTypeConstants;
@@ -138,24 +140,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     @Override
     @Transactional
     public AssetAnalysisVO assemble(String symbol, String timeframe) {
-        LocalDateTime analysisTime = LocalDateTime.now();
-        AnalysisExecutionContext context = new AnalysisExecutionContext(
-                AnalysisRunIds.analysisId(),
-                AnalysisRunIds.traceId(),
-                RequestIdSupport.currentOrNew(),
-                null,
-                normalizeAnalysisSymbol(symbol),
-                normalizeAnalysisTimeframe(timeframe),
-                analysisTime,
-                resolveActiveRuleVersion(),
-                AnalysisRunTriggerType.MANUAL_API,
-                "LEGACY_DIRECT_ASSEMBLE",
-                null,
-                null,
-                null,
-                null,
-                false);
-        return assembleInternal(context);
+        throw new IllegalStateException("DIRECT_ASSEMBLER_ENTRY_DISABLED");
     }
 
     @Override
@@ -247,40 +232,54 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
     private AnalysisExecutionContext normalizeExecutionContext(AnalysisExecutionContext context) {
         if (context == null) {
-            return new AnalysisExecutionContext(
-                    AnalysisRunIds.analysisId(), AnalysisRunIds.traceId(), RequestIdSupport.currentOrNew(), null,
-                    "BTCUSDT", "1m", LocalDateTime.now(), resolveActiveRuleVersion(),
-                    AnalysisRunTriggerType.MANUAL_API, "LEGACY_DIRECT_ASSEMBLE",
-                    null, null, null, null, false);
+            throw new AnalysisRunInputException("ANALYSIS_CONTEXT_REQUIRED", "analysis execution context is required");
         }
         return new AnalysisExecutionContext(
-                context.getAnalysisId() != null ? context.getAnalysisId() : AnalysisRunIds.analysisId(),
-                context.getTraceId() != null ? context.getTraceId() : AnalysisRunIds.traceId(),
-                context.getRequestId() != null ? context.getRequestId() : RequestIdSupport.currentOrNew(),
-                context.getIdempotencyKey(),
+                requireText(context.getAnalysisId(), "ANALYSIS_ID_REQUIRED"),
+                requireText(context.getTraceId(), "TRACE_ID_REQUIRED"),
+                requireText(context.getRequestId(), "REQUEST_ID_REQUIRED"),
+                requireText(context.getIdempotencyKey(), "IDEMPOTENCY_KEY_REQUIRED"),
                 normalizeAnalysisSymbol(context.getSymbol()),
-                normalizeAnalysisTimeframe(context.getTimeframe()),
-                context.getAnalysisTime() != null ? context.getAnalysisTime() : LocalDateTime.now(),
-                context.getRuleVersion() != null ? context.getRuleVersion() : resolveActiveRuleVersion(),
+                AnalysisTimePolicy.requireSupportedTimeframe(context.getTimeframe()),
+                requireTime(context.getAnalysisTime()),
+                requireBucket(context.getCanonicalAnalysisTimeBucket(), context.getAnalysisTime(), context.getTimeframe()),
+                requireText(context.getRuleVersion(), "RULE_VERSION_REQUIRED"),
                 context.getTriggerType() != null ? context.getTriggerType() : AnalysisRunTriggerType.MANUAL_API,
                 context.getTriggerReference(),
                 context.getParentAnalysisId(),
                 context.getParentTraceId(),
                 context.getInputSnapshotJson(),
                 context.getInputSnapshotHash(),
+                requireText(context.getLeaseOwner(), "LEASE_OWNER_REQUIRED"),
+                context.getClaimVersion() != null ? context.getClaimVersion() : 1,
+                context.getAttemptCount() != null ? context.getAttemptCount() : 1,
                 context.isRunAlreadyClaimed());
     }
 
     private static String normalizeAnalysisSymbol(String raw) {
         if (raw == null || raw.isBlank()) {
-            return "BTCUSDT";
+            throw new AnalysisRunInputException("SYMBOL_REQUIRED", "symbol is required");
         }
         return raw.trim().toUpperCase();
     }
 
-    private static String normalizeAnalysisTimeframe(String raw) {
+    private static LocalDateTime requireTime(LocalDateTime analysisTime) {
+        if (analysisTime == null) {
+            throw new AnalysisRunInputException("ANALYSIS_TIME_REQUIRED", "analysisTime is required");
+        }
+        return analysisTime;
+    }
+
+    private static LocalDateTime requireBucket(LocalDateTime bucket, LocalDateTime analysisTime, String timeframe) {
+        if (bucket != null) {
+            return bucket;
+        }
+        return AnalysisTimePolicy.canonicalBucket(requireTime(analysisTime), timeframe);
+    }
+
+    private static String requireText(String raw, String reasonCode) {
         if (raw == null || raw.isBlank()) {
-            return "1m";
+            throw new AnalysisRunInputException(reasonCode, reasonCode);
         }
         return raw.trim();
     }
@@ -288,24 +287,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private void saveToDatabase(AssetAnalysisVO analysis, List<EvidenceItemVO> evidences,
                                 List<ScoreItemVO> scores, DecisionBundleVO decision, ExecutionPlanVO plan,
                                 String marketEnvSourceType) {
-        LocalDateTime now = LocalDateTime.now();
-        AnalysisExecutionContext context = new AnalysisExecutionContext(
-                analysis != null && analysis.getAnalysisId() != null ? analysis.getAnalysisId() : AnalysisRunIds.analysisId(),
-                AnalysisRunIds.traceId(),
-                RequestIdSupport.currentOrNew(),
-                null,
-                normalizeAnalysisSymbol(analysis != null ? analysis.getSymbol() : null),
-                normalizeAnalysisTimeframe(analysis != null ? analysis.getTimeframe() : null),
-                now,
-                resolveActiveRuleVersion(),
-                AnalysisRunTriggerType.MANUAL_API,
-                "LEGACY_REFLECTION_SAVE",
-                null,
-                null,
-                null,
-                null,
-                false);
-        saveToDatabase(context, analysis, evidences, scores, decision, plan, marketEnvSourceType);
+        throw new IllegalStateException("DIRECT_ASSEMBLER_ENTRY_DISABLED");
     }
 
     private void saveToDatabase(AnalysisExecutionContext context, AssetAnalysisVO analysis, List<EvidenceItemVO> evidences,
@@ -337,12 +319,14 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             run.setParentTraceId(context.getParentTraceId());
             run.setInputSnapshotJson(context.getInputSnapshotJson());
             run.setInputSnapshotHash(context.getInputSnapshotHash());
-            run.setAttemptCount(1);
+            run.setAttemptCount(context.getAttemptCount() != null ? context.getAttemptCount() : 1);
+            run.setLeaseOwner(context.getLeaseOwner());
+            run.setLeaseExpiresAt(null);
             run.setStartedAt(persistStartedAt);
             run.setCompletedAt(context.isRunAlreadyClaimed() ? null : persistStartedAt);
             run.setCreatedAt(persistStartedAt);
             run.setUpdatedAt(persistStartedAt);
-            run.setVersionNo(1);
+            run.setVersionNo(context.getClaimVersion() != null ? context.getClaimVersion() : 1);
             if (!context.isRunAlreadyClaimed()) {
                 analysisRunMapper.insert(run);
             }
@@ -500,7 +484,15 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             monitorAlertWriteService.emitAfterAnalysisPersist(run, analysis, decision);
 
             if (context.isRunAlreadyClaimed()) {
-                analysisRunMapper.markSuccess(analysis.getAnalysisId(), analysis.getDataQualityScore(), LocalDateTime.now());
+                int updated = analysisRunMapper.markSuccess(
+                        analysis.getAnalysisId(),
+                        analysis.getDataQualityScore(),
+                        LocalDateTime.now(),
+                        context.getLeaseOwner(),
+                        context.getClaimVersion() != null ? context.getClaimVersion() : 1);
+                if (updated != 1) {
+                    throw new IllegalStateException("ANALYSIS_RUN_LEASE_FENCING_CONFLICT");
+                }
             }
 
             System.out.println("✅ 6张表落库全部完成！analysisId = " + analysis.getAnalysisId());

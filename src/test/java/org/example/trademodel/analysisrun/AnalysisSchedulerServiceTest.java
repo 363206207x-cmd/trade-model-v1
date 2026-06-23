@@ -41,6 +41,20 @@ class AnalysisSchedulerServiceTest {
     }
 
     @Test
+    void invalidSchedulerConfigFailsClosedWithoutCallingOrchestrator() {
+        CapturingOrchestrator orchestrator = new CapturingOrchestrator();
+        AnalysisRunProperties properties = new AnalysisRunProperties();
+        properties.getScheduler().setEnabled(true);
+        properties.getScheduler().setSymbols(List.of("BTCUSDT"));
+        properties.getScheduler().setTimeframes(List.of("7m"));
+        AnalysisSchedulerService service = new AnalysisSchedulerService(orchestrator, properties);
+
+        assertThat(service.runScheduledCycle()).isEmpty();
+        assertThat(orchestrator.commands).isEmpty();
+        assertThat(service.status()).containsEntry("configValid", false);
+    }
+
+    @Test
     void hotResetCompatibilityMethodUsesHotResetTriggerType() {
         CapturingOrchestrator orchestrator = new CapturingOrchestrator();
         AnalysisSchedulerService service = new AnalysisSchedulerService(orchestrator, new AnalysisRunProperties());

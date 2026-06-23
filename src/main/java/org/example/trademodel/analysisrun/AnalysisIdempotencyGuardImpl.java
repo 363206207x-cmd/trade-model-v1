@@ -5,26 +5,36 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 @Service
 public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
     private static final String STATUS_STARTED = "STARTED";
     private static final String STATUS_SUCCESS = "SUCCESS";
     private static final String STATUS_FAILED = "FAILED";
+    private static final Pattern AUTHORIZATION = Pattern.compile("(?i)(authorization\\s*[:=]\\s*)([^,;]+)");
+    private static final Pattern SECRET_PARAM = Pattern.compile("(?i)(api[_-]?key|token|access[_-]?token|secret)=([^&\\s]+)");
+    private static final Pattern URL_QUERY = Pattern.compile("https?://([^\\s?]+)\\?[^\\s]+", Pattern.CASE_INSENSITIVE);
 
     private final AnalysisRunMapper analysisRunMapper;
     private final AnalysisRunProperties properties;
     private final TransactionTemplate transactionTemplate;
+    private final Clock clock;
 
     public AnalysisIdempotencyGuardImpl(AnalysisRunMapper analysisRunMapper,
                                         AnalysisRunProperties properties,
-                                        PlatformTransactionManager transactionManager) {
+                                        PlatformTransactionManager transactionManager,
+                                        Clock analysisRunClock) {
         this.analysisRunMapper = analysisRunMapper;
         this.properties = properties;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
     }
 
     @Override
@@ -33,7 +43,7 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
     }
 
     private AnalysisIdempotencyClaim claimInTransaction(AnalysisRunClaimRequest request) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(request.getAnalysisId());
         run.setSymbol(request.getSymbol());
@@ -144,16 +154,32 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
     }
 
     @Override
-    public void markFailed(String analysisId, String errorCode, String errorMessage) {
+    public void markFailed(AnalysisExecutionContext context, String errorCode, String errorMessage) {
         transactionTemplate.executeWithoutResult(status -> analysisRunMapper.markFailed(
-                analysisId,
-                truncate(errorCode, 128),
-                truncate(errorMessage, 512),
-                LocalDateTime.now()));
+                context.getAnalysisId(),
+                truncate(redact(errorCode), 128),
+                truncate(redact(errorMessage), 512),
+                LocalDateTime.now(clock),
+                context.getLeaseOwner(),
+                safeVersion(context.getClaimVersion())));
     }
 
     private static int safeVersion(AnalysisRunDO row) {
         return row.getVersionNo() != null ? row.getVersionNo() : 1;
+    }
+
+    private static int safeVersion(Integer version) {
+        return version != null ? version : 1;
+    }
+
+    static String redact(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String t = AUTHORIZATION.matcher(raw).replaceAll("$1<redacted>");
+        t = SECRET_PARAM.matcher(t).replaceAll("$1=<redacted>");
+        t = URL_QUERY.matcher(t).replaceAll("https://$1?<redacted>");
+        return t;
     }
 
     private static String truncate(String raw, int max) {

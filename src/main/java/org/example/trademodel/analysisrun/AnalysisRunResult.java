@@ -69,8 +69,8 @@ public class AnalysisRunResult {
     }
 
     public static AnalysisRunResult duplicateSuccess(AnalysisRunDO run) {
-        return new AnalysisRunResult("DUPLICATE_SUCCESS_BLOCKED", "IDEMPOTENCY_DUPLICATE_SUCCESS",
-                "duplicate trigger blocked; existing successful analysis run reused", run, null,
+        return new AnalysisRunResult("EXISTING_SUCCESS", "IDEMPOTENCY_DUPLICATE_SUCCESS",
+                "existing successful analysis run reused for canonical idempotency key", run, null,
                 false, true, false, false, false, false, false);
     }
 

@@ -32,6 +32,15 @@ public class AnalysisTraceServiceImpl implements AnalysisTraceService {
         return run != null ? snapshot(run) : null;
     }
 
+    @Override
+    public AnalysisTraceSnapshot byRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return null;
+        }
+        AnalysisRunDO run = analysisRunMapper.selectByRequestId(requestId.trim());
+        return run != null ? snapshot(run) : null;
+    }
+
     private AnalysisTraceSnapshot snapshot(AnalysisRunDO run) {
         String analysisId = run.getAnalysisId();
         String traceId = run.getTraceId();

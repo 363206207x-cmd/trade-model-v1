@@ -32,23 +32,32 @@ public interface AnalysisRunMapper {
     @Select("SELECT * FROM tm_analysis_run WHERE trace_id = #{traceId}")
     AnalysisRunDO selectByTraceId(String traceId);
 
+    @Select("SELECT * FROM tm_analysis_run WHERE request_id = #{requestId} ORDER BY created_at DESC, analysis_id DESC LIMIT 1")
+    AnalysisRunDO selectByRequestId(String requestId);
+
     @Select("SELECT * FROM tm_analysis_run WHERE idempotency_key = #{idempotencyKey}")
     AnalysisRunDO selectByIdempotencyKey(String idempotencyKey);
 
     @Update("UPDATE tm_analysis_run SET status = 'SUCCESS', data_quality_score = #{dataQualityScore}, completed_at = #{completedAt}, "
             + "lease_owner = NULL, lease_expires_at = NULL, updated_at = #{completedAt}, version_no = COALESCE(version_no, 1) + 1 "
-            + "WHERE analysis_id = #{analysisId} AND status = 'STARTED'")
+            + "WHERE analysis_id = #{analysisId} AND status = 'STARTED' "
+            + "AND lease_owner = #{leaseOwner} AND COALESCE(version_no, 1) = #{claimVersion}")
     int markSuccess(@Param("analysisId") String analysisId,
                     @Param("dataQualityScore") Integer dataQualityScore,
-                    @Param("completedAt") LocalDateTime completedAt);
+                    @Param("completedAt") LocalDateTime completedAt,
+                    @Param("leaseOwner") String leaseOwner,
+                    @Param("claimVersion") int claimVersion);
 
     @Update("UPDATE tm_analysis_run SET status = 'FAILED', error_code = #{errorCode}, error_message = #{errorMessage}, "
             + "completed_at = #{completedAt}, lease_owner = NULL, lease_expires_at = NULL, updated_at = #{completedAt}, "
-            + "version_no = COALESCE(version_no, 1) + 1 WHERE analysis_id = #{analysisId} AND status = 'STARTED'")
+            + "version_no = COALESCE(version_no, 1) + 1 WHERE analysis_id = #{analysisId} AND status = 'STARTED' "
+            + "AND lease_owner = #{leaseOwner} AND COALESCE(version_no, 1) = #{claimVersion}")
     int markFailed(@Param("analysisId") String analysisId,
                    @Param("errorCode") String errorCode,
                    @Param("errorMessage") String errorMessage,
-                   @Param("completedAt") LocalDateTime completedAt);
+                   @Param("completedAt") LocalDateTime completedAt,
+                   @Param("leaseOwner") String leaseOwner,
+                   @Param("claimVersion") int claimVersion);
 
     @Update("UPDATE tm_analysis_run SET status = 'STARTED', request_id = #{requestId}, lease_owner = #{leaseOwner}, "
             + "lease_expires_at = #{leaseExpiresAt}, started_at = #{startedAt}, completed_at = NULL, error_code = NULL, error_message = NULL, "

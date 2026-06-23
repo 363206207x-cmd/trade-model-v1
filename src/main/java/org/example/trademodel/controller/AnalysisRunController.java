@@ -1,12 +1,14 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.analysisrun.AnalysisRunCommand;
+import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.analysistrace.AnalysisTraceService;
 import org.example.trademodel.analysistrace.AnalysisTraceSnapshot;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.requestcontext.RequestIdSupport;
+import org.example.trademodel.service.AnalysisSchedulerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,11 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalysisRunController {
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final AnalysisTraceService analysisTraceService;
+    private final AnalysisSchedulerService analysisSchedulerService;
 
     public AnalysisRunController(AnalysisRunOrchestrator analysisRunOrchestrator,
-                                 AnalysisTraceService analysisTraceService) {
+                                 AnalysisTraceService analysisTraceService,
+                                 AnalysisSchedulerService analysisSchedulerService) {
         this.analysisRunOrchestrator = analysisRunOrchestrator;
         this.analysisTraceService = analysisTraceService;
+        this.analysisSchedulerService = analysisSchedulerService;
     }
 
     @PostMapping("/runs")
@@ -33,14 +38,20 @@ public class AnalysisRunController {
         if (request == null || blank(request.getSymbol())) {
             return ResponseEntity.badRequest().body(ApiResponse.badRequest("symbol is required"));
         }
-        String timeframe = blank(request.getTimeframe()) ? "1m" : request.getTimeframe();
-        AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.manual(
-                request.getSymbol(), timeframe, RequestIdSupport.currentOrNew(), request.getAnalysisTime()));
-        HttpStatus status = result.isConcurrentTriggerBlocked()
-                || result.isPartialStateRecoveryBlocked()
-                || result.isMaxRecoveryAttemptsExceeded()
-                ? HttpStatus.CONFLICT : HttpStatus.OK;
-        return ResponseEntity.status(status).body(ApiResponse.success(result.getStatus(), result));
+        if (blank(request.getTimeframe())) {
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest("timeframe is required"));
+        }
+        try {
+            AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.manual(
+                    request.getSymbol(), request.getTimeframe(), RequestIdSupport.currentOrNew(), request.getAnalysisTime()));
+            HttpStatus status = result.isConcurrentTriggerBlocked()
+                    || result.isPartialStateRecoveryBlocked()
+                    || result.isMaxRecoveryAttemptsExceeded()
+                    ? HttpStatus.CONFLICT : HttpStatus.OK;
+            return ResponseEntity.status(status).body(ApiResponse.success(result.getStatus(), result));
+        } catch (AnalysisRunInputException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest(ex.getMessage()));
+        }
     }
 
     @GetMapping("/runs/{analysisId}")
@@ -52,6 +63,15 @@ public class AnalysisRunController {
         return ResponseEntity.ok(ApiResponse.success(snapshot));
     }
 
+    @GetMapping("/runs/by-request/{requestId}")
+    public ResponseEntity<ApiResponse<AnalysisTraceSnapshot>> runTraceByRequest(@PathVariable String requestId) {
+        AnalysisTraceSnapshot snapshot = analysisTraceService.byRequestId(requestId);
+        if (snapshot == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound("analysis request not found"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(snapshot));
+    }
+
     @GetMapping("/traces/{traceId}")
     public ResponseEntity<ApiResponse<AnalysisTraceSnapshot>> trace(@PathVariable String traceId) {
         AnalysisTraceSnapshot snapshot = analysisTraceService.byTraceId(traceId);
@@ -59,6 +79,11 @@ public class AnalysisRunController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound("analysis trace not found"));
         }
         return ResponseEntity.ok(ApiResponse.success(snapshot));
+    }
+
+    @GetMapping("/scheduler/status")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> schedulerStatus() {
+        return ResponseEntity.ok(ApiResponse.success(analysisSchedulerService.status()));
     }
 
     private static boolean blank(String value) {

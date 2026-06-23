@@ -1,16 +1,21 @@
 package org.example.trademodel.service;
 
 import org.example.trademodel.analysisrun.AnalysisRunCommand;
+import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunProperties;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
+import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.vo.AssetAnalysisVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,11 +26,20 @@ public class AnalysisSchedulerService {
 
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final AnalysisRunProperties properties;
+    private final Clock clock;
 
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties) {
+        this(analysisRunOrchestrator, properties, Clock.systemUTC());
+    }
+
+    @Autowired
+    public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
+                                    AnalysisRunProperties properties,
+                                    Clock analysisRunClock) {
         this.analysisRunOrchestrator = analysisRunOrchestrator;
         this.properties = properties;
+        this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
     }
 
     public ApiResponse<AssetAnalysisVO> executeAnalysis(String symbol, String timeframe, String triggerType) {
@@ -34,10 +48,12 @@ public class AnalysisSchedulerService {
             String eventId = triggerType.substring("HOT_RESET:".length());
             result = runHotResetRebuild(symbol, timeframe, eventId, null, null);
         } else if ("SCHEDULED".equalsIgnoreCase(triggerType)) {
-            String reference = "SCHEDULED:" + LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+            validateInput(symbol, timeframe);
+            String reference = "SCHEDULED:" + LocalDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
             result = analysisRunOrchestrator.run(AnalysisRunCommand.scheduled(
                     symbol, timeframe, RequestIdSupport.generate(), reference));
         } else {
+            validateInput(symbol, timeframe);
             result = analysisRunOrchestrator.run(AnalysisRunCommand.manual(
                     symbol, timeframe, RequestIdSupport.generate(), null));
         }
@@ -62,7 +78,10 @@ public class AnalysisSchedulerService {
         if (!properties.getScheduler().isEnabled()) {
             return List.of();
         }
-        String reference = "SCHEDULED:" + LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        if (!schedulerConfigValid()) {
+            return List.of();
+        }
+        String reference = "SCHEDULED:" + LocalDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
         List<AnalysisRunResult> results = new ArrayList<>();
         for (String symbol : properties.getScheduler().getSymbols()) {
             for (String timeframe : properties.getScheduler().getTimeframes()) {
@@ -88,7 +107,39 @@ public class AnalysisSchedulerService {
         status.put("notOrderExecution", true);
         status.put("notUserPositionCreation", true);
         status.put("notUserPositionMutation", true);
+        status.put("supportedTimeframes", AnalysisTimePolicy.supportedTimeframes());
+        status.put("configValid", schedulerConfigValid());
         return status;
+    }
+
+    private boolean schedulerConfigValid() {
+        try {
+            if (properties.getScheduler().getSymbols() == null || properties.getScheduler().getSymbols().isEmpty()
+                    || properties.getScheduler().getTimeframes() == null || properties.getScheduler().getTimeframes().isEmpty()) {
+                return false;
+            }
+            for (String symbol : properties.getScheduler().getSymbols()) {
+                validateSymbol(symbol);
+            }
+            for (String timeframe : properties.getScheduler().getTimeframes()) {
+                AnalysisTimePolicy.requireSupportedTimeframe(timeframe);
+            }
+            return true;
+        } catch (AnalysisRunInputException ex) {
+            return false;
+        }
+    }
+
+    private static void validateInput(String symbol, String timeframe) {
+        validateSymbol(symbol);
+        AnalysisTimePolicy.requireSupportedTimeframe(timeframe);
+    }
+
+    private static String validateSymbol(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new AnalysisRunInputException("SYMBOL_REQUIRED", "symbol is required");
+        }
+        return raw.trim().toUpperCase(Locale.ROOT);
     }
 
     private static AssetAnalysisVO analysisOrMinimal(AnalysisRunResult result) {

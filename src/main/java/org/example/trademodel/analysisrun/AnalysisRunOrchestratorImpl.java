@@ -12,30 +12,37 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Service
 public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
     private static final Logger log = LoggerFactory.getLogger(AnalysisRunOrchestratorImpl.class);
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Pattern AUTHORIZATION = Pattern.compile("(?i)(authorization\\s*[:=]\\s*)([^,;]+)");
+    private static final Pattern SECRET_PARAM = Pattern.compile("(?i)(api[_-]?key|token|access[_-]?token|secret)=([^&\\s]+)");
+    private static final Pattern URL_QUERY = Pattern.compile("https?://([^\\s?]+)\\?[^\\s]+", Pattern.CASE_INSENSITIVE);
 
     private final AnalysisIdempotencyGuard idempotencyGuard;
     private final AnalysisAssemblerService assemblerService;
     private final RuleConfigService ruleConfigService;
     private final AnalysisRunProperties properties;
+    private final Clock clock;
 
     public AnalysisRunOrchestratorImpl(AnalysisIdempotencyGuard idempotencyGuard,
                                        AnalysisAssemblerService assemblerService,
                                        RuleConfigService ruleConfigService,
-                                       AnalysisRunProperties properties) {
+                                       AnalysisRunProperties properties,
+                                       Clock analysisRunClock) {
         this.idempotencyGuard = idempotencyGuard;
         this.assemblerService = assemblerService;
         this.ruleConfigService = ruleConfigService;
         this.properties = properties;
+        this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
     }
 
     @Override
@@ -62,7 +69,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 inputSnapshotJson,
                 inputSnapshotHash,
                 AnalysisRunIds.leaseOwner(),
-                LocalDateTime.now().plusSeconds(properties.getIdempotency().getLeaseSeconds()));
+                LocalDateTime.now(clock).plusSeconds(properties.getIdempotency().getLeaseSeconds()));
 
         AnalysisIdempotencyClaim claim = idempotencyGuard.claim(request);
         if (claim.getStatus() == AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS) {
@@ -86,65 +93,71 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             boolean expiredLeaseRecovery = claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_EXPIRED_LEASE;
             return AnalysisRunResult.executed(run, analysis, failedRecovery, expiredLeaseRecovery);
         } catch (Exception e) {
+            String redactedMessage = redact(e.getMessage());
             log.warn("analysis run failed analysisId={} traceId={} reason={}",
                     run != null ? run.getAnalysisId() : null,
                     run != null ? run.getTraceId() : null,
-                    e.getMessage());
+                    redactedMessage);
             if (run != null) {
-                idempotencyGuard.markFailed(run.getAnalysisId(), e.getClass().getSimpleName(), e.getMessage());
+                idempotencyGuard.markFailed(context, e.getClass().getSimpleName(), redactedMessage);
             }
-            return AnalysisRunResult.failed(run, e.getMessage());
+            return AnalysisRunResult.failed(run, redactedMessage);
         }
     }
 
     private NormalizedCommand normalize(AnalysisRunCommand command) {
         if (command == null) {
-            command = AnalysisRunCommand.manual("BTCUSDT", "1m", RequestIdSupport.generate(), null);
+            throw new AnalysisRunInputException("ANALYSIS_COMMAND_REQUIRED", "analysis command is required");
         }
         String symbol = normalizeSymbol(command.getSymbol());
-        String timeframe = normalizeTimeframe(command.getTimeframe());
+        String timeframe = AnalysisTimePolicy.requireSupportedTimeframe(command.getTimeframe());
         AnalysisRunTriggerType triggerType = command.getTriggerType() != null
                 ? command.getTriggerType() : AnalysisRunTriggerType.MANUAL_API;
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime analysisTime = AnalysisTimePolicy.normalize(command.getAnalysisTime(), now);
+        LocalDateTime analysisTime = AnalysisTimePolicy.normalize(command.getAnalysisTime(), timeframe, clock);
+        LocalDateTime canonicalBucket = AnalysisTimePolicy.canonicalBucket(analysisTime, timeframe);
         String requestId = RequestIdSupport.normalizeOrGenerate(command.getRequestId());
-        String triggerReference = normalizeTriggerReference(triggerType, command.getTriggerReference(), requestId, analysisTime);
+        String triggerReference = normalizeTriggerReference(triggerType, command.getTriggerReference(), requestId, canonicalBucket);
         String ruleVersion = ruleConfigService != null ? ruleConfigService.resolveActiveRuleVersion() : "v1.0";
         return new NormalizedCommand(symbol, timeframe, triggerType, triggerReference, requestId, analysisTime,
-                ruleVersion, safe(command.getParentAnalysisId()), safe(command.getParentTraceId()));
+                canonicalBucket, ruleVersion, safe(command.getParentAnalysisId()), safe(command.getParentTraceId()));
     }
 
     private static String normalizeTriggerReference(AnalysisRunTriggerType triggerType, String raw,
-                                                    String requestId, LocalDateTime analysisTime) {
+                                                    String requestId, LocalDateTime canonicalBucket) {
         String explicit = safe(raw);
         if (explicit != null) {
             return explicit;
         }
         if (triggerType == AnalysisRunTriggerType.SCHEDULED) {
-            return "SCHEDULED:" + AnalysisTimePolicy.idempotencyBucket(analysisTime);
+            return "SCHEDULED:" + canonicalBucket;
         }
         return requestId;
     }
 
-    private static String normalizeSymbol(String raw) {
-        String t = raw == null ? "BTCUSDT" : raw.trim().toUpperCase(Locale.ROOT);
-        return t.isEmpty() ? "BTCUSDT" : t;
+    static String normalizeSymbol(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new AnalysisRunInputException("SYMBOL_REQUIRED", "symbol is required");
+        }
+        return raw.trim().toUpperCase(Locale.ROOT);
     }
 
-    private static String normalizeTimeframe(String raw) {
-        String t = raw == null ? "1m" : raw.trim();
-        return t.isEmpty() ? "1m" : t;
+    static String idempotencyKeyForTest(String symbol, String timeframe, LocalDateTime canonicalBucket, String ruleVersion) {
+        return canonicalIdempotencyKey(normalizeSymbol(symbol), AnalysisTimePolicy.requireSupportedTimeframe(timeframe),
+                canonicalBucket, ruleVersion);
     }
 
     private static String idempotencyKey(NormalizedCommand command) {
-        LocalDateTime bucket = command.triggerType() == AnalysisRunTriggerType.MANUAL_API
-                || command.triggerType() == AnalysisRunTriggerType.MARKET_DATA_COMPATIBILITY
-                || command.triggerType() == AnalysisRunTriggerType.HOT_RESET_REBUILD
-                ? command.analysisTime().truncatedTo(ChronoUnit.SECONDS)
-                : AnalysisTimePolicy.idempotencyBucket(command.analysisTime());
-        return sha256("P2-3|" + command.symbol() + "|" + command.timeframe() + "|"
-                + command.triggerType().name() + "|" + command.triggerReference() + "|"
-                + command.ruleVersion() + "|" + bucket);
+        return canonicalIdempotencyKey(command.symbol(), command.timeframe(), command.canonicalAnalysisTimeBucket(),
+                command.ruleVersion());
+    }
+
+    private static String canonicalIdempotencyKey(String symbol, String timeframe,
+                                                  LocalDateTime canonicalBucket, String ruleVersion) {
+        if (canonicalBucket == null) {
+            throw new AnalysisRunInputException("ANALYSIS_TIME_BUCKET_REQUIRED", "canonical analysis time bucket is required");
+        }
+        String version = ruleVersion == null || ruleVersion.isBlank() ? "v1.0" : ruleVersion.trim();
+        return sha256(symbol + "|" + timeframe + "|" + canonicalBucket + "|" + version);
     }
 
     private static String inputSnapshotJson(NormalizedCommand command, String traceId, String idempotencyKey) {
@@ -153,12 +166,13 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             snapshot.put("version", "P2-3");
             snapshot.put("symbol", command.symbol());
             snapshot.put("timeframe", command.timeframe());
+            snapshot.put("analysisTime", command.analysisTime().toString());
+            snapshot.put("canonicalAnalysisTimeBucket", command.canonicalAnalysisTimeBucket().toString());
+            snapshot.put("ruleVersion", command.ruleVersion());
             snapshot.put("triggerType", command.triggerType().name());
             snapshot.put("triggerReference", command.triggerReference());
             snapshot.put("requestId", command.requestId());
             snapshot.put("traceId", traceId);
-            snapshot.put("ruleVersion", command.ruleVersion());
-            snapshot.put("analysisTime", command.analysisTime().toString());
             snapshot.put("parentAnalysisId", command.parentAnalysisId());
             snapshot.put("parentTraceId", command.parentTraceId());
             snapshot.put("idempotencyKey", idempotencyKey);
@@ -185,6 +199,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 run.getSymbol(),
                 run.getTimeframe(),
                 run.getAnalysisTime(),
+                AnalysisTimePolicy.canonicalBucket(run.getAnalysisTime(), run.getTimeframe()),
                 run.getRuleVersion(),
                 triggerType,
                 run.getTriggerReference(),
@@ -192,6 +207,9 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 run.getParentTraceId(),
                 run.getInputSnapshotJson(),
                 run.getInputSnapshotHash(),
+                run.getLeaseOwner(),
+                run.getVersionNo(),
+                run.getAttemptCount(),
                 true);
     }
 
@@ -209,6 +227,15 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
         }
     }
 
+    private static String redact(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String t = AUTHORIZATION.matcher(raw).replaceAll("$1<redacted>");
+        t = SECRET_PARAM.matcher(t).replaceAll("$1=<redacted>");
+        return URL_QUERY.matcher(t).replaceAll("https://$1?<redacted>");
+    }
+
     private static String safe(String raw) {
         if (raw == null) {
             return null;
@@ -219,6 +246,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
 
     private record NormalizedCommand(String symbol, String timeframe, AnalysisRunTriggerType triggerType,
                                      String triggerReference, String requestId, LocalDateTime analysisTime,
-                                     String ruleVersion, String parentAnalysisId, String parentTraceId) {
+                                     LocalDateTime canonicalAnalysisTimeBucket, String ruleVersion,
+                                     String parentAnalysisId, String parentTraceId) {
     }
 }

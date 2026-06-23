@@ -252,3 +252,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p2-3-scheduler-idempotency-trace-done-candidate
+
+Date: 2026-06-23
+Changed by: Codex
+Reason: P2-3 Scheduler / Idempotency / Trace B-risk implementation package contract blocker fixes for PR #1020.
+Before: P2-3 had scheduler/requestId assets but idempotency keys included trigger metadata, invalid time input could fall back, lease completion was not fenced, direct assembler entry remained available, by-request trace and scheduler status read APIs were missing, and real DB concurrency/recovery tests were incomplete.
+After: P2-3 is a branch DONE candidate with canonical tuple idempotency, timeframe-aware buckets, fail-closed input validation, DB unique-key concurrency guard, leaseOwner/claimVersion/attemptCount fencing, failed and expired-lease recovery, partial-state/max-attempt blocking, redacted error persistence, disabled direct assembler bypass, requestId/traceId/input snapshot persistence, by-request trace, scheduler status, traceStatus/missingSegments/generatedAt/manualReviewOnly trace snapshots, and real DB integration tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

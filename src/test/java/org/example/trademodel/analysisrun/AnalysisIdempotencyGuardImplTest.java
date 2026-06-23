@@ -12,10 +12,14 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,6 +27,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AnalysisIdempotencyGuardImplTest {
+    private static final Clock FIXED = Clock.fixed(Instant.parse("2026-06-23T10:00:00Z"), ZoneOffset.UTC);
+
     @Mock private AnalysisRunMapper mapper;
 
     private AnalysisRunProperties properties;
@@ -32,7 +38,7 @@ class AnalysisIdempotencyGuardImplTest {
     void setUp() {
         properties = new AnalysisRunProperties();
         properties.getIdempotency().setMaxRecoveryAttempts(3);
-        guard = new AnalysisIdempotencyGuardImpl(mapper, properties, new NoopTransactionManager());
+        guard = new AnalysisIdempotencyGuardImpl(mapper, properties, new NoopTransactionManager(), FIXED);
     }
 
     @Test
@@ -54,14 +60,14 @@ class AnalysisIdempotencyGuardImplTest {
         AnalysisIdempotencyClaim claim = guard.claim(request("idem-success"));
 
         assertThat(claim.getStatus()).isEqualTo(AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS);
-        verify(mapper, never()).recoverFailed(anyString(), anyString(), anyString(), any(), any(), any(Integer.class), any(Integer.class));
+        verify(mapper, never()).recoverFailed(anyString(), anyString(), anyString(), any(), any(), anyInt(), anyInt());
     }
 
     @Test
     void activeStartedLeaseBlocksConcurrentTrigger() {
         when(mapper.insertStarted(any())).thenThrow(new DuplicateKeyException("dup"));
         when(mapper.selectByIdempotencyKey("idem-active"))
-                .thenReturn(row("ana-active", "STARTED", 1, LocalDateTime.now().plusMinutes(2)));
+                .thenReturn(row("ana-active", "STARTED", 1, LocalDateTime.of(2026, 6, 23, 10, 2)));
 
         AnalysisIdempotencyClaim claim = guard.claim(request("idem-active"));
 
@@ -78,17 +84,17 @@ class AnalysisIdempotencyGuardImplTest {
         AnalysisIdempotencyClaim claim = guard.claim(request("idem-partial"));
 
         assertThat(claim.getStatus()).isEqualTo(AnalysisIdempotencyClaimStatus.RECOVERY_BLOCKED_PARTIAL_STATE);
-        verify(mapper, never()).recoverFailed(anyString(), anyString(), anyString(), any(), any(), any(Integer.class), any(Integer.class));
+        verify(mapper, never()).recoverFailed(anyString(), anyString(), anyString(), any(), any(), anyInt(), anyInt());
     }
 
     @Test
     void expiredLeaseCanBeRecoveredAtomically() {
         when(mapper.insertStarted(any())).thenThrow(new DuplicateKeyException("dup"));
-        AnalysisRunDO expired = row("ana-expired", "STARTED", 1, LocalDateTime.now().minusMinutes(1));
-        AnalysisRunDO recovered = row("ana-expired", "STARTED", 2, LocalDateTime.now().plusMinutes(2));
+        AnalysisRunDO expired = row("ana-expired", "STARTED", 1, LocalDateTime.of(2026, 6, 23, 9, 59));
+        AnalysisRunDO recovered = row("ana-expired", "STARTED", 2, LocalDateTime.of(2026, 6, 23, 10, 2));
         when(mapper.selectByIdempotencyKey("idem-expired")).thenReturn(expired);
         when(mapper.countPartialStateRows("ana-expired")).thenReturn(0);
-        when(mapper.recoverExpiredLease(anyString(), anyString(), anyString(), any(), any(), any(Integer.class), any(Integer.class)))
+        when(mapper.recoverExpiredLease(anyString(), anyString(), anyString(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(1);
         when(mapper.selectById("ana-expired")).thenReturn(recovered);
 
@@ -98,11 +104,35 @@ class AnalysisIdempotencyGuardImplTest {
         assertThat(claim.getRun().getAttemptCount()).isEqualTo(2);
     }
 
+    @Test
+    void markFailedUsesLeaseOwnerVersionAndRedactsSensitiveMessage() {
+        AnalysisExecutionContext context = new AnalysisExecutionContext(
+                "ana-fail", "trace-fail", "req-fail", "idem-fail", "BTCUSDT", "1m",
+                LocalDateTime.of(2026, 6, 23, 10, 0),
+                LocalDateTime.of(2026, 6, 23, 10, 0),
+                "v1.0", AnalysisRunTriggerType.MANUAL_API, "req-fail", null, null,
+                "{}", "hash", "lease-owner-1", 7, 2, true);
+
+        guard.markFailed(context, "RuntimeException",
+                "Authorization: Bearer SECRET https://api.example.test/path?api_key=SECRET&x=1 token=SECRET");
+
+        verify(mapper).markFailed(
+                anyString(),
+                anyString(),
+                org.mockito.ArgumentMatchers.argThat(msg -> msg.contains("<redacted>")
+                        && !msg.contains("Bearer SECRET")
+                        && !msg.contains("api_key=SECRET")
+                        && !msg.contains("token=SECRET")),
+                any(),
+                org.mockito.ArgumentMatchers.eq("lease-owner-1"),
+                org.mockito.ArgumentMatchers.eq(7));
+    }
+
     private static AnalysisRunClaimRequest request(String key) {
         return new AnalysisRunClaimRequest("ana-new", "trace-new", "req-test", key,
                 "BTCUSDT", "1m", LocalDateTime.of(2026, 6, 23, 10, 0), "v1.0",
                 AnalysisRunTriggerType.MANUAL_API, "req-test", null, null,
-                "{}", "hash", "lease-test", LocalDateTime.now().plusMinutes(2));
+                "{}", "hash", "lease-test", LocalDateTime.of(2026, 6, 23, 10, 2));
     }
 
     private static AnalysisRunDO row(String analysisId, String status, int attempts, LocalDateTime leaseExpiresAt) {
