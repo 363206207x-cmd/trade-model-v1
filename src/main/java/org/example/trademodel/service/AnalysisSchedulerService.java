@@ -57,7 +57,10 @@ public class AnalysisSchedulerService {
             result = analysisRunOrchestrator.run(AnalysisRunCommand.manual(
                     symbol, timeframe, RequestIdSupport.generate(), null));
         }
-        return ApiResponse.success(result.getStatus(), analysisOrMinimal(result));
+        if (result != null && result.isSuccessfulAnalysisAvailable()) {
+            return ApiResponse.success(result.getStatus(), analysisOrMinimal(result));
+        }
+        return ApiResponse.fail(failureMessage(result));
     }
 
     public AnalysisRunResult runManual(String symbol, String timeframe, String requestId, String analysisTime) {
@@ -152,5 +155,19 @@ public class AnalysisSchedulerService {
         vo.setTimeframe(result.getTimeframe());
         vo.setAnalysisTime(LocalDateTime.now().toString());
         return vo;
+    }
+
+    private static String failureMessage(AnalysisRunResult result) {
+        if (result == null) {
+            return "ANALYSIS_REBUILD_RESULT_MISSING";
+        }
+        String status = hasText(result.getStatus()) ? result.getStatus() : "UNKNOWN";
+        String reason = hasText(result.getReasonCode()) ? result.getReasonCode() : "ANALYSIS_REBUILD_NOT_EXECUTED";
+        String message = hasText(result.getMessage()) ? result.getMessage() : "analysis rebuild did not execute successfully";
+        return status + ": " + reason + ": " + message;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

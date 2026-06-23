@@ -11,6 +11,7 @@ public class AnalysisRunResult {
     private final String traceId;
     private final String requestId;
     private final String idempotencyKey;
+    private final String runStatus;
     private final String symbol;
     private final String timeframe;
     private final String triggerType;
@@ -46,6 +47,7 @@ public class AnalysisRunResult {
         this.traceId = run != null ? run.getTraceId() : null;
         this.requestId = run != null ? run.getRequestId() : null;
         this.idempotencyKey = run != null ? run.getIdempotencyKey() : null;
+        this.runStatus = run != null ? run.getStatus() : null;
         this.symbol = run != null ? run.getSymbol() : null;
         this.timeframe = run != null ? run.getTimeframe() : null;
         this.triggerType = run != null ? run.getTriggerType() : null;
@@ -103,6 +105,7 @@ public class AnalysisRunResult {
     public String getTraceId() { return traceId; }
     public String getRequestId() { return requestId; }
     public String getIdempotencyKey() { return idempotencyKey; }
+    public String getRunStatus() { return runStatus; }
     public String getSymbol() { return symbol; }
     public String getTimeframe() { return timeframe; }
     public String getTriggerType() { return triggerType; }
@@ -125,4 +128,23 @@ public class AnalysisRunResult {
     public boolean isNotUserPositionMutation() { return notUserPositionMutation; }
     public boolean isNotPushSend() { return notPushSend; }
     public boolean isNotExternalChannel() { return notExternalChannel; }
+
+    public boolean hasAnalysisId() {
+        return analysisId != null && !analysisId.isBlank();
+    }
+
+    public boolean isExecutedAnalysisAvailable() {
+        return acceptedForExecution && hasAnalysisId();
+    }
+
+    public boolean isReusableDuplicateSuccess() {
+        return duplicateTriggerBlocked
+                && "EXISTING_SUCCESS".equals(status)
+                && "SUCCESS".equals(runStatus)
+                && hasAnalysisId();
+    }
+
+    public boolean isSuccessfulAnalysisAvailable() {
+        return isExecutedAnalysisAvailable() || isReusableDuplicateSuccess();
+    }
 }

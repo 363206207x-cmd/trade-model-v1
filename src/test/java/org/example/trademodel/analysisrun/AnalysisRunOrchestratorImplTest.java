@@ -53,6 +53,42 @@ class AnalysisRunOrchestratorImplTest {
     }
 
     @Test
+    void oneMinuteBucketKeepsSameKeyAcrossDifferentSeconds() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.IN_PROGRESS);
+        AnalysisRunOrchestratorImpl orchestrator = orchestrator(guard, new CapturingAssembler(false), "rules-2026-06");
+
+        orchestrator.run(AnalysisRunCommand.manual("BTCUSDT", "1m", "req-1", "2026-06-23T10:04:01Z"));
+        orchestrator.run(AnalysisRunCommand.manual("BTCUSDT", "1m", "req-2", "2026-06-23T10:04:59Z"));
+
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getIdempotencyKey)
+                .containsOnly(guard.requests.get(0).getIdempotencyKey());
+    }
+
+    @Test
+    void fiveMinuteBucketKeepsSameKeyAcrossDifferentMinutesInBucket() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.IN_PROGRESS);
+        AnalysisRunOrchestratorImpl orchestrator = orchestrator(guard, new CapturingAssembler(false), "rules-2026-06");
+
+        orchestrator.run(AnalysisRunCommand.manual("BTCUSDT", "5m", "req-1", "2026-06-23T10:01:00Z"));
+        orchestrator.run(AnalysisRunCommand.manual("BTCUSDT", "5m", "req-2", "2026-06-23T10:04:59Z"));
+
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getIdempotencyKey)
+                .containsOnly(guard.requests.get(0).getIdempotencyKey());
+    }
+
+    @Test
+    void idempotencyKeyChangesAcrossCanonicalTimeBuckets() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.IN_PROGRESS);
+        AnalysisRunOrchestratorImpl orchestrator = orchestrator(guard, new CapturingAssembler(false), "rules-2026-06");
+
+        orchestrator.run(AnalysisRunCommand.manual("BTCUSDT", "1m", "req-1", "2026-06-23T10:04:59Z"));
+        orchestrator.run(AnalysisRunCommand.manual("BTCUSDT", "1m", "req-2", "2026-06-23T10:05:00Z"));
+
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getIdempotencyKey)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
     void assemblerContextCarriesLeaseFenceFromClaimedRun() {
         CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
         CapturingAssembler assembler = new CapturingAssembler(false);

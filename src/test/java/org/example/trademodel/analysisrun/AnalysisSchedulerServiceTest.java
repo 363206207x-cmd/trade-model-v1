@@ -1,6 +1,7 @@
 package org.example.trademodel.analysisrun;
 
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.service.AnalysisSchedulerService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.junit.jupiter.api.Test;
@@ -66,12 +67,47 @@ class AnalysisSchedulerServiceTest {
         assertThat(orchestrator.commands.get(0).getTriggerReference()).isEqualTo("hre-1");
     }
 
+    @Test
+    void executeAnalysisReturnsFailureWithoutMinimalAnalysisForNonExecutedResult() {
+        CapturingOrchestrator orchestrator = new CapturingOrchestrator(
+                AnalysisRunResult.inProgress(run("ana-in-progress", "STARTED")));
+        AnalysisSchedulerService service = new AnalysisSchedulerService(orchestrator, new AnalysisRunProperties());
+
+        ApiResponse<AssetAnalysisVO> response = service.executeAnalysis("BTCUSDT", "1m", "HOT_RESET:hre-blocked");
+
+        assertThat(response.getCode()).isEqualTo(500);
+        assertThat(response.getData()).isNull();
+        assertThat(response.getMsg()).contains("CONCURRENT_TRIGGER_BLOCKED");
+    }
+
+    @Test
+    void executeAnalysisAllowsReusableDuplicateSuccessWithoutExecutingAnalysisAgain() {
+        CapturingOrchestrator orchestrator = new CapturingOrchestrator(
+                AnalysisRunResult.duplicateSuccess(run("ana-existing-success", "SUCCESS")));
+        AnalysisSchedulerService service = new AnalysisSchedulerService(orchestrator, new AnalysisRunProperties());
+
+        ApiResponse<AssetAnalysisVO> response = service.executeAnalysis("BTCUSDT", "1m", "HOT_RESET:hre-duplicate");
+
+        assertThat(response.getCode()).isEqualTo(200);
+        assertThat(response.getMsg()).isEqualTo("EXISTING_SUCCESS");
+        assertThat(response.getData()).isNotNull();
+        assertThat(response.getData().getAnalysisId()).isEqualTo("ana-existing-success");
+    }
+
     private static class CapturingOrchestrator implements AnalysisRunOrchestrator {
         private final List<AnalysisRunCommand> commands = new ArrayList<>();
+        private final List<AnalysisRunResult> results = new ArrayList<>();
+
+        private CapturingOrchestrator(AnalysisRunResult... results) {
+            this.results.addAll(List.of(results));
+        }
 
         @Override
         public AnalysisRunResult run(AnalysisRunCommand command) {
             commands.add(command);
+            if (!results.isEmpty()) {
+                return results.remove(0);
+            }
             AnalysisRunDO run = new AnalysisRunDO();
             run.setAnalysisId("ana-" + commands.size());
             run.setTraceId("trace-" + commands.size());
@@ -86,5 +122,18 @@ class AnalysisSchedulerServiceTest {
             analysis.setTimeframe(run.getTimeframe());
             return AnalysisRunResult.executed(run, analysis, false, false);
         }
+    }
+
+    private static AnalysisRunDO run(String analysisId, String status) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setTraceId("trace-" + analysisId);
+        run.setRequestId("req-" + analysisId);
+        run.setSymbol("BTCUSDT");
+        run.setTimeframe("1m");
+        run.setTriggerType(AnalysisRunTriggerType.HOT_RESET_REBUILD.name());
+        run.setTriggerReference("hre-test");
+        run.setStatus(status);
+        return run;
     }
 }

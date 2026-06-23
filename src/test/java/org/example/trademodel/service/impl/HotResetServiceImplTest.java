@@ -1,7 +1,8 @@
 package org.example.trademodel.service.impl;
 
-import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.HotResetEventTypeEnum;
@@ -37,6 +38,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -81,7 +83,7 @@ class HotResetServiceImplTest {
         assertThat(result.isTriggered()).isFalse();
         verify(assetStateMapper, never()).mergeUpsertCore(any());
         verify(decisionResultMapper, never()).markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any());
-        verify(scheduler, never()).executeAnalysis(anyString(), anyString(), anyString());
+        verify(scheduler, never()).runHotResetRebuild(anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -105,7 +107,7 @@ class HotResetServiceImplTest {
         when(decisionResultMapper.markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any())).thenReturn(1);
         when(executionPlanMapper.markNeedsRevalidationForHotReset(any(), anyString(), anyString(), anyString(), any())).thenReturn(1);
         when(pushSnapshotMapper.invalidatePendingBySymbolForHotReset(anyString())).thenReturn(1);
-        when(scheduler.executeAnalysis(anyString(), anyString(), anyString())).thenReturn(ApiResponse.success(rebuilt("ana-rebuild")));
+        whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult result = service.evaluateAndExecute(command);
 
@@ -144,7 +146,7 @@ class HotResetServiceImplTest {
         when(decisionResultMapper.markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any())).thenReturn(2);
         when(executionPlanMapper.markNeedsRevalidationForHotReset(any(), anyString(), anyString(), anyString(), any())).thenReturn(3);
         when(pushSnapshotMapper.invalidatePendingBySymbolForHotReset(anyString())).thenReturn(4);
-        when(scheduler.executeAnalysis(anyString(), anyString(), anyString())).thenReturn(ApiResponse.success(rebuilt("ana-rebuild")));
+        whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult result = service.evaluateAndExecute(command);
 
@@ -170,7 +172,7 @@ class HotResetServiceImplTest {
 
         assertThat(result.isDeduplicated()).isTrue();
         verify(assetStateMapper, never()).mergeUpsertCore(any());
-        verify(scheduler, never()).executeAnalysis(anyString(), anyString(), anyString());
+        verify(scheduler, never()).runHotResetRebuild(anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -184,11 +186,11 @@ class HotResetServiceImplTest {
 
         service.evaluateAndExecute(command);
 
-        verify(scheduler, never()).executeAnalysis(anyString(), anyString(), anyString());
+        verify(scheduler, never()).runHotResetRebuild(anyString(), anyString(), anyString(), any(), any());
         List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
         assertThat(synchronizations).hasSize(1);
         TransactionSynchronizationManager.clearSynchronization();
-        verify(scheduler, never()).executeAnalysis(anyString(), anyString(), anyString());
+        verify(scheduler, never()).runHotResetRebuild(anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -198,13 +200,95 @@ class HotResetServiceImplTest {
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
-        when(scheduler.executeAnalysis(anyString(), anyString(), anyString())).thenReturn(ApiResponse.success(rebuilt("ana-rebuild")));
+        whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult success = service.evaluateAndExecute(command);
 
         assertThat(success.getRebuildAnalysisId()).isEqualTo("ana-rebuild");
+        assertThat(success.getExecutionStatus()).isEqualTo("COMPLETED");
+        verify(scheduler).runHotResetRebuild(eq("BTCUSDT"), eq("1m"), anyString(), eq("ana-test"), eq("trace-test"));
         verify(executionPlanMapper).markNeedsRevalidationForHotReset(any(), anyString(), anyString(), anyString(), any());
         verify(hotResetEventMapper).updateRebuildOutcome(any(HotResetEventDO.class));
+    }
+
+    @Test
+    void recoveredRebuildExecutionIsCompleted() {
+        mockTriggeredPath();
+        whenRebuildReturns(executed("ana-recovered", true, false));
+
+        HotResetResult result = service.evaluateAndExecute(command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE));
+
+        assertThat(result.getExecutionStatus()).isEqualTo("COMPLETED");
+        assertThat(result.getRebuildAnalysisId()).isEqualTo("ana-recovered");
+        assertRebuildOutcome("COMPLETED", "ana-recovered", null, null);
+    }
+
+    @Test
+    void duplicateSuccessReusesExistingSuccessfulAnalysisWithoutCompatibilityExecution() {
+        mockTriggeredPath();
+        whenRebuildReturns(AnalysisRunResult.duplicateSuccess(run("ana-existing-success", "SUCCESS")));
+
+        HotResetResult result = service.evaluateAndExecute(command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE));
+
+        assertThat(result.getExecutionStatus()).isEqualTo("COMPLETED");
+        assertThat(result.getRebuildAnalysisId()).isEqualTo("ana-existing-success");
+        verify(scheduler, never()).executeAnalysis(anyString(), anyString(), anyString());
+        assertRebuildOutcome("COMPLETED", "ana-existing-success", null, null);
+    }
+
+    @Test
+    void failedRebuildIsRecordedAsFailedWithoutRebuildAnalysisIdAndRedactsMessage() {
+        mockTriggeredPath();
+        whenRebuildReturns(AnalysisRunResult.failed(run("ana-failed", "STARTED"),
+                "Authorization: Bearer SECRET https://api.example.test/path?api_key=SECRET&x=1 token=SECRET"));
+
+        HotResetResult result = service.evaluateAndExecute(command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE));
+
+        assertThat(result.getExecutionStatus()).isEqualTo("REBUILD_FAILED");
+        assertThat(result.getRebuildAnalysisId()).isNull();
+        HotResetEventDO update = assertRebuildOutcome("REBUILD_FAILED", null,
+                "ANALYSIS_EXECUTION_FAILED", null);
+        assertThat(update.getExecutionErrorMessage()).contains("<redacted>");
+        assertThat(update.getExecutionErrorMessage()).doesNotContain("Bearer SECRET");
+        assertThat(update.getExecutionErrorMessage()).doesNotContain("api_key=SECRET");
+        assertThat(update.getExecutionErrorMessage()).doesNotContain("token=SECRET");
+    }
+
+    @Test
+    void concurrentRebuildBlockedIsNotMarkedCompleted() {
+        mockTriggeredPath();
+        whenRebuildReturns(AnalysisRunResult.inProgress(run("ana-in-progress", "STARTED")));
+
+        HotResetResult result = service.evaluateAndExecute(command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE));
+
+        assertThat(result.getExecutionStatus()).isEqualTo("REBUILD_FAILED");
+        assertThat(result.getRebuildAnalysisId()).isNull();
+        assertRebuildOutcome("REBUILD_FAILED", null, "IDEMPOTENCY_IN_PROGRESS", "CONCURRENT_TRIGGER_BLOCKED");
+    }
+
+    @Test
+    void recoveryBlockedRebuildIsNotMarkedCompleted() {
+        mockTriggeredPath();
+        whenRebuildReturns(AnalysisRunResult.recoveryBlocked(run("ana-recovery-blocked", "FAILED"),
+                "PARTIAL_STATE_RECOVERY_BLOCKED", "downstream analysis rows exist; recovery is blocked"));
+
+        HotResetResult result = service.evaluateAndExecute(command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE));
+
+        assertThat(result.getExecutionStatus()).isEqualTo("REBUILD_FAILED");
+        assertThat(result.getRebuildAnalysisId()).isNull();
+        assertRebuildOutcome("REBUILD_FAILED", null, "PARTIAL_STATE_RECOVERY_BLOCKED", "RECOVERY_BLOCKED");
+    }
+
+    @Test
+    void maxAttemptsExceededRebuildIsNotMarkedCompleted() {
+        mockTriggeredPath();
+        whenRebuildReturns(AnalysisRunResult.maxAttempts(run("ana-max-attempts", "FAILED")));
+
+        HotResetResult result = service.evaluateAndExecute(command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE));
+
+        assertThat(result.getExecutionStatus()).isEqualTo("REBUILD_FAILED");
+        assertThat(result.getRebuildAnalysisId()).isNull();
+        assertRebuildOutcome("REBUILD_FAILED", null, "MAX_RECOVERY_ATTEMPTS_EXCEEDED", "RECOVERY_BLOCKED_MAX_ATTEMPTS");
     }
 
     @Test
@@ -233,7 +317,7 @@ class HotResetServiceImplTest {
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, preState.name(), "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
-        when(scheduler.executeAnalysis(anyString(), anyString(), anyString())).thenReturn(ApiResponse.success(rebuilt("ana-rebuild")));
+        whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult result = service.evaluateAndExecute(command);
 
@@ -246,7 +330,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CONFUSED, 54, 1));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class))).thenReturn(confusedResult);
         when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
-        when(scheduler.executeAnalysis(anyString(), anyString(), anyString())).thenReturn(ApiResponse.success(rebuilt("ana-rebuild")));
+        whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult result = service.evaluateAndExecute(command);
 
@@ -284,9 +368,56 @@ class HotResetServiceImplTest {
         return row;
     }
 
+    private void mockTriggeredPath() {
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
+        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+    }
+
+    private void whenRebuildReturns(AnalysisRunResult result) {
+        when(scheduler.runHotResetRebuild(anyString(), anyString(), anyString(), any(), any())).thenReturn(result);
+    }
+
+    private HotResetEventDO assertRebuildOutcome(String status, String rebuildAnalysisId,
+                                                 String errorCode, String messageFragment) {
+        ArgumentCaptor<HotResetEventDO> captor = ArgumentCaptor.forClass(HotResetEventDO.class);
+        verify(hotResetEventMapper).updateRebuildOutcome(captor.capture());
+        HotResetEventDO update = captor.getValue();
+        assertThat(update.getExecutionStatus()).isEqualTo(status);
+        assertThat(update.getRebuildAnalysisId()).isEqualTo(rebuildAnalysisId);
+        assertThat(update.getExecutionErrorCode()).isEqualTo(errorCode);
+        if (messageFragment != null) {
+            assertThat(update.getExecutionErrorMessage()).contains(messageFragment);
+        } else if (errorCode == null) {
+            assertThat(update.getExecutionErrorMessage()).isNull();
+        }
+        return update;
+    }
+
+    private static AnalysisRunResult executed(String analysisId, boolean failedRecovery, boolean expiredLeaseRecovery) {
+        return AnalysisRunResult.executed(run(analysisId, "STARTED"), rebuilt(analysisId),
+                failedRecovery, expiredLeaseRecovery);
+    }
+
+    private static AnalysisRunDO run(String analysisId, String status) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setTraceId("trace-" + analysisId);
+        run.setRequestId("req-" + analysisId);
+        run.setSymbol("BTCUSDT");
+        run.setTimeframe("1m");
+        run.setTriggerType("HOT_RESET_REBUILD");
+        run.setTriggerReference("hre-test");
+        run.setStatus(status);
+        return run;
+    }
+
     private static AssetAnalysisVO rebuilt(String analysisId) {
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         analysis.setAnalysisId(analysisId);
+        analysis.setSymbol("BTCUSDT");
+        analysis.setTimeframe("1m");
         return analysis;
     }
 }
