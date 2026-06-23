@@ -5,6 +5,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -39,6 +40,8 @@ class ReviewControllerPositionMonitorLogTest {
     private PositionMonitorLogService positionMonitorLogService;
     @Mock
     private UserPositionReviewAdapter userPositionReviewAdapter;
+    @Mock
+    private OpportunityLogService opportunityLogService;
 
     private MockMvc mockMvc;
 
@@ -49,7 +52,8 @@ class ReviewControllerPositionMonitorLogTest {
                 reviewAggregateService,
                 ruleVersionLogQueryService,
                 positionMonitorLogService,
-                userPositionReviewAdapter)).build();
+                userPositionReviewAdapter,
+                opportunityLogService)).build();
     }
 
     @Test

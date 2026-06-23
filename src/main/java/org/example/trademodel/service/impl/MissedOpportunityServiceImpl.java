@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.trademodel.entity.MissedOpportunityDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.MissedOpportunityMapper;
-import org.example.trademodel.mapper.RealPositionMapper;
 import org.example.trademodel.service.MissedOpportunityService;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.springframework.stereotype.Service;
@@ -22,66 +21,16 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
     private static final ObjectMapper REASON_JSON = new ObjectMapper();
 
     private final MissedOpportunityMapper missedOpportunityMapper;
-    private final RealPositionMapper realPositionMapper;
 
-    public MissedOpportunityServiceImpl(MissedOpportunityMapper missedOpportunityMapper,
-                                        RealPositionMapper realPositionMapper) {
+    public MissedOpportunityServiceImpl(MissedOpportunityMapper missedOpportunityMapper) {
         this.missedOpportunityMapper = missedOpportunityMapper;
-        this.realPositionMapper = realPositionMapper;
     }
 
     @Override
     public void recordFromAuthoritativeAnalysisIfEligible(String analysisId, String symbol, String traceId,
                                                           DecisionBundleVO decision, boolean hotResetWouldFire) {
-        if (decision == null || analysisId == null || analysisId.isBlank()) {
-            return;
-        }
-        if (!Boolean.TRUE.equals(decision.getIsWorthOpening())) {
-            return;
-        }
-        if (hotResetWouldFire) {
-            return;
-        }
-        if (decision.getAssetState() == AssetStateEnum.INVALIDATED) {
-            return;
-        }
-        if (symbol == null || symbol.isBlank()) {
-            return;
-        }
-        if (hasOpenPositionForSymbol(symbol)) {
-            return;
-        }
-        String decisionId = decision.getDecisionId();
-        if (decisionId == null || decisionId.isBlank()) {
-            return;
-        }
-        if (!listByDecisionId(decisionId).isEmpty()) {
-            return;
-        }
-
-        MissedOpportunityDO row = new MissedOpportunityDO();
-        row.setMissedId("mo-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
-        row.setDecisionId(decisionId);
-        row.setAnalysisId(analysisId);
-        row.setSymbol(symbol.trim());
-        row.setBizDate(LocalDate.now());
-        row.setReasonJson(buildReasonJsonV1(decision, analysisId, decisionId, symbol, hotResetWouldFire));
-        row.setRuleVersion(MISSED_RULE_VERSION);
-        row.setTraceId(traceId);
-        row.setCreateTime(LocalDateTime.now());
-        missedOpportunityMapper.insert(row);
-    }
-
-    private boolean hasOpenPositionForSymbol(String symbol) {
-        try {
-            String n = normalizeSymbol(symbol);
-            if (n == null) {
-                return false;
-            }
-            return realPositionMapper.countOpenPositionsBySymbol(n) > 0;
-        } catch (Exception ignored) {
-            return false;
-        }
+        // P1-4 freezes this legacy write path. Authoritative opportunity outcomes are
+        // recorded by OpportunityLogService after persisted analysis facts exist.
     }
 
     private static String normalizeSymbol(String symbol) {

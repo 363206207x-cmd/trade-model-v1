@@ -417,6 +417,91 @@ CREATE TABLE IF NOT EXISTS tm_monitor_alert (
 
 CREATE INDEX IF NOT EXISTS idx_tm_monitor_alert_list ON tm_monitor_alert(is_deleted, created_at);
 
+-- Opportunity Log（机会日志）：P1-4 权威机会结果所有者。
+-- 仅记录分析后机会候选和只读结果分类，不代表交易指令，不创建或修改用户持仓。
+CREATE TABLE IF NOT EXISTS tm_opportunity_log (
+    opportunity_id VARCHAR(64) PRIMARY KEY,
+    opportunity_key VARCHAR(160) NOT NULL UNIQUE,
+    analysis_id VARCHAR(64) NOT NULL,
+    decision_id VARCHAR(64),
+    execution_plan_id VARCHAR(64),
+    push_id BIGINT,
+    user_position_id BIGINT,
+    symbol VARCHAR(32) NOT NULL,
+    timeframe VARCHAR(16) NOT NULL,
+    direction VARCHAR(16) NOT NULL,
+    lifecycle_status VARCHAR(32) NOT NULL,
+    opportunity_status VARCHAR(40),
+    anchor_time TIMESTAMP NOT NULL,
+    evaluation_as_of TIMESTAMP,
+    resolved_at TIMESTAMP,
+    entry_reference DECIMAL(20, 8),
+    target_price DECIMAL(20, 8),
+    invalidation_price DECIMAL(20, 8),
+    target_hit BOOLEAN NOT NULL DEFAULT FALSE,
+    invalidation_hit BOOLEAN NOT NULL DEFAULT FALSE,
+    target_hit_at TIMESTAMP,
+    invalidation_hit_at TIMESTAMP,
+    hit_order VARCHAR(32),
+    mfe_price DECIMAL(20, 8),
+    mfe_ratio DECIMAL(20, 10),
+    mae_price DECIMAL(20, 8),
+    mae_ratio DECIMAL(20, 10),
+    push_present BOOLEAN NOT NULL DEFAULT FALSE,
+    risk_blocked_evidence BOOLEAN NOT NULL DEFAULT FALSE,
+    risk_blocked_at TIMESTAMP,
+    user_position_present BOOLEAN NOT NULL DEFAULT FALSE,
+    source_type VARCHAR(64),
+    source_reference VARCHAR(256),
+    market_data_source VARCHAR(128),
+    market_data_trace_id VARCHAR(128),
+    reason_codes TEXT,
+    trace_id VARCHAR(64),
+    review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    manual_review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_executable BOOLEAN NOT NULL DEFAULT TRUE,
+    not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_mutation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_push_send BOOLEAN NOT NULL DEFAULT TRUE,
+    not_external_channel BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_opportunity_log_lifecycle CHECK (
+        lifecycle_status IN ('PENDING_EVALUATION', 'RESOLVED', 'SOURCE_INCOMPLETE',
+        'MARKET_PATH_UNAVAILABLE', 'AMBIGUOUS_MARKET_PATH', 'REVIEW_REQUIRED')
+    ),
+    CONSTRAINT ck_tm_opportunity_log_status CHECK (
+        opportunity_status IS NULL OR opportunity_status IN ('EXECUTED_VALID', 'EXECUTED_INVALID',
+        'MISSED_VALID', 'MISSED_INVALID', 'PUSHED_NOT_FILLED_VALID', 'BLOCKED_BY_RISK_VALID')
+    ),
+    CONSTRAINT ck_tm_opportunity_log_hit_order CHECK (
+        hit_order IS NULL OR hit_order IN ('TARGET_FIRST', 'INVALIDATION_FIRST', 'AMBIGUOUS_SAME_BAR')
+    ),
+    CONSTRAINT ck_tm_opportunity_log_safety CHECK (
+        review_only = TRUE
+        AND manual_review_only = TRUE
+        AND not_trade_instruction = TRUE
+        AND not_executable = TRUE
+        AND not_auto_trading = TRUE
+        AND not_order_execution = TRUE
+        AND not_user_position_creation = TRUE
+        AND not_user_position_mutation = TRUE
+        AND not_push_send = TRUE
+        AND not_external_channel = TRUE
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_analysis_id ON tm_opportunity_log(analysis_id);
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_decision_id ON tm_opportunity_log(decision_id);
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_execution_plan_id ON tm_opportunity_log(execution_plan_id);
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_symbol_anchor ON tm_opportunity_log(symbol, anchor_time);
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_status_resolved ON tm_opportunity_log(opportunity_status, resolved_at);
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_user_position_id ON tm_opportunity_log(user_position_id);
+CREATE INDEX IF NOT EXISTS idx_tm_opportunity_log_push_id ON tm_opportunity_log(push_id);
+
 -- Missed Opportunity（窄表；主链仅在 hotResetWouldFire=false 时落库；dashboard 仅消费当日计数）
 CREATE TABLE IF NOT EXISTS tm_missed_opportunity (
     missed_id VARCHAR(64) PRIMARY KEY,

@@ -17,6 +17,7 @@ import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.HotResetService;
 import org.example.trademodel.service.MissedOpportunityService;
 import org.example.trademodel.service.MonitorAlertWriteService;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.service.PushSnapshotService;
 import org.example.trademodel.service.RuleConfigService;
@@ -86,6 +87,8 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
     private HotResetService hotResetService;
     @Mock
     private MissedOpportunityService missedOpportunityService;
+    @Mock
+    private OpportunityLogService opportunityLogService;
 
     private AnalysisAssemblerServiceImpl service;
 
@@ -109,7 +112,8 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 pushSnapshotService,
                 monitorAlertWriteService,
                 hotResetService,
-                missedOpportunityService);
+                missedOpportunityService,
+                opportunityLogService);
     }
 
     @Test

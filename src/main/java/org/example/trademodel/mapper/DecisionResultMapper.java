@@ -95,6 +95,9 @@ public interface DecisionResultMapper {
     @Select("SELECT * FROM tm_decision_result WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
     DecisionResult selectLatestByAnalysisId(String analysisId);
 
+    @Select("SELECT * FROM tm_decision_result WHERE decision_id = #{decisionId}")
+    DecisionResult selectByDecisionId(@Param("decisionId") String decisionId);
+
     @Update("UPDATE tm_decision_result SET hot_reset_invalidated = TRUE, hot_reset_event_id = #{eventId}, "
             + "hot_reset_invalidated_at = #{invalidatedAt}, hot_reset_reason_code = #{reasonCode} "
             + "WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol} "

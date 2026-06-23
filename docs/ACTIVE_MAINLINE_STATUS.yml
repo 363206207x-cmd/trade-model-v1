@@ -12,17 +12,17 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P1-3 HotReset real action DONE candidate"
-active_block_cn: "P1-3 热重置真实动作 DONE candidate"
+active_block: "P1-4 OpportunityLog DONE candidate"
+active_block_cn: "P1-4 机会日志 DONE candidate"
 
-next_required_action: "Review and merge-gate the P1-3 HotReset real action B-risk PR; do not start P1-4 before merged-main effectivity."
-next_business_phase: "P1-4 OpportunityLog"
+next_required_action: "Review and merge-gate the P1-4 OpportunityLog B-risk PR; do not start P2-1 before merged-main effectivity."
+next_business_phase: "P2-1 Macro / News / External Context"
 next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "DERIVED_BY_V1_STATE"
-current_branch: "p1-3-hot-reset-real-action"
+current_branch: "p1-4-opportunity-log-full-implementation"
 current_package_pr: "DERIVED_BY_V1_STATE"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -56,9 +56,12 @@ p1_2_started: true
 p1_2_status: "DONE on merged main"
 p1_2_effective: true
 p1_3_started: true
-p1_3_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
-p1_3_effective: false
-p1_4_allowed: false
+p1_3_status: "DONE on merged main"
+p1_3_effective: true
+p1_4_started: true
+p1_4_status: "DONE candidate on branch; effective only after reviewed merge to clean / synced main"
+p1_4_effective: false
+p2_1_allowed: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -74,8 +77,9 @@ notes:
   - "P0-6 Review integrates UserPosition is effective on merged main."
   - "P1-1 PushRecheck semantic hardening is effective on merged main."
   - "P1-2 ConfusedState + AiConflict hardening is effective on merged main."
-  - "P1-3 HotReset real action is now the active branch candidate."
-  - "P1-3 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
-  - "P1-4 remains blocked while P1-3 is only a branch candidate."
-  - "No UserPosition mutation, automatic reduce / close / reverse, order execution, auto-trading, Push send, external channel, Dashboard UI, OpportunityLog, or PR #1004 code is part of this package."
+  - "P1-3 HotReset real action is effective on merged main."
+  - "P1-4 OpportunityLog is now the active branch candidate."
+  - "P1-4 remains ineffective until the B-risk PR is reviewed, merged, main is synced, and runtime state confirms effectivity."
+  - "P2-1 remains blocked while P1-4 is only a branch candidate."
+  - "No tm_real_position substitution, UserPosition mutation, Recheck / Replay execution, HotReset execution, external quote refresh, order execution, auto-trading, Push send, external channel, Dashboard UI, Macro / News, or PR #1004 code is part of this package."
   - "Review-only slice count is no longer a delivery completion standard."
