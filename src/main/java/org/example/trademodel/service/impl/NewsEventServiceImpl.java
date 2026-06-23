@@ -40,8 +40,8 @@ public class NewsEventServiceImpl implements NewsEventService {
     public List<NewsEventDO> findWindowCandidates(String symbol, String marketScope, LocalDateTime contextTime) {
         LocalDateTime at = contextTime == null ? LocalDateTime.now() : contextTime;
         return mapper.selectWindowCandidates(at, 500).stream()
-                .filter(event -> MacroEventServiceImpl.matchesSymbol(event.getAffectedSymbols(), symbol))
-                .filter(event -> MacroEventServiceImpl.matchesMarketScope(event.getMarketScope(), marketScope))
+                .filter(event -> ExternalContextPolicy.matchesContextScope(
+                        event.getAffectedSymbols(), event.getMarketScope(), symbol, marketScope))
                 .filter(event -> {
                     String state = ExternalContextPolicy.windowState(event, at);
                     return ExternalContextPolicy.STATUS_ACTIVE.equals(state) || ExternalContextPolicy.STATUS_NEAR.equals(state);

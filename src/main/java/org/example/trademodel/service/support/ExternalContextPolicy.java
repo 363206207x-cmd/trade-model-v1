@@ -30,7 +30,7 @@ public final class ExternalContextPolicy {
             return STATUS_EXPIRED;
         }
         String status = normalize(event.getStatus());
-        if (STATUS_CANCELLED.equals(status) || STATUS_RETRACTED.equals(status)) {
+        if (STATUS_EXPIRED.equals(status) || STATUS_CANCELLED.equals(status) || STATUS_RETRACTED.equals(status)) {
             return status;
         }
         if (event.getSourcePublishedAt() != null && event.getSourcePublishedAt().isAfter(contextTime)) {
@@ -80,6 +80,36 @@ public final class ExternalContextPolicy {
             return "LOW";
         }
         return hasText(confidence) ? confidence : "LOW";
+    }
+
+    public static boolean matchesContextScope(String affectedSymbols,
+                                              String eventMarketScope,
+                                              String requestedSymbol,
+                                              String requestedMarketScope) {
+        if (hasText(affectedSymbols)) {
+            return containsExactSymbol(affectedSymbols, requestedSymbol);
+        }
+        String normalizedEventScope = normalize(eventMarketScope);
+        if ("GLOBAL".equals(normalizedEventScope)) {
+            return true;
+        }
+        String normalizedRequestedScope = normalize(requestedMarketScope);
+        return hasText(normalizedEventScope)
+                && hasText(normalizedRequestedScope)
+                && normalizedEventScope.equals(normalizedRequestedScope);
+    }
+
+    public static boolean containsExactSymbol(String affectedSymbols, String requestedSymbol) {
+        if (!hasText(affectedSymbols) || !hasText(requestedSymbol)) {
+            return false;
+        }
+        String target = normalize(requestedSymbol);
+        for (String part : affectedSymbols.split(",")) {
+            if (target.equals(normalize(part))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static String normalize(String value) {

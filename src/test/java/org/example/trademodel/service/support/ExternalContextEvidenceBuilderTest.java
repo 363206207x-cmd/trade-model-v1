@@ -64,6 +64,77 @@ class ExternalContextEvidenceBuilderTest {
         assertThat(bundle.getEvidenceItems()).hasSize(1);
     }
 
+    @Test
+    void explicitExpiredStatusProducesNoEvidenceOrBlockerEvenInsideWindow() {
+        LocalDateTime now = LocalDateTime.now();
+        NewsEventDO expired = news("news-expired-status", now, 95, true);
+        expired.setStatus(ExternalContextPolicy.STATUS_EXPIRED);
+        ExternalContextEvidenceBuilder builder = new ExternalContextEvidenceBuilder(macroService(List.of()), newsService(List.of(expired)));
+
+        ExternalContextEvidenceBundle bundle = builder.build("ana-expired", "BTCUSDT", "1h", now, "CRYPTO");
+
+        assertThat(bundle.getEvidenceItems()).isEmpty();
+        assertThat(bundle.getSnapshot().isExternalContextBlocked()).isFalse();
+        assertThat(bundle.getSnapshot().getActiveExternalEventCount()).isZero();
+    }
+
+    @Test
+    void nullMarketScopeDoesNotWildcardCrossMarketEventWithoutSymbolScope() {
+        LocalDateTime now = LocalDateTime.now();
+        MacroEventDO equities = macro("macro-equities", now, 95, true);
+        equities.setAffectedSymbols(null);
+        equities.setMarketScope("EQUITIES");
+        ExternalContextEvidenceBuilder builder = new ExternalContextEvidenceBuilder(macroService(List.of(equities)), newsService(List.of()));
+
+        ExternalContextEvidenceBundle bundle = builder.build("ana-cross-market", "BTCUSDT", "1h", now, null);
+
+        assertThat(bundle.getEvidenceItems()).isEmpty();
+        assertThat(bundle.getSnapshot().isExternalContextBlocked()).isFalse();
+        assertThat(bundle.getSnapshot().getExternalEventIds()).isEmpty();
+    }
+
+    @Test
+    void globalMarketScopeIsAllowedWithoutSymbolScope() {
+        LocalDateTime now = LocalDateTime.now();
+        MacroEventDO global = macro("macro-global", now, 72, false);
+        global.setAffectedSymbols(null);
+        global.setMarketScope("GLOBAL");
+        ExternalContextEvidenceBuilder builder = new ExternalContextEvidenceBuilder(macroService(List.of(global)), newsService(List.of()));
+
+        ExternalContextEvidenceBundle bundle = builder.build("ana-global", "BTCUSDT", "1h", now, null);
+
+        assertThat(bundle.getEvidenceItems()).hasSize(1);
+        assertThat(bundle.getSnapshot().getActiveMacroEventCount()).isEqualTo(1);
+    }
+
+    @Test
+    void exactSymbolScopeIsAllowedEvenWhenMarketScopeIsMissing() {
+        LocalDateTime now = LocalDateTime.now();
+        MacroEventDO exactSymbol = macro("macro-exact-symbol", now, 72, false);
+        exactSymbol.setAffectedSymbols("BTCUSDT");
+        exactSymbol.setMarketScope("EQUITIES");
+        ExternalContextEvidenceBuilder builder = new ExternalContextEvidenceBuilder(macroService(List.of(exactSymbol)), newsService(List.of()));
+
+        ExternalContextEvidenceBundle bundle = builder.build("ana-exact-symbol", "BTCUSDT", "1h", now, null);
+
+        assertThat(bundle.getEvidenceItems()).hasSize(1);
+        assertThat(bundle.getEvidenceItems()).extracting(EvidenceItemVO::getExternalEventId)
+                .containsExactly("macro-exact-symbol");
+    }
+
+    @Test
+    void partialSymbolDoesNotMatchExactSymbolScope() {
+        LocalDateTime now = LocalDateTime.now();
+        MacroEventDO exactSymbol = macro("macro-partial-symbol", now, 95, true);
+        exactSymbol.setAffectedSymbols("BTCUSDT");
+        ExternalContextEvidenceBuilder builder = new ExternalContextEvidenceBuilder(macroService(List.of(exactSymbol)), newsService(List.of()));
+
+        ExternalContextEvidenceBundle bundle = builder.build("ana-partial-symbol", "BTC", "1h", now, "CRYPTO");
+
+        assertThat(bundle.getEvidenceItems()).isEmpty();
+        assertThat(bundle.getSnapshot().isExternalContextBlocked()).isFalse();
+    }
+
     private MacroEventDO macro(String id, LocalDateTime now, int score, boolean blocking) {
         MacroEventDO event = new MacroEventDO();
         fill(event, id, now, score, blocking);

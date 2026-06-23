@@ -33,8 +33,8 @@ public class ExternalContextEvidenceBuilder {
         Set<String> emitted = new HashSet<>();
         List<MacroEventDO> macroEvents = macroEventService == null ? List.of() : macroEventService.findWindowCandidates(symbol, marketScope, at);
         List<NewsEventDO> newsEvents = newsEventService == null ? List.of() : newsEventService.findWindowCandidates(symbol, marketScope, at);
-        for (MacroEventDO event : macroEvents) { applyEvent(snapshot, evidence, emitted, analysisId, event, "MACRO", label(event), at); }
-        for (NewsEventDO event : newsEvents) { applyEvent(snapshot, evidence, emitted, analysisId, event, "NEWS", label(event), at); }
+        for (MacroEventDO event : macroEvents) { applyEvent(snapshot, evidence, emitted, analysisId, symbol, marketScope, event, "MACRO", label(event), at); }
+        for (NewsEventDO event : newsEvents) { applyEvent(snapshot, evidence, emitted, analysisId, symbol, marketScope, event, "NEWS", label(event), at); }
         return new ExternalContextEvidenceBundle(snapshot, evidence);
     }
 
@@ -63,7 +63,12 @@ public class ExternalContextEvidenceBuilder {
     }
 
     private static void applyEvent(ExternalContextSnapshot snapshot, List<EvidenceItemVO> evidence, Set<String> emitted,
-                                   String analysisId, ExternalContextEventDO event, String eventType, String label, LocalDateTime at) {
+                                   String analysisId, String symbol, String marketScope, ExternalContextEventDO event,
+                                   String eventType, String label, LocalDateTime at) {
+        if (!ExternalContextPolicy.matchesContextScope(event == null ? null : event.getAffectedSymbols(),
+                event == null ? null : event.getMarketScope(), symbol, marketScope)) {
+            return;
+        }
         String state = ExternalContextPolicy.windowState(event, at);
         if (ExternalContextPolicy.STATUS_CANCELLED.equals(state) || ExternalContextPolicy.STATUS_RETRACTED.equals(state)
                 || ExternalContextPolicy.STATUS_EXPIRED.equals(state)) { return; }

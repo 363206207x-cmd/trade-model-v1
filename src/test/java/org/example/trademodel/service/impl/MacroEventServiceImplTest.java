@@ -59,13 +59,42 @@ class MacroEventServiceImplTest {
         near.setSourcePublishedAt(now.minusMinutes(1));
         service.importEvent(near);
         service.importEvent(request("macro-expired", "EXPIRED", now.minusHours(2), now.minusHours(1)));
+        service.importEvent(request("macro-expired-current-window", "EXPIRED", now.minusMinutes(10), now.plusMinutes(10)));
         service.importEvent(request("macro-cancelled", "CANCELLED", now.minusMinutes(10), now.plusMinutes(10)));
 
         List<MacroEventDO> candidates = service.findWindowCandidates("BTCUSDT", "CRYPTO", now);
 
         assertThat(candidates).extracting(MacroEventDO::getEventId)
                 .contains("macro-active", "macro-near")
-                .doesNotContain("macro-expired", "macro-cancelled");
+                .doesNotContain("macro-expired", "macro-expired-current-window", "macro-cancelled");
+    }
+
+    @Test
+    void windowCandidatesDoNotTreatMissingMarketScopeAsWildcard() {
+        LocalDateTime now = LocalDateTime.now();
+        ExternalContextImportRequest equitiesNoSymbol = request("macro-equities-no-symbol", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
+        equitiesNoSymbol.setAffectedSymbols(null);
+        equitiesNoSymbol.setMarketScope("EQUITIES");
+        service.importEvent(equitiesNoSymbol);
+
+        ExternalContextImportRequest globalNoSymbol = request("macro-global-no-symbol", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
+        globalNoSymbol.setAffectedSymbols(null);
+        globalNoSymbol.setMarketScope("GLOBAL");
+        service.importEvent(globalNoSymbol);
+
+        ExternalContextImportRequest exactSymbol = request("macro-exact-symbol-equities", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
+        exactSymbol.setAffectedSymbols("BTCUSDT");
+        exactSymbol.setMarketScope("EQUITIES");
+        service.importEvent(exactSymbol);
+
+        List<MacroEventDO> candidates = service.findWindowCandidates("BTCUSDT", null, now);
+        assertThat(candidates).extracting(MacroEventDO::getEventId)
+                .contains("macro-global-no-symbol", "macro-exact-symbol-equities")
+                .doesNotContain("macro-equities-no-symbol");
+
+        List<MacroEventDO> partialSymbolCandidates = service.findWindowCandidates("BTC", "CRYPTO", now);
+        assertThat(partialSymbolCandidates).extracting(MacroEventDO::getEventId)
+                .doesNotContain("macro-exact-symbol-equities");
     }
 
     private ExternalContextImportRequest request(String id, String status, LocalDateTime windowStart, LocalDateTime windowEnd) {

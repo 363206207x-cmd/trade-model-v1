@@ -48,6 +48,7 @@ class NewsEventServiceImplTest {
         service.importEvent(request("news-active", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30)));
         service.importEvent(request("news-retracted", "RETRACTED", now.minusMinutes(5), now.plusMinutes(30)));
         service.importEvent(request("news-expired", "EXPIRED", now.minusHours(3), now.minusHours(2)));
+        service.importEvent(request("news-expired-current-window", "EXPIRED", now.minusMinutes(5), now.plusMinutes(30)));
         ExternalContextImportRequest futurePublished = request("news-future", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
         futurePublished.setSourcePublishedAt(now.plusMinutes(5));
         service.importEvent(futurePublished);
@@ -56,7 +57,35 @@ class NewsEventServiceImplTest {
 
         assertThat(candidates).extracting(NewsEventDO::getEventId)
                 .contains("news-active")
-                .doesNotContain("news-retracted", "news-expired", "news-future");
+                .doesNotContain("news-retracted", "news-expired", "news-expired-current-window", "news-future");
+    }
+
+    @Test
+    void candidatesDoNotTreatMissingMarketScopeAsWildcard() {
+        LocalDateTime now = LocalDateTime.now();
+        ExternalContextImportRequest equitiesNoSymbol = request("news-equities-no-symbol", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
+        equitiesNoSymbol.setAffectedSymbols(null);
+        equitiesNoSymbol.setMarketScope("EQUITIES");
+        service.importEvent(equitiesNoSymbol);
+
+        ExternalContextImportRequest globalNoSymbol = request("news-global-no-symbol", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
+        globalNoSymbol.setAffectedSymbols(null);
+        globalNoSymbol.setMarketScope("GLOBAL");
+        service.importEvent(globalNoSymbol);
+
+        ExternalContextImportRequest exactSymbol = request("news-exact-symbol-equities", "ACTIVE", now.minusMinutes(5), now.plusMinutes(30));
+        exactSymbol.setAffectedSymbols("BTCUSDT");
+        exactSymbol.setMarketScope("EQUITIES");
+        service.importEvent(exactSymbol);
+
+        List<NewsEventDO> candidates = service.findWindowCandidates("BTCUSDT", null, now);
+        assertThat(candidates).extracting(NewsEventDO::getEventId)
+                .contains("news-global-no-symbol", "news-exact-symbol-equities")
+                .doesNotContain("news-equities-no-symbol");
+
+        List<NewsEventDO> partialSymbolCandidates = service.findWindowCandidates("BTC", "CRYPTO", now);
+        assertThat(partialSymbolCandidates).extracting(NewsEventDO::getEventId)
+                .doesNotContain("news-exact-symbol-equities");
     }
 
     private ExternalContextImportRequest request(String id, String status, LocalDateTime windowStart, LocalDateTime windowEnd) {

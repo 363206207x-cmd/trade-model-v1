@@ -51,7 +51,12 @@ class DecisionEngineServiceTest {
         when(assetStateService.buildSnapshotAtDecision(
                 anyString(), anyString(), any(AssetStateEnum.class), any(AssetStateEnum.class),
                 anyInt(), anyInt(), anyBoolean(), anyBoolean()))
-                .thenReturn("{\"state\":\"TEST\"}");
+                .thenAnswer(invocation -> {
+                    AssetStateEnum previous = invocation.getArgument(2);
+                    AssetStateEnum next = invocation.getArgument(3);
+                    return "{\"previousState\":\"" + previous.name() + "\",\"nextState\":\""
+                            + next.name() + "\",\"state\":\"" + next.name() + "\"}";
+                });
         lenient().when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
                         AiConflictLevelEnum.LEVEL_1_CONSISTENT,
@@ -240,7 +245,41 @@ class DecisionEngineServiceTest {
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
         assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
         assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
+        assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"HIGH_RISK\"");
+        assertThat(decision.getAssetStateSnapshot()).doesNotContain("CANDIDATE");
         assertThat(decision.getReviewReasons()).contains(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
+    }
+
+    @Test
+    void makeDecision_blockedExternalSourceFailClosesAssetStateBeforeSnapshot() {
+        EventImpactInputVO external = externalInput(false, "LOW", ExternalContextPolicy.SOURCE_HEALTH_BLOCKED,
+                List.of(ExternalContextPolicy.REASON_MISSING_SOURCE));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-source-block", 85, 65, external);
+
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
+        assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"HIGH_RISK\"");
+        assertThat(decision.getAssetStateSnapshot()).doesNotContain("CANDIDATE");
+        assertThat(decision.getReviewReasons()).contains(ExternalContextPolicy.REASON_MISSING_SOURCE);
+    }
+
+    @Test
+    void makeDecision_blockingExternalContextPreservesStricterConfusedState() {
+        EventImpactInputVO external = externalInput(true, "HIGH", ExternalContextPolicy.SOURCE_HEALTH_OK,
+                List.of(ExternalContextPolicy.REASON_WINDOW_BLOCKED));
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
+                        true, false, 0, true, "threshold", "block"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-confused", 85, 65, external);
+
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"CONFUSED\"");
     }
 
     private static List<String[]> bullishKlines() {

@@ -2,6 +2,8 @@ package org.example.trademodel.positionmonitor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.entity.MacroEventDO;
+import org.example.trademodel.entity.NewsEventDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
@@ -14,9 +16,13 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.service.MacroEventService;
+import org.example.trademodel.service.NewsEventService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.service.support.ExternalContextImportRequest;
+import org.example.trademodel.service.support.ExternalContextImportResult;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.junit.jupiter.api.BeforeEach;
@@ -315,6 +321,39 @@ class PositionMonitorServiceImplTest {
         verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
     }
 
+    @Test
+    void crossMarketExternalContextDoesNotEscalatePositionMonitorRiskWhenMarketScopeMissing() {
+        LocalDateTime now = LocalDateTime.now();
+        MacroEventDO equitiesEvent = macroEvent("macro-position-equities", now);
+        equitiesEvent.setAffectedSymbols(null);
+        equitiesEvent.setMarketScope("EQUITIES");
+        ExternalContextEvidenceBuilder scopedBuilder = new ExternalContextEvidenceBuilder(
+                macroService(List.of(equitiesEvent)), newsService(List.of()));
+        service = new PositionMonitorServiceImpl(
+                userPositionMapper,
+                marketQuoteClient,
+                userPositionRiskAdapter,
+                executionPlanMapper,
+                positionMonitorLogService,
+                evidenceItemMapper,
+                scoreItemMapper,
+                decisionResultMapper,
+                new ObjectMapper(),
+                scopedBuilder);
+        UserPositionDO position = position(31L, "LONG", "OPEN", "plan-cross-market", "90", "120");
+        arrange(position, "100", risk("LOW", false), plan("plan-cross-market", "ana-31", "VALID", true));
+
+        PositionMonitorResultDTO result = service.monitorUserPosition(31L);
+
+        assertThat(result.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(result.getExternalContextBlocked()).isFalse();
+        assertThat(result.getExternalEventIds()).isEmpty();
+        assertThat(result.getReasonCodes()).doesNotContain(
+                ExternalContextPolicy.REASON_WINDOW_BLOCKED,
+                "EXTERNAL_CONTEXT_REVIEW_REQUIRED");
+        verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
+    }
+
     private void arrange(UserPositionDO position,
                          String currentPrice,
                          UserPositionRiskResult risk,
@@ -380,6 +419,48 @@ class PositionMonitorServiceImplTest {
         dto.setLogId(1L);
         dto.setRiskLevel(riskLevel);
         return dto;
+    }
+
+    private static MacroEventDO macroEvent(String id, LocalDateTime now) {
+        MacroEventDO event = new MacroEventDO();
+        event.setEventId(id);
+        event.setAffectedSymbols("BTCUSDT");
+        event.setMarketScope("CRYPTO");
+        event.setEventTime(now.minusMinutes(1));
+        event.setWindowStart(now.minusMinutes(5));
+        event.setWindowEnd(now.plusMinutes(30));
+        event.setImpactScore(95);
+        event.setSeverity("CRITICAL");
+        event.setDirection("NEUTRAL");
+        event.setProvider("UNIT_TEST_PROVIDER");
+        event.setSourceType("CALENDAR");
+        event.setSourceReference("unit://" + id);
+        event.setSourceTraceId("trace-" + id);
+        event.setSourceEventId("source-" + id);
+        event.setSourcePublishedAt(now.minusMinutes(10));
+        event.setExecutionBlocking(true);
+        event.setEventType("RATE_DECISION");
+        event.setTitle("Macro " + id);
+        event.setStatus("ACTIVE");
+        return event;
+    }
+
+    private static MacroEventService macroService(List<MacroEventDO> events) {
+        return new MacroEventService() {
+            public ExternalContextImportResult<MacroEventDO> importEvent(ExternalContextImportRequest request) { return null; }
+            public MacroEventDO findByEventId(String eventId) { return null; }
+            public List<MacroEventDO> listRecent(int limit) { return events; }
+            public List<MacroEventDO> findWindowCandidates(String symbol, String marketScope, LocalDateTime contextTime) { return events; }
+        };
+    }
+
+    private static NewsEventService newsService(List<NewsEventDO> events) {
+        return new NewsEventService() {
+            public ExternalContextImportResult<NewsEventDO> importEvent(ExternalContextImportRequest request) { return null; }
+            public NewsEventDO findByEventId(String eventId) { return null; }
+            public List<NewsEventDO> listRecent(int limit) { return events; }
+            public List<NewsEventDO> findWindowCandidates(String symbol, String marketScope, LocalDateTime contextTime) { return events; }
+        };
     }
 
     private static void assertSafetyFields(PositionMonitorResultDTO dto) {

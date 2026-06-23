@@ -55,8 +55,8 @@ public class MacroEventServiceImpl implements MacroEventService {
     public List<MacroEventDO> findWindowCandidates(String symbol, String marketScope, LocalDateTime contextTime) {
         LocalDateTime at = contextTime == null ? LocalDateTime.now() : contextTime;
         return mapper.selectWindowCandidates(at, 500).stream()
-                .filter(event -> matchesSymbol(event.getAffectedSymbols(), symbol))
-                .filter(event -> matchesMarketScope(event.getMarketScope(), marketScope))
+                .filter(event -> ExternalContextPolicy.matchesContextScope(
+                        event.getAffectedSymbols(), event.getMarketScope(), symbol, marketScope))
                 .filter(event -> {
                     String state = ExternalContextPolicy.windowState(event, at);
                     return ExternalContextPolicy.STATUS_ACTIVE.equals(state) || ExternalContextPolicy.STATUS_NEAR.equals(state);
@@ -112,27 +112,6 @@ public class MacroEventServiceImpl implements MacroEventService {
         }
         event.setStatus(normalizeAllowed(defaultText(request.getStatus(), "SCHEDULED"), "status", List.of("SCHEDULED", "ACTIVE", "EXPIRED", "CANCELLED")));
         event.setExecutionBlocking(Boolean.TRUE.equals(request.getExecutionBlocking()));
-    }
-
-    static boolean matchesSymbol(String affectedSymbols, String symbol) {
-        if (!ExternalContextPolicy.hasText(symbol) || !ExternalContextPolicy.hasText(affectedSymbols)) {
-            return true;
-        }
-        String target = symbol.trim().toUpperCase(Locale.ROOT);
-        for (String part : affectedSymbols.split(",")) {
-            if (target.equals(part.trim().toUpperCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    static boolean matchesMarketScope(String eventScope, String requestedScope) {
-        if (!ExternalContextPolicy.hasText(requestedScope) || !ExternalContextPolicy.hasText(eventScope)) {
-            return true;
-        }
-        String event = eventScope.trim().toUpperCase(Locale.ROOT);
-        return "GLOBAL".equals(event) || event.equals(requestedScope.trim().toUpperCase(Locale.ROOT));
     }
 
     static String buildDedupeKey(String type, MacroEventDO event) {

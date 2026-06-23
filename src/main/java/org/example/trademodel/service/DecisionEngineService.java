@@ -148,6 +148,8 @@ public class DecisionEngineService {
             if (dataQualityScore != null && dataQualityScore < MIN_DATA_QUALITY_SCORE_FOR_OPENING) {
                 worthOpening = false;
             }
+            boolean externalContextBlocked = isEffectiveExternalBlocked(externalContextInput);
+            boolean effectiveWorthOpening = worthOpening && !externalContextBlocked;
 
             String conclusion = String.format(
                 "规则层基础方向：%s | AI复核方向：%s | 总分 %d | Gemini复核：%s | Grok快讯：%s | 多TF收敛：%s",
@@ -167,7 +169,7 @@ public class DecisionEngineService {
             ctx.setMultiTimeframeAligned(multiTfConvergence);
             ctx.setRiskTier(riskTier);
             ctx.setDataQualityScore(dataQualityScore);
-            ctx.setWorthOpening(worthOpening);
+            ctx.setWorthOpening(effectiveWorthOpening);
             if (externalContextInput != null) {
                 ctx.setExternalContextRiskLevel(externalContextInput.getExternalContextRiskLevel());
                 ctx.setExternalContextBlocked(externalContextInput.getExternalContextBlocked());
@@ -185,12 +187,13 @@ public class DecisionEngineService {
 
             AssetStateEnum previousState = parseAssetState(confused.getPreviousState(), AssetStateEnum.OBSERVING);
             AssetStateEnum syntheticState = parseAssetState(confused.getNextState(),
-                    worthOpening ? AssetStateEnum.CANDIDATE : AssetStateEnum.OBSERVING);
+                    effectiveWorthOpening ? AssetStateEnum.CANDIDATE : AssetStateEnum.OBSERVING);
+            AssetStateEnum finalAssetState = failClosedExternalState(syntheticState, externalContextBlocked);
             String snapshot = assetStateService.buildSnapshotAtDecision(
                     symbol,
                     analysisId != null ? analysisId : "",
                     previousState,
-                    syntheticState,
+                    finalAssetState,
                     confused.getConfusedScore(),
                     confused.getConfusedLowStreak(),
                     confused.isDirectionalPushBlocked(),
@@ -199,6 +202,7 @@ public class DecisionEngineService {
             String riskLevelLabel;
             if (confused.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD
                     || finalScore < highFinalScoreBelow
+                    || externalContextBlocked
                     || "HIGH".equalsIgnoreCase(conflict.getRiskAdjustment())) {
                 riskLevelLabel = "HIGH";
             } else if (finalScore >= riskTierLowMinScore) {
@@ -257,7 +261,7 @@ public class DecisionEngineService {
             decision.setRiskLevel(riskLevelLabel);
             decision.setActionPriority(finalScore > actionPriorityHighMinScoreExclusive ? "HIGH" : "MEDIUM");
             decision.setConclusionSummary(conclusion);
-            decision.setIsWorthOpening(worthOpening && !confused.isDirectionalPushBlocked());
+            decision.setIsWorthOpening(effectiveWorthOpening && !confused.isDirectionalPushBlocked());
             decision.setMultiTfConvergence(multiTfLabel);
             decision.setAiRoleResults(
                 "Grok advisory: " + grokOpinion + " | Gemini advisory: " + geminiReview
@@ -273,7 +277,7 @@ public class DecisionEngineService {
             decision.setDirectionalPushBlockReason(confused.isDirectionalPushBlocked()
                     ? "CONFUSED_SCORE_BLOCK_THRESHOLD"
                     : null);
-            decision.setAssetState(syntheticState);
+            decision.setAssetState(finalAssetState);
             decision.setAssetStateSnapshot(snapshot);
             decision.setMultiTimeframeAligned(multiTfConvergence);
             decision.setPushTriggerPrice(pushTriggerPrice);
@@ -323,6 +327,24 @@ public class DecisionEngineService {
         } catch (Exception e) {
             return fallback;
         }
+    }
+
+    private static boolean isEffectiveExternalBlocked(EventImpactInputVO input) {
+        return input != null
+                && (Boolean.TRUE.equals(input.getExternalContextBlocked())
+                || ExternalContextPolicy.SOURCE_HEALTH_BLOCKED.equalsIgnoreCase(input.getExternalContextSourceHealth()));
+    }
+
+    private static AssetStateEnum failClosedExternalState(AssetStateEnum syntheticState, boolean externalBlocked) {
+        if (!externalBlocked) {
+            return syntheticState;
+        }
+        if (AssetStateEnum.CONFUSED.equals(syntheticState)
+                || AssetStateEnum.COOLING.equals(syntheticState)
+                || AssetStateEnum.INVALIDATED.equals(syntheticState)) {
+            return syntheticState;
+        }
+        return AssetStateEnum.HIGH_RISK;
     }
 
     private static void applyExternalContext(DecisionBundleVO decision, EventImpactInputVO input) {

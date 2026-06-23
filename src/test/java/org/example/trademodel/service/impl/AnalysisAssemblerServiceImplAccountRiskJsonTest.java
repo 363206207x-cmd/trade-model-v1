@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
@@ -210,6 +211,35 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         assertThat(jsonNode.path("riskReasonCode").asText()).isEqualTo("DECISION_NOT_WORTH_OPENING");
 
         verify(pushSnapshotService).insertAuthoritativeSnapshot(any(), any(), any(), any(), eq(202L));
+    }
+
+    @Test
+    void saveToDatabase_persistsExternalBlockedHighRiskAssetStateInsteadOfCandidate() {
+        String analysisId = "ana-risk-json-external-blocked";
+        when(pushSnapshotService.ensureAccountRiskSnapshot(any(), any(), any(), any())).thenReturn(null);
+        when(accountRiskSnapshotMapper.selectLatestByAnalysisId(analysisId)).thenReturn(null);
+        DecisionBundleVO decision = mockDecision(false, "external context blocked");
+        decision.setAssetState(AssetStateEnum.HIGH_RISK);
+        decision.setAssetStateSnapshot("{\"nextState\":\"HIGH_RISK\"}");
+        decision.setConfusedScore(0);
+        decision.setConfusedLowStreak(0);
+
+        ReflectionTestUtils.invokeMethod(
+                service,
+                "saveToDatabase",
+                mockAnalysis(analysisId),
+                new ArrayList<>(),
+                new ArrayList<>(),
+                decision,
+                mockPlan(),
+                "BINANCE_24H_HEURISTIC");
+
+        verify(assetStateService).persistAuthoritativeState(
+                eq("BTCUSDT"),
+                eq(AssetStateEnum.HIGH_RISK),
+                eq(0),
+                eq(0),
+                any());
     }
 
     private static AssetAnalysisVO mockAnalysis(String analysisId) {
