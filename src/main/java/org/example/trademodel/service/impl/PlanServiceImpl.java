@@ -4,6 +4,7 @@ import org.example.trademodel.dto.planboundary.ExecutionPlanSourceGate;
 import org.example.trademodel.dto.planboundary.ExecutionPlanSourceGateResultDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
+import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
@@ -12,6 +13,7 @@ import org.example.trademodel.vo.ExecutionPlanVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.springframework.stereotype.Service;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,6 +74,7 @@ public class PlanServiceImpl implements PlanService {
         plan.setPlanMode(resolvePlanMode(plan, decisionBundle));
         applySourceTraceReadiness(plan, sourceTrace);
         applyRiskActionGuardReadiness(plan, riskActionGuardDisplay);
+        applyExternalContextReadiness(plan, decisionBundle);
         return plan;
     }
 
@@ -186,6 +189,42 @@ public class PlanServiceImpl implements PlanService {
             plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
         }
         plan.setNotExecutableReason(reason);
+    }
+
+    private static void applyExternalContextReadiness(ExecutionPlanVO plan, DecisionBundleVO decisionBundle) {
+        if (plan == null || decisionBundle == null) {
+            return;
+        }
+        boolean sourceBlocked = ExternalContextPolicy.SOURCE_HEALTH_BLOCKED.equalsIgnoreCase(
+                decisionBundle.getExternalContextSourceHealth());
+        boolean blocked = Boolean.TRUE.equals(decisionBundle.getExternalContextBlocked()) || sourceBlocked;
+        if (!blocked) {
+            return;
+        }
+        String reason = sourceBlocked
+                ? ExternalContextPolicy.REASON_MISSING_SOURCE
+                : ExternalContextPolicy.REASON_WINDOW_BLOCKED;
+        plan.setExecutionPlanStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+        plan.setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+        plan.setSourceGateComplete(false);
+        plan.setSourceTraceComplete(false);
+        plan.setSourceTraceStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+        plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        plan.setPlanMode(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        plan.setManualReviewRequired(true);
+        plan.setNotTradeInstruction(true);
+        plan.setNotExecutable(true);
+        plan.setNotAutoTrading(true);
+        plan.setNotOrderExecution(true);
+        plan.setNotUserPositionCreation(true);
+        plan.setNotExecutableReason(reason);
+        List<String> blockers = new ArrayList<>(plan.getSourceBlockerReasons());
+        blockers.add(reason);
+        if (decisionBundle.getExternalEventIds() != null) {
+            blockers.addAll(decisionBundle.getExternalEventIds());
+        }
+        plan.setSourceBlockerReasons(blockers);
+        plan.setSourceCompletenessSummary("external context gate BLOCKED");
     }
 
     private static String resolveRiskActionGuardReason(

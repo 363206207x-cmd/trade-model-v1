@@ -224,3 +224,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p2-1-macro-news-external-context-done-candidate
+
+Date: 2026-06-23
+Changed by: Codex
+Reason: P2-1 Macro / News / External Context B-risk implementation package.
+Before: P2-1 Macro / News / External Context was NOT_STARTED/NONE with no `tm_macro_event`, `tm_news_event`, MacroEventService, NewsEventService, ExternalContextEvidenceBuilder, source traceable external EvidenceItem, event-window Decision / ExecutionPlan / PositionMonitor integration, or dashboard panel.
+After: P2-1 is a branch DONE candidate with macro/news event persistence, import/query services, source validation and dedupe idempotency, external-context evidence generation with eventId/provider/sourceReference/sourceTraceId/window trace fields, high-impact/manual-review policy, active blocking-window and missing-source fail-closed policy, Decision risk/confidence integration without direction reversal, ExecutionPlan source-gate blocking, PositionMonitor external context status, read-only dashboard status panel, controller endpoints, and tests. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

@@ -20,6 +20,10 @@ import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionMonitorService;
+import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.ExternalContextSnapshot;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -44,6 +48,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final ScoreItemMapper scoreItemMapper;
     private final DecisionResultMapper decisionResultMapper;
     private final ObjectMapper objectMapper;
+    private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketQuoteClient marketQuoteClient,
@@ -54,6 +59,21 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       ScoreItemMapper scoreItemMapper,
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper) {
+        this(userPositionMapper, marketQuoteClient, userPositionRiskAdapter, executionPlanMapper,
+                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper, objectMapper, null);
+    }
+
+    @Autowired
+    public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
+                                      MarketQuoteClient marketQuoteClient,
+                                      UserPositionRiskAdapter userPositionRiskAdapter,
+                                      ExecutionPlanMapper executionPlanMapper,
+                                      PositionMonitorLogService positionMonitorLogService,
+                                      EvidenceItemMapper evidenceItemMapper,
+                                      ScoreItemMapper scoreItemMapper,
+                                      DecisionResultMapper decisionResultMapper,
+                                      ObjectMapper objectMapper,
+                                      ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
         this.userPositionMapper = userPositionMapper;
         this.marketQuoteClient = marketQuoteClient;
         this.userPositionRiskAdapter = userPositionRiskAdapter;
@@ -63,6 +83,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         this.scoreItemMapper = scoreItemMapper;
         this.decisionResultMapper = decisionResultMapper;
         this.objectMapper = objectMapper;
+        this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
     }
 
     @Override
@@ -124,6 +145,22 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         PlanContext planContext = resolvePlanContext(position, reasons);
         boolean riskBlocked = risk.isRiskBlocked();
         String riskLevel = riskBlocked ? "HIGH" : PositionMonitorPolicy.normalizeRiskLevel(risk.getRiskLevel());
+        ExternalContextSnapshot externalContext = resolveExternalContext(assetSymbol, planContext.analysisId);
+        boolean externalSourceBlocked = ExternalContextPolicy.SOURCE_HEALTH_BLOCKED.equalsIgnoreCase(
+                externalContext.getSourceHealth());
+        boolean externalBlocked = externalContext.isExternalContextBlocked() || externalSourceBlocked;
+        boolean externalHighRisk = ExternalContextPolicy.RISK_HIGH.equalsIgnoreCase(externalContext.getRiskLevel())
+                || externalBlocked;
+        if (externalSourceBlocked) {
+            reasons.add(ExternalContextPolicy.REASON_MISSING_SOURCE);
+        }
+        if (externalBlocked && !externalSourceBlocked) {
+            reasons.add(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
+        }
+        if (externalHighRisk) {
+            riskLevel = "HIGH";
+            reasons.add("EXTERNAL_CONTEXT_REVIEW_REQUIRED");
+        }
         boolean riskIncreased = riskIncreased(position.getId(), riskLevel);
         if (riskBlocked) {
             reasons.add("RISK_BLOCKED");
@@ -171,11 +208,12 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                 || "INCOMPLETE".equals(planStatus)
                 || "REVIEW_ONLY".equals(planStatus)
                 || missingStopLoss
-                || missingTakeProfit;
+                || missingTakeProfit
+                || (externalHighRisk && !externalBlocked);
 
         String logicStatus;
         String suggestedAction;
-        if (riskBlocked) {
+        if (riskBlocked || externalBlocked) {
             logicStatus = "HIGH_RISK";
             suggestedAction = "RISK_REVIEW";
         } else if (planInvalidated) {
@@ -202,7 +240,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         command.setEvidenceSnapshot(snapshotCount("evidence", planContext.analysisId));
         command.setScoreSnapshot(snapshotCount("score", planContext.analysisId));
         command.setDecisionSnapshot(decisionSnapshot(planContext.analysisId));
-        command.setRiskSnapshot(riskSnapshot(risk));
+        command.setRiskSnapshot(riskSnapshot(risk, externalContext));
         command.setTraceId("POSITION_MONITOR_" + position.getId());
         PositionMonitorLogDTO log = positionMonitorLogService.recordMonitorRun(command);
 
@@ -227,6 +265,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setTakeProfitReached(takeProfitReached);
         result.setSuggestedAction(suggestedAction);
         result.setReasonCodes(new ArrayList<>(reasons));
+        applyExternalContext(result, externalContext);
         result.setMonitorLogId(log.getLogId());
         result.setMonitoredAt(LocalDateTime.now());
         return result;
@@ -336,11 +375,53 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         return json(safe);
     }
 
-    private String riskSnapshot(UserPositionRiskResult risk) {
+    private ExternalContextSnapshot resolveExternalContext(String assetSymbol, String analysisId) {
+        if (externalContextEvidenceBuilder == null) {
+            return new ExternalContextSnapshot();
+        }
+        try {
+            return externalContextEvidenceBuilder.buildSnapshot(analysisId, assetSymbol, null, LocalDateTime.now(), null);
+        } catch (RuntimeException ignored) {
+            ExternalContextSnapshot snapshot = new ExternalContextSnapshot();
+            snapshot.setSourceHealth(ExternalContextPolicy.SOURCE_HEALTH_BLOCKED);
+            snapshot.setExternalContextBlocked(true);
+            snapshot.setRiskLevel(ExternalContextPolicy.RISK_HIGH);
+            snapshot.addReason(ExternalContextPolicy.REASON_MISSING_SOURCE);
+            return snapshot;
+        }
+    }
+
+    private static void applyExternalContext(PositionMonitorResultDTO result, ExternalContextSnapshot snapshot) {
+        result.setExternalContextStatus(snapshot.getStatus());
+        result.setActiveExternalEventCount(snapshot.getActiveExternalEventCount());
+        result.setActiveMacroEventCount(snapshot.getActiveMacroEventCount());
+        result.setActiveNewsEventCount(snapshot.getActiveNewsEventCount());
+        result.setExternalContextRiskLevel(snapshot.getRiskLevel());
+        result.setExternalContextBlocked(snapshot.isExternalContextBlocked());
+        result.setExternalEventIds(snapshot.getExternalEventIds());
+        result.setExternalContextReasonCodes(snapshot.getReasonCodes());
+        result.setNextExternalEventTime(snapshot.getNextExternalEventTime());
+        result.setExternalContextSourceHealth(snapshot.getSourceHealth());
+    }
+
+    private String riskSnapshot(UserPositionRiskResult risk, ExternalContextSnapshot externalContext) {
         Map<String, Object> safe = new LinkedHashMap<>();
         safe.put("riskLevel", PositionMonitorPolicy.normalizeRiskLevel(risk.getRiskLevel()));
         safe.put("riskBlocked", risk.isRiskBlocked());
         safe.put("aggregateRiskScore", risk.getAggregateRiskScore());
+        if (externalContext != null) {
+            Map<String, Object> external = new LinkedHashMap<>();
+            external.put("status", externalContext.getStatus());
+            external.put("sourceHealth", externalContext.getSourceHealth());
+            external.put("riskLevel", externalContext.getRiskLevel());
+            external.put("blocked", externalContext.isExternalContextBlocked());
+            external.put("activeCount", externalContext.getActiveExternalEventCount());
+            external.put("macroCount", externalContext.getActiveMacroEventCount());
+            external.put("newsCount", externalContext.getActiveNewsEventCount());
+            external.put("reasonCodes", externalContext.getReasonCodes());
+            external.put("eventIds", externalContext.getExternalEventIds());
+            safe.put("externalContext", external);
+        }
         return json(safe);
     }
 

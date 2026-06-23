@@ -160,6 +160,9 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
             AssetAnalysisVO scoreInput = new AssetAnalysisVO();
             scoreInput.setAnalysisId(analysisId);
+            scoreInput.setSymbol(symbol);
+            scoreInput.setTimeframe(timeframe);
+            scoreInput.setAnalysisTime(LocalDateTime.now().toString());
             List<EvidenceItemVO> evidences = evidenceService.buildEvidence(scoreInput, marketEnv);
             scoreInput.setEvidenceList(evidences);
             List<ScoreItemVO> scores = scoreService.buildScoreList(scoreInput, marketEnv);
@@ -171,7 +174,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     timeframe,
                     analysisId,
                     dataQualityScore,
-                    trendStructureScore);
+                    trendStructureScore,
+                    scoreInput.getEventImpactInput());
 
             ExecutionPlanVO plan = planService.generateExecutionPlan(decision, scores, marketEnv, new AssetAnalysisVO());
 
@@ -185,6 +189,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             analysis.setScoreList(scores);
             analysis.setDecisionBundle(decision);
             analysis.setDataQualityScore(dataQualityScore);
+            analysis.setEventImpactInput(scoreInput.getEventImpactInput());
 
             System.out.println("=== 准备执行落库 saveToDatabase === analysisId=" + analysisId);
             saveToDatabase(analysis, evidences, scores, decision, plan, marketEnvSourceType);
@@ -237,6 +242,15 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     edo.setStrength(e.getStrength());
                     edo.setConfidence(e.getConfidence());
                     edo.setSource(EvidenceTypeConstants.normalizeEvidenceSource(e.getSource()));
+                    edo.setSourceProvider(e.getSourceProvider());
+                    edo.setSourceReference(e.getSourceReference());
+                    edo.setSourceTraceId(e.getSourceTraceId());
+                    edo.setExternalEventId(e.getExternalEventId());
+                    edo.setExternalEventType(e.getExternalEventType());
+                    edo.setEventWindowStart(e.getEventWindowStart());
+                    edo.setEventWindowEnd(e.getEventWindowEnd());
+                    edo.setImpactScore(e.getImpactScore());
+                    edo.setSeverity(e.getSeverity());
                     edo.setCreateTime(LocalDateTime.now());
                     evidenceItemMapper.insert(edo);
                 }
@@ -987,6 +1001,19 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         ObjectNode confused = EXPLAIN_JSON.createObjectNode();
         confused.put("score", decision.getConfusedScore() != null ? decision.getConfusedScore() : 0);
         root.set("confused", confused);
+
+        ObjectNode external = EXPLAIN_JSON.createObjectNode();
+        external.put("status", decision.getExternalContextStatus() != null ? decision.getExternalContextStatus() : "READY");
+        external.put("sourceHealth", decision.getExternalContextSourceHealth() != null ? decision.getExternalContextSourceHealth() : "OK");
+        external.put("riskLevel", decision.getExternalContextRiskLevel() != null ? decision.getExternalContextRiskLevel() : "LOW");
+        external.put("blocked", Boolean.TRUE.equals(decision.getExternalContextBlocked()));
+        external.put("activeCount", decision.getActiveExternalEventCount() != null ? decision.getActiveExternalEventCount() : 0);
+        ArrayNode externalReasons = EXPLAIN_JSON.createArrayNode();
+        if (decision.getExternalContextReasonCodes() != null) {
+            decision.getExternalContextReasonCodes().forEach(externalReasons::add);
+        }
+        external.set("reasonCodes", externalReasons);
+        root.set("externalContext", external);
 
         try {
             return EXPLAIN_JSON.writeValueAsString(root);

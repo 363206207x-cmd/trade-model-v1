@@ -26,6 +26,9 @@ public class DecisionContext {
 
     /** 主链估算的数据质量分（可为 null，规则侧不强制） */
     private Integer dataQualityScore;
+    private String externalContextRiskLevel;
+    private Boolean externalContextBlocked;
+    private String externalContextSourceHealth;
 
     public String getSymbol() {
         return symbol;
@@ -178,4 +181,11 @@ public class DecisionContext {
     public void setDataQualityScore(Integer dataQualityScore) {
         this.dataQualityScore = dataQualityScore;
     }
+
+    public String getExternalContextRiskLevel() { return externalContextRiskLevel; }
+    public void setExternalContextRiskLevel(String externalContextRiskLevel) { this.externalContextRiskLevel = externalContextRiskLevel; }
+    public Boolean getExternalContextBlocked() { return externalContextBlocked; }
+    public void setExternalContextBlocked(Boolean externalContextBlocked) { this.externalContextBlocked = externalContextBlocked; }
+    public String getExternalContextSourceHealth() { return externalContextSourceHealth; }
+    public void setExternalContextSourceHealth(String externalContextSourceHealth) { this.externalContextSourceHealth = externalContextSourceHealth; }
 }

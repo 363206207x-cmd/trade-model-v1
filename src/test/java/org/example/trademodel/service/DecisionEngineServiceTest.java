@@ -2,7 +2,9 @@ package org.example.trademodel.service;
 
 import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.EventImpactInputVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +51,12 @@ class DecisionEngineServiceTest {
         when(assetStateService.buildSnapshotAtDecision(
                 anyString(), anyString(), any(AssetStateEnum.class), any(AssetStateEnum.class),
                 anyInt(), anyInt(), anyBoolean(), anyBoolean()))
-                .thenReturn("{\"state\":\"TEST\"}");
+                .thenAnswer(invocation -> {
+                    AssetStateEnum previous = invocation.getArgument(2);
+                    AssetStateEnum next = invocation.getArgument(3);
+                    return "{\"previousState\":\"" + previous.name() + "\",\"nextState\":\""
+                            + next.name() + "\",\"state\":\"" + next.name() + "\"}";
+                });
         lenient().when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
                         AiConflictLevelEnum.LEVEL_1_CONSISTENT,
@@ -214,6 +221,67 @@ class DecisionEngineServiceTest {
         assertThat(decision.getAssetState()).isNotEqualTo(AssetStateEnum.WAITING_TRIGGER);
     }
 
+    @Test
+    void makeDecision_highExternalContextLowersConfidenceWithoutDirectionReversal() {
+        EventImpactInputVO external = externalInput(false, "HIGH", ExternalContextPolicy.SOURCE_HEALTH_OK,
+                List.of(ExternalContextPolicy.REASON_HIGH_IMPACT_REVIEW));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-high", 85, 65, external);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getConfidenceLevel()).isEqualTo("MEDIUM");
+        assertThat(decision.getIsWorthOpening()).isTrue();
+        assertThat(decision.getReviewReasons()).contains(ExternalContextPolicy.REASON_HIGH_IMPACT_REVIEW);
+    }
+
+    @Test
+    void makeDecision_blockingExternalContextForcesWorthOpeningFalse() {
+        EventImpactInputVO external = externalInput(true, "HIGH", ExternalContextPolicy.SOURCE_HEALTH_OK,
+                List.of(ExternalContextPolicy.REASON_WINDOW_BLOCKED));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-block", 85, 65, external);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
+        assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"HIGH_RISK\"");
+        assertThat(decision.getAssetStateSnapshot()).doesNotContain("CANDIDATE");
+        assertThat(decision.getReviewReasons()).contains(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
+    }
+
+    @Test
+    void makeDecision_blockedExternalSourceFailClosesAssetStateBeforeSnapshot() {
+        EventImpactInputVO external = externalInput(false, "LOW", ExternalContextPolicy.SOURCE_HEALTH_BLOCKED,
+                List.of(ExternalContextPolicy.REASON_MISSING_SOURCE));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-source-block", 85, 65, external);
+
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
+        assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"HIGH_RISK\"");
+        assertThat(decision.getAssetStateSnapshot()).doesNotContain("CANDIDATE");
+        assertThat(decision.getReviewReasons()).contains(ExternalContextPolicy.REASON_MISSING_SOURCE);
+    }
+
+    @Test
+    void makeDecision_blockingExternalContextPreservesStricterConfusedState() {
+        EventImpactInputVO external = externalInput(true, "HIGH", ExternalContextPolicy.SOURCE_HEALTH_OK,
+                List.of(ExternalContextPolicy.REASON_WINDOW_BLOCKED));
+        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
+                        true, false, 0, true, "threshold", "block"));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-confused", 85, 65, external);
+
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"CONFUSED\"");
+    }
+
     private static List<String[]> bullishKlines() {
         return List.of(
                 new String[]{"0", "100", "110", "95", "108"},
@@ -228,5 +296,19 @@ class DecisionEngineServiceTest {
                 new String[]{"0", "108", "109", "101", "104"},
                 new String[]{"0", "104", "105", "98", "100"}
         );
+    }
+
+    private static EventImpactInputVO externalInput(boolean blocked, String riskLevel, String sourceHealth, List<String> reasons) {
+        EventImpactInputVO input = new EventImpactInputVO();
+        input.setExternalContextStatus(blocked ? "BLOCKED" : "READY");
+        input.setExternalContextBlocked(blocked);
+        input.setExternalContextRiskLevel(riskLevel);
+        input.setExternalContextSourceHealth(sourceHealth);
+        input.setActiveExternalEventCount(1);
+        input.setActiveMacroEventCount(0);
+        input.setActiveNewsEventCount(1);
+        input.setExternalEventIds(List.of("NEWS:news-test"));
+        input.setExternalContextReasonCodes(reasons);
+        return input;
     }
 }

@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P1-4 OpportunityLog DONE candidate
-Next Business Phase: P2-1 Macro / News / External Context
+Current Work Package: P2-1 Macro / News / External Context DONE candidate
+Next Business Phase: P2-2 AI Orchestrator + AiCallLog
 Next Business Phase Allowed: NO
 Production Deployment Readiness: BLOCKED
 
@@ -35,8 +35,10 @@ P1-2 ConfusedState + AiConflict hardening is effective because its implementatio
 
 P1-3 HotReset real action is effective because its implementation is merged to clean / synced `main` and the runtime gate allowed P1-4.
 
-P1-4 OpportunityLog is only a branch DONE candidate in this worktree.
-It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P1-4 effectivity.
+P1-4 OpportunityLog is effective because its implementation is merged to clean / synced `main` by PR #1017 and the runtime gate allowed P2-1.
+
+P2-1 Macro / News / External Context is only a branch DONE candidate in this worktree.
+It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P2-1 effectivity.
 
 `bash scripts/v1-state.sh` must distinguish `CURRENT_PACKAGE_PR`, `UNRELATED_OPEN_PRS`, and `BLOCK_NEXT_BUSINESS_PHASE_ONLY`. An unrelated Draft PR must not block merging the current P0-0 package PR, but it still blocks the next business phase.
 
@@ -44,13 +46,13 @@ It is not effective until this branch commit is reviewed, merged to `main`, loca
 
 ## Current Allowed Work
 
-Only the following work is allowed after this P1-4 branch-candidate update:
+Only the following work is allowed after this P2-1 branch-candidate update:
 
-1. Checks, push, PR creation, and merge-gate handling for the P1-4 OpportunityLog B-risk package.
-2. Main sync after the P1-4 PR is reviewed and merged.
-3. Runtime verification that P1-4 is effective on clean / synced main before any P2-1 work starts.
+1. Checks, push, PR creation, and merge-gate handling for the P2-1 Macro / News / External Context B-risk package.
+2. Main sync after the P2-1 PR is reviewed and merged.
+3. Runtime verification that P2-1 is effective on clean / synced main before any P2-2 work starts.
 
-P1-4 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
+P2-1 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
 
 PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into this package.
 
@@ -58,46 +60,44 @@ PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into 
 
 ## Current Forbidden Work
 
-The following work is blocked until P1-4 is effective on merged main:
+The following work is blocked until P2-1 is effective on merged main:
 
-1. Macro / News / External Context.
-2. AI Orchestrator + AiCallLog.
-3. Scheduler / Idempotency / Trace.
-4. Dashboard Final.
-5. Auto-trading of any kind.
+1. AI Orchestrator + AiCallLog.
+2. Scheduler / Idempotency / Trace.
+3. Dashboard Final.
+4. Auto-trading of any kind.
 
 ---
 
 ## Current Known Critical Gaps
 
-1. P1-4 OpportunityLog is only a branch DONE candidate until merged main confirms it effective.
-2. Macro / News runtime not complete.
-3. AI orchestrator and ai call log incomplete.
-4. Dashboard Final must wait until business semantics are stable.
+1. P2-1 Macro / News / External Context is only a branch DONE candidate until merged main confirms it effective.
+2. AI orchestrator and ai call log incomplete.
+3. Dashboard Final must wait until business semantics are stable.
 
-## P1-4 OpportunityLog Branch Candidate
+## P2-1 Macro / News / External Context Branch Candidate
 
-Branch: `p1-4-opportunity-log-full-implementation`
+Branch: `p2-1-macro-news-external-context-full-implementation`
 Risk: B
 Status: DONE candidate
 Effective State: pending merged main
 
 Implemented branch evidence:
 
-1. `tm_opportunity_log` is added as the authoritative opportunity outcome owner.
-2. OpportunityLog DO / Mapper / Service / Controller support candidate creation, read, query, evaluate, and Review stats.
-3. Analysis mainline creates PENDING opportunity candidates only after AnalysisRun, Decision, ExecutionPlan, AccountRiskSnapshot, and optional PushSnapshot are persisted.
-4. Legacy MissedOpportunity is retained for historical compatibility but no longer writes authoritative missed outcomes or treats `tm_real_position` as user execution.
-5. User execution evidence uses only exact MANUAL UserPosition `source_ref_id` matching executionPlanId or analysisId.
-6. The final statuses EXECUTED_VALID, EXECUTED_INVALID, MISSED_VALID, MISSED_INVALID, PUSHED_NOT_FILLED_VALID, and BLOCKED_BY_RISK_VALID are implemented.
-7. Target / invalidation ordering, same-bar ambiguity, unresolved pending state, and missing market-path fail-closed behavior are implemented.
-8. MFE / MAE use only persisted closed OHLCV bars and record market data source / trace id.
-9. Risk-blocked classification uses persisted AccountRiskSnapshot or PushRecheck RISK_BLOCKED evidence, not current live risk.
-10. Resolved opportunity logs are immutable and duplicate candidate/evaluate calls are idempotent.
-11. Review opportunity stats return review-only aggregate counts, ratios, status/source maps, and fixed safety fields.
-12. No tm_real_position substitution, UserPosition creation or mutation, Recheck / Replay execution, HotReset execution, external quote refresh, Push send, external channel, order execution, auto-trading, Dashboard UI, Macro / News, or P2-1 changes are part of this package.
+1. `tm_macro_event` and `tm_news_event` are added as persistent external-context event owners.
+2. MacroEvent and NewsEvent DO / Mapper / Service support import, query, source validation, dedupe idempotency, and window candidate reads.
+3. ExternalContextEvidenceBuilder creates one EvidenceItem per eligible event with eventId, provider, sourceReference, sourceTraceId, event window, impact score, severity, and event type.
+4. EvidenceItem schema / DO / VO / mapper preserve source trace fields while ordinary evidence may keep them null.
+5. Macro sourcePublishedAt may fall back to eventTime with `MACRO_SOURCE_PUBLISHED_AT_FALLBACK_EVENT_TIME`; News sourcePublishedAt is mandatory.
+6. ACTIVE / NEAR / EXPIRED / CANCELLED / RETRACTED and future-published source windows are enforced locally without external network fetch.
+7. Decision applies external high-impact risk, lowers confidence one level, preserves rule-layer direction, and fail-closes blocking or missing-source contexts.
+8. ExecutionPlan source gate becomes BLOCKED with fixed external reason codes when active blocking windows or missing source are present.
+9. PositionMonitor reads external context, exposes external context fields, sets HIGH_RISK / RISK_REVIEW for active blocking context, and does not mutate UserPosition or issue order actions.
+10. Dashboard adds a read-only external context panel and `/api/external-context/dashboard-status` status feed.
+11. ExternalContextController exposes import/query/current/detail/dashboard-status endpoints only; no delete, provider refresh, external fetch, Push send, order, trade, or execution endpoint is added.
+12. Tests cover near events, expired events, major news, missing source, source traceability, dedupe, blocking policy, PositionMonitor integration, controller safety, and dashboard DOM IDs.
 
-P2-1 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P1-4 effective.
+P2-2 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P2-1 effective.
 
 ---
 

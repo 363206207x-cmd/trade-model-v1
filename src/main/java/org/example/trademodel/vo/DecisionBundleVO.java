@@ -47,6 +47,20 @@ public class DecisionBundleVO {
     private BigDecimal pushInvalidPriceAbove;
     /** 失效说明文本，写入 invalidation_condition_json 的 text */
     private String pushInvalidationSummary;
+    private String externalContextStatus;
+    private Integer activeExternalEventCount;
+    private Integer activeMacroEventCount;
+    private Integer activeNewsEventCount;
+    private String externalContextRiskLevel;
+    private Boolean externalContextBlocked;
+    private List<String> externalEventIds;
+    private List<String> externalContextReasonCodes;
+    private LocalDateTime nextExternalEventTime;
+    private LocalDateTime latestExternalEventTime;
+    private String latestExternalEventLabel;
+    private LocalDateTime externalEventWindowStart;
+    private LocalDateTime externalEventWindowEnd;
+    private String externalContextSourceHealth;
 
     // 空构造器 + 方便日志打印
     public DecisionBundleVO() {}
@@ -144,4 +158,33 @@ public class DecisionBundleVO {
     public void setPushInvalidationSummary(String pushInvalidationSummary) {
         this.pushInvalidationSummary = pushInvalidationSummary;
     }
+
+    public String getExternalContextStatus() { return externalContextStatus; }
+    public void setExternalContextStatus(String externalContextStatus) { this.externalContextStatus = externalContextStatus; }
+    public Integer getActiveExternalEventCount() { return activeExternalEventCount; }
+    public void setActiveExternalEventCount(Integer activeExternalEventCount) { this.activeExternalEventCount = activeExternalEventCount; }
+    public Integer getActiveMacroEventCount() { return activeMacroEventCount; }
+    public void setActiveMacroEventCount(Integer activeMacroEventCount) { this.activeMacroEventCount = activeMacroEventCount; }
+    public Integer getActiveNewsEventCount() { return activeNewsEventCount; }
+    public void setActiveNewsEventCount(Integer activeNewsEventCount) { this.activeNewsEventCount = activeNewsEventCount; }
+    public String getExternalContextRiskLevel() { return externalContextRiskLevel; }
+    public void setExternalContextRiskLevel(String externalContextRiskLevel) { this.externalContextRiskLevel = externalContextRiskLevel; }
+    public Boolean getExternalContextBlocked() { return externalContextBlocked; }
+    public void setExternalContextBlocked(Boolean externalContextBlocked) { this.externalContextBlocked = externalContextBlocked; }
+    public List<String> getExternalEventIds() { return externalEventIds; }
+    public void setExternalEventIds(List<String> externalEventIds) { this.externalEventIds = externalEventIds; }
+    public List<String> getExternalContextReasonCodes() { return externalContextReasonCodes; }
+    public void setExternalContextReasonCodes(List<String> externalContextReasonCodes) { this.externalContextReasonCodes = externalContextReasonCodes; }
+    public LocalDateTime getNextExternalEventTime() { return nextExternalEventTime; }
+    public void setNextExternalEventTime(LocalDateTime nextExternalEventTime) { this.nextExternalEventTime = nextExternalEventTime; }
+    public LocalDateTime getLatestExternalEventTime() { return latestExternalEventTime; }
+    public void setLatestExternalEventTime(LocalDateTime latestExternalEventTime) { this.latestExternalEventTime = latestExternalEventTime; }
+    public String getLatestExternalEventLabel() { return latestExternalEventLabel; }
+    public void setLatestExternalEventLabel(String latestExternalEventLabel) { this.latestExternalEventLabel = latestExternalEventLabel; }
+    public LocalDateTime getExternalEventWindowStart() { return externalEventWindowStart; }
+    public void setExternalEventWindowStart(LocalDateTime externalEventWindowStart) { this.externalEventWindowStart = externalEventWindowStart; }
+    public LocalDateTime getExternalEventWindowEnd() { return externalEventWindowEnd; }
+    public void setExternalEventWindowEnd(LocalDateTime externalEventWindowEnd) { this.externalEventWindowEnd = externalEventWindowEnd; }
+    public String getExternalContextSourceHealth() { return externalContextSourceHealth; }
+    public void setExternalContextSourceHealth(String externalContextSourceHealth) { this.externalContextSourceHealth = externalContextSourceHealth; }
 }
