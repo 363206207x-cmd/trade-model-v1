@@ -2,6 +2,8 @@ package org.example.trademodel.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.analysisrun.AnalysisRunResult;
+import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class RealMarketDataFetcherService {
@@ -30,11 +30,11 @@ public class RealMarketDataFetcherService {
     @Value("${market.api.base-url:https://api.binance.com}")
     private String baseUrl;
 
-    private final AnalysisAssemblerService analysisAssemblerService;
+    private final AnalysisSchedulerService analysisSchedulerService;
 
     @Autowired
-    public RealMarketDataFetcherService(@Lazy AnalysisAssemblerService analysisAssemblerService) {
-        this.analysisAssemblerService = analysisAssemblerService;
+    public RealMarketDataFetcherService(@Lazy AnalysisSchedulerService analysisSchedulerService) {
+        this.analysisSchedulerService = analysisSchedulerService;
         logger.info("RealMarketDataFetcherService initialized successfully with baseUrl: {}", baseUrl);
     }
 
@@ -44,7 +44,7 @@ public class RealMarketDataFetcherService {
     public List<String[]> fetchKlines(String symbol, String interval, int limit) {
         String fetchId = "FETCH-" + Instant.now().toEpochMilli();
         try {
-            String url = baseUrl + "/api/v3/klines?symbol=" + symbol.toUpperCase() 
+            String url = baseUrl + "/api/v3/klines?symbol=" + symbol.toUpperCase()
                         + "&interval=" + interval + "&limit=" + limit;
 
             HttpHeaders headers = new HttpHeaders();
@@ -56,7 +56,6 @@ public class RealMarketDataFetcherService {
 
             if (raw == null || raw.trim().isEmpty()) return List.of();
 
-            // Binance 返回的是 List<List<Object>>，我们转成 String[] 方便使用
             List<List<Object>> data = objectMapper.readValue(raw, new TypeReference<>() {});
             return data.stream()
                     .map(row -> row.stream().map(Object::toString).toArray(String[]::new))
@@ -68,14 +67,14 @@ public class RealMarketDataFetcherService {
         }
     }
 
-    // 原有方法保持不变（兼容旧代码）
     public void fetchRealMarketData(String symbol, String interval) {
         String fetchId = "FETCH-" + Instant.now().toEpochMilli();
         logger.info("[{}] === REAL MARKET DATA FETCH START === Symbol: {} | Interval: {}", fetchId, symbol, interval);
         try {
-            // 继续调用 assemble 进行完整落库
-            analysisAssemblerService.assemble(symbol, interval);
-            logger.info("[{}] === FETCH COMPLETED SUCCESSFULLY ===", fetchId);
+            AnalysisRunResult result = analysisSchedulerService.runMarketDataCompatibility(
+                    symbol, interval, RequestIdSupport.generate());
+            logger.info("[{}] === FETCH ROUTED THROUGH ANALYSIS ORCHESTRATOR === status={} analysisId={}",
+                    fetchId, result.getStatus(), result.getAnalysisId());
         } catch (Exception e) {
             logger.error("[{}] FETCH FAILED: {}", fetchId, e.getMessage());
         }

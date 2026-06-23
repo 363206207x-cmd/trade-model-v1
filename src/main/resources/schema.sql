@@ -5,11 +5,39 @@ CREATE TABLE IF NOT EXISTS tm_analysis_run (
     symbol VARCHAR(20) NOT NULL,
     timeframe VARCHAR(10) NOT NULL,
     analysis_time TIMESTAMP NOT NULL,
-    rule_version VARCHAR(20),
+    rule_version VARCHAR(32),
     data_quality_score INT,
-    trace_id VARCHAR(64),
-    status VARCHAR(20)
+    trace_id VARCHAR(128),
+    status VARCHAR(20),
+    idempotency_key VARCHAR(128),
+    request_id VARCHAR(128),
+    trigger_type VARCHAR(64),
+    trigger_reference VARCHAR(256),
+    parent_analysis_id VARCHAR(64),
+    parent_trace_id VARCHAR(128),
+    input_snapshot_json CLOB,
+    input_snapshot_hash VARCHAR(128),
+    attempt_count INT NOT NULL DEFAULT 1,
+    lease_owner VARCHAR(128),
+    lease_expires_at TIMESTAMP,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    error_code VARCHAR(128),
+    error_message VARCHAR(512),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version_no INT NOT NULL DEFAULT 1,
+    CONSTRAINT ck_tm_analysis_run_status CHECK (
+        status IS NULL OR status IN ('STARTED', 'SUCCESS', 'FAILED')
+    )
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_analysis_run_idempotency_key
+    ON tm_analysis_run(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_tm_analysis_run_trace_id ON tm_analysis_run(trace_id);
+CREATE INDEX IF NOT EXISTS idx_tm_analysis_run_request_id ON tm_analysis_run(request_id);
+CREATE INDEX IF NOT EXISTS idx_tm_analysis_run_status_lease ON tm_analysis_run(status, lease_expires_at);
+CREATE INDEX IF NOT EXISTS idx_tm_analysis_run_trigger_ref ON tm_analysis_run(trigger_type, trigger_reference);
 
 CREATE TABLE IF NOT EXISTS tm_evidence_item (
     evidence_id VARCHAR(64) PRIMARY KEY,

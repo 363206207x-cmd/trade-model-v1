@@ -28,6 +28,16 @@ logging:
     org.example.trademodel: DEBUG
 
 trade-model:
+  analysis:
+    scheduler:
+      enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
+      initial-delay-ms: ${TRADE_MODEL_ANALYSIS_SCHEDULER_INITIAL_DELAY_MS:60000}
+      fixed-delay-ms: ${TRADE_MODEL_ANALYSIS_SCHEDULER_FIXED_DELAY_MS:60000}
+      symbols: ${TRADE_MODEL_ANALYSIS_SCHEDULER_SYMBOLS:BTCUSDT}
+      timeframes: ${TRADE_MODEL_ANALYSIS_SCHEDULER_TIMEFRAMES:1m}
+    idempotency:
+      lease-seconds: ${TRADE_MODEL_ANALYSIS_IDEMPOTENCY_LEASE_SECONDS:120}
+      max-recovery-attempts: ${TRADE_MODEL_ANALYSIS_IDEMPOTENCY_MAX_RECOVERY_ATTEMPTS:3}
   ai:
     enabled: ${TRADE_MODEL_AI_ENABLED:false}
     request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}

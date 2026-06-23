@@ -13,6 +13,9 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class RuleConfigServiceImpl implements RuleConfigService {
 
+    private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
+    private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
+
     private final RuleConfigMapper ruleConfigMapper;
     /**
      * 真热加载要求：读线程不能读到 clear/半刷新状态
@@ -48,5 +51,19 @@ public class RuleConfigServiceImpl implements RuleConfigService {
             }
         }
         ruleCacheRef.set(Collections.unmodifiableMap(next));
+    }
+
+    @Override
+    public String resolveActiveRuleVersion() {
+        Map<String, RuleConfigDO> ruleMap = getRuleConfigMap();
+        if (ruleMap == null) {
+            return DEFAULT_ACTIVE_RULE_VERSION;
+        }
+        RuleConfigDO cfg = ruleMap.get(KEY_ACTIVE_VERSION_FALLBACK);
+        if (cfg == null || cfg.getRuleValue() == null) {
+            return DEFAULT_ACTIVE_RULE_VERSION;
+        }
+        String v = cfg.getRuleValue().trim();
+        return v.isEmpty() ? DEFAULT_ACTIVE_RULE_VERSION : v;
     }
 }
