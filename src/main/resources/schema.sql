@@ -716,6 +716,76 @@ CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_analysis_id ON tm_hot_reset_ev
 CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_trace_id ON tm_hot_reset_event(trace_id);
 CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_symbol_event_time ON tm_hot_reset_event(symbol, event_time);
 
+-- AI Call Log（P2-2）：只读 AI 复核调用审计链。
+-- 本表仅记录 provider review-only 调用、fallback、token/cost/latency 与安全边界；不保存原始密钥、原始 prompt 或可执行交易 payload。
+CREATE TABLE IF NOT EXISTS tm_ai_call_log (
+    call_id VARCHAR(64) PRIMARY KEY,
+    analysis_id VARCHAR(64),
+    trace_id VARCHAR(128),
+    request_id VARCHAR(128),
+    provider_name VARCHAR(32) NOT NULL,
+    model_name VARCHAR(128),
+    ai_role VARCHAR(64) NOT NULL,
+    call_status VARCHAR(32) NOT NULL,
+    provider_request_id VARCHAR(128),
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    latency_ms BIGINT,
+    input_tokens BIGINT,
+    output_tokens BIGINT,
+    total_tokens BIGINT,
+    reserved_cost_usd DECIMAL(20, 8) DEFAULT 0,
+    calculated_cost_usd DECIMAL(20, 8) DEFAULT 0,
+    cost_currency VARCHAR(8) NOT NULL DEFAULT 'USD',
+    cost_calculation_method VARCHAR(64) NOT NULL DEFAULT 'TOKEN_RATE_ESTIMATE',
+    fallback_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    fallback_reason VARCHAR(512),
+    rate_limited BOOLEAN NOT NULL DEFAULT FALSE,
+    budget_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    timeout_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    error_code VARCHAR(128),
+    error_message VARCHAR(512),
+    request_hash VARCHAR(128),
+    request_summary CLOB,
+    response_summary CLOB,
+    rule_version VARCHAR(32),
+    review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    manual_review_only BOOLEAN NOT NULL DEFAULT TRUE,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_executable BOOLEAN NOT NULL DEFAULT TRUE,
+    not_auto_trading BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    not_user_position_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_position_mutation BOOLEAN NOT NULL DEFAULT TRUE,
+    not_state_machine_override BOOLEAN NOT NULL DEFAULT TRUE,
+    not_execution_plan_creation BOOLEAN NOT NULL DEFAULT TRUE,
+    rule_direction_preserved BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_ai_call_log_status CHECK (
+        call_status IN ('STARTED', 'SUCCESS', 'DISABLED', 'NOT_CONFIGURED',
+        'RATE_LIMITED', 'BUDGET_BLOCKED', 'TIMEOUT', 'FAILED', 'INVALID_RESPONSE')
+    ),
+    CONSTRAINT ck_tm_ai_call_log_safety CHECK (
+        review_only = TRUE
+        AND manual_review_only = TRUE
+        AND not_trade_instruction = TRUE
+        AND not_executable = TRUE
+        AND not_auto_trading = TRUE
+        AND not_order_execution = TRUE
+        AND not_user_position_creation = TRUE
+        AND not_position_mutation = TRUE
+        AND not_state_machine_override = TRUE
+        AND not_execution_plan_creation = TRUE
+        AND rule_direction_preserved = TRUE
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_analysis_id ON tm_ai_call_log(analysis_id);
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_trace_id ON tm_ai_call_log(trace_id);
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_provider_time ON tm_ai_call_log(provider_name, started_at);
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_status_time ON tm_ai_call_log(call_status, started_at);
+
 -- tm_asset_state 语义：每个 symbol 当前仅一行（会被后续分析覆盖更新）。
 -- hot_reset_* / pre_reset_state / post_reset_state 记录的是该行最近一次 Hot Reset 元数据，
 -- 不是按 analysis_id 归档的事件流水；review 仅做当前行解释展示。

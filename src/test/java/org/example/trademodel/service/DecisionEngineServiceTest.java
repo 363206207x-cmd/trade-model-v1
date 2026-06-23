@@ -1,5 +1,7 @@
 package org.example.trademodel.service;
 
+import org.example.trademodel.ai.AiOrchestrationMode;
+import org.example.trademodel.ai.AiOrchestratorResult;
 import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
@@ -8,6 +10,7 @@ import org.example.trademodel.vo.EventImpactInputVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -20,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +39,8 @@ class DecisionEngineServiceTest {
     private AssetStateService assetStateService;
     @Mock
     private RuleConfigService ruleConfigService;
+    @Mock
+    private AiDecisionOrchestratorService aiDecisionOrchestratorService;
 
     private DecisionEngineService service;
 
@@ -280,6 +286,58 @@ class DecisionEngineServiceTest {
         assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.CONFUSED);
         assertThat(decision.getAssetStateSnapshot()).contains("\"nextState\":\"CONFUSED\"");
+    }
+
+    @Test
+    void makeDecision_aiChallengeEntersConflictContextWithoutChangingRuleDirection() {
+        AiOrchestratorResult review = new AiOrchestratorResult();
+        review.setOrchestrationMode(AiOrchestrationMode.AI_ASSISTED);
+        review.setGptConsistentWithRule(false);
+        review.setGeminiConsistentWithRule(true);
+        review.setGrokConsistentWithRule(true);
+        review.setConflictContribution(18);
+        review.setReasonCodes(List.of("AI_CHALLENGE"));
+        when(aiDecisionOrchestratorService.review(any())).thenReturn(review);
+        DecisionEngineService serviceWithAi = new DecisionEngineService(
+                marketDataFetcher,
+                aiConflictResolverService,
+                confusedStateService,
+                assetStateService,
+                ruleConfigService,
+                aiDecisionOrchestratorService
+        );
+
+        DecisionBundleVO decision = serviceWithAi.makeDecision("BTCUSDT", "1m", "analysis-ai-challenge", 85, 65);
+
+        ArgumentCaptor<DecisionContext> captor = ArgumentCaptor.forClass(DecisionContext.class);
+        verify(aiConflictResolverService).resolve(captor.capture());
+        DecisionContext context = captor.getValue();
+        assertThat(context.isGptConsistentWithRule()).isFalse();
+        assertThat(context.getAiProviderConflictContribution()).isEqualTo(18);
+        assertThat(context.getAiOrchestrationMode()).isEqualTo("AI_ASSISTED");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getAiRoleResults()).contains("rule-layer base direction preserved as BULLISH");
+        assertThat(decision.getAiRoleResults()).doesNotContain("Grok advisory");
+        assertThat(decision.getAiRoleResults()).doesNotContain("Gemini advisory");
+    }
+
+    @Test
+    void makeDecision_aiProviderFailureFallsBackWithoutFailingDecision() {
+        when(aiDecisionOrchestratorService.review(any())).thenThrow(new IllegalStateException("provider unavailable"));
+        DecisionEngineService serviceWithAi = new DecisionEngineService(
+                marketDataFetcher,
+                aiConflictResolverService,
+                confusedStateService,
+                assetStateService,
+                ruleConfigService,
+                aiDecisionOrchestratorService
+        );
+
+        DecisionBundleVO decision = serviceWithAi.makeDecision("BTCUSDT", "1m", "analysis-ai-fallback", 85, 65);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getAiRoleResults()).contains("RULE_ONLY_FALLBACK");
+        assertThat(decision.getAiRoleResults()).contains("AI_ORCHESTRATOR_FAILED");
     }
 
     private static List<String[]> bullishKlines() {

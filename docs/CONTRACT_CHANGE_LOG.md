@@ -238,3 +238,17 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-p2-2-ai-orchestrator-ai-call-log-done-candidate
+
+Date: 2026-06-23
+Changed by: Codex
+Reason: P2-2 AI Orchestrator + AiCallLog B-risk implementation package.
+Before: P2-2 AI Orchestrator + AiCallLog was NOT_STARTED/PARTIAL with a legacy `AiCallLogDO` and heuristic GPT/Gemini/Grok display strings, but no provider client abstraction, safe provider adapters, usage guard, real call-log persistence, fallback orchestration, or read-only AI status/log APIs.
+After: P2-2 is a branch DONE candidate with `AiDecisionOrchestratorService`, `AiProviderClient` abstraction, safe OpenAI/GPT, Gemini, and xAI/Grok adapters, strict review-only prompt/response parsing, prompt-injection and forbidden-field guards, timeout/failure/malformed/rate-limit/budget fallback, `tm_ai_call_log` persistence with token/cost/latency/provider/fallback/traceId evidence, read-only AI status/log APIs, and DecisionEngine integration that preserves rule-layer direction while AI can only support/challenge/abstain through bounded conflict downgrade. It is effective only after reviewed merge to clean / synced main.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before B-risk PR merge.

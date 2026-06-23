@@ -1,5 +1,8 @@
 package org.example.trademodel.service;
 
+import org.example.trademodel.ai.AiOrchestrationMode;
+import org.example.trademodel.ai.AiOrchestratorResult;
+import org.example.trademodel.ai.AiProviderRequest;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
@@ -8,19 +11,19 @@ import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
 
 /**
- * V3 决策引擎 - 规则层基础方向 + AI advisory review（真实K线 + 多时间框架）。
- * 1. GPT role：规则方向复核
- * 2. Gemini role：冲突复核
- * 3. Grok role：快讯与反方挑战
+ * V3 决策引擎 - 规则层基础方向 + AI review-only 编排（真实K线 + 多时间框架）。
+ * AI 仅能支持 / 质疑 / 弃权，并通过冲突通道降级，不能覆盖规则层方向。
  *
  * <p>本 run 将 {@link DecisionContext} 接入 {@link AiConflictResolverService}、{@link ConfusedStateService}、
  * {@link AssetStateService}，供 {@link org.example.trademodel.service.impl.AnalysisAssemblerServiceImpl} 落库。</p>
@@ -35,6 +38,7 @@ public class DecisionEngineService {
     private final ConfusedStateService confusedStateService;
     private final AssetStateService assetStateService;
     private final RuleConfigService ruleConfigService;
+    private final AiDecisionOrchestratorService aiDecisionOrchestratorService;
 
     // ========= 最小规则键集合（仅限本阶段允许 keys） =========
     private static final String KEY_WORTH_OPENING_MIN_SCORE = "decision.worth_opening_min_score";
@@ -62,12 +66,24 @@ public class DecisionEngineService {
                                  ConfusedStateService confusedStateService,
                                  AssetStateService assetStateService,
                                  RuleConfigService ruleConfigService) {
+        this(marketDataFetcher, aiConflictResolverService, confusedStateService,
+                assetStateService, ruleConfigService, null);
+    }
+
+    @Autowired
+    public DecisionEngineService(RealMarketDataFetcherService marketDataFetcher,
+                                 AiConflictResolverService aiConflictResolverService,
+                                 ConfusedStateService confusedStateService,
+                                 AssetStateService assetStateService,
+                                 RuleConfigService ruleConfigService,
+                                 AiDecisionOrchestratorService aiDecisionOrchestratorService) {
         this.marketDataFetcher = marketDataFetcher;
         this.aiConflictResolverService = aiConflictResolverService;
         this.confusedStateService = confusedStateService;
         this.assetStateService = assetStateService;
         this.ruleConfigService = ruleConfigService;
-        logger.info("✅ DecisionEngineService V3 (规则层基础方向 + AI advisory review + 真实K线 + 多TF) initialized successfully");
+        this.aiDecisionOrchestratorService = aiDecisionOrchestratorService;
+        logger.info("DecisionEngineService V3 (rule-layer direction + AI review-only orchestrator + real klines + multiTF) initialized successfully");
     }
 
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId) {
@@ -121,24 +137,11 @@ public class DecisionEngineService {
             boolean multiTfConvergence = isBullish1m == isBullish5m;
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
-            // ==================== 2. 规则层基础方向 + AI advisory review ====================
-
-            // Grok role：快讯与反方挑战，仅用于风险/置信度复核
-            String grokOpinion = isBullish1m ? 
-                "快讯：1m K线阳线，短期情绪看涨。但反方挑战：5m 未完全收敛，需警惕假突破。" : 
-                "快讯：1m K线阴线，短期情绪偏空。但反方挑战：可能仅为洗盘，关注支撑位。";
-
-            // Gemini role：冲突复核，仅能影响冲突等级与风险提示
-            String geminiReview = multiTfConvergence ? 
-                "复核通过：1m与5m方向一致，无明显冲突，维持原判断。" : 
-                "复核警告：1m与5m方向冲突，建议降级置信度或转为观望。";
-
-            // GPT role：规则方向复核，不覆盖 rule-layer base direction
+            // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================
             int baseScore = isBullish1m ? 82 : 58;
             int finalScore = baseScore + convergenceScore;
 
             String ruleMarketBias = isBullish1m ? "BULLISH" : "BEARISH";
-            String advisoryBias = finalScore >= confidenceMediumMinScore ? "BULLISH" : "BEARISH";
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
             boolean worthOpening = finalScore >= worthOpeningMinScore;
@@ -150,22 +153,14 @@ public class DecisionEngineService {
             }
             boolean externalContextBlocked = isEffectiveExternalBlocked(externalContextInput);
             boolean effectiveWorthOpening = worthOpening && !externalContextBlocked;
-
-            String conclusion = String.format(
-                "规则层基础方向：%s | AI复核方向：%s | 总分 %d | Gemini复核：%s | Grok快讯：%s | 多TF收敛：%s",
-                ruleMarketBias, advisoryBias, finalScore, geminiReview, grokOpinion, multiTfConvergence ? "STRONG" : "WEAK");
-
-            // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
             String riskTier = finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM";
 
+            // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
             DecisionContext ctx = new DecisionContext();
             ctx.setSymbol(symbol);
             ctx.setRuleMarketBias(ruleMarketBias);
             ctx.setRuleConfidenceLevel(confidenceLevel);
             ctx.setHasRuleBaseOutput(true);
-            ctx.setGptConsistentWithRule(ruleMarketBias.equals(advisoryBias));
-            ctx.setGeminiConsistentWithRule(multiTfConvergence);
-            ctx.setGrokConsistentWithRule(true);
             ctx.setMultiTimeframeAligned(multiTfConvergence);
             ctx.setRiskTier(riskTier);
             ctx.setDataQualityScore(dataQualityScore);
@@ -180,6 +175,18 @@ public class DecisionEngineService {
             ctx.setMicrostructureTrapScore(multiTfConvergence ? 22 : 38);
             ctx.setCauseEffectDivergenceScore(multiTfConvergence ? 12 : 40);
             ctx.setConsecutiveLowConfusedCount(0);
+
+            AiOrchestratorResult aiReview = runAiReview(symbol, timeframe, analysisId, decisionId,
+                    ruleMarketBias, confidenceLevel, riskTier, effectiveWorthOpening,
+                    dataQualityScore, trendStructureScore, multiTfConvergence,
+                    externalContextInput, baseScore, convergenceScore, finalScore,
+                    isBullish1m, isBullish5m, externalContextBlocked);
+            ctx.setGptConsistentWithRule(aiReview.isGptConsistentWithRule());
+            ctx.setGeminiConsistentWithRule(aiReview.isGeminiConsistentWithRule());
+            ctx.setGrokConsistentWithRule(aiReview.isGrokConsistentWithRule());
+            ctx.setAiProviderConflictContribution(aiReview.getConflictContribution());
+            ctx.setAiOrchestrationMode(aiReview.getOrchestrationMode().name());
+            ctx.setAiOrchestrationSummary(aiReview.toSanitizedSummary());
 
             AiConflictResult conflict = aiConflictResolverService.resolve(ctx);
             ctx.setAiConflictScore(conflict.getConfusedContribution());
@@ -251,6 +258,13 @@ public class DecisionEngineService {
             }
 
             // ==================== 4. 输出最终决策 ====================
+            String conclusion = String.format(
+                    "规则层基础方向：%s | AI编排模式：%s | 总分 %d | 多TF收敛：%s | 外部上下文阻塞：%s",
+                    ruleMarketBias,
+                    aiReview.getOrchestrationMode(),
+                    finalScore,
+                    multiTfConvergence ? "STRONG" : "WEAK",
+                    externalContextBlocked);
             DecisionBundleVO decision = new DecisionBundleVO();
             decision.setDecisionId(decisionId);
             decision.setMarketBiasHierarchy(ruleMarketBias);
@@ -264,9 +278,9 @@ public class DecisionEngineService {
             decision.setIsWorthOpening(effectiveWorthOpening && !confused.isDirectionalPushBlocked());
             decision.setMultiTfConvergence(multiTfLabel);
             decision.setAiRoleResults(
-                "Grok advisory: " + grokOpinion + " | Gemini advisory: " + geminiReview
-                        + " | GPT advisory: rule-layer base direction preserved as "
-                        + ruleMarketBias + " (Score=" + finalScore + ")");
+                    aiReview.toSanitizedSummary()
+                            + " | rule-layer base direction preserved as "
+                            + ruleMarketBias + " (Score=" + finalScore + ")");
             decision.setReviewReasons(reviewJson);
             decision.setAiConflictLevel(conflict.getLevel() != null ? conflict.getLevel().name() : null);
             decision.setAiConflictScore(conflict.getAiConflictScore());
@@ -345,6 +359,76 @@ public class DecisionEngineService {
             return syntheticState;
         }
         return AssetStateEnum.HIGH_RISK;
+    }
+
+    private AiOrchestratorResult runAiReview(String symbol, String timeframe, String analysisId, String decisionId,
+                                             String ruleMarketBias, String confidenceLevel, String riskTier,
+                                             boolean effectiveWorthOpening,
+                                             Integer dataQualityScore, Integer trendStructureScore,
+                                             boolean multiTfConvergence,
+                                             EventImpactInputVO externalContextInput,
+                                             int baseScore, int convergenceScore, int finalScore,
+                                             boolean isBullish1m, boolean isBullish5m,
+                                             boolean externalContextBlocked) {
+        String traceId = analysisId != null && !analysisId.isBlank()
+                ? analysisId + "-ai-review"
+                : decisionId + "-ai-review";
+        if (aiDecisionOrchestratorService == null) {
+            return ruleOnlyFallback(analysisId, traceId, "AI_ORCHESTRATOR_NOT_WIRED");
+        }
+        AiProviderRequest request = new AiProviderRequest();
+        request.setAnalysisId(analysisId);
+        request.setTraceId(traceId);
+        request.setSymbol(symbol);
+        request.setTimeframe(timeframe);
+        request.setRuleMarketBias(ruleMarketBias);
+        request.setRuleConfidence(confidenceLevel);
+        request.setRuleRiskLevel(riskTier);
+        request.setRuleWorthOpening(effectiveWorthOpening);
+        request.setDataQualityScore(dataQualityScore);
+        request.setTrendStructureScore(trendStructureScore);
+        request.setMultiTimeframeState(multiTfConvergence ? "ALIGNED" : "MISALIGNED");
+        request.setExternalContextState(externalContextSummary(externalContextInput, externalContextBlocked));
+        request.setEvidenceSummary("Rule layer produced base direction from current 1m/5m klines; AI may only review or challenge.");
+        request.setScoreSummary("baseScore=" + baseScore + ", convergenceScore=" + convergenceScore + ", finalScore=" + finalScore);
+        Map<String, Object> facts = new LinkedHashMap<>();
+        facts.put("isBullish1m", isBullish1m);
+        facts.put("isBullish5m", isBullish5m);
+        facts.put("multiTimeframeAligned", multiTfConvergence);
+        facts.put("externalContextBlocked", externalContextBlocked);
+        facts.put("reviewOnly", true);
+        facts.put("notExecutable", true);
+        facts.put("ruleDirectionPreserved", true);
+        request.setDecisionFacts(facts);
+        request.setRequestTime(LocalDateTime.now());
+        try {
+            return aiDecisionOrchestratorService.review(request);
+        } catch (Exception e) {
+            AiOrchestratorResult fallback = ruleOnlyFallback(analysisId, traceId, "AI_ORCHESTRATOR_FAILED");
+            fallback.setReasonCodes(List.of("AI_ORCHESTRATOR_FAILED"));
+            return fallback;
+        }
+    }
+
+    private static AiOrchestratorResult ruleOnlyFallback(String analysisId, String traceId, String reasonCode) {
+        AiOrchestratorResult result = new AiOrchestratorResult();
+        result.setAnalysisId(analysisId);
+        result.setTraceId(traceId);
+        result.setOrchestrationMode(AiOrchestrationMode.RULE_ONLY_FALLBACK);
+        result.setReasonCodes(List.of(reasonCode));
+        result.setCompletedAt(LocalDateTime.now());
+        return result;
+    }
+
+    private static String externalContextSummary(EventImpactInputVO input, boolean effectiveBlocked) {
+        if (input == null) {
+            return "ABSENT";
+        }
+        return "status=" + input.getExternalContextStatus()
+                + ", risk=" + input.getExternalContextRiskLevel()
+                + ", blocked=" + effectiveBlocked
+                + ", sourceHealth=" + input.getExternalContextSourceHealth()
+                + ", reasonCodes=" + input.getExternalContextReasonCodes();
     }
 
     private static void applyExternalContext(DecisionBundleVO decision, EventImpactInputVO input) {
