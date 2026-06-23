@@ -2,6 +2,8 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.analysisrun.AnalysisExecutionContext;
+import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.enums.AssetStateEnum;
@@ -36,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -128,6 +131,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         ReflectionTestUtils.invokeMethod(
                 service,
                 "saveToDatabase",
+                context(analysisId),
                 mockAnalysis(analysisId),
                 new ArrayList<>(),
                 new ArrayList<>(),
@@ -170,6 +174,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         ReflectionTestUtils.invokeMethod(
                 service,
                 "saveToDatabase",
+                context(analysisId),
                 mockAnalysis(analysisId),
                 new ArrayList<>(),
                 new ArrayList<>(),
@@ -195,6 +200,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         ReflectionTestUtils.invokeMethod(
                 service,
                 "saveToDatabase",
+                context(analysisId),
                 mockAnalysis(analysisId),
                 new ArrayList<>(),
                 new ArrayList<>(),
@@ -227,6 +233,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         ReflectionTestUtils.invokeMethod(
                 service,
                 "saveToDatabase",
+                context(analysisId),
                 mockAnalysis(analysisId),
                 new ArrayList<>(),
                 new ArrayList<>(),
@@ -240,6 +247,30 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 eq(0),
                 eq(0),
                 any());
+    }
+
+    private static AnalysisExecutionContext context(String analysisId) {
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 6, 23, 10, 0);
+        return new AnalysisExecutionContext(
+                analysisId,
+                "trace-" + analysisId,
+                "req-" + analysisId,
+                "idem-" + analysisId,
+                "BTCUSDT",
+                "1h",
+                analysisTime,
+                analysisTime,
+                "v1.0",
+                AnalysisRunTriggerType.MANUAL_API,
+                "req-" + analysisId,
+                null,
+                null,
+                "{}",
+                "hash-" + analysisId,
+                "lease-" + analysisId,
+                1,
+                1,
+                false);
     }
 
     private static AssetAnalysisVO mockAnalysis(String analysisId) {

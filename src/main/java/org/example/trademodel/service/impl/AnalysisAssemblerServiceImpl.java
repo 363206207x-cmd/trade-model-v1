@@ -4,8 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.example.trademodel.analysisrun.AnalysisExecutionContext;
+import org.example.trademodel.analysisrun.AnalysisRunIds;
+import org.example.trademodel.analysisrun.AnalysisRunInputException;
+import org.example.trademodel.analysisrun.AnalysisTimePolicy;
+import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.common.EvidenceTypeConstants;
+import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.entity.*;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.HotResetEventTypeEnum;
@@ -130,12 +136,28 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.opportunityLogService = opportunityLogService;
     }
 
+
     @Override
     @Transactional
     public AssetAnalysisVO assemble(String symbol, String timeframe) {
+        throw new IllegalStateException("DIRECT_ASSEMBLER_ENTRY_DISABLED");
+    }
+
+    @Override
+    @Transactional
+    public AssetAnalysisVO assemble(AnalysisExecutionContext context) {
+        return assembleInternal(context);
+    }
+
+    private AssetAnalysisVO assembleInternal(AnalysisExecutionContext context) {
         long assembleStart = System.currentTimeMillis();
-        String analysisId = "ana-" + UUID.randomUUID().toString().substring(0, 8);
-        System.out.println("=== 开始执行 assemble 方法 === symbol=" + symbol + ", timeframe=" + timeframe);
+        AnalysisExecutionContext effectiveContext = normalizeExecutionContext(context);
+        String analysisId = effectiveContext.getAnalysisId();
+        String symbol = effectiveContext.getSymbol();
+        String timeframe = effectiveContext.getTimeframe();
+        System.out.println("=== 开始执行 assemble 方法 === analysisId=" + analysisId
+                + ", traceId=" + effectiveContext.getTraceId()
+                + ", symbol=" + symbol + ", timeframe=" + timeframe);
 
         try {
             MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
@@ -162,7 +184,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             scoreInput.setAnalysisId(analysisId);
             scoreInput.setSymbol(symbol);
             scoreInput.setTimeframe(timeframe);
-            scoreInput.setAnalysisTime(LocalDateTime.now().toString());
+            scoreInput.setAnalysisTime(effectiveContext.getAnalysisTime().toString());
             List<EvidenceItemVO> evidences = evidenceService.buildEvidence(scoreInput, marketEnv);
             scoreInput.setEvidenceList(evidences);
             List<ScoreItemVO> scores = scoreService.buildScoreList(scoreInput, marketEnv);
@@ -183,7 +205,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             analysis.setAnalysisId(analysisId);
             analysis.setSymbol(symbol);
             analysis.setTimeframe(timeframe);
-            analysis.setAnalysisTime(LocalDateTime.now().toString());
+            analysis.setAnalysisTime(effectiveContext.getAnalysisTime().toString());
             analysis.setMarketEnvironment(marketEnv);
             analysis.setEvidenceList(evidences);
             analysis.setScoreList(scores);
@@ -192,7 +214,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             analysis.setEventImpactInput(scoreInput.getEventImpactInput());
 
             System.out.println("=== 准备执行落库 saveToDatabase === analysisId=" + analysisId);
-            saveToDatabase(analysis, evidences, scores, decision, plan, marketEnvSourceType);
+            saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan, marketEnvSourceType);
             System.out.println("=== 落库执行完成 === analysisId=" + analysisId);
 
             return analysis;
@@ -208,7 +230,67 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         }
     }
 
+    private AnalysisExecutionContext normalizeExecutionContext(AnalysisExecutionContext context) {
+        if (context == null) {
+            throw new AnalysisRunInputException("ANALYSIS_CONTEXT_REQUIRED", "analysis execution context is required");
+        }
+        return new AnalysisExecutionContext(
+                requireText(context.getAnalysisId(), "ANALYSIS_ID_REQUIRED"),
+                requireText(context.getTraceId(), "TRACE_ID_REQUIRED"),
+                requireText(context.getRequestId(), "REQUEST_ID_REQUIRED"),
+                requireText(context.getIdempotencyKey(), "IDEMPOTENCY_KEY_REQUIRED"),
+                normalizeAnalysisSymbol(context.getSymbol()),
+                AnalysisTimePolicy.requireSupportedTimeframe(context.getTimeframe()),
+                requireTime(context.getAnalysisTime()),
+                requireBucket(context.getCanonicalAnalysisTimeBucket(), context.getAnalysisTime(), context.getTimeframe()),
+                requireText(context.getRuleVersion(), "RULE_VERSION_REQUIRED"),
+                context.getTriggerType() != null ? context.getTriggerType() : AnalysisRunTriggerType.MANUAL_API,
+                context.getTriggerReference(),
+                context.getParentAnalysisId(),
+                context.getParentTraceId(),
+                context.getInputSnapshotJson(),
+                context.getInputSnapshotHash(),
+                requireText(context.getLeaseOwner(), "LEASE_OWNER_REQUIRED"),
+                context.getClaimVersion() != null ? context.getClaimVersion() : 1,
+                context.getAttemptCount() != null ? context.getAttemptCount() : 1,
+                context.isRunAlreadyClaimed());
+    }
+
+    private static String normalizeAnalysisSymbol(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new AnalysisRunInputException("SYMBOL_REQUIRED", "symbol is required");
+        }
+        return raw.trim().toUpperCase();
+    }
+
+    private static LocalDateTime requireTime(LocalDateTime analysisTime) {
+        if (analysisTime == null) {
+            throw new AnalysisRunInputException("ANALYSIS_TIME_REQUIRED", "analysisTime is required");
+        }
+        return analysisTime;
+    }
+
+    private static LocalDateTime requireBucket(LocalDateTime bucket, LocalDateTime analysisTime, String timeframe) {
+        if (bucket != null) {
+            return bucket;
+        }
+        return AnalysisTimePolicy.canonicalBucket(requireTime(analysisTime), timeframe);
+    }
+
+    private static String requireText(String raw, String reasonCode) {
+        if (raw == null || raw.isBlank()) {
+            throw new AnalysisRunInputException(reasonCode, reasonCode);
+        }
+        return raw.trim();
+    }
+
     private void saveToDatabase(AssetAnalysisVO analysis, List<EvidenceItemVO> evidences,
+                                List<ScoreItemVO> scores, DecisionBundleVO decision, ExecutionPlanVO plan,
+                                String marketEnvSourceType) {
+        throw new IllegalStateException("DIRECT_ASSEMBLER_ENTRY_DISABLED");
+    }
+
+    private void saveToDatabase(AnalysisExecutionContext context, AssetAnalysisVO analysis, List<EvidenceItemVO> evidences,
                                 List<ScoreItemVO> scores, DecisionBundleVO decision, ExecutionPlanVO plan,
                                 String marketEnvSourceType) {
         System.out.println("落库开始 - analysisId = " + analysis.getAnalysisId());
@@ -219,16 +301,35 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         ExecutionPlanDO persistedPlan = null;
         try {
             // 1. AnalysisRun
+            LocalDateTime persistStartedAt = LocalDateTime.now();
             AnalysisRunDO run = new AnalysisRunDO();
             run.setAnalysisId(analysis.getAnalysisId());
             run.setSymbol(analysis.getSymbol());
             run.setTimeframe(analysis.getTimeframe());
-            run.setAnalysisTime(LocalDateTime.now());
-            run.setRuleVersion(resolveActiveRuleVersion());
+            run.setAnalysisTime(context.getAnalysisTime() != null ? context.getAnalysisTime() : persistStartedAt);
+            run.setRuleVersion(context.getRuleVersion() != null ? context.getRuleVersion() : resolveActiveRuleVersion());
             run.setDataQualityScore(analysis.getDataQualityScore());
-            run.setTraceId("trace-" + System.currentTimeMillis());
-            run.setStatus("SUCCESS");
-            analysisRunMapper.insert(run);
+            run.setTraceId(context.getTraceId() != null ? context.getTraceId() : AnalysisRunIds.traceId());
+            run.setStatus(context.isRunAlreadyClaimed() ? "STARTED" : "SUCCESS");
+            run.setIdempotencyKey(context.getIdempotencyKey());
+            run.setRequestId(context.getRequestId());
+            run.setTriggerType(context.getTriggerType() != null ? context.getTriggerType().name() : AnalysisRunTriggerType.MANUAL_API.name());
+            run.setTriggerReference(context.getTriggerReference());
+            run.setParentAnalysisId(context.getParentAnalysisId());
+            run.setParentTraceId(context.getParentTraceId());
+            run.setInputSnapshotJson(context.getInputSnapshotJson());
+            run.setInputSnapshotHash(context.getInputSnapshotHash());
+            run.setAttemptCount(context.getAttemptCount() != null ? context.getAttemptCount() : 1);
+            run.setLeaseOwner(context.getLeaseOwner());
+            run.setLeaseExpiresAt(null);
+            run.setStartedAt(persistStartedAt);
+            run.setCompletedAt(context.isRunAlreadyClaimed() ? null : persistStartedAt);
+            run.setCreatedAt(persistStartedAt);
+            run.setUpdatedAt(persistStartedAt);
+            run.setVersionNo(context.getClaimVersion() != null ? context.getClaimVersion() : 1);
+            if (!context.isRunAlreadyClaimed()) {
+                analysisRunMapper.insert(run);
+            }
 
             // 2. Evidence
             if (evidences != null) {
@@ -381,6 +482,18 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             }
 
             monitorAlertWriteService.emitAfterAnalysisPersist(run, analysis, decision);
+
+            if (context.isRunAlreadyClaimed()) {
+                int updated = analysisRunMapper.markSuccess(
+                        analysis.getAnalysisId(),
+                        analysis.getDataQualityScore(),
+                        LocalDateTime.now(),
+                        context.getLeaseOwner(),
+                        context.getClaimVersion() != null ? context.getClaimVersion() : 1);
+                if (updated != 1) {
+                    throw new IllegalStateException("ANALYSIS_RUN_LEASE_FENCING_CONFLICT");
+                }
+            }
 
             System.out.println("✅ 6张表落库全部完成！analysisId = " + analysis.getAnalysisId());
         } catch (Exception ex) {
@@ -929,18 +1042,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     }
 
     private String resolveActiveRuleVersion() {
-        Map<String, RuleConfigDO> ruleMap = ruleConfigService != null
-                ? ruleConfigService.getRuleConfigMap()
-                : null;
-        if (ruleMap == null) {
-            return DEFAULT_ACTIVE_RULE_VERSION;
-        }
-        RuleConfigDO cfg = ruleMap.get(KEY_ACTIVE_VERSION_FALLBACK);
-        if (cfg == null || cfg.getRuleValue() == null) {
-            return DEFAULT_ACTIVE_RULE_VERSION;
-        }
-        String v = cfg.getRuleValue().trim();
-        return v.isEmpty() ? DEFAULT_ACTIVE_RULE_VERSION : v;
+        return ruleConfigService != null ? ruleConfigService.resolveActiveRuleVersion() : DEFAULT_ACTIVE_RULE_VERSION;
     }
 
     /**

@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P2-2 AI Orchestrator + AiCallLog DONE candidate
-Next Business Phase: P2-3 Scheduler / Idempotency / Trace
+Current Work Package: P2-3 Scheduler / Idempotency / Trace DONE candidate
+Next Business Phase: P3-1 Dashboard Final
 Next Business Phase Allowed: NO
 Production Deployment Readiness: BLOCKED
 
@@ -39,8 +39,10 @@ P1-4 OpportunityLog is effective because its implementation is merged to clean /
 
 P2-1 Macro / News / External Context is effective because its implementation is merged to clean / synced `main` by PR #1018 commit `d7fef874b39aabbd07f6b05fd97f4725e89e79b5` and the runtime gate allowed P2-2.
 
-P2-2 AI Orchestrator + AiCallLog is only a branch DONE candidate in this worktree.
-It is not effective until this branch commit is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P2-2 effectivity.
+P2-2 AI Orchestrator + AiCallLog is effective because its implementation is merged to clean / synced `main` by PR #1019 commit `92fd7cbf17db31c8ea2bfd4673badde1c69d20cd` and the runtime gate allowed P2-3.
+
+P2-3 Scheduler / Idempotency / Trace is only a branch DONE candidate in this worktree.
+It is not effective until PR #1020 is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P2-3 effectivity.
 
 `bash scripts/v1-state.sh` must distinguish `CURRENT_PACKAGE_PR`, `UNRELATED_OPEN_PRS`, and `BLOCK_NEXT_BUSINESS_PHASE_ONLY`. An unrelated Draft PR must not block merging the current P0-0 package PR, but it still blocks the next business phase.
 
@@ -48,13 +50,13 @@ It is not effective until this branch commit is reviewed, merged to `main`, loca
 
 ## Current Allowed Work
 
-Only the following work is allowed after this P2-2 branch-candidate update:
+Only the following work is allowed after this P2-3 branch-candidate update:
 
-1. Checks, push, PR creation, and merge-gate handling for the P2-2 AI Orchestrator + AiCallLog B-risk package.
-2. Main sync after the P2-2 PR is reviewed and merged.
-3. Runtime verification that P2-2 is effective on clean / synced main before any P2-3 work starts.
+1. Checks, push, PR review handling, and merge-gate handling for the P2-3 Scheduler / Idempotency / Trace B-risk package in PR #1020.
+2. Main sync after PR #1020 is reviewed and merged.
+3. Runtime verification that P2-3 is effective on clean / synced main before any P3-1 work starts.
 
-P2-2 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
+P2-3 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
 
 PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into this package.
 
@@ -62,41 +64,41 @@ PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into 
 
 ## Current Forbidden Work
 
-The following work is blocked until P2-2 is effective on merged main:
+The following work is blocked until P2-3 is effective on merged main:
 
-1. Scheduler / Idempotency / Trace.
-2. Dashboard Final.
+1. P3-1 Dashboard Final.
+2. Full E2E Acceptance.
 3. Auto-trading of any kind.
 
 ---
 
 ## Current Known Critical Gaps
 
-1. P2-2 AI Orchestrator + AiCallLog is only a branch DONE candidate until merged main confirms it effective.
-2. Scheduler / Idempotency / Trace remains incomplete and blocked.
-3. Dashboard Final must wait until business semantics are stable.
+1. P2-3 Scheduler / Idempotency / Trace is only a branch DONE candidate until merged main confirms it effective.
+2. Dashboard Final remains blocked until P2-3 is reviewed, merged, synced, and runtime-confirmed effective.
+3. Production deployment remains blocked by non-production runtime/config evidence.
 
-## P2-2 AI Orchestrator + AiCallLog Branch Candidate
+## P2-3 Scheduler / Idempotency / Trace Branch Candidate
 
-Branch: `p2-2-ai-orchestrator-ai-call-log-full-implementation`
+Branch: `p2-3-scheduler-idempotency-trace-full-implementation`
+PR: #1020
 Risk: B
 Status: DONE candidate
-Effective State: pending merged main
+Effective State: pending reviewed merge to clean / synced main
 
 Implemented branch evidence:
 
-1. `AiDecisionOrchestratorService` runs provider review after rule-layer facts exist.
-2. OpenAI / GPT, Gemini, and xAI / Grok adapters are safe, env-configured, default disabled, and tested with fake transport only.
-3. AI outputs are strict JSON review-only results: SUPPORT / CHALLENGE / ABSTAIN plus conflict level and reason codes.
-4. Provider responses with direction overrides, executable fields, prompt-injection text, malformed JSON, timeout, 429, or failure fail closed to fallback.
-5. AI cannot overwrite rule-layer base direction, cannot create ExecutionPlan, cannot write state-machine transitions, cannot create or mutate UserPosition, and cannot issue order / Push / external-channel actions.
-6. `tm_ai_call_log`, mapper, and service record STARTED before provider call and completion/fallback token, cost, latency, provider, traceId, rate-limit, budget, and error evidence without raw keys or raw provider payload.
-7. `AiUsageGuard` blocks disabled, unconfigured, unknown-cost, exhausted-budget, and rate-limited providers before network calls.
-8. `/api/ai/orchestrator/status` and `/api/ai/call-logs` are read-only status/log surfaces and do not expose API keys.
-9. DecisionEngine uses orchestration summary only as review evidence; AI challenge contributes bounded conflict downgrade through `AiConflictResolverService`.
-10. Tests cover provider request mapping, no provider-network tests, parser injection/forbidden-field guards, budget/rate limit guards, orchestrator fallback modes, AiCallLog lifecycle, controller safety, and DecisionEngine preservation of rule-layer direction.
+1. Canonical idempotency key is exactly SHA-256 of normalized symbol, normalized timeframe, canonical timeframe bucket, and resolved rule version. Trigger type, requestId, trigger reference, and parent IDs remain audit metadata only and do not affect the key.
+2. `AnalysisTimePolicy` floors supported timeframes `1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d`; 1d uses UTC date boundary, and illegal symbol/timeframe/time inputs fail closed instead of defaulting to BTCUSDT / 1m / now.
+3. DB idempotency guard uses `tm_analysis_run` unique idempotency key, explicit claim/failure transactions, lease owner, claim version, attempt count, max recovery attempts, expired lease recovery, failed-run recovery, and partial-state recovery blocking.
+4. `AnalysisExecutionContext` carries lease owner, claim version, attempt count, requestId, traceId, input snapshot, input hash, parent IDs, and trigger audit fields into the assembler.
+5. `markSuccess` and `markFailed` are fenced by analysisId, STARTED status, leaseOwner, and versionNo / claimVersion; stale executors cannot overwrite recovered or successful runs.
+6. Direct assembler bypass is disabled with `DIRECT_ASSEMBLER_ENTRY_DISABLED`; production analysis execution enters through `AnalysisRunOrchestrator` and `assemble(AnalysisExecutionContext)`.
+7. Request and trace read APIs include `GET /api/analysis/runs/by-request/{requestId}`, `GET /api/analysis/runs/{analysisId}`, `GET /api/analysis/traces/{traceId}`, and `GET /api/analysis/scheduler/status`; these are read-only and do not trigger analysis, AI, monitor, review, Push, external channel, or trading actions.
+8. `AnalysisTraceSnapshot` reports `traceStatus`, `missingSegments`, `generatedAt`, and `manualReviewOnly=true`, with COMPLETE / PARTIAL_TRACE / RUNNING / FAILED status semantics.
+9. Tests cover canonical key behavior, cross-trigger dedupe, different tuple key changes, manual API 400 fail-closed input, scheduler invalid config fail-closed, lease fencing, real H2 unique index and concurrent idempotency behavior, failed recovery, partial recovery blocking, max attempts, expired lease single-winner recovery, trace by requestId, scheduler status, request correlation, and direct bypass guard.
 
-P2-3 remains blocked until this branch is reviewed, merged to `main`, main is synced, and runtime state confirms P2-2 effective.
+P3-1 remains blocked until PR #1020 is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and runtime state confirms P2-3 effective.
 
 ---
 
@@ -126,4 +128,4 @@ Review-only slice count is no longer a delivery completion standard.
 
 ## Rule
 
-No later business phase may start until the current branch candidate is merged to main and `Next Business Phase Allowed` becomes YES through the contract gate.
+No later business phase may start until PR #1020 is reviewed, merged to main, local main is synced, the worktree is clean, and `Next Business Phase Allowed` becomes YES through the contract gate.

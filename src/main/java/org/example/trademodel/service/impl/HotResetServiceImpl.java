@@ -1,7 +1,7 @@
 package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.HotResetEventDO;
@@ -22,7 +22,6 @@ import org.example.trademodel.service.HotResetCommand;
 import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
-import org.example.trademodel.vo.AssetAnalysisVO;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +35,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class HotResetServiceImpl implements HotResetService {
@@ -43,6 +43,11 @@ public class HotResetServiceImpl implements HotResetService {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final int LEGACY_MIN_CONFUSED_SCORE_THRESHOLD = 40;
     private static final int DEFAULT_EVENT_VERSION = 3;
+    private static final int MAX_REBUILD_ERROR_CODE_LENGTH = 128;
+    private static final int MAX_REBUILD_ERROR_MESSAGE_LENGTH = 512;
+    private static final Pattern AUTHORIZATION = Pattern.compile("(?i)(authorization\\s*[:=]\\s*)([^,;]+)");
+    private static final Pattern SECRET_PARAM = Pattern.compile("(?i)(api[_-]?key|token|access[_-]?token|secret)=([^&\\s]+)");
+    private static final Pattern URL_QUERY = Pattern.compile("https?://([^\\s?]+)\\?[^\\s]+", Pattern.CASE_INSENSITIVE);
 
     private final AssetStateMapper assetStateMapper;
     private final HotResetEventMapper hotResetEventMapper;
@@ -301,30 +306,81 @@ public class HotResetServiceImpl implements HotResetService {
         try {
             AnalysisSchedulerService scheduler = analysisSchedulerServiceProvider.getIfAvailable();
             if (scheduler == null) {
-                update.setExecutionStatus("REBUILD_FAILED");
-                update.setExecutionErrorCode("ANALYSIS_SCHEDULER_UNAVAILABLE");
-                update.setExecutionErrorMessage("AnalysisSchedulerService unavailable");
+                markRebuildFailed(update, result,
+                        "ANALYSIS_SCHEDULER_UNAVAILABLE",
+                        "AnalysisSchedulerService unavailable");
             } else {
-                ApiResponse<AssetAnalysisVO> response = scheduler.executeAnalysis(
-                        event.getSymbol(), event.getTimeframe(), "HOT_RESET:" + event.getEventId());
-                AssetAnalysisVO rebuilt = response != null ? response.getData() : null;
-                String rebuildAnalysisId = rebuilt != null ? rebuilt.getAnalysisId() : null;
-                update.setRebuildAnalysisId(rebuildAnalysisId);
-                update.setExecutionStatus(rebuildAnalysisId != null ? "COMPLETED" : "REBUILD_FAILED");
-                if (rebuildAnalysisId == null) {
-                    update.setExecutionErrorCode("REBUILD_ANALYSIS_ID_MISSING");
-                    update.setExecutionErrorMessage("Analysis rebuild returned no analysisId");
-                }
-                result.setRebuildAnalysisId(rebuildAnalysisId);
-                result.setExecutionStatus(update.getExecutionStatus());
+                AnalysisRunResult rebuildResult = scheduler.runHotResetRebuild(
+                        event.getSymbol(), event.getTimeframe(), event.getEventId(),
+                        event.getAnalysisId(), event.getTraceId());
+                applyRebuildOutcome(update, result, rebuildResult);
             }
         } catch (Exception e) {
-            update.setExecutionStatus("REBUILD_FAILED");
-            update.setExecutionErrorCode("REBUILD_EXCEPTION");
-            update.setExecutionErrorMessage(e.getMessage());
-            result.setExecutionStatus("REBUILD_FAILED");
+            markRebuildFailed(update, result, "REBUILD_EXCEPTION", e.getMessage());
         }
         hotResetEventMapper.updateRebuildOutcome(update);
+    }
+
+    private void applyRebuildOutcome(HotResetEventDO update, HotResetResult result, AnalysisRunResult rebuildResult) {
+        if (rebuildResult != null && rebuildResult.isSuccessfulAnalysisAvailable()) {
+            update.setRebuildAnalysisId(rebuildResult.getAnalysisId());
+            update.setExecutionStatus("COMPLETED");
+            update.setExecutionErrorCode(null);
+            update.setExecutionErrorMessage(null);
+            result.setRebuildAnalysisId(rebuildResult.getAnalysisId());
+            result.setExecutionStatus("COMPLETED");
+            return;
+        }
+        markRebuildFailed(update, result, rebuildFailureCode(rebuildResult), rebuildFailureMessage(rebuildResult));
+    }
+
+    private void markRebuildFailed(HotResetEventDO update, HotResetResult result, String errorCode, String errorMessage) {
+        update.setRebuildAnalysisId(null);
+        update.setExecutionStatus("REBUILD_FAILED");
+        update.setExecutionErrorCode(truncate(redact(errorCode), MAX_REBUILD_ERROR_CODE_LENGTH));
+        update.setExecutionErrorMessage(truncate(redact(errorMessage), MAX_REBUILD_ERROR_MESSAGE_LENGTH));
+        result.setRebuildAnalysisId(null);
+        result.setExecutionStatus("REBUILD_FAILED");
+    }
+
+    private static String rebuildFailureCode(AnalysisRunResult rebuildResult) {
+        if (rebuildResult == null) {
+            return "ANALYSIS_REBUILD_RESULT_MISSING";
+        }
+        return hasText(rebuildResult.getReasonCode())
+                ? rebuildResult.getReasonCode()
+                : "ANALYSIS_REBUILD_RESULT_INVALID";
+    }
+
+    private static String rebuildFailureMessage(AnalysisRunResult rebuildResult) {
+        if (rebuildResult == null) {
+            return "Analysis rebuild returned no result";
+        }
+        String status = hasText(rebuildResult.getStatus()) ? rebuildResult.getStatus() : "UNKNOWN";
+        String message = hasText(rebuildResult.getMessage())
+                ? rebuildResult.getMessage()
+                : "analysis rebuild did not execute successfully";
+        if (!rebuildResult.hasAnalysisId()) {
+            message = message + "; analysisId missing";
+        }
+        return status + ": " + message;
+    }
+
+    private static String redact(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String t = AUTHORIZATION.matcher(raw).replaceAll("$1<redacted>");
+        t = SECRET_PARAM.matcher(t).replaceAll("$1=<redacted>");
+        return URL_QUERY.matcher(t).replaceAll("https://$1?<redacted>");
+    }
+
+    private static String truncate(String raw, int max) {
+        if (raw == null) {
+            return null;
+        }
+        String t = raw.trim();
+        return t.length() <= max ? t : t.substring(0, max);
     }
 
     private DecisionContext buildConfusedContext(HotResetCommand command) {
@@ -406,5 +462,9 @@ public class HotResetServiceImpl implements HotResetService {
 
     private int zero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
