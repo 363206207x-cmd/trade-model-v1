@@ -22,6 +22,9 @@ public class DecisionContext {
     private Integer microstructureTrapScore;
     private Integer causeEffectDivergenceScore;
     private Integer aiConflictScore;
+    private Integer aiProviderConflictContribution = 0;
+    private String aiOrchestrationMode = "RULE_ONLY_FALLBACK";
+    private String aiOrchestrationSummary;
     private Integer consecutiveLowConfusedCount = 0;
 
     /** 主链估算的数据质量分（可为 null，规则侧不强制） */
@@ -164,6 +167,30 @@ public class DecisionContext {
 
     public void setAiConflictScore(Integer aiConflictScore) {
         this.aiConflictScore = aiConflictScore;
+    }
+
+    public Integer getAiProviderConflictContribution() {
+        return aiProviderConflictContribution;
+    }
+
+    public void setAiProviderConflictContribution(Integer aiProviderConflictContribution) {
+        this.aiProviderConflictContribution = aiProviderConflictContribution;
+    }
+
+    public String getAiOrchestrationMode() {
+        return aiOrchestrationMode;
+    }
+
+    public void setAiOrchestrationMode(String aiOrchestrationMode) {
+        this.aiOrchestrationMode = aiOrchestrationMode;
+    }
+
+    public String getAiOrchestrationSummary() {
+        return aiOrchestrationSummary;
+    }
+
+    public void setAiOrchestrationSummary(String aiOrchestrationSummary) {
+        this.aiOrchestrationSummary = aiOrchestrationSummary;
     }
 
     public Integer getConsecutiveLowConfusedCount() {

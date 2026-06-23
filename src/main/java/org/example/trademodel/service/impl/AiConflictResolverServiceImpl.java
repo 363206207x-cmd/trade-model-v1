@@ -23,8 +23,9 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         int directionConflict = calculateDirectionConflict(context, objectionCount);
         int riskConflict = calculateRiskConflict(context);
         int planConflict = calculatePlanConflict(context);
+        int providerConflict = providerConflictContribution(context);
 
-        int aiConflictScore = Math.min(100, directionConflict + riskConflict + planConflict);
+        int aiConflictScore = Math.min(100, directionConflict + riskConflict + planConflict + providerConflict);
         if (objectionCount == 1) {
             aiConflictScore = Math.min(aiConflictScore, 35);
         }
@@ -80,6 +81,14 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             return 0;
         }
         return 6;
+    }
+
+    private int providerConflictContribution(DecisionContext ctx) {
+        Integer contribution = ctx.getAiProviderConflictContribution();
+        if (contribution == null) {
+            return 0;
+        }
+        return Math.max(0, Math.min(25, contribution));
     }
 
     private int aiObjectionCount(DecisionContext ctx) {
