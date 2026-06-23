@@ -35,7 +35,7 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
-    protected AiHttpRequest buildHttpRequest(String promptJson) throws Exception {
+    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerProperties().getModel());
         body.put("instructions", AiPromptBuilder.SYSTEM_INSTRUCTION);
@@ -43,7 +43,8 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
         body.put("max_output_tokens", maxOutputTokens());
         body.put("temperature", 0);
 
-        AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"), json(body));
+        AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"),
+                json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();
         headers.put("Authorization", "Bearer " + providerProperties().getApiKey());
         request.setHeaders(headers);

@@ -20,9 +20,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,6 +74,16 @@ class AiCallLogServiceImplTest {
         assertThat(captor.getValue().getTotalTokens()).isEqualTo(15L);
         assertThat(captor.getValue().getResponseSummary()).contains("sk-***");
         assertThat(captor.getValue().getResponseSummary()).doesNotContain("should-redact");
+    }
+
+    @Test
+    void sumChargeableCostByAnalysisIdReturnsZeroWhenMapperReturnsNull() {
+        AiCallLogServiceImpl service = new AiCallLogServiceImpl(mapper, new ObjectMapper());
+        when(mapper.sumChargeableCostByAnalysisId("analysis-1")).thenReturn(null);
+        when(mapper.sumChargeableCostSince(LocalDateTime.MIN)).thenReturn(new BigDecimal("0.60"));
+
+        assertThat(service.sumChargeableCostByAnalysisId("analysis-1")).isEqualByComparingTo("0");
+        assertThat(service.sumChargeableCostSince(LocalDateTime.MIN)).isEqualByComparingTo("0.60");
     }
 
     private static AiProviderRequest request() {

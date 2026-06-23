@@ -35,7 +35,7 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
-    protected AiHttpRequest buildHttpRequest(String promptJson) throws Exception {
+    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerProperties().getModel());
         body.put("messages", List.of(
@@ -46,7 +46,7 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
         body.put("temperature", 0);
 
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/chat/completions"),
-                json(body));
+                json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();
         headers.put("Authorization", "Bearer " + providerProperties().getApiKey());
         request.setHeaders(headers);

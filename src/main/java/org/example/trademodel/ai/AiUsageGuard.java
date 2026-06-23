@@ -19,6 +19,10 @@ public class AiUsageGuard {
     }
 
     public AiUsageGuardResult evaluate(AiProviderClient client) {
+        return evaluate(client, null);
+    }
+
+    public AiUsageGuardResult evaluate(AiProviderClient client, String analysisId) {
         if (!properties.isEnabled()) {
             return AiUsageGuardResult.blocked(AiProviderCallStatus.DISABLED, "AI_ORCHESTRATOR_DISABLED", BigDecimal.ZERO);
         }
@@ -44,14 +48,22 @@ public class AiUsageGuard {
         if (reservedCost.compareTo(properties.getPerAnalysisBudgetUsd()) > 0) {
             return AiUsageGuardResult.blocked(AiProviderCallStatus.BUDGET_BLOCKED, "PER_ANALYSIS_BUDGET_EXCEEDED", reservedCost);
         }
+        if (analysisId == null || analysisId.isBlank()) {
+            return AiUsageGuardResult.blocked(AiProviderCallStatus.BUDGET_BLOCKED, "ANALYSIS_ID_REQUIRED", reservedCost);
+        }
         try {
             LocalDateTime minuteAgo = LocalDateTime.now().minusMinutes(1);
             int attempts = callLogService.countProviderAttemptsSince(client.provider().name(), minuteAgo);
             if (attempts >= providerProperties.getRequestsPerMinute()) {
                 return AiUsageGuardResult.blocked(AiProviderCallStatus.RATE_LIMITED, "RATE_LIMIT_EXCEEDED", reservedCost);
             }
+            BigDecimal spentForAnalysis = zeroWhenNull(callLogService.sumChargeableCostByAnalysisId(analysisId));
+            if (spentForAnalysis.add(reservedCost).compareTo(properties.getPerAnalysisBudgetUsd()) > 0) {
+                return AiUsageGuardResult.blocked(AiProviderCallStatus.BUDGET_BLOCKED,
+                        "PER_ANALYSIS_BUDGET_EXCEEDED", reservedCost);
+            }
             LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-            BigDecimal spentToday = callLogService.sumChargeableCostSince(startOfDay);
+            BigDecimal spentToday = zeroWhenNull(callLogService.sumChargeableCostSince(startOfDay));
             if (spentToday.add(reservedCost).compareTo(properties.getDailyBudgetUsd()) > 0) {
                 return AiUsageGuardResult.blocked(AiProviderCallStatus.BUDGET_BLOCKED, "DAILY_BUDGET_EXCEEDED", reservedCost);
             }
@@ -75,5 +87,9 @@ public class AiUsageGuard {
                 .multiply(providerProperties.getOutputCostPerMillionUsd())
                 .divide(BigDecimal.valueOf(1_000_000L), 12, RoundingMode.HALF_UP);
         return input.add(output).setScale(8, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal zeroWhenNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

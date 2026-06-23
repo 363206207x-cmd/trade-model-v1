@@ -48,10 +48,15 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
 
     @Override
     public AiProviderReviewResult review(AiProviderRequest request) {
+        return review(request, properties.getRequestTimeoutMs());
+    }
+
+    @Override
+    public AiProviderReviewResult review(AiProviderRequest request, long timeoutOverrideMs) {
         long started = System.nanoTime();
         AiPromptBuilder.PromptPayload prompt = promptBuilder.build(request, role());
         try {
-            AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson());
+            AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs);
             AiHttpResponse response = transport.post(httpRequest);
             long latencyMs = elapsedMs(started);
             if (response.getStatusCode() == 429) {
@@ -89,7 +94,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         }
     }
 
-    protected abstract AiHttpRequest buildHttpRequest(String promptJson) throws Exception;
+    protected abstract AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception;
 
     protected abstract ProviderPayload extractPayload(AiHttpResponse response) throws Exception;
 
@@ -101,11 +106,11 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return objectMapper.readTree(body == null ? "" : body);
     }
 
-    protected AiHttpRequest baseRequest(String url, String body) {
+    protected AiHttpRequest baseRequest(String url, String body, long timeoutOverrideMs) {
         AiHttpRequest request = new AiHttpRequest();
         request.setUrl(url);
         request.setBody(body);
-        request.setTimeout(Duration.ofMillis(Math.max(100, properties.getRequestTimeoutMs())));
+        request.setTimeout(Duration.ofMillis(Math.max(1, timeoutOverrideMs)));
         return request;
     }
 

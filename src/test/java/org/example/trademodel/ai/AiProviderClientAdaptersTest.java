@@ -33,6 +33,20 @@ class AiProviderClientAdaptersTest {
     }
 
     @Test
+    void openAiAdapter_usesPerCallTimeoutOverrideForHttpRequest() throws Exception {
+        AiOrchestratorProperties properties = properties();
+        configure(properties.getOpenai(), "openai-key", "gpt-test", "https://api.openai.test");
+        FakeTransport transport = FakeTransport.responding(new AiHttpResponse(200, """
+                {"id":"resp-openai","output_text":"{\\"stance\\":\\"SUPPORT\\",\\"conflictLevel\\":\\"NONE\\",\\"reasonCodes\\":[\\"OK\\"],\\"summary\\":\\"clean\\"}","usage":{"input_tokens":11,"output_tokens":7,"total_tokens":18}}
+                """, Map.of()));
+        OpenAiProviderClient client = new OpenAiProviderClient(properties, transport, objectMapper);
+
+        client.review(request(), 1234);
+
+        assertThat(transport.lastRequest.getTimeout().toMillis()).isEqualTo(1234);
+    }
+
+    @Test
     void geminiAdapter_mapsGenerateContentWithHeaderKeyAndNoTools() throws Exception {
         AiOrchestratorProperties properties = properties();
         configure(properties.getGemini(), "gemini-key", "gemini-test", "https://gemini.test");

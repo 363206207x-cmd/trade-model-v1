@@ -6,21 +6,112 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AiUsageGuardTest {
     @Test
-    void evaluate_allowsWhenBudgetAndRatePermit() {
+    void evaluate_allowsSingleProviderBelowCumulativeAnalysisBudget() {
         AiOrchestratorProperties properties = configuredProperties();
         FakeLogService logService = new FakeLogService();
         AiUsageGuard guard = new AiUsageGuard(properties, logService);
 
-        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()));
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
 
         assertThat(result.isAllowed()).isTrue();
         assertThat(result.getReservedCostUsd()).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    @Test
+    void evaluate_blocksThirdProviderWhenCumulativeAnalysisBudgetWouldBeExceeded() {
+        AiOrchestratorProperties properties = configuredProperties();
+        setReservation(properties.getOpenai(), "0.40");
+        FakeLogService logService = new FakeLogService();
+        AiUsageGuard guard = new AiUsageGuard(properties, logService);
+        FakeClient client = new FakeClient(properties.getOpenai());
+
+        AiUsageGuardResult first = guard.evaluate(client, "analysis-1");
+        logService.analysisSpent.put("analysis-1", first.getReservedCostUsd());
+        AiUsageGuardResult second = guard.evaluate(client, "analysis-1");
+        logService.analysisSpent.put("analysis-1", logService.analysisSpent.get("analysis-1").add(second.getReservedCostUsd()));
+        AiUsageGuardResult third = guard.evaluate(client, "analysis-1");
+
+        assertThat(first.isAllowed()).isTrue();
+        assertThat(second.isAllowed()).isTrue();
+        assertThat(third.isAllowed()).isFalse();
+        assertThat(third.getStatus()).isEqualTo(AiProviderCallStatus.BUDGET_BLOCKED);
+        assertThat(third.getReasonCode()).isEqualTo("PER_ANALYSIS_BUDGET_EXCEEDED");
+    }
+
+    @Test
+    void evaluate_blocksWhenHistoricalAnalysisCostPlusReservationWouldExceedBudget() {
+        AiOrchestratorProperties properties = configuredProperties();
+        setReservation(properties.getOpenai(), "0.40");
+        FakeLogService logService = new FakeLogService();
+        logService.analysisSpent.put("analysis-1", new BigDecimal("0.70"));
+        AiUsageGuard guard = new AiUsageGuard(properties, logService);
+
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
+
+        assertThat(result.isAllowed()).isFalse();
+        assertThat(result.getReasonCode()).isEqualTo("PER_ANALYSIS_BUDGET_EXCEEDED");
+    }
+
+    @Test
+    void evaluate_keepsAnalysisBudgetsIsolatedByAnalysisId() {
+        AiOrchestratorProperties properties = configuredProperties();
+        setReservation(properties.getOpenai(), "0.40");
+        FakeLogService logService = new FakeLogService();
+        logService.analysisSpent.put("other-analysis", new BigDecimal("0.90"));
+        AiUsageGuard guard = new AiUsageGuard(properties, logService);
+
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
+
+        assertThat(result.isAllowed()).isTrue();
+    }
+
+    @Test
+    void evaluate_doesNotChargeSkippedBudgetBlockedLogsAgain() {
+        AiOrchestratorProperties properties = configuredProperties();
+        setReservation(properties.getOpenai(), "0.40");
+        FakeLogService logService = new FakeLogService();
+        logService.skippedBudgetBlockedReservations.put("analysis-1", new BigDecimal("10.00"));
+        AiUsageGuard guard = new AiUsageGuard(properties, logService);
+
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
+
+        assertThat(result.isAllowed()).isTrue();
+    }
+
+    @Test
+    void evaluate_failClosesWhenAnalysisIdIsMissing() {
+        AiOrchestratorProperties properties = configuredProperties();
+        AiUsageGuard guard = new AiUsageGuard(properties, new FakeLogService());
+
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), " ");
+
+        assertThat(result.isAllowed()).isFalse();
+        assertThat(result.getStatus()).isEqualTo(AiProviderCallStatus.BUDGET_BLOCKED);
+        assertThat(result.getReasonCode()).isEqualTo("ANALYSIS_ID_REQUIRED");
+    }
+
+    @Test
+    void evaluate_blocksWhenStartedDailyReservationConsumesRemainingBudget() {
+        AiOrchestratorProperties properties = configuredProperties();
+        setReservation(properties.getOpenai(), "0.50");
+        properties.setDailyBudgetUsd(new BigDecimal("1.00"));
+        FakeLogService logService = new FakeLogService();
+        logService.spent = new BigDecimal("0.60");
+        AiUsageGuard guard = new AiUsageGuard(properties, logService);
+
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
+
+        assertThat(result.isAllowed()).isFalse();
+        assertThat(result.getStatus()).isEqualTo(AiProviderCallStatus.BUDGET_BLOCKED);
+        assertThat(result.getReasonCode()).isEqualTo("DAILY_BUDGET_EXCEEDED");
     }
 
     @Test
@@ -31,26 +122,11 @@ class AiUsageGuardTest {
         logService.attempts = 1;
         AiUsageGuard guard = new AiUsageGuard(properties, logService);
 
-        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()));
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
 
         assertThat(result.isAllowed()).isFalse();
         assertThat(result.getStatus()).isEqualTo(AiProviderCallStatus.RATE_LIMITED);
         assertThat(result.getReasonCode()).isEqualTo("RATE_LIMIT_EXCEEDED");
-    }
-
-    @Test
-    void evaluate_blocksWhenDailyBudgetWouldBeExceeded() {
-        AiOrchestratorProperties properties = configuredProperties();
-        properties.setDailyBudgetUsd(new BigDecimal("0.00001"));
-        FakeLogService logService = new FakeLogService();
-        logService.spent = new BigDecimal("0.000009");
-        AiUsageGuard guard = new AiUsageGuard(properties, logService);
-
-        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()));
-
-        assertThat(result.isAllowed()).isFalse();
-        assertThat(result.getStatus()).isEqualTo(AiProviderCallStatus.BUDGET_BLOCKED);
-        assertThat(result.getReasonCode()).isEqualTo("DAILY_BUDGET_EXCEEDED");
     }
 
     @Test
@@ -59,7 +135,7 @@ class AiUsageGuardTest {
         properties.getOpenai().setInputCostPerMillionUsd(BigDecimal.ZERO);
         AiUsageGuard guard = new AiUsageGuard(properties, new FakeLogService());
 
-        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()));
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
 
         assertThat(result.isAllowed()).isFalse();
         assertThat(result.getStatus()).isEqualTo(AiProviderCallStatus.BUDGET_BLOCKED);
@@ -72,7 +148,7 @@ class AiUsageGuardTest {
         properties.getOpenai().setEnabled(false);
         AiUsageGuard guard = new AiUsageGuard(properties, new FakeLogService());
 
-        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()));
+        AiUsageGuardResult result = guard.evaluate(new FakeClient(properties.getOpenai()), "analysis-1");
 
         assertThat(result.isAllowed()).isFalse();
         assertThat(result.getStatus()).isEqualTo(AiProviderCallStatus.DISABLED);
@@ -95,6 +171,12 @@ class AiUsageGuardTest {
         return properties;
     }
 
+    private static void setReservation(AiProviderProperties properties, String expectedReservation) {
+        BigDecimal target = new BigDecimal(expectedReservation);
+        properties.setInputCostPerMillionUsd(target.multiply(new BigDecimal("1000")).subtract(new BigDecimal("0.20")));
+        properties.setOutputCostPerMillionUsd(BigDecimal.ONE);
+    }
+
     private record FakeClient(AiProviderProperties providerProperties) implements AiProviderClient {
         @Override public AiProviderName provider() { return AiProviderName.OPENAI; }
         @Override public AiProviderRole role() { return AiProviderRole.GPT_RULE_REVIEW; }
@@ -110,6 +192,8 @@ class AiUsageGuardTest {
     private static final class FakeLogService implements AiCallLogService {
         int attempts;
         BigDecimal spent = BigDecimal.ZERO;
+        final Map<String, BigDecimal> analysisSpent = new HashMap<>();
+        final Map<String, BigDecimal> skippedBudgetBlockedReservations = new HashMap<>();
 
         @Override public AiCallLogDO startCall(AiProviderRequest request, AiProviderClient client, BigDecimal reservedCostUsd) { return null; }
         @Override public void completeCall(AiCallLogDO log, AiProviderReviewResult result) { }
@@ -117,5 +201,8 @@ class AiUsageGuardTest {
         @Override public List<AiCallLogDO> query(String analysisId, String traceId, String providerName, String callStatus, LocalDateTime from, LocalDateTime to, int limit) { return List.of(); }
         @Override public int countProviderAttemptsSince(String providerName, LocalDateTime since) { return attempts; }
         @Override public BigDecimal sumChargeableCostSince(LocalDateTime since) { return spent; }
+        @Override public BigDecimal sumChargeableCostByAnalysisId(String analysisId) {
+            return analysisSpent.getOrDefault(analysisId, BigDecimal.ZERO);
+        }
     }
 }

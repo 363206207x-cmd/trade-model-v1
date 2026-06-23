@@ -31,6 +31,19 @@ public interface AiCallLogMapper {
             + "not_execution_plan_creation AS notExecutionPlanCreation, "
             + "rule_direction_preserved AS ruleDirectionPreserved, created_at AS createdAt, updated_at AS updatedAt";
 
+    String CHARGEABLE_COST = """
+            CASE
+              WHEN call_status IN ('DISABLED', 'NOT_CONFIGURED', 'BUDGET_BLOCKED', 'RATE_LIMITED') THEN 0
+              WHEN call_status = 'STARTED' THEN COALESCE(reserved_cost_usd, 0)
+              WHEN call_status IN ('SUCCESS', 'FAILED', 'TIMEOUT', 'INVALID_RESPONSE') THEN
+                CASE
+                  WHEN COALESCE(calculated_cost_usd, 0) > 0 THEN calculated_cost_usd
+                  ELSE COALESCE(reserved_cost_usd, 0)
+                END
+              ELSE 0
+            END
+            """;
+
     @Insert("""
             INSERT INTO tm_ai_call_log(
               call_id, analysis_id, trace_id, request_id, provider_name, model_name, ai_role, call_status,
@@ -102,6 +115,9 @@ public interface AiCallLogMapper {
     @Select("SELECT COUNT(*) FROM tm_ai_call_log WHERE provider_name = #{providerName} AND started_at >= #{since}")
     int countProviderAttemptsSince(@Param("providerName") String providerName, @Param("since") LocalDateTime since);
 
-    @Select("SELECT COALESCE(SUM(COALESCE(calculated_cost_usd, reserved_cost_usd, 0)), 0) FROM tm_ai_call_log WHERE started_at >= #{since}")
+    @Select("SELECT COALESCE(SUM(" + CHARGEABLE_COST + "), 0) FROM tm_ai_call_log WHERE started_at >= #{since}")
     BigDecimal sumChargeableCostSince(@Param("since") LocalDateTime since);
+
+    @Select("SELECT COALESCE(SUM(" + CHARGEABLE_COST + "), 0) FROM tm_ai_call_log WHERE analysis_id = #{analysisId}")
+    BigDecimal sumChargeableCostByAnalysisId(@Param("analysisId") String analysisId);
 }

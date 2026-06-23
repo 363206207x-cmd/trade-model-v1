@@ -23,4 +23,8 @@ public interface AiCallLogService {
     int countProviderAttemptsSince(String providerName, LocalDateTime since);
 
     BigDecimal sumChargeableCostSince(LocalDateTime since);
+
+    default BigDecimal sumChargeableCostByAnalysisId(String analysisId) {
+        return BigDecimal.ZERO;
+    }
 }

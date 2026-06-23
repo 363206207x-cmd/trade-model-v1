@@ -15,6 +15,7 @@ import org.example.trademodel.ai.AiUsageGuardResult;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.service.AiCallLogService;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestratorService {
@@ -29,17 +31,28 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
     private final AiUsageGuard usageGuard;
     private final AiCallLogService callLogService;
     private final AiOrchestratorProperties properties;
+    private final TimeSource timeSource;
 
+    @Autowired
     public AiDecisionOrchestratorServiceImpl(List<AiProviderClient> providerClients,
                                              AiUsageGuard usageGuard,
                                              AiCallLogService callLogService,
                                              AiOrchestratorProperties properties) {
+        this(providerClients, usageGuard, callLogService, properties, System::nanoTime);
+    }
+
+    AiDecisionOrchestratorServiceImpl(List<AiProviderClient> providerClients,
+                                      AiUsageGuard usageGuard,
+                                      AiCallLogService callLogService,
+                                      AiOrchestratorProperties properties,
+                                      TimeSource timeSource) {
         this.providerClients = providerClients == null ? List.of() : providerClients.stream()
                 .sorted(Comparator.comparing(client -> client.role().name()))
                 .toList();
         this.usageGuard = usageGuard;
         this.callLogService = callLogService;
         this.properties = properties;
+        this.timeSource = timeSource == null ? System::nanoTime : timeSource;
     }
 
     @Override
@@ -49,6 +62,7 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
         result.setTraceId(request.getTraceId());
         List<AiProviderReviewResult> providerResults = new ArrayList<>();
         List<String> reasonCodes = new ArrayList<>();
+        long startedNanos = timeSource.nanoTime();
 
         if (!properties.isEnabled()) {
             for (AiProviderClient client : providerClients) {
@@ -58,9 +72,25 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
             }
             return finalizeResult(result, providerResults, reasonCodes);
         }
+        if (properties.getOverallTimeoutMs() <= 0) {
+            for (AiProviderClient client : providerClients) {
+                AiProviderReviewResult skipped = overallTimeoutResult(client);
+                providerResults.add(recordSkipped(request, client, skipped, BigDecimal.ZERO));
+            }
+            return finalizeResult(result, providerResults, reasonCodes);
+        }
+
+        long deadlineNanos = deadlineNanos(startedNanos, properties.getOverallTimeoutMs());
 
         for (AiProviderClient client : providerClients) {
-            AiUsageGuardResult guard = usageGuard.evaluate(client);
+            long remainingMs = remainingTimeoutMs(deadlineNanos);
+            if (remainingMs <= 0) {
+                AiProviderReviewResult skipped = overallTimeoutResult(client);
+                providerResults.add(recordSkipped(request, client, skipped, BigDecimal.ZERO));
+                continue;
+            }
+
+            AiUsageGuardResult guard = usageGuard.evaluate(client, request.getAnalysisId());
             if (!guard.isAllowed()) {
                 AiProviderReviewResult skipped = AiProviderReviewResult.skipped(
                         client.provider(), client.role(), guard.getStatus(), guard.getReasonCode());
@@ -82,7 +112,12 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
 
             AiProviderReviewResult providerResult;
             try {
-                providerResult = client.review(request);
+                remainingMs = remainingTimeoutMs(deadlineNanos);
+                if (remainingMs <= 0) {
+                    providerResult = overallTimeoutResult(client);
+                } else {
+                    providerResult = client.review(request, effectiveProviderTimeoutMs(remainingMs));
+                }
             } catch (Exception e) {
                 providerResult = AiProviderReviewResult.skipped(
                         client.provider(), client.role(), AiProviderCallStatus.FAILED, "PROVIDER_THROWN_FAILURE");
@@ -115,6 +150,38 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
             result.setFallbackReason("AI_CALL_LOG_SKIPPED_FAILED");
         }
         return result;
+    }
+
+    private AiProviderReviewResult overallTimeoutResult(AiProviderClient client) {
+        AiProviderReviewResult result = AiProviderReviewResult.skipped(
+                client.provider(), client.role(), AiProviderCallStatus.TIMEOUT, "ORCHESTRATOR_OVERALL_TIMEOUT");
+        result.setErrorCode("ORCHESTRATOR_OVERALL_TIMEOUT");
+        result.setTimeout(true);
+        return result;
+    }
+
+    private long effectiveProviderTimeoutMs(long remainingMs) {
+        long requestTimeoutMs = properties.getRequestTimeoutMs() <= 0
+                ? remainingMs
+                : properties.getRequestTimeoutMs();
+        return Math.max(1, Math.min(requestTimeoutMs, remainingMs));
+    }
+
+    private long remainingTimeoutMs(long deadlineNanos) {
+        long remainingNanos = deadlineNanos - timeSource.nanoTime();
+        if (remainingNanos <= 0) {
+            return 0;
+        }
+        long remainingMs = TimeUnit.NANOSECONDS.toMillis(remainingNanos);
+        return remainingMs <= 0 ? 1 : remainingMs;
+    }
+
+    private static long deadlineNanos(long startedNanos, long timeoutMs) {
+        long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+        if (timeoutNanos > Long.MAX_VALUE - startedNanos) {
+            return Long.MAX_VALUE;
+        }
+        return startedNanos + timeoutNanos;
     }
 
     private AiOrchestratorResult finalizeResult(AiOrchestratorResult result,
@@ -187,5 +254,9 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
             return 18;
         }
         return 0;
+    }
+
+    interface TimeSource {
+        long nanoTime();
     }
 }

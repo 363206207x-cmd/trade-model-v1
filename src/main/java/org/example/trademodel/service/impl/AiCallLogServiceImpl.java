@@ -73,6 +73,12 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         return sum == null ? BigDecimal.ZERO : sum;
     }
 
+    @Override
+    public BigDecimal sumChargeableCostByAnalysisId(String analysisId) {
+        BigDecimal sum = mapper.sumChargeableCostByAnalysisId(analysisId);
+        return sum == null ? BigDecimal.ZERO : sum;
+    }
+
     private AiCallLogDO baseLog(AiProviderRequest request, AiProviderClient client, BigDecimal reservedCostUsd) {
         LocalDateTime now = LocalDateTime.now();
         AiCallLogDO log = new AiCallLogDO();
