@@ -229,6 +229,78 @@ Supported modes:
 - `ship`: validates, stages only allowlisted files, commits, pushes, and creates a ready PR.
 - `merge`: waits for GitHub checks, refuses Draft/conflict/blocked PRs, squash merges, deletes the remote branch through GitHub, switches to `main`, pulls `origin main`, and runs final `v1-state`.
 - `full`: runs `ship` and then `merge`.
+- `resume`: resumes a branch after commit / push / PR creation / checks / merge interruption, reuses an existing PR when present, creates the PR when missing, waits for checks, merges, syncs `main`, and runs final delivery check.
+
+### Full Mode / full 模式
+
+Use `full` only before the task branch has been successfully pushed and handed to GitHub PR flow.
+
+只在任务分支尚未成功 push 并进入 GitHub PR 流程前使用 `full`。
+
+`full` is allowed to commit local allowlisted changes, push the branch, create or reuse the PR, wait for checks, squash merge, delete the remote branch through GitHub, switch to `main`, pull `origin main`, and run the final delivery check.
+
+`full` 可以提交本地 allowlist（允许范围）内变更、push 分支、创建或复用 PR、等待 checks、squash merge、通过 GitHub 删除远端分支、切回 `main`、pull `origin main`，并运行最终 delivery check。
+
+### Resume Mode / resume 模式
+
+If the branch has already been pushed, do not rerun `full`. Use:
+
+```bash
+bash scripts/v1-autodeliver.sh resume --branch <branch>
+```
+
+如果分支已经 push，不要重新跑 `full`，改用 `resume`。
+
+`resume` is idempotent for the common interrupted states:
+
+- committed but not pushed: pushes the branch;
+- pushed but PR missing: creates the PR using provided `--title` / `--body-file` or safe fallback text;
+- PR already open: reuses the PR and waits for checks;
+- checks already passed: proceeds to merge after draft / mergeability / conflict checks;
+- PR already merged: switches to `main`, pulls `origin main`, runs delivery check, and reports done;
+- remote branch already deleted after merge: treats the merged PR as done and syncs `main`.
+
+`resume` 针对常见中断状态是幂等的：已 commit 未 push、已 push 但 PR 缺失、PR 已存在、checks 已通过、PR 已合并、远端分支合并后已删除，都应继续或报告完成，而不是重复 commit 或重复创建 PR。
+
+### GitHub EOF / Transient API Failure
+
+`v1-autodeliver.sh` wraps GitHub CLI API calls with bounded retry for:
+
+- `gh pr create`
+- `gh pr list`
+- `gh pr view`
+- `gh pr checks`
+- `gh pr merge`
+
+It retries transient EOF / timeout / GitHub API 5xx style failures, prints the attempt count, sleeps between attempts, and stops after the configured retry limit.
+
+如果 GitHub 返回 `Post "https://api.github.com/graphql": EOF` 或类似 timeout / transient API failure（临时 API 失败），不要手动去浏览器创建 PR 或合并。直接运行：
+
+```bash
+bash scripts/v1-autodeliver.sh resume --branch <branch>
+```
+
+Rule: do not rerun `full` after a branch has already been pushed; use `resume`.
+
+规则：分支已经 push 之后不要重跑 `full`，必须用 `resume`。
+
+### Output To Paste Back / 需要贴回的输出
+
+When automation stops or succeeds, paste back only the compact summary fields:
+
+- `AUTODELIVER_STATUS`
+- `MODE`
+- `BRANCH`
+- `COMMIT`
+- `PR_NUMBER`
+- `PR_URL`
+- `SHIP_STATUS`
+- `CHECKS_STATUS`
+- `MERGE_STATUS`
+- `FINAL_BRANCH`
+- `DELIVERY_CHECK_STATUS`
+- `NEXT_STEP`
+- `RESUME_COMMAND` when present
 
 What Codex should do automatically:
 
@@ -262,9 +334,9 @@ Resume after failure:
 - wrong path: `cd /Users/xuchao/Documents/trade-model-v1` and rerun.
 - tests failed: keep the same branch, fix the scoped files, rerun `ship` or `full`.
 - disallowed path: inspect `git status --short`, decide whether to revert manually or add an explicit safe `--allow`.
-- push/PR creation failed after commit: rerun `ship`; it reuses the existing open PR for the branch when present.
-- checks failed after PR creation: fix on the same branch, rerun `full` or rerun `merge` after pushing.
-- merge failed because PR is Draft, conflicted, or blocked: resolve that GitHub state, then run `merge --pr <number>`.
+- push/PR creation failed after commit or GitHub returned EOF: run `resume --branch <branch>`.
+- checks failed after PR creation: fix on the same branch, push, then run `resume --branch <branch>`.
+- merge failed because PR is Draft, conflicted, or blocked: resolve that GitHub state, then run `resume --branch <branch>` or `merge --pr <number>`.
 
 Safety boundaries:
 
