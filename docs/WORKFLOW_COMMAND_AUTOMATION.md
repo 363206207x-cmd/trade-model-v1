@@ -201,6 +201,79 @@ When the current branch is not `main` and the worktree is dirty, `v1-package-dir
 
 当当前分支不是 `main` 且工作区为 dirty（脏）时，`v1-package-dirty-work.sh` 优先把当前分支识别为当前包分支。dirty 的 `CODEX_NEXT_TASK.yml` 可能已经指向下一阶段，不得覆盖当前包分支。
 
+## Autonomous Delivery / 自主交付
+
+Use the autonomous delivery helpers when Codex has completed a scoped task and the user wants the fastest safe path from local changes to merged `main`.
+
+```bash
+bash scripts/v1-delivery-check.sh
+```
+
+`v1-delivery-check.sh` is read-only. It refuses the wrong project path, runs `./mvnw test -q`, runs `bash scripts/v1-state.sh`, and prints a compact machine-readable status. It does not stage, commit, push, create PRs, merge, delete branches, reset, clean, or edit files.
+
+Normal full delivery command:
+
+```bash
+bash scripts/v1-autodeliver.sh full \
+  --branch codex/p3-2b-dashboard-manual-userposition-binding \
+  --commit "feat(dashboard): bind manual user positions to dashboard" \
+  --title "feat(dashboard): bind manual user positions to dashboard" \
+  --body-file /tmp/pr-body.md \
+  --allow src/main/java \
+  --allow src/test/java
+```
+
+Supported modes:
+
+- `check`: delegates to `v1-delivery-check.sh` and performs no mutation.
+- `ship`: validates, stages only allowlisted files, commits, pushes, and creates a ready PR.
+- `merge`: waits for GitHub checks, refuses Draft/conflict/blocked PRs, squash merges, deletes the remote branch through GitHub, switches to `main`, pulls `origin main`, and runs final `v1-state`.
+- `full`: runs `ship` and then `merge`.
+
+What Codex should do automatically:
+
+- run `bash scripts/v1-delivery-check.sh` before or after implementation when a compact local status is useful;
+- after completing a scoped task on a non-main branch, prepare `/tmp/pr-body.md`;
+- run `v1-autodeliver.sh ship` or `full` only when the user has authorized autonomous local delivery for that task;
+- pass every intended changed-file prefix through repeated `--allow`;
+- paste back only the compact summary, PR number, failing check tail, or final state fields.
+
+What the user needs to paste back:
+
+- nothing when `full` succeeds;
+- the `AUTODELIVER_STATUS`, `REASON`, `PR_NUMBER`, and failing log tail when it stops;
+- any manual GitHub review or merge approval that the current task explicitly requires.
+
+Automation must stop when:
+
+- current path is not `/Users/xuchao/Documents/trade-model-v1`;
+- ship mode is running on `main`;
+- Maven tests fail;
+- `v1-state` reports blockers other than expected dirty-worktree blockers before commit;
+- changed files are outside the explicit `--allow` prefixes;
+- `gh` is unavailable or unauthenticated for PR/push/merge steps;
+- GitHub checks fail;
+- the PR is Draft;
+- the PR is not mergeable or has merge conflict / blocked merge state;
+- force push would be required but `--force-with-lease` was not explicitly passed.
+
+Resume after failure:
+
+- wrong path: `cd /Users/xuchao/Documents/trade-model-v1` and rerun.
+- tests failed: keep the same branch, fix the scoped files, rerun `ship` or `full`.
+- disallowed path: inspect `git status --short`, decide whether to revert manually or add an explicit safe `--allow`.
+- push/PR creation failed after commit: rerun `ship`; it reuses the existing open PR for the branch when present.
+- checks failed after PR creation: fix on the same branch, rerun `full` or rerun `merge` after pushing.
+- merge failed because PR is Draft, conflicted, or blocked: resolve that GitHub state, then run `merge --pr <number>`.
+
+Safety boundaries:
+
+- no `git reset`;
+- no `git clean`;
+- no local file deletion;
+- no default force push;
+- no auto-trading, order, execution, Push send, external channel, or business-capability change.
+
 ## Create Draft PR / 创建 Draft PR
 
 Use:
