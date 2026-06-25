@@ -434,15 +434,110 @@
             color: var(--text-secondary);
             line-height: 1.45;
         }
+
+        .review-center-shell {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .review-center-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .review-center-title {
+            margin: 0;
+            font-size: 0.96rem;
+            font-weight: 700;
+        }
+        .review-center-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 8px;
+        }
+        .review-center-tab {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--text-secondary);
+            padding: 6px 10px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .review-center-tab.active {
+            color: var(--brand-accent);
+            border-color: #bfdbfe;
+            background: #eff6ff;
+        }
+        .review-center-panel { display: none; }
+        .review-center-panel.active { display: block; }
+        .review-center-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 0.8rem;
+        }
+        .review-center-table th,
+        .review-center-table td {
+            border: 1px solid var(--border-subtle);
+            padding: 7px 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .review-center-table th {
+            background: #f8fafc;
+            color: var(--text-secondary);
+            font-weight: 650;
+        }
+        .review-empty-state {
+            color: var(--text-secondary);
+            height: 44px;
+            font-weight: 600;
+        }
+        .review-field-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .review-field-chip {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: #f8fafc;
+            color: var(--text-secondary);
+            padding: 7px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .single-analysis-review {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .single-analysis-review > summary {
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 0.86rem;
+            font-weight: 700;
+        }
+        .single-analysis-body { margin-top: 12px; }
     </style>
 </head>
 <body>
 <header class="top-bar">
     <div>
-        <h1>复盘</h1>
-        <p class="muted">analysisId：<span th:text="${analysisId}">—</span></p>
-        <p class="muted" style="margin:4px 0 0 0;max-width:42rem;">本页绑定单次 analysis（固定快照）；与 Dashboard 按标的展示的最新一轮分析不一定是同一对象，请勿跨页逐项对拍。</p>
-        <p class="muted" style="margin:4px 0 0 0;max-width:42rem;">上方为「复盘录入」（可保存）；下方为管道聚合摘要（只读）。可用顶部快速跳转在各区块间移动。</p>
+        <h1>复盘中心</h1>
+        <p class="muted">持仓、机会、推送与规则反馈</p>
+        <p class="muted" style="margin:4px 0 0 0;">单次 analysis：<span th:text="${analysisId}">dashboard</span></p>
     </div>
     <div>
         <a href="/dashboard">返回 Dashboard</a>
@@ -450,6 +545,48 @@
 </header>
 
 <main class="wrap">
+    <section class="review-center-shell" aria-label="复盘中心">
+        <div class="review-center-head">
+            <h2 class="review-center-title">复盘中心</h2>
+        </div>
+        <div class="review-center-tabs" role="tablist" aria-label="复盘分类">
+            <button type="button" class="review-center-tab active" id="review-tab-positions" data-review-tab="positions" role="tab" aria-selected="true" aria-controls="review-panel-positions">持仓复盘</button>
+            <button type="button" class="review-center-tab" id="review-tab-opportunities" data-review-tab="opportunities" role="tab" aria-selected="false" aria-controls="review-panel-opportunities">机会复盘</button>
+            <button type="button" class="review-center-tab" id="review-tab-pushes" data-review-tab="pushes" role="tab" aria-selected="false" aria-controls="review-panel-pushes">推送复盘</button>
+            <button type="button" class="review-center-tab" id="review-tab-rules" data-review-tab="rules" role="tab" aria-selected="false" aria-controls="review-panel-rules">规则反馈</button>
+        </div>
+        <section class="review-center-panel active" id="review-panel-positions" role="tabpanel" aria-labelledby="review-tab-positions">
+            <table class="review-center-table" aria-label="持仓复盘">
+                <thead><tr><th>时间</th><th>标的</th><th>方向</th><th>开仓价</th><th>平仓价</th><th>盈亏</th><th>执行偏离</th><th>监控结论</th><th>复盘状态</th></tr></thead>
+                <tbody><tr><td class="review-empty-state" colspan="9">暂无持仓复盘记录</td></tr></tbody>
+            </table>
+            <div class="review-field-grid" aria-label="持仓复盘字段结构"><div class="review-field-chip">进场是否合理</div><div class="review-field-chip">止损是否合理</div><div class="review-field-chip">止盈是否执行</div><div class="review-field-chip">仓位是否过重</div><div class="review-field-chip">杠杆是否合理</div><div class="review-field-chip">是否提前退出</div><div class="review-field-chip">是否扛单</div><div class="review-field-chip">情绪状态</div><div class="review-field-chip">规则修正建议</div></div>
+        </section>
+        <section class="review-center-panel" id="review-panel-opportunities" role="tabpanel" aria-labelledby="review-tab-opportunities">
+            <table class="review-center-table" aria-label="机会复盘">
+                <thead><tr><th>时间</th><th>标的</th><th>机会类型</th><th>计划模式</th><th>是否推送</th><th>是否点击</th><th>是否执行</th><th>结果</th><th>最大有利波动</th><th>最大不利波动</th></tr></thead>
+                <tbody><tr><td class="review-empty-state" colspan="10">暂无机会复盘记录</td></tr></tbody>
+            </table>
+            <div class="review-field-grid" aria-label="机会复盘字段结构"><div class="review-field-chip">为何推送</div><div class="review-field-chip">为何未执行</div><div class="review-field-chip">是否错过</div><div class="review-field-chip">是否是假机会</div><div class="review-field-chip">是否触发后失效</div><div class="review-field-chip">评分是否偏高</div><div class="review-field-chip">AI 是否误判</div><div class="review-field-chip">应加入规则</div><div class="review-field-chip">应降低权重</div></div>
+        </section>
+        <section class="review-center-panel" id="review-panel-pushes" role="tabpanel" aria-labelledby="review-tab-pushes">
+            <table class="review-center-table" aria-label="推送复盘">
+                <thead><tr><th>推送时间</th><th>标的</th><th>推送类型</th><th>Telegram 状态</th><th>是否点击</th><th>Recheck 状态</th><th>是否过期</th><th>失败原因</th><th>后续结果</th></tr></thead>
+                <tbody><tr><td class="review-empty-state" colspan="9">暂无推送复盘记录</td></tr></tbody>
+            </table>
+            <div class="review-field-grid" aria-label="推送复盘字段结构"><div class="review-field-chip">是否应推</div><div class="review-field-chip">是否推晚</div><div class="review-field-chip">是否推早</div><div class="review-field-chip">是否重复推送</div><div class="review-field-chip">无持仓模式</div><div class="review-field-chip">有持仓模式</div><div class="review-field-chip">Telegram 状态</div><div class="review-field-chip">用户响应</div><div class="review-field-chip">后续是否改进</div></div>
+        </section>
+        <section class="review-center-panel" id="review-panel-rules" role="tabpanel" aria-labelledby="review-tab-rules">
+            <table class="review-center-table" aria-label="规则反馈">
+                <thead><tr><th>时间</th><th>标的</th><th>复盘类型</th><th>错误类型</th><th>是否规则问题</th><th>是否执行偏离</th><th>建议调整</th><th>规则版本</th><th>处理状态</th></tr></thead>
+                <tbody><tr><td class="review-empty-state" colspan="9">暂无规则反馈记录</td></tr></tbody>
+            </table>
+            <div class="review-field-grid" aria-label="规则反馈字段结构"><div class="review-field-chip">数据规则</div><div class="review-field-chip">评分规则</div><div class="review-field-chip">冲突规则</div><div class="review-field-chip">降级规则</div><div class="review-field-chip">Confused 规则</div><div class="review-field-chip">Hot Reset 规则</div><div class="review-field-chip">Push 规则</div><div class="review-field-chip">持仓监控规则</div><div class="review-field-chip">AI 裁决规则</div></div>
+        </section>
+    </section>
+    <details class="single-analysis-review" id="singleAnalysisReview">
+        <summary>单次分析复盘录入</summary>
+        <div class="single-analysis-body">
     <div id="status-banner" class="banner loading">正在加载聚合数据…</div>
     <nav id="review-nav" class="review-nav" aria-label="复盘页区块导航"></nav>
     <div id="review-entry" class="section review-entry-card" style="display:none;">
@@ -497,8 +634,30 @@
         <p class="readonly-hint">以下区块按三层语义组织：事实层（Run/Decision/Plan/Push/Missed/Hot Reset/Alerts）、人工结论层（治理输入摘要）、规则审计层（RuleVersionLog）。</p>
         <div id="review-root"></div>
     </div>
+
+        </div>
+    </details>
 </main>
 
+<script>
+(function () {
+    function activateReviewTab(name) {
+        document.querySelectorAll("[data-review-tab]").forEach(function (tab) {
+            var active = tab.getAttribute("data-review-tab") === name;
+            tab.classList.toggle("active", active);
+            tab.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        document.querySelectorAll(".review-center-panel").forEach(function (panel) {
+            panel.classList.toggle("active", panel.id === "review-panel-" + name);
+        });
+    }
+    document.querySelectorAll("[data-review-tab]").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+            activateReviewTab(tab.getAttribute("data-review-tab"));
+        });
+    });
+})();
+</script>
 <script th:inline="javascript">
     window.__REVIEW_ANALYSIS_ID__ = /*[[${analysisId}]]*/ '';
 </script>
