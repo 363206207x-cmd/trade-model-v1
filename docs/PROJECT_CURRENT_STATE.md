@@ -6,14 +6,16 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P2-3 Scheduler / Idempotency / Trace DONE candidate
-Next Business Phase: P3-1 Dashboard Final
-Next Business Phase Allowed: NO
+Current Work Package: P3-1 Dashboard Final DONE/effective on merged main
+Next Business Phase: P3-2 Full E2E Acceptance
+Next Business Phase Allowed: NO in this task; P3-2 requires a separate explicit task after this status closure
 Production Deployment Readiness: BLOCKED
 
 ---
 
 ## Effective State Rule
+
+Compatibility note: `scripts/v1-state.sh` still prints `CURRENT_PHASE: P0-0` as the contract-baseline phase. The active delivery handoff is tracked by `Current Work Package`, `Next Business Phase`, and the Delivery Progress Matrix.
 
 P0-0 is effective only because its DONE commit is merged to `main`, local `main` is synced, and the worktree was clean when the runtime gate evaluated it.
 
@@ -41,64 +43,60 @@ P2-1 Macro / News / External Context is effective because its implementation is 
 
 P2-2 AI Orchestrator + AiCallLog is effective because its implementation is merged to clean / synced `main` by PR #1019 commit `92fd7cbf17db31c8ea2bfd4673badde1c69d20cd` and the runtime gate allowed P2-3.
 
-P2-3 Scheduler / Idempotency / Trace is only a branch DONE candidate in this worktree.
-It is not effective until PR #1020 is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and `bash scripts/v1-state.sh` confirms P2-3 effectivity.
+P2-3 Scheduler / Idempotency / Trace is effective because its implementation is merged to clean / synced `main` by PR #1020 commit `5c2b2b47eb7fa4cfc9c428ef022375f4ca890b23` and runtime state allowed P3-1 to proceed.
 
-`bash scripts/v1-state.sh` must distinguish `CURRENT_PACKAGE_PR`, `UNRELATED_OPEN_PRS`, and `BLOCK_NEXT_BUSINESS_PHASE_ONLY`. An unrelated Draft PR must not block merging the current P0-0 package PR, but it still blocks the next business phase.
+P3-1 Dashboard Final is effective because its final homepage UI layout is merged to clean / synced `main` by PR #1023 commit `f543832cf5907fe00920ca3f05666566daa16b7a`, full Maven validation passed, and the merged PR changed only `src/main/resources/templates/dashboard.html`.
+
+Local Codex `gh` may report `GH_NOT_AVAILABLE`. Per `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`, that is GitHub-state unknown, not project failure. User-supplied handoff evidence for this closure confirms open PR count is 0, local `main` is clean / synced, and PR #1023 is merged.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed after this P2-3 branch-candidate update:
+Only the following work is allowed in this P3-1 post-merge closure task:
 
-1. Checks, push, PR review handling, and merge-gate handling for the P2-3 Scheduler / Idempotency / Trace B-risk package in PR #1020.
-2. Main sync after PR #1020 is reviewed and merged.
-3. Runtime verification that P2-3 is effective on clean / synced main before any P3-1 work starts.
+1. Read-only validation of the merged P3-1 Dashboard Final UI on clean / synced `main`.
+2. Status documentation updates that mark P3-1 Dashboard Final DONE/effective.
+3. Reporting that P3-2 Full E2E Acceptance is the next separate phase without starting it.
 
-P2-3 is a DONE candidate on the task branch only. It is not effective until the branch commit is merged to `main`, local `main` is synced, and the worktree is clean.
-
-PR #1004 was an unrelated Draft dashboard PR and no code from it is merged into this package.
+PR #1004 was an unrelated Draft dashboard PR and no code from it is part of the P3-1 completion evidence.
 
 ---
 
 ## Current Forbidden Work
 
-The following work is blocked until P2-3 is effective on merged main:
+The following work is blocked in this P3-1 closure task:
 
-1. P3-1 Dashboard Final.
-2. Full E2E Acceptance.
+1. Starting P3-2 Full E2E Acceptance implementation.
+2. Java, schema, API contract, test, script, scheduler, Push, order, execution, auto-trading, or trading-logic changes.
 3. Auto-trading of any kind.
 
 ---
 
 ## Current Known Critical Gaps
 
-1. P2-3 Scheduler / Idempotency / Trace is only a branch DONE candidate until merged main confirms it effective.
-2. Dashboard Final remains blocked until P2-3 is reviewed, merged, synced, and runtime-confirmed effective.
-3. Production deployment remains blocked by non-production runtime/config evidence.
+1. P3-2 Full E2E Acceptance is NOT_STARTED and remains a separate phase.
+2. Production deployment remains blocked by non-production runtime/config evidence.
+3. P3-1 Dashboard Final completion does not prove full E2E behavior, production readiness, order execution, Push send, external channel, or auto-trading capability.
 
-## P2-3 Scheduler / Idempotency / Trace Branch Candidate
+## P3-1 Dashboard Final Post-Merge Closure
 
-Branch: `p2-3-scheduler-idempotency-trace-full-implementation`
-PR: #1020
-Risk: B
-Status: DONE candidate
-Effective State: pending reviewed merge to clean / synced main
+Merged main commit: `f543832cf5907fe00920ca3f05666566daa16b7a`
+PR: #1023
+Risk: Dashboard UI-only / no backend behavior change
+Status: DONE
+Effective State: merged to clean / synced main
 
-Implemented branch evidence:
+Implemented mainline evidence:
 
-1. Canonical idempotency key is exactly SHA-256 of normalized symbol, normalized timeframe, canonical timeframe bucket, and resolved rule version. Trigger type, requestId, trigger reference, and parent IDs remain audit metadata only and do not affect the key.
-2. `AnalysisTimePolicy` floors supported timeframes `1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d`; 1d uses UTC date boundary, and illegal symbol/timeframe/time inputs fail closed instead of defaulting to BTCUSDT / 1m / now.
-3. DB idempotency guard uses `tm_analysis_run` unique idempotency key, explicit claim/failure transactions, lease owner, claim version, attempt count, max recovery attempts, expired lease recovery, failed-run recovery, and partial-state recovery blocking.
-4. `AnalysisExecutionContext` carries lease owner, claim version, attempt count, requestId, traceId, input snapshot, input hash, parent IDs, and trigger audit fields into the assembler.
-5. `markSuccess` and `markFailed` are fenced by analysisId, STARTED status, leaseOwner, and versionNo / claimVersion; stale executors cannot overwrite recovered or successful runs.
-6. Direct assembler bypass is disabled with `DIRECT_ASSEMBLER_ENTRY_DISABLED`; production analysis execution enters through `AnalysisRunOrchestrator` and `assemble(AnalysisExecutionContext)`.
-7. Request and trace read APIs include `GET /api/analysis/runs/by-request/{requestId}`, `GET /api/analysis/runs/{analysisId}`, `GET /api/analysis/traces/{traceId}`, and `GET /api/analysis/scheduler/status`; these are read-only and do not trigger analysis, AI, monitor, review, Push, external channel, or trading actions.
-8. `AnalysisTraceSnapshot` reports `traceStatus`, `missingSegments`, `generatedAt`, and `manualReviewOnly=true`, with COMPLETE / PARTIAL_TRACE / RUNNING / FAILED status semantics.
-9. Tests cover canonical key behavior, cross-trigger dedupe, different tuple key changes, manual API 400 fail-closed input, scheduler invalid config fail-closed, lease fencing, real H2 unique index and concurrent idempotency behavior, failed recovery, partial recovery blocking, max attempts, expired lease single-winner recovery, trace by requestId, scheduler status, request correlation, and direct bypass guard.
+1. `dashboard.html` contains the final homepage UI layout: header status pills, seven-card system state row, risk alert / key event row, asset monitor cards, user real position monitor, non-trade execution suggestion panel, AI three-role tabs, and consistency panel.
+2. `candidateReviewSkeleton()` test extraction remains satisfied through the restored `candidateReviewDisplay` section.
+3. `internalPushPreviewDisplay` remains present for the internal push preview display gate tests.
+4. `git show --name-only main` for PR #1023 commit `f543832` lists only `src/main/resources/templates/dashboard.html`; no Java, schema, API, test, or script file is part of the merged UI change.
+5. `./mvnw test -q` passed on synced `main`.
+6. `bash scripts/v1-state.sh` on synced `main` reports `WORKTREE_CLEAN: Yes`, `ON_MAIN_BRANCH: YES`, `MAIN_SYNC: OK`, `HEAD_MATCHES_ORIGIN_MAIN: YES`, and `CLEAN_SYNCED_MAIN: YES`; local `gh` remains unavailable, so open-PR status is supplied by user handoff evidence.
 
-P3-1 remains blocked until PR #1020 is reviewed, merged to `main`, local `main` is synced, the worktree is clean, and runtime state confirms P2-3 effective.
+P3-2 Full E2E Acceptance is the next separate phase. It is not started by this closure.
 
 ---
 
@@ -129,3 +127,8 @@ Review-only slice count is no longer a delivery completion standard.
 ## Rule
 
 No later business phase may start until PR #1020 is reviewed, merged to main, local main is synced, the worktree is clean, and `Next Business Phase Allowed` becomes YES through the contract gate.
+
+## Workflow PR Status
+
+- CURRENT_PACKAGE_PR: #1024 docs(dashboard): mark P3-1 final dashboard effective
+- UNRELATED_OPEN_PRS: none
