@@ -39,12 +39,12 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main: `f543832 feat(dashboard): restore P3-1 final homepage UI layout (#1023)`
-- Current active block: `P3-1 Dashboard Final DONE/effective on merged main`
-- Current level: `DASHBOARD_FINAL_UI effective`
-- Capability movement from this status closure: P3-1 Dashboard Final is DONE/effective as a UI layout phase only. This does not prove P3-2 Full E2E Acceptance, production deployment readiness, Push send, external channel, order execution, or auto-trading.
-- Next required action: stop after this P3-1 status closure. P3-2 Full E2E Acceptance is the next separate phase and requires a separate explicit task.
-- Validation evidence: `dashboard.html` contains the final homepage layout, `candidateReviewDisplay` satisfies `candidateReviewSkeleton()`, `internalPushPreviewDisplay` exists, PR #1023 changed only `src/main/resources/templates/dashboard.html`, `./mvnw test -q` passed on synced main, and `bash scripts/v1-state.sh` confirmed clean / synced main while local `gh` remained unavailable.
+- Current merged main evidence: `1b08abd test(dashboard): add P3-2 E2E state proof`
+- Current active block: `P3-2 Full E2E Acceptance DONE/effective on merged main evidence`
+- Current level: `E2E_ACCEPTANCE_DONE effective; PRODUCTION_DEPLOYMENT_READINESS blocked`
+- Capability movement from this status closure: P3-2 Full E2E Acceptance is DONE/effective as E2E acceptance evidence. This does not prove production deployment readiness, Push send, external channel, order execution, or auto-trading.
+- Next required action: stop after this P3-2 status closure. P3-3 Final Delivery & System Freeze is the next separate phase and requires a separate explicit task after this closure is merged/effective.
+- Validation evidence: PR #1025 binds dashboard user real position display to manual UserPosition, PR #1027 adds full UserPosition lifecycle E2E acceptance, and PR #1028 / commit `1b08abd` adds dashboard E2E state proof. Evidence covers ExecutionPlan-only non-position display, manual UserPosition dashboard source, CLOSED/non-MANUAL exclusion, UserPosition -> monitor -> close -> Review -> rule feedback, dashboard key states, PositionMonitor HOLD/LOGIC_WEAKENED/PLAN_INVALIDATED, AccountRisk blocking, PushRecheck no UserPosition mutation, ConfusedState/HotReset safety, Review deviation/feedback, OpportunityLog, Macro/News, AI fallback/AiCallLog, `./mvnw test -q`, `bash scripts/v1-delivery-check.sh`, and `bash scripts/v1-state.sh` with blockers none on clean/synced main. Production Deployment Readiness remains BLOCKED.
 
 ## Historical Runtime Slice Log
 
@@ -330,4 +330,4 @@ Progress must be described by capability level:
 | 6 | PRODUCTION_WIRING | Real runtime wiring exists, still not necessarily production-ready. |
 | 7 | PRODUCTION_READY | Production-ready behavior with complete safety, observability, and review requirements. |
 
-`REVIEW_ONLY_RUNTIME partial` remains the current level.
+`E2E_ACCEPTANCE_DONE` is the current delivery evidence level for P3-2. `PRODUCTION_READY` is not claimed because Production Deployment Readiness remains BLOCKED.

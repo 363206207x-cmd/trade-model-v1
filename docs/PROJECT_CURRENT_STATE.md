@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-1 Dashboard Final DONE/effective on merged main
-Next Business Phase: P3-2 Full E2E Acceptance
-Next Business Phase Allowed: NO in this task; P3-2 requires a separate explicit task after this status closure
+Current Work Package: P3-2 Full E2E Acceptance DONE/effective on merged main evidence
+Next Business Phase: P3-3 Final Delivery & System Freeze
+Next Business Phase Allowed: NO in this task; P3-3 requires a separate explicit task after this P3-2 closure is merged/effective
 Production Deployment Readiness: BLOCKED
 
 ---
@@ -47,56 +47,58 @@ P2-3 Scheduler / Idempotency / Trace is effective because its implementation is 
 
 P3-1 Dashboard Final is effective because its final homepage UI layout is merged to clean / synced `main` by PR #1023 commit `f543832cf5907fe00920ca3f05666566daa16b7a`, full Maven validation passed, and the merged PR changed only `src/main/resources/templates/dashboard.html`.
 
-Local Codex `gh` may report `GH_NOT_AVAILABLE`. Per `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`, that is GitHub-state unknown, not project failure. User-supplied handoff evidence for this closure confirms open PR count is 0, local `main` is clean / synced, and PR #1023 is merged.
+P3-2 Full E2E Acceptance is effective because its acceptance evidence is merged to clean / synced `main` by PR #1025 Dashboard Manual UserPosition Binding, PR #1027 Full UserPosition lifecycle E2E acceptance, and PR #1028 Dashboard E2E state proof / commit `1b08abd`. Full Maven validation, delivery check, and `v1-state` pass on clean / synced main.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed in this P3-1 post-merge closure task:
+Only the following work is allowed in this P3-2 docs/status closure task:
 
-1. Read-only validation of the merged P3-1 Dashboard Final UI on clean / synced `main`.
-2. Status documentation updates that mark P3-1 Dashboard Final DONE/effective.
-3. Reporting that P3-2 Full E2E Acceptance is the next separate phase without starting it.
-
-PR #1004 was an unrelated Draft dashboard PR and no code from it is part of the P3-1 completion evidence.
+1. Updating progress/status documentation to record P3-2 Full E2E Acceptance DONE/effective.
+2. Recording the evidenced P3-2 acceptance table.
+3. Preserving Production Deployment Readiness as BLOCKED.
+4. Reporting P3-3 Final Delivery & System Freeze as the next separate phase without starting it.
 
 ---
 
 ## Current Forbidden Work
 
-The following work is blocked in this P3-1 closure task:
+The following work is blocked in this P3-2 closure task:
 
-1. Starting P3-2 Full E2E Acceptance implementation.
-2. Java, schema, API contract, test, script, scheduler, Push, order, execution, auto-trading, or trading-logic changes.
-3. Auto-trading of any kind.
+1. Starting P3-3 Final Delivery & System Freeze implementation.
+2. Java, schema, dashboard, API contract, test, script, scheduler, Push, order, execution, auto-trading, production config, or trading-logic changes.
+3. Production-ready claims.
+4. Auto-trading of any kind.
 
 ---
 
 ## Current Known Critical Gaps
 
-1. P3-2 Full E2E Acceptance is NOT_STARTED and remains a separate phase.
-2. Production deployment remains blocked by non-production runtime/config evidence.
-3. P3-1 Dashboard Final completion does not prove full E2E behavior, production readiness, order execution, Push send, external channel, or auto-trading capability.
+1. Production deployment remains blocked by non-production runtime/config evidence.
+2. P3-3 Final Delivery & System Freeze is NOT_STARTED and remains a separate phase.
+3. P3-2 Full E2E Acceptance completion does not prove production readiness, Push send, external channel, order execution, or auto-trading capability.
 
-## P3-1 Dashboard Final Post-Merge Closure
+## P3-2 Full E2E Acceptance Closure
 
-Merged main commit: `f543832cf5907fe00920ca3f05666566daa16b7a`
-PR: #1023
-Risk: Dashboard UI-only / no backend behavior change
-Status: DONE
-Effective State: merged to clean / synced main
+Merged main evidence:
 
-Implemented mainline evidence:
+1. `DecisionServiceImplTest.getLatestDecisionResultsDoesNotInferOpenPositionFromTriggeredDecisionWithoutManualUserPosition` proves ExecutionPlan / triggered DecisionResult state without UserPosition does not render as an opened position.
+2. `DecisionServiceImplTest.getLatestDecisionResultBySymbolUsesManualOpenUserPositionAsDashboardPositionSource` proves manual OPEN UserPosition is the dashboard real-position source.
+3. `DecisionServiceImplTest.getLatestDecisionResultBySymbolExcludesClosedAndNonManualUserPositionRows` and `countOpenPositionsCountsOnlyManualOpenUserPositions` prove CLOSED and non-MANUAL UserPosition rows are excluded from open dashboard display.
+4. `UserPositionFullLifecycleE2EAcceptanceTest.manualUserPositionFlowsThroughMonitorCloseReviewAndRuleFeedbackWithoutExecutableSurfaces` proves the UserPosition -> PositionMonitor -> manual close -> Review -> rule feedback chain.
+5. `DashboardControllerTest.summary_json_exposesManualUserPositionFieldsAndKeepsExecutionPlanOnlyRowsNonPosition`, `dashboardTemplateHomePositionReadsOnlyManualUserPositionReadModelFields`, `StaticNoTradeInstructionGuardTest.dashboardPositionExecutionRowKeepsManualPositionDisplayPassive`, and `CandidatePushReviewOnlyMvpClosureTest.dashboardDisplaysInternalPushPreviewAsDisabledReviewOnlySurface` prove dashboard E2E key states and safety anchors.
+6. `PositionMonitorServiceImplTest` and `PositionMonitorLogServiceImplTest` prove HOLD / LOGIC_WEAKENED / PLAN_INVALIDATED monitor outcomes and one-log monitor persistence.
+7. `UserPositionRiskAdapterTest` and `PositionMonitorServiceImplTest.riskBlockedAndRiskIncreasedAreFailClosed` prove AccountRisk high-risk blocking.
+8. `PushRecheckServiceImplTest` proves PushRecheck risk/confused/drifted/expired behavior remains review-only and does not create UserPosition.
+9. `ConfusedStateServiceImplTest` and `HotResetServiceImplTest` prove ConfusedState and HotReset safety states.
+10. `UserPositionReviewAdapterTest` and `ReviewControllerUserPositionReviewTest` prove Review execution deviation and rule feedback.
+11. `OpportunityLogServiceImplTest`, `MacroEventServiceImplTest`, `NewsEventServiceImplTest`, `ExternalContextEvidenceBuilderTest`, `AiDecisionOrchestratorServiceImplTest`, and `AiCallLogServiceImplTest` prove the remaining contract E2E evidence around OpportunityLog, Macro / News, AI fallback, and AiCallLog.
+12. `./mvnw test -q` passed on clean / synced `main`.
+13. `bash scripts/v1-delivery-check.sh` passed on clean / synced `main`.
+14. `bash scripts/v1-state.sh` passed with `WORKTREE_CLEAN: Yes`, `OPEN_PR_STATUS: NONE`, `MAIN_SYNC: OK`, `CLEAN_SYNCED_MAIN: YES`, and `BLOCKERS: none`.
 
-1. `dashboard.html` contains the final homepage UI layout: header status pills, seven-card system state row, risk alert / key event row, asset monitor cards, user real position monitor, non-trade execution suggestion panel, AI three-role tabs, and consistency panel.
-2. `candidateReviewSkeleton()` test extraction remains satisfied through the restored `candidateReviewDisplay` section.
-3. `internalPushPreviewDisplay` remains present for the internal push preview display gate tests.
-4. `git show --name-only main` for PR #1023 commit `f543832` lists only `src/main/resources/templates/dashboard.html`; no Java, schema, API, test, or script file is part of the merged UI change.
-5. `./mvnw test -q` passed on synced `main`.
-6. `bash scripts/v1-state.sh` on synced `main` reports `WORKTREE_CLEAN: Yes`, `ON_MAIN_BRANCH: YES`, `MAIN_SYNC: OK`, `HEAD_MATCHES_ORIGIN_MAIN: YES`, and `CLEAN_SYNCED_MAIN: YES`; local `gh` remains unavailable, so open-PR status is supplied by user handoff evidence.
-
-P3-2 Full E2E Acceptance is the next separate phase. It is not started by this closure.
+P3-2 Full E2E Acceptance is DONE/effective as E2E acceptance evidence. Production Deployment Readiness remains BLOCKED and no production-ready claim is made.
 
 ---
 
@@ -126,9 +128,9 @@ Review-only slice count is no longer a delivery completion standard.
 
 ## Rule
 
-No later business phase may start until PR #1020 is reviewed, merged to main, local main is synced, the worktree is clean, and `Next Business Phase Allowed` becomes YES through the contract gate.
+No P3-3 implementation or final-delivery package may start until this P3-2 docs/status closure is merged to `main`, local `main` is synced, the worktree is clean, and the runtime gate has no blockers.
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1024 docs(dashboard): mark P3-1 final dashboard effective
+- CURRENT_PACKAGE_PR: none
 - UNRELATED_OPEN_PRS: none
