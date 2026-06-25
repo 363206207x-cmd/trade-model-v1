@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.entity.AssetStateDO;
@@ -15,23 +16,25 @@ import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.MissedOpportunityMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
-import org.example.trademodel.mapper.RealPositionMapper;
+import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
-import org.example.trademodel.vo.RealPositionVO;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DecisionServiceImpl implements DecisionService {
     private static final int MAX_DASHBOARD_SUMMARY_LIMIT = 24;
+    private static final String MANUAL_SOURCE_TYPE = "MANUAL";
+    private static final String STATUS_OPEN = "OPEN";
+    private static final String STATUS_PARTIALLY_CLOSED = "PARTIALLY_CLOSED";
 
     private final DecisionResultMapper decisionResultMapper;
     private final AnalysisRunMapper analysisRunMapper;
     private final MarketQuoteClient marketQuoteClient;
-    private final RealPositionMapper realPositionMapper;
+    private final UserPositionMapper userPositionMapper;
     private final AssetStateService assetStateService;
     private final AssetStateMapper assetStateMapper;
     private final PushSnapshotMapper pushSnapshotMapper;
@@ -39,7 +42,7 @@ public class DecisionServiceImpl implements DecisionService {
     private final RuntimeMetricService runtimeMetricService;
 
     public DecisionServiceImpl(DecisionResultMapper decisionResultMapper, AnalysisRunMapper analysisRunMapper,
-                               MarketQuoteClient marketQuoteClient, RealPositionMapper realPositionMapper,
+                               MarketQuoteClient marketQuoteClient, UserPositionMapper userPositionMapper,
                                AssetStateService assetStateService,
                                AssetStateMapper assetStateMapper,
                                PushSnapshotMapper pushSnapshotMapper,
@@ -48,7 +51,7 @@ public class DecisionServiceImpl implements DecisionService {
         this.decisionResultMapper = decisionResultMapper;
         this.analysisRunMapper = analysisRunMapper;
         this.marketQuoteClient = marketQuoteClient;
-        this.realPositionMapper = realPositionMapper;
+        this.userPositionMapper = userPositionMapper;
         this.assetStateService = assetStateService;
         this.assetStateMapper = assetStateMapper;
         this.pushSnapshotMapper = pushSnapshotMapper;
@@ -121,7 +124,7 @@ public class DecisionServiceImpl implements DecisionService {
             return new ArrayList<>();
         }
         Map<String, MarketQuoteSnapshot> quoteCache = new HashMap<>();
-        Map<String, RealPositionVO> openPositionMap = loadOpenPositionMap();
+        Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap();
         for (DecisionResultVO item : results) {
             if (item == null) {
                 continue;
@@ -135,23 +138,7 @@ public class DecisionServiceImpl implements DecisionService {
                     item.setPriceUpdateTimeMs(snapshot.getFetchedAtEpochMillis());
                 }
             }
-            RealPositionVO openPosition = openPositionMap.get(normalizeSymbol(item.getSymbol()));
-            if (openPosition != null) {
-                item.setHasOpenPosition(true);
-                item.setPositionSide(openPosition.getPositionSide());
-                item.setAvgOpenPrice(openPosition.getAvgOpenPrice());
-                item.setPositionOpenTime(openPosition.getPositionOpenTime());
-                item.setPositionQuantity(openPosition.getPositionQuantity());
-                item.setUnrealizedPnlPct(openPosition.getUnrealizedPnlPct());
-                item.setPositionStatus(openPosition.getPositionStatus());
-                item.setMarkPrice(openPosition.getMarkPrice());
-                item.setBreakEvenPrice(openPosition.getBreakEvenPrice());
-                item.setLiquidationPrice(openPosition.getLiquidationPrice());
-            } else {
-                item.setHasOpenPosition(false);
-                // No open position row means "not observed by read model now", not a business close conclusion.
-                item.setPositionStatus(null);
-            }
+            applyManualUserPosition(item, openPositionMap.get(normalizeSymbol(item.getSymbol())));
             annotateReadModelFallback(item);
         }
         long methodCostMs = System.currentTimeMillis() - methodStart;
@@ -179,23 +166,8 @@ public class DecisionServiceImpl implements DecisionService {
             row.setPriceUpdateTimeMs(snapshot.getFetchedAtEpochMillis());
         }
 
-        Map<String, RealPositionVO> openPositionMap = loadOpenPositionMap();
-        RealPositionVO openPosition = openPositionMap.get(normalizeSymbol(row.getSymbol()));
-        if (openPosition != null) {
-            row.setHasOpenPosition(true);
-            row.setPositionSide(openPosition.getPositionSide());
-            row.setAvgOpenPrice(openPosition.getAvgOpenPrice());
-            row.setPositionOpenTime(openPosition.getPositionOpenTime());
-            row.setPositionQuantity(openPosition.getPositionQuantity());
-            row.setUnrealizedPnlPct(openPosition.getUnrealizedPnlPct());
-            row.setPositionStatus(openPosition.getPositionStatus());
-            row.setMarkPrice(openPosition.getMarkPrice());
-            row.setBreakEvenPrice(openPosition.getBreakEvenPrice());
-            row.setLiquidationPrice(openPosition.getLiquidationPrice());
-        } else {
-            row.setHasOpenPosition(false);
-            row.setPositionStatus(null);
-        }
+        Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap();
+        applyManualUserPosition(row, openPositionMap.get(normalizeSymbol(row.getSymbol())));
         annotateReadModelFallback(row);
         runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", System.currentTimeMillis() - methodStart);
         return row;
@@ -204,7 +176,17 @@ public class DecisionServiceImpl implements DecisionService {
     @Override
     public int countOpenPositions() {
         try {
-            return realPositionMapper.countOpenPositions();
+            List<UserPositionDO> openPositions = userPositionMapper.listOpenPositions();
+            if (openPositions == null) {
+                return 0;
+            }
+            int count = 0;
+            for (UserPositionDO position : openPositions) {
+                if (isDashboardManualOpenPosition(position)) {
+                    count++;
+                }
+            }
+            return count;
         } catch (Exception ignored) {
             return 0;
         }
@@ -219,18 +201,18 @@ public class DecisionServiceImpl implements DecisionService {
         }
     }
 
-    private Map<String, RealPositionVO> loadOpenPositionMap() {
-        Map<String, RealPositionVO> openPositionMap = new HashMap<>();
+    private Map<String, UserPositionDO> loadOpenManualUserPositionMap() {
+        Map<String, UserPositionDO> openPositionMap = new HashMap<>();
         try {
-            List<RealPositionVO> openPositions = realPositionMapper.findOpenPositions();
+            List<UserPositionDO> openPositions = userPositionMapper.listOpenPositions();
             if (openPositions != null) {
-                for (RealPositionVO position : openPositions) {
-                    if (position == null) {
+                for (UserPositionDO position : openPositions) {
+                    if (!isDashboardManualOpenPosition(position)) {
                         continue;
                     }
-                    String normalized = normalizeSymbol(position.getSymbol());
+                    String normalized = normalizeSymbol(position.getAssetSymbol());
                     if (normalized != null) {
-                        openPositionMap.put(normalized, position);
+                        openPositionMap.putIfAbsent(normalized, position);
                     }
                 }
             }
@@ -238,6 +220,47 @@ public class DecisionServiceImpl implements DecisionService {
             // 持仓表不存在或暂不可用时，按无持仓处理，避免影响首页刷新链路。
         }
         return openPositionMap;
+    }
+
+    private void applyManualUserPosition(DecisionResultVO item, UserPositionDO position) {
+        if (position == null) {
+            item.setHasOpenPosition(false);
+            // No manual UserPosition row means "no user-entered open position", not a business close conclusion.
+            item.setPositionStatus(null);
+            item.setPositionSide(null);
+            item.setAvgOpenPrice(null);
+            item.setPositionOpenTime(null);
+            item.setPositionQuantity(null);
+            item.setUnrealizedPnlPct(null);
+            item.setMarkPrice(null);
+            item.setBreakEvenPrice(null);
+            item.setLiquidationPrice(null);
+            return;
+        }
+        item.setHasOpenPosition(true);
+        item.setPositionSide(position.getSide());
+        item.setAvgOpenPrice(position.getEntryPrice());
+        item.setPositionOpenTime(position.getOpenedAt());
+        item.setPositionQuantity(position.getQuantity());
+        item.setUnrealizedPnlPct(null);
+        item.setPositionStatus(position.getStatus());
+        item.setMarkPrice(null);
+        item.setBreakEvenPrice(null);
+        item.setLiquidationPrice(null);
+    }
+
+    private boolean isDashboardManualOpenPosition(UserPositionDO position) {
+        if (position == null) {
+            return false;
+        }
+        String sourceType = position.getSourceType();
+        if (sourceType == null || !MANUAL_SOURCE_TYPE.equalsIgnoreCase(sourceType.trim())) {
+            return false;
+        }
+        String status = position.getStatus();
+        return status != null
+                && (STATUS_OPEN.equalsIgnoreCase(status.trim())
+                || STATUS_PARTIALLY_CLOSED.equalsIgnoreCase(status.trim()));
     }
 
     private String normalizeSymbol(String symbol) {
