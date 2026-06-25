@@ -84,6 +84,20 @@ class DashboardControllerTest {
             Path.of("src/main/resources/templates/dashboard.html");
     private static final String INTERNAL_PUSH_PREVIEW_START =
             "<section class=\"card module-status-card review-display-card\" id=\"internalPushPreviewDisplay\"";
+    private static final String CANDIDATE_REVIEW_START =
+            "<section class=\"card module-status-card review-display-card\" id=\"candidateReviewDisplay\"";
+    private static final String HOME_POSITION_CARD_START =
+            "<section class=\"card\" id=\"homePositionCard\"";
+    private static final String HOME_EXECUTION_CARD_START =
+            "<section class=\"card\" id=\"homeExecutionCard\"";
+    private static final String HAS_REAL_POSITION_DETAIL_START =
+            "function hasRealPositionDetail(d)";
+    private static final String UPDATE_MODE_HINT_START =
+            "function updateModeHint()";
+    private static final String RENDER_HOME_POSITION_START =
+            "function renderHomePosition(d)";
+    private static final String RENDER_HOME_EXECUTION_START =
+            "function renderHomeExecution(d)";
     private static final String SECTION_END = "</section>";
 
     @Mock
@@ -1024,6 +1038,103 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.decisions[0].aiConflictScore").value(42))
                 .andExpect(jsonPath("$.decisions[0].aiPlanMode").value("AGGRESSIVE"))
                 .andExpect(jsonPath("$.decisions[0].confusedScore").value(3));
+    }
+
+    @Test
+    void summary_json_exposesManualUserPositionFieldsAndKeepsExecutionPlanOnlyRowsNonPosition() throws Exception {
+        LightSystemStatusVO system = new LightSystemStatusVO();
+        when(decisionService.getLightSystemStatus()).thenReturn(system);
+        when(decisionService.countOpenPositions()).thenReturn(1);
+        when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
+        when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+
+        DecisionResultVO manualPositionDecision = newDecisionWithCoreDashboardTruthFields();
+        manualPositionDecision.setHasOpenPosition(true);
+        manualPositionDecision.setPositionStatus("OPEN");
+        manualPositionDecision.setPositionSide("LONG");
+        manualPositionDecision.setAvgOpenPrice(new BigDecimal("100.50"));
+        manualPositionDecision.setPositionQuantity(new BigDecimal("0.25"));
+        manualPositionDecision.setPositionOpenTime(LocalDateTime.of(2026, 6, 22, 8, 30));
+
+        DecisionResultVO executionPlanOnlyDecision = newDecisionWithCoreDashboardTruthFields();
+        executionPlanOnlyDecision.setSymbol("ETHUSDT");
+        executionPlanOnlyDecision.setTradeType("TRIGGERED");
+        executionPlanOnlyDecision.setIsWorthOpening(Boolean.TRUE);
+        executionPlanOnlyDecision.setRecommendedAction("OPEN_LONG");
+        executionPlanOnlyDecision.setEntryZone("3000-3050");
+        executionPlanOnlyDecision.setStopLoss("2900");
+        executionPlanOnlyDecision.setTakeProfitRules("3200");
+        executionPlanOnlyDecision.setHasOpenPosition(false);
+
+        when(decisionService.getLatestDecisionResults(12)).thenReturn(List.of(manualPositionDecision, executionPlanOnlyDecision));
+
+        mockMvc.perform(get("/api/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openPositionCount").value(1))
+                .andExpect(jsonPath("$.decisions[0].symbol").value("BTCUSDT"))
+                .andExpect(jsonPath("$.decisions[0].hasOpenPosition").value(true))
+                .andExpect(jsonPath("$.decisions[0].positionStatus").value("OPEN"))
+                .andExpect(jsonPath("$.decisions[0].positionSide").value("LONG"))
+                .andExpect(jsonPath("$.decisions[0].avgOpenPrice").value(100.50))
+                .andExpect(jsonPath("$.decisions[0].positionQuantity").value(0.25))
+                .andExpect(jsonPath("$.decisions[0].positionOpenTime").exists())
+                .andExpect(jsonPath("$.decisions[1].symbol").value("ETHUSDT"))
+                .andExpect(jsonPath("$.decisions[1].tradeType").value("TRIGGERED"))
+                .andExpect(jsonPath("$.decisions[1].recommendedAction").value("OPEN_LONG"))
+                .andExpect(jsonPath("$.decisions[1].entryZone").value("3000-3050"))
+                .andExpect(jsonPath("$.decisions[1].stopLoss").value("2900"))
+                .andExpect(jsonPath("$.decisions[1].takeProfitRules").value("3200"))
+                .andExpect(jsonPath("$.decisions[1].hasOpenPosition").value(false))
+                .andExpect(jsonPath("$.decisions[1].positionStatus").value(nullValue()))
+                .andExpect(jsonPath("$.decisions[1].positionSide").value(nullValue()))
+                .andExpect(jsonPath("$.decisions[1].avgOpenPrice").value(nullValue()))
+                .andExpect(jsonPath("$.decisions[1].positionQuantity").value(nullValue()));
+    }
+
+    @Test
+    void dashboardTemplateHomePositionReadsOnlyManualUserPositionReadModelFields() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String positionCard = htmlSection(HOME_POSITION_CARD_START);
+        String executionCard = htmlSection(HOME_EXECUTION_CARD_START);
+        String realPositionDetector = htmlBlock(HAS_REAL_POSITION_DETAIL_START, UPDATE_MODE_HINT_START);
+        String renderHomePosition = htmlBlock(RENDER_HOME_POSITION_START, RENDER_HOME_EXECUTION_START);
+
+        assertThat(html).contains(CANDIDATE_REVIEW_START);
+        assertThat(html).contains(INTERNAL_PUSH_PREVIEW_START);
+        assertThat(positionCard).contains("用户真实持仓监控");
+        assertThat(positionCard).contains("仅显示手动录入持仓，系统建议不会自动生成持仓");
+        assertThat(positionCard).contains("暂无手动录入持仓");
+        assertThat(positionCard).contains("manualPositionBtn");
+        assertThat(executionCard).contains("系统执行建议（非交易指令）");
+
+        assertThat(realPositionDetector).contains("hasOpenPosition");
+        assertThat(realPositionDetector).contains("positionStatus");
+        assertThat(realPositionDetector).contains("positionSide");
+        assertThat(realPositionDetector).contains("avgOpenPrice");
+        assertThat(realPositionDetector).doesNotContain("isAdopted");
+        assertThat(realPositionDetector).doesNotContain("tradeType");
+        assertThat(realPositionDetector).doesNotContain("recommendedAction");
+        assertThat(realPositionDetector).doesNotContain("executionPlanDisplay");
+        assertThat(realPositionDetector).doesNotContain("entryZone");
+        assertThat(realPositionDetector).doesNotContain("stopLoss");
+        assertThat(realPositionDetector).doesNotContain("takeProfit");
+
+        assertThat(renderHomePosition).contains("hasRealPositionDetail(d)");
+        assertThat(renderHomePosition).contains("暂无手动录入持仓");
+        assertThat(renderHomePosition).contains("positionStatus");
+        assertThat(renderHomePosition).contains("positionSide");
+        assertThat(renderHomePosition).contains("avgOpenPrice");
+        assertThat(renderHomePosition).contains("positionQuantity");
+        assertThat(renderHomePosition).doesNotContain("fetch(");
+        assertThat(renderHomePosition).doesNotContain("/api/user-positions/manual-open");
+        assertThat(renderHomePosition).doesNotContain("/api/user-positions/");
+        assertThat(renderHomePosition).doesNotContain("orderBtn");
+        assertThat(renderHomePosition).doesNotContain("executeBtn");
+        assertThat(renderHomePosition).doesNotContain("buyBtn");
+        assertThat(renderHomePosition).doesNotContain("sellBtn");
+        assertThat(renderHomePosition).doesNotContain("autoOpen");
+        assertThat(renderHomePosition).doesNotContain("autoClose");
+        assertThat(renderHomePosition).doesNotContain("pushRecheckCreatedUserPosition");
     }
 
     @Test
@@ -3171,6 +3282,28 @@ class DashboardControllerTest {
         assertThat(sectionEnd).isNotNegative();
 
         return html.substring(sectionStart, sectionEnd + SECTION_END.length());
+    }
+
+    private static String htmlSection(String sectionStartMarker) throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        int sectionStart = html.indexOf(sectionStartMarker);
+        assertThat(sectionStart).isNotNegative();
+
+        int sectionEnd = html.indexOf(SECTION_END, sectionStart);
+        assertThat(sectionEnd).isNotNegative();
+
+        return html.substring(sectionStart, sectionEnd + SECTION_END.length());
+    }
+
+    private static String htmlBlock(String startMarker, String endMarker) throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        int start = html.indexOf(startMarker);
+        assertThat(start).isNotNegative();
+
+        int end = html.indexOf(endMarker, start);
+        assertThat(end).isNotNegative();
+
+        return html.substring(start, end);
     }
 
     private static DecisionResultVO newDecisionWithCoreDashboardTruthFields() {
