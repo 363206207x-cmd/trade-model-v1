@@ -214,6 +214,51 @@ class DecisionServiceImplTest {
     }
 
     @Test
+    void getLatestDecisionResultsUsesOnlyManualOpenUserPositionRowsForDashboardPositionFields() {
+        LocalDateTime openedAt = LocalDateTime.of(2026, 6, 22, 8, 30);
+        DecisionResultVO manualDecision = new DecisionResultVO();
+        manualDecision.setSymbol("BTCUSDT");
+        DecisionResultVO executionPlanOnlyDecision = new DecisionResultVO();
+        executionPlanOnlyDecision.setSymbol("ETHUSDT");
+        executionPlanOnlyDecision.setTradeType("TRIGGERED");
+        executionPlanOnlyDecision.setIsWorthOpening(Boolean.TRUE);
+        executionPlanOnlyDecision.setRecommendedAction("OPEN_LONG");
+        executionPlanOnlyDecision.setEntryZone("3000-3050");
+        executionPlanOnlyDecision.setStopLoss("2900");
+        executionPlanOnlyDecision.setTakeProfitRules("3200");
+        UserPositionDO manualOpen = manualUserPosition("BTCUSDT", "OPEN", openedAt);
+        UserPositionDO manualClosed = manualUserPosition("ETHUSDT", "CLOSED", LocalDateTime.of(2026, 6, 22, 8, 10));
+        UserPositionDO pushRecheckCreatedSurface = manualUserPosition("ETHUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 20));
+        pushRecheckCreatedSurface.setSourceType("PUSH_RECHECK");
+
+        when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(manualDecision, executionPlanOnlyDecision));
+        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(manualOpen, manualClosed, pushRecheckCreatedSurface));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
+        when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.empty());
+
+        List<DecisionResultVO> result = service.getLatestDecisionResults(10);
+
+        assertThat(result).hasSize(2);
+        DecisionResultVO manualItem = result.get(0);
+        assertThat(manualItem.getHasOpenPosition()).isTrue();
+        assertThat(manualItem.getPositionStatus()).isEqualTo("OPEN");
+        assertThat(manualItem.getPositionSide()).isEqualTo("LONG");
+        assertThat(manualItem.getAvgOpenPrice()).isEqualByComparingTo("100.50");
+        assertThat(manualItem.getPositionQuantity()).isEqualByComparingTo("0.25");
+        assertThat(manualItem.getPositionOpenTime()).isEqualTo(openedAt);
+
+        DecisionResultVO executionPlanOnlyItem = result.get(1);
+        assertThat(executionPlanOnlyItem.getTradeType()).isEqualTo("TRIGGERED");
+        assertThat(executionPlanOnlyItem.getRecommendedAction()).isEqualTo("OPEN_LONG");
+        assertThat(executionPlanOnlyItem.getEntryZone()).isEqualTo("3000-3050");
+        assertThat(executionPlanOnlyItem.getHasOpenPosition()).isFalse();
+        assertThat(executionPlanOnlyItem.getPositionStatus()).isNull();
+        assertThat(executionPlanOnlyItem.getPositionSide()).isNull();
+        assertThat(executionPlanOnlyItem.getAvgOpenPrice()).isNull();
+        assertThat(executionPlanOnlyItem.getPositionQuantity()).isNull();
+    }
+
+    @Test
     void getLatestDecisionResultBySymbolUsesManualOpenUserPositionAsDashboardPositionSource() {
         LocalDateTime openedAt = LocalDateTime.of(2026, 6, 22, 8, 30);
         DecisionResultVO row = new DecisionResultVO();
