@@ -2171,7 +2171,7 @@
                 <div id="kpi-trend"></div>
             </div>
             <div class="card kpi-card" id="cardRisk">
-                <h3>系统风险等级</h3>
+                <h3>风险等级</h3>
                 <div id="kpi-risk"></div>
             </div>
             <div class="card kpi-card" id="cardDataQuality">
@@ -2644,6 +2644,7 @@
                 <button type="button" class="btn" id="opportunityReviewClose">关闭</button>
             </div>
             <div class="opportunity-review-status">
+                <div class="opportunity-status-row"><span>待复核机会</span><strong id="opportunityPendingCountText">暂无待复核</strong></div>
                 <div class="opportunity-status-row"><span>Telegram</span><strong id="opportunityTelegramStatus">等待同步</strong></div>
                 <div class="opportunity-status-row"><span>当前推送模式</span><strong id="opportunityPushModeText">等待同步</strong></div>
             </div>
@@ -2734,7 +2735,7 @@
  * A) 现有后端 /api/dashboard/refresh 已提供的真实字段 —— 直接用于展示映射（非伪装）
  * -----------------------------------------------------------------------------
  * systemStatus（LightSystemStatusVO）：status, monitoredCoins, lastDecisionTime, totalDecisionsToday，
- *   missedValidOpportunityCount（今日 biz_date 错失条数，tm_missed_opportunity），
+ *   pendingCount（当前待复核 / 待处理机会积压），missedValidOpportunityCount（机会复盘：今日错失有效机会归档），
  *   hotResetFired, hotResetSymbol, hotResetTriggerType, hotResetTriggerValue, hotResetTime（最近一次 Hot Reset，全库按时间聚合）
  * systemHealth（Map）：cpuUsage, memoryUsage, databaseStatus, schedulerStatus 等
  * alerts：alertLevel, alertMessage, createdAt
@@ -2757,10 +2758,10 @@
  * hot_reset_* / hotReset*：dashboard 展示的是 tm_asset_state 全库“最近一次 Hot Reset 当前行语义”，
  *   不是单次 analysis 的独立事件流水；readHotReset() 同时兼容 snake_case 与 camelCase。
  *   无最近一次事件时 Hot Reset 显示未触发。
- * 今日可复盘机会（第四张卡片）：missedOpportunityCount() 优先读 systemStatus.missedValidOpportunityCount /
- *   missed_valid_opportunity_count；无或为非数字时显示 0。
+ * 待复核机会（第一层卡片）：opportunityCountSummary() 仅读 systemStatus.pendingCount / pending_count；
+ *   missedValidOpportunityCount 只属于机会复盘 / 错失有效机会归档，不驱动当前待复核 backlog。
  *
- * 第一层 reverse/pending/confused 统计：仅展示后端聚合字段；缺失时显示“—”并提示待后端补齐。
+ * 第一层 reverse/pending/confused 统计：仅展示后端聚合字段；缺失时显示“—”或干净空态。
  * =============================================================================
  */
 (function () {
@@ -4185,13 +4186,16 @@
         return { value: best, note: note, level: bestCount > 0 ? 2 : 0 };
     }
 
-    function systemRiskSummary(systemStatus, health) {
-        var raw = pickField(systemStatus, ["systemRiskLevel", "system_risk_level", "overallRiskLevel", "overall_risk_level"])
-            || pickField(health, ["systemRiskLevel", "system_risk_level", "overallRiskLevel", "overall_risk_level"]);
+    function decisionRiskSummary(decisions) {
+        var raw = null;
+        (decisions || []).some(function (d) {
+            raw = pickField(d, ["riskLevel", "risk_level"]);
+            return raw != null && String(raw).trim() !== "";
+        });
         var value = riskLevelText(raw);
         if (value === "—") return { value: "—", note: "等待同步", level: 0 };
         var level = value === "极高" || value === "高" ? 3 : (value === "中" ? 2 : 1);
-        return { value: value, note: "系统同步", level: level };
+        return { value: value, note: "决策风险", level: level };
     }
 
     function aiConflictCardSummary(decisions) {
@@ -4210,11 +4214,16 @@
 
     function opportunityCountSummary(systemStatus) {
         var sys = systemStatus || window.__lastSystemStatus || {};
-        var raw = pickField(sys, ["missedValidOpportunityCount", "missed_valid_opportunity_count", "opportunityCount", "opportunity_count"]);
-        if (raw == null || raw === "") return { value: "—", note: "等待同步", level: 0 };
+        var raw = pickField(sys, ["pendingCount", "pending_count"]);
+        if (raw == null || raw === "") return { value: "暂无", note: "暂无待复核", level: 1, count: 0 };
         var n = Number(raw);
-        if (!isFinite(n)) return { value: "—", note: "等待同步", level: 0 };
-        return { value: n > 0 ? String(n) : "暂无", note: n > 0 ? "可执行 / 等待 / 失效" : "暂无待复核", level: n > 0 ? 2 : 1 };
+        if (!isFinite(n) || n <= 0) return { value: "暂无", note: "暂无待复核", level: 1, count: 0 };
+        return { value: String(n), note: "可执行 / 等待 / 失效", level: 2, count: n };
+    }
+
+    function pendingOpportunityDrawerText() {
+        var summary = opportunityCountSummary(window.__lastSystemStatus || {});
+        return summary.count > 0 ? (summary.count + " 个待处理") : "暂无待复核";
     }
 
     function homeMetric(label, value) {
@@ -5492,8 +5501,8 @@
     }
 
     /**
-     * 【真实映射优先】若 systemStatus 将来提供 missedValidOpportunityCount / missed_valid_opportunity_count 则直接用；
-     * 【否则】返回 0，不伪造遗漏笔数。
+     * 【机会复盘归档】missedValidOpportunityCount / missed_valid_opportunity_count 仅表示错失有效机会，
+     * 不表示当前待复核 push/recheck backlog。
      */
     function missedOpportunityCount(decisions) {
         var sys = window.__lastSystemStatus || {};
@@ -7141,7 +7150,7 @@
 
         var trend = decisionTrendSummary(decisions);
         var dqAvg = averageDataQuality(decisions);
-        var systemRisk = systemRiskSummary(systemStatus, health);
+        var decisionRisk = decisionRiskSummary(decisions);
         var conflict = aiConflictCardSummary(decisions);
         var opportunity = opportunityCountSummary(systemStatus);
         var confusedValue = ccMetric.value != null ? ccDisplay : "—";
@@ -7152,7 +7161,7 @@
         var hotNote = hot.fired ? (hot.trigger || "原因待同步") : "暂无";
 
         document.getElementById("kpi-trend").innerHTML = kpiHtml("市场趋势", trend.value, trend.note, trend.level);
-        document.getElementById("kpi-risk").innerHTML = kpiHtml("系统风险等级", systemRisk.value, systemRisk.note, systemRisk.level);
+        document.getElementById("kpi-risk").innerHTML = kpiHtml("风险等级", decisionRisk.value, decisionRisk.note, decisionRisk.level);
         document.getElementById("kpi-data-quality").innerHTML = kpiHtml("数据质量分", dqAvg != null ? dqAvg : "—", dqAvg != null ? "摘要均值" : "等待同步", dataQualityLevel(dqAvg));
         document.getElementById("kpi-ai-conflict").innerHTML = kpiHtml("AI 冲突等级", conflict.value, conflict.note, conflict.level);
         document.getElementById("kpi-opportunity").innerHTML = kpiHtml("待复核机会", opportunity.value, opportunity.note, opportunity.level);
@@ -7751,6 +7760,7 @@
     }
 
     function renderOpportunityReviewDrawer() {
+        setText("opportunityPendingCountText", pendingOpportunityDrawerText());
         setText("opportunityTelegramStatus", telegramChannelStatusText());
         setText("opportunityPushModeText", pushModeRuleText());
         var riskSection = document.getElementById("positionRiskPushSection");
@@ -7882,8 +7892,8 @@
             })
                 .then(function (r) {
                     return r.json().catch(function () { return {}; }).then(function (body) {
-                        if (!r.ok || body.success === false) {
-                            throw new Error(body.message || "保存失败，请检查输入");
+                        if (!r.ok || body.success === false || (body.code != null && Number(body.code) !== 200)) {
+                            throw new Error(body.msg || body.message || "保存失败，请检查输入");
                         }
                         return body;
                     });

@@ -12,10 +12,19 @@ import org.springframework.web.bind.annotation.PathVariable;
 @Controller
 public class ReviewPageController {
 
+    @GetMapping("/review/dashboard")
+    public String reviewDashboard(Model model) {
+        model.addAttribute("analysisId", "");
+        model.addAttribute("title", "复盘中心");
+        model.addAttribute("reviewCenterMode", true);
+        return "review";
+    }
+
     @GetMapping("/review/{analysisId}")
     public String reviewPage(@PathVariable String analysisId, Model model) {
         model.addAttribute("analysisId", analysisId);
         model.addAttribute("title", "复盘 · " + analysisId);
+        model.addAttribute("reviewCenterMode", false);
         return "review";
     }
 }
