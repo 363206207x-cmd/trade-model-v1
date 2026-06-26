@@ -537,7 +537,7 @@
     <div>
         <h1>复盘中心</h1>
         <p class="muted">持仓、机会、推送与规则反馈</p>
-        <p class="muted" style="margin:4px 0 0 0;">单次 analysis：<span th:text="${analysisId}">dashboard</span></p>
+        <p class="muted" style="margin:4px 0 0 0;" th:if="${!reviewCenterMode}">单次 analysis：<span th:text="${analysisId}">—</span></p>
     </div>
     <div>
         <a href="/dashboard">返回 Dashboard</a>
@@ -584,7 +584,7 @@
             <div class="review-field-grid" aria-label="规则反馈字段结构"><div class="review-field-chip">数据规则</div><div class="review-field-chip">评分规则</div><div class="review-field-chip">冲突规则</div><div class="review-field-chip">降级规则</div><div class="review-field-chip">Confused 规则</div><div class="review-field-chip">Hot Reset 规则</div><div class="review-field-chip">Push 规则</div><div class="review-field-chip">持仓监控规则</div><div class="review-field-chip">AI 裁决规则</div></div>
         </section>
     </section>
-    <details class="single-analysis-review" id="singleAnalysisReview">
+    <details class="single-analysis-review" id="singleAnalysisReview" th:if="${!reviewCenterMode}">
         <summary>单次分析复盘录入</summary>
         <div class="single-analysis-body">
     <div id="status-banner" class="banner loading">正在加载聚合数据…</div>
@@ -659,9 +659,10 @@
 })();
 </script>
 <script th:inline="javascript">
+    window.__REVIEW_CENTER_MODE__ = /*[[${reviewCenterMode}]]*/ false;
     window.__REVIEW_ANALYSIS_ID__ = /*[[${analysisId}]]*/ '';
 </script>
-<script src="/js/alert-explain.js" defer></script>
-<script src="/js/review-page.js" defer></script>
+<script th:if="${!reviewCenterMode}" src="/js/alert-explain.js" defer></script>
+<script th:if="${!reviewCenterMode}" src="/js/review-page.js" defer></script>
 </body>
 </html>
