@@ -1,0 +1,1138 @@
+package org.example.trademodel.vo;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+public class DashboardHomeVO {
+    private HeaderVO header = new HeaderVO();
+    private SystemStateVO systemState = new SystemStateVO();
+    private List<AlertRowVO> alerts = new ArrayList<>();
+    private List<EventRowVO> events = new ArrayList<>();
+    private List<AssetVO> assets = new ArrayList<>();
+    private List<PositionVO> positions = new ArrayList<>();
+    private String selectedSymbol;
+    private ExecutionSuggestionVO executionSuggestion = new ExecutionSuggestionVO();
+    private AiDecisionVO aiDecision = new AiDecisionVO();
+    private PushInboxVO pushInbox = new PushInboxVO();
+    private DiagnosticsVO diagnostics = new DiagnosticsVO();
+    private SafetyVO safety = new SafetyVO();
+
+    public HeaderVO getHeader() {
+        return header;
+    }
+
+    public void setHeader(HeaderVO header) {
+        this.header = header;
+    }
+
+    public SystemStateVO getSystemState() {
+        return systemState;
+    }
+
+    public void setSystemState(SystemStateVO systemState) {
+        this.systemState = systemState;
+    }
+
+    public List<AlertRowVO> getAlerts() {
+        return alerts;
+    }
+
+    public void setAlerts(List<AlertRowVO> alerts) {
+        this.alerts = alerts;
+    }
+
+    public List<EventRowVO> getEvents() {
+        return events;
+    }
+
+    public void setEvents(List<EventRowVO> events) {
+        this.events = events;
+    }
+
+    public List<AssetVO> getAssets() {
+        return assets;
+    }
+
+    public void setAssets(List<AssetVO> assets) {
+        this.assets = assets;
+    }
+
+    public List<PositionVO> getPositions() {
+        return positions;
+    }
+
+    public void setPositions(List<PositionVO> positions) {
+        this.positions = positions;
+    }
+
+    public String getSelectedSymbol() {
+        return selectedSymbol;
+    }
+
+    public void setSelectedSymbol(String selectedSymbol) {
+        this.selectedSymbol = selectedSymbol;
+    }
+
+    public ExecutionSuggestionVO getExecutionSuggestion() {
+        return executionSuggestion;
+    }
+
+    public void setExecutionSuggestion(ExecutionSuggestionVO executionSuggestion) {
+        this.executionSuggestion = executionSuggestion;
+    }
+
+    public AiDecisionVO getAiDecision() {
+        return aiDecision;
+    }
+
+    public void setAiDecision(AiDecisionVO aiDecision) {
+        this.aiDecision = aiDecision;
+    }
+
+    public PushInboxVO getPushInbox() {
+        return pushInbox;
+    }
+
+    public void setPushInbox(PushInboxVO pushInbox) {
+        this.pushInbox = pushInbox;
+    }
+
+    public DiagnosticsVO getDiagnostics() {
+        return diagnostics;
+    }
+
+    public void setDiagnostics(DiagnosticsVO diagnostics) {
+        this.diagnostics = diagnostics;
+    }
+
+    public SafetyVO getSafety() {
+        return safety;
+    }
+
+    public void setSafety(SafetyVO safety) {
+        this.safety = safety;
+    }
+
+    public static class HeaderVO {
+        private String pageTitle = "首页总览";
+        private String dataStatus = "WAITING_SYNC";
+        private String aiStatus = "WAITING_SYNC";
+        private String dataSourceText = "WAITING_SYNC";
+        private LocalDateTime updatedAt;
+
+        public String getPageTitle() {
+            return pageTitle;
+        }
+
+        public void setPageTitle(String pageTitle) {
+            this.pageTitle = pageTitle;
+        }
+
+        public String getDataStatus() {
+            return dataStatus;
+        }
+
+        public void setDataStatus(String dataStatus) {
+            this.dataStatus = dataStatus;
+        }
+
+        public String getAiStatus() {
+            return aiStatus;
+        }
+
+        public void setAiStatus(String aiStatus) {
+            this.aiStatus = aiStatus;
+        }
+
+        public String getDataSourceText() {
+            return dataSourceText;
+        }
+
+        public void setDataSourceText(String dataSourceText) {
+            this.dataSourceText = dataSourceText;
+        }
+
+        public LocalDateTime getUpdatedAt() {
+            return updatedAt;
+        }
+
+        public void setUpdatedAt(LocalDateTime updatedAt) {
+            this.updatedAt = updatedAt;
+        }
+    }
+
+    public static class SystemStateVO {
+        private StatusCardVO marketTrend = new StatusCardVO();
+        private StatusCardVO riskLevel = new StatusCardVO();
+        private StatusCardVO dataQuality = new StatusCardVO();
+        private StatusCardVO aiConflict = new StatusCardVO();
+        private StatusCardVO pendingReview = new StatusCardVO();
+        private StatusCardVO confused = new StatusCardVO();
+        private StatusCardVO hotReset = new StatusCardVO();
+
+        public StatusCardVO getMarketTrend() {
+            return marketTrend;
+        }
+
+        public void setMarketTrend(StatusCardVO marketTrend) {
+            this.marketTrend = marketTrend;
+        }
+
+        public StatusCardVO getRiskLevel() {
+            return riskLevel;
+        }
+
+        public void setRiskLevel(StatusCardVO riskLevel) {
+            this.riskLevel = riskLevel;
+        }
+
+        public StatusCardVO getDataQuality() {
+            return dataQuality;
+        }
+
+        public void setDataQuality(StatusCardVO dataQuality) {
+            this.dataQuality = dataQuality;
+        }
+
+        public StatusCardVO getAiConflict() {
+            return aiConflict;
+        }
+
+        public void setAiConflict(StatusCardVO aiConflict) {
+            this.aiConflict = aiConflict;
+        }
+
+        public StatusCardVO getPendingReview() {
+            return pendingReview;
+        }
+
+        public void setPendingReview(StatusCardVO pendingReview) {
+            this.pendingReview = pendingReview;
+        }
+
+        public StatusCardVO getConfused() {
+            return confused;
+        }
+
+        public void setConfused(StatusCardVO confused) {
+            this.confused = confused;
+        }
+
+        public StatusCardVO getHotReset() {
+            return hotReset;
+        }
+
+        public void setHotReset(StatusCardVO hotReset) {
+            this.hotReset = hotReset;
+        }
+    }
+
+    public static class StatusCardVO {
+        private String key;
+        private String label;
+        private Object value;
+        private String valueLabel;
+        private String helper;
+        private String status = "WAITING_SYNC";
+        private Integer score;
+        private Map<String, Object> meta;
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public Object getValue() {
+            return value;
+        }
+
+        public void setValue(Object value) {
+            this.value = value;
+        }
+
+        public String getValueLabel() {
+            return valueLabel;
+        }
+
+        public void setValueLabel(String valueLabel) {
+            this.valueLabel = valueLabel;
+        }
+
+        public String getHelper() {
+            return helper;
+        }
+
+        public void setHelper(String helper) {
+            this.helper = helper;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public Integer getScore() {
+            return score;
+        }
+
+        public void setScore(Integer score) {
+            this.score = score;
+        }
+
+        public Map<String, Object> getMeta() {
+            return meta;
+        }
+
+        public void setMeta(Map<String, Object> meta) {
+            this.meta = meta;
+        }
+    }
+
+    public static class AlertRowVO {
+        private String level;
+        private String message;
+        private String symbol;
+        private String time;
+
+        public String getLevel() {
+            return level;
+        }
+
+        public void setLevel(String level) {
+            this.level = level;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public void setSymbol(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String getTime() {
+            return time;
+        }
+
+        public void setTime(String time) {
+            this.time = time;
+        }
+    }
+
+    public static class EventRowVO {
+        private String type;
+        private String label;
+        private String impactLevel;
+        private Object timeWindow;
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public String getImpactLevel() {
+            return impactLevel;
+        }
+
+        public void setImpactLevel(String impactLevel) {
+            this.impactLevel = impactLevel;
+        }
+
+        public Object getTimeWindow() {
+            return timeWindow;
+        }
+
+        public void setTimeWindow(Object timeWindow) {
+            this.timeWindow = timeWindow;
+        }
+    }
+
+    public static class AssetVO {
+        private Integer slot;
+        private String slotType;
+        private String symbol;
+        private String rawSymbol;
+        private String marketBias;
+        private String marketBiasLabel;
+        private Integer compositeScore;
+        private String confidenceLevel;
+        private String confidenceLabel;
+        private String riskLevel;
+        private String riskLabel;
+        private String assetState;
+        private String assetStateLabel;
+        private Boolean worthOpening;
+
+        public Integer getSlot() {
+            return slot;
+        }
+
+        public void setSlot(Integer slot) {
+            this.slot = slot;
+        }
+
+        public String getSlotType() {
+            return slotType;
+        }
+
+        public void setSlotType(String slotType) {
+            this.slotType = slotType;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public void setSymbol(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String getRawSymbol() {
+            return rawSymbol;
+        }
+
+        public void setRawSymbol(String rawSymbol) {
+            this.rawSymbol = rawSymbol;
+        }
+
+        public String getMarketBias() {
+            return marketBias;
+        }
+
+        public void setMarketBias(String marketBias) {
+            this.marketBias = marketBias;
+        }
+
+        public String getMarketBiasLabel() {
+            return marketBiasLabel;
+        }
+
+        public void setMarketBiasLabel(String marketBiasLabel) {
+            this.marketBiasLabel = marketBiasLabel;
+        }
+
+        public Integer getCompositeScore() {
+            return compositeScore;
+        }
+
+        public void setCompositeScore(Integer compositeScore) {
+            this.compositeScore = compositeScore;
+        }
+
+        public String getConfidenceLevel() {
+            return confidenceLevel;
+        }
+
+        public void setConfidenceLevel(String confidenceLevel) {
+            this.confidenceLevel = confidenceLevel;
+        }
+
+        public String getConfidenceLabel() {
+            return confidenceLabel;
+        }
+
+        public void setConfidenceLabel(String confidenceLabel) {
+            this.confidenceLabel = confidenceLabel;
+        }
+
+        public String getRiskLevel() {
+            return riskLevel;
+        }
+
+        public void setRiskLevel(String riskLevel) {
+            this.riskLevel = riskLevel;
+        }
+
+        public String getRiskLabel() {
+            return riskLabel;
+        }
+
+        public void setRiskLabel(String riskLabel) {
+            this.riskLabel = riskLabel;
+        }
+
+        public String getAssetState() {
+            return assetState;
+        }
+
+        public void setAssetState(String assetState) {
+            this.assetState = assetState;
+        }
+
+        public String getAssetStateLabel() {
+            return assetStateLabel;
+        }
+
+        public void setAssetStateLabel(String assetStateLabel) {
+            this.assetStateLabel = assetStateLabel;
+        }
+
+        public Boolean getWorthOpening() {
+            return worthOpening;
+        }
+
+        public void setWorthOpening(Boolean worthOpening) {
+            this.worthOpening = worthOpening;
+        }
+    }
+
+    public static class PositionVO {
+        private Long positionId;
+        private String symbol;
+        private String direction;
+        private BigDecimal entryPrice;
+        private BigDecimal currentPrice;
+        private BigDecimal floatingPnl;
+        private BigDecimal leverage;
+        private BigDecimal positionSize;
+        private String positionStatus;
+        private String monitorConclusion;
+        private LocalDateTime updatedAt;
+
+        public Long getPositionId() {
+            return positionId;
+        }
+
+        public void setPositionId(Long positionId) {
+            this.positionId = positionId;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public void setSymbol(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String getDirection() {
+            return direction;
+        }
+
+        public void setDirection(String direction) {
+            this.direction = direction;
+        }
+
+        public BigDecimal getEntryPrice() {
+            return entryPrice;
+        }
+
+        public void setEntryPrice(BigDecimal entryPrice) {
+            this.entryPrice = entryPrice;
+        }
+
+        public BigDecimal getCurrentPrice() {
+            return currentPrice;
+        }
+
+        public void setCurrentPrice(BigDecimal currentPrice) {
+            this.currentPrice = currentPrice;
+        }
+
+        public BigDecimal getFloatingPnl() {
+            return floatingPnl;
+        }
+
+        public void setFloatingPnl(BigDecimal floatingPnl) {
+            this.floatingPnl = floatingPnl;
+        }
+
+        public BigDecimal getLeverage() {
+            return leverage;
+        }
+
+        public void setLeverage(BigDecimal leverage) {
+            this.leverage = leverage;
+        }
+
+        public BigDecimal getPositionSize() {
+            return positionSize;
+        }
+
+        public void setPositionSize(BigDecimal positionSize) {
+            this.positionSize = positionSize;
+        }
+
+        public String getPositionStatus() {
+            return positionStatus;
+        }
+
+        public void setPositionStatus(String positionStatus) {
+            this.positionStatus = positionStatus;
+        }
+
+        public String getMonitorConclusion() {
+            return monitorConclusion;
+        }
+
+        public void setMonitorConclusion(String monitorConclusion) {
+            this.monitorConclusion = monitorConclusion;
+        }
+
+        public LocalDateTime getUpdatedAt() {
+            return updatedAt;
+        }
+
+        public void setUpdatedAt(LocalDateTime updatedAt) {
+            this.updatedAt = updatedAt;
+        }
+    }
+
+    public static class ExecutionSuggestionVO {
+        private String direction;
+        private String entryZone;
+        private String stopLoss;
+        private String takeProfitRules;
+        private String leverageSuggestion;
+        private String positionSuggestion;
+        private String validPeriod;
+        private String invalidCondition;
+
+        public String getDirection() {
+            return direction;
+        }
+
+        public void setDirection(String direction) {
+            this.direction = direction;
+        }
+
+        public String getEntryZone() {
+            return entryZone;
+        }
+
+        public void setEntryZone(String entryZone) {
+            this.entryZone = entryZone;
+        }
+
+        public String getStopLoss() {
+            return stopLoss;
+        }
+
+        public void setStopLoss(String stopLoss) {
+            this.stopLoss = stopLoss;
+        }
+
+        public String getTakeProfitRules() {
+            return takeProfitRules;
+        }
+
+        public void setTakeProfitRules(String takeProfitRules) {
+            this.takeProfitRules = takeProfitRules;
+        }
+
+        public String getLeverageSuggestion() {
+            return leverageSuggestion;
+        }
+
+        public void setLeverageSuggestion(String leverageSuggestion) {
+            this.leverageSuggestion = leverageSuggestion;
+        }
+
+        public String getPositionSuggestion() {
+            return positionSuggestion;
+        }
+
+        public void setPositionSuggestion(String positionSuggestion) {
+            this.positionSuggestion = positionSuggestion;
+        }
+
+        public String getValidPeriod() {
+            return validPeriod;
+        }
+
+        public void setValidPeriod(String validPeriod) {
+            this.validPeriod = validPeriod;
+        }
+
+        public String getInvalidCondition() {
+            return invalidCondition;
+        }
+
+        public void setInvalidCondition(String invalidCondition) {
+            this.invalidCondition = invalidCondition;
+        }
+    }
+
+    public static class AiDecisionVO {
+        private String activeTab = "GPT_FINAL";
+        private List<AiTabVO> tabs = new ArrayList<>();
+        private ConsistencyVO consistency = new ConsistencyVO();
+
+        public String getActiveTab() {
+            return activeTab;
+        }
+
+        public void setActiveTab(String activeTab) {
+            this.activeTab = activeTab;
+        }
+
+        public List<AiTabVO> getTabs() {
+            return tabs;
+        }
+
+        public void setTabs(List<AiTabVO> tabs) {
+            this.tabs = tabs;
+        }
+
+        public ConsistencyVO getConsistency() {
+            return consistency;
+        }
+
+        public void setConsistency(ConsistencyVO consistency) {
+            this.consistency = consistency;
+        }
+    }
+
+    public static class AiTabVO {
+        private String role;
+        private String roleLabel;
+        private String direction;
+        private String confidenceLevel;
+        private List<String> supportEvidence = new ArrayList<>();
+        private List<String> againstEvidence = new ArrayList<>();
+        private List<String> riskPoints = new ArrayList<>();
+        private String downgradeReason;
+        private String reviewConclusion;
+
+        public String getRole() {
+            return role;
+        }
+
+        public void setRole(String role) {
+            this.role = role;
+        }
+
+        public String getRoleLabel() {
+            return roleLabel;
+        }
+
+        public void setRoleLabel(String roleLabel) {
+            this.roleLabel = roleLabel;
+        }
+
+        public String getDirection() {
+            return direction;
+        }
+
+        public void setDirection(String direction) {
+            this.direction = direction;
+        }
+
+        public String getConfidenceLevel() {
+            return confidenceLevel;
+        }
+
+        public void setConfidenceLevel(String confidenceLevel) {
+            this.confidenceLevel = confidenceLevel;
+        }
+
+        public List<String> getSupportEvidence() {
+            return supportEvidence;
+        }
+
+        public void setSupportEvidence(List<String> supportEvidence) {
+            this.supportEvidence = supportEvidence;
+        }
+
+        public List<String> getAgainstEvidence() {
+            return againstEvidence;
+        }
+
+        public void setAgainstEvidence(List<String> againstEvidence) {
+            this.againstEvidence = againstEvidence;
+        }
+
+        public List<String> getRiskPoints() {
+            return riskPoints;
+        }
+
+        public void setRiskPoints(List<String> riskPoints) {
+            this.riskPoints = riskPoints;
+        }
+
+        public String getDowngradeReason() {
+            return downgradeReason;
+        }
+
+        public void setDowngradeReason(String downgradeReason) {
+            this.downgradeReason = downgradeReason;
+        }
+
+        public String getReviewConclusion() {
+            return reviewConclusion;
+        }
+
+        public void setReviewConclusion(String reviewConclusion) {
+            this.reviewConclusion = reviewConclusion;
+        }
+    }
+
+    public static class ConsistencyVO {
+        private String level;
+        private Integer score;
+        private Boolean confused;
+
+        public String getLevel() {
+            return level;
+        }
+
+        public void setLevel(String level) {
+            this.level = level;
+        }
+
+        public Integer getScore() {
+            return score;
+        }
+
+        public void setScore(Integer score) {
+            this.score = score;
+        }
+
+        public Boolean getConfused() {
+            return confused;
+        }
+
+        public void setConfused(Boolean confused) {
+            this.confused = confused;
+        }
+    }
+
+    public static class PushInboxVO {
+        private String telegramStatus = "WAITING_SYNC";
+        private Boolean hasOpenPosition = false;
+        private String mode = "OPPORTUNITY_ONLY";
+        private PushCountsVO counts = new PushCountsVO();
+        private List<PushItemVO> items = new ArrayList<>();
+
+        public String getTelegramStatus() {
+            return telegramStatus;
+        }
+
+        public void setTelegramStatus(String telegramStatus) {
+            this.telegramStatus = telegramStatus;
+        }
+
+        public Boolean getHasOpenPosition() {
+            return hasOpenPosition;
+        }
+
+        public void setHasOpenPosition(Boolean hasOpenPosition) {
+            this.hasOpenPosition = hasOpenPosition;
+        }
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        public PushCountsVO getCounts() {
+            return counts;
+        }
+
+        public void setCounts(PushCountsVO counts) {
+            this.counts = counts;
+        }
+
+        public List<PushItemVO> getItems() {
+            return items;
+        }
+
+        public void setItems(List<PushItemVO> items) {
+            this.items = items;
+        }
+    }
+
+    public static class PushCountsVO {
+        private Integer executable = 0;
+        private Integer waiting = 0;
+        private Integer invalidated = 0;
+        private Integer positionRisk = 0;
+
+        public Integer getExecutable() {
+            return executable;
+        }
+
+        public void setExecutable(Integer executable) {
+            this.executable = executable;
+        }
+
+        public Integer getWaiting() {
+            return waiting;
+        }
+
+        public void setWaiting(Integer waiting) {
+            this.waiting = waiting;
+        }
+
+        public Integer getInvalidated() {
+            return invalidated;
+        }
+
+        public void setInvalidated(Integer invalidated) {
+            this.invalidated = invalidated;
+        }
+
+        public Integer getPositionRisk() {
+            return positionRisk;
+        }
+
+        public void setPositionRisk(Integer positionRisk) {
+            this.positionRisk = positionRisk;
+        }
+    }
+
+    public static class PushItemVO {
+        private Long pushId;
+        private String symbol;
+        private String status;
+        private LocalDateTime createdAt;
+
+        public Long getPushId() {
+            return pushId;
+        }
+
+        public void setPushId(Long pushId) {
+            this.pushId = pushId;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public void setSymbol(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public LocalDateTime getCreatedAt() {
+            return createdAt;
+        }
+
+        public void setCreatedAt(LocalDateTime createdAt) {
+            this.createdAt = createdAt;
+        }
+    }
+
+    public static class DiagnosticsVO {
+        private String dataIngestion = "UNKNOWN";
+        private String dataQuality = "UNKNOWN";
+        private String aiCall = "UNKNOWN";
+        private String pushRecheck = "UNKNOWN";
+        private String telegram = "WAITING_SYNC";
+        private String confused = "UNKNOWN";
+        private String hotReset = "UNKNOWN";
+        private String opportunityLog = "UNKNOWN";
+        private String review = "UNKNOWN";
+
+        public String getDataIngestion() {
+            return dataIngestion;
+        }
+
+        public void setDataIngestion(String dataIngestion) {
+            this.dataIngestion = dataIngestion;
+        }
+
+        public String getDataQuality() {
+            return dataQuality;
+        }
+
+        public void setDataQuality(String dataQuality) {
+            this.dataQuality = dataQuality;
+        }
+
+        public String getAiCall() {
+            return aiCall;
+        }
+
+        public void setAiCall(String aiCall) {
+            this.aiCall = aiCall;
+        }
+
+        public String getPushRecheck() {
+            return pushRecheck;
+        }
+
+        public void setPushRecheck(String pushRecheck) {
+            this.pushRecheck = pushRecheck;
+        }
+
+        public String getTelegram() {
+            return telegram;
+        }
+
+        public void setTelegram(String telegram) {
+            this.telegram = telegram;
+        }
+
+        public String getConfused() {
+            return confused;
+        }
+
+        public void setConfused(String confused) {
+            this.confused = confused;
+        }
+
+        public String getHotReset() {
+            return hotReset;
+        }
+
+        public void setHotReset(String hotReset) {
+            this.hotReset = hotReset;
+        }
+
+        public String getOpportunityLog() {
+            return opportunityLog;
+        }
+
+        public void setOpportunityLog(String opportunityLog) {
+            this.opportunityLog = opportunityLog;
+        }
+
+        public String getReview() {
+            return review;
+        }
+
+        public void setReview(String review) {
+            this.review = review;
+        }
+    }
+
+    public static class SafetyVO {
+        private Boolean reviewOnly = true;
+        private Boolean manualReviewOnly = true;
+        private Boolean notTradeInstruction = true;
+        private Boolean notExecutable = true;
+        private Boolean notAutoTrading = true;
+        private Boolean notOrderExecution = true;
+        private Boolean notPushSend = true;
+        private Boolean notExternalChannel = true;
+        private Boolean notUserPositionCreation = true;
+        private Boolean notUserPositionMutation = true;
+
+        public Boolean getReviewOnly() {
+            return reviewOnly;
+        }
+
+        public void setReviewOnly(Boolean reviewOnly) {
+            this.reviewOnly = reviewOnly;
+        }
+
+        public Boolean getManualReviewOnly() {
+            return manualReviewOnly;
+        }
+
+        public void setManualReviewOnly(Boolean manualReviewOnly) {
+            this.manualReviewOnly = manualReviewOnly;
+        }
+
+        public Boolean getNotTradeInstruction() {
+            return notTradeInstruction;
+        }
+
+        public void setNotTradeInstruction(Boolean notTradeInstruction) {
+            this.notTradeInstruction = notTradeInstruction;
+        }
+
+        public Boolean getNotExecutable() {
+            return notExecutable;
+        }
+
+        public void setNotExecutable(Boolean notExecutable) {
+            this.notExecutable = notExecutable;
+        }
+
+        public Boolean getNotAutoTrading() {
+            return notAutoTrading;
+        }
+
+        public void setNotAutoTrading(Boolean notAutoTrading) {
+            this.notAutoTrading = notAutoTrading;
+        }
+
+        public Boolean getNotOrderExecution() {
+            return notOrderExecution;
+        }
+
+        public void setNotOrderExecution(Boolean notOrderExecution) {
+            this.notOrderExecution = notOrderExecution;
+        }
+
+        public Boolean getNotPushSend() {
+            return notPushSend;
+        }
+
+        public void setNotPushSend(Boolean notPushSend) {
+            this.notPushSend = notPushSend;
+        }
+
+        public Boolean getNotExternalChannel() {
+            return notExternalChannel;
+        }
+
+        public void setNotExternalChannel(Boolean notExternalChannel) {
+            this.notExternalChannel = notExternalChannel;
+        }
+
+        public Boolean getNotUserPositionCreation() {
+            return notUserPositionCreation;
+        }
+
+        public void setNotUserPositionCreation(Boolean notUserPositionCreation) {
+            this.notUserPositionCreation = notUserPositionCreation;
+        }
+
+        public Boolean getNotUserPositionMutation() {
+            return notUserPositionMutation;
+        }
+
+        public void setNotUserPositionMutation(Boolean notUserPositionMutation) {
+            this.notUserPositionMutation = notUserPositionMutation;
+        }
+    }
+}

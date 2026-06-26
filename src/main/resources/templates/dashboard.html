@@ -4797,6 +4797,269 @@
         renderHomeAiDecision(d);
     }
 
+    function homeCardValue(card) {
+        if (!card) return "—";
+        return firstNonEmpty(card.valueLabel, card.value, "—");
+    }
+
+    function homeCardLevel(card) {
+        var status = String(card && card.status || "").toUpperCase();
+        if (status === "CONNECTED") return 1;
+        if (status === "PARTIAL") return 2;
+        if (status === "NOT_CONNECTED") return 3;
+        return 0;
+    }
+
+    function renderHomeSystemStateFromPayload(systemState) {
+        var s = systemState || {};
+        function put(id, title, card) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = kpiHtml(title, homeCardValue(card), card && card.helper ? card.helper : "等待同步", homeCardLevel(card));
+        }
+        put("kpi-trend", "市场趋势", s.marketTrend);
+        put("kpi-risk", "风险等级", s.riskLevel);
+        put("kpi-data-quality", "数据质量分", s.dataQuality);
+        put("kpi-ai-conflict", "AI 冲突等级", s.aiConflict);
+        put("kpi-opportunity", "待复核机会", s.pendingReview);
+        put("kpi-confused", "Confused", s.confused);
+        put("kpi-hot-reset", "Hot Reset", s.hotReset);
+    }
+
+    function renderHomeCompactRows(id, rows, fallbackRows) {
+        var box = document.getElementById(id);
+        if (!box) return;
+        renderTwoRowCompactList(box, rows || [], fallbackRows || []);
+    }
+
+    function renderHomeAlertEventRowsFromPayload(home) {
+        var alerts = (home.alerts || []).slice(0, 2).map(function (a) {
+            var level = a.level || "";
+            var tone = /高|严重|critical|error/i.test(level) ? "error" : (/中|warn/i.test(level) ? "warn" : "");
+            return { text: (level ? level + " · " : "") + (a.message || ""), meta: a.time || "", tone: tone };
+        });
+        renderHomeCompactRows("homeAlertList", alerts, [
+            { text: "暂无高优先级告警", meta: "", tone: "" },
+            { text: "等待风险事件同步", meta: "", tone: "" }
+        ]);
+        var events = (home.events || []).slice(0, 2).map(function (e) {
+            return { text: e.label || "", meta: e.timeWindow || e.impactLevel || "", tone: /HIGH|CRITICAL|BLOCK/i.test(e.impactLevel || "") ? "warn" : "" };
+        });
+        renderHomeCompactRows("homeEventList", events, [
+            { text: "暂无高影响事件", meta: "", tone: "" },
+            { text: "等待事件窗口同步", meta: "", tone: "" }
+        ]);
+    }
+
+    function homeAssetDecisionLike(asset) {
+        return {
+            symbol: (asset.rawSymbol || asset.symbol || "").replace("/", ""),
+            marketBiasHierarchy: asset.marketBias,
+            compositeScore: asset.compositeScore,
+            confidenceLevel: asset.confidenceLevel,
+            riskLevel: asset.riskLevel,
+            assetState: asset.assetState,
+            assetStateSnapshot: asset.assetStateLabel || asset.assetState,
+            isWorthOpening: asset.worthOpening
+        };
+    }
+
+    function riskLabelText(raw) {
+        var v = String(raw || "").toUpperCase();
+        if (v === "EXTREME" || v === "VERY_HIGH") return "极高";
+        if (v === "HIGH") return "高";
+        if (v === "MEDIUM") return "中";
+        if (v === "LOW") return "低";
+        return raw || "";
+    }
+
+    function confidenceLabelText(raw) {
+        var v = String(raw || "").toUpperCase();
+        if (v === "HIGH") return "高";
+        if (v === "MEDIUM") return "中";
+        if (v === "LOW") return "低";
+        return raw || "";
+    }
+
+    function renderHomeAssetsFromPayload(assets) {
+        var box = document.getElementById("tilesRow");
+        if (!box) return;
+        var list = (assets || []).slice(0, 6);
+        box.innerHTML = list.map(function (asset, idx) {
+            var rawSymbol = (asset.rawSymbol || asset.symbol || "").replace("/", "");
+            var selected = rawSymbol && rawSymbol === selectedSymbol ? " selected" : "";
+            var bias = cleanBlankValue(asset.marketBiasLabel || biasText(asset.marketBias));
+            var bcls = biasClass(asset.marketBias);
+            var scoreLabel = asset.compositeScore == null ? "综合评分" : ("综合评分 " + asset.compositeScore);
+            var scoreTone = asset.compositeScore == null ? "neu" : (Number(asset.compositeScore) >= 75 ? "bull" : (Number(asset.compositeScore) <= 45 ? "bear" : "neu"));
+            var riskText = cleanBlankValue(asset.riskLabel || riskLabelText(asset.riskLevel));
+            var confidenceText = cleanBlankValue(asset.confidenceLabel || confidenceLabelText(asset.confidenceLevel));
+            var stateText = cleanBlankValue(asset.assetStateLabel || "");
+            var worthText = asset.worthOpening === true ? "待复核候选" : (asset.worthOpening === false ? "暂不建议" : "");
+            var stateOpinion = stateText && worthText ? (stateText + " / " + worthText) : (stateText || worthText || "");
+            var coinCls = coinAvatarClass(rawSymbol);
+            return '<div class="coin-tile bias-' + bcls + selected + (asset.slotType === "DEFAULT_SLOT" ? ' placeholder' : '') + '" data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '">' +
+                '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
+                + '<span><span class="tile-symbol-text">' + escapeHtml(asset.symbol || formatSymbolPair(rawSymbol) || "") + '</span></span>'
+                + '<span class="tile-score-pill ' + scoreTone + '">' + escapeHtml(scoreLabel) + '</span></div>' +
+                '<div class="tile-primary">' +
+                '<div class="tile-mainline"><span class="tile-direction-label">方向：</span><span class="tile-bias ' + bcls + '">' + escapeHtml(bias) + '</span></div>' +
+                '<div class="tile-compact-grid">' +
+                '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value">' + escapeHtml(stateOpinion) + '</span></div>' +
+                '</div></div></div>';
+        }).join("");
+        Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
+            el.addEventListener("click", function () {
+                var sym = el.getAttribute("data-symbol");
+                if (!sym || el.classList.contains("placeholder")) return;
+                selectedSymbol = sym;
+                refreshDashboard();
+            });
+        });
+    }
+
+    function renderHomePositionsFromPayload(positions) {
+        var box = document.getElementById("homePositionContent");
+        if (!box) return;
+        var tableHead = '<table class="position-table"><thead><tr>'
+            + '<th>标的</th><th>方向</th><th>入场价</th><th>当前价</th><th>浮动盈亏</th><th>杠杆</th><th>仓位</th><th>持仓状态</th><th>监控结论</th><th>更新时间</th>'
+            + '</tr></thead><tbody>';
+        var list = positions || [];
+        if (!list.length) {
+            box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
+            return;
+        }
+        var rows = list.slice(0, 5).map(function (p) {
+            return '<tr>'
+                + '<td>' + escapeHtml(cleanBlankValue(p.symbol)) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(positionSideText(p.direction))) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(formatPrice(p.entryPrice))) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(formatPrice(p.currentPrice))) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(formatPct(p.floatingPnl))) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(p.leverage != null ? String(p.leverage) : "")) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(p.positionSize != null ? String(p.positionSize) : "")) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(positionStatusText(p.positionStatus))) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(p.monitorConclusion || "")) + '</td>'
+                + '<td>' + escapeHtml(cleanBlankValue(formatDateTime(p.updatedAt))) + '</td>'
+                + '</tr>';
+        });
+        box.innerHTML = tableHead + rows.join("") + positionFillerRows(Math.max(0, 5 - rows.length)) + '</tbody></table>';
+    }
+
+    function renderHomeExecutionFromPayload(suggestion) {
+        var box = document.getElementById("homeExecutionContent");
+        if (!box) return;
+        var s = suggestion || {};
+        var direction = biasText(s.direction);
+        if (direction === "—") direction = s.direction || "";
+        var rows = [
+            ["方向", direction],
+            ["入场区间", s.entryZone || ""],
+            ["止损价", s.stopLoss || ""],
+            ["阶梯止盈", s.takeProfitRules || ""],
+            ["杠杆", s.leverageSuggestion || ""],
+            ["仓位建议", s.positionSuggestion || ""],
+            ["有效期", s.validPeriod || ""],
+            ["失效条件", s.invalidCondition || ""]
+        ];
+        box.innerHTML = '<div class="execution-card-body">'
+            + '<div class="execution-plan-panel"><table class="execution-plan-table"><tbody>'
+            + rows.map(function (r) { return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(cleanBlankValue(r[1])) + '</td></tr>'; }).join("")
+            + '</tbody></table></div>'
+            + '</div>';
+    }
+
+    function renderHomeAiDecisionFromPayload(aiDecision) {
+        var tabs = document.getElementById("homeAiTabs");
+        var content = document.getElementById("homeAiTabContent");
+        var ai = aiDecision || {};
+        var tabList = ai.tabs || [];
+        if (!activeAiTab || !tabList.some(function (t) { return t.role === activeAiTab; })) activeAiTab = ai.activeTab || "GPT_FINAL";
+        if (tabs && content) {
+            Array.prototype.forEach.call(tabs.querySelectorAll(".ai-tab"), function (btn) {
+                var tab = btn.getAttribute("data-ai-tab");
+                btn.classList.toggle("active", tab === activeAiTab);
+                btn.onclick = function () { activeAiTab = tab; renderHomeAiDecisionFromPayload(aiDecision); };
+            });
+            var current = tabList.find(function (t) { return t.role === activeAiTab; }) || {};
+            var rows = [
+                ["方向判断", biasText(current.direction) !== "—" ? biasText(current.direction) : (current.direction || "")],
+                ["置信度", confidenceLabelText(current.confidenceLevel)],
+                ["支持证据", (current.supportEvidence || []).join("；") || "暂无证据\n等待同步"],
+                ["反对证据", (current.againstEvidence || []).join("；") || "暂无证据\n等待同步"],
+                ["风险点", (current.riskPoints || []).join("；") || "等待同步"],
+                ["降级 / 阻断理由", current.downgradeReason || "等待同步"],
+                ["复核结论", current.reviewConclusion || "等待同步"]
+            ];
+            content.innerHTML = '<div class="ai-evidence-grid">' + aiEvidenceTable(rows) + '</div>';
+        }
+        var consistency = document.getElementById("homeConsistencyContent");
+        if (consistency) {
+            var c = ai.consistency || {};
+            var score = c.score != null ? Math.max(8, Math.min(98, 100 - Number(c.score))) : null;
+            consistency.innerHTML = '<div class="consistency-card-grid">'
+                + '<div class="consistency-ring" style="--consistency-score:' + (score != null ? score : 0) + '%"><span>' + escapeHtml(score != null ? (score + "%") : "—") + '</span></div>'
+                + '<div class="consistency-list">'
+                + '<div class="consistency-row"><span>最终倾向</span><span class="value"></span></div>'
+                + '<div class="consistency-row"><span>冲突等级</span><span class="value">' + escapeHtml(c.level || "") + '</span></div>'
+                + '<div class="consistency-row"><span>AI 计划模式</span><span class="value"></span></div>'
+                + '<div class="consistency-row"><span>是否进入 Confused</span><span class="value">' + escapeHtml(c.confused ? "是" : "否") + '</span></div>'
+                + '</div></div>';
+        }
+    }
+
+    function renderHomePushInboxFromPayload(pushInbox) {
+        var inbox = pushInbox || {};
+        var counts = inbox.counts || {};
+        setText("opportunityPendingCountText", counts.waiting > 0 ? (counts.waiting + " 个待处理") : "暂无待复核");
+        setText("opportunityTelegramStatus", inbox.telegramStatus || "WAITING_SYNC");
+        setText("opportunityPushModeText", inbox.mode || "OPPORTUNITY_ONLY");
+        setText("opportunityInboxCountText", String((inbox.items || []).length));
+        setText("opportunityRiskCountText", String(counts.positionRisk || 0));
+    }
+
+    function renderDashboardHomePayload(home) {
+        if (!home) return;
+        var header = home.header || {};
+        setRuntimeStatus(header.dataStatus || "WAITING_SYNC");
+        setText("headerAiStatusText", header.aiStatus || "WAITING_SYNC");
+        setText("headerSourceStatusText", header.dataSourceText || "WAITING_SYNC");
+        selectedSymbol = (home.selectedSymbol || selectedSymbol || "").replace("/", "");
+        window.__lastDashboardHome = home;
+        window.__lastHomeDiagnostics = home.diagnostics || {};
+        window.__lastSystemStatus = {
+            pendingCount: home.systemState && home.systemState.pendingReview ? home.systemState.pendingReview.value : null,
+            confusedCount: home.systemState && home.systemState.confused ? home.systemState.confused.value : null,
+            hotResetFired: home.systemState && home.systemState.hotReset ? home.systemState.hotReset.value : null
+        };
+        allDecisions = (home.assets || []).map(homeAssetDecisionLike);
+        displayDecisions = allDecisions.slice(0, 6);
+        renderHomeSystemStateFromPayload(home.systemState || {});
+        renderHomeAlertEventRowsFromPayload(home);
+        renderHomeAssetsFromPayload(home.assets || []);
+        renderSidebarSlots();
+        renderHomePositionsFromPayload(home.positions || []);
+        renderHomeExecutionFromPayload(home.executionSuggestion || {});
+        renderHomeAiDecisionFromPayload(home.aiDecision || {});
+        renderHomePushInboxFromPayload(home.pushInbox || {});
+        updateAssetPoolPanel();
+        document.getElementById("lastUpdatedText").textContent = nowText();
+    }
+
+    function fetchDashboardHome() {
+        var query = "?limit=6";
+        if (selectedSymbol) query += "&selectedSymbol=" + encodeURIComponent(selectedSymbol);
+        return fetch("/api/dashboard/home" + query)
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function (resp) {
+                var home = resp && resp.data ? resp.data : resp;
+                renderDashboardHomePayload(home);
+                return home;
+            });
+    }
+
     function renderSidebarPanel(systemStatus, alerts, openPositionCount) {
         var sysBox = document.getElementById("sidebarSystemStatus");
         var alertBox = document.getElementById("sidebarAlertList");
@@ -7631,6 +7894,12 @@
     }
 
     function refreshDashboard() {
+        fetchDashboardHome().catch(function () {
+            refreshDashboardLegacy();
+        });
+    }
+
+    function refreshDashboardLegacy() {
         fetch("/api/dashboard/summary?limit=12")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (data) {
