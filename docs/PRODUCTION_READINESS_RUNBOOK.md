@@ -6,7 +6,7 @@ This runbook records production-readiness decisions and remaining gates. It is n
 
 Production Deployment Readiness is `BLOCKED`.
 
-V1 is locally acceptance-ready. Production deployment remains blocked until database migration, rollback, auth, secrets, observability, deployment packaging, smoke testing, and an explicit human production release gate are complete.
+V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M3 adds a single-operator auth gate, but it is not a production deployment approval.
 
 ## PDR-2A Database Migration + Rollback Decision
 
@@ -71,7 +71,18 @@ PDR-M2 adds a server deployment skeleton. It does not deploy to a real server an
 - `.env.example` documents required placeholder environment variables. Real `.env` files and local secret files are ignored and must not be committed.
 - `scripts/prod-smoke.sh` performs readonly smoke checks for `/api/dashboard/home` and `/api/review/center`, including dashboard/review response shape and no-order/no-auto-trading safety fields.
 - `scripts/prod-backup.sh` and `scripts/prod-restore.sh` provide PostgreSQL backup/restore templates that require explicit environment variables; restore also requires an explicit confirmation variable.
-- Deferred: auth/access control, observability, real server deployment smoke, real restore drill evidence, secrets manager integration, external integration readiness, and production release-gate approval.
+- Deferred: observability, real server deployment smoke, real restore drill evidence, secrets manager integration, external integration readiness, HTTPS/reverse-proxy readiness, and production release-gate approval.
+
+## PDR-M3 Auth + Access Control Gate
+
+PDR-M3 adds a single-operator Spring Security Basic Auth gate. It does not add a database user table, signup, roles UI, OAuth, public production exposure, or production release approval.
+
+- Auth model: one in-memory operator account from `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD`.
+- Local/test compatibility: tests can disable the gate with `trade-model.auth.enabled=false`; local development keeps an explicit fallback account unless overridden.
+- Protected surfaces: dashboard and review pages, dashboard/review APIs, manual user-position APIs, push recheck APIs, opportunity log APIs, rule/system/external-context/market/AI API surfaces, and write endpoints are behind authentication when the gate is enabled.
+- Production credential guard: prod startup rejects missing admin credentials and unsafe defaults such as `password`, `admin`, `change-me`, `changeme`, `123456`, and the local fallback password.
+- Smoke behavior: readonly production smoke checks require auth credentials through `SMOKE_AUTH_USERNAME` / `SMOKE_AUTH_PASSWORD` or `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`; scripts must not print passwords.
+- Deferred: HTTPS / reverse proxy configuration, secrets manager integration, credential rotation, audit logging, rate limiting, real server auth smoke evidence, and production release-gate approval.
 
 ## Current Schema State
 
@@ -83,6 +94,7 @@ PDR-M2 adds a server deployment skeleton. It does not deploy to a real server an
 - PostgreSQL JDBC driver is present, but no production database is connected by PDR-M1.
 - Testcontainers/Flyway smoke is test-only and does not use real secrets.
 - Dockerfile, Docker Compose, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed and no public production access is approved.
+- Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy, secrets manager, credential rotation, real server auth smoke, or production release approval exists yet.
 
 ## Migration Execution Policy
 
@@ -118,7 +130,7 @@ docker compose down
 Security notes:
 
 - The host app port binds to `127.0.0.1` by default.
-- Do not expose the app publicly before a separate PDR-M3 Auth / Access Control package is complete.
+- Do not expose the app publicly until HTTPS/reverse-proxy readiness, secrets manager integration, real server auth smoke, and the production release gate are complete.
 - Do not commit `.env`, real secrets, database dumps, or local secret files.
 - The Flyway migration runner is manual: `docker compose --profile migrate run --rm migrate`.
 - This skeleton does not add Telegram send, Push send, order execution, auto-open, auto-close, or auto-trading.
@@ -126,6 +138,7 @@ Security notes:
 Required environment categories:
 
 - App bind/profile: `SPRING_PROFILES_ACTIVE`, `APP_PORT`, `APP_BIND_ADDRESS`, `SERVER_ADDRESS`, `TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND`.
+- Auth: `APP_ADMIN_USERNAME`, `APP_ADMIN_PASSWORD`; optional smoke overrides `SMOKE_AUTH_USERNAME`, `SMOKE_AUTH_PASSWORD`.
 - Database: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `PROD_DATASOURCE_URL`, `PROD_DATASOURCE_USERNAME`, `PROD_DATASOURCE_PASSWORD`.
 - Position provider: `POSITION_PROVIDER_TYPE`, `BINANCE_API_BASE_URL`, `BINANCE_API_KEY`, `BINANCE_API_SECRET`.
 - Optional AI provider toggles/keys: `TRADE_MODEL_AI_ENABLED`, provider-specific enabled flags, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`.
@@ -212,17 +225,17 @@ The restore script must only target a controlled recovery database until a separ
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but this local environment may skip it when Docker is unavailable.
 - Mapper PostgreSQL compatibility covers known upsert and DATEADD / FORMATDATETIME blockers; live PostgreSQL mapper execution remains to be expanded beyond smoke/static guards.
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
-- Auth/access control missing.
+- Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
 - Observability missing.
 - Deployment packaging is skeletal only and not release-gated.
-- Secrets contract exists as placeholders only; no secrets manager integration exists.
+- Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
-1. PDR-M3 Auth / Access Control Gate.
-2. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
-3. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
+1. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
+2. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
+3. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening if not covered by PDR-M5.
 
 ## Explicit Non-Scope
 
-PDR-M2 does not deploy to a real server, commit real secrets, add auth, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, change schema.sql, change mapper SQL, change Java business logic, add order/execution, or add auto-trading semantics. It adds Docker/Compose deployment skeleton files, `.env.example`, readonly smoke checks, and PostgreSQL backup/restore template scripts while preserving Production Deployment Readiness as `BLOCKED`.
+PDR-M3 does not deploy to a real server, commit real secrets, add user registration, add role management UI, add OAuth, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds a single-operator Basic Auth gate, production credential fail-closed checks, auth-aware smoke behavior, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.

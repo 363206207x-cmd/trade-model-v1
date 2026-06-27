@@ -1,6 +1,7 @@
 package org.example.trademodel.config;
 
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 
@@ -13,6 +14,15 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("prod")
 public class ProductionProfileSafetyGuard implements ApplicationRunner {
+
+    private static final Set<String> UNSAFE_ADMIN_PASSWORDS = Set.of(
+            "PASSWORD",
+            "ADMIN",
+            "CHANGE-ME",
+            "CHANGEME",
+            "123456",
+            "DEV-LOCAL-PASSWORD"
+    );
 
     private final Environment environment;
 
@@ -72,6 +82,18 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             errors.add("production public server bind requires trade-model.production.allow-public-bind=true");
         }
 
+        String adminUsername = property(environment, "trade-model.auth.admin-username");
+        if (isBlank(adminUsername)) {
+            errors.add("production admin username missing");
+        }
+
+        String adminPassword = property(environment, "trade-model.auth.admin-password");
+        if (isBlank(adminPassword)) {
+            errors.add("production admin password missing");
+        } else if (isUnsafeAdminPassword(adminPassword)) {
+            errors.add("production admin password uses an unsafe default value");
+        }
+
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Unsafe prod profile config: " + String.join("; ", errors));
         }
@@ -95,6 +117,10 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
     private static boolean isTrue(String value) {
         return "true".equalsIgnoreCase(trim(value));
+    }
+
+    private static boolean isUnsafeAdminPassword(String value) {
+        return UNSAFE_ADMIN_PASSWORDS.contains(normalized(value));
     }
 
     private static boolean isBlank(String value) {
