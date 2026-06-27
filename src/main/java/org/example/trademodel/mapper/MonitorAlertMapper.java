@@ -27,6 +27,10 @@ public interface MonitorAlertMapper {
     @Select("SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = 'OPEN' "
             + "AND created_at >= DATEADD('MINUTE', -#{cooldownMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
+            + "AND UPPER(TRIM(COALESCE(status, ''))) = 'OPEN' "
+            + "AND created_at >= CURRENT_TIMESTAMP - (#{cooldownMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     int countOpenInThrottleWindow(
             @Param("assetSymbol") String assetSymbol,
             @Param("alertType") String alertType,
@@ -38,6 +42,9 @@ public interface MonitorAlertMapper {
      */
     @Select("SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
             + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
+            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     int countAnyInSemanticWindow(
             @Param("assetSymbol") String assetSymbol,
             @Param("alertType") String alertType,
@@ -51,6 +58,14 @@ public interface MonitorAlertMapper {
             + "FORMATDATETIME(updated_at, 'yyyy-MM-dd HH:mm:ss') AS updated_at, "
             + "is_deleted, version_no "
             + "FROM tm_monitor_alert WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT #{limit}")
+    @Select(value = "SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE TO_CHAR(cooldown_until, 'YYYY-MM-DD HH24:MI:SS') END AS cooldown_until, "
+            + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
+            + "TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at, "
+            + "TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at, "
+            + "is_deleted, version_no "
+            + "FROM tm_monitor_alert WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT #{limit}",
+            databaseId = "postgresql")
     List<MonitorAlertDO> selectRecent(@Param("limit") int limit);
 
     @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
@@ -60,12 +75,25 @@ public interface MonitorAlertMapper {
             + "FORMATDATETIME(updated_at, 'yyyy-MM-dd HH:mm:ss') AS updated_at, "
             + "is_deleted, version_no "
             + "FROM tm_monitor_alert WHERE is_deleted = 0 AND analysis_id = #{analysisId} ORDER BY created_at DESC")
+    @Select(value = "SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE TO_CHAR(cooldown_until, 'YYYY-MM-DD HH24:MI:SS') END AS cooldown_until, "
+            + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
+            + "TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at, "
+            + "TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at, "
+            + "is_deleted, version_no "
+            + "FROM tm_monitor_alert WHERE is_deleted = 0 AND analysis_id = #{analysisId} ORDER BY created_at DESC",
+            databaseId = "postgresql")
     List<MonitorAlertDO> listByAnalysisId(@Param("analysisId") String analysisId);
 
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
             + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert "
+            + "WHERE is_deleted = 0 "
+            + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
+            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     Integer countByStatusInWindow(@Param("status") String status, @Param("windowMinutes") int windowMinutes);
 
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
@@ -73,6 +101,12 @@ public interface MonitorAlertMapper {
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
             + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
             + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert "
+            + "WHERE is_deleted = 0 "
+            + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
+            + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
+            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     Integer countByStatusAndTypeInWindow(@Param("status") String status,
                                          @Param("alertType") String alertType,
                                          @Param("windowMinutes") int windowMinutes);

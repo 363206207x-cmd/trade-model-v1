@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-2C2A Mapper PostgreSQL Upsert Variants
+Current Work Package: PDR-M1 PostgreSQL Runtime Pack
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Package: PDR-2C2A Mapper PostgreSQL Upsert Variants recorded on branch codex/pdr-2c2a-mapper-upsert-postgresql-variants
+Latest Production Readiness Package: PDR-M1 PostgreSQL Runtime Pack recorded on branch codex/pdr-m1-postgresql-runtime-pack
 
 ---
 
@@ -58,9 +58,9 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this PDR-2C2A mapper PostgreSQL upsert variant package if approved.
+1. Autodeliver this PDR-M1 PostgreSQL runtime pack if approved.
 2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Prepare PDR-2C2B Mapper PostgreSQL Date Function Compatibility only under a separate explicit production-readiness package.
+3. Prepare the next production-readiness package for secrets/deployment/auth/observability/release-gate gaps under a separate explicit scope.
 4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
@@ -69,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java business service/controller code, schema.sql, Flyway migration SQL, dashboard, review UI, API contract, unrelated business test, script, scheduler, Push, Telegram, order, execution, auto-trading, runtime application config, default Flyway activation, PostgreSQL connection, or trading-logic changes inside this PDR-2C2A mapper upsert package.
+1. Java business service/controller code, schema.sql, dashboard, review UI, API contract, unrelated business test, script, scheduler, Push, Telegram, order, execution, auto-trading, production runtime config, real PostgreSQL connection, or trading-logic changes inside this PDR-M1 runtime smoke package.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -136,7 +136,7 @@ Blocking evidence:
 - `src/main/resources/application.yml` and `src/main/resources/application.properties` enable H2 console.
 - `src/main/resources/application.properties` defaults `position.provider.type` to `SIMULATED`.
 - PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
-- Flyway is present only as a non-default Maven profile skeleton; PDR-2C1 baseline schema SQL exists but has not been validated against PostgreSQL yet; PDR-2C2A adds PostgreSQL upsert mapper variants only.
+- PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
 - No production database is connected in this package.
 - No migration/rollback pipeline, backup/restore command set, auth/authz evidence, deployment smoke/rollback evidence, observability stack, or complete secrets contract exists yet.
 
@@ -153,13 +153,12 @@ PDR-2A records the production database and migration decisions only. It does not
 - No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
 - Production readiness remains BLOCKED.
 
-Database migration remaining blockers after PDR-2C2A:
+Database migration remaining blockers after PDR-M1:
 
-- Flyway exists only as a non-default skeleton profile.
-- PostgreSQL baseline schema SQL exists but has not been executed against PostgreSQL.
-- Mapper PostgreSQL compatibility is partial: AssetState/UserConfig upsert variants are present, DATEADD / FORMATDATETIME compatibility remains pending.
-- PostgreSQL driver/Testcontainers validation not added.
-- Backup/restore scripts or commands not implemented.
+- Flyway remains non-default for runtime startup; PDR-M1 adds only test/manual smoke coverage.
+- PostgreSQL baseline schema SQL has a Testcontainers smoke path, but local evidence depends on Docker availability.
+- Mapper PostgreSQL variants cover known upsert and DATEADD / FORMATDATETIME blockers; broader live mapper execution remains deferred.
+- Backup/restore command templates exist, but real restore drill evidence is still missing.
 - Auth/access control missing.
 - Observability missing.
 - Deployment packaging missing.
@@ -167,9 +166,9 @@ Database migration remaining blockers after PDR-2C2A:
 
 Next production-readiness packages:
 
-1. PDR-2C2B Mapper PostgreSQL Date Function Compatibility.
-2. PDR-2C3 PostgreSQL Driver + Migration Smoke Validation.
-3. PDR-2D Backup/Restore Runbook.
+1. PDR-M2 Secrets / Deployment Config Contract.
+2. PDR-M3 Auth / Access Control Gate.
+3. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
 
 ### PDR-2B Flyway Baseline Skeleton
 
@@ -206,6 +205,19 @@ PDR-2C2A adds MyBatis mapper-level PostgreSQL upsert variants without changing d
 - `UserConfigMapper.saveOrUpdate` keeps the generic MySQL/H2 `ON DUPLICATE KEY UPDATE` fallback and adds a PostgreSQL `ON CONFLICT (user_id) DO UPDATE` variant.
 - Focused tests prove default H2 upsert behavior still works and annotation guards prove PostgreSQL variants do not contain H2/MySQL upsert syntax.
 - DATEADD / FORMATDATETIME mapper compatibility, PostgreSQL driver/Testcontainers validation, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, and auto-trading semantics remain deferred / blocked.
+- Production readiness remains BLOCKED.
+
+### PDR-M1 PostgreSQL Runtime Pack
+
+PDR-M1 adds PostgreSQL runtime smoke readiness while preserving default H2/local behavior.
+
+- `pom.xml` includes PostgreSQL JDBC runtime dependency and test-scoped Testcontainers / Flyway PostgreSQL smoke dependencies.
+- `src/test/resources/application.properties` disables Spring Boot Flyway auto-configuration for default tests so `schema.sql` remains the H2 local/test bootstrap.
+- `PostgreSqlFlywayMigrationSmokeTest` manually runs Flyway V1/V2 migrations against PostgreSQL Testcontainers when Docker is available, verifies the 27 V1 tables, critical indexes, Flyway history success, and PostgreSQL identity generated-key behavior.
+- PostgreSQL `databaseId = "postgresql"` mapper variants replace DATEADD / FORMATDATETIME syntax for AnalysisRun, PushSnapshot, HotResetEvent, PushRecheckLog, and MonitorAlert targeted methods while leaving generic H2 SQL unchanged.
+- `UserPositionMapper.insert` specifies `keyColumn = "id"` for generated-key compatibility.
+- `PRODUCTION_READINESS_RUNBOOK.md` records pg_dump / pg_restore / psql restore templates and a restore smoke checklist.
+- No real PostgreSQL connection, schema.sql change, production config change, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added.
 - Production readiness remains BLOCKED.
 
 ---
