@@ -49,14 +49,27 @@ PDR-2C2A adds mapper-level PostgreSQL upsert variants only. It does not change d
 - User config upsert: `UserConfigMapper.saveOrUpdate` keeps the generic MySQL/H2 `ON DUPLICATE KEY UPDATE` fallback and adds a PostgreSQL `ON CONFLICT (user_id) DO UPDATE` variant.
 - Deferred: DATEADD / FORMATDATETIME mapper compatibility, PostgreSQL driver, Testcontainers/Flyway smoke validation, real database connection, and backup/restore validation.
 
+## PDR-M1 PostgreSQL Runtime Pack
+
+PDR-M1 adds a PostgreSQL runtime-readiness smoke layer. It does not deploy to production and does not connect to any real database.
+
+- PostgreSQL JDBC driver is available as a runtime dependency.
+- Testcontainers PostgreSQL and Flyway PostgreSQL smoke tests are available in test scope.
+- Default Spring Boot H2 tests keep Flyway auto-configuration disabled through test-only config so `schema.sql` remains the local/default bootstrap path.
+- Flyway V1/V2 migration smoke runs manually in a PostgreSQL Testcontainer when Docker is available; when Docker is unavailable, the smoke test skips gracefully.
+- PostgreSQL mapper variants exist for DATEADD / FORMATDATETIME methods in AnalysisRun, PushSnapshot, HotResetEvent, PushRecheckLog, and MonitorAlert mapper paths.
+- `UserPositionMapper` generated-key metadata now specifies `keyColumn = "id"`; PostgreSQL identity generated-key behavior is covered by the PostgreSQL smoke when Docker is available.
+- Deferred: real production database connection, deployment packaging, auth/access control, secrets manager, observability, real server smoke, and production release-gate approval.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
 - A Flyway skeleton exists only behind the explicit `flyway-migration` Maven profile.
 - PostgreSQL baseline schema SQL files exist as PDR-2C1 draft migrations.
 - PostgreSQL upsert mapper variants exist for asset state and user config.
-- No production database is connected by PDR-2C2A.
-- No PostgreSQL driver/runtime connection is added by PDR-2C2A.
+- PostgreSQL date-function mapper variants exist for the known DATEADD / FORMATDATETIME blockers.
+- PostgreSQL JDBC driver is present, but no production database is connected by PDR-M1.
+- Testcontainers/Flyway smoke is test-only and does not use real secrets.
 
 ## Migration Execution Policy
 
@@ -64,7 +77,7 @@ Production migrations must run as an explicit pre-deploy step.
 
 Application startup must not silently mutate the production schema without a controlled migration process.
 
-PDR-2C1 adds schema SQL drafts only. PDR-2C2A adds the first mapper compatibility slice for upsert SQL only. PDR-2C2B/PDR-2C3 must complete date-function compatibility and PostgreSQL validation before any migration implementation is treated as deployable.
+PDR-2C1 adds schema SQL drafts only. PDR-2C2A adds mapper upsert compatibility. PDR-M1 adds PostgreSQL driver, test-only Testcontainers/Flyway smoke, date-function mapper variants, and backup/restore command templates. Production migrations are still not deployable until real environment validation and the production release gate are complete.
 
 ## Rollback Policy
 
@@ -83,13 +96,61 @@ Initial targets:
 
 PDR-2A does not implement backup or restore commands. PDR-2D must define PostgreSQL-specific backup and restore commands and validation evidence.
 
+### PostgreSQL Backup / Restore Draft
+
+These commands are templates. Replace environment variables through the production secrets manager / deployment environment; do not hard-code secrets.
+
+Pre-migration backup requirement:
+
+```bash
+PGPASSWORD="$PROD_DATASOURCE_PASSWORD" pg_dump \
+  --host="$PROD_DATASOURCE_HOST" \
+  --port="${PROD_DATASOURCE_PORT:-5432}" \
+  --username="$PROD_DATASOURCE_USERNAME" \
+  --dbname="$PROD_DATASOURCE_DATABASE" \
+  --format=custom \
+  --file="backup/trade_model_v1_$(date +%Y%m%d_%H%M%S).dump"
+```
+
+Restore template for a controlled recovery database:
+
+```bash
+PGPASSWORD="$RESTORE_DATASOURCE_PASSWORD" pg_restore \
+  --host="$RESTORE_DATASOURCE_HOST" \
+  --port="${RESTORE_DATASOURCE_PORT:-5432}" \
+  --username="$RESTORE_DATASOURCE_USERNAME" \
+  --dbname="$RESTORE_DATASOURCE_DATABASE" \
+  --clean \
+  --if-exists \
+  --no-owner \
+  "backup/trade_model_v1_YYYYMMDD_HHMMSS.dump"
+```
+
+Plain SQL restore alternative when using `pg_dump --format=plain`:
+
+```bash
+PGPASSWORD="$RESTORE_DATASOURCE_PASSWORD" psql \
+  --host="$RESTORE_DATASOURCE_HOST" \
+  --port="${RESTORE_DATASOURCE_PORT:-5432}" \
+  --username="$RESTORE_DATASOURCE_USERNAME" \
+  --dbname="$RESTORE_DATASOURCE_DATABASE" \
+  --file="backup/trade_model_v1_YYYYMMDD_HHMMSS.sql"
+```
+
+Restore smoke checklist:
+
+- DB connection succeeds with the restored credentials.
+- `flyway_schema_history` exists and reports expected successful migrations.
+- `/api/dashboard/home` returns HTTP 200 in the restored environment.
+- `/api/review/center` returns HTTP 200 in the restored environment.
+- RPO 24h / RTO 4h target evidence is recorded for the restore drill.
+
 ## Remaining Blockers
 
-- Flyway dependency is available only through the non-default `flyway-migration` Maven profile.
-- PostgreSQL baseline schema SQL exists but is not validated against PostgreSQL yet.
-- Mapper PostgreSQL compatibility is partial: upsert variants are present, DATEADD / FORMATDATETIME compatibility is still pending.
-- PostgreSQL driver/Testcontainers validation not added.
-- Backup/restore scripts or commands not implemented.
+- Flyway remains non-default for runtime startup; test-only Flyway smoke exists.
+- PostgreSQL baseline schema SQL has a Testcontainers smoke path, but this local environment may skip it when Docker is unavailable.
+- Mapper PostgreSQL compatibility covers known upsert and DATEADD / FORMATDATETIME blockers; live PostgreSQL mapper execution remains to be expanded beyond smoke/static guards.
+- Backup/restore command templates exist; real restore drill evidence is still missing.
 - Auth/access control missing.
 - Observability missing.
 - Deployment packaging missing.
@@ -97,10 +158,10 @@ PDR-2A does not implement backup or restore commands. PDR-2D must define Postgre
 
 ## Next Packages
 
-1. PDR-2C2B Mapper PostgreSQL Date Function Compatibility.
-2. PDR-2C3 PostgreSQL Driver + Migration Smoke Validation.
-3. PDR-2D Backup/Restore Runbook.
+1. PDR-M2 Production Secrets / Deployment Config Contract.
+2. PDR-M3 Auth / Access Control Gate.
+3. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
 
 ## Explicit Non-Scope
 
-PDR-2C2A does not add PostgreSQL connection, schema.sql changes, Flyway migration changes, runtime application config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics. It only adds MyBatis database-id detection and PostgreSQL upsert annotation variants while preserving default H2 mapper behavior.
+PDR-M1 does not add a real PostgreSQL connection, schema.sql changes, production application config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics. It adds runtime PostgreSQL driver support, test-only PostgreSQL smoke coverage, mapper PostgreSQL variants, and backup/restore templates while preserving default H2 mapper behavior.

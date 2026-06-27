@@ -46,11 +46,19 @@ public interface HotResetEventMapper {
 
     @Select("SELECT COUNT(*) FROM tm_hot_reset_event "
             + "WHERE event_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_hot_reset_event "
+            + "WHERE event_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     Integer countInWindow(@Param("windowMinutes") int windowMinutes);
 
     @Select("SELECT trigger_type AS key, COUNT(*) AS count "
             + "FROM tm_hot_reset_event "
             + "WHERE event_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP) "
             + "GROUP BY trigger_type ORDER BY COUNT(*) DESC, trigger_type ASC")
+    @Select(value = "SELECT trigger_type AS key, COUNT(*) AS count "
+            + "FROM tm_hot_reset_event "
+            + "WHERE event_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute') "
+            + "GROUP BY trigger_type ORDER BY COUNT(*) DESC, trigger_type ASC",
+            databaseId = "postgresql")
     List<KeyCountVO> selectTriggerTypeCountsInWindow(@Param("windowMinutes") int windowMinutes);
 }

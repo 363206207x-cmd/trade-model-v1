@@ -79,6 +79,19 @@ public interface PushSnapshotMapper {
             "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= DATEADD('MINUTE', -#{minRetryMinutes}, CURRENT_TIMESTAMP)) " +
             "ORDER BY s.push_id ASC " +
             "LIMIT #{limit}")
+    @Select(value = "SELECT s.* FROM tm_push_snapshot s " +
+            "LEFT JOIN ( " +
+            "  SELECT push_id, COUNT(1) AS attempt_count, MAX(recheck_time) AS last_recheck_time " +
+            "  FROM tm_push_recheck_log " +
+            "  GROUP BY push_id " +
+            ") r ON r.push_id = s.push_id " +
+            "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB} OR s.push_status = #{statusC}) " +
+            "AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP) " +
+            "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
+            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= CURRENT_TIMESTAMP - (#{minRetryMinutes} * INTERVAL '1 minute')) " +
+            "ORDER BY s.push_id ASC " +
+            "LIMIT #{limit}",
+            databaseId = "postgresql")
     List<TmPushSnapshotDO> listPendingRecheckNext(
             @Param("statusA") String statusA,
             @Param("statusB") String statusB,

@@ -132,11 +132,18 @@ public interface AnalysisRunMapper {
 
     @Select("SELECT COUNT(*) FROM tm_analysis_run "
             + "WHERE analysis_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_analysis_run "
+            + "WHERE analysis_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     Integer countInWindow(@Param("windowMinutes") int windowMinutes);
 
     @Select("SELECT COUNT(*) FROM tm_analysis_run "
             + "WHERE analysis_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP) "
             + "AND data_quality_score IS NOT NULL AND data_quality_score < #{threshold}")
+    @Select(value = "SELECT COUNT(*) FROM tm_analysis_run "
+            + "WHERE analysis_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute') "
+            + "AND data_quality_score IS NOT NULL AND data_quality_score < #{threshold}",
+            databaseId = "postgresql")
     Integer countLowQualityInWindow(@Param("windowMinutes") int windowMinutes,
                                     @Param("threshold") int threshold);
 }

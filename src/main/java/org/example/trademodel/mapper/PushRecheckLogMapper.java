@@ -46,5 +46,9 @@ public interface PushRecheckLogMapper {
     @Select("SELECT COUNT(*) FROM tm_push_recheck_log "
             + "WHERE UPPER(TRIM(COALESCE(recheck_status, ''))) = UPPER(TRIM(#{status})) "
             + "AND create_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
+    @Select(value = "SELECT COUNT(*) FROM tm_push_recheck_log "
+            + "WHERE UPPER(TRIM(COALESCE(recheck_status, ''))) = UPPER(TRIM(#{status})) "
+            + "AND create_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
+            databaseId = "postgresql")
     Integer countByStatusInWindow(@Param("status") String status, @Param("windowMinutes") int windowMinutes);
 }

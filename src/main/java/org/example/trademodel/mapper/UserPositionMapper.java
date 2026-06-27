@@ -25,7 +25,7 @@ public interface UserPositionMapper {
             "#{manualReviewRequired}, #{notTradeInstruction}, #{notAutoTrading}, #{notOrderExecution}, " +
             "#{notPositionSync}, #{createdAt}, #{updatedAt}" +
             ")")
-    @Options(useGeneratedKeys = true, keyProperty = "id")
+    @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(UserPositionDO row);
 
     @Select("SELECT * FROM tm_user_position WHERE id = #{id}")
