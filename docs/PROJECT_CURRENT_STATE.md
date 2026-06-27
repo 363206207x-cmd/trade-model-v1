@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-2 Full E2E Acceptance DONE/effective on merged main evidence
-Next Business Phase: P3-3 Final Delivery & System Freeze
-Next Business Phase Allowed: NO in this task; P3-3 requires a separate explicit task after this P3-2 closure is merged/effective
+Current Work Package: P3-3 Final Delivery & System Freeze DONE/effective as local acceptance-ready final freeze
+Next Business Phase: Post-freeze user acceptance / production readiness remediation
+Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
 
 ---
@@ -49,35 +49,37 @@ P3-1 Dashboard Final is effective because its final homepage UI layout is merged
 
 P3-2 Full E2E Acceptance is effective because its acceptance evidence is merged to clean / synced `main` by PR #1025 Dashboard Manual UserPosition Binding, PR #1027 Full UserPosition lifecycle E2E acceptance, and PR #1028 Dashboard E2E state proof / commit `1b08abd`. Full Maven validation, delivery check, and `v1-state` pass on clean / synced main.
 
+P3-3 Final Delivery & System Freeze is effective because final docs/status closure now records the local acceptance-ready freeze state on clean / synced `main`: full Maven validation passed, delivery check passed, `v1-state` passed with blockers none, `/api/dashboard/home` returned HTTP 200 success with the expected Dashboard Home shape, and `/api/review/center` returned HTTP 200 success with the expected Review Center shape.
+
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed in this P3-2 docs/status closure task:
+Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Updating progress/status documentation to record P3-2 Full E2E Acceptance DONE/effective.
-2. Recording the evidenced P3-2 acceptance table.
-3. Preserving Production Deployment Readiness as BLOCKED.
-4. Reporting P3-3 Final Delivery & System Freeze as the next separate phase without starting it.
+1. Autodeliver this docs/status closure if approved.
+2. User visual / acceptance review of the locally frozen V1 decision-support workflow.
+3. Future production-readiness remediation only under a separate explicit production release gate.
+4. Preserving Production Deployment Readiness as BLOCKED until that separate gate clears it.
 
 ---
 
 ## Current Forbidden Work
 
-The following work is blocked in this P3-2 closure task:
+The following work remains blocked after this P3-3 closure:
 
-1. Starting P3-3 Final Delivery & System Freeze implementation.
-2. Java, schema, dashboard, API contract, test, script, scheduler, Push, order, execution, auto-trading, production config, or trading-logic changes.
-3. Production-ready claims.
-4. Auto-trading of any kind.
+1. Java, schema, dashboard, review UI, API contract, test, script, scheduler, Push, Telegram, order, execution, auto-trading, production config, or trading-logic changes inside this closure.
+2. Production-ready claims.
+3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
+4. Treating this local acceptance freeze as production deployment approval.
 
 ---
 
 ## Current Known Critical Gaps
 
 1. Production deployment remains blocked by non-production runtime/config evidence.
-2. P3-3 Final Delivery & System Freeze is NOT_STARTED and remains a separate phase.
-3. P3-2 Full E2E Acceptance completion does not prove production readiness, Push send, external channel, order execution, or auto-trading capability.
+2. P3-3 Final Delivery & System Freeze completion does not prove production readiness, Push send, Telegram send, external channel, order execution, or auto-trading capability.
+3. Production-readiness remediation remains a separate future scope and requires a separate human release gate.
 
 ## P3-2 Full E2E Acceptance Closure
 
@@ -99,6 +101,26 @@ Merged main evidence:
 14. `bash scripts/v1-state.sh` passed with `WORKTREE_CLEAN: Yes`, `OPEN_PR_STATUS: NONE`, `MAIN_SYNC: OK`, `CLEAN_SYNCED_MAIN: YES`, and `BLOCKERS: none`.
 
 P3-2 Full E2E Acceptance is DONE/effective as E2E acceptance evidence. Production Deployment Readiness remains BLOCKED and no production-ready claim is made.
+
+## P3-3 Final Delivery & System Freeze Closure
+
+Final local acceptance-ready freeze evidence:
+
+1. `GET /api/dashboard/home` returned HTTP 200 success with `header`, `systemState`, `assets`, `positions`, `executionSuggestion`, `aiDecision`, `pushInbox`, `diagnostics`, and `safety`.
+2. Dashboard Home Aggregation API is merged/effective.
+3. Dashboard Data Fill P1-P5 are merged/effective: decision/systemState/assets, manual positions/executionSuggestion, AI role evidence, pushInbox readonly data, and Telegram readonly status contract.
+4. Push Inbox remains readonly.
+5. Telegram status remains `WAITING_SYNC` until a verified status source exists; no Telegram send is implemented.
+6. `GET /api/review/center` returned HTTP 200 success with `summary`, `positionReviews`, `opportunityReviews`, `pushReviews`, and `ruleFeedback`.
+7. `/review/dashboard` exists as the Review Center route; four tabs exist: 持仓复盘 / 机会复盘 / 推送复盘 / 规则反馈.
+8. Review Center data is readonly and does not fabricate records.
+9. Mainline validation passed on `main`: clean worktree before closure, no open PRs, MAIN_SYNC OK, full Maven PASS, delivery check PASS, and `v1-state` blockers none.
+10. P0-0 through P3-2 remain DONE/effective.
+11. Production Deployment Readiness remains BLOCKED.
+12. No production deployment approval is granted.
+13. No order / execution / auto-trading capability exists.
+
+P3-3 Final Delivery & System Freeze is DONE/effective as a local acceptance-ready / read-only decision support / review workflow freeze. It is not production deployment ready.
 
 ---
 
@@ -128,7 +150,7 @@ Review-only slice count is no longer a delivery completion standard.
 
 ## Rule
 
-No P3-3 implementation or final-delivery package may start until this P3-2 docs/status closure is merged to `main`, local `main` is synced, the worktree is clean, and the runtime gate has no blockers.
+No production deployment package may start until a separate explicit production release gate addresses the blocked runtime/config evidence and preserves the permanent no auto-trading / no order-execution safety boundaries.
 
 ## Workflow PR Status
 
