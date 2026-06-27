@@ -71,6 +71,28 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsMissingAdminCredentials() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.admin-username", "");
+        environment.setProperty("trade-model.auth.admin-password", " ");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production admin username missing")
+                .hasMessageContaining("production admin password missing");
+    }
+
+    @Test
+    void rejectsUnsafeAdminPasswordDefaults() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.admin-password", "change-me");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production admin password uses an unsafe default value");
+    }
+
+    @Test
     void allowsSafeExternalDatasourceLookingConfig() {
         MockEnvironment environment = safeEnvironment();
 
@@ -89,6 +111,8 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("position.provider.type", "BINANCE");
         environment.setProperty("binance.api.key", "configured-key");
         environment.setProperty("binance.api.secret", "configured-secret");
+        environment.setProperty("trade-model.auth.admin-username", "operator");
+        environment.setProperty("trade-model.auth.admin-password", "configured-admin-password");
         return environment;
     }
 }

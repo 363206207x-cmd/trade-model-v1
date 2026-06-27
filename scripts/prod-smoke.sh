@@ -2,6 +2,13 @@
 set -euo pipefail
 
 APP_URL="${APP_URL:-http://localhost:8081}"
+AUTH_USERNAME="${SMOKE_AUTH_USERNAME:-${APP_ADMIN_USERNAME:-}}"
+AUTH_PASSWORD="${SMOKE_AUTH_PASSWORD:-${APP_ADMIN_PASSWORD:-}}"
+
+if [ -z "$AUTH_USERNAME" ] || [ -z "$AUTH_PASSWORD" ]; then
+  echo "FAIL smoke auth credentials missing; set APP_ADMIN_USERNAME/APP_ADMIN_PASSWORD or SMOKE_AUTH_USERNAME/SMOKE_AUTH_PASSWORD" >&2
+  exit 1
+fi
 
 dashboard_body="$(mktemp)"
 review_body="$(mktemp)"
@@ -11,7 +18,7 @@ request_json() {
   local path="$1"
   local out="$2"
   local code
-  code="$(curl -sS -o "$out" -w '%{http_code}' "${APP_URL}${path}" || true)"
+  code="$(curl -sS -u "${AUTH_USERNAME}:${AUTH_PASSWORD}" -o "$out" -w '%{http_code}' "${APP_URL}${path}" || true)"
   if [ "$code" != "200" ]; then
     echo "FAIL ${path} returned HTTP ${code}" >&2
     return 1

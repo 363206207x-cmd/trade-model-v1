@@ -28,6 +28,10 @@ logging:
     org.example.trademodel: DEBUG
 
 trade-model:
+  auth:
+    enabled: ${TRADE_MODEL_AUTH_ENABLED:true}
+    admin-username: ${APP_ADMIN_USERNAME:admin}
+    admin-password: ${APP_ADMIN_PASSWORD:dev-local-password}
   analysis:
     scheduler:
       enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
