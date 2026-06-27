@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.entity.UserConfigDO;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
@@ -38,6 +39,18 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardHomeServiceImplTest {
+    private static final List<String> FORBIDDEN_TELEGRAM_STATUS_DEPENDENCIES = List.of(
+            "Telegram",
+            "Notification",
+            "PushRecheckService",
+            "PushRecheckScheduler",
+            "PushRecheckController",
+            "PushRecheckDispatch",
+            "UserConfigService",
+            "UserConfigMapper",
+            "Webhook"
+    );
+
     @Mock
     private DecisionService decisionService;
     @Mock
@@ -247,6 +260,7 @@ class DashboardHomeServiceImplTest {
 
         assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo("WAITING_SYNC");
         assertThat(home.getDiagnostics().getTelegram()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo(home.getDiagnostics().getTelegram());
         assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
         assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_ONLY");
         assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(3);
@@ -254,6 +268,44 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPushInbox().getCounts().getExecutable()).isEqualTo(2);
         assertThat(home.getPushInbox().getCounts().getInvalidated()).isEqualTo(5);
         assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
+    }
+
+    @Test
+    void telegramReadonlyStatusStaysWaitingSyncAndDoesNotUseConfigOnlyNotifyChannels() {
+        UserConfigDO configOnly = new UserConfigDO();
+        configOnly.setUserId("dashboard-home");
+        configOnly.setNotifyChannels("telegram");
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(configOnly.getNotifyChannels()).containsIgnoringCase("telegram");
+        assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getDiagnostics().getTelegram()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo(home.getDiagnostics().getTelegram());
+        assertThat(home.getPushInbox().getTelegramStatus()).isNotEqualTo("CONNECTED");
+        assertThat(home.getDiagnostics().getTelegram()).isNotEqualTo("CONNECTED");
+    }
+
+    @Test
+    void dashboardHomeAggregationHasNoTelegramSendDispatchOrRecheckExecutionDependency() {
+        assertThat(Arrays.stream(DashboardHomeServiceImpl.class.getDeclaredFields())
+                .map(field -> field.getType().getSimpleName()))
+                .doesNotContain(FORBIDDEN_TELEGRAM_STATUS_DEPENDENCIES.toArray(String[]::new));
+        assertThat(Arrays.stream(DashboardHomeServiceImpl.class.getDeclaredConstructors())
+                .flatMap(constructor -> Arrays.stream(constructor.getParameterTypes()))
+                .map(Class::getSimpleName))
+                .doesNotContain(FORBIDDEN_TELEGRAM_STATUS_DEPENDENCIES.toArray(String[]::new));
+        assertThat(Arrays.stream(DashboardHomeServiceImpl.class.getDeclaredMethods())
+                .map(method -> method.getName().toLowerCase()))
+                .allSatisfy(methodName -> {
+                    assertThat(methodName).doesNotContain("telegram");
+                    assertThat(methodName).doesNotContain("notify");
+                    assertThat(methodName).doesNotContain("notification");
+                    assertThat(methodName).doesNotContain("webhook");
+                    assertThat(methodName).doesNotContain("dispatch");
+                    assertThat(methodName).doesNotContain("replay");
+                    assertThat(methodName).doesNotContain("send");
+                });
     }
 
     @Test
