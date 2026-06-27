@@ -130,13 +130,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 statusForText(trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null),
                 null
         ));
+        String highestRisk = riskLevelFrom(decisions);
         state.setRiskLevel(card(
                 "riskLevel",
                 "风险等级",
-                selectedDecision != null ? selectedDecision.getRiskLevel() : riskLevelFrom(decisions),
-                riskLabel(selectedDecision != null ? selectedDecision.getRiskLevel() : riskLevelFrom(decisions)),
+                highestRisk,
+                riskLabel(highestRisk),
                 "决策风险",
-                statusForText(selectedDecision != null ? selectedDecision.getRiskLevel() : riskLevelFrom(decisions)),
+                statusForText(highestRisk),
                 null
         ));
         Integer averageDataQuality = averageDataQuality(decisions);
@@ -266,8 +267,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setConfidenceLabel(confidenceLabel(decision.getConfidenceLevel()));
         asset.setRiskLevel(trimToNull(decision.getRiskLevel()));
         asset.setRiskLabel(riskLabel(decision.getRiskLevel()));
-        asset.setAssetState(trimToNull(decision.getAssetStateSnapshot()));
-        asset.setAssetStateLabel(assetStateLabel(decision));
+        String assetState = recognizedAssetStateFromSnapshot(decision.getAssetStateSnapshot());
+        asset.setAssetState(assetState);
+        asset.setAssetStateLabel(assetStateLabel(assetState));
         asset.setWorthOpening(decision.getIsWorthOpening());
         return asset;
     }
@@ -626,8 +628,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private String riskLevelFrom(List<DecisionResultVO> decisions) {
-        DecisionResultVO first = firstDecision(decisions);
-        return first != null ? first.getRiskLevel() : null;
+        String highest = null;
+        int highestRank = -1;
+        if (decisions != null) {
+            for (DecisionResultVO decision : decisions) {
+                if (decision == null) {
+                    continue;
+                }
+                String risk = trimToNull(decision.getRiskLevel());
+                int rank = riskRank(risk);
+                if (rank > highestRank) {
+                    highest = risk;
+                    highestRank = rank;
+                }
+            }
+        }
+        return highest;
     }
 
     private Integer averageDataQuality(List<DecisionResultVO> decisions) {
@@ -716,21 +732,59 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return hasText(value) ? "CONNECTED" : "WAITING_SYNC";
     }
 
-    private String assetStateLabel(DecisionResultVO decision) {
-        if (decision == null) {
+    private String recognizedAssetStateFromSnapshot(String snapshot) {
+        String raw = trimToNull(snapshot);
+        if (raw == null) {
             return null;
         }
-        String raw = trimToNull(decision.getAssetStateSnapshot());
-        if (raw != null) {
-            return raw;
+        try {
+            JsonNode root = objectMapper.readTree(raw);
+            if (root == null || !root.isObject()) {
+                return null;
+            }
+            String state = recognizedAssetStateValue(root.get("state"));
+            if (state != null) {
+                return state;
+            }
+            return recognizedAssetStateValue(root.get("nextState"));
+        } catch (Exception ignored) {
+            return null;
         }
-        if (Boolean.TRUE.equals(decision.getIsWorthOpening())) {
-            return "候选";
+    }
+
+    private String recognizedAssetStateValue(JsonNode node) {
+        if (node == null || !node.isTextual()) {
+            return null;
         }
-        if (Boolean.FALSE.equals(decision.getIsWorthOpening())) {
-            return "暂不建议";
-        }
-        return null;
+        return switch (node.asText()) {
+            case "OBSERVING", "CANDIDATE", "WAITING_TRIGGER", "TRIGGERED",
+                    "HIGH_RISK", "INVALIDATED", "COOLING", "CONFUSED" -> node.asText();
+            default -> null;
+        };
+    }
+
+    private String assetStateLabel(String assetState) {
+        return switch (assetState != null ? assetState : "") {
+            case "OBSERVING" -> "观察";
+            case "CANDIDATE" -> "候选";
+            case "WAITING_TRIGGER" -> "等待触发";
+            case "TRIGGERED" -> "已触发";
+            case "HIGH_RISK" -> "高风险观察";
+            case "INVALIDATED" -> "已失效";
+            case "COOLING" -> "冷却";
+            case "CONFUSED" -> "Confused 阻断";
+            default -> null;
+        };
+    }
+
+    private int riskRank(String risk) {
+        return switch (upper(risk)) {
+            case "EXTREME" -> 4;
+            case "HIGH" -> 3;
+            case "MEDIUM" -> 2;
+            case "LOW" -> 1;
+            default -> -1;
+        };
     }
 
     private String biasLabel(String bias) {
