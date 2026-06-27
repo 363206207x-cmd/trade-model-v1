@@ -1,0 +1,34 @@
+server:
+  port: ${SERVER_PORT:8081}
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  datasource:
+    url: ${PROD_DATASOURCE_URL}
+    username: ${PROD_DATASOURCE_USERNAME}
+    password: ${PROD_DATASOURCE_PASSWORD}
+
+  h2:
+    console:
+      enabled: false
+
+  main:
+    allow-circular-references: false
+
+logging:
+  level:
+    org.example.trademodel: INFO
+
+position:
+  provider:
+    type: ${POSITION_PROVIDER_TYPE:BINANCE}
+
+binance:
+  api:
+    base-url: ${BINANCE_API_BASE_URL:https://fapi.binance.com}
+    key: ${BINANCE_API_KEY}
+    secret: ${BINANCE_API_SECRET}
+
+trade-model:
+  production:
+    allow-public-bind: ${TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND:false}
