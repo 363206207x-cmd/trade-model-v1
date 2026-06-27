@@ -373,20 +373,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AiTabVO tab = new DashboardHomeVO.AiTabVO();
         tab.setRole(role);
         tab.setRoleLabel(roleLabel(role));
-        tab.setDirection(firstNonBlank(text(roleNode, "direction", "marketBias", "market_bias"),
-                decision != null ? decision.getMarketBiasHierarchy() : null));
-        tab.setConfidenceLevel(firstNonBlank(text(roleNode, "confidenceLevel", "confidence_level", "confidence"),
-                decision != null ? decision.getConfidenceLevel() : null));
-        tab.setSupportEvidence(textList(roleNode, "supportEvidence", "supportEvidences", "support_evidence",
-                "support_evidences", "supportingEvidence", "supportingEvidences"));
-        tab.setAgainstEvidence(textList(roleNode, "againstEvidence", "againstEvidences", "against_evidence",
-                "against_evidences", "opposingEvidence", "opposingEvidences"));
-        tab.setRiskPoints(textList(roleNode, "riskPoint", "riskPoints", "risk_point", "risk_points"));
-        tab.setDowngradeReason(text(roleNode, "downgradeReason", "downgrade_reason", "blockReason", "block_reason"));
-        tab.setReviewConclusion(text(roleNode, "reviewConclusion", "review_conclusion", "conclusion", "summary"));
-        if (tab.getReviewConclusion() == null && roleNode != null && roleNode.isTextual()) {
-            tab.setReviewConclusion(trimToNull(roleNode.asText()));
-        }
+        tab.setDirection(text(roleNode, "direction", "marketBias", "bias", "finalDirection",
+                "directionJudgement", "directionJudgment"));
+        tab.setConfidenceLevel(text(roleNode, "confidenceLevel", "confidence", "confidence_level"));
+        tab.setSupportEvidence(textList(roleNode, "supportEvidence", "supportingEvidence", "positiveEvidence",
+                "coreSupportEvidence", "evidenceSupport", "supports", "support"));
+        tab.setAgainstEvidence(textList(roleNode, "againstEvidence", "opposingEvidence", "negativeEvidence",
+                "counterEvidence", "contradictionEvidence", "opposition", "against"));
+        tab.setRiskPoints(textList(roleNode, "riskPoints", "risks", "riskWarnings", "riskSummary", "risk_points"));
+        tab.setDowngradeReason(text(roleNode, "downgradeReason", "blockReason", "downgradeOrBlockReason",
+                "downgrade_reason", "rejectReason"));
+        tab.setReviewConclusion(text(roleNode, "reviewConclusion", "conclusion", "finalOpinion",
+                "reviewOpinion", "summary", "decisionSummary"));
         return tab;
     }
 
@@ -554,45 +552,77 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private JsonNode roleNode(JsonNode root, String role) {
-        if (root == null || !root.isObject()) {
+        if (root == null) {
             return null;
         }
-        for (String key : roleKeys(role)) {
-            JsonNode node = root.get(key);
-            if (node != null && !node.isNull()) {
-                return node;
+        if (root.isObject() && roleMatches(role, text(root, "role", "aiRole", "providerRole", "roleType"))) {
+            return root;
+        }
+        if (root.isObject()) {
+            for (String key : roleKeys(role)) {
+                JsonNode node = root.get(key);
+                if (node != null && node.isObject()) {
+                    return node;
+                }
             }
-        }
-        return null;
-    }
-
-    private List<String> roleKeys(String role) {
-        if ("GPT_FINAL".equals(role)) {
-            return List.of("GPT_FINAL", "gptFinal", "gpt_final", "GPT", "gpt", "final");
-        }
-        if ("GEMINI_REVIEW".equals(role)) {
-            return List.of("GEMINI_REVIEW", "geminiReview", "gemini_review", "GEMINI", "gemini");
-        }
-        return List.of("GROK_CHALLENGE", "grokChallenge", "grok_challenge", "GROK", "grok");
-    }
-
-    private String text(JsonNode node, String... keys) {
-        if (node == null || !node.isObject()) {
-            return null;
-        }
-        for (String key : keys) {
-            JsonNode child = node.get(key);
-            if (child == null || child.isNull()) {
-                continue;
+            for (var fields = root.fieldNames(); fields.hasNext(); ) {
+                JsonNode found = roleNode(root.get(fields.next()), role);
+                if (found != null) {
+                    return found;
+                }
             }
-            if (child.isTextual() || child.isNumber() || child.isBoolean()) {
-                String value = trimToNull(child.asText());
-                if (value != null) {
-                    return value;
+        } else if (root.isArray()) {
+            for (JsonNode child : root) {
+                JsonNode found = roleNode(child, role);
+                if (found != null) {
+                    return found;
                 }
             }
         }
         return null;
+    }
+
+    private boolean roleMatches(String expectedRole, String rawRole) {
+        String expected = roleToken(expectedRole);
+        String actual = roleToken(rawRole);
+        if (actual.isEmpty()) {
+            return false;
+        }
+        if (expected.equals(actual)) {
+            return true;
+        }
+        return switch (expected) {
+            case "GPTFINAL" -> actual.equals("GPT") || actual.equals("FINAL") || actual.equals("GPTRULEREVIEW");
+            case "GEMINIREVIEW" -> actual.equals("GEMINI") || actual.equals("GEMINICONSISTENCYREVIEW");
+            case "GROKCHALLENGE" -> actual.equals("GROK") || actual.equals("GROKADVERSARIALCHALLENGE");
+            default -> false;
+        };
+    }
+
+    private String roleToken(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            return "";
+        }
+        StringBuilder token = new StringBuilder();
+        for (char ch : trimmed.toUpperCase(Locale.ROOT).toCharArray()) {
+            if (Character.isLetterOrDigit(ch)) {
+                token.append(ch);
+            }
+        }
+        return token.toString();
+    }
+
+    private List<String> roleKeys(String role) {
+        if ("GPT_FINAL".equals(role)) {
+            return List.of("GPT_FINAL", "gptFinal", "gpt_final", "GPT", "gpt", "final", "GPT_RULE_REVIEW", "gptRuleReview");
+        }
+        if ("GEMINI_REVIEW".equals(role)) {
+            return List.of("GEMINI_REVIEW", "geminiReview", "gemini_review", "GEMINI", "gemini",
+                    "GEMINI_CONSISTENCY_REVIEW", "geminiConsistencyReview");
+        }
+        return List.of("GROK_CHALLENGE", "grokChallenge", "grok_challenge", "GROK", "grok",
+                "GROK_ADVERSARIAL_CHALLENGE", "grokAdversarialChallenge");
     }
 
     private List<String> textList(JsonNode node, String... keys) {
@@ -607,13 +637,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             List<String> values = new ArrayList<>();
             if (child.isArray()) {
                 child.forEach(item -> {
-                    String value = item.isTextual() || item.isNumber() || item.isBoolean() ? trimToNull(item.asText()) : null;
+                    String value = scalarText(item);
                     if (value != null) {
                         values.add(value);
                     }
                 });
-            } else if (child.isTextual() || child.isNumber() || child.isBoolean()) {
-                String value = trimToNull(child.asText());
+            } else {
+                String value = scalarText(child);
                 if (value != null) {
                     values.add(value);
                 }
@@ -623,6 +653,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
         }
         return List.of();
+    }
+
+    private String text(JsonNode node, String... keys) {
+        if (node == null || !node.isObject()) {
+            return null;
+        }
+        for (String key : keys) {
+            JsonNode child = node.get(key);
+            if (child == null || child.isNull()) {
+                continue;
+            }
+            String value = scalarText(child);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String scalarText(JsonNode node) {
+        if (node == null || !(node.isTextual() || node.isNumber() || node.isBoolean())) {
+            return null;
+        }
+        return trimToNull(node.asText());
     }
 
     private int normalizeLimit(Integer limit) {
