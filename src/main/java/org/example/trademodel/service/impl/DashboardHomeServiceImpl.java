@@ -8,8 +8,10 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.example.trademodel.vo.DashboardHomeVO;
@@ -41,6 +43,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final DecisionService decisionService;
     private final MonitorService monitorService;
     private final UserPositionService userPositionService;
+    private final PositionMonitorLogService positionMonitorLogService;
     private final PositionSyncService positionSyncService;
     private final PushSnapshotMapper pushSnapshotMapper;
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
@@ -49,6 +52,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
                                     UserPositionService userPositionService,
+                                    PositionMonitorLogService positionMonitorLogService,
                                     PositionSyncService positionSyncService,
                                     PushSnapshotMapper pushSnapshotMapper,
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
@@ -56,6 +60,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.decisionService = decisionService;
         this.monitorService = monitorService;
         this.userPositionService = userPositionService;
+        this.positionMonitorLogService = positionMonitorLogService;
         this.positionSyncService = positionSyncService;
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
@@ -291,21 +296,44 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private List<DashboardHomeVO.PositionVO> buildPositions(List<UserPositionVO> positions) {
         List<DashboardHomeVO.PositionVO> rows = new ArrayList<>();
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
+            if (!isManualPosition(position)) {
+                continue;
+            }
+            PositionMonitorLogDTO latestMonitorLog = latestPositionMonitorLog(position.getId());
             DashboardHomeVO.PositionVO row = new DashboardHomeVO.PositionVO();
             row.setPositionId(position.getId());
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
             row.setDirection(trimToNull(position.getSide()));
             row.setEntryPrice(position.getEntryPrice());
-            row.setCurrentPrice(null);
+            row.setCurrentPrice(latestMonitorLog != null ? latestMonitorLog.getCurrentPrice() : null);
             row.setFloatingPnl(null);
             row.setLeverage(position.getLeverage());
             row.setPositionSize(position.getQuantity());
             row.setPositionStatus(trimToNull(position.getStatus()));
-            row.setMonitorConclusion(null);
+            row.setMonitorConclusion(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null);
             row.setUpdatedAt(position.getUpdatedAt());
             rows.add(row);
         }
         return rows;
+    }
+
+    private boolean isManualPosition(UserPositionVO position) {
+        return position != null && "MANUAL".equalsIgnoreCase(trimToNull(position.getSourceType()));
+    }
+
+    private PositionMonitorLogDTO latestPositionMonitorLog(Long positionId) {
+        if (positionId == null) {
+            return null;
+        }
+        try {
+            List<PositionMonitorLogDTO> logs = positionMonitorLogService.listByPositionId(positionId, 1);
+            if (logs == null || logs.isEmpty()) {
+                return null;
+            }
+            return logs.get(0);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(DecisionResultVO decision) {
