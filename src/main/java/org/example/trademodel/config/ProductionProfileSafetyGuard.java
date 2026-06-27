@@ -79,6 +79,10 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             }
         }
 
+        validateExplicitAiProvider(environment, errors, "OpenAI", "trade-model.ai.openai");
+        validateExplicitAiProvider(environment, errors, "Gemini", "trade-model.ai.gemini");
+        validateExplicitAiProvider(environment, errors, "xAI", "trade-model.ai.xai");
+
         String serverAddress = normalizedAddress(property(environment, "server.address"));
         if (isPublicBind(serverAddress) && !isTrue(property(environment, "trade-model.production.allow-public-bind"))) {
             errors.add("production public server bind requires trade-model.production.allow-public-bind=true");
@@ -141,6 +145,24 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             }
         }
         return false;
+    }
+
+    private static void validateExplicitAiProvider(Environment environment,
+                                                   List<String> errors,
+                                                   String displayName,
+                                                   String propertyPrefix) {
+        if (!isTrue(property(environment, propertyPrefix + ".enabled"))) {
+            return;
+        }
+        if (isBlank(property(environment, propertyPrefix + ".api-key"))) {
+            errors.add(displayName + " API key missing for explicitly enabled production AI provider");
+        }
+        if (isBlank(property(environment, propertyPrefix + ".model"))) {
+            errors.add(displayName + " model missing for explicitly enabled production AI provider");
+        }
+        if (isBlank(property(environment, propertyPrefix + ".base-url"))) {
+            errors.add(displayName + " base URL missing for explicitly enabled production AI provider");
+        }
     }
 
     private static boolean isBlank(String value) {

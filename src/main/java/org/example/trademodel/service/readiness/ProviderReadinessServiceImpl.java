@@ -1,0 +1,222 @@
+package org.example.trademodel.service.readiness;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.example.trademodel.vo.ProviderReadinessVO;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ProviderReadinessServiceImpl implements ProviderReadinessService {
+    public static final String STATUS_CONNECTED = "CONNECTED";
+    public static final String STATUS_CONFIGURED = "CONFIGURED";
+    public static final String STATUS_NOT_CONFIGURED = "NOT_CONFIGURED";
+    public static final String STATUS_WAITING_SYNC = "WAITING_SYNC";
+    public static final String STATUS_FAIL_CLOSED = "FAIL_CLOSED";
+    public static final String STATUS_UNKNOWN = "UNKNOWN";
+
+    private final Environment environment;
+
+    public ProviderReadinessServiceImpl(Environment environment) {
+        this.environment = environment;
+    }
+
+    @Override
+    public ProviderReadinessVO getReadiness() {
+        ProviderReadinessVO.ProviderStatusVO market = marketDataStatus();
+        List<ProviderReadinessVO.ProviderStatusVO> aiProviders = aiProviderStatuses();
+        ProviderReadinessVO.ProviderStatusVO externalContext = externalContextStatus();
+
+        List<ProviderReadinessVO.ProviderStatusVO> providers = new ArrayList<>();
+        providers.add(market);
+        providers.addAll(aiProviders);
+        providers.add(externalContext);
+
+        ProviderReadinessVO readiness = new ProviderReadinessVO();
+        readiness.setMarketDataProviderStatus(market.getStatus());
+        readiness.setAiProviderStatus(aggregateAiStatus(aiProviders));
+        readiness.setExternalContextProviderStatus(externalContext.getStatus());
+        readiness.setDataSourceText(dataSourceText(market));
+        readiness.setProviders(providers);
+
+        Map<String, String> summary = new LinkedHashMap<>();
+        summary.put("marketDataProvider", readiness.getMarketDataProviderStatus());
+        summary.put("aiProvider", readiness.getAiProviderStatus());
+        summary.put("externalContextProvider", readiness.getExternalContextProviderStatus());
+        readiness.setSummary(summary);
+        return readiness;
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO marketDataStatus() {
+        String providerType = upper(firstNonBlank(property("position.provider.type"), "SIMULATED"));
+        if ("BINANCE".equals(providerType)) {
+            boolean baseUrlConfigured = hasText(firstNonBlank(
+                    property("binance.api.base-url"),
+                    property("market.api.base-url"),
+                    "https://api.binance.com"
+            ));
+            return item(
+                    "MARKET_DATA",
+                    "BINANCE_PUBLIC_MARKET_DATA",
+                    baseUrlConfigured ? STATUS_CONFIGURED : STATUS_NOT_CONFIGURED,
+                    true,
+                    baseUrlConfigured,
+                    false,
+                    baseUrlConfigured
+                            ? "BINANCE_PUBLIC_MARKET_CONFIG_ONLY_NOT_CONNECTED"
+                            : "BINANCE_PUBLIC_MARKET_BASE_URL_MISSING"
+            );
+        }
+        if ("SIMULATED".equals(providerType)) {
+            return item(
+                    "MARKET_DATA",
+                    "SIMULATED_FALLBACK",
+                    STATUS_WAITING_SYNC,
+                    true,
+                    false,
+                    false,
+                    "LOCAL_DEV_SIMULATED_FALLBACK_NOT_PRODUCTION_READY"
+            );
+        }
+        return item(
+                "MARKET_DATA",
+                providerType,
+                STATUS_UNKNOWN,
+                false,
+                false,
+                false,
+                "UNKNOWN_MARKET_PROVIDER_TYPE"
+        );
+    }
+
+    private List<ProviderReadinessVO.ProviderStatusVO> aiProviderStatuses() {
+        boolean orchestratorEnabled = isTrue(property("trade-model.ai.enabled"));
+        return List.of(
+                aiProviderStatus("OPENAI", "trade-model.ai.openai", orchestratorEnabled),
+                aiProviderStatus("GEMINI", "trade-model.ai.gemini", orchestratorEnabled),
+                aiProviderStatus("XAI", "trade-model.ai.xai", orchestratorEnabled)
+        );
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO aiProviderStatus(String name, String prefix, boolean orchestratorEnabled) {
+        boolean providerEnabled = orchestratorEnabled && isTrue(property(prefix + ".enabled"));
+        boolean configured = hasText(property(prefix + ".api-key"))
+                && hasText(property(prefix + ".model"))
+                && hasText(property(prefix + ".base-url"));
+        if (!orchestratorEnabled) {
+            return item("AI", name, STATUS_WAITING_SYNC, false, configured, false, "AI_ORCHESTRATOR_DISABLED");
+        }
+        if (!providerEnabled) {
+            return item("AI", name, STATUS_WAITING_SYNC, false, configured, false, "AI_PROVIDER_DISABLED");
+        }
+        if (!configured) {
+            return item("AI", name, STATUS_FAIL_CLOSED, true, false, false, "AI_PROVIDER_NOT_CONFIGURED");
+        }
+        return item("AI", name, STATUS_CONFIGURED, true, true, false, "AI_PROVIDER_CONFIG_ONLY_NOT_CONNECTED");
+    }
+
+    private String aggregateAiStatus(List<ProviderReadinessVO.ProviderStatusVO> providers) {
+        boolean sawConfigured = false;
+        for (ProviderReadinessVO.ProviderStatusVO provider : providers) {
+            if (STATUS_FAIL_CLOSED.equals(provider.getStatus())) {
+                return STATUS_FAIL_CLOSED;
+            }
+            if (STATUS_CONFIGURED.equals(provider.getStatus())) {
+                sawConfigured = true;
+            }
+        }
+        return sawConfigured ? STATUS_CONFIGURED : STATUS_WAITING_SYNC;
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO externalContextStatus() {
+        boolean newsConfigured = hasAnyText("trade-model.external-context.news.api-key", "news.api-key", "NEWS_API_KEY");
+        boolean macroConfigured = hasAnyText("trade-model.external-context.macro-calendar.api-key", "macro-calendar.api-key", "MACRO_CALENDAR_API_KEY");
+        boolean etfConfigured = hasAnyText("trade-model.external-context.etf-flow.api-key", "etf-flow.api-key", "ETF_FLOW_API_KEY");
+        boolean configured = newsConfigured || macroConfigured || etfConfigured;
+        return item(
+                "EXTERNAL_CONTEXT",
+                "MACRO_NEWS_CONTEXT",
+                configured ? STATUS_CONFIGURED : STATUS_WAITING_SYNC,
+                configured,
+                configured,
+                false,
+                configured ? "EXTERNAL_CONTEXT_CONFIG_ONLY_NOT_CONNECTED" : "EXTERNAL_CONTEXT_IMPORT_ONLY_WAITING_SYNC"
+        );
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO item(String category,
+                                                     String name,
+                                                     String status,
+                                                     boolean enabled,
+                                                     boolean configured,
+                                                     boolean connected,
+                                                     String reason) {
+        ProviderReadinessVO.ProviderStatusVO item = new ProviderReadinessVO.ProviderStatusVO();
+        item.setCategory(category);
+        item.setName(name);
+        item.setStatus(status);
+        item.setEnabled(enabled);
+        item.setConfigured(configured);
+        item.setConnected(connected);
+        item.setReason(reason);
+        return item;
+    }
+
+    private String dataSourceText(ProviderReadinessVO.ProviderStatusVO market) {
+        if (market == null) {
+            return STATUS_WAITING_SYNC;
+        }
+        if ("BINANCE_PUBLIC_MARKET_DATA".equals(market.getName())) {
+            return "Binance public data / " + market.getStatus();
+        }
+        if ("SIMULATED_FALLBACK".equals(market.getName())) {
+            return "Simulated fallback / " + market.getStatus();
+        }
+        return firstNonBlank(market.getName(), "UNKNOWN") + " / " + firstNonBlank(market.getStatus(), STATUS_UNKNOWN);
+    }
+
+    private boolean hasAnyText(String... keys) {
+        for (String key : keys) {
+            if (hasText(property(key))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String property(String key) {
+        try {
+            return environment.getProperty(key);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private boolean isTrue(String value) {
+        return "true".equalsIgnoreCase(trim(value));
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (hasText(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private String upper(String value) {
+        return trim(value).toUpperCase(Locale.ROOT);
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+}

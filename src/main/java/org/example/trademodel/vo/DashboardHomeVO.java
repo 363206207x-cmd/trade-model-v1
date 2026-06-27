@@ -996,6 +996,10 @@ public class DashboardHomeVO {
         private String hotReset = "UNKNOWN";
         private String opportunityLog = "UNKNOWN";
         private String review = "UNKNOWN";
+        private String marketDataProvider = "WAITING_SYNC";
+        private String aiProvider = "WAITING_SYNC";
+        private String externalContextProvider = "WAITING_SYNC";
+        private ProviderReadinessVO providerReadiness = new ProviderReadinessVO();
 
         public String getDataIngestion() {
             return dataIngestion;
@@ -1067,6 +1071,38 @@ public class DashboardHomeVO {
 
         public void setReview(String review) {
             this.review = review;
+        }
+
+        public String getMarketDataProvider() {
+            return marketDataProvider;
+        }
+
+        public void setMarketDataProvider(String marketDataProvider) {
+            this.marketDataProvider = marketDataProvider;
+        }
+
+        public String getAiProvider() {
+            return aiProvider;
+        }
+
+        public void setAiProvider(String aiProvider) {
+            this.aiProvider = aiProvider;
+        }
+
+        public String getExternalContextProvider() {
+            return externalContextProvider;
+        }
+
+        public void setExternalContextProvider(String externalContextProvider) {
+            this.externalContextProvider = externalContextProvider;
+        }
+
+        public ProviderReadinessVO getProviderReadiness() {
+            return providerReadiness;
+        }
+
+        public void setProviderReadiness(ProviderReadinessVO providerReadiness) {
+            this.providerReadiness = providerReadiness == null ? new ProviderReadinessVO() : providerReadiness;
         }
     }
 

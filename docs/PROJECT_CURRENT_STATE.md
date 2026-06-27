@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-M4 Observability + Production Smoke Gate
+Current Work Package: PDR-M5 Real Data Provider Readiness Pack
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Package: PDR-M4 Observability + Production Smoke Gate recorded on branch codex/pdr-m4-observability-smoke-gate
+Latest Production Readiness Package: PDR-M5 Real Data Provider Readiness Pack recorded on branch codex/pdr-m5-real-data-provider-readiness
 
 ---
 
@@ -58,9 +58,9 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this PDR-M4 observability and production smoke gate if approved.
+1. Autodeliver this PDR-M5 real data provider readiness pack if approved.
 2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Prepare the next production-readiness package for secrets manager integration, external integration readiness, HTTPS/reverse-proxy hardening, real server smoke evidence, restore drill evidence, and release-gate gaps under a separate explicit scope.
+3. Prepare the next production-readiness package for secrets manager integration, verified external-provider smoke, HTTPS/reverse-proxy hardening, real server smoke evidence, restore drill evidence, and release-gate gaps under a separate explicit scope.
 4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
@@ -69,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java business service/controller code unrelated to health/security configuration, schema.sql, mapper SQL, Flyway migration SQL, dashboard, review UI, business API contract, unrelated business test, scheduler, Push, Telegram, order, execution, auto-trading, real server deployment, real secrets, real PostgreSQL connection, sensitive actuator exposure, metrics/alerting stack, or trading-logic changes inside this PDR-M4 observability package.
+1. Java business service/controller code unrelated to readonly provider readiness or fail-closed config guards, schema.sql, mapper SQL, Flyway migration SQL, dashboard, review UI, business API contract, unrelated business test, scheduler, Push, Telegram, order, execution, auto-trading, real server deployment, real secrets, real PostgreSQL connection, sensitive actuator exposure, metrics/alerting stack, or trading-logic changes inside this PDR-M5 provider readiness package.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -139,9 +139,9 @@ Blocking evidence:
 - PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
 - Dockerfile, Docker Compose skeleton, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed.
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, secrets manager integration, real server auth smoke, or production release gate exists yet.
-- Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no metrics dashboards, log aggregation, alerting, real server smoke evidence, or production release gate exists yet.
+- Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, and readonly provider readiness checks exist after PDR-M5, but no metrics dashboards, log aggregation, alerting, live provider connection proof, real server smoke evidence, or production release gate exists yet.
 - No production database is connected in this package.
-- No full observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, external integration readiness, or production release gate exists yet.
+- No full observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, verified external-provider integration, or production release gate exists yet.
 
 ### PDR-2A Database Migration + Rollback Decision Pack
 
@@ -156,7 +156,7 @@ PDR-2A records the production database and migration decisions only. It does not
 - No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
 - Production readiness remains BLOCKED.
 
-Database / deployment remaining blockers after PDR-M4:
+Database / deployment remaining blockers after PDR-M5:
 
 - Flyway remains non-default for runtime startup; PDR-M1 adds only test/manual smoke coverage.
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but local evidence depends on Docker availability.
@@ -169,9 +169,9 @@ Database / deployment remaining blockers after PDR-M4:
 
 Next production-readiness packages:
 
-1. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
-2. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
-3. PDR-M7 Real Server Deployment Smoke / Restore Drill Evidence if not covered by PDR-M5.
+1. PDR-M6 Secrets Manager / Verified External Integration / Production Release Gate.
+2. PDR-M7 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
+3. PDR-M8 Real Server Deployment Smoke / Restore Drill Evidence if not covered by earlier packages.
 
 ### PDR-2B Flyway Baseline Skeleton
 
@@ -259,6 +259,20 @@ PDR-M4 adds minimal health/readiness observability and strengthens authenticated
 - `scripts/prod-smoke.sh` checks public health/liveness/readiness, authenticated `/api/dashboard/home`, authenticated `/api/review/center`, no-auto-trading/no-order safety fields, and Telegram non-connected status without printing passwords.
 - Targeted health/actuator/security tests prove public minimal health behavior, sensitive actuator non-exposure, auth boundary preservation, prod guard rejection, and smoke script syntax.
 - No real server deployment, real secrets, sensitive actuator endpoints, Prometheus/Grafana, alerting stack, Java business logic change, schema.sql change, mapper SQL change, Flyway migration change, Telegram send, Push dispatch, order/execution, or auto-trading semantics are added.
+- Production readiness remains BLOCKED.
+
+### PDR-M5 Real Data Provider Readiness Pack
+
+PDR-M5 adds readonly provider-readiness status and production smoke checks while preserving blocked-production and no-trading boundaries.
+
+- `ProviderReadinessService` maps Binance public market data, AI providers, and external context placeholders to safe statuses: `CONFIGURED`, `WAITING_SYNC`, `NOT_CONFIGURED`, `FAIL_CLOSED`, or `UNKNOWN`.
+- `CONNECTED` is not reported from config-only fields; live-provider proof remains deferred.
+- `/api/dashboard/home.header.dataSourceText` and `/api/dashboard/home.diagnostics` expose provider readiness without external calls.
+- `.env.example` records placeholder-only Binance, AI, news, macro calendar, ETF flow, and smoke external-call variables; no real secrets are committed.
+- `ProductionProfileSafetyGuard` rejects explicitly enabled production AI providers with missing key/model/base URL while preserving local/dev compatibility.
+- `scripts/prod-smoke.sh` checks dashboard provider readiness and defaults `SMOKE_ALLOW_EXTERNAL_CALLS=false`, so smoke does not call live providers by default.
+- Targeted provider/config/production tests prove config-only is not `CONNECTED`, simulated fallback remains local/dev only, AI missing keys fail closed when explicitly enabled, and smoke syntax/provider checks remain safe.
+- No real server deployment, real secrets, live external provider call in default tests/smoke, Binance private trading, Telegram send, Push dispatch, schema change, mapper SQL change, dashboard/review template change, order/execution, or auto-trading semantics are added.
 - Production readiness remains BLOCKED.
 
 ---

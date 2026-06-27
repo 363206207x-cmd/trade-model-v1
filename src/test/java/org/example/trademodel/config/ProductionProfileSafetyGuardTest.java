@@ -61,6 +61,32 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsExplicitlyEnabledAiProviderWithoutKeyModelOrBaseUrl() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.ai.openai.enabled", "true");
+        environment.setProperty("trade-model.ai.openai.api-key", " ");
+        environment.setProperty("trade-model.ai.openai.model", "");
+        environment.setProperty("trade-model.ai.openai.base-url", " ");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("OpenAI API key missing for explicitly enabled production AI provider")
+                .hasMessageContaining("OpenAI model missing for explicitly enabled production AI provider")
+                .hasMessageContaining("OpenAI base URL missing for explicitly enabled production AI provider");
+    }
+
+    @Test
+    void allowsMissingAiKeysWhenAiProvidersAreNotExplicitlyEnabled() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.ai.openai.api-key", "");
+        environment.setProperty("trade-model.ai.gemini.api-key", "");
+        environment.setProperty("trade-model.ai.xai.api-key", "");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void rejectsPublicBindUnlessExplicitlyAllowed() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("server.address", "0.0.0.0");
