@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Insert;
 import org.example.trademodel.entity.AssetStateDO;
 
 @Mapper
@@ -13,7 +14,13 @@ public interface AssetStateMapper {
      * H2：按 symbol 合并写入核心权威字段（state / confused / trace），不触碰 hot_reset_*，
      * 避免每次分析把「最近一次 Hot Reset」覆盖掉。
      */
-    @org.apache.ibatis.annotations.Insert("MERGE INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, last_update_time, trace_id) KEY (symbol) VALUES (#{symbol}, #{state}, #{confusedScore}, #{confusedLowStreak}, #{lastUpdateTime}, #{traceId})")
+    @Insert("MERGE INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, last_update_time, trace_id) KEY (symbol) VALUES (#{symbol}, #{state}, #{confusedScore}, #{confusedLowStreak}, #{lastUpdateTime}, #{traceId})")
+    @Insert(value = "INSERT INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, last_update_time, trace_id) "
+            + "VALUES (#{symbol}, #{state}, #{confusedScore}, #{confusedLowStreak}, #{lastUpdateTime}, #{traceId}) "
+            + "ON CONFLICT (symbol) DO UPDATE SET state = EXCLUDED.state, confused_score = EXCLUDED.confused_score, "
+            + "confused_low_streak = EXCLUDED.confused_low_streak, last_update_time = EXCLUDED.last_update_time, "
+            + "trace_id = EXCLUDED.trace_id",
+            databaseId = "postgresql")
     int mergeUpsertCore(AssetStateDO row);
 
     @Select("SELECT * FROM tm_asset_state WHERE symbol = #{symbol}")

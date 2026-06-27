@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-2C1 PostgreSQL Baseline Schema SQL
+Current Work Package: PDR-2C2A Mapper PostgreSQL Upsert Variants
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Decision Pack: PDR-2C1 PostgreSQL Baseline Schema SQL recorded on branch codex/pdr-2c1-postgresql-baseline-schema
+Latest Production Readiness Package: PDR-2C2A Mapper PostgreSQL Upsert Variants recorded on branch codex/pdr-2c2a-mapper-upsert-postgresql-variants
 
 ---
 
@@ -58,9 +58,9 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this PDR-2C1 PostgreSQL baseline schema SQL package if approved.
+1. Autodeliver this PDR-2C2A mapper PostgreSQL upsert variant package if approved.
 2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Prepare PDR-2C2 Mapper PostgreSQL Compatibility only under a separate explicit production-readiness package.
+3. Prepare PDR-2C2B Mapper PostgreSQL Date Function Compatibility only under a separate explicit production-readiness package.
 4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
@@ -69,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java business code, schema.sql, mapper SQL, dashboard, review UI, API contract, business test, script, scheduler, Push, Telegram, order, execution, auto-trading, production config, default Flyway activation, PostgreSQL connection, or trading-logic changes inside this PDR-2C1 schema SQL package.
+1. Java business service/controller code, schema.sql, Flyway migration SQL, dashboard, review UI, API contract, unrelated business test, script, scheduler, Push, Telegram, order, execution, auto-trading, runtime application config, default Flyway activation, PostgreSQL connection, or trading-logic changes inside this PDR-2C2A mapper upsert package.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -136,7 +136,7 @@ Blocking evidence:
 - `src/main/resources/application.yml` and `src/main/resources/application.properties` enable H2 console.
 - `src/main/resources/application.properties` defaults `position.provider.type` to `SIMULATED`.
 - PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
-- Flyway is present only as a non-default Maven profile skeleton; PDR-2C1 baseline schema SQL exists but has not been validated against PostgreSQL yet.
+- Flyway is present only as a non-default Maven profile skeleton; PDR-2C1 baseline schema SQL exists but has not been validated against PostgreSQL yet; PDR-2C2A adds PostgreSQL upsert mapper variants only.
 - No production database is connected in this package.
 - No migration/rollback pipeline, backup/restore command set, auth/authz evidence, deployment smoke/rollback evidence, observability stack, or complete secrets contract exists yet.
 
@@ -153,11 +153,11 @@ PDR-2A records the production database and migration decisions only. It does not
 - No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
 - Production readiness remains BLOCKED.
 
-Database migration remaining blockers after PDR-2C1:
+Database migration remaining blockers after PDR-2C2A:
 
 - Flyway exists only as a non-default skeleton profile.
 - PostgreSQL baseline schema SQL exists but has not been executed against PostgreSQL.
-- Mapper PostgreSQL compatibility not completed.
+- Mapper PostgreSQL compatibility is partial: AssetState/UserConfig upsert variants are present, DATEADD / FORMATDATETIME compatibility remains pending.
 - PostgreSQL driver/Testcontainers validation not added.
 - Backup/restore scripts or commands not implemented.
 - Auth/access control missing.
@@ -167,7 +167,7 @@ Database migration remaining blockers after PDR-2C1:
 
 Next production-readiness packages:
 
-1. PDR-2C2 Mapper PostgreSQL Compatibility.
+1. PDR-2C2B Mapper PostgreSQL Date Function Compatibility.
 2. PDR-2C3 PostgreSQL Driver + Migration Smoke Validation.
 3. PDR-2D Backup/Restore Runbook.
 
@@ -195,6 +195,17 @@ PDR-2C1 adds PostgreSQL-compatible Flyway baseline schema SQL drafts without cha
 - V1 remains foreign-key-free for this baseline, matching current schema semantics.
 - No seed data, schema.sql change, mapper SQL change, Java/config/test change, PostgreSQL driver, Testcontainers, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2C1.
 - Mapper compatibility and real PostgreSQL validation remain deferred to PDR-2C2/PDR-2C3.
+- Production readiness remains BLOCKED.
+
+### PDR-2C2A Mapper PostgreSQL Upsert Variants
+
+PDR-2C2A adds MyBatis mapper-level PostgreSQL upsert variants without changing default local/test H2 behavior.
+
+- `MyBatisDatabaseIdProviderConfig` maps PostgreSQL to `postgresql`, H2 to `h2`, and MySQL to `mysql` for MyBatis database-specific annotation selection.
+- `AssetStateMapper.mergeUpsertCore` keeps the generic H2 `MERGE INTO ... KEY` fallback and adds a PostgreSQL `ON CONFLICT (symbol) DO UPDATE` variant that does not overwrite `hot_reset_*` fields.
+- `UserConfigMapper.saveOrUpdate` keeps the generic MySQL/H2 `ON DUPLICATE KEY UPDATE` fallback and adds a PostgreSQL `ON CONFLICT (user_id) DO UPDATE` variant.
+- Focused tests prove default H2 upsert behavior still works and annotation guards prove PostgreSQL variants do not contain H2/MySQL upsert syntax.
+- DATEADD / FORMATDATETIME mapper compatibility, PostgreSQL driver/Testcontainers validation, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, and auto-trading semantics remain deferred / blocked.
 - Production readiness remains BLOCKED.
 
 ---
