@@ -39,15 +39,15 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main evidence: `8fa0294 chore(prod): add production profile safety guard` plus prior P3-3 local acceptance freeze and Review Center readonly integration evidence.
-- Current active block: `PDR-2A Database Migration + Rollback Decision Pack`
+- Current merged main evidence: `cc6bd02 docs(prod): record database migration strategy` plus prior P3-3 local acceptance freeze, Review Center readonly integration, and PDR-1 production profile guard evidence.
+- Current active block: `PDR-2B Flyway Baseline Skeleton`
 - Current level: `LOCAL_ACCEPTANCE_FREEZE_DONE effective; PRODUCTION_DEPLOYMENT_READINESS blocked`
 - Capability movement from this status closure: P3-3 Final Delivery & System Freeze is recorded as local/acceptance-ready final freeze. This does not prove production deployment readiness, Push send, Telegram send, external channel, order execution, or auto-trading.
-- Latest production readiness remediation movement: PDR-1 Production Config / Profile Lock is merged on main, and PDR-2A records database migration decisions only: PostgreSQL target, Flyway SQL-first migration target, forward-only migrations plus backup/restore rollback policy, manual pre-deploy migration execution, RPO 24h, RTO 4h, and `schema.sql` as local/test bootstrap for now.
-- Next required action: autodeliver this PDR-2A docs decision pack after review, then start PDR-2B Flyway Baseline Skeleton only under a separate scoped package. Production Deployment Readiness remains BLOCKED.
+- Latest production readiness remediation movement: PDR-1 Production Config / Profile Lock is merged on main, PDR-2A records database migration decisions, and PDR-2B adds a safe Flyway skeleton only: `flyway-migration` Maven profile, `src/main/resources/db/migration/` README placeholder, no executable `V*.sql`, and unchanged `schema.sql` local/test bootstrap.
+- Next required action: autodeliver this PDR-2B Flyway baseline skeleton after review, then start PDR-2C PostgreSQL Compatibility Pass only under a separate scoped package. Production Deployment Readiness remains BLOCKED.
 - Validation evidence: P0-0 through P3-2 remain DONE/effective. Dashboard Home Aggregation API and Dashboard Data Fill P1-P5 are merged/effective; `GET /api/dashboard/home` returned HTTP 200 success with `header`, `systemState`, `assets`, `positions`, `executionSuggestion`, `aiDecision`, `pushInbox`, `diagnostics`, and `safety`. Review Center readonly integration is merged/effective; `GET /api/review/center` returned HTTP 200 success with `summary`, `positionReviews`, `opportunityReviews`, `pushReviews`, and `ruleFeedback`. Mainline validation passed on clean `main`: no open PRs, MAIN_SYNC OK, `./mvnw test -q` PASS, `bash scripts/v1-delivery-check.sh` PASS, and `bash scripts/v1-state.sh` PASS with blockers none. Production Deployment Readiness remains BLOCKED.
 
-PDR-2A does not add Flyway dependency, `db/migration` files, PostgreSQL driver/config connection, schema changes, mapper SQL changes, application config changes, backup/restore commands, deployment scripts, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics.
+PDR-2B does not add default Flyway activation, executable migration SQL, PostgreSQL driver/config connection, schema changes, mapper SQL changes, application config changes, backup/restore commands, deployment scripts, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics.
 
 ## Historical Runtime Slice Log
 
