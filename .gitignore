@@ -18,6 +18,16 @@ target/
 *.tmp
 *.swp
 
+# Local deployment secrets and backups
+.env
+.env.*
+!.env.example
+*.local-secret
+*.secret
+backups/
+backup/
+*.dump
+
 # Local H2 database runtime files
 data/*.mv.db
 data/*.trace.db

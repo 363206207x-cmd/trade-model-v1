@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-M1 PostgreSQL Runtime Pack
+Current Work Package: PDR-M2 Server Deployment + Secrets + Smoke Pack
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Package: PDR-M1 PostgreSQL Runtime Pack recorded on branch codex/pdr-m1-postgresql-runtime-pack
+Latest Production Readiness Package: PDR-M2 Server Deployment + Secrets + Smoke Pack recorded on branch codex/pdr-m2-server-deployment-secrets-smoke
 
 ---
 
@@ -58,9 +58,9 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this PDR-M1 PostgreSQL runtime pack if approved.
+1. Autodeliver this PDR-M2 server deployment skeleton if approved.
 2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Prepare the next production-readiness package for secrets/deployment/auth/observability/release-gate gaps under a separate explicit scope.
+3. Prepare the next production-readiness package for auth/access control, observability, real server smoke, secrets manager, external integration readiness, and release-gate gaps under a separate explicit scope.
 4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
@@ -69,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java business service/controller code, schema.sql, dashboard, review UI, API contract, unrelated business test, script, scheduler, Push, Telegram, order, execution, auto-trading, production runtime config, real PostgreSQL connection, or trading-logic changes inside this PDR-M1 runtime smoke package.
+1. Java business service/controller code, schema.sql, mapper SQL, Flyway migration SQL, dashboard, review UI, API contract, unrelated business test, scheduler, Push, Telegram, order, execution, auto-trading, production runtime config, real server deployment, real secrets, real PostgreSQL connection, or trading-logic changes inside this PDR-M2 deployment skeleton package.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -137,8 +137,9 @@ Blocking evidence:
 - `src/main/resources/application.properties` defaults `position.provider.type` to `SIMULATED`.
 - PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
 - PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
+- Dockerfile, Docker Compose skeleton, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed.
 - No production database is connected in this package.
-- No migration/rollback pipeline, backup/restore command set, auth/authz evidence, deployment smoke/rollback evidence, observability stack, or complete secrets contract exists yet.
+- No auth/authz evidence, observability stack, real server deployment smoke/rollback evidence, secrets manager integration, external integration readiness, or production release gate exists yet.
 
 ### PDR-2A Database Migration + Rollback Decision Pack
 
@@ -153,22 +154,22 @@ PDR-2A records the production database and migration decisions only. It does not
 - No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
 - Production readiness remains BLOCKED.
 
-Database migration remaining blockers after PDR-M1:
+Database / deployment remaining blockers after PDR-M2:
 
 - Flyway remains non-default for runtime startup; PDR-M1 adds only test/manual smoke coverage.
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but local evidence depends on Docker availability.
 - Mapper PostgreSQL variants cover known upsert and DATEADD / FORMATDATETIME blockers; broader live mapper execution remains deferred.
-- Backup/restore command templates exist, but real restore drill evidence is still missing.
+- Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist, but real server deployment smoke and real restore drill evidence are still missing.
 - Auth/access control missing.
 - Observability missing.
-- Deployment packaging missing.
-- Secrets contract incomplete.
+- Deployment packaging is skeletal only and not release-gated.
+- Secrets contract exists as placeholders only; secrets manager integration is missing.
 
 Next production-readiness packages:
 
-1. PDR-M2 Secrets / Deployment Config Contract.
-2. PDR-M3 Auth / Access Control Gate.
-3. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
+1. PDR-M3 Auth / Access Control Gate.
+2. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
+3. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
 
 ### PDR-2B Flyway Baseline Skeleton
 
@@ -218,6 +219,18 @@ PDR-M1 adds PostgreSQL runtime smoke readiness while preserving default H2/local
 - `UserPositionMapper.insert` specifies `keyColumn = "id"` for generated-key compatibility.
 - `PRODUCTION_READINESS_RUNBOOK.md` records pg_dump / pg_restore / psql restore templates and a restore smoke checklist.
 - No real PostgreSQL connection, schema.sql change, production config change, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added.
+- Production readiness remains BLOCKED.
+
+### PDR-M2 Server Deployment + Secrets + Smoke Pack
+
+PDR-M2 adds a Docker Compose server deployment skeleton while preserving the no-trading and blocked-production boundaries.
+
+- `Dockerfile` builds the Spring Boot app with Maven wrapper in a JDK build stage and runs the packaged jar in a JRE runtime stage as a non-root user.
+- `docker-compose.yml` defines PostgreSQL, a manual Flyway migration runner profile, and the app service. The host app port binds to `127.0.0.1` by default.
+- `.env.example` records placeholder-only app, PostgreSQL, Binance position provider, optional AI, future Telegram, backup, and restore variables. `.env` and secret/backup outputs are ignored.
+- `scripts/prod-smoke.sh` performs readonly checks for `/api/dashboard/home` and `/api/review/center`, including safety fields and Telegram non-connected status.
+- `scripts/prod-backup.sh` and `scripts/prod-restore.sh` provide PostgreSQL backup/restore templates with required env vars and no hard-coded secrets; restore requires explicit confirmation.
+- No real server deployment, real secrets, Java business logic change, schema.sql change, mapper SQL change, Flyway migration change, auth implementation, Telegram send, Push dispatch, order/execution, or auto-trading semantics are added.
 - Production readiness remains BLOCKED.
 
 ---

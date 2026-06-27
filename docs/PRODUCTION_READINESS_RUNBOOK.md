@@ -61,6 +61,18 @@ PDR-M1 adds a PostgreSQL runtime-readiness smoke layer. It does not deploy to pr
 - `UserPositionMapper` generated-key metadata now specifies `keyColumn = "id"`; PostgreSQL identity generated-key behavior is covered by the PostgreSQL smoke when Docker is available.
 - Deferred: real production database connection, deployment packaging, auth/access control, secrets manager, observability, real server smoke, and production release-gate approval.
 
+## PDR-M2 Server Deployment + Secrets + Smoke Pack
+
+PDR-M2 adds a server deployment skeleton. It does not deploy to a real server and does not approve public production access.
+
+- `Dockerfile` builds a generic application image with Maven wrapper in a build stage and runs the packaged jar in a JRE runtime stage as a non-root user.
+- `docker-compose.yml` defines PostgreSQL, a manual Flyway migration runner profile, and the application service.
+- The application port is bound to `${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8081}:8081` by default so it is not publicly exposed unless explicitly changed.
+- `.env.example` documents required placeholder environment variables. Real `.env` files and local secret files are ignored and must not be committed.
+- `scripts/prod-smoke.sh` performs readonly smoke checks for `/api/dashboard/home` and `/api/review/center`, including dashboard/review response shape and no-order/no-auto-trading safety fields.
+- `scripts/prod-backup.sh` and `scripts/prod-restore.sh` provide PostgreSQL backup/restore templates that require explicit environment variables; restore also requires an explicit confirmation variable.
+- Deferred: auth/access control, observability, real server deployment smoke, real restore drill evidence, secrets manager integration, external integration readiness, and production release-gate approval.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -70,6 +82,7 @@ PDR-M1 adds a PostgreSQL runtime-readiness smoke layer. It does not deploy to pr
 - PostgreSQL date-function mapper variants exist for the known DATEADD / FORMATDATETIME blockers.
 - PostgreSQL JDBC driver is present, but no production database is connected by PDR-M1.
 - Testcontainers/Flyway smoke is test-only and does not use real secrets.
+- Dockerfile, Docker Compose, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed and no public production access is approved.
 
 ## Migration Execution Policy
 
@@ -77,7 +90,46 @@ Production migrations must run as an explicit pre-deploy step.
 
 Application startup must not silently mutate the production schema without a controlled migration process.
 
-PDR-2C1 adds schema SQL drafts only. PDR-2C2A adds mapper upsert compatibility. PDR-M1 adds PostgreSQL driver, test-only Testcontainers/Flyway smoke, date-function mapper variants, and backup/restore command templates. Production migrations are still not deployable until real environment validation and the production release gate are complete.
+PDR-2C1 adds schema SQL drafts only. PDR-2C2A adds mapper upsert compatibility. PDR-M1 adds PostgreSQL driver, test-only Testcontainers/Flyway smoke, date-function mapper variants, and backup/restore command templates. PDR-M2 adds a manual Docker Compose migration runner entry. Production migrations are still not deployable until real environment validation and the production release gate are complete.
+
+## Server Deployment Skeleton
+
+The PDR-M2 Compose layout is intended for a controlled server rehearsal only:
+
+```bash
+cp .env.example .env
+# edit .env and replace every change-me placeholder with deployment secrets
+docker compose build
+docker compose up -d postgres
+docker compose --profile migrate run --rm migrate
+docker compose up -d app
+docker compose logs -f app
+bash scripts/prod-smoke.sh
+```
+
+Stop/restart commands:
+
+```bash
+docker compose stop app
+docker compose restart app
+docker compose down
+```
+
+Security notes:
+
+- The host app port binds to `127.0.0.1` by default.
+- Do not expose the app publicly before a separate PDR-M3 Auth / Access Control package is complete.
+- Do not commit `.env`, real secrets, database dumps, or local secret files.
+- The Flyway migration runner is manual: `docker compose --profile migrate run --rm migrate`.
+- This skeleton does not add Telegram send, Push send, order execution, auto-open, auto-close, or auto-trading.
+
+Required environment categories:
+
+- App bind/profile: `SPRING_PROFILES_ACTIVE`, `APP_PORT`, `APP_BIND_ADDRESS`, `SERVER_ADDRESS`, `TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND`.
+- Database: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `PROD_DATASOURCE_URL`, `PROD_DATASOURCE_USERNAME`, `PROD_DATASOURCE_PASSWORD`.
+- Position provider: `POSITION_PROVIDER_TYPE`, `BINANCE_API_BASE_URL`, `BINANCE_API_KEY`, `BINANCE_API_SECRET`.
+- Optional AI provider toggles/keys: `TRADE_MODEL_AI_ENABLED`, provider-specific enabled flags, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`.
+- Future Telegram placeholders: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`; these do not activate Telegram send.
 
 ## Rollback Policy
 
@@ -145,23 +197,32 @@ Restore smoke checklist:
 - `/api/review/center` returns HTTP 200 in the restored environment.
 - RPO 24h / RTO 4h target evidence is recorded for the restore drill.
 
+Template scripts:
+
+```bash
+bash scripts/prod-backup.sh
+RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA bash scripts/prod-restore.sh
+```
+
+The restore script must only target a controlled recovery database until a separate production restore drill has been approved.
+
 ## Remaining Blockers
 
 - Flyway remains non-default for runtime startup; test-only Flyway smoke exists.
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but this local environment may skip it when Docker is unavailable.
 - Mapper PostgreSQL compatibility covers known upsert and DATEADD / FORMATDATETIME blockers; live PostgreSQL mapper execution remains to be expanded beyond smoke/static guards.
-- Backup/restore command templates exist; real restore drill evidence is still missing.
+- Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Auth/access control missing.
 - Observability missing.
-- Deployment packaging missing.
-- Secrets contract incomplete.
+- Deployment packaging is skeletal only and not release-gated.
+- Secrets contract exists as placeholders only; no secrets manager integration exists.
 
 ## Next Packages
 
-1. PDR-M2 Production Secrets / Deployment Config Contract.
-2. PDR-M3 Auth / Access Control Gate.
-3. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
+1. PDR-M3 Auth / Access Control Gate.
+2. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
+3. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
 
 ## Explicit Non-Scope
 
-PDR-M1 does not add a real PostgreSQL connection, schema.sql changes, production application config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics. It adds runtime PostgreSQL driver support, test-only PostgreSQL smoke coverage, mapper PostgreSQL variants, and backup/restore templates while preserving default H2 mapper behavior.
+PDR-M2 does not deploy to a real server, commit real secrets, add auth, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, change schema.sql, change mapper SQL, change Java business logic, add order/execution, or add auto-trading semantics. It adds Docker/Compose deployment skeleton files, `.env.example`, readonly smoke checks, and PostgreSQL backup/restore template scripts while preserving Production Deployment Readiness as `BLOCKED`.
