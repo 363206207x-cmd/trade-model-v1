@@ -558,28 +558,28 @@
         <section class="review-center-panel active" id="review-panel-positions" role="tabpanel" aria-labelledby="review-tab-positions">
             <table class="review-center-table" aria-label="持仓复盘">
                 <thead><tr><th>时间</th><th>标的</th><th>方向</th><th>开仓价</th><th>平仓价</th><th>盈亏</th><th>执行偏离</th><th>监控结论</th><th>复盘状态</th></tr></thead>
-                <tbody><tr><td class="review-empty-state" colspan="9">暂无持仓复盘记录</td></tr></tbody>
+                <tbody id="review-center-positions-body"><tr><td class="review-empty-state" colspan="9">暂无持仓复盘记录</td></tr></tbody>
             </table>
             <div class="review-field-grid" aria-label="持仓复盘字段结构"><div class="review-field-chip">进场是否合理</div><div class="review-field-chip">止损是否合理</div><div class="review-field-chip">止盈是否执行</div><div class="review-field-chip">仓位是否过重</div><div class="review-field-chip">杠杆是否合理</div><div class="review-field-chip">是否提前退出</div><div class="review-field-chip">是否扛单</div><div class="review-field-chip">情绪状态</div><div class="review-field-chip">规则修正建议</div></div>
         </section>
         <section class="review-center-panel" id="review-panel-opportunities" role="tabpanel" aria-labelledby="review-tab-opportunities">
             <table class="review-center-table" aria-label="机会复盘">
                 <thead><tr><th>时间</th><th>标的</th><th>机会类型</th><th>计划模式</th><th>是否推送</th><th>是否点击</th><th>是否执行</th><th>结果</th><th>最大有利波动</th><th>最大不利波动</th></tr></thead>
-                <tbody><tr><td class="review-empty-state" colspan="10">暂无机会复盘记录</td></tr></tbody>
+                <tbody id="review-center-opportunities-body"><tr><td class="review-empty-state" colspan="10">暂无机会复盘记录</td></tr></tbody>
             </table>
             <div class="review-field-grid" aria-label="机会复盘字段结构"><div class="review-field-chip">为何推送</div><div class="review-field-chip">为何未执行</div><div class="review-field-chip">是否错过</div><div class="review-field-chip">是否是假机会</div><div class="review-field-chip">是否触发后失效</div><div class="review-field-chip">评分是否偏高</div><div class="review-field-chip">AI 是否误判</div><div class="review-field-chip">应加入规则</div><div class="review-field-chip">应降低权重</div></div>
         </section>
         <section class="review-center-panel" id="review-panel-pushes" role="tabpanel" aria-labelledby="review-tab-pushes">
             <table class="review-center-table" aria-label="推送复盘">
                 <thead><tr><th>推送时间</th><th>标的</th><th>推送类型</th><th>Telegram 状态</th><th>是否点击</th><th>Recheck 状态</th><th>是否过期</th><th>失败原因</th><th>后续结果</th></tr></thead>
-                <tbody><tr><td class="review-empty-state" colspan="9">暂无推送复盘记录</td></tr></tbody>
+                <tbody id="review-center-pushes-body"><tr><td class="review-empty-state" colspan="9">暂无推送复盘记录</td></tr></tbody>
             </table>
             <div class="review-field-grid" aria-label="推送复盘字段结构"><div class="review-field-chip">是否应推</div><div class="review-field-chip">是否推晚</div><div class="review-field-chip">是否推早</div><div class="review-field-chip">是否重复推送</div><div class="review-field-chip">无持仓模式</div><div class="review-field-chip">有持仓模式</div><div class="review-field-chip">Telegram 状态</div><div class="review-field-chip">用户响应</div><div class="review-field-chip">后续是否改进</div></div>
         </section>
         <section class="review-center-panel" id="review-panel-rules" role="tabpanel" aria-labelledby="review-tab-rules">
             <table class="review-center-table" aria-label="规则反馈">
                 <thead><tr><th>时间</th><th>标的</th><th>复盘类型</th><th>错误类型</th><th>是否规则问题</th><th>是否执行偏离</th><th>建议调整</th><th>规则版本</th><th>处理状态</th></tr></thead>
-                <tbody><tr><td class="review-empty-state" colspan="9">暂无规则反馈记录</td></tr></tbody>
+                <tbody id="review-center-rules-body"><tr><td class="review-empty-state" colspan="9">暂无规则反馈记录</td></tr></tbody>
             </table>
             <div class="review-field-grid" aria-label="规则反馈字段结构"><div class="review-field-chip">数据规则</div><div class="review-field-chip">评分规则</div><div class="review-field-chip">冲突规则</div><div class="review-field-chip">降级规则</div><div class="review-field-chip">Confused 规则</div><div class="review-field-chip">Hot Reset 规则</div><div class="review-field-chip">Push 规则</div><div class="review-field-chip">持仓监控规则</div><div class="review-field-chip">AI 裁决规则</div></div>
         </section>
@@ -655,6 +655,92 @@
         tab.addEventListener("click", function () {
             activateReviewTab(tab.getAttribute("data-review-tab"));
         });
+    });
+
+    function text(value) {
+        return value === null || value === undefined ? "" : String(value);
+    }
+
+    function boolText(value) {
+        if (value === null || value === undefined) {
+            return "";
+        }
+        return value ? "是" : "否";
+    }
+
+    function timeText(value) {
+        if (!value) {
+            return "";
+        }
+        return String(value).replace("T", " ").slice(0, 16);
+    }
+
+    function setEmpty(tbodyId, colspan, label) {
+        var tbody = document.getElementById(tbodyId);
+        if (!tbody) {
+            return;
+        }
+        tbody.innerHTML = '<tr><td class="review-empty-state" colspan="' + colspan + '">' + label + '</td></tr>';
+    }
+
+    function renderRows(tbodyId, rows, colspan, emptyLabel, cells) {
+        var tbody = document.getElementById(tbodyId);
+        if (!tbody) {
+            return;
+        }
+        if (!Array.isArray(rows) || rows.length === 0) {
+            setEmpty(tbodyId, colspan, emptyLabel);
+            return;
+        }
+        tbody.innerHTML = "";
+        rows.forEach(function (row) {
+            var tr = document.createElement("tr");
+            cells(row).forEach(function (cell) {
+                var td = document.createElement("td");
+                td.textContent = text(cell);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderReviewCenter(data) {
+        var safe = data || {};
+        renderRows("review-center-positions-body", safe.positionReviews, 9, "暂无持仓复盘记录", function (row) {
+            return [
+                timeText(row.time), row.symbol, row.direction, row.entryPrice, row.closePrice,
+                row.pnl, row.executionDeviation, row.monitorConclusion, row.reviewStatus
+            ];
+        });
+        renderRows("review-center-opportunities-body", safe.opportunityReviews, 10, "暂无机会复盘记录", function (row) {
+            return [
+                timeText(row.time), row.symbol, row.opportunityType, row.planMode,
+                boolText(row.wasPushed), boolText(row.wasClicked), boolText(row.wasExecuted), row.outcome,
+                row.maxFavorableExcursion, row.maxAdverseExcursion
+            ];
+        });
+        renderRows("review-center-pushes-body", safe.pushReviews, 9, "暂无推送复盘记录", function (row) {
+            return [
+                timeText(row.pushTime), row.symbol, row.pushType, row.telegramStatus, boolText(row.clicked),
+                row.recheckStatus, boolText(row.expired), row.failReason, row.outcome
+            ];
+        });
+        renderRows("review-center-rules-body", safe.ruleFeedback, 9, "暂无规则反馈记录", function (row) {
+            return [
+                timeText(row.time), row.symbol, row.reviewType, row.errorType, boolText(row.ruleIssue),
+                boolText(row.executionDeviation), row.suggestion, row.ruleVersion, row.status
+            ];
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        if (window.__REVIEW_CENTER_MODE__ !== true) {
+            return;
+        }
+        fetch("/api/review/center", { headers: { "Accept": "application/json" } })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (payload) { renderReviewCenter(payload && payload.data); })
+            .catch(function () { renderReviewCenter(null); });
     });
 })();
 </script>

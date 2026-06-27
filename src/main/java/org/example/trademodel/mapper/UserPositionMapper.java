@@ -41,6 +41,11 @@ public interface UserPositionMapper {
             "ORDER BY opened_at ASC, id ASC")
     List<UserPositionDO> listByExactSourceRefId(@Param("sourceRefId") String sourceRefId);
 
+    @Select("SELECT * FROM tm_user_position " +
+            "WHERE status = 'CLOSED' AND source_type = 'MANUAL' " +
+            "ORDER BY closed_at DESC, updated_at DESC, id DESC LIMIT #{limit}")
+    List<UserPositionDO> listClosedManualPositions(@Param("limit") int limit);
+
     @Select("SELECT COUNT(*) FROM tm_user_position WHERE status = 'CLOSED'")
     int countClosedPositions();
 
