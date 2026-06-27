@@ -30,6 +30,9 @@ public interface PushSnapshotMapper {
     @Select("SELECT * FROM tm_push_snapshot WHERE analysis_id = #{analysisId} ORDER BY push_id DESC")
     List<TmPushSnapshotDO> listByAnalysisId(String analysisId);
 
+    @Select("SELECT * FROM tm_push_snapshot ORDER BY push_create_time DESC, push_id DESC LIMIT #{limit}")
+    List<TmPushSnapshotDO> listRecent(@Param("limit") int limit);
+
     /**
      * Dashboard 积压口径：未过期且仍处于 CAPTURED / RECHECK_REVIEW_WAITING 或历史等待状态的 push 条数。
      */

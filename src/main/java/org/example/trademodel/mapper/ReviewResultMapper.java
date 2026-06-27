@@ -2,9 +2,12 @@ package org.example.trademodel.mapper;
 
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.ReviewResultDO;
+
+import java.util.List;
 
 @Mapper
 public interface ReviewResultMapper {
@@ -13,6 +16,11 @@ public interface ReviewResultMapper {
             + "adjustment_suggestion AS adjustmentSuggestion, create_time AS createTime, update_time AS updateTime "
             + "FROM tm_review_result WHERE analysis_id = #{analysisId}")
     ReviewResultDO selectByAnalysisId(String analysisId);
+
+    @Select("SELECT id, analysis_id AS analysisId, error_type AS errorType, actual_outcome AS actualOutcome, "
+            + "adjustment_suggestion AS adjustmentSuggestion, create_time AS createTime, update_time AS updateTime "
+            + "FROM tm_review_result ORDER BY update_time DESC, create_time DESC, id DESC LIMIT #{limit}")
+    List<ReviewResultDO> listRecent(@Param("limit") int limit);
 
     @Insert("INSERT INTO tm_review_result(id, analysis_id, error_type, actual_outcome, adjustment_suggestion, create_time, update_time) "
             + "VALUES(#{id}, #{analysisId}, #{errorType}, #{actualOutcome}, #{adjustmentSuggestion}, #{createTime}, #{updateTime})")
