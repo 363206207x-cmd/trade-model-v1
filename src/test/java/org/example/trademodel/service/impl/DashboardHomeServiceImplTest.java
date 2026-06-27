@@ -2,6 +2,9 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.TmPushRecheckLogDO;
+import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.DecisionService;
@@ -22,10 +25,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -45,6 +51,8 @@ class DashboardHomeServiceImplTest {
     @Mock
     private PushSnapshotMapper pushSnapshotMapper;
     @Mock
+    private PushRecheckLogMapper pushRecheckLogMapper;
+    @Mock
     private ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
 
     private DashboardHomeServiceImpl service;
@@ -58,6 +66,7 @@ class DashboardHomeServiceImplTest {
                 positionMonitorLogService,
                 positionSyncService,
                 pushSnapshotMapper,
+                pushRecheckLogMapper,
                 externalContextEvidenceBuilder,
                 new ObjectMapper()
         );
@@ -199,9 +208,107 @@ class DashboardHomeServiceImplTest {
                 .containsExactly("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         assertThat(home.getAiDecision().getTabs().get(0).getSupportEvidence()).containsExactly("规则方向一致");
         assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(7);
+        assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
+        assertThat(home.getPushInbox().getHasOpenPosition()).isTrue();
+        assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_AND_POSITION_RISK");
+        assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getDiagnostics().getTelegram()).isEqualTo("WAITING_SYNC");
         assertThat(home.getSafety().getNotTradeInstruction()).isTrue();
         assertThat(home.getSafety().getNotAutoTrading()).isTrue();
         assertThat(home.getSafety().getNotOrderExecution()).isTrue();
+    }
+
+    @Test
+    void pushInboxCountsUseReadonlyPushBacklogAndNotMissedOpportunityOrPositions() {
+        LightSystemStatusVO system = new LightSystemStatusVO();
+        system.setMissedValidOpportunityCount(99);
+
+        UserPositionVO nonManualPosition = new UserPositionVO();
+        nonManualPosition.setId(12L);
+        nonManualPosition.setAssetSymbol("ETHUSDT");
+        nonManualPosition.setStatus("OPEN");
+        nonManualPosition.setSourceType("SYSTEM");
+
+        when(decisionService.getLightSystemStatus()).thenReturn(system);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(nonManualPosition));
+        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(3);
+        when(pushSnapshotMapper.countByPushStatuses(anyList())).thenAnswer(invocation -> {
+            List<String> statuses = invocation.getArgument(0);
+            if (statuses.contains("RECHECK_REVIEW_PASSED")) {
+                return 2;
+            }
+            if (statuses.contains("RECHECK_INVALIDATED")) {
+                return 5;
+            }
+            return 0;
+        });
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getDiagnostics().getTelegram()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
+        assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_ONLY");
+        assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(3);
+        assertThat(home.getPushInbox().getCounts().getWaiting()).isNotEqualTo(99);
+        assertThat(home.getPushInbox().getCounts().getExecutable()).isEqualTo(2);
+        assertThat(home.getPushInbox().getCounts().getInvalidated()).isEqualTo(5);
+        assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
+    }
+
+    @Test
+    void pushInboxModeUsesRealOpenManualPositionOnly() {
+        UserPositionVO manualPosition = new UserPositionVO();
+        manualPosition.setId(13L);
+        manualPosition.setAssetSymbol("BTCUSDT");
+        manualPosition.setStatus("OPEN");
+        manualPosition.setSourceType("MANUAL");
+
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(manualPosition));
+        when(positionMonitorLogService.listByPositionId(13L, 1)).thenReturn(List.of());
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(home.getPushInbox().getHasOpenPosition()).isTrue();
+        assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_AND_POSITION_RISK");
+        assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
+    }
+
+    @Test
+    void pushInboxItemsMapOnlyRealSnapshotFieldsAndLatestRecheckStatus() {
+        LocalDateTime createTime = LocalDateTime.of(2026, 6, 27, 9, 30);
+        LocalDateTime expiresAt = LocalDateTime.of(2026, 6, 27, 11, 30);
+        TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
+        snapshot.setPushId(101L);
+        snapshot.setSymbol("BTCUSDT");
+        snapshot.setPushType("OPPORTUNITY_RECHECK");
+        snapshot.setPushStatus("CAPTURED");
+        snapshot.setCreateTime(createTime);
+        snapshot.setExpiresAt(expiresAt);
+
+        TmPushRecheckLogDO latestLog = new TmPushRecheckLogDO();
+        latestLog.setPushId(101L);
+        latestLog.setRecheckStatus("DRIFTED");
+
+        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(1);
+        when(pushSnapshotMapper.listPendingRecheck("CAPTURED", 6)).thenReturn(List.of(snapshot));
+        when(pushSnapshotMapper.listPendingRecheck("RECHECK_REVIEW_WAITING", 5)).thenReturn(List.of());
+        when(pushSnapshotMapper.listPendingRecheck("RECHECK_VALID_WAITING", 5)).thenReturn(List.of());
+        when(pushRecheckLogMapper.selectLatestByPushId(101L)).thenReturn(latestLog);
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(home.getPushInbox().getItems()).hasSize(1);
+        DashboardHomeVO.PushItemVO item = home.getPushInbox().getItems().get(0);
+        assertThat(item.getPushId()).isEqualTo(101L);
+        assertThat(item.getSymbol()).isEqualTo("BTC/USDT");
+        assertThat(item.getStatus()).isEqualTo("CAPTURED");
+        assertThat(item.getType()).isEqualTo("OPPORTUNITY_RECHECK");
+        assertThat(item.getCreatedAt()).isEqualTo(createTime);
+        assertThat(item.getExpiresAt()).isEqualTo(expiresAt);
+        assertThat(item.getRecheckStatus()).isEqualTo("DRIFTED_FROM_ENTRY_ZONE");
+        assertThat(Arrays.stream(DashboardHomeVO.PushItemVO.class.getDeclaredFields()).map(Field::getName))
+                .doesNotContain("title", "summary");
     }
 
     @Test

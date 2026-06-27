@@ -39,6 +39,15 @@ public interface PushSnapshotMapper {
             + "AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)")
     int countPendingRecheckBacklog();
 
+    @Select({
+            "<script>",
+            "SELECT COUNT(*) FROM tm_push_snapshot",
+            "WHERE push_status IN",
+            "<foreach collection='statuses' item='status' open='(' separator=',' close=')'>#{status}</foreach>",
+            "</script>"
+    })
+    int countByPushStatuses(@Param("statuses") List<String> statuses);
+
     @Select("SELECT * FROM tm_push_snapshot " +
             "WHERE push_status = #{pushStatus} " +
             "AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) " +

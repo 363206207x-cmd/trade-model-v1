@@ -924,6 +924,9 @@ public class DashboardHomeVO {
         private Long pushId;
         private String symbol;
         private String status;
+        private String type;
+        private LocalDateTime expiresAt;
+        private String recheckStatus;
         private LocalDateTime createdAt;
 
         public Long getPushId() {
@@ -948,6 +951,30 @@ public class DashboardHomeVO {
 
         public void setStatus(String status) {
             this.status = status;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public LocalDateTime getExpiresAt() {
+            return expiresAt;
+        }
+
+        public void setExpiresAt(LocalDateTime expiresAt) {
+            this.expiresAt = expiresAt;
+        }
+
+        public String getRecheckStatus() {
+            return recheckStatus;
+        }
+
+        public void setRecheckStatus(String recheckStatus) {
+            this.recheckStatus = recheckStatus;
         }
 
         public LocalDateTime getCreatedAt() {
