@@ -12,11 +12,11 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P3-2 Full E2E Acceptance DONE/effective on merged main evidence"
-active_block_cn: "P3-2 全链路 E2E 验收已基于 merged main 证据生效"
+active_block: "P3-3 Final Delivery & System Freeze DONE/effective as local acceptance-ready final freeze"
+active_block_cn: "P3-3 最终交付与系统冻结已作为本地验收就绪冻结生效"
 
-next_required_action: "Stop after P3-2 Full E2E Acceptance docs/status closure. Do not start P3-3 in this task; P3-3 Final Delivery & System Freeze requires a separate explicit task after this closure is merged/effective."
-next_business_phase: "P3-3 Final Delivery & System Freeze"
+next_required_action: "Autodeliver this docs/status closure when approved. Keep Production Deployment Readiness BLOCKED until a separate production release gate explicitly clears it."
+next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
 
 production_deployment_readiness: "BLOCKED"
@@ -42,7 +42,8 @@ p3_1_effective: true
 p3_2_status: "DONE/effective on merged main evidence by PR #1025, PR #1027, and PR #1028 / commit 1b08abd"
 p3_2_effective: true
 p3_2_started: true
-p3_3_status: "NOT_STARTED"
+p3_3_status: "DONE/effective as local acceptance-ready final freeze"
+p3_3_effective: true
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -54,6 +55,8 @@ notes:
   - "P2-3 Scheduler / Idempotency / Trace is effective on merged main by PR #1020 commit 5c2b2b47eb7fa4cfc9c428ef022375f4ca890b23."
   - "P3-1 Dashboard Final is effective on merged main by PR #1023 commit f543832cf5907fe00920ca3f05666566daa16b7a."
   - "P3-2 Full E2E Acceptance evidence is effective on merged main: ExecutionPlan-only rows do not display as opened positions; manual UserPosition is the dashboard position source; closed/non-MANUAL UserPosition rows are excluded; UserPosition -> monitor -> close -> review -> feedback chain is evidenced; dashboard E2E states, PositionMonitor HOLD/LOGIC_WEAKENED/PLAN_INVALIDATED, AccountRisk risk blocking, PushRecheck no-UserPosition mutation, ConfusedState/HotReset safety, Review deviation/feedback, full Maven, delivery check, and v1-state all pass."
+  - "Dashboard Home API and data fill packages P1-P5 are merged/effective: /api/dashboard/home returns header, systemState, assets, positions, executionSuggestion, aiDecision, pushInbox, diagnostics, and safety; push inbox remains readonly; Telegram remains WAITING_SYNC until a verified status source exists; no Telegram send is implemented."
+  - "Review Center readonly integration is merged/effective: /review/dashboard exists; /api/review/center returns summary, positionReviews, opportunityReviews, pushReviews, and ruleFeedback; the four tabs are readonly and do not fabricate records."
+  - "P3-3 Final Delivery & System Freeze is recorded as local/acceptance-ready final freeze based on clean main, full Maven PASS, delivery check PASS, v1-state PASS, and runtime API evidence."
   - "Production Deployment Readiness remains BLOCKED and no production-ready claim is made."
-  - "P3-3 Final Delivery & System Freeze is the next separate phase but is not started by this P3-2 closure task."
   - "No UserPosition mutation, order execution, auto-trading, Push send, external channel action, backend Java, schema, tests, scripts, production config, or API contracts are part of this status closure."
