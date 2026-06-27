@@ -1015,7 +1015,7 @@ Such an exception may ship a repair. It must not mark a business phase DONE unle
 
 Production Deployment Readiness is currently `BLOCKED`.
 
-The current repository evidence shows deployment blockers that must be cleared before P3-2 Full E2E Acceptance can be DONE:
+The current repository evidence shows deployment blockers that must be cleared before a production-ready deployment claim can be made:
 
 1. H2 in-memory database must be replaced or gated behind a non-production profile.
 2. Empty database password must not be a production default.
@@ -1028,9 +1028,25 @@ The current repository evidence shows deployment blockers that must be cleared b
 9. Deployment smoke and rollback pipeline must exist.
 10. Simulated position provider default must not be ambiguous in production.
 
-P3-2 Full E2E Acceptance cannot be DONE until these production readiness blockers are either fixed or explicitly accepted by a human release gate.
+P3-3 local acceptance freeze can be DONE without production deployment approval. Production Deployment Readiness remains BLOCKED until these blockers are fixed or explicitly accepted by a separate human production release gate.
 
 中文：生产部署就绪当前为 BLOCKED。P3-2 必须纳入生产配置、持久化数据库、认证、secret、health、migration、rollback、deployment smoke 等验收。
+
+### 14A. PDR-2A Database Migration + Rollback Decision / 数据库迁移与回滚决策
+
+PDR-2A locks the database migration direction before implementation:
+
+1. Production database target is PostgreSQL.
+2. Migration framework target is Flyway with SQL-first migrations.
+3. Rollback policy is forward-only migrations plus pre-migration backup and restore.
+4. Production migration execution must be an explicit manual pre-deploy step.
+5. Application startup must not silently mutate production schema without a controlled migration process.
+6. Initial recovery target is RPO 24h and RTO 4h.
+7. `src/main/resources/schema.sql` remains local/test bootstrap until a later Flyway/Testcontainers package changes that behavior.
+8. No PostgreSQL driver, Flyway dependency, migration SQL, schema change, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are introduced by PDR-2A.
+9. PDR-2B may add the Flyway baseline skeleton only under a separate scoped package.
+
+Production Deployment Readiness remains `BLOCKED` after PDR-2A.
 
 ---
 

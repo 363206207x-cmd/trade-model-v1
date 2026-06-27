@@ -6,10 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-3 Final Delivery & System Freeze DONE/effective as local acceptance-ready final freeze
+Current Work Package: PDR-2A Database Migration + Rollback Decision Pack docs-only remediation scope
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
+Latest Production Readiness Decision Pack: PDR-2A Database Migration + Rollback Decision Pack recorded on branch codex/pdr-2a-db-migration-decision-pack
 
 ---
 
@@ -57,10 +58,10 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this docs/status closure if approved.
-2. User visual / acceptance review of the locally frozen V1 decision-support workflow.
-3. Future production-readiness remediation only under a separate explicit production release gate.
-4. Preserving Production Deployment Readiness as BLOCKED until that separate gate clears it.
+1. Autodeliver this PDR-2A docs-only decision pack if approved.
+2. Keep P3-3 V1 local acceptance-ready final freeze effective.
+3. Prepare PDR-2B Flyway Baseline Skeleton only under a separate explicit production-readiness package.
+4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
 
@@ -68,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java, schema, dashboard, review UI, API contract, test, script, scheduler, Push, Telegram, order, execution, auto-trading, production config, or trading-logic changes inside this closure.
+1. Java, schema, dashboard, review UI, API contract, test, script, scheduler, Push, Telegram, order, execution, auto-trading, production config, Flyway dependency, migration SQL, PostgreSQL connection, or trading-logic changes inside this PDR-2A decision pack.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -134,7 +135,40 @@ Blocking evidence:
 - `src/main/resources/application.yml` has empty datasource password.
 - `src/main/resources/application.yml` and `src/main/resources/application.properties` enable H2 console.
 - `src/main/resources/application.properties` defaults `position.provider.type` to `SIMULATED`.
-- No production profile, migration/rollback pipeline, auth/authz evidence, or deployment smoke/rollback evidence was found in the P0-0 audit pass.
+- PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
+- No production migration framework exists yet.
+- No production database is connected in this package.
+- No migration/rollback pipeline, backup/restore command set, auth/authz evidence, deployment smoke/rollback evidence, observability stack, or complete secrets contract exists yet.
+
+### PDR-2A Database Migration + Rollback Decision Pack
+
+PDR-2A records the production database and migration decisions only. It does not add runtime implementation.
+
+- Production database target: PostgreSQL.
+- Migration framework target: Flyway, SQL-first.
+- Rollback policy: forward-only migrations plus pre-migration backup and restore.
+- Migration execution model: explicit manual pre-deploy migration; application startup must not silently mutate the production schema without a controlled migration process.
+- Initial recovery target: RPO 24h and RTO 4h.
+- Current schema state: `src/main/resources/schema.sql` remains local/test bootstrap for now.
+- No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
+- Production readiness remains BLOCKED.
+
+PDR-2A remaining blockers:
+
+- Flyway dependency not added.
+- Flyway baseline migration not created.
+- PostgreSQL compatibility not verified.
+- Backup/restore scripts or commands not implemented.
+- Auth/access control missing.
+- Observability missing.
+- Deployment packaging missing.
+- Secrets contract incomplete.
+
+Next production-readiness packages:
+
+1. PDR-2B Flyway Baseline Skeleton.
+2. PDR-2C PostgreSQL Compatibility Pass.
+3. PDR-2D Backup/Restore Runbook.
 
 ---
 
@@ -150,7 +184,7 @@ Review-only slice count is no longer a delivery completion standard.
 
 ## Rule
 
-No production deployment package may start until a separate explicit production release gate addresses the blocked runtime/config evidence and preserves the permanent no auto-trading / no order-execution safety boundaries.
+No production deployment approval or runtime production implementation package may start until a separate explicit production release gate addresses the blocked runtime/config evidence and preserves the permanent no auto-trading / no order-execution safety boundaries. Docs-only production-readiness decision packs may record decisions while keeping deployment readiness BLOCKED.
 
 ## Workflow PR Status
 

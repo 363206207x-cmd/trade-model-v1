@@ -12,10 +12,10 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P3-3 Final Delivery & System Freeze DONE/effective as local acceptance-ready final freeze"
-active_block_cn: "P3-3 最终交付与系统冻结已作为本地验收就绪冻结生效"
+active_block: "PDR-2A Database Migration + Rollback Decision Pack"
+active_block_cn: "PDR-2A 数据库迁移与回滚决策包"
 
-next_required_action: "Autodeliver this docs/status closure when approved. Keep Production Deployment Readiness BLOCKED until a separate production release gate explicitly clears it."
+next_required_action: "Autodeliver the PDR-2A docs-only decision pack when approved. Keep Production Deployment Readiness BLOCKED until a separate production release gate explicitly clears it."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
 
@@ -44,6 +44,10 @@ p3_2_effective: true
 p3_2_started: true
 p3_3_status: "DONE/effective as local acceptance-ready final freeze"
 p3_3_effective: true
+pdr_1_status: "DONE/effective on merged main: production profile safety guard added"
+pdr_1_effective: true
+pdr_2a_status: "DONE as docs-only decision pack when merged: PostgreSQL target, Flyway target, forward-only migrations plus backup/restore rollback, manual pre-deploy migration, RPO 24h, RTO 4h, schema.sql local/test bootstrap"
+pdr_2a_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -58,5 +62,8 @@ notes:
   - "Dashboard Home API and data fill packages P1-P5 are merged/effective: /api/dashboard/home returns header, systemState, assets, positions, executionSuggestion, aiDecision, pushInbox, diagnostics, and safety; push inbox remains readonly; Telegram remains WAITING_SYNC until a verified status source exists; no Telegram send is implemented."
   - "Review Center readonly integration is merged/effective: /review/dashboard exists; /api/review/center returns summary, positionReviews, opportunityReviews, pushReviews, and ruleFeedback; the four tabs are readonly and do not fabricate records."
   - "P3-3 Final Delivery & System Freeze is recorded as local/acceptance-ready final freeze based on clean main, full Maven PASS, delivery check PASS, v1-state PASS, and runtime API evidence."
+  - "PDR-1 Production Config / Profile Lock is merged/effective on main: application-prod.yml and ProductionProfileSafetyGuard exist."
+  - "PDR-2A records database migration decisions only: PostgreSQL target, Flyway SQL-first migration target, forward-only migrations plus pre-migration backup/restore rollback, manual pre-deploy migration, RPO 24h, RTO 4h, and schema.sql local/test bootstrap."
+  - "PDR-2A does not add Flyway dependency, migration SQL, PostgreSQL connection, schema/config/code changes, backup scripts, deployment scripts, secrets, auth, Telegram send, Push send, order/execution, or auto-trading."
   - "Production Deployment Readiness remains BLOCKED and no production-ready claim is made."
   - "No UserPosition mutation, order execution, auto-trading, Push send, external channel action, backend Java, schema, tests, scripts, production config, or API contracts are part of this status closure."
