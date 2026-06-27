@@ -14,6 +14,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
@@ -21,6 +22,7 @@ import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
+import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.stereotype.Service;
 
@@ -68,6 +70,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final PushSnapshotMapper pushSnapshotMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
+    private final ProviderReadinessService providerReadinessService;
     private final ObjectMapper objectMapper;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -78,6 +81,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                     PushSnapshotMapper pushSnapshotMapper,
                                     PushRecheckLogMapper pushRecheckLogMapper,
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
+                                    ProviderReadinessService providerReadinessService,
                                     ObjectMapper objectMapper) {
         this.decisionService = decisionService;
         this.monitorService = monitorService;
@@ -87,6 +91,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
+        this.providerReadinessService = providerReadinessService;
         this.objectMapper = objectMapper;
     }
 
@@ -98,6 +103,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<MonitorAlertDO> alerts = safeAlerts();
         List<UserPositionVO> positions = safePositions();
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
+        ProviderReadinessVO providerReadiness = safeProviderReadiness();
 
         String normalizedSelected = normalizeSymbol(selectedSymbol);
         if (normalizedSelected == null) {
@@ -116,7 +122,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
         DashboardHomeVO home = new DashboardHomeVO();
-        home.setHeader(buildHeader(systemStatus, decisions, positionSyncStatus, externalContext));
+        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness));
         home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
@@ -126,20 +132,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision));
         home.setAiDecision(buildAiDecision(selectedDecision));
         home.setPushInbox(pushInboxContext.pushInbox());
-        home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus, pushInboxContext));
+        home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
+                pushInboxContext, providerReadiness));
         home.setSafety(new DashboardHomeVO.SafetyVO());
         return home;
     }
 
     private DashboardHomeVO.HeaderVO buildHeader(LightSystemStatusVO systemStatus,
-                                                 List<DecisionResultVO> decisions,
                                                  PositionSyncStatusVO positionSyncStatus,
-                                                 ExternalContextSnapshot externalContext) {
+                                                 ExternalContextSnapshot externalContext,
+                                                 ProviderReadinessVO providerReadiness) {
         DashboardHomeVO.HeaderVO header = new DashboardHomeVO.HeaderVO();
         header.setPageTitle("首页总览");
         header.setDataStatus(firstNonBlank(systemStatus != null ? systemStatus.getStatus() : null, "WAITING_SYNC"));
-        header.setAiStatus(decisions == null || decisions.isEmpty() ? "WAITING_SYNC" : "CONNECTED");
-        header.setDataSourceText(dataSourceText(positionSyncStatus, externalContext));
+        header.setAiStatus(firstNonBlank(providerReadiness != null ? providerReadiness.getAiProviderStatus() : null,
+                "WAITING_SYNC"));
+        header.setDataSourceText(dataSourceText(positionSyncStatus, externalContext, providerReadiness));
         header.setUpdatedAt(LocalDateTime.now());
         return header;
     }
@@ -511,7 +519,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                            List<DecisionResultVO> decisions,
                                                            DecisionResultVO selectedDecision,
                                                            PositionSyncStatusVO positionSyncStatus,
-                                                           PushInboxContext pushInboxContext) {
+                                                           PushInboxContext pushInboxContext,
+                                                           ProviderReadinessVO providerReadiness) {
         DashboardHomeVO.DiagnosticsVO diagnostics = new DashboardHomeVO.DiagnosticsVO();
         diagnostics.setDataIngestion(diagnosticFromFreshness(positionSyncStatus));
         diagnostics.setDataQuality(averageDataQuality(decisions) != null ? "CONNECTED" : "WAITING_SYNC");
@@ -522,6 +531,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         diagnostics.setHotReset(systemStatus != null && systemStatus.getHotResetFired() != null ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setOpportunityLog("UNKNOWN");
         diagnostics.setReview("UNKNOWN");
+        diagnostics.setMarketDataProvider(firstNonBlank(
+                providerReadiness != null ? providerReadiness.getMarketDataProviderStatus() : null,
+                "WAITING_SYNC"));
+        diagnostics.setAiProvider(firstNonBlank(
+                providerReadiness != null ? providerReadiness.getAiProviderStatus() : null,
+                "WAITING_SYNC"));
+        diagnostics.setExternalContextProvider(firstNonBlank(
+                providerReadiness != null ? providerReadiness.getExternalContextProviderStatus() : null,
+                "WAITING_SYNC"));
+        diagnostics.setProviderReadiness(providerReadiness);
         return diagnostics;
     }
 
@@ -591,6 +610,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return positionSyncService.getPositionSyncStatus();
         } catch (RuntimeException ignored) {
             return null;
+        }
+    }
+
+    private ProviderReadinessVO safeProviderReadiness() {
+        try {
+            ProviderReadinessVO readiness = providerReadinessService.getReadiness();
+            return readiness != null ? readiness : new ProviderReadinessVO();
+        } catch (RuntimeException ignored) {
+            return new ProviderReadinessVO();
         }
     }
 
@@ -853,7 +881,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return sawField ? count : null;
     }
 
-    private String dataSourceText(PositionSyncStatusVO positionSyncStatus, ExternalContextSnapshot externalContext) {
+    private String dataSourceText(PositionSyncStatusVO positionSyncStatus,
+                                  ExternalContextSnapshot externalContext,
+                                  ProviderReadinessVO providerReadiness) {
         String provider = positionSyncStatus != null
                 ? firstNonBlank(positionSyncStatus.getActiveProviderType(), positionSyncStatus.getConfiguredProviderType())
                 : null;
@@ -861,7 +891,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (hasText(provider) && hasText(sourceHealth)) {
             return provider + " / " + sourceHealth;
         }
-        return firstNonBlank(provider, sourceHealth, "WAITING_SYNC");
+        return firstNonBlank(
+                provider,
+                providerReadiness != null ? providerReadiness.getDataSourceText() : null,
+                sourceHealth,
+                "WAITING_SYNC"
+        );
     }
 
     private String diagnosticFromFreshness(PositionSyncStatusVO positionSyncStatus) {

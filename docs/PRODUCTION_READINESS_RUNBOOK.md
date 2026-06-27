@@ -6,7 +6,7 @@ This runbook records production-readiness decisions and remaining gates. It is n
 
 Production Deployment Readiness is `BLOCKED`.
 
-V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M4 adds minimal health/readiness observability and authenticated smoke checks, but it is not a production deployment approval.
+V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real data-provider readiness evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M5 adds readonly provider-readiness status and smoke checks, but it is not a production deployment approval.
 
 ## PDR-2A Database Migration + Rollback Decision
 
@@ -96,6 +96,18 @@ PDR-M4 adds minimal Spring Boot Actuator health/readiness observability and stre
 - Smoke behavior: `scripts/prod-smoke.sh` checks public health/liveness/readiness, authenticated `/api/dashboard/home`, authenticated `/api/review/center`, dashboard safety fields, and Telegram non-connected status without printing passwords.
 - Deferred: real server smoke evidence, log aggregation, metrics dashboards, alerting, HTTPS/reverse-proxy hardening, secrets manager integration, restore drill evidence, and production release-gate approval.
 
+## PDR-M5 Real Data Provider Readiness Pack
+
+PDR-M5 adds readonly provider-readiness status for real data-provider configuration. It does not call live providers by default and does not approve production deployment.
+
+- Market data readiness: Binance public market data reports `CONFIGURED` only from config presence; local/dev `SIMULATED` remains `WAITING_SYNC` and is not production-ready.
+- AI readiness: OpenAI, Gemini, and xAI report `CONFIGURED` only when explicitly enabled and configured; config-only status is not `CONNECTED`. Missing config for an explicitly enabled provider fails closed.
+- External context readiness: optional news, macro calendar, and ETF flow keys are placeholders only. Config-only status is not `CONNECTED`; without verified sources the dashboard remains `WAITING_SYNC`.
+- Dashboard status: `/api/dashboard/home.header.dataSourceText` and `/api/dashboard/home.diagnostics` expose readonly provider readiness without external calls.
+- Smoke behavior: `scripts/prod-smoke.sh` checks provider readiness shape and rejects provider `CONNECTED` status unless `SMOKE_ALLOW_EXTERNAL_CALLS=true` and a verified source exists.
+- Production guard: prod startup keeps rejecting simulated position provider and now rejects explicitly enabled AI providers with missing key/model/base URL.
+- Deferred: live provider probes, secrets manager integration, real server provider smoke, HTTPS/reverse proxy hardening, Telegram send, Push dispatch, order/execution, and production release-gate approval.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -182,6 +194,8 @@ Required environment categories:
 - Database: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `PROD_DATASOURCE_URL`, `PROD_DATASOURCE_USERNAME`, `PROD_DATASOURCE_PASSWORD`.
 - Position provider: `POSITION_PROVIDER_TYPE`, `BINANCE_API_BASE_URL`, `BINANCE_API_KEY`, `BINANCE_API_SECRET`.
 - Optional AI provider toggles/keys: `TRADE_MODEL_AI_ENABLED`, provider-specific enabled flags, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`.
+- Optional external context provider placeholders: `NEWS_API_KEY`, `MACRO_CALENDAR_API_KEY`, `ETF_FLOW_API_KEY`.
+- Smoke external-call policy: `SMOKE_ALLOW_EXTERNAL_CALLS=false` by default; default smoke does not call live providers.
 - Future Telegram placeholders: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`; these do not activate Telegram send.
 
 ## Rollback Policy
@@ -269,15 +283,16 @@ The restore script must only target a controlled recovery database until a separ
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
+- Provider readiness is readonly after PDR-M5: config-only status exists for Binance public market data, AI providers, and external context placeholders, but no live provider connection proof, secrets manager integration, or real server provider smoke exists yet.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
-1. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
-2. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
-3. PDR-M7 Real Server Deployment Smoke / Restore Drill Evidence if not covered by PDR-M5.
+1. PDR-M6 Secrets Manager / External Integration Verification / Production Release Gate.
+2. PDR-M7 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
+3. PDR-M8 Real Server Deployment Smoke / Restore Drill Evidence if not covered by earlier packages.
 
 ## Explicit Non-Scope
 
-PDR-M4 does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds minimal health/readiness observability, sensitive actuator exposure guards, authenticated smoke checks, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.
+PDR-M5 does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, call live providers in default tests or smoke, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds readonly provider readiness, config-only fail-closed guards, smoke checks, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.

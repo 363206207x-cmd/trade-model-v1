@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +24,19 @@ class ProdSmokeScriptHealthTest {
         assertThat(exitCode)
                 .as(output)
                 .isZero();
+    }
+
+    @Test
+    void prodSmokeScriptChecksProviderReadinessWithoutExternalCallsByDefault() throws Exception {
+        String script = Files.readString(Path.of("scripts", "prod-smoke.sh"), StandardCharsets.UTF_8);
+
+        assertThat(script).contains("SMOKE_ALLOW_EXTERNAL_CALLS=\"${SMOKE_ALLOW_EXTERNAL_CALLS:-false}\"");
+        assertThat(script).contains("dashboard header.dataSourceText missing");
+        assertThat(script).contains("marketDataProvider");
+        assertThat(script).contains("aiProvider");
+        assertThat(script).contains("externalContextProvider");
+        assertThat(script).contains("providerReadiness");
+        assertThat(script).contains("provider status CONNECTED requires SMOKE_ALLOW_EXTERNAL_CALLS=true");
     }
 
     private static String readOutput(Process process) throws IOException {

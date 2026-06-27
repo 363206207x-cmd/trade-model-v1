@@ -4,6 +4,7 @@ set -euo pipefail
 APP_URL="${APP_URL:-http://localhost:8081}"
 AUTH_USERNAME="${SMOKE_AUTH_USERNAME:-${APP_ADMIN_USERNAME:-}}"
 AUTH_PASSWORD="${SMOKE_AUTH_PASSWORD:-${APP_ADMIN_PASSWORD:-}}"
+SMOKE_ALLOW_EXTERNAL_CALLS="${SMOKE_ALLOW_EXTERNAL_CALLS:-false}"
 
 if [ -z "$AUTH_USERNAME" ] || [ -z "$AUTH_PASSWORD" ]; then
   echo "FAIL smoke auth credentials missing; set APP_ADMIN_USERNAME/APP_ADMIN_PASSWORD or SMOKE_AUTH_USERNAME/SMOKE_AUTH_PASSWORD" >&2
@@ -45,11 +46,12 @@ request_public_json "/actuator/health/readiness" "$readiness_body"
 request_authenticated_json "/api/dashboard/home" "$dashboard_body"
 request_authenticated_json "/api/review/center" "$review_body"
 
-python3 - "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body" <<'PY'
+python3 - "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body" "$SMOKE_ALLOW_EXTERNAL_CALLS" <<'PY'
 import json
 import sys
 
-health_path, liveness_path, readiness_path, dashboard_path, review_path = sys.argv[1:]
+health_path, liveness_path, readiness_path, dashboard_path, review_path, allow_external_calls = sys.argv[1:]
+allow_external_calls = allow_external_calls.lower() == "true"
 
 def load_payload(path):
     with open(path, "r", encoding="utf-8") as handle:
@@ -101,6 +103,32 @@ if safety.get("notAutoTrading") is not True:
     raise SystemExit("FAIL safety.notAutoTrading is not true")
 if safety.get("notOrderExecution") is not True:
     raise SystemExit("FAIL safety.notOrderExecution is not true")
+
+header = dashboard.get("header") or {}
+if not header.get("dataSourceText"):
+    raise SystemExit("FAIL dashboard header.dataSourceText missing")
+
+diagnostics = dashboard.get("diagnostics") or {}
+for key in ("marketDataProvider", "aiProvider", "externalContextProvider", "providerReadiness"):
+    if key not in diagnostics:
+        raise SystemExit(f"FAIL dashboard diagnostics.{key} missing")
+
+allowed_statuses = {"CONNECTED", "CONFIGURED", "NOT_CONFIGURED", "WAITING_SYNC", "FAIL_CLOSED", "UNKNOWN"}
+provider_readiness = diagnostics.get("providerReadiness") or {}
+provider_statuses = [
+    diagnostics.get("marketDataProvider"),
+    diagnostics.get("aiProvider"),
+    diagnostics.get("externalContextProvider"),
+    (header.get("aiStatus") or ""),
+]
+for provider in provider_readiness.get("providers") or []:
+    provider_statuses.append((provider or {}).get("status"))
+
+for status in [value for value in provider_statuses if value]:
+    if status not in allowed_statuses:
+        raise SystemExit(f"FAIL unknown provider readiness status: {status}")
+    if status == "CONNECTED" and not allow_external_calls:
+        raise SystemExit("FAIL provider status CONNECTED requires SMOKE_ALLOW_EXTERNAL_CALLS=true and a verified source")
 
 telegram_status = (dashboard.get("pushInbox") or {}).get("telegramStatus")
 if telegram_status == "CONNECTED":

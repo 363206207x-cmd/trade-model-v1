@@ -13,11 +13,13 @@ import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
+import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,6 +69,8 @@ class DashboardHomeServiceImplTest {
     private PushRecheckLogMapper pushRecheckLogMapper;
     @Mock
     private ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
+    @Mock
+    private ProviderReadinessService providerReadinessService;
 
     private DashboardHomeServiceImpl service;
 
@@ -81,6 +85,7 @@ class DashboardHomeServiceImplTest {
                 pushSnapshotMapper,
                 pushRecheckLogMapper,
                 externalContextEvidenceBuilder,
+                providerReadinessService,
                 new ObjectMapper()
         );
     }
@@ -284,6 +289,29 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo(home.getDiagnostics().getTelegram());
         assertThat(home.getPushInbox().getTelegramStatus()).isNotEqualTo("CONNECTED");
         assertThat(home.getDiagnostics().getTelegram()).isNotEqualTo("CONNECTED");
+    }
+
+    @Test
+    void providerReadinessFeedsHeaderAndDiagnosticsWithoutFakeConnectedStatus() {
+        ProviderReadinessVO readiness = providerReadiness(
+                "CONFIGURED",
+                "CONFIGURED",
+                "WAITING_SYNC",
+                "Binance public data / CONFIGURED"
+        );
+        when(providerReadinessService.getReadiness()).thenReturn(readiness);
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(home.getHeader().getAiStatus()).isEqualTo("CONFIGURED");
+        assertThat(home.getHeader().getDataSourceText()).isEqualTo("Binance public data / CONFIGURED");
+        assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONFIGURED");
+        assertThat(home.getDiagnostics().getAiProvider()).isEqualTo("CONFIGURED");
+        assertThat(home.getDiagnostics().getExternalContextProvider()).isEqualTo("WAITING_SYNC");
+        assertThat(home.getDiagnostics().getProviderReadiness().getProviders()).allSatisfy(provider -> {
+            assertThat(provider.getStatus()).isNotEqualTo("CONNECTED");
+            assertThat(provider.getConnected()).isFalse();
+        });
     }
 
     @Test
@@ -631,6 +659,35 @@ class DashboardHomeServiceImplTest {
                 .filter(tab -> role.equals(tab.getRole()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private ProviderReadinessVO providerReadiness(String marketStatus,
+                                                  String aiStatus,
+                                                  String externalContextStatus,
+                                                  String dataSourceText) {
+        ProviderReadinessVO readiness = new ProviderReadinessVO();
+        readiness.setMarketDataProviderStatus(marketStatus);
+        readiness.setAiProviderStatus(aiStatus);
+        readiness.setExternalContextProviderStatus(externalContextStatus);
+        readiness.setDataSourceText(dataSourceText);
+        readiness.setProviders(List.of(
+                provider("MARKET_DATA", "BINANCE_PUBLIC_MARKET_DATA", marketStatus),
+                provider("AI", "OPENAI", aiStatus),
+                provider("EXTERNAL_CONTEXT", "MACRO_NEWS_CONTEXT", externalContextStatus)
+        ));
+        return readiness;
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO provider(String category, String name, String status) {
+        ProviderReadinessVO.ProviderStatusVO provider = new ProviderReadinessVO.ProviderStatusVO();
+        provider.setCategory(category);
+        provider.setName(name);
+        provider.setStatus(status);
+        provider.setEnabled("CONFIGURED".equals(status));
+        provider.setConfigured("CONFIGURED".equals(status));
+        provider.setConnected(false);
+        provider.setReason("CONFIG_ONLY_NOT_CONNECTED");
+        return provider;
     }
 
     private void assertNoAiEvidence(DashboardHomeVO home) {
