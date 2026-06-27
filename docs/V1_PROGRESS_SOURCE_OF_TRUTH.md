@@ -40,14 +40,14 @@ The following do not count as completed:
 ## Current Active Block
 
 - Current merged main evidence: `aa2d320 chore(prod): add flyway baseline skeleton` plus prior P3-3 local acceptance freeze, Review Center readonly integration, PDR-1 production profile guard evidence, and PDR-2A database migration decision evidence.
-- Current active block: `PDR-2C1 PostgreSQL Baseline Schema SQL`
+- Current active block: `PDR-2C2A Mapper PostgreSQL Upsert Variants`
 - Current level: `LOCAL_ACCEPTANCE_FREEZE_DONE effective; PRODUCTION_DEPLOYMENT_READINESS blocked`
 - Capability movement from this status closure: P3-3 Final Delivery & System Freeze is recorded as local/acceptance-ready final freeze. This does not prove production deployment readiness, Push send, Telegram send, external channel, order execution, or auto-trading.
-- Latest production readiness remediation movement: PDR-1 Production Config / Profile Lock is merged on main, PDR-2A records database migration decisions, PDR-2B adds a safe Flyway skeleton, and PDR-2C1 adds PostgreSQL baseline schema SQL drafts: `V1__baseline_schema_tables.sql` and `V2__baseline_schema_indexes.sql`.
-- Next required action: autodeliver this PDR-2C1 PostgreSQL baseline schema SQL package after review, then start PDR-2C2 Mapper PostgreSQL Compatibility only under a separate scoped package. Production Deployment Readiness remains BLOCKED.
+- Latest production readiness remediation movement: PDR-1 Production Config / Profile Lock is merged on main, PDR-2A records database migration decisions, PDR-2B adds a safe Flyway skeleton, PDR-2C1 adds PostgreSQL baseline schema SQL drafts, and PDR-2C2A adds MyBatis PostgreSQL upsert mapper variants for AssetState/UserConfig while preserving default H2 behavior.
+- Next required action: autodeliver this PDR-2C2A mapper PostgreSQL upsert variant package after review, then start PDR-2C2B DATEADD / FORMATDATETIME mapper compatibility only under a separate scoped package. Production Deployment Readiness remains BLOCKED.
 - Validation evidence: P0-0 through P3-2 remain DONE/effective. Dashboard Home Aggregation API and Dashboard Data Fill P1-P5 are merged/effective; `GET /api/dashboard/home` returned HTTP 200 success with `header`, `systemState`, `assets`, `positions`, `executionSuggestion`, `aiDecision`, `pushInbox`, `diagnostics`, and `safety`. Review Center readonly integration is merged/effective; `GET /api/review/center` returned HTTP 200 success with `summary`, `positionReviews`, `opportunityReviews`, `pushReviews`, and `ruleFeedback`. Mainline validation passed on clean `main`: no open PRs, MAIN_SYNC OK, `./mvnw test -q` PASS, `bash scripts/v1-delivery-check.sh` PASS, and `bash scripts/v1-state.sh` PASS with blockers none. Production Deployment Readiness remains BLOCKED.
 
-PDR-2C1 does not add default Flyway activation, PostgreSQL driver/config connection, schema.sql changes, mapper SQL changes, application config changes, backup/restore commands, deployment scripts, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics.
+PDR-2C2A does not add default Flyway activation, PostgreSQL driver/config connection, schema.sql changes, Flyway migration changes, runtime application config changes, backup/restore commands, deployment scripts, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics. It only adds MyBatis database-id detection and PostgreSQL upsert annotation variants while preserving default H2 mapper behavior.
 
 ## Historical Runtime Slice Log
 

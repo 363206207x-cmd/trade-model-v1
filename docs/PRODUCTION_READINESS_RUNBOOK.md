@@ -40,13 +40,23 @@ PDR-2C1 adds PostgreSQL-compatible baseline schema SQL files only. It does not v
 - Type strategy: generated identity columns, `TEXT` for JSON-like text fields, `TIMESTAMP WITHOUT TIME ZONE` for current `LocalDateTime` semantics, and PostgreSQL-compatible floating-point types.
 - Deferred: mapper PostgreSQL compatibility, PostgreSQL driver, Testcontainers/Flyway smoke validation, real database connection, and backup/restore validation.
 
+## PDR-2C2A Mapper PostgreSQL Upsert Variants
+
+PDR-2C2A adds mapper-level PostgreSQL upsert variants only. It does not change default H2 behavior and does not validate against a live PostgreSQL database.
+
+- MyBatis database-id detection: `DatabaseIdProvider` maps PostgreSQL to `postgresql`, H2 to `h2`, and MySQL to `mysql`.
+- Asset state upsert: `AssetStateMapper.mergeUpsertCore` keeps the generic H2 `MERGE INTO ... KEY` fallback and adds a PostgreSQL `ON CONFLICT (symbol) DO UPDATE` variant.
+- User config upsert: `UserConfigMapper.saveOrUpdate` keeps the generic MySQL/H2 `ON DUPLICATE KEY UPDATE` fallback and adds a PostgreSQL `ON CONFLICT (user_id) DO UPDATE` variant.
+- Deferred: DATEADD / FORMATDATETIME mapper compatibility, PostgreSQL driver, Testcontainers/Flyway smoke validation, real database connection, and backup/restore validation.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
 - A Flyway skeleton exists only behind the explicit `flyway-migration` Maven profile.
 - PostgreSQL baseline schema SQL files exist as PDR-2C1 draft migrations.
-- No production database is connected by PDR-2C1.
-- No PostgreSQL driver/config is added by PDR-2C1.
+- PostgreSQL upsert mapper variants exist for asset state and user config.
+- No production database is connected by PDR-2C2A.
+- No PostgreSQL driver/runtime connection is added by PDR-2C2A.
 
 ## Migration Execution Policy
 
@@ -54,7 +64,7 @@ Production migrations must run as an explicit pre-deploy step.
 
 Application startup must not silently mutate the production schema without a controlled migration process.
 
-PDR-2C1 adds schema SQL drafts only. PDR-2C2/PDR-2C3 must complete mapper compatibility and PostgreSQL validation before any migration implementation is treated as deployable.
+PDR-2C1 adds schema SQL drafts only. PDR-2C2A adds the first mapper compatibility slice for upsert SQL only. PDR-2C2B/PDR-2C3 must complete date-function compatibility and PostgreSQL validation before any migration implementation is treated as deployable.
 
 ## Rollback Policy
 
@@ -77,7 +87,7 @@ PDR-2A does not implement backup or restore commands. PDR-2D must define Postgre
 
 - Flyway dependency is available only through the non-default `flyway-migration` Maven profile.
 - PostgreSQL baseline schema SQL exists but is not validated against PostgreSQL yet.
-- Mapper PostgreSQL compatibility not completed.
+- Mapper PostgreSQL compatibility is partial: upsert variants are present, DATEADD / FORMATDATETIME compatibility is still pending.
 - PostgreSQL driver/Testcontainers validation not added.
 - Backup/restore scripts or commands not implemented.
 - Auth/access control missing.
@@ -87,10 +97,10 @@ PDR-2A does not implement backup or restore commands. PDR-2D must define Postgre
 
 ## Next Packages
 
-1. PDR-2C2 Mapper PostgreSQL Compatibility.
+1. PDR-2C2B Mapper PostgreSQL Date Function Compatibility.
 2. PDR-2C3 PostgreSQL Driver + Migration Smoke Validation.
 3. PDR-2D Backup/Restore Runbook.
 
 ## Explicit Non-Scope
 
-PDR-2C1 does not add PostgreSQL connection, schema.sql changes, mapper SQL changes, runtime config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics.
+PDR-2C2A does not add PostgreSQL connection, schema.sql changes, Flyway migration changes, runtime application config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics. It only adds MyBatis database-id detection and PostgreSQL upsert annotation variants while preserving default H2 mapper behavior.
