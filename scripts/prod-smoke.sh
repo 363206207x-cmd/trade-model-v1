@@ -10,11 +10,25 @@ if [ -z "$AUTH_USERNAME" ] || [ -z "$AUTH_PASSWORD" ]; then
   exit 1
 fi
 
+health_body="$(mktemp)"
+liveness_body="$(mktemp)"
+readiness_body="$(mktemp)"
 dashboard_body="$(mktemp)"
 review_body="$(mktemp)"
-trap 'rm -f "$dashboard_body" "$review_body"' EXIT
+trap 'rm -f "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body"' EXIT
 
-request_json() {
+request_public_json() {
+  local path="$1"
+  local out="$2"
+  local code
+  code="$(curl -sS -o "$out" -w '%{http_code}' "${APP_URL}${path}" || true)"
+  if [ "$code" != "200" ]; then
+    echo "FAIL ${path} returned HTTP ${code}" >&2
+    return 1
+  fi
+}
+
+request_authenticated_json() {
   local path="$1"
   local out="$2"
   local code
@@ -25,14 +39,17 @@ request_json() {
   fi
 }
 
-request_json "/api/dashboard/home" "$dashboard_body"
-request_json "/api/review/center" "$review_body"
+request_public_json "/actuator/health" "$health_body"
+request_public_json "/actuator/health/liveness" "$liveness_body"
+request_public_json "/actuator/health/readiness" "$readiness_body"
+request_authenticated_json "/api/dashboard/home" "$dashboard_body"
+request_authenticated_json "/api/review/center" "$review_body"
 
-python3 - "$dashboard_body" "$review_body" <<'PY'
+python3 - "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body" <<'PY'
 import json
 import sys
 
-dashboard_path, review_path = sys.argv[1], sys.argv[2]
+health_path, liveness_path, readiness_path, dashboard_path, review_path = sys.argv[1:]
 
 def load_payload(path):
     with open(path, "r", encoding="utf-8") as handle:
@@ -48,6 +65,17 @@ def require_keys(name, payload, keys):
 
 dashboard = load_payload(dashboard_path)
 review = load_payload(review_path)
+
+for name, path in (
+    ("health", health_path),
+    ("liveness", liveness_path),
+    ("readiness", readiness_path),
+):
+    payload = load_payload(path)
+    if payload.get("status") != "UP":
+        raise SystemExit(f"FAIL {name} status is not UP")
+    if "components" in payload or "details" in payload:
+        raise SystemExit(f"FAIL {name} exposes health details")
 
 require_keys("dashboard", dashboard, [
     "header",

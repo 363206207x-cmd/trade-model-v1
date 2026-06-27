@@ -6,7 +6,7 @@ This runbook records production-readiness decisions and remaining gates. It is n
 
 Production Deployment Readiness is `BLOCKED`.
 
-V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M3 adds a single-operator auth gate, but it is not a production deployment approval.
+V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M4 adds minimal health/readiness observability and authenticated smoke checks, but it is not a production deployment approval.
 
 ## PDR-2A Database Migration + Rollback Decision
 
@@ -84,6 +84,18 @@ PDR-M3 adds a single-operator Spring Security Basic Auth gate. It does not add a
 - Smoke behavior: readonly production smoke checks require auth credentials through `SMOKE_AUTH_USERNAME` / `SMOKE_AUTH_PASSWORD` or `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`; scripts must not print passwords.
 - Deferred: HTTPS / reverse proxy configuration, secrets manager integration, credential rotation, audit logging, rate limiting, real server auth smoke evidence, and production release-gate approval.
 
+## PDR-M4 Observability + Production Smoke Gate
+
+PDR-M4 adds minimal Spring Boot Actuator health/readiness observability and strengthens the production smoke gate. It does not add a metrics stack, alerting platform, real server deployment, or production release approval.
+
+- Actuator dependency: `spring-boot-starter-actuator` is present.
+- Exposed actuator endpoints: only `health` is exposed over HTTP; liveness and readiness health groups are enabled under `/actuator/health/liveness` and `/actuator/health/readiness`.
+- Health detail policy: details and components are hidden (`show-details=never`, `show-components=never`).
+- Auth policy: minimal health/liveness/readiness endpoints are public; dashboard/review and operational APIs remain behind Basic Auth.
+- Production guard: prod startup rejects actuator web exposure that is wider than `health`, including wildcard exposure.
+- Smoke behavior: `scripts/prod-smoke.sh` checks public health/liveness/readiness, authenticated `/api/dashboard/home`, authenticated `/api/review/center`, dashboard safety fields, and Telegram non-connected status without printing passwords.
+- Deferred: real server smoke evidence, log aggregation, metrics dashboards, alerting, HTTPS/reverse-proxy hardening, secrets manager integration, restore drill evidence, and production release-gate approval.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -95,6 +107,7 @@ PDR-M3 adds a single-operator Spring Security Basic Auth gate. It does not add a
 - Testcontainers/Flyway smoke is test-only and does not use real secrets.
 - Dockerfile, Docker Compose, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed and no public production access is approved.
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy, secrets manager, credential rotation, real server auth smoke, or production release approval exists yet.
+- Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no real server smoke evidence, log aggregation, metrics dashboards, or alerting exists yet.
 
 ## Migration Execution Policy
 
@@ -119,6 +132,16 @@ docker compose logs -f app
 bash scripts/prod-smoke.sh
 ```
 
+Health and smoke checks:
+
+```bash
+export APP_URL=http://localhost:8081
+curl -fsS "$APP_URL/actuator/health"
+curl -fsS "$APP_URL/actuator/health/liveness"
+curl -fsS "$APP_URL/actuator/health/readiness"
+APP_ADMIN_USERNAME=operator APP_ADMIN_PASSWORD='replace-me' bash scripts/prod-smoke.sh
+```
+
 Stop/restart commands:
 
 ```bash
@@ -126,6 +149,23 @@ docker compose stop app
 docker compose restart app
 docker compose down
 ```
+
+Log and troubleshooting commands:
+
+```bash
+docker compose ps
+docker compose logs --tail=200 app
+docker compose logs --tail=200 postgres
+docker compose logs --tail=200 migrate
+```
+
+Troubleshooting checklist:
+
+- If `/actuator/health/readiness` is not `UP`, inspect app logs and database connectivity first.
+- If smoke auth fails, rotate or re-enter `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`; do not print secrets in logs.
+- If dashboard/review smoke fails but readiness is `UP`, inspect application logs, database schema/migration state, and API response body locally.
+- If safety fields fail, stop the deployment rehearsal and do not proceed to release-gate review.
+- If rollback is needed, stop the app, restore to a controlled recovery database, start the app against the restored database, then rerun readiness and smoke checks.
 
 Security notes:
 
@@ -206,8 +246,10 @@ Restore smoke checklist:
 
 - DB connection succeeds with the restored credentials.
 - `flyway_schema_history` exists and reports expected successful migrations.
+- `/actuator/health/readiness` returns HTTP 200 with `status=UP` and no health detail payload.
 - `/api/dashboard/home` returns HTTP 200 in the restored environment.
 - `/api/review/center` returns HTTP 200 in the restored environment.
+- `scripts/prod-smoke.sh` passes with authenticated dashboard/review API checks and safety-field checks.
 - RPO 24h / RTO 4h target evidence is recorded for the restore drill.
 
 Template scripts:
@@ -226,16 +268,16 @@ The restore script must only target a controlled recovery database until a separ
 - Mapper PostgreSQL compatibility covers known upsert and DATEADD / FORMATDATETIME blockers; live PostgreSQL mapper execution remains to be expanded beyond smoke/static guards.
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
-- Observability missing.
+- Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
-1. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
-2. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
-3. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening if not covered by PDR-M5.
+1. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
+2. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
+3. PDR-M7 Real Server Deployment Smoke / Restore Drill Evidence if not covered by PDR-M5.
 
 ## Explicit Non-Scope
 
-PDR-M3 does not deploy to a real server, commit real secrets, add user registration, add role management UI, add OAuth, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds a single-operator Basic Auth gate, production credential fail-closed checks, auth-aware smoke behavior, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.
+PDR-M4 does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds minimal health/readiness observability, sensitive actuator exposure guards, authenticated smoke checks, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.

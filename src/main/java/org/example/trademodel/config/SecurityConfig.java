@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers("/favicon.ico", "/error", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/", "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                         .anyRequest().authenticated())
                 .build();
     }

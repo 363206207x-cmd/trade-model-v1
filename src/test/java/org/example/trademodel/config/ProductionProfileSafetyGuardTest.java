@@ -93,6 +93,26 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsSensitiveActuatorEndpointExposure() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("management.endpoints.web.exposure.include", "health,env,beans");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production actuator web exposure must be limited to health");
+    }
+
+    @Test
+    void rejectsWildcardActuatorEndpointExposure() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("management.endpoints.web.exposure.include", "*");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production actuator web exposure must be limited to health");
+    }
+
+    @Test
     void allowsSafeExternalDatasourceLookingConfig() {
         MockEnvironment environment = safeEnvironment();
 
@@ -113,6 +133,7 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("binance.api.secret", "configured-secret");
         environment.setProperty("trade-model.auth.admin-username", "operator");
         environment.setProperty("trade-model.auth.admin-password", "configured-admin-password");
+        environment.setProperty("management.endpoints.web.exposure.include", "health");
         return environment;
     }
 }
