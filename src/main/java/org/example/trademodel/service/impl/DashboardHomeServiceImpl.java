@@ -3,13 +3,16 @@ package org.example.trademodel.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
+import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
@@ -39,6 +42,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"
     );
     private static final List<String> AI_ROLES = List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+    private static final List<String> EXECUTABLE_PUSH_STATUSES = List.of(
+            PushRecheckStatusContract.PUSH_STATUS_REVIEW_PASSED,
+            "RECHECK_VALID_EXECUTABLE"
+    );
+    private static final List<String> INVALIDATED_PUSH_STATUSES = List.of(
+            PushRecheckStatusContract.PUSH_STATUS_DRIFTED_FROM_ENTRY_ZONE,
+            PushRecheckStatusContract.PUSH_STATUS_INVALIDATED,
+            PushRecheckStatusContract.PUSH_STATUS_RISK_BLOCKED,
+            PushRecheckStatusContract.PUSH_STATUS_CONFUSED_BLOCKED,
+            PushRecheckStatusContract.PUSH_STATUS_EXPIRED,
+            "RECHECK_DRIFTED",
+            "DRIFTED",
+            "INVALIDATED",
+            "RISK_BLOCKED",
+            "CONFUSED_BLOCKED",
+            "EXPIRED"
+    );
 
     private final DecisionService decisionService;
     private final MonitorService monitorService;
@@ -46,6 +66,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final PositionMonitorLogService positionMonitorLogService;
     private final PositionSyncService positionSyncService;
     private final PushSnapshotMapper pushSnapshotMapper;
+    private final PushRecheckLogMapper pushRecheckLogMapper;
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     private final ObjectMapper objectMapper;
 
@@ -55,6 +76,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                     PositionMonitorLogService positionMonitorLogService,
                                     PositionSyncService positionSyncService,
                                     PushSnapshotMapper pushSnapshotMapper,
+                                    PushRecheckLogMapper pushRecheckLogMapper,
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
                                     ObjectMapper objectMapper) {
         this.decisionService = decisionService;
@@ -63,6 +85,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.positionMonitorLogService = positionMonitorLogService;
         this.positionSyncService = positionSyncService;
         this.pushSnapshotMapper = pushSnapshotMapper;
+        this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
         this.objectMapper = objectMapper;
     }
@@ -390,16 +413,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private PushInboxContext buildPushInbox(List<UserPositionVO> positions, int limit) {
         DashboardHomeVO.PushInboxVO inbox = new DashboardHomeVO.PushInboxVO();
-        boolean hasOpenPosition = positions != null && !positions.isEmpty();
+        boolean hasOpenPosition = hasOpenManualPosition(positions);
         inbox.setHasOpenPosition(hasOpenPosition);
         inbox.setMode(hasOpenPosition ? "OPPORTUNITY_AND_POSITION_RISK" : "OPPORTUNITY_ONLY");
         inbox.setTelegramStatus("WAITING_SYNC");
 
         boolean readOk = false;
         int waiting = 0;
+        int executable = 0;
+        int invalidated = 0;
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
         try {
             waiting = Math.max(0, pushSnapshotMapper.countPendingRecheckBacklog());
+            executable = safeCountPushStatuses(EXECUTABLE_PUSH_STATUSES);
+            invalidated = safeCountPushStatuses(INVALIDATED_PUSH_STATUSES);
             items.addAll(pushItems("CAPTURED", limit));
             if (items.size() < limit) {
                 items.addAll(pushItems("RECHECK_REVIEW_WAITING", limit - items.size()));
@@ -414,13 +441,33 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
 
         DashboardHomeVO.PushCountsVO counts = new DashboardHomeVO.PushCountsVO();
-        counts.setExecutable(0);
+        counts.setExecutable(executable);
         counts.setWaiting(waiting);
-        counts.setInvalidated(0);
-        counts.setPositionRisk(positions != null ? positions.size() : 0);
+        counts.setInvalidated(invalidated);
+        counts.setPositionRisk(0);
         inbox.setCounts(counts);
         inbox.setItems(items.size() > limit ? items.subList(0, limit) : items);
         return new PushInboxContext(inbox, readOk);
+    }
+
+    private boolean hasOpenManualPosition(List<UserPositionVO> positions) {
+        for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
+            if (isManualPosition(position)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int safeCountPushStatuses(List<String> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, pushSnapshotMapper.countByPushStatuses(statuses));
+        } catch (RuntimeException ignored) {
+            return 0;
+        }
     }
 
     private List<DashboardHomeVO.PushItemVO> pushItems(String status, int limit) {
@@ -428,15 +475,36 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return List.of();
         }
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
-        for (TmPushSnapshotDO row : pushSnapshotMapper.listPendingRecheck(status, limit)) {
+        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listPendingRecheck(status, limit);
+        for (TmPushSnapshotDO row : rows == null ? List.<TmPushSnapshotDO>of() : rows) {
+            if (row == null) {
+                continue;
+            }
             DashboardHomeVO.PushItemVO item = new DashboardHomeVO.PushItemVO();
             item.setPushId(row.getPushId());
             item.setSymbol(toDisplaySymbol(row.getSymbol()));
             item.setStatus(row.getPushStatus());
+            item.setType(row.getPushType());
+            item.setExpiresAt(row.getExpiresAt());
+            item.setRecheckStatus(latestRecheckStatus(row.getPushId()));
             item.setCreatedAt(row.getPushCreateTime() != null ? row.getPushCreateTime() : row.getCreateTime());
             items.add(item);
         }
         return items;
+    }
+
+    private String latestRecheckStatus(Long pushId) {
+        if (pushId == null) {
+            return null;
+        }
+        try {
+            TmPushRecheckLogDO latest = pushRecheckLogMapper.selectLatestByPushId(pushId);
+            return latest != null
+                    ? trimToNull(PushRecheckStatusContract.canonicalizeRecheckStatusName(latest.getRecheckStatus()))
+                    : null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private DashboardHomeVO.DiagnosticsVO buildDiagnostics(LightSystemStatusVO systemStatus,

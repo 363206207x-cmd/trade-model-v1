@@ -28,6 +28,9 @@ public interface PushRecheckLogMapper {
     @Select("SELECT * FROM tm_push_recheck_log WHERE push_id = #{pushId} ORDER BY log_id DESC")
     List<TmPushRecheckLogDO> selectByPushId(Long pushId);
 
+    @Select("SELECT * FROM tm_push_recheck_log WHERE push_id = #{pushId} ORDER BY log_id DESC LIMIT 1")
+    TmPushRecheckLogDO selectLatestByPushId(@Param("pushId") Long pushId);
+
     @Select("SELECT COUNT(*) FROM tm_push_recheck_log WHERE push_id = #{pushId}")
     Integer countByPushId(@Param("pushId") Long pushId);
 
