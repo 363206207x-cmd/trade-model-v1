@@ -30,13 +30,23 @@ PDR-2B adds a non-default Flyway project skeleton only. It does not create an ex
 - Production database target: PostgreSQL.
 - Real PostgreSQL-compatible baseline migration: deferred to PDR-2C.
 
+## PDR-2C1 PostgreSQL Baseline Schema SQL
+
+PDR-2C1 adds PostgreSQL-compatible baseline schema SQL files only. It does not validate the files against a live PostgreSQL database and does not change default local/test behavior.
+
+- Table migration: `src/main/resources/db/migration/V1__baseline_schema_tables.sql`.
+- Index migration: `src/main/resources/db/migration/V2__baseline_schema_indexes.sql`.
+- Scope: current V1 tables and indexes only; no seed data and no foreign keys beyond current V1 semantics.
+- Type strategy: generated identity columns, `TEXT` for JSON-like text fields, `TIMESTAMP WITHOUT TIME ZONE` for current `LocalDateTime` semantics, and PostgreSQL-compatible floating-point types.
+- Deferred: mapper PostgreSQL compatibility, PostgreSQL driver, Testcontainers/Flyway smoke validation, real database connection, and backup/restore validation.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
 - A Flyway skeleton exists only behind the explicit `flyway-migration` Maven profile.
-- No executable production migration exists yet.
-- No production database is connected by PDR-2B.
-- No PostgreSQL driver/config/migration is added by PDR-2B.
+- PostgreSQL baseline schema SQL files exist as PDR-2C1 draft migrations.
+- No production database is connected by PDR-2C1.
+- No PostgreSQL driver/config is added by PDR-2C1.
 
 ## Migration Execution Policy
 
@@ -44,7 +54,7 @@ Production migrations must run as an explicit pre-deploy step.
 
 Application startup must not silently mutate the production schema without a controlled migration process.
 
-PDR-2B defines the safe boundary by keeping Flyway out of the default classpath and adding no executable migration. PDR-2C must create the PostgreSQL-compatible baseline migration before any migration implementation is treated as deployable.
+PDR-2C1 adds schema SQL drafts only. PDR-2C2/PDR-2C3 must complete mapper compatibility and PostgreSQL validation before any migration implementation is treated as deployable.
 
 ## Rollback Policy
 
@@ -66,8 +76,9 @@ PDR-2A does not implement backup or restore commands. PDR-2D must define Postgre
 ## Remaining Blockers
 
 - Flyway dependency is available only through the non-default `flyway-migration` Maven profile.
-- Flyway baseline migration not created.
-- PostgreSQL compatibility not verified.
+- PostgreSQL baseline schema SQL exists but is not validated against PostgreSQL yet.
+- Mapper PostgreSQL compatibility not completed.
+- PostgreSQL driver/Testcontainers validation not added.
 - Backup/restore scripts or commands not implemented.
 - Auth/access control missing.
 - Observability missing.
@@ -76,9 +87,10 @@ PDR-2A does not implement backup or restore commands. PDR-2D must define Postgre
 
 ## Next Packages
 
-1. PDR-2C PostgreSQL Compatibility Pass.
-2. PDR-2D Backup/Restore Runbook.
+1. PDR-2C2 Mapper PostgreSQL Compatibility.
+2. PDR-2C3 PostgreSQL Driver + Migration Smoke Validation.
+3. PDR-2D Backup/Restore Runbook.
 
 ## Explicit Non-Scope
 
-PDR-2B does not add executable migration SQL, PostgreSQL connection, schema changes, mapper SQL changes, runtime config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics.
+PDR-2C1 does not add PostgreSQL connection, schema.sql changes, mapper SQL changes, runtime config changes, deployment files, secrets, auth, Telegram send, Push send, order/execution, or auto-trading semantics.
