@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-2B Flyway Baseline Skeleton
+Current Work Package: PDR-2C1 PostgreSQL Baseline Schema SQL
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Decision Pack: PDR-2B Flyway Baseline Skeleton recorded on branch codex/pdr-2b-flyway-baseline-skeleton
+Latest Production Readiness Decision Pack: PDR-2C1 PostgreSQL Baseline Schema SQL recorded on branch codex/pdr-2c1-postgresql-baseline-schema
 
 ---
 
@@ -58,9 +58,9 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this PDR-2B Flyway baseline skeleton if approved.
+1. Autodeliver this PDR-2C1 PostgreSQL baseline schema SQL package if approved.
 2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Prepare PDR-2C PostgreSQL Compatibility Pass only under a separate explicit production-readiness package.
+3. Prepare PDR-2C2 Mapper PostgreSQL Compatibility only under a separate explicit production-readiness package.
 4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
@@ -69,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java business code, schema, dashboard, review UI, API contract, business test, script, scheduler, Push, Telegram, order, execution, auto-trading, production config, default Flyway activation, executable migration SQL, PostgreSQL connection, or trading-logic changes inside this PDR-2B skeleton package.
+1. Java business code, schema.sql, mapper SQL, dashboard, review UI, API contract, business test, script, scheduler, Push, Telegram, order, execution, auto-trading, production config, default Flyway activation, PostgreSQL connection, or trading-logic changes inside this PDR-2C1 schema SQL package.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -136,7 +136,7 @@ Blocking evidence:
 - `src/main/resources/application.yml` and `src/main/resources/application.properties` enable H2 console.
 - `src/main/resources/application.properties` defaults `position.provider.type` to `SIMULATED`.
 - PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
-- Flyway is present only as a non-default Maven profile skeleton; no executable production migration exists yet.
+- Flyway is present only as a non-default Maven profile skeleton; PDR-2C1 baseline schema SQL exists but has not been validated against PostgreSQL yet.
 - No production database is connected in this package.
 - No migration/rollback pipeline, backup/restore command set, auth/authz evidence, deployment smoke/rollback evidence, observability stack, or complete secrets contract exists yet.
 
@@ -153,11 +153,12 @@ PDR-2A records the production database and migration decisions only. It does not
 - No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
 - Production readiness remains BLOCKED.
 
-Database migration remaining blockers after PDR-2B:
+Database migration remaining blockers after PDR-2C1:
 
 - Flyway exists only as a non-default skeleton profile.
-- Flyway baseline migration not created.
-- PostgreSQL compatibility not verified.
+- PostgreSQL baseline schema SQL exists but has not been executed against PostgreSQL.
+- Mapper PostgreSQL compatibility not completed.
+- PostgreSQL driver/Testcontainers validation not added.
 - Backup/restore scripts or commands not implemented.
 - Auth/access control missing.
 - Observability missing.
@@ -166,8 +167,9 @@ Database migration remaining blockers after PDR-2B:
 
 Next production-readiness packages:
 
-1. PDR-2C PostgreSQL Compatibility Pass.
-2. PDR-2D Backup/Restore Runbook.
+1. PDR-2C2 Mapper PostgreSQL Compatibility.
+2. PDR-2C3 PostgreSQL Driver + Migration Smoke Validation.
+3. PDR-2D Backup/Restore Runbook.
 
 ### PDR-2B Flyway Baseline Skeleton
 
@@ -180,6 +182,19 @@ PDR-2B adds the Flyway project skeleton without changing default local/test runt
 - Production target database remains PostgreSQL.
 - Real PostgreSQL-compatible baseline migration is deferred to PDR-2C.
 - No PostgreSQL driver, production DB connection, schema change, mapper SQL change, application config change, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2B.
+- Production readiness remains BLOCKED.
+
+### PDR-2C1 PostgreSQL Baseline Schema SQL
+
+PDR-2C1 adds PostgreSQL-compatible Flyway baseline schema SQL drafts without changing local/test runtime behavior.
+
+- Table migration: `src/main/resources/db/migration/V1__baseline_schema_tables.sql`.
+- Index migration: `src/main/resources/db/migration/V2__baseline_schema_indexes.sql`.
+- Scope: current V1 table and index semantics only.
+- JSON-like fields remain `TEXT`; timestamp fields use `TIMESTAMP WITHOUT TIME ZONE`; generated numeric ids use PostgreSQL identity columns.
+- V1 remains foreign-key-free for this baseline, matching current schema semantics.
+- No seed data, schema.sql change, mapper SQL change, Java/config/test change, PostgreSQL driver, Testcontainers, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2C1.
+- Mapper compatibility and real PostgreSQL validation remain deferred to PDR-2C2/PDR-2C3.
 - Production readiness remains BLOCKED.
 
 ---
