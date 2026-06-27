@@ -67,24 +67,16 @@ class DashboardHomeServiceImplTest {
         system.setConfusedCount(2);
         system.setHotResetFired(false);
 
-        DecisionResultVO decision = new DecisionResultVO();
-        decision.setSymbol("BTCUSDT");
-        decision.setTimeframe("1h");
-        decision.setMarketBiasHierarchy("BULLISH");
-        decision.setRiskLevel("HIGH");
-        decision.setConfidenceLevel("HIGH");
-        decision.setDataQualityScore(88);
-        decision.setAiConflictLevel("LEVEL_2_REVIEW");
-        decision.setAiConflictScore(25);
-        decision.setIsWorthOpening(true);
-        decision.setEntryZone("63000-64000");
-        decision.setStopLoss("61000");
-        decision.setTakeProfitRules("66000 / 69000");
-        decision.setLeverageSuggestion("20x");
-        decision.setPositionSuggestion("10%");
-        decision.setValidPeriod("12h");
-        decision.setInvalidCondition("跌破 61000");
-        decision.setAiRoleResults("""
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        btc.setEntryZone("63000-64000");
+        btc.setStopLoss("61000");
+        btc.setTakeProfitRules("66000 / 69000");
+        btc.setLeverageSuggestion("20x");
+        btc.setPositionSuggestion("10%");
+        btc.setValidPeriod("12h");
+        btc.setInvalidCondition("跌破 61000");
+        btc.setAiRoleResults("""
                 {
                   "GPT_FINAL": {
                     "supportEvidence": ["规则方向一致"],
@@ -96,6 +88,13 @@ class DashboardHomeServiceImplTest {
                   "GROK_CHALLENGE": {}
                 }
                 """);
+
+        DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "EXTREME", 72, 80,
+                "LEVEL_4_EXTREME_DIVERGENCE", false, "{\"nextState\":\"HIGH_RISK\"}");
+        DecisionResultVO sol = decision("SOLUSDT", "RANGE", "LOW", "LOW", null, null,
+                null, null, "CONFUSED");
+        DecisionResultVO bnb = decision("BNBUSDT", "WEAK_BULLISH", "LOW", "MEDIUM", 100, 40,
+                "LEVEL_3_DIVERGENCE", true, "{\"state\":\"UNKNOWN\"}");
 
         UserPositionVO position = new UserPositionVO();
         position.setId(9L);
@@ -118,7 +117,7 @@ class DashboardHomeServiceImplTest {
         sync.setActiveProviderType("BINANCE");
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth, sol, bnb));
         when(monitorService.getRecentAlerts(2)).thenReturn(List.of(alert));
         when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
         when(positionSyncService.getPositionSyncStatus()).thenReturn(sync);
@@ -129,11 +128,37 @@ class DashboardHomeServiceImplTest {
 
         assertThat(home.getSystemState().getPendingReview().getValue()).isEqualTo(4);
         assertThat(home.getSystemState().getPendingReview().getValue()).isNotEqualTo(99);
-        assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("HIGH");
+        assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(87);
+        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("摘要均值");
+        assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("EXTREME");
         assertThat(home.getSystemState().getRiskLevel().getHelper()).isEqualTo("决策风险");
-        assertThat(home.getSystemState().getAiConflict().getScore()).isEqualTo(25);
+        assertThat(home.getSystemState().getMarketTrend().getValue()).isEqualTo("BULLISH");
+        assertThat(home.getSystemState().getAiConflict().getValue()).isEqualTo("LEVEL_4_EXTREME_DIVERGENCE");
+        assertThat(home.getSystemState().getAiConflict().getScore()).isEqualTo(80);
+
         assertThat(home.getAssets()).hasSize(6);
-        assertThat(home.getAssets().get(0).getCompositeScore()).isNull();
+        DashboardHomeVO.AssetVO btcAsset = asset(home, "BTC/USDT");
+        assertThat(btcAsset.getMarketBias()).isEqualTo("BULLISH");
+        assertThat(btcAsset.getConfidenceLevel()).isEqualTo("HIGH");
+        assertThat(btcAsset.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(btcAsset.getWorthOpening()).isTrue();
+        assertThat(btcAsset.getCompositeScore()).isNull();
+        assertThat(btcAsset.getAssetState()).isEqualTo("CANDIDATE");
+        assertThat(btcAsset.getAssetStateLabel()).isEqualTo("候选");
+
+        DashboardHomeVO.AssetVO ethAsset = asset(home, "ETH/USDT");
+        assertThat(ethAsset.getAssetState()).isEqualTo("HIGH_RISK");
+        assertThat(ethAsset.getAssetStateLabel()).isEqualTo("高风险观察");
+        assertThat(ethAsset.getCompositeScore()).isNull();
+
+        DashboardHomeVO.AssetVO solAsset = asset(home, "SOL/USDT");
+        assertThat(solAsset.getAssetState()).isNull();
+        assertThat(solAsset.getAssetStateLabel()).isNull();
+
+        DashboardHomeVO.AssetVO bnbAsset = asset(home, "BNB/USDT");
+        assertThat(bnbAsset.getAssetState()).isNull();
+        assertThat(bnbAsset.getAssetStateLabel()).isNull();
+
         assertThat(home.getPositions()).hasSize(1);
         assertThat(home.getPositions().get(0).getLeverage()).isEqualByComparingTo("2");
         assertThat(home.getPositions().get(0).getCurrentPrice()).isNull();
@@ -151,4 +176,35 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSafety().getNotAutoTrading()).isTrue();
         assertThat(home.getSafety().getNotOrderExecution()).isTrue();
     }
+
+    private DecisionResultVO decision(String symbol,
+                                      String marketBias,
+                                      String confidence,
+                                      String risk,
+                                      Integer dataQuality,
+                                      Integer aiConflictScore,
+                                      String aiConflictLevel,
+                                      Boolean worthOpening,
+                                      String assetStateSnapshot) {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setSymbol(symbol);
+        decision.setTimeframe("1h");
+        decision.setMarketBiasHierarchy(marketBias);
+        decision.setConfidenceLevel(confidence);
+        decision.setRiskLevel(risk);
+        decision.setDataQualityScore(dataQuality);
+        decision.setAiConflictScore(aiConflictScore);
+        decision.setAiConflictLevel(aiConflictLevel);
+        decision.setIsWorthOpening(worthOpening);
+        decision.setAssetStateSnapshot(assetStateSnapshot);
+        return decision;
+    }
+
+    private DashboardHomeVO.AssetVO asset(DashboardHomeVO home, String symbol) {
+        return home.getAssets().stream()
+                .filter(asset -> symbol.equals(asset.getSymbol()))
+                .findFirst()
+                .orElseThrow();
+    }
+
 }
