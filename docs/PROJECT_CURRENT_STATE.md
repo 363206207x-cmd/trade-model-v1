@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-M3 Auth + Access Control Gate
+Current Work Package: PDR-M4 Observability + Production Smoke Gate
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Package: PDR-M3 Auth + Access Control Gate recorded on branch codex/pdr-m3-auth-access-control-gate
+Latest Production Readiness Package: PDR-M4 Observability + Production Smoke Gate recorded on branch codex/pdr-m4-observability-smoke-gate
 
 ---
 
@@ -58,9 +58,9 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 Only the following work is allowed after this P3-3 docs/status closure:
 
-1. Autodeliver this PDR-M3 auth access-control gate if approved.
+1. Autodeliver this PDR-M4 observability and production smoke gate if approved.
 2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Prepare the next production-readiness package for observability, real server smoke, restore drill evidence, secrets manager integration, external integration readiness, HTTPS/reverse-proxy hardening, and release-gate gaps under a separate explicit scope.
+3. Prepare the next production-readiness package for secrets manager integration, external integration readiness, HTTPS/reverse-proxy hardening, real server smoke evidence, restore drill evidence, and release-gate gaps under a separate explicit scope.
 4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
 
 ---
@@ -69,7 +69,7 @@ Only the following work is allowed after this P3-3 docs/status closure:
 
 The following work remains blocked after this P3-3 closure:
 
-1. Java business service/controller code unrelated to Spring Security/auth configuration, schema.sql, mapper SQL, Flyway migration SQL, dashboard, review UI, business API contract, unrelated business test, scheduler, Push, Telegram, order, execution, auto-trading, real server deployment, real secrets, real PostgreSQL connection, database user model, signup, OAuth, role UI, user center, or trading-logic changes inside this PDR-M3 auth package.
+1. Java business service/controller code unrelated to health/security configuration, schema.sql, mapper SQL, Flyway migration SQL, dashboard, review UI, business API contract, unrelated business test, scheduler, Push, Telegram, order, execution, auto-trading, real server deployment, real secrets, real PostgreSQL connection, sensitive actuator exposure, metrics/alerting stack, or trading-logic changes inside this PDR-M4 observability package.
 2. Production-ready claims.
 3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
 4. Treating this local acceptance freeze as production deployment approval.
@@ -139,8 +139,9 @@ Blocking evidence:
 - PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
 - Dockerfile, Docker Compose skeleton, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed.
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, secrets manager integration, real server auth smoke, or production release gate exists yet.
+- Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no metrics dashboards, log aggregation, alerting, real server smoke evidence, or production release gate exists yet.
 - No production database is connected in this package.
-- No observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, external integration readiness, or production release gate exists yet.
+- No full observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, external integration readiness, or production release gate exists yet.
 
 ### PDR-2A Database Migration + Rollback Decision Pack
 
@@ -155,22 +156,22 @@ PDR-2A records the production database and migration decisions only. It does not
 - No PostgreSQL driver, Flyway dependency, migration SQL, mapper SQL change, production DB connection, backup script, deployment script, secret, auth, Telegram send, Push send, order/execution, or auto-trading semantics are added by PDR-2A.
 - Production readiness remains BLOCKED.
 
-Database / deployment remaining blockers after PDR-M3:
+Database / deployment remaining blockers after PDR-M4:
 
 - Flyway remains non-default for runtime startup; PDR-M1 adds only test/manual smoke coverage.
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but local evidence depends on Docker availability.
 - Mapper PostgreSQL variants cover known upsert and DATEADD / FORMATDATETIME blockers; broader live mapper execution remains deferred.
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist, but real server deployment smoke and real restore drill evidence are still missing.
 - Auth/access control baseline exists as single-operator Basic Auth, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, and secrets manager integration remain missing.
-- Observability missing.
+- Observability is minimal: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; secrets manager integration is missing.
 
 Next production-readiness packages:
 
-1. PDR-M4 Observability + Real Server Deployment Smoke / Restore Drill.
-2. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
-3. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening if not covered by PDR-M5.
+1. PDR-M5 Secrets Manager / External Integration Readiness / Production Release Gate.
+2. PDR-M6 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
+3. PDR-M7 Real Server Deployment Smoke / Restore Drill Evidence if not covered by PDR-M5.
 
 ### PDR-2B Flyway Baseline Skeleton
 
@@ -245,6 +246,19 @@ PDR-M3 adds a single-operator Spring Security Basic Auth gate while preserving t
 - `.env.example`, `docker-compose.yml`, and `scripts/prod-smoke.sh` now include auth credential handling without printing passwords.
 - Targeted security tests prove protected routes require Basic Auth, authenticated requests succeed, write endpoints are protected, static resources are not turned into auth challenges, and no buy/sell/order/execute/auto-trading route surface is introduced.
 - No real server deployment, real secrets, database user table, signup/login UI, OAuth, role UI, Java trading logic change, schema.sql change, mapper SQL change, Flyway migration change, Telegram send, Push dispatch, order/execution, or auto-trading semantics are added.
+- Production readiness remains BLOCKED.
+
+### PDR-M4 Observability + Production Smoke Gate
+
+PDR-M4 adds minimal health/readiness observability and strengthens authenticated production smoke checks while preserving blocked-production and no-trading boundaries.
+
+- `pom.xml` includes Spring Boot Actuator.
+- `application.yml` exposes only the `health` actuator endpoint and enables `/actuator/health/liveness` and `/actuator/health/readiness` with details/components hidden.
+- `SecurityConfig` permits public minimal health/liveness/readiness and keeps dashboard/review plus operational APIs authenticated.
+- `ProductionProfileSafetyGuard` rejects prod actuator exposure wider than `health`, including wildcard exposure.
+- `scripts/prod-smoke.sh` checks public health/liveness/readiness, authenticated `/api/dashboard/home`, authenticated `/api/review/center`, no-auto-trading/no-order safety fields, and Telegram non-connected status without printing passwords.
+- Targeted health/actuator/security tests prove public minimal health behavior, sensitive actuator non-exposure, auth boundary preservation, prod guard rejection, and smoke script syntax.
+- No real server deployment, real secrets, sensitive actuator endpoints, Prometheus/Grafana, alerting stack, Java business logic change, schema.sql change, mapper SQL change, Flyway migration change, Telegram send, Push dispatch, order/execution, or auto-trading semantics are added.
 - Production readiness remains BLOCKED.
 
 ---

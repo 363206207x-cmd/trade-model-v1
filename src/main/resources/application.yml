@@ -27,6 +27,18 @@ logging:
   level:
     org.example.trademodel: DEBUG
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      show-components: never
+
 trade-model:
   auth:
     enabled: ${TRADE_MODEL_AUTH_ENABLED:true}

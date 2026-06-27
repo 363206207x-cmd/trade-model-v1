@@ -1,9 +1,9 @@
 package org.example.trademodel.config;
 
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -23,6 +23,8 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             "123456",
             "DEV-LOCAL-PASSWORD"
     );
+
+    private static final Set<String> ALLOWED_ACTUATOR_EXPOSURE = Set.of("HEALTH");
 
     private final Environment environment;
 
@@ -82,6 +84,11 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             errors.add("production public server bind requires trade-model.production.allow-public-bind=true");
         }
 
+        String actuatorExposure = property(environment, "management.endpoints.web.exposure.include");
+        if (hasUnsafeActuatorExposure(actuatorExposure)) {
+            errors.add("production actuator web exposure must be limited to health");
+        }
+
         String adminUsername = property(environment, "trade-model.auth.admin-username");
         if (isBlank(adminUsername)) {
             errors.add("production admin username missing");
@@ -121,6 +128,19 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
     private static boolean isUnsafeAdminPassword(String value) {
         return UNSAFE_ADMIN_PASSWORDS.contains(normalized(value));
+    }
+
+    private static boolean hasUnsafeActuatorExposure(String exposure) {
+        if (isBlank(exposure)) {
+            return false;
+        }
+        for (String rawEndpoint : exposure.split(",")) {
+            String endpoint = normalized(rawEndpoint);
+            if (!ALLOWED_ACTUATOR_EXPOSURE.contains(endpoint)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isBlank(String value) {
