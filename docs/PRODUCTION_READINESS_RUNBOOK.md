@@ -6,7 +6,7 @@ This runbook records production-readiness decisions and remaining gates. It is n
 
 Production Deployment Readiness is `BLOCKED`.
 
-V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real data-provider readiness evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M6A adds a real-server acceptance evidence framework, but it is not production deployment approval and does not make the system conditionally ready.
+V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real data-provider readiness evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M7 adds an opt-in real provider live smoke harness, but it is not production deployment approval and does not make the system conditionally ready.
 
 ## PDR-2A Database Migration + Rollback Decision
 
@@ -119,6 +119,21 @@ PDR-M6A adds a disciplined evidence framework for the human-run real-server acce
 - Required human evidence: production readiness cannot advance unless the evidence template is completed with redacted server outputs and reviewed by the release gate owner.
 - Deferred: real server execution, secrets manager integration, restore drill execution, HTTPS/reverse-proxy implementation, live provider verification, metrics/log aggregation/alerting, and production release approval.
 
+## PDR-M7 Real Provider Live Smoke Harness
+
+PDR-M7 adds an explicit opt-in live provider smoke harness. It does not run live external calls by default, commit secrets, enable trading, send Telegram, dispatch Push, trigger Push Recheck, or approve production deployment.
+
+- Script: `scripts/prod-provider-smoke.sh`.
+- Default behavior: `PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=false` returns `PROVIDER_LIVE_SMOKE: SKIPPED` and exits successfully without network calls.
+- Binance public market data: enable with `PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true` and `PROVIDER_SMOKE_BINANCE_PUBLIC_ENABLED=true`. The check uses a Binance futures public market endpoint only; it does not require trading, withdrawal, or private order permissions.
+- OpenAI: enable with `PROVIDER_SMOKE_OPENAI_ENABLED=true` and `OPENAI_API_KEY` in the server `.env`; the script performs a minimal models endpoint readiness call and does not print the key or response body.
+- Gemini: enable with `PROVIDER_SMOKE_GEMINI_ENABLED=true` and `GEMINI_API_KEY` in the server `.env`; the script performs a minimal models endpoint readiness call and does not print the key or response body.
+- XAI / Grok: enable with `PROVIDER_SMOKE_XAI_ENABLED=true` and `XAI_API_KEY` in the server `.env`; the script performs a minimal models endpoint readiness call and does not print the key or response body.
+- External context placeholders: `NEWS_API_KEY`, `MACRO_CALENDAR_API_KEY`, and `ETF_FLOW_API_KEY` are reported as configured/skipped only; no live external-context provider call is implemented by this harness.
+- Release gate integration: `scripts/prod-release-gate.sh` can require provider smoke only when `RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=true`; otherwise provider smoke remains incomplete evidence, not a production-ready signal.
+- Key policy: real keys must live only in the server `.env` or future secrets manager. Never commit `.env`, paste keys into evidence, or enable Binance withdrawal/trading/order permissions.
+- Evidence policy: record only redacted output lines such as `BINANCE_PUBLIC_SMOKE: PASS`, `OPENAI_SMOKE: PASS`, and `PROVIDER_LIVE_SMOKE: PASS/INCOMPLETE/FAIL`.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -132,6 +147,7 @@ PDR-M6A adds a disciplined evidence framework for the human-run real-server acce
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy, secrets manager, credential rotation, real server auth smoke, or production release approval exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no real server smoke evidence, log aggregation, metrics dashboards, or alerting exists yet.
 - PDR-M6A adds the real-server acceptance evidence template and conservative release gate runner, but no real server evidence has been collected yet.
+- PDR-M7 adds the opt-in provider live smoke harness, but no real provider evidence has been collected yet.
 
 ## Migration Execution Policy
 
@@ -155,6 +171,8 @@ docker compose up -d app
 docker compose logs -f app
 bash scripts/prod-smoke.sh
 bash scripts/prod-release-gate.sh
+# Optional provider live smoke, only after server keys are configured and approved for testing.
+PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true PROVIDER_SMOKE_BINANCE_PUBLIC_ENABLED=true bash scripts/prod-provider-smoke.sh
 ```
 
 Health and smoke checks:
@@ -210,8 +228,40 @@ Required environment categories:
 - Optional AI provider toggles/keys: `TRADE_MODEL_AI_ENABLED`, provider-specific enabled flags, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`.
 - Optional external context provider placeholders: `NEWS_API_KEY`, `MACRO_CALENDAR_API_KEY`, `ETF_FLOW_API_KEY`.
 - Smoke external-call policy: `SMOKE_ALLOW_EXTERNAL_CALLS=false` by default; default smoke does not call live providers.
-- Release gate runner: `RELEASE_GATE_REQUIRE_DOCKER=true`, `RELEASE_GATE_REQUIRE_BACKUP=false`, and `RELEASE_GATE_ALLOW_EXTERNAL_CALLS=false` by default.
+- Provider live smoke: `PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=false`, `PROVIDER_SMOKE_BINANCE_PUBLIC_ENABLED=false`, `PROVIDER_SMOKE_OPENAI_ENABLED=false`, `PROVIDER_SMOKE_GEMINI_ENABLED=false`, and `PROVIDER_SMOKE_XAI_ENABLED=false` by default.
+- Release gate runner: `RELEASE_GATE_REQUIRE_DOCKER=true`, `RELEASE_GATE_REQUIRE_BACKUP=false`, `RELEASE_GATE_ALLOW_EXTERNAL_CALLS=false`, and `RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=false` by default.
 - Future Telegram placeholders: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`; these do not activate Telegram send.
+
+## Real Provider Live Smoke
+
+Run provider live smoke only on the server after keys are placed in the server `.env` or future secrets manager. Do not run it from Codex with real secrets.
+
+Minimum first-run examples:
+
+```bash
+# Dry run: no network calls, should return SKIPPED.
+PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=false bash scripts/prod-provider-smoke.sh
+
+# Binance public market data only; no API key required and no trading permission required.
+PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true \
+PROVIDER_SMOKE_BINANCE_PUBLIC_ENABLED=true \
+bash scripts/prod-provider-smoke.sh
+
+# AI providers; enable only providers that have server-side keys configured.
+PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true \
+PROVIDER_SMOKE_OPENAI_ENABLED=true \
+PROVIDER_SMOKE_GEMINI_ENABLED=true \
+PROVIDER_SMOKE_XAI_ENABLED=true \
+bash scripts/prod-provider-smoke.sh
+```
+
+Provider live smoke key rules:
+
+- `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `XAI_API_KEY` are optional until their smoke flags are enabled.
+- `BINANCE_API_KEY` / `BINANCE_API_SECRET` are not required for the public Binance smoke. If Binance keys are configured for other readonly position checks, they must not have withdrawal permission or trading/order permission.
+- Do not paste key values into terminal transcripts, screenshots, issue comments, PRs, or evidence docs.
+- Telegram remains disabled unless a future package explicitly approves send behavior.
+- Provider live smoke does not change decision semantics and cannot authorize trades.
 
 ## Production Release Gate Checklist
 
@@ -225,7 +275,7 @@ The real-server release gate must collect redacted evidence for every item below
 6. Backup drill: `scripts/prod-backup.sh` creates a timestamped ignored backup file without printing secrets.
 7. Restore drill: `scripts/prod-restore.sh` restores into a controlled recovery database and smoke passes after restore. If restore is not run, readiness cannot advance beyond `BLOCKED`.
 8. HTTPS / reverse proxy / auth smoke: HTTPS access and authenticated dashboard/review API checks pass through the intended server entrypoint.
-9. Provider live smoke: real-provider readiness evidence is recorded without printing secrets, without fake `CONNECTED` statuses, and without private trading calls.
+9. Provider live smoke: `scripts/prod-provider-smoke.sh` evidence is recorded without printing secrets, without fake `CONNECTED` statuses, and without private trading calls.
 10. Safety boundary check: no buy/sell/order/execute/auto-open/auto-close/auto-trading route or workflow is introduced.
 
 Use `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` as the evidence record.
@@ -317,15 +367,16 @@ The restore script must only target a controlled recovery database until a separ
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Provider readiness is readonly after PDR-M5: config-only status exists for Binance public market data, AI providers, and external context placeholders, but no live provider connection proof, secrets manager integration, or real server provider smoke exists yet.
 - PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
+- PDR-M7 provider live smoke harness exists, but the live checks are opt-in and no real provider smoke evidence has been collected yet.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
 1. User-run real server acceptance evidence collection using `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` and `scripts/prod-release-gate.sh`.
-2. PDR-M7 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
-3. PDR-M8 Verified External Integration / Real Provider Smoke if not covered by the server evidence package.
+2. User-run provider live smoke with redacted evidence after server keys are configured.
+3. PDR-M8 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
 
 ## Explicit Non-Scope
 
-PDR-M6A does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, call live providers in default tests or smoke, run restore automatically, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds the evidence template, conservative release gate runner, env placeholders, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.
+PDR-M7 does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, call live providers in default tests or smoke, run restore automatically, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds the opt-in provider live smoke harness, optional release-gate integration, env placeholders, static tests, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.

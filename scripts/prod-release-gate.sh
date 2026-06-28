@@ -7,6 +7,7 @@ AUTH_PASSWORD="${SMOKE_AUTH_PASSWORD:-${APP_ADMIN_PASSWORD:-}}"
 RELEASE_GATE_REQUIRE_DOCKER="${RELEASE_GATE_REQUIRE_DOCKER:-true}"
 RELEASE_GATE_REQUIRE_BACKUP="${RELEASE_GATE_REQUIRE_BACKUP:-false}"
 RELEASE_GATE_ALLOW_EXTERNAL_CALLS="${RELEASE_GATE_ALLOW_EXTERNAL_CALLS:-false}"
+RELEASE_GATE_REQUIRE_PROVIDER_SMOKE="${RELEASE_GATE_REQUIRE_PROVIDER_SMOKE:-false}"
 
 status="PASS"
 
@@ -80,16 +81,41 @@ run_backup_check() {
   fi
 }
 
+run_provider_smoke_check() {
+  if [ "$RELEASE_GATE_REQUIRE_PROVIDER_SMOKE" != "true" ]; then
+    mark_incomplete "provider live smoke not required by this script run; set RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=true after provider env is ready"
+    return
+  fi
+
+  echo "CHECK provider live smoke"
+  local provider_output
+  if provider_output="$(PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS="true" bash scripts/prod-provider-smoke.sh)"; then
+    echo "$provider_output"
+    if echo "$provider_output" | grep -q "PROVIDER_LIVE_SMOKE: PASS"; then
+      echo "PASS provider live smoke"
+    elif echo "$provider_output" | grep -q "PROVIDER_LIVE_SMOKE: FAIL"; then
+      mark_fail "provider live smoke failed"
+    else
+      mark_incomplete "provider live smoke did not produce PASS"
+    fi
+  else
+    echo "$provider_output"
+    mark_fail "provider live smoke failed"
+  fi
+}
+
 echo "Production release gate evidence runner"
 echo "APP_URL=${APP_URL}"
 echo "RELEASE_GATE_REQUIRE_DOCKER=${RELEASE_GATE_REQUIRE_DOCKER}"
 echo "RELEASE_GATE_REQUIRE_BACKUP=${RELEASE_GATE_REQUIRE_BACKUP}"
 echo "RELEASE_GATE_ALLOW_EXTERNAL_CALLS=${RELEASE_GATE_ALLOW_EXTERNAL_CALLS}"
+echo "RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=${RELEASE_GATE_REQUIRE_PROVIDER_SMOKE}"
 echo "Passwords and secrets are intentionally not printed."
 
 run_docker_config_check
 run_smoke_check
 run_backup_check
+run_provider_smoke_check
 
 if [ "$status" = "PASS" ]; then
   echo "INCOMPLETE restore drill, HTTPS/reverse-proxy smoke, and human review evidence must still be recorded before readiness can move beyond BLOCKED"
