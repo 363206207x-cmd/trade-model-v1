@@ -6,7 +6,7 @@ This runbook records production-readiness decisions and remaining gates. It is n
 
 Production Deployment Readiness is `BLOCKED`.
 
-V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real data-provider readiness evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M5 adds readonly provider-readiness status and smoke checks, but it is not a production deployment approval.
+V1 is locally acceptance-ready. Production deployment remains blocked until real database migration validation, rollback drills, secrets management, observability evidence, real data-provider readiness evidence, real server smoke testing, HTTPS/reverse-proxy readiness, and an explicit human production release gate are complete. PDR-M6A adds a real-server acceptance evidence framework, but it is not production deployment approval and does not make the system conditionally ready.
 
 ## PDR-2A Database Migration + Rollback Decision
 
@@ -108,6 +108,17 @@ PDR-M5 adds readonly provider-readiness status for real data-provider configurat
 - Production guard: prod startup keeps rejecting simulated position provider and now rejects explicitly enabled AI providers with missing key/model/base URL.
 - Deferred: live provider probes, secrets manager integration, real server provider smoke, HTTPS/reverse proxy hardening, Telegram send, Push dispatch, order/execution, and production release-gate approval.
 
+## PDR-M6A Real Server Acceptance Evidence Gate
+
+PDR-M6A adds a disciplined evidence framework for the human-run real-server acceptance gate. It does not deploy to a real server, use real secrets, connect Telegram, dispatch Push, trigger Push Recheck, call Binance private trading, or approve production deployment.
+
+- Evidence template: `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` records the required real-server outputs for Docker Compose config, PostgreSQL startup, Flyway migration, app prod startup, authenticated smoke, backup, restore, HTTPS/reverse-proxy/auth smoke, provider live smoke, and safety boundary checks.
+- Release gate runner: `scripts/prod-release-gate.sh` orchestrates safe checks only. It can run `docker compose config`, `scripts/prod-smoke.sh`, and an optional backup drill when explicitly enabled. It never runs restore automatically and never prints secrets.
+- Release gate status policy: the script outputs `PRODUCTION_RELEASE_GATE: PASS / FAIL / INCOMPLETE`, but defaults to `INCOMPLETE` when real-server evidence is missing. A script PASS alone is not enough to change readiness.
+- Environment contract: `.env.example` documents `RELEASE_GATE_REQUIRE_DOCKER`, `RELEASE_GATE_REQUIRE_BACKUP`, and `RELEASE_GATE_ALLOW_EXTERNAL_CALLS`; all default to conservative behavior.
+- Required human evidence: production readiness cannot advance unless the evidence template is completed with redacted server outputs and reviewed by the release gate owner.
+- Deferred: real server execution, secrets manager integration, restore drill execution, HTTPS/reverse-proxy implementation, live provider verification, metrics/log aggregation/alerting, and production release approval.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -120,6 +131,7 @@ PDR-M5 adds readonly provider-readiness status for real data-provider configurat
 - Dockerfile, Docker Compose, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed and no public production access is approved.
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy, secrets manager, credential rotation, real server auth smoke, or production release approval exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no real server smoke evidence, log aggregation, metrics dashboards, or alerting exists yet.
+- PDR-M6A adds the real-server acceptance evidence template and conservative release gate runner, but no real server evidence has been collected yet.
 
 ## Migration Execution Policy
 
@@ -142,6 +154,7 @@ docker compose --profile migrate run --rm migrate
 docker compose up -d app
 docker compose logs -f app
 bash scripts/prod-smoke.sh
+bash scripts/prod-release-gate.sh
 ```
 
 Health and smoke checks:
@@ -178,6 +191,7 @@ Troubleshooting checklist:
 - If dashboard/review smoke fails but readiness is `UP`, inspect application logs, database schema/migration state, and API response body locally.
 - If safety fields fail, stop the deployment rehearsal and do not proceed to release-gate review.
 - If rollback is needed, stop the app, restore to a controlled recovery database, start the app against the restored database, then rerun readiness and smoke checks.
+- Record every server command result in `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` or a copy of that template; redact secrets before sharing.
 
 Security notes:
 
@@ -196,7 +210,25 @@ Required environment categories:
 - Optional AI provider toggles/keys: `TRADE_MODEL_AI_ENABLED`, provider-specific enabled flags, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`.
 - Optional external context provider placeholders: `NEWS_API_KEY`, `MACRO_CALENDAR_API_KEY`, `ETF_FLOW_API_KEY`.
 - Smoke external-call policy: `SMOKE_ALLOW_EXTERNAL_CALLS=false` by default; default smoke does not call live providers.
+- Release gate runner: `RELEASE_GATE_REQUIRE_DOCKER=true`, `RELEASE_GATE_REQUIRE_BACKUP=false`, and `RELEASE_GATE_ALLOW_EXTERNAL_CALLS=false` by default.
 - Future Telegram placeholders: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`; these do not activate Telegram send.
+
+## Production Release Gate Checklist
+
+The real-server release gate must collect redacted evidence for every item below. If any item is missing, Production Deployment Readiness remains `BLOCKED`.
+
+1. Docker Compose config: `docker compose config` succeeds and shows the expected `postgres`, `migrate`, and `app` services.
+2. PostgreSQL startup: `docker compose up -d postgres`, `docker compose ps`, and PostgreSQL logs show a healthy database without printing secrets.
+3. Flyway migration: `docker compose --profile migrate run --rm migrate` succeeds and `flyway_schema_history` records successful migrations.
+4. App prod startup: `docker compose up -d app` starts the app with the prod profile and no unsafe production guard failure.
+5. Authenticated smoke: `scripts/prod-smoke.sh` passes health, liveness, readiness, dashboard home, review center, and safety-field checks.
+6. Backup drill: `scripts/prod-backup.sh` creates a timestamped ignored backup file without printing secrets.
+7. Restore drill: `scripts/prod-restore.sh` restores into a controlled recovery database and smoke passes after restore. If restore is not run, readiness cannot advance beyond `BLOCKED`.
+8. HTTPS / reverse proxy / auth smoke: HTTPS access and authenticated dashboard/review API checks pass through the intended server entrypoint.
+9. Provider live smoke: real-provider readiness evidence is recorded without printing secrets, without fake `CONNECTED` statuses, and without private trading calls.
+10. Safety boundary check: no buy/sell/order/execute/auto-open/auto-close/auto-trading route or workflow is introduced.
+
+Use `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` as the evidence record.
 
 ## Rollback Policy
 
@@ -284,15 +316,16 @@ The restore script must only target a controlled recovery database until a separ
 - Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Provider readiness is readonly after PDR-M5: config-only status exists for Binance public market data, AI providers, and external context placeholders, but no live provider connection proof, secrets manager integration, or real server provider smoke exists yet.
+- PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
-1. PDR-M6 Secrets Manager / External Integration Verification / Production Release Gate.
-2. PDR-M7 HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
-3. PDR-M8 Real Server Deployment Smoke / Restore Drill Evidence if not covered by earlier packages.
+1. User-run real server acceptance evidence collection using `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` and `scripts/prod-release-gate.sh`.
+2. PDR-M7 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
+3. PDR-M8 Verified External Integration / Real Provider Smoke if not covered by the server evidence package.
 
 ## Explicit Non-Scope
 
-PDR-M5 does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, call live providers in default tests or smoke, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds readonly provider readiness, config-only fail-closed guards, smoke checks, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.
+PDR-M6A does not deploy to a real server, expose sensitive actuator endpoints, add Prometheus/Grafana, commit real secrets, connect Telegram, send Telegram, dispatch Push, trigger Push Recheck, connect Binance private trading execution, call live providers in default tests or smoke, run restore automatically, change schema.sql, change mapper SQL, add order/execution, or add auto-trading semantics. It adds the evidence template, conservative release gate runner, env placeholders, and docs/status updates while preserving Production Deployment Readiness as `BLOCKED`.

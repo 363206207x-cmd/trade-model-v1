@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_URL="${APP_URL:-http://localhost:8081}"
+AUTH_USERNAME="${SMOKE_AUTH_USERNAME:-${APP_ADMIN_USERNAME:-}}"
+AUTH_PASSWORD="${SMOKE_AUTH_PASSWORD:-${APP_ADMIN_PASSWORD:-}}"
+RELEASE_GATE_REQUIRE_DOCKER="${RELEASE_GATE_REQUIRE_DOCKER:-true}"
+RELEASE_GATE_REQUIRE_BACKUP="${RELEASE_GATE_REQUIRE_BACKUP:-false}"
+RELEASE_GATE_ALLOW_EXTERNAL_CALLS="${RELEASE_GATE_ALLOW_EXTERNAL_CALLS:-false}"
+
+status="PASS"
+
+mark_incomplete() {
+  local message="$1"
+  echo "INCOMPLETE ${message}" >&2
+  if [ "$status" = "PASS" ]; then
+    status="INCOMPLETE"
+  fi
+}
+
+mark_fail() {
+  local message="$1"
+  echo "FAIL ${message}" >&2
+  status="FAIL"
+}
+
+require_command() {
+  local command_name="$1"
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    return 1
+  fi
+}
+
+run_docker_config_check() {
+  if ! require_command docker; then
+    if [ "$RELEASE_GATE_REQUIRE_DOCKER" = "true" ]; then
+      mark_incomplete "docker is unavailable; real server compose config cannot be verified"
+    else
+      echo "SKIP docker compose config; docker unavailable and RELEASE_GATE_REQUIRE_DOCKER=false"
+    fi
+    return
+  fi
+
+  echo "CHECK docker compose config"
+  if docker compose config >/dev/null; then
+    echo "PASS docker compose config"
+  else
+    mark_fail "docker compose config failed"
+  fi
+}
+
+run_smoke_check() {
+  if [ -z "$AUTH_USERNAME" ] || [ -z "$AUTH_PASSWORD" ]; then
+    mark_fail "smoke auth credentials missing; set APP_ADMIN_USERNAME/APP_ADMIN_PASSWORD or SMOKE_AUTH_USERNAME/SMOKE_AUTH_PASSWORD"
+    return
+  fi
+
+  echo "CHECK production smoke at ${APP_URL}"
+  if SMOKE_AUTH_USERNAME="$AUTH_USERNAME" \
+    SMOKE_AUTH_PASSWORD="$AUTH_PASSWORD" \
+    SMOKE_ALLOW_EXTERNAL_CALLS="$RELEASE_GATE_ALLOW_EXTERNAL_CALLS" \
+    bash scripts/prod-smoke.sh; then
+    echo "PASS production smoke"
+  else
+    mark_fail "production smoke failed"
+  fi
+}
+
+run_backup_check() {
+  if [ "$RELEASE_GATE_REQUIRE_BACKUP" != "true" ]; then
+    mark_incomplete "backup drill not required by this script run; set RELEASE_GATE_REQUIRE_BACKUP=true after server DB env is ready"
+    return
+  fi
+
+  echo "CHECK production backup drill"
+  if bash scripts/prod-backup.sh; then
+    echo "PASS production backup drill"
+  else
+    mark_fail "production backup drill failed"
+  fi
+}
+
+echo "Production release gate evidence runner"
+echo "APP_URL=${APP_URL}"
+echo "RELEASE_GATE_REQUIRE_DOCKER=${RELEASE_GATE_REQUIRE_DOCKER}"
+echo "RELEASE_GATE_REQUIRE_BACKUP=${RELEASE_GATE_REQUIRE_BACKUP}"
+echo "RELEASE_GATE_ALLOW_EXTERNAL_CALLS=${RELEASE_GATE_ALLOW_EXTERNAL_CALLS}"
+echo "Passwords and secrets are intentionally not printed."
+
+run_docker_config_check
+run_smoke_check
+run_backup_check
+
+if [ "$status" = "PASS" ]; then
+  echo "INCOMPLETE restore drill, HTTPS/reverse-proxy smoke, and human review evidence must still be recorded before readiness can move beyond BLOCKED"
+  status="INCOMPLETE"
+fi
+
+echo "PRODUCTION_RELEASE_GATE: ${status}"
+
+case "$status" in
+  PASS) exit 0 ;;
+  INCOMPLETE) exit 2 ;;
+  *) exit 1 ;;
+esac
