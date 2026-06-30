@@ -850,6 +850,15 @@
             overflow-x: auto;
             min-height: 160px;
         }
+        .position-flow-message {
+            min-height: 18px;
+            margin: -2px 0 6px;
+            color: var(--text-secondary);
+            font-size: 0.76rem;
+            font-weight: 650;
+        }
+        .position-flow-message.ok { color: var(--status-ok); }
+        .position-flow-message.error { color: var(--status-error); }
         .home-metric-grid,
         .execution-grid,
         .consistency-grid {
@@ -1163,6 +1172,11 @@
         }
         .ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         body[data-monitor-mode="system"] .custom-only-action { display: inline-flex; }
+        .asset-search-wrap {
+            position: relative;
+            display: inline-flex;
+            min-width: min(280px, 100%);
+        }
         .ctl input[type="search"] {
             width: 280px;
             max-width: 100%;
@@ -1173,6 +1187,52 @@
             background: var(--bg-elevated);
             color: var(--text-primary);
             font-size: 0.82rem;
+        }
+        .asset-suggestions {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            z-index: 25;
+            display: none;
+            padding: 5px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-surface);
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+        }
+        .asset-suggestions.open { display: grid; gap: 4px; }
+        .asset-suggestion-item,
+        .manual-symbol-suggestions button {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            text-align: left;
+        }
+        .asset-suggestion-item {
+            width: 100%;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-primary);
+            padding: 7px 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .asset-suggestion-item:hover,
+        .asset-suggestion-item:focus-visible {
+            outline: none;
+            background: rgba(47, 117, 255, 0.08);
+        }
+        .asset-suggestion-main {
+            font-weight: 750;
+            min-width: 0;
+        }
+        .asset-suggestion-secondary {
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 650;
         }
         .sort-hint { font-size: 0.72rem; color: var(--text-secondary); margin-left: 4px; }
         .homepage-secondary-control { display: none !important; }
@@ -1458,7 +1518,7 @@
             font-size: 0.75rem;
         }
         .position-table {
-            min-width: 840px;
+            min-width: 900px;
             border: 1px solid rgba(226, 232, 240, 0.5);
             border-radius: 8px;
             overflow: hidden;
@@ -1511,6 +1571,114 @@
         .execution-plan-table td {
             color: var(--text-primary);
             font-weight: 600;
+        }
+        .position-table .position-asset-cell {
+            min-width: 168px;
+            text-align: left;
+        }
+        .position-symbol-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: flex-start;
+            font-weight: 760;
+            color: var(--text-primary);
+        }
+        .position-direction-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 18px;
+            padding: 1px 6px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            background: rgba(248, 250, 252, 0.82);
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 760;
+            white-space: nowrap;
+        }
+        .position-direction-pill.long {
+            color: #15803d;
+            border-color: rgba(34, 197, 94, 0.26);
+            background: rgba(34, 197, 94, 0.08);
+        }
+        .position-direction-pill.short {
+            color: #dc2626;
+            border-color: rgba(248, 113, 113, 0.28);
+            background: rgba(248, 113, 113, 0.08);
+        }
+        .position-basic-meta {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2px;
+            margin-top: 4px;
+            color: var(--text-secondary);
+            font-size: 0.66rem;
+            font-weight: 520;
+            line-height: 1.28;
+        }
+        .position-basic-meta span {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .position-basic-meta .position-meta-empty {
+            color: rgba(100, 116, 139, 0.72);
+        }
+        .position-monitor-waiting {
+            color: var(--text-secondary);
+            font-weight: 620;
+        }
+        .position-stop-take {
+            display: grid;
+            gap: 2px;
+            line-height: 1.25;
+        }
+        .position-advice-cell {
+            display: grid;
+            gap: 2px;
+            line-height: 1.25;
+        }
+        .position-advice-primary {
+            color: var(--text-primary);
+            font-weight: 720;
+        }
+        .position-advice-meta {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 560;
+        }
+        .position-validation-countdown {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 68px;
+            min-height: 22px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(47, 117, 255, 0.18);
+            background: rgba(47, 117, 255, 0.07);
+            color: var(--brand-accent);
+            font-size: 0.72rem;
+            font-weight: 760;
+            white-space: nowrap;
+        }
+        .position-action-btn {
+            min-height: 24px;
+            padding: 3px 9px;
+            border: 1px solid rgba(47, 117, 255, 0.32);
+            border-radius: 999px;
+            background: rgba(47, 117, 255, 0.08);
+            color: var(--brand-accent);
+            font-size: 0.72rem;
+            font-weight: 750;
+            cursor: pointer;
+        }
+        .position-action-btn:hover {
+            border-color: rgba(47, 117, 255, 0.5);
+            background: rgba(47, 117, 255, 0.12);
         }
         .tile-compact-row .value:empty::after,
         .execution-plan-table td:empty::after,
@@ -2033,6 +2201,56 @@
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
         }
+        .manual-position-required-grid,
+        .manual-position-advanced {
+            grid-column: 1 / -1;
+        }
+        .manual-position-required-grid,
+        .manual-position-advanced-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .manual-time-note {
+            display: grid;
+            gap: 5px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            padding: 8px 9px;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 650;
+        }
+        .manual-time-note strong {
+            color: var(--text-primary);
+            font-size: 0.82rem;
+        }
+        .manual-position-advanced {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: rgba(248, 250, 252, 0.54);
+            padding: 0;
+            overflow: hidden;
+        }
+        .manual-position-advanced summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 8px 10px;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+            font-weight: 750;
+        }
+        .manual-position-advanced summary::-webkit-details-marker { display: none; }
+        .manual-position-advanced summary::after {
+            content: "▾";
+            float: right;
+            color: var(--text-secondary);
+        }
+        .manual-position-advanced[open] summary::after { content: "▴"; }
+        .manual-position-advanced-grid {
+            padding: 0 10px 10px;
+        }
         .manual-position-form label {
             display: grid;
             gap: 5px;
@@ -2081,10 +2299,19 @@
             font-size: 0.74rem;
             cursor: pointer;
         }
+        .manual-symbol-suggestions button .asset-suggestion-secondary {
+            font-size: 0.68rem;
+        }
         .manual-symbol-suggestions button:hover {
             border-color: var(--brand-accent);
             color: var(--brand-accent);
         }
+        .manual-close-review-actions {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 10px;
+        }
+        .manual-close-review-actions[hidden] { display: none; }
         .opportunity-review-drawer {
             position: fixed;
             inset: 0;
@@ -2312,12 +2539,15 @@
             <span class="module-title">重点资产监控</span>
             <div class="ctl">
                 <label class="muted homepage-secondary-control">模式
-                    <select id="modeSelect" class="btn" title="系统推荐：展示全部决策前 6 条；自定义监控：仅展示已加入本机列表的标的">
+                    <select id="modeSelect" class="btn" title="系统推荐：展示全部决策前 6 条；自定义监控：仅展示已加入本机列表的资产">
                         <option value="system">系统推荐</option>
                         <option value="custom">自定义监控</option>
                     </select>
                 </label>
-                <input type="search" id="symbolSearch" placeholder="搜索币种，如 BTCUSDT" autocomplete="off">
+                <div class="asset-search-wrap">
+                    <input type="search" id="symbolSearch" placeholder="搜索资产，如 BTCUSDT" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="assetSearchSuggestions">
+                    <div class="asset-suggestions" id="assetSearchSuggestions" role="listbox" aria-label="资产候选"></div>
+                </div>
                 <button type="button" class="btn custom-only-action" id="btnAdd">添加</button>
                 <button type="button" class="btn custom-only-action" id="btnRemove">删除</button>
                 <button type="button" class="btn asset-pool-toggle" id="assetPoolToggle" aria-expanded="false">资产池 ▾</button>
@@ -2347,15 +2577,16 @@
                     </div>
                 </div>
                 <p class="position-source-note">仅显示手动录入持仓</p>
+                <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
                     <table class="position-table"><thead><tr>
-                        <th>标的</th><th>方向</th><th>入场价</th><th>当前价</th><th>浮动盈亏</th><th>杠杆</th><th>仓位</th><th>持仓状态</th><th>监控结论</th><th>更新时间</th>
+                        <th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>操作</th>
                     </tr></thead><tbody>
-                        <tr class="position-empty-row"><td><div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                        <tr class="position-empty-row"><td><div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div></td><td></td><td></td><td></td><td></td><td></td><td><span class="position-monitor-waiting">等待监控</span></td><td></td></tr>
+                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                     </tbody></table>
                 </div>
             </section>
@@ -2774,41 +3005,75 @@
     <div class="manual-position-drawer" id="manualPositionDrawer" aria-hidden="true">
         <div class="manual-position-panel" role="dialog" aria-modal="true" aria-labelledby="manualPositionTitle">
             <h3 id="manualPositionTitle">手动录入持仓</h3>
-            <p>仅记录手动持仓；不会读取执行建议，也不会触发交易执行。</p>
+            <p>仅记录你的真实持仓，不会触发交易。</p>
             <div class="manual-position-form" id="manualPositionForm">
-                <label for="manualAssetSymbol">标的
-                    <input id="manualAssetSymbol" type="text" autocomplete="off" placeholder="BTCUSDT">
-                </label>
-                <div class="manual-symbol-suggestions" id="manualSymbolSuggestions" aria-label="标的候选"></div>
-                <label for="manualSide">方向
-                    <select id="manualSide">
-                        <option value="LONG">LONG</option>
-                        <option value="SHORT">SHORT</option>
-                    </select>
-                </label>
-                <label for="manualEntryPrice">入场价
-                    <input id="manualEntryPrice" type="number" step="0.00000001" min="0" placeholder="0.00">
-                </label>
-                <label for="manualQuantity">数量
-                    <input id="manualQuantity" type="number" step="0.00000001" min="0" placeholder="0">
-                </label>
-                <label for="manualLeverage">杠杆
-                    <input id="manualLeverage" type="number" step="0.01" min="1" placeholder="1">
-                </label>
-                <label for="manualStopLoss">止损
-                    <input id="manualStopLoss" type="number" step="0.00000001" min="0" placeholder="可选">
-                </label>
-                <label for="manualTakeProfit">止盈
-                    <input id="manualTakeProfit" type="number" step="0.00000001" min="0" placeholder="可选">
-                </label>
-                <label for="manualSourceRefId">来源备注
-                    <input id="manualSourceRefId" type="text" autocomplete="off" placeholder="manual-dashboard">
-                </label>
+                <div class="manual-position-required-grid">
+                    <label for="manualAssetSymbol">资产
+                        <input id="manualAssetSymbol" type="text" autocomplete="off" placeholder="BTCUSDT">
+                    </label>
+                    <label for="manualSide">方向
+                        <select id="manualSide">
+                            <option value="LONG">做多</option>
+                            <option value="SHORT">做空</option>
+                        </select>
+                    </label>
+                    <label for="manualEntryPrice">开仓价
+                        <input id="manualEntryPrice" type="number" step="0.00000001" min="0" placeholder="0.00">
+                    </label>
+                    <div class="manual-time-note" aria-label="开仓时间">
+                        <span>开仓时间</span>
+                        <strong>保存时自动记录</strong>
+                    </div>
+                </div>
+                <div class="manual-symbol-suggestions" id="manualSymbolSuggestions" aria-label="资产候选"></div>
+                <details class="manual-position-advanced" id="manualPositionAdvanced">
+                    <summary>高级信息（可选）</summary>
+                    <div class="manual-position-advanced-grid">
+                        <label for="manualQuantity">数量 / 仓位
+                            <input id="manualQuantity" type="number" step="0.00000001" min="0" value="1" placeholder="1">
+                        </label>
+                        <label for="manualLeverage">杠杆
+                            <input id="manualLeverage" type="number" step="0.01" min="1" value="1" placeholder="1">
+                        </label>
+                        <label for="manualStopLoss">实际止损
+                            <input id="manualStopLoss" type="number" step="0.00000001" min="0" placeholder="可选">
+                        </label>
+                        <label for="manualTakeProfit">实际止盈
+                            <input id="manualTakeProfit" type="number" step="0.00000001" min="0" placeholder="可选">
+                        </label>
+                        <label for="manualSourceRefId">来源备注
+                            <input id="manualSourceRefId" type="text" autocomplete="off" placeholder="manual-dashboard">
+                        </label>
+                    </div>
+                </details>
             </div>
             <div class="manual-position-message" id="manualPositionMessage" role="status"></div>
             <div class="manual-position-actions">
                 <button type="button" class="btn" id="manualPositionCancel">取消</button>
                 <button type="button" class="btn" id="manualPositionSave">保存手动持仓</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="manual-position-drawer" id="manualCloseDrawer" aria-hidden="true">
+        <div class="manual-position-panel" role="dialog" aria-modal="true" aria-labelledby="manualCloseTitle">
+            <h3 id="manualCloseTitle">记录平仓</h3>
+            <p>仅记录你的实际平仓结果，不会触发交易所操作。</p>
+            <div class="manual-position-form" id="manualCloseForm">
+                <label for="manualClosePrice">平仓价
+                    <input id="manualClosePrice" type="number" step="0.00000001" min="0" placeholder="0.00">
+                </label>
+                <label for="manualCloseReason">平仓原因
+                    <input id="manualCloseReason" type="text" autocomplete="off" placeholder="可选">
+                </label>
+            </div>
+            <div class="manual-position-message" id="manualCloseMessage" role="status"></div>
+            <div class="manual-close-review-actions" id="manualCloseReviewActions" hidden>
+                <a class="btn review-center-btn" id="manualCloseReviewLink" href="/review/dashboard">进入复盘中心</a>
+            </div>
+            <div class="manual-position-actions">
+                <button type="button" class="btn" id="manualCloseCancel">取消</button>
+                <button type="button" class="btn manual-position-btn" id="manualCloseSave">记录平仓</button>
             </div>
         </div>
     </div>
@@ -2863,7 +3128,11 @@
  */
 (function () {
     var REFRESH_MS = 30000;
+    var POSITION_VALIDATION_COUNTDOWN_MS = 15000;
     var refreshTimer = null;
+    var validationCountdownTimer = null;
+    var dashboardLastRefreshAt = null;
+    var dashboardRefreshInFlight = false;
     var allDecisions = [];
     var displayDecisions = [];
     var detailDecisionMap = {};
@@ -3803,7 +4072,7 @@
             if (modeValue === "system") {
                 el.textContent = "当前：系统推荐";
             } else {
-                el.textContent = "当前：自定义监控 · 本机已保存 " + loadCustomSymbols().length + " 个标的（仅浏览器）";
+                el.textContent = "当前：自定义监控 · 本机已保存 " + loadCustomSymbols().length + " 个资产（仅浏览器）";
             }
         }
         updateAssetPoolPanel();
@@ -3836,6 +4105,77 @@
             .concat(loadCustomSymbols()));
     }
 
+    function assetCandidateFromSymbol(raw, sourceRank) {
+        var rawSymbol = normalizeSymbolInput(raw);
+        if (!rawSymbol) return null;
+        return {
+            rawSymbol: rawSymbol,
+            displaySymbol: formatSymbolPair(rawSymbol),
+            baseAsset: rawSymbol.replace(/USDT$/, ""),
+            sourceRank: sourceRank || 0
+        };
+    }
+
+    function collectAssetCandidates() {
+        var list = [];
+        var seen = {};
+        function add(raw, sourceRank) {
+            var candidate = assetCandidateFromSymbol(raw, sourceRank);
+            if (!candidate || seen[candidate.rawSymbol]) return;
+            seen[candidate.rawSymbol] = true;
+            candidate.order = list.length;
+            list.push(candidate);
+        }
+        DEFAULT_DISPLAY_SLOT_SYMBOLS.forEach(function (sym) { add(sym, 0); });
+        var homeAssets = (window.__lastDashboardHome && window.__lastDashboardHome.assets) || [];
+        homeAssets.forEach(function (asset) { add(asset && (asset.rawSymbol || asset.symbol), 1); });
+        (allDecisions || []).forEach(function (d) { add(d && d.symbol, 2); });
+        (displayDecisions || []).forEach(function (d) { add(d && d.symbol, 2); });
+        loadCustomSymbols().forEach(function (sym) { add(sym, 3); });
+        add(selectedSymbol, 4);
+        add(searchQuery, 4);
+        return list;
+    }
+
+    function assetMatchRank(candidate, query) {
+        var q = normalizeSymbolInput(query);
+        if (!q) return 10;
+        var raw = candidate.rawSymbol || "";
+        var base = candidate.baseAsset || raw.replace(/USDT$/, "");
+        var display = normalizeSymbolInput(candidate.displaySymbol || "");
+        if (raw === q) return 0;
+        if (raw.indexOf(q) === 0) return 1;
+        if (base.indexOf(q) === 0) return 2;
+        if (raw.indexOf(q) >= 0) return 3;
+        if (display.indexOf(q) >= 0) return 4;
+        return null;
+    }
+
+    function rankedAssetCandidates(query, limit) {
+        var q = normalizeSymbolInput(query);
+        return collectAssetCandidates().map(function (candidate) {
+            return {
+                candidate: candidate,
+                rank: q ? assetMatchRank(candidate, q) : 10
+            };
+        }).filter(function (item) {
+            return item.rank !== null;
+        }).sort(function (a, b) {
+            if (a.rank !== b.rank) return a.rank - b.rank;
+            if (a.candidate.sourceRank !== b.candidate.sourceRank) return a.candidate.sourceRank - b.candidate.sourceRank;
+            return a.candidate.order - b.candidate.order;
+        }).slice(0, limit || 6).map(function (item) {
+            return item.candidate;
+        });
+    }
+
+    function assetSuggestionHtml(candidate, className) {
+        return '<button type="button" class="' + escapeHtml(className || "asset-suggestion-item") + '" data-symbol="' + escapeHtml(candidate.rawSymbol) + '">'
+            + '<span class="asset-suggestion-main">' + escapeHtml(candidate.displaySymbol) + '</span>'
+            + '<span class="asset-suggestion-secondary">' + escapeHtml(candidate.rawSymbol) + '</span>'
+            + '</button>';
+    }
+
     function updateAssetPoolPanel() {
         var text = document.getElementById("manualSlotText");
         if (text) {
@@ -3847,13 +4187,13 @@
     function removeSelectedCustomSymbol() {
         var sym = normalizeSymbolInput(selectedSymbol || searchQuery || "");
         if (!sym) {
-            alert("请先选择或搜索要移除的标的。");
+            alert("请先选择或搜索要移除的资产。");
             return;
         }
         var cur = loadCustomSymbols();
         var next = cur.filter(function (s) { return s !== sym; });
         if (next.length === cur.length) {
-            alert("本机自定义列表中没有该标的。");
+            alert("本机自定义列表中没有该资产。");
             return;
         }
         saveCustomSymbols(next);
@@ -4632,12 +4972,195 @@
         return raw != null ? formatDateTime(raw) : "—";
     }
 
+    function positionTableHeadHtml() {
+        return '<table class="position-table"><thead><tr>'
+            + '<th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>操作</th>'
+            + '</tr></thead><tbody>';
+    }
+
+    function positionDirectionClass(side) {
+        var v = String(side || "").trim().toUpperCase();
+        if (v === "LONG") return " long";
+        if (v === "SHORT") return " short";
+        return "";
+    }
+
+    function positionMonitorCell(raw, fallback) {
+        var value = cleanBlankValue(displayPlanCell(raw));
+        if (value) return escapeHtml(value);
+        return '<span class="position-monitor-waiting">' + escapeHtml(fallback || "") + '</span>';
+    }
+
+    function positionMonitorFieldHtml(d, names, fallback) {
+        return positionMonitorCell(pickField(d, names), fallback);
+    }
+
+    function positionMonitorStateText(d) {
+        var raw = pickField(d, [
+            "positionMonitorConclusion", "position_monitor_conclusion",
+            "monitorConclusion", "monitor_conclusion",
+            "logicStatus", "logic_status",
+            "monitorLogicStatus", "monitor_logic_status",
+            "positionMonitorLogicStatus", "position_monitor_logic_status"
+        ]);
+        var v = String(raw || "").trim().toUpperCase();
+        if (!v) return "";
+        if (v === "LOGIC_VALID") return "状态：逻辑仍成立";
+        if (v === "LOGIC_WEAKENED") return "状态：逻辑弱化";
+        if (v === "PLAN_INVALIDATED") return "状态：计划失效";
+        if (v === "HIGH_RISK") return "状态：高风险观察";
+        if (v === "HOLD") return "状态：监控中";
+        if (v === "MANUAL_REVIEW" || v === "RECHECK_PLAN" || v === "RISK_REVIEW") return "状态：等待用户确认";
+        return "";
+    }
+
+    function positionAdviceText(raw) {
+        var text = cleanBlankValue(raw);
+        var v = text.toUpperCase();
+        if (!v) return "";
+        if (v === "HOLD" || v === "CONTINUE_HOLD" || v === "CONTINUE_HOLDING" || v === "KEEP_HOLDING") return "继续持有";
+        if (v === "NO_ADD" || v === "DO_NOT_ADD" || v === "WATCH" || v === "OBSERVE") return "暂不加仓";
+        if (v === "REDUCE_POSITION" || v === "DECREASE_POSITION" || v === "SCALE_DOWN") return "降低仓位";
+        if (v === "TIGHTEN_STOP" || v === "TIGHTEN_STOP_LOSS") return "收紧止损";
+        if (v === "MOVE_STOP" || v === "MOVE_STOP_LOSS" || v === "TRAIL_STOP") return "移动止损";
+        if (v === "TAKE_PROFIT" || v === "PARTIAL_TAKE_PROFIT" || v === "SCALE_OUT") return "到达止盈区后分批止盈";
+        if (v === "PLAN_INVALIDATED" || v === "INVALIDATED" || v === "MANUAL_CONFIRM") return "计划失效，等待人工确认";
+        if (v === "RECORD_CLOSE" || v === "CLOSE_AND_REVIEW") return "记录平仓并进入复盘";
+        var allowed = ["继续持有", "暂不加仓", "降低仓位", "收紧止损", "移动止损", "到达止盈区后分批止盈", "计划失效，等待人工确认", "记录平仓并进入复盘"];
+        if (allowed.indexOf(text) >= 0) return text;
+        return "";
+    }
+
+    function positionStopTakePressureText(d) {
+        var raw = pickField(d, [
+            "stopTakePressure", "stop_take_pressure",
+            "stopLossTakeProfitPressure", "stop_loss_take_profit_pressure",
+            "stopTakeStatus", "stop_take_status",
+            "stopLossPressure", "stop_loss_pressure",
+            "takeProfitPressure", "take_profit_pressure"
+        ]);
+        var text = cleanBlankValue(raw);
+        if (!text) return "";
+        return text;
+    }
+
+    function positionCurrentAdviceHtml(d) {
+        var advice = positionAdviceText(pickField(d, [
+            "currentAdvice", "current_advice",
+            "positionAdvice", "position_advice",
+            "monitorAdvice", "monitor_advice",
+            "monitorSuggestedAction", "monitor_suggested_action",
+            "suggestedAction", "suggested_action"
+        ])) || "等待监控";
+        var meta = [];
+        var pressure = positionStopTakePressureText(d);
+        var state = positionMonitorStateText(d);
+        if (pressure) meta.push(pressure);
+        if (state) meta.push(state);
+        return '<div class="position-advice-cell"><span class="position-advice-primary">' + escapeHtml(advice) + '</span>'
+            + (meta.length ? '<span class="position-advice-meta">' + escapeHtml(meta.join(" · ")) + '</span>' : '')
+            + '</div>';
+    }
+
+    function positionValidationRawTime(d) {
+        return pickField(d, ["positionUpdatedAt", "position_updated_at", "updatedAt", "updated_at", "monitorTime", "monitor_time", "monitoredAt", "monitored_at"]);
+    }
+
+    function positionValidationCellHtml(rawTime) {
+        var fullTime = rawTime != null ? String(rawTime) : "";
+        var title = rawTime != null ? formatDateTime(rawTime) : "";
+        return '<span class="position-validation-countdown" data-full-time="' + escapeHtml(fullTime) + '" title="' + escapeHtml(title) + '">等待监控</span>';
+    }
+
+    function positionValidationCadenceMs() {
+        if (!REFRESH_MS || REFRESH_MS <= 0) return 0;
+        return POSITION_VALIDATION_COUNTDOWN_MS > 0 ? POSITION_VALIDATION_COUNTDOWN_MS : REFRESH_MS;
+    }
+
+    function formatPositionValidationCountdownText() {
+        if (dashboardRefreshInFlight) return "验证中";
+        var cadenceMs = positionValidationCadenceMs();
+        if (!cadenceMs || !dashboardLastRefreshAt) return "等待监控";
+        var elapsedMs = Date.now() - dashboardLastRefreshAt;
+        var remaining = Math.ceil((cadenceMs - elapsedMs) / 1000);
+        if (remaining <= 0) return "验证中";
+        return remaining + "s";
+    }
+
+    function updatePositionValidationCountdown() {
+        var text = formatPositionValidationCountdownText();
+        Array.prototype.forEach.call(document.querySelectorAll(".position-validation-countdown"), function (el) {
+            el.textContent = text;
+        });
+    }
+
+    function schedulePositionValidationCountdown() {
+        if (validationCountdownTimer) clearInterval(validationCountdownTimer);
+        validationCountdownTimer = null;
+        if (positionValidationCadenceMs() > 0) validationCountdownTimer = setInterval(updatePositionValidationCountdown, 1000);
+        updatePositionValidationCountdown();
+    }
+
+    function markPositionValidationStarted() {
+        dashboardRefreshInFlight = true;
+        updatePositionValidationCountdown();
+    }
+
+    function markPositionValidationFinished() {
+        dashboardLastRefreshAt = Date.now();
+        dashboardRefreshInFlight = false;
+        updatePositionValidationCountdown();
+    }
+
+    function positionRiskHtml(d) {
+        var raw = pickField(d, [
+            "positionRiskLevel", "position_risk_level",
+            "monitorRiskLevel", "monitor_risk_level",
+            "riskLevel", "risk_level"
+        ]);
+        var mapped = raw != null ? riskLevelText(raw) : "";
+        return positionMonitorCell(mapped && mapped !== "—" ? mapped : raw, "等待监控");
+    }
+
+    function positionBasicMetaHtml(items) {
+        var html = [];
+        items.forEach(function (item) {
+            var value = cleanBlankValue(item.value);
+            if (value) html.push('<span>' + escapeHtml(item.label) + '：' + escapeHtml(value) + '</span>');
+        });
+        if (!html.length) html.push('<span class="position-meta-empty">暂无基础信息</span>');
+        return '<div class="position-basic-meta">' + html.join("") + '</div>';
+    }
+
+    function positionAssetCellHtml(symbol, side, metaItems) {
+        var sideText = cleanBlankValue(positionSideText(side)) || "暂无";
+        return '<div class="position-symbol-line"><span>' + escapeHtml(cleanBlankValue(symbol) || "暂无") + '</span>'
+            + '<span class="position-direction-pill' + positionDirectionClass(side) + '">' + escapeHtml(sideText) + '</span></div>'
+            + positionBasicMetaHtml(metaItems || []);
+    }
+
+    function positionCloseActionHtml(positionId, symbol) {
+        if (positionId == null || String(positionId).trim() === "") return "";
+        return '<button type="button" class="position-action-btn" data-position-id="' + escapeHtml(positionId) + '" data-position-symbol="' + escapeHtml(symbol || "") + '">记录平仓</button>';
+    }
+
+    function bindManualCloseButtons() {
+        Array.prototype.forEach.call(document.querySelectorAll(".position-action-btn[data-position-id]"), function (btn) {
+            btn.addEventListener("click", function () {
+                showManualCloseDrawer(btn.getAttribute("data-position-id"), btn.getAttribute("data-position-symbol") || "");
+            });
+        });
+    }
+
     function positionEmptyRows() {
         var rows = [];
         for (var i = 0; i < 5; i++) {
             var cells = [];
-            for (var j = 0; j < 10; j++) {
-                cells.push('<td>' + (i === 0 && j === 0 ? '<div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div>' : '') + '</td>');
+            for (var j = 0; j < 8; j++) {
+                var cell = "";
+                if (i === 0 && j === 0) cell = '<div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div>';
+                if (i === 0 && j === 6) cell = '<span class="position-monitor-waiting">等待监控</span>';
+                cells.push('<td>' + cell + '</td>');
             }
             rows.push('<tr class="position-empty-row">' + cells.join("") + '</tr>');
         }
@@ -4647,7 +5170,7 @@
     function positionFillerRows(count) {
         var rows = [];
         for (var i = 0; i < count; i++) {
-            rows.push('<tr class="position-empty-row">' + new Array(11).join('<td></td>') + '</tr>');
+            rows.push('<tr class="position-empty-row">' + new Array(9).join('<td></td>') + '</tr>');
         }
         return rows.join("");
     }
@@ -4655,9 +5178,7 @@
     function renderHomePosition(d) {
         var box = document.getElementById("homePositionContent");
         if (!box) return;
-        var tableHead = '<table class="position-table"><thead><tr>'
-            + '<th>标的</th><th>方向</th><th>入场价</th><th>当前价</th><th>浮动盈亏</th><th>杠杆</th><th>仓位</th><th>持仓状态</th><th>监控结论</th><th>更新时间</th>'
-            + '</tr></thead><tbody>';
+        var tableHead = positionTableHeadHtml();
         var legacyManualEmptyText = "暂无手动录入持仓";
         if (!d || !hasRealPositionDetail(d)) {
             box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
@@ -4668,20 +5189,28 @@
         var positionQuantity = pickField(d, ["quantity", "positionQuantity", "position_quantity", "size", "positionSize", "position_size"]);
         var positionSide = pickField(d, ["side", "positionSide", "position_side", "direction"]);
         var positionStatus = pickField(d, ["positionStatus", "position_status", "status"]);
-        var unrealizedPnl = pickField(d, ["unrealizedPnlPct", "unrealized_pnl_pct", "pnl", "pnlPct", "pnl_pct"]);
+        var positionOpenedAt = pickField(d, ["openedAt", "opened_at", "openTime", "open_time", "positionOpenTime", "position_open_time", "entryTime", "entry_time"]);
+        var unrealizedPnl = pickField(d, ["unrealizedPnlPct", "unrealized_pnl_pct", "floatingPnl", "floating_pnl", "pnl", "pnlPct", "pnl_pct"]);
         var latestPrice = pickField(d, ["latestPrice", "latest_price", "currentPrice", "current_price", "monitorPrice", "monitor_price"]);
+        var assetCell = positionAssetCellHtml(symbol, positionSide, [
+            { label: "用户开仓价", value: cleanBlankValue(formatPrice(avgOpenPrice)) },
+            { label: "杠杆", value: cleanBlankValue(positionLeverageText(d)) },
+            { label: "仓位", value: positionQuantity != null ? String(positionQuantity) : "" },
+            { label: "开仓时间", value: cleanBlankValue(formatDateTime(positionOpenedAt)) },
+            { label: "当前价", value: cleanBlankValue(formatPrice(latestPrice)) },
+            { label: "浮动盈亏", value: cleanBlankValue(formatPct(unrealizedPnl)) }
+        ]);
         box.innerHTML = tableHead + '<tr>'
-            + '<td>' + escapeHtml(cleanBlankValue(symbol)) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(positionSideText(positionSide))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(formatPrice(avgOpenPrice))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(formatPrice(latestPrice))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(formatPct(unrealizedPnl))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(positionLeverageText(d))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(positionQuantity != null ? String(positionQuantity) : "")) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(positionStatusText(positionStatus))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(positionMonitorConclusionText(d))) + '</td>'
-            + '<td>' + escapeHtml(cleanBlankValue(positionUpdatedText(d))) + '</td>'
+            + '<td class="position-asset-cell">' + assetCell + '</td>'
+            + '<td>' + positionMonitorFieldHtml(d, ["entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
+            + '<td>' + positionMonitorFieldHtml(d, ["directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
+            + '<td>' + positionMonitorFieldHtml(d, ["reversalStatus", "reversal_status", "positionReversalStatus", "position_reversal_status", "monitorReversalStatus", "monitor_reversal_status"], "等待监控") + '</td>'
+            + '<td>' + positionRiskHtml(d) + '</td>'
+            + '<td>' + positionCurrentAdviceHtml(d) + '</td>'
+            + '<td>' + positionValidationCellHtml(positionValidationRawTime(d)) + '</td>'
+            + '<td></td>'
             + '</tr>' + positionFillerRows(4) + '</tbody></table>';
+        updatePositionValidationCountdown();
     }
 
     function renderHomeExecution(d) {
@@ -5149,29 +5678,36 @@
     function renderHomePositionsFromPayload(positions) {
         var box = document.getElementById("homePositionContent");
         if (!box) return;
-        var tableHead = '<table class="position-table"><thead><tr>'
-            + '<th>标的</th><th>方向</th><th>入场价</th><th>当前价</th><th>浮动盈亏</th><th>杠杆</th><th>仓位</th><th>持仓状态</th><th>监控结论</th><th>更新时间</th>'
-            + '</tr></thead><tbody>';
+        var tableHead = positionTableHeadHtml();
         var list = positions || [];
         if (!list.length) {
             box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
             return;
         }
         var rows = list.slice(0, 5).map(function (p) {
+            var positionId = p.positionId != null ? p.positionId : p.id;
+            var assetCell = positionAssetCellHtml(p.symbol, p.direction, [
+                { label: "用户开仓价", value: cleanBlankValue(formatPrice(p.entryPrice)) },
+                { label: "杠杆", value: p.leverage != null ? String(p.leverage) : "" },
+                { label: "仓位", value: p.positionSize != null ? String(p.positionSize) : "" },
+                { label: "开仓时间", value: cleanBlankValue(formatDateTime(p.openedAt || p.opened_at || p.openTime || p.open_time || p.entryTime || p.entry_time)) },
+                { label: "当前价", value: cleanBlankValue(formatPrice(p.currentPrice)) },
+                { label: "浮动盈亏", value: cleanBlankValue(formatPct(p.floatingPnl)) }
+            ]);
             return '<tr>'
-                + '<td>' + escapeHtml(cleanBlankValue(p.symbol)) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(positionSideText(p.direction))) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(formatPrice(p.entryPrice))) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(formatPrice(p.currentPrice))) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(formatPct(p.floatingPnl))) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(p.leverage != null ? String(p.leverage) : "")) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(p.positionSize != null ? String(p.positionSize) : "")) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(positionStatusText(p.positionStatus))) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(p.monitorConclusion || "")) + '</td>'
-                + '<td>' + escapeHtml(cleanBlankValue(formatDateTime(p.updatedAt))) + '</td>'
+                + '<td class="position-asset-cell">' + assetCell + '</td>'
+                + '<td>' + positionMonitorFieldHtml(p, ["entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
+                + '<td>' + positionMonitorFieldHtml(p, ["directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
+                + '<td>' + positionMonitorFieldHtml(p, ["reversalStatus", "reversal_status", "positionReversalStatus", "position_reversal_status", "monitorReversalStatus", "monitor_reversal_status"], "等待监控") + '</td>'
+                + '<td>' + positionRiskHtml(p) + '</td>'
+                + '<td>' + positionCurrentAdviceHtml(p) + '</td>'
+                + '<td>' + positionValidationCellHtml(p.updatedAt || p.updated_at || p.monitorTime || p.monitor_time || p.monitoredAt || p.monitored_at) + '</td>'
+                + '<td>' + positionCloseActionHtml(positionId, p.symbol) + '</td>'
                 + '</tr>';
         });
         box.innerHTML = tableHead + rows.join("") + positionFillerRows(Math.max(0, 5 - rows.length)) + '</tbody></table>';
+        bindManualCloseButtons();
+        updatePositionValidationCountdown();
     }
 
     function renderHomeExecutionFromPayload(suggestion) {
@@ -7601,22 +8137,34 @@
                 var set = {};
                 want.forEach(function (s) { set[s] = true; });
                 list = list.filter(function (d) {
-                    var key = (d.symbol || "").toUpperCase();
+                    var key = normalizeSymbolInput(d && d.symbol);
                     return set[key];
                 });
             }
         }
-        var q = (searchQuery || "").trim().toUpperCase();
+        var q = normalizeSymbolInput(searchQuery || "");
         if (q) {
-            list = list.filter(function (d) {
-                return (d.symbol || "").toUpperCase().indexOf(q) >= 0;
+            list = list.map(function (d, idx) {
+                var candidate = assetCandidateFromSymbol(d && d.symbol, 2);
+                return {
+                    decision: d,
+                    rank: candidate ? assetMatchRank(candidate, q) : null,
+                    order: idx
+                };
+            }).filter(function (item) {
+                return item.rank !== null;
+            }).sort(function (a, b) {
+                if (a.rank !== b.rank) return a.rank - b.rank;
+                return a.order - b.order;
+            }).map(function (item) {
+                return item.decision;
             });
         }
         displayDecisions = list.slice(0, 6);
         detailDecisionMap = {};
-        if (!displayDecisions.length) selectedSymbol = null;
-        else if (!selectedSymbol || !displayDecisions.some(function (d) { return d.symbol === selectedSymbol; })) {
-            selectedSymbol = displayDecisions[0].symbol;
+        if (!displayDecisions.length) selectedSymbol = normalizeSymbolInput(selectedSymbol || searchQuery) || null;
+        else if (!selectedSymbol || !displayDecisions.some(function (d) { return normalizeSymbolInput(d && d.symbol) === normalizeSymbolInput(selectedSymbol); })) {
+            selectedSymbol = normalizeSymbolInput(displayDecisions[0].symbol);
         }
     }
 
@@ -8127,13 +8675,24 @@
     }
 
     function refreshDashboard() {
-        fetchDashboardHome().catch(function () {
-            refreshDashboardLegacy();
-        });
+        markPositionValidationStarted();
+        fetchDashboardHome()
+            .then(function (home) {
+                markPositionValidationFinished();
+                return home;
+            })
+            .catch(function () {
+                var legacyResult = refreshDashboardLegacy();
+                if (legacyResult && typeof legacyResult.then === "function") {
+                    legacyResult.then(markPositionValidationFinished).catch(markPositionValidationFinished);
+                } else {
+                    markPositionValidationFinished();
+                }
+            });
     }
 
     function refreshDashboardLegacy() {
-        fetch("/api/dashboard/summary?limit=12")
+        return fetch("/api/dashboard/summary?limit=12")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (data) {
                 setRuntimeStatus(data.systemStatus ? data.systemStatus.status : "OK");
@@ -8232,6 +8791,7 @@
         if (refreshTimer) clearInterval(refreshTimer);
         refreshTimer = null;
         if (REFRESH_MS > 0) refreshTimer = setInterval(refreshDashboard, REFRESH_MS);
+        schedulePositionValidationCountdown();
     }
 
     function telegramChannelStatusText() {
@@ -8298,6 +8858,40 @@
         msg.className = "manual-position-message" + (type ? " " + type : "");
     }
 
+    function setPositionFlowMessage(text, type) {
+        var msg = document.getElementById("positionFlowMessage");
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.className = "position-flow-message" + (type ? " " + type : "");
+    }
+
+    function parseDashboardApiResponse(response, fallbackMessage) {
+        return response.json().catch(function () { return {}; }).then(function (body) {
+            if (response.status === 401) throw new Error("登录状态已失效，请重新登录");
+            if (!response.ok || body.success === false || (body.code != null && Number(body.code) !== 200)) {
+                throw new Error(body.msg || body.message || fallbackMessage || "请求失败，请稍后重试");
+            }
+            return body;
+        });
+    }
+
+    function resetManualPositionForm() {
+        ["manualAssetSymbol", "manualEntryPrice", "manualQuantity", "manualLeverage", "manualStopLoss", "manualTakeProfit"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.value = "";
+        });
+        var quantity = document.getElementById("manualQuantity");
+        var leverage = document.getElementById("manualLeverage");
+        if (quantity) quantity.value = "1";
+        if (leverage) leverage.value = "1";
+        var side = document.getElementById("manualSide");
+        if (side) side.value = "LONG";
+        var source = document.getElementById("manualSourceRefId");
+        if (source) source.value = "manual-dashboard";
+        var advanced = document.getElementById("manualPositionAdvanced");
+        if (advanced) advanced.open = false;
+    }
+
     function showManualPositionDrawer() {
         var drawer = document.getElementById("manualPositionDrawer");
         if (!drawer) return;
@@ -8309,6 +8903,10 @@
         if (sourceInput && !sourceInput.value) {
             sourceInput.value = "manual-dashboard";
         }
+        var quantity = document.getElementById("manualQuantity");
+        var leverage = document.getElementById("manualLeverage");
+        if (quantity && !quantity.value) quantity.value = "1";
+        if (leverage && !leverage.value) leverage.value = "1";
         setManualPositionMessage("", "");
         drawer.classList.add("open");
         drawer.setAttribute("aria-hidden", "false");
@@ -8331,42 +8929,102 @@
         box.innerHTML = "";
     }
 
+    function hideAssetSearchSuggestions() {
+        var box = document.getElementById("assetSearchSuggestions");
+        var input = document.getElementById("symbolSearch");
+        if (box) {
+            box.classList.remove("open");
+            box.innerHTML = "";
+        }
+        if (input) input.setAttribute("aria-expanded", "false");
+    }
+
+    function selectDashboardAsset(rawSymbol) {
+        var symbol = normalizeSymbolInput(rawSymbol);
+        if (!symbol) return;
+        selectedSymbol = symbol;
+        searchQuery = symbol;
+        var topSearch = document.getElementById("symbolSearch");
+        var sideSearch = document.getElementById("sidebarSymbolSearch");
+        if (topSearch) topSearch.value = formatSymbolPair(symbol);
+        if (sideSearch) sideSearch.value = formatSymbolPair(symbol);
+        hideAssetSearchSuggestions();
+        buildDisplayList();
+        renderTiles();
+        refreshDashboard();
+    }
+
+    function renderAssetSearchSuggestions() {
+        var input = document.getElementById("symbolSearch");
+        var box = document.getElementById("assetSearchSuggestions");
+        if (!input || !box) return;
+        var candidates = rankedAssetCandidates(input.value, 6);
+        if (!candidates.length) {
+            hideAssetSearchSuggestions();
+            return;
+        }
+        box.innerHTML = candidates.map(function (candidate) {
+            return assetSuggestionHtml(candidate, "asset-suggestion-item");
+        }).join("");
+        box.classList.add("open");
+        input.setAttribute("aria-expanded", "true");
+        Array.prototype.forEach.call(box.querySelectorAll("button"), function (btn) {
+            var handled = false;
+            var select = function (event) {
+                if (handled) return;
+                handled = true;
+                event.preventDefault();
+                selectDashboardAsset(btn.getAttribute("data-symbol") || "");
+            };
+            btn.addEventListener("pointerdown", select);
+            btn.addEventListener("mousedown", select);
+        });
+    }
+
+    function selectManualAsset(rawSymbol) {
+        var input = document.getElementById("manualAssetSymbol");
+        var symbol = normalizeSymbolInput(rawSymbol);
+        if (!input || !symbol) return;
+        input.value = symbol;
+        hideManualSymbolSuggestions();
+        input.focus();
+    }
+
     function renderManualSymbolSuggestions() {
         var input = document.getElementById("manualAssetSymbol");
         var box = document.getElementById("manualSymbolSuggestions");
         if (!input || !box) return;
-        var q = normalizeSymbolInput(input.value);
-        var symbols = knownManualSymbols().filter(function (sym) {
-            if (!q) return true;
-            var base = sym.replace(/USDT$/, "");
-            return sym.indexOf(q) === 0 || base.indexOf(q) === 0;
-        }).slice(0, 6);
-        if (!symbols.length) {
+        var candidates = rankedAssetCandidates(input.value, 6);
+        if (!candidates.length) {
             hideManualSymbolSuggestions();
             return;
         }
-        box.innerHTML = symbols.map(function (sym) {
-            return '<button type="button" data-symbol="' + escapeHtml(sym) + '">' + escapeHtml(formatSymbolPair(sym)) + '</button>';
+        box.innerHTML = candidates.map(function (candidate) {
+            return assetSuggestionHtml(candidate, "manual-asset-suggestion");
         }).join("");
         box.classList.add("open");
         Array.prototype.forEach.call(box.querySelectorAll("button"), function (btn) {
-            btn.addEventListener("click", function () {
-                input.value = btn.getAttribute("data-symbol") || "";
-                hideManualSymbolSuggestions();
-                input.focus();
-            });
+            var handled = false;
+            var select = function (event) {
+                if (handled) return;
+                handled = true;
+                event.preventDefault();
+                selectManualAsset(btn.getAttribute("data-symbol") || "");
+            };
+            btn.addEventListener("pointerdown", select);
+            btn.addEventListener("mousedown", select);
         });
     }
 
-    function readManualNumber(id, required) {
+    function readManualNumber(id, required, emptyMessage, invalidMessage) {
         var el = document.getElementById(id);
         var raw = el ? String(el.value || "").trim() : "";
         if (!raw) {
-            if (required) throw new Error("请补全必填数值");
+            if (required) throw new Error(emptyMessage || "请补全必填数值");
             return null;
         }
         var n = Number(raw);
-        if (!isFinite(n) || n <= 0) throw new Error("数值必须大于 0");
+        if (!isFinite(n) || n <= 0) throw new Error(invalidMessage || "数值必须大于 0");
         return raw;
     }
 
@@ -8374,42 +9032,125 @@
         try {
             var symbol = (document.getElementById("manualAssetSymbol").value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
             var side = document.getElementById("manualSide").value;
-            if (!symbol) throw new Error("请填写标的");
+            if (!symbol) throw new Error("请选择资产");
+            if (!side) throw new Error("请选择方向");
             var payload = {
                 asset_symbol: symbol,
                 side: side,
-                entry_price: readManualNumber("manualEntryPrice", true),
-                quantity: readManualNumber("manualQuantity", true),
-                leverage: readManualNumber("manualLeverage", true),
-                stop_loss: readManualNumber("manualStopLoss", false),
-                take_profit: readManualNumber("manualTakeProfit", false),
+                entry_price: readManualNumber("manualEntryPrice", true, "请输入开仓价", "开仓价必须大于 0"),
+                quantity: readManualNumber("manualQuantity", false, "", "数量 / 仓位必须大于 0") || "1",
+                leverage: readManualNumber("manualLeverage", false, "", "杠杆必须大于 0") || "1",
+                stop_loss: readManualNumber("manualStopLoss", false, "", "实际止损必须大于 0"),
+                take_profit: readManualNumber("manualTakeProfit", false, "", "实际止盈必须大于 0"),
                 source_type: "MANUAL",
                 source_ref_id: (document.getElementById("manualSourceRefId").value || "manual-dashboard").trim()
             };
             setManualPositionMessage("正在保存手动持仓...", "");
             fetch("/api/user-positions/manual-open", {
                 method: "POST",
+                credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             })
-                .then(function (r) {
-                    return r.json().catch(function () { return {}; }).then(function (body) {
-                        if (!r.ok || body.success === false || (body.code != null && Number(body.code) !== 200)) {
-                            throw new Error(body.msg || body.message || "保存失败，请检查输入");
-                        }
-                        return body;
-                    });
-                })
-                .then(function () {
-                    setManualPositionMessage("已保存手动持仓，首页将刷新。", "ok");
+                .then(function (r) { return parseDashboardApiResponse(r, "保存失败，请检查输入"); })
+                .then(function (body) {
+                    var saved = body && body.data ? body.data : {};
+                    if (saved.id != null || saved.positionId != null) {
+                        window.__lastManualPositionId = saved.id != null ? saved.id : saved.positionId;
+                    }
+                    setManualPositionMessage("已保存手动持仓", "ok");
+                    setPositionFlowMessage("已保存手动持仓", "ok");
                     selectedSymbol = symbol;
+                    searchQuery = symbol;
+                    var topSearch = document.getElementById("symbolSearch");
+                    var sideSearch = document.getElementById("sidebarSymbolSearch");
+                    if (topSearch) topSearch.value = formatSymbolPair(symbol);
+                    if (sideSearch) sideSearch.value = formatSymbolPair(symbol);
+                    resetManualPositionForm();
+                    hideManualPositionDrawer();
                     refreshDashboard();
                 })
                 .catch(function (err) {
                     setManualPositionMessage(err && err.message ? err.message : "保存失败，请稍后重试", "error");
+                    setPositionFlowMessage(err && err.message ? err.message : "保存失败，请稍后重试", "error");
                 });
         } catch (err) {
             setManualPositionMessage(err && err.message ? err.message : "请检查输入", "error");
+            setPositionFlowMessage(err && err.message ? err.message : "请检查输入", "error");
+        }
+    }
+
+    var manualClosePositionId = null;
+
+    function setManualCloseMessage(text, type) {
+        var msg = document.getElementById("manualCloseMessage");
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.className = "manual-position-message" + (type ? " " + type : "");
+    }
+
+    function resetManualCloseForm() {
+        var price = document.getElementById("manualClosePrice");
+        var reason = document.getElementById("manualCloseReason");
+        var actions = document.getElementById("manualCloseReviewActions");
+        if (price) price.value = "";
+        if (reason) reason.value = "";
+        if (actions) actions.hidden = true;
+    }
+
+    function showManualCloseDrawer(positionId, symbol) {
+        manualClosePositionId = positionId;
+        resetManualCloseForm();
+        setManualCloseMessage("", "");
+        var drawer = document.getElementById("manualCloseDrawer");
+        var title = document.getElementById("manualCloseTitle");
+        if (title) title.textContent = symbol ? ("记录平仓 · " + formatSymbolPair(symbol)) : "记录平仓";
+        if (!drawer) return;
+        drawer.classList.add("open");
+        drawer.setAttribute("aria-hidden", "false");
+        var price = document.getElementById("manualClosePrice");
+        if (price) price.focus();
+    }
+
+    function hideManualCloseDrawer() {
+        var drawer = document.getElementById("manualCloseDrawer");
+        if (!drawer) return;
+        drawer.classList.remove("open");
+        drawer.setAttribute("aria-hidden", "true");
+        manualClosePositionId = null;
+    }
+
+    function submitManualClose() {
+        try {
+            if (manualClosePositionId == null || String(manualClosePositionId).trim() === "") {
+                throw new Error("未找到持仓记录");
+            }
+            var payload = {
+                close_price: readManualNumber("manualClosePrice", true, "请输入平仓价", "平仓价必须大于 0"),
+                close_reason: (document.getElementById("manualCloseReason").value || "").trim()
+            };
+            setManualCloseMessage("正在记录平仓...", "");
+            fetch("/api/user-positions/" + encodeURIComponent(manualClosePositionId) + "/manual-close", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+                .then(function (r) { return parseDashboardApiResponse(r, "记录失败，请检查输入"); })
+                .then(function () {
+                    setManualCloseMessage("已记录平仓", "ok");
+                    setPositionFlowMessage("已记录平仓", "ok");
+                    var actions = document.getElementById("manualCloseReviewActions");
+                    if (actions) actions.hidden = false;
+                    refreshDashboard();
+                })
+                .catch(function (err) {
+                    setManualCloseMessage(err && err.message ? err.message : "记录失败，请稍后重试", "error");
+                    setPositionFlowMessage(err && err.message ? err.message : "记录失败，请稍后重试", "error");
+                });
+        } catch (err) {
+            setManualCloseMessage(err && err.message ? err.message : "请检查输入", "error");
+            setPositionFlowMessage(err && err.message ? err.message : "请检查输入", "error");
         }
     }
 
@@ -8421,13 +9162,32 @@
         });
     }
 
-    document.getElementById("symbolSearch").addEventListener("input", function () {
-        searchQuery = this.value;
-        var sideSearch = document.getElementById("sidebarSymbolSearch");
-        if (sideSearch && sideSearch.value !== this.value) sideSearch.value = this.value;
-        buildDisplayList();
-        renderTiles();
-    });
+    var topAssetSearchInput = document.getElementById("symbolSearch");
+    if (topAssetSearchInput) {
+        topAssetSearchInput.addEventListener("input", function () {
+            searchQuery = this.value;
+            var sideSearch = document.getElementById("sidebarSymbolSearch");
+            if (sideSearch && sideSearch.value !== this.value) sideSearch.value = this.value;
+            buildDisplayList();
+            renderTiles();
+            renderAssetSearchSuggestions();
+        });
+        topAssetSearchInput.addEventListener("focus", renderAssetSearchSuggestions);
+        topAssetSearchInput.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                hideAssetSearchSuggestions();
+                return;
+            }
+            if (event.key !== "Enter") return;
+            var first = document.querySelector("#assetSearchSuggestions button");
+            if (!first) return;
+            event.preventDefault();
+            selectDashboardAsset(first.getAttribute("data-symbol") || "");
+        });
+        topAssetSearchInput.addEventListener("blur", function () {
+            setTimeout(hideAssetSearchSuggestions, 120);
+        });
+    }
 
     var sidebarSearchInput = document.getElementById("sidebarSymbolSearch");
     if (sidebarSearchInput) {
@@ -8437,6 +9197,7 @@
             if (topSearch && topSearch.value !== this.value) topSearch.value = this.value;
             buildDisplayList();
             renderTiles();
+            renderAssetSearchSuggestions();
         });
     }
 
@@ -8464,7 +9225,7 @@
     document.getElementById("btnAdd").addEventListener("click", function () {
         var raw = normalizeSymbolInput(document.getElementById("symbolSearch").value || "");
         if (!raw) {
-            alert("请输入币种代码，例如 BTCUSDT");
+            alert("请输入资产代码，例如 BTCUSDT");
             return;
         }
         var cur = loadCustomSymbols();
@@ -8537,11 +9298,18 @@
         manualSymbolInput.addEventListener("input", renderManualSymbolSuggestions);
         manualSymbolInput.addEventListener("focus", renderManualSymbolSuggestions);
         manualSymbolInput.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                hideManualSymbolSuggestions();
+                return;
+            }
             if (event.key !== "Enter") return;
             var first = document.querySelector("#manualSymbolSuggestions button");
             if (!first) return;
             event.preventDefault();
-            first.click();
+            selectManualAsset(first.getAttribute("data-symbol") || "");
+        });
+        manualSymbolInput.addEventListener("blur", function () {
+            setTimeout(hideManualSymbolSuggestions, 120);
         });
     }
 
@@ -8568,10 +9336,33 @@
         });
     }
 
+    var manualCloseCancel = document.getElementById("manualCloseCancel");
+    if (manualCloseCancel) {
+        manualCloseCancel.addEventListener("click", function () {
+            hideManualCloseDrawer();
+        });
+    }
+
+    var manualCloseSave = document.getElementById("manualCloseSave");
+    if (manualCloseSave) {
+        manualCloseSave.addEventListener("click", function () {
+            submitManualClose();
+        });
+    }
+
+    var manualCloseDrawer = document.getElementById("manualCloseDrawer");
+    if (manualCloseDrawer) {
+        manualCloseDrawer.addEventListener("click", function (event) {
+            if (event.target === manualCloseDrawer) {
+                hideManualCloseDrawer();
+            }
+        });
+    }
+
     var helpButton = document.getElementById("helpBtn");
     if (helpButton) {
         helpButton.addEventListener("click", function () {
-            alert("TRINE LOGIC (V1)\n\n· 系统推荐：中层展示决策时间倒序前 6 条\n· 自定义监控：仅展示已加入本机列表的标的（localStorage）\n· 点击币块查看下方详情");
+            alert("TRINE LOGIC (V1)\n\n· 系统推荐：中层展示决策时间倒序前 6 条\n· 自定义监控：仅展示已加入本机列表的资产（localStorage）\n· 点击资产卡查看下方详情");
         });
     }
 
