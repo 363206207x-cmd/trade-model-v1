@@ -28,7 +28,8 @@ public interface DecisionResultMapper {
             d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
-            d.is_adopted AS isAdopted, d.valid_period AS validPeriod, d.invalid_condition AS invalidCondition,
+            d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
@@ -44,7 +45,7 @@ public interface DecisionResultMapper {
             FROM tm_decision_result d
             LEFT JOIN (
               SELECT plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
-                     leverage_suggestion, position_suggestion,
+                     leverage_suggestion, position_suggestion, invalid_condition,
                      ROW_NUMBER() OVER (PARTITION BY analysis_id ORDER BY create_time DESC, plan_id DESC) AS rn
               FROM tm_execution_plan
             ) p ON d.analysis_id = p.analysis_id AND p.rn = 1
@@ -60,7 +61,8 @@ public interface DecisionResultMapper {
             d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
-            d.is_adopted AS isAdopted, d.valid_period AS validPeriod, d.invalid_condition AS invalidCondition,
+            d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
@@ -76,7 +78,7 @@ public interface DecisionResultMapper {
             FROM tm_decision_result d
             LEFT JOIN (
               SELECT plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
-                     leverage_suggestion, position_suggestion,
+                     leverage_suggestion, position_suggestion, invalid_condition,
                      ROW_NUMBER() OVER (PARTITION BY analysis_id ORDER BY create_time DESC, plan_id DESC) AS rn
               FROM tm_execution_plan
             ) p ON d.analysis_id = p.analysis_id AND p.rn = 1
