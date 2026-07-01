@@ -1680,6 +1680,23 @@
             border-color: rgba(47, 117, 255, 0.5);
             background: rgba(47, 117, 255, 0.12);
         }
+        .position-action-btn[disabled] {
+            cursor: not-allowed;
+            opacity: 0.58;
+        }
+        .position-ended-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 24px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 720;
+            white-space: nowrap;
+        }
         .tile-compact-row .value:empty::after,
         .execution-plan-table td:empty::after,
         .position-table td:empty::after,
@@ -2309,8 +2326,11 @@
         .manual-close-review-actions {
             display: flex;
             justify-content: flex-start;
+            align-items: center;
+            gap: 8px;
             margin-top: 10px;
         }
+        .manual-position-message { white-space: pre-line; }
         .manual-close-review-actions[hidden] { display: none; }
         .opportunity-review-drawer {
             position: fixed;
@@ -2580,7 +2600,7 @@
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
                     <table class="position-table"><thead><tr>
-                        <th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>操作</th>
+                        <th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>人工处理</th>
                     </tr></thead><tbody>
                         <tr class="position-empty-row"><td><div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div></td><td></td><td></td><td></td><td></td><td></td><td><span class="position-monitor-waiting">等待监控</span></td><td></td></tr>
                         <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
@@ -3069,9 +3089,14 @@
             </div>
             <div class="manual-position-message" id="manualCloseMessage" role="status"></div>
             <div class="manual-close-review-actions" id="manualCloseReviewActions" hidden>
+                <button type="button" class="btn" id="manualCloseDoneClose">关闭</button>
                 <a class="btn review-center-btn" id="manualCloseReviewLink" href="/review/dashboard">进入复盘中心</a>
             </div>
-            <div class="manual-position-actions">
+            <div class="manual-close-review-actions" id="manualCloseRefreshActions" hidden>
+                <button type="button" class="btn" id="manualCloseInvalidClose">关闭</button>
+                <button type="button" class="btn manual-position-btn" id="manualCloseInvalidRefresh">刷新</button>
+            </div>
+            <div class="manual-position-actions" id="manualCloseFormActions">
                 <button type="button" class="btn" id="manualCloseCancel">取消</button>
                 <button type="button" class="btn manual-position-btn" id="manualCloseSave">记录平仓</button>
             </div>
@@ -4974,7 +4999,7 @@
 
     function positionTableHeadHtml() {
         return '<table class="position-table"><thead><tr>'
-            + '<th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>操作</th>'
+            + '<th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>人工处理</th>'
             + '</tr></thead><tbody>';
     }
 
@@ -5139,15 +5164,77 @@
             + positionBasicMetaHtml(metaItems || []);
     }
 
-    function positionCloseActionHtml(positionId, symbol) {
-        if (positionId == null || String(positionId).trim() === "") return "";
-        return '<button type="button" class="position-action-btn" data-position-id="' + escapeHtml(positionId) + '" data-position-symbol="' + escapeHtml(symbol || "") + '">记录平仓</button>';
+    function normalizePositionId(positionId) {
+        if (positionId === null || positionId === undefined) return "";
+        return String(positionId).trim();
+    }
+
+    function positionStatusValue(position) {
+        return pickField(position || {}, ["positionStatus", "position_status", "status"]);
+    }
+
+    function canManualClosePositionStatus(status) {
+        var v = String(status || "").trim().toUpperCase();
+        return v === "OPEN" || v === "PARTIALLY_CLOSED";
+    }
+
+    function isLocallyClosedPosition(positionId) {
+        var id = normalizePositionId(positionId);
+        return !!(id && locallyClosedPositionIds[id]);
+    }
+
+    function markPositionClosedLocally(positionId) {
+        var id = normalizePositionId(positionId);
+        if (id) locallyClosedPositionIds[id] = true;
+        return id;
+    }
+
+    function positionEndedLabelHtml() {
+        return '<span class="position-ended-label">已结束</span>';
+    }
+
+    function positionCloseActionHtml(positionId, symbol, status) {
+        var id = normalizePositionId(positionId);
+        if (!id) return "";
+        if (isLocallyClosedPosition(id) || String(status || "").trim().toUpperCase() === "CLOSED") return positionEndedLabelHtml();
+        if (!canManualClosePositionStatus(status)) return "";
+        return '<button type="button" class="position-action-btn" data-position-id="' + escapeHtml(id) + '" data-position-symbol="' + escapeHtml(symbol || "") + '" data-position-status="' + escapeHtml(status || "") + '">记录平仓</button>';
+    }
+
+    function replaceManualCloseButtonWithEnded(btn) {
+        if (!btn || !btn.parentNode) return;
+        var label = document.createElement("span");
+        label.className = "position-ended-label";
+        label.textContent = "已结束";
+        btn.parentNode.replaceChild(label, btn);
+    }
+
+    function disableManualCloseActionsForPosition(positionId) {
+        var id = normalizePositionId(positionId);
+        if (!id) return;
+        Array.prototype.forEach.call(document.querySelectorAll(".position-action-btn[data-position-id]"), function (btn) {
+            if (normalizePositionId(btn.getAttribute("data-position-id")) !== id) return;
+            btn.disabled = true;
+            replaceManualCloseButtonWithEnded(btn);
+        });
+    }
+
+    function rerenderPositionsAfterLocalClose(positionId) {
+        disableManualCloseActionsForPosition(positionId);
+        var home = window.__lastDashboardHome || {};
+        if (Array.isArray(home.positions)) {
+            renderHomePositionsFromPayload(home.positions);
+        }
     }
 
     function bindManualCloseButtons() {
         Array.prototype.forEach.call(document.querySelectorAll(".position-action-btn[data-position-id]"), function (btn) {
             btn.addEventListener("click", function () {
-                showManualCloseDrawer(btn.getAttribute("data-position-id"), btn.getAttribute("data-position-symbol") || "");
+                showManualCloseDrawer(
+                    btn.getAttribute("data-position-id"),
+                    btn.getAttribute("data-position-symbol") || "",
+                    btn.getAttribute("data-position-status") || ""
+                );
             });
         });
     }
@@ -5679,13 +5766,18 @@
         var box = document.getElementById("homePositionContent");
         if (!box) return;
         var tableHead = positionTableHeadHtml();
-        var list = positions || [];
+        var list = (positions || []).filter(function (p) {
+            var positionId = p && (p.positionId != null ? p.positionId : p.id);
+            return !isLocallyClosedPosition(positionId) && canManualClosePositionStatus(positionStatusValue(p));
+        });
         if (!list.length) {
             box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
+            updatePositionValidationCountdown();
             return;
         }
         var rows = list.slice(0, 5).map(function (p) {
             var positionId = p.positionId != null ? p.positionId : p.id;
+            var positionStatus = positionStatusValue(p);
             var assetCell = positionAssetCellHtml(p.symbol, p.direction, [
                 { label: "用户开仓价", value: cleanBlankValue(formatPrice(p.entryPrice)) },
                 { label: "杠杆", value: p.leverage != null ? String(p.leverage) : "" },
@@ -5702,7 +5794,7 @@
                 + '<td>' + positionRiskHtml(p) + '</td>'
                 + '<td>' + positionCurrentAdviceHtml(p) + '</td>'
                 + '<td>' + positionValidationCellHtml(p.updatedAt || p.updated_at || p.monitorTime || p.monitor_time || p.monitoredAt || p.monitored_at) + '</td>'
-                + '<td>' + positionCloseActionHtml(positionId, p.symbol) + '</td>'
+                + '<td>' + positionCloseActionHtml(positionId, p.symbol, positionStatus) + '</td>'
                 + '</tr>';
         });
         box.innerHTML = tableHead + rows.join("") + positionFillerRows(Math.max(0, 5 - rows.length)) + '</tbody></table>';
@@ -9081,6 +9173,8 @@
     }
 
     var manualClosePositionId = null;
+    var manualCloseMode = "close-input";
+    var locallyClosedPositionIds = Object.create(null);
 
     function setManualCloseMessage(text, type) {
         var msg = document.getElementById("manualCloseMessage");
@@ -9089,25 +9183,99 @@
         msg.className = "manual-position-message" + (type ? " " + type : "");
     }
 
+    function setManualCloseMode(mode, message, type) {
+        manualCloseMode = mode || "close-input";
+        var form = document.getElementById("manualCloseForm");
+        var reviewActions = document.getElementById("manualCloseReviewActions");
+        var refreshActions = document.getElementById("manualCloseRefreshActions");
+        var formActions = document.getElementById("manualCloseFormActions");
+        var save = document.getElementById("manualCloseSave");
+        var cancel = document.getElementById("manualCloseCancel");
+        var price = document.getElementById("manualClosePrice");
+        var reason = document.getElementById("manualCloseReason");
+        var inputMode = manualCloseMode === "close-input" || manualCloseMode === "submitting";
+        if (form) form.hidden = !inputMode;
+        if (reviewActions) reviewActions.hidden = manualCloseMode !== "success";
+        if (refreshActions) refreshActions.hidden = manualCloseMode !== "invalid-error";
+        if (formActions) formActions.hidden = !(manualCloseMode === "close-input" || manualCloseMode === "submitting");
+        if (save) {
+            save.disabled = manualCloseMode === "submitting";
+            save.textContent = manualCloseMode === "submitting" ? "记录中" : "记录平仓";
+        }
+        if (cancel) cancel.disabled = manualCloseMode === "submitting";
+        if (price) price.disabled = manualCloseMode === "submitting";
+        if (reason) reason.disabled = manualCloseMode === "submitting";
+        if (message !== undefined) setManualCloseMessage(message, type || "");
+    }
+
     function resetManualCloseForm() {
         var price = document.getElementById("manualClosePrice");
         var reason = document.getElementById("manualCloseReason");
-        var actions = document.getElementById("manualCloseReviewActions");
         if (price) price.value = "";
         if (reason) reason.value = "";
-        if (actions) actions.hidden = true;
+        setManualCloseMode("close-input", "", "");
     }
 
-    function showManualCloseDrawer(positionId, symbol) {
-        manualClosePositionId = positionId;
-        resetManualCloseForm();
-        setManualCloseMessage("", "");
+    function manualCloseIsInvalidStateError(err) {
+        var message = err && err.message ? String(err.message) : "";
+        return (/status/i.test(message) || (/OPEN/i.test(message) && /PARTIALLY_CLOSED/i.test(message)));
+    }
+
+    function manualCloseIsMissingTargetError(err) {
+        var message = err && err.message ? String(err.message) : "";
+        return /未找到持仓记录|not found|missing/i.test(message);
+    }
+
+    function manualCloseSafeErrorMessage(err) {
+        var message = err && err.message ? String(err.message) : "";
+        if (manualCloseIsMissingTargetError(err)) return "未找到持仓记录，请刷新后查看。";
+        if (manualCloseIsInvalidStateError(err)) {
+            return "当前状态不可记录平仓，请刷新后查看。\n该持仓可能已经平仓或状态已变化。";
+        }
+        if (/登录状态|请输入平仓价|平仓价必须大于 0/.test(message)) return message;
+        return "记录失败，请刷新后重试。";
+    }
+
+    function openManualCloseDrawerShell(symbol) {
         var drawer = document.getElementById("manualCloseDrawer");
         var title = document.getElementById("manualCloseTitle");
         if (title) title.textContent = symbol ? ("记录平仓 · " + formatSymbolPair(symbol)) : "记录平仓";
         if (!drawer) return;
         drawer.classList.add("open");
         drawer.setAttribute("aria-hidden", "false");
+    }
+
+    function showManualCloseInvalidState(message, symbol) {
+        manualClosePositionId = null;
+        openManualCloseDrawerShell(symbol || "");
+        setManualCloseMode("invalid-error", message || "当前状态不可记录平仓，请刷新后查看。", "error");
+    }
+
+    function showManualCloseDrawer(positionId, symbol, status) {
+        var id = normalizePositionId(positionId);
+        if (!id) {
+            var missingMessage = "未找到持仓记录，请刷新后查看。";
+            setPositionFlowMessage(missingMessage, "error");
+            showManualCloseInvalidState(missingMessage, symbol);
+            return;
+        }
+        if (isLocallyClosedPosition(id)) {
+            var staleMessage = "该持仓已记录平仓，请前往复盘中心查看。";
+            setPositionFlowMessage(staleMessage, "error");
+            disableManualCloseActionsForPosition(id);
+            showManualCloseInvalidState(staleMessage, symbol);
+            return;
+        }
+        if (!canManualClosePositionStatus(status)) {
+            var invalidMessage = "当前状态不可记录平仓，请刷新后查看。";
+            setPositionFlowMessage(invalidMessage, "error");
+            disableManualCloseActionsForPosition(id);
+            showManualCloseInvalidState(invalidMessage, symbol);
+            return;
+        }
+        manualClosePositionId = id;
+        resetManualCloseForm();
+        openManualCloseDrawerShell(symbol || "");
         var price = document.getElementById("manualClosePrice");
         if (price) price.focus();
     }
@@ -9122,15 +9290,23 @@
 
     function submitManualClose() {
         try {
-            if (manualClosePositionId == null || String(manualClosePositionId).trim() === "") {
-                throw new Error("未找到持仓记录");
+            var closingPositionId = normalizePositionId(manualClosePositionId);
+            if (!closingPositionId) {
+                showManualCloseInvalidState("未找到持仓记录，请刷新后查看。");
+                setPositionFlowMessage("未找到持仓记录，请刷新后查看。", "error");
+                return;
+            }
+            if (isLocallyClosedPosition(closingPositionId)) {
+                showManualCloseInvalidState("该持仓已记录平仓，请前往复盘中心查看。");
+                setPositionFlowMessage("该持仓已记录平仓，请前往复盘中心查看。", "error");
+                return;
             }
             var payload = {
                 close_price: readManualNumber("manualClosePrice", true, "请输入平仓价", "平仓价必须大于 0"),
                 close_reason: (document.getElementById("manualCloseReason").value || "").trim()
             };
-            setManualCloseMessage("正在记录平仓...", "");
-            fetch("/api/user-positions/" + encodeURIComponent(manualClosePositionId) + "/manual-close", {
+            setManualCloseMode("submitting", "正在记录平仓...", "");
+            fetch("/api/user-positions/" + encodeURIComponent(closingPositionId) + "/manual-close", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
@@ -9138,19 +9314,33 @@
             })
                 .then(function (r) { return parseDashboardApiResponse(r, "记录失败，请检查输入"); })
                 .then(function () {
-                    setManualCloseMessage("已记录平仓", "ok");
+                    markPositionClosedLocally(closingPositionId);
+                    rerenderPositionsAfterLocalClose(closingPositionId);
+                    manualClosePositionId = null;
+                    setManualCloseMode("success", "已记录平仓\n这笔持仓已结束，首页监控将不再显示。", "ok");
                     setPositionFlowMessage("已记录平仓", "ok");
-                    var actions = document.getElementById("manualCloseReviewActions");
-                    if (actions) actions.hidden = false;
                     refreshDashboard();
                 })
                 .catch(function (err) {
-                    setManualCloseMessage(err && err.message ? err.message : "记录失败，请稍后重试", "error");
-                    setPositionFlowMessage(err && err.message ? err.message : "记录失败，请稍后重试", "error");
+                    var safeMessage = manualCloseSafeErrorMessage(err);
+                    if (manualCloseIsInvalidStateError(err) || manualCloseIsMissingTargetError(err)) {
+                        markPositionClosedLocally(closingPositionId);
+                        rerenderPositionsAfterLocalClose(closingPositionId);
+                        manualClosePositionId = null;
+                        showManualCloseInvalidState(safeMessage);
+                    } else {
+                        setManualCloseMode("close-input", safeMessage, "error");
+                    }
+                    setPositionFlowMessage(safeMessage, "error");
                 });
         } catch (err) {
-            setManualCloseMessage(err && err.message ? err.message : "请检查输入", "error");
-            setPositionFlowMessage(err && err.message ? err.message : "请检查输入", "error");
+            var safeMessage = manualCloseSafeErrorMessage(err);
+            if (manualCloseIsInvalidStateError(err) || manualCloseIsMissingTargetError(err)) {
+                showManualCloseInvalidState(safeMessage);
+            } else {
+                setManualCloseMode("close-input", safeMessage || "请检查输入", "error");
+            }
+            setPositionFlowMessage(safeMessage || "请检查输入", "error");
         }
     }
 
@@ -9347,6 +9537,28 @@
     if (manualCloseSave) {
         manualCloseSave.addEventListener("click", function () {
             submitManualClose();
+        });
+    }
+
+    var manualCloseDoneClose = document.getElementById("manualCloseDoneClose");
+    if (manualCloseDoneClose) {
+        manualCloseDoneClose.addEventListener("click", function () {
+            hideManualCloseDrawer();
+        });
+    }
+
+    var manualCloseInvalidClose = document.getElementById("manualCloseInvalidClose");
+    if (manualCloseInvalidClose) {
+        manualCloseInvalidClose.addEventListener("click", function () {
+            hideManualCloseDrawer();
+        });
+    }
+
+    var manualCloseInvalidRefresh = document.getElementById("manualCloseInvalidRefresh");
+    if (manualCloseInvalidRefresh) {
+        manualCloseInvalidRefresh.addEventListener("click", function () {
+            setManualCloseMode("invalid-error", "正在刷新持仓状态...", "");
+            refreshDashboard();
         });
     }
 
