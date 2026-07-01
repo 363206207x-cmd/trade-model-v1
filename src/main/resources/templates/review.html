@@ -41,7 +41,7 @@
         }
         .top-bar .muted { color: var(--text-secondary); font-size: 0.82rem; }
         .top-bar a { color: var(--brand-accent); text-decoration: none; font-size: 0.85rem; }
-        .wrap { padding: 14px 18px 32px; max-width: 1100px; margin: 0 auto; }
+        .wrap { padding: 12px 20px 28px; max-width: 1480px; margin: 0 auto; }
         .banner {
             padding: 10px 12px;
             border-radius: 8px;
@@ -439,8 +439,9 @@
             background: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
-            padding: 12px;
+            padding: 14px;
             margin-bottom: 12px;
+            overflow-x: auto;
         }
         .review-center-head {
             display: flex;
@@ -454,6 +455,15 @@
             font-size: 0.96rem;
             font-weight: 700;
         }
+        .review-center-note,
+        .review-tab-note,
+        .review-field-note {
+            margin: 0 0 10px 0;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.45;
+        }
+        .review-tab-note { margin-top: 0; }
         .review-center-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -509,6 +519,10 @@
             margin-top: 10px;
         }
         .review-field-chip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
             border: 1px solid var(--border-subtle);
             border-radius: 8px;
             background: #f8fafc;
@@ -516,6 +530,16 @@
             padding: 7px 8px;
             font-size: 0.78rem;
             font-weight: 600;
+        }
+        .review-field-chip .chip-status {
+            flex: 0 0 auto;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            padding: 1px 6px;
+            background: #fff;
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 650;
         }
         .single-analysis-review {
             background: var(--bg-surface);
@@ -549,6 +573,7 @@
         <div class="review-center-head">
             <h2 class="review-center-title">复盘中心</h2>
         </div>
+        <p class="review-center-note">四个 Tab 是复盘对象分类，不是平仓时需要选择的字段。手动平仓只会形成持仓复盘候选，后续在这里补充和校验。</p>
         <div class="review-center-tabs" role="tablist" aria-label="复盘分类">
             <button type="button" class="review-center-tab active" id="review-tab-positions" data-review-tab="positions" role="tab" aria-selected="true" aria-controls="review-panel-positions">持仓复盘</button>
             <button type="button" class="review-center-tab" id="review-tab-opportunities" data-review-tab="opportunities" role="tab" aria-selected="false" aria-controls="review-panel-opportunities">机会复盘</button>
@@ -556,32 +581,40 @@
             <button type="button" class="review-center-tab" id="review-tab-rules" data-review-tab="rules" role="tab" aria-selected="false" aria-controls="review-panel-rules">规则反馈</button>
         </div>
         <section class="review-center-panel active" id="review-panel-positions" role="tabpanel" aria-labelledby="review-tab-positions">
+            <p class="review-tab-note">对象：已手动录入并平仓的真实持仓。用于对比系统执行建议、用户实际执行与持仓监控过程。</p>
             <table class="review-center-table" aria-label="持仓复盘">
                 <thead><tr><th>时间</th><th>标的</th><th>方向</th><th>开仓价</th><th>平仓价</th><th>盈亏</th><th>执行偏离</th><th>监控结论</th><th>复盘状态</th></tr></thead>
                 <tbody id="review-center-positions-body"><tr><td class="review-empty-state" colspan="9">暂无持仓复盘记录</td></tr></tbody>
             </table>
-            <div class="review-field-grid" aria-label="持仓复盘字段结构"><div class="review-field-chip">进场是否合理</div><div class="review-field-chip">止损是否合理</div><div class="review-field-chip">止盈是否执行</div><div class="review-field-chip">仓位是否过重</div><div class="review-field-chip">杠杆是否合理</div><div class="review-field-chip">是否提前退出</div><div class="review-field-chip">是否扛单</div><div class="review-field-chip">情绪状态</div><div class="review-field-chip">规则修正建议</div></div>
+            <p class="review-field-note">以下为复盘维度，需在复盘时补充，不代表系统已完成判断。</p>
+            <div class="review-field-grid" aria-label="持仓复盘字段结构"><div class="review-field-chip"><span>进场是否合理</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>止损是否合理</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>止盈是否执行</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>仓位是否过重</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>杠杆是否合理</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>是否提前退出</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>是否扛单</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>情绪状态</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>规则修正建议</span><span class="chip-status">待确认</span></div></div>
         </section>
         <section class="review-center-panel" id="review-panel-opportunities" role="tabpanel" aria-labelledby="review-tab-opportunities">
+            <p class="review-tab-note">对象：错过但有效、观察中未执行或被风险阻断的机会。用于减少幸存者偏差。</p>
             <table class="review-center-table" aria-label="机会复盘">
                 <thead><tr><th>时间</th><th>标的</th><th>机会类型</th><th>计划模式</th><th>是否推送</th><th>是否点击</th><th>是否执行</th><th>结果</th><th>最大有利波动</th><th>最大不利波动</th></tr></thead>
                 <tbody id="review-center-opportunities-body"><tr><td class="review-empty-state" colspan="10">暂无机会复盘记录</td></tr></tbody>
             </table>
-            <div class="review-field-grid" aria-label="机会复盘字段结构"><div class="review-field-chip">为何推送</div><div class="review-field-chip">为何未执行</div><div class="review-field-chip">是否错过</div><div class="review-field-chip">是否是假机会</div><div class="review-field-chip">是否触发后失效</div><div class="review-field-chip">评分是否偏高</div><div class="review-field-chip">AI 是否误判</div><div class="review-field-chip">应加入规则</div><div class="review-field-chip">应降低权重</div></div>
+            <p class="review-field-note">以下为机会复盘维度，暂无结论时保持待确认。</p>
+            <div class="review-field-grid" aria-label="机会复盘字段结构"><div class="review-field-chip"><span>为何推送</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>为何未执行</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>是否错过</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>是否是假机会</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>是否触发后失效</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>评分是否偏高</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>AI 是否误判</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>应加入规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>应降低权重</span><span class="chip-status">待确认</span></div></div>
         </section>
         <section class="review-center-panel" id="review-panel-pushes" role="tabpanel" aria-labelledby="review-tab-pushes">
+            <p class="review-tab-note">对象：推送、提醒与复核记录。用于评估是否及时、有用、噪声过高或误导。</p>
             <table class="review-center-table" aria-label="推送复盘">
                 <thead><tr><th>推送时间</th><th>标的</th><th>推送类型</th><th>Telegram 状态</th><th>是否点击</th><th>Recheck 状态</th><th>是否过期</th><th>失败原因</th><th>后续结果</th></tr></thead>
                 <tbody id="review-center-pushes-body"><tr><td class="review-empty-state" colspan="9">暂无推送复盘记录</td></tr></tbody>
             </table>
-            <div class="review-field-grid" aria-label="推送复盘字段结构"><div class="review-field-chip">是否应推</div><div class="review-field-chip">是否推晚</div><div class="review-field-chip">是否推早</div><div class="review-field-chip">是否重复推送</div><div class="review-field-chip">无持仓模式</div><div class="review-field-chip">有持仓模式</div><div class="review-field-chip">Telegram 状态</div><div class="review-field-chip">用户响应</div><div class="review-field-chip">后续是否改进</div></div>
+            <p class="review-field-note">以下为推送复盘维度，未复盘时不代表系统已判断。</p>
+            <div class="review-field-grid" aria-label="推送复盘字段结构"><div class="review-field-chip"><span>是否应推</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>是否推晚</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>是否推早</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>是否重复推送</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>无持仓模式</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>有持仓模式</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>Telegram 状态</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>用户响应</span><span class="chip-status">待填写</span></div><div class="review-field-chip"><span>后续是否改进</span><span class="chip-status">待确认</span></div></div>
         </section>
         <section class="review-center-panel" id="review-panel-rules" role="tabpanel" aria-labelledby="review-tab-rules">
+            <p class="review-tab-note">对象：由复盘结论沉淀出的规则、配置和版本改进建议；无证据时保持待确认。</p>
             <table class="review-center-table" aria-label="规则反馈">
                 <thead><tr><th>时间</th><th>标的</th><th>复盘类型</th><th>错误类型</th><th>是否规则问题</th><th>是否执行偏离</th><th>建议调整</th><th>规则版本</th><th>处理状态</th></tr></thead>
                 <tbody id="review-center-rules-body"><tr><td class="review-empty-state" colspan="9">暂无规则反馈记录</td></tr></tbody>
             </table>
-            <div class="review-field-grid" aria-label="规则反馈字段结构"><div class="review-field-chip">数据规则</div><div class="review-field-chip">评分规则</div><div class="review-field-chip">冲突规则</div><div class="review-field-chip">降级规则</div><div class="review-field-chip">Confused 规则</div><div class="review-field-chip">Hot Reset 规则</div><div class="review-field-chip">Push 规则</div><div class="review-field-chip">持仓监控规则</div><div class="review-field-chip">AI 裁决规则</div></div>
+            <p class="review-field-note">以下为规则反馈维度，仅在复盘证据足够时沉淀建议。</p>
+            <div class="review-field-grid" aria-label="规则反馈字段结构"><div class="review-field-chip"><span>数据规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>评分规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>冲突规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>降级规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>Confused 规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>Hot Reset 规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>Push 规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>持仓监控规则</span><span class="chip-status">待确认</span></div><div class="review-field-chip"><span>AI 裁决规则</span><span class="chip-status">待确认</span></div></div>
         </section>
     </section>
     <details class="single-analysis-review" id="singleAnalysisReview" th:if="${!reviewCenterMode}">
@@ -661,6 +694,94 @@
         return value === null || value === undefined ? "" : String(value);
     }
 
+    function displayText(value, fallback) {
+        if (value === null || value === undefined || String(value).trim() === "") return fallback || "—";
+        return String(value);
+    }
+
+    function rawEnumLike(value) {
+        var s = String(value || "").trim();
+        return /^[A-Z0-9_/-]+$/.test(s) && /[_A-Z]/.test(s);
+    }
+
+    function labelFromMap(value, map, fallback) {
+        if (value === null || value === undefined || String(value).trim() === "") return fallback || "—";
+        var raw = String(value).trim();
+        var key = raw.toUpperCase();
+        if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
+        return rawEnumLike(raw) ? (fallback || "待确认") : raw;
+    }
+
+    function directionLabel(value) {
+        return labelFromMap(value, { LONG: "做多", SHORT: "做空" }, "—");
+    }
+
+    function executionDeviationLabel(value) {
+        return labelFromMap(value, {
+            NOT_COMPUTABLE: "暂无法计算",
+            FOLLOWED_PLAN: "基本按计划执行",
+            MINOR_DEVIATION: "轻微偏离",
+            MAJOR_DEVIATION: "明显偏离",
+            USER_OVERRIDDEN: "用户主动偏离"
+        }, "待确认");
+    }
+
+    function reviewStatusLabel(value) {
+        return labelFromMap(value, {
+            REVIEW_SUMMARY_READY: "复盘摘要已生成",
+            PENDING_REVIEW: "待复盘",
+            REVIEWED: "已复盘",
+            INSUFFICIENT_DATA: "数据不足"
+        }, "待确认");
+    }
+
+    function monitorConclusionLabel(value) {
+        return labelFromMap(value, {
+            LOGIC_VALID: "逻辑仍成立",
+            LOGIC_WEAKENED: "逻辑弱化",
+            PLAN_INVALIDATED: "计划失效",
+            HIGH_RISK: "高风险观察",
+            INSUFFICIENT_DATA: "数据不足",
+            NOT_COMPUTABLE: "数据不足"
+        }, "待确认");
+    }
+
+    function reviewTypeLabel(value) {
+        return labelFromMap(value, {
+            POSITION_REVIEW: "持仓复盘",
+            OPPORTUNITY_REVIEW: "机会复盘",
+            PUSH_REVIEW: "推送复盘",
+            RULE_FEEDBACK: "规则反馈"
+        }, "待确认");
+    }
+
+    function genericBusinessLabel(value, fallback) {
+        return labelFromMap(value, {
+            WAITING_SYNC: "等待同步",
+            CONNECTED: "已连接",
+            NOT_CONNECTED: "未连接",
+            PENDING_REVIEW: "待复盘",
+            REVIEWED: "已复盘",
+            INSUFFICIENT_DATA: "数据不足",
+            REVIEW_SUMMARY_READY: "复盘摘要已生成",
+            NOT_COMPUTABLE: "暂无法计算",
+            SUCCESS: "成功",
+            FAILED: "失败",
+            EXPIRED: "已过期",
+            PENDING: "待处理",
+            OPEN: "待处理",
+            DONE: "已处理",
+            POSITION_RISK: "持仓风险",
+            OPPORTUNITY: "机会提醒",
+            MANUAL_REVIEW: "人工复核"
+        }, fallback || "待确认");
+    }
+
+    function amountText(value) {
+        if (value === null || value === undefined || String(value).trim() === "") return "—";
+        return String(value);
+    }
+
     function boolText(value) {
         if (value === null || value === undefined) {
             return "";
@@ -697,7 +818,7 @@
             var tr = document.createElement("tr");
             cells(row).forEach(function (cell) {
                 var td = document.createElement("td");
-                td.textContent = text(cell);
+                td.textContent = displayText(cell);
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -708,27 +829,27 @@
         var safe = data || {};
         renderRows("review-center-positions-body", safe.positionReviews, 9, "暂无持仓复盘记录", function (row) {
             return [
-                timeText(row.time), row.symbol, row.direction, row.entryPrice, row.closePrice,
-                row.pnl, row.executionDeviation, row.monitorConclusion, row.reviewStatus
+                timeText(row.time), displayText(row.symbol), directionLabel(row.direction), amountText(row.entryPrice), amountText(row.closePrice),
+                amountText(row.pnl), executionDeviationLabel(row.executionDeviation), monitorConclusionLabel(row.monitorConclusion), reviewStatusLabel(row.reviewStatus)
             ];
         });
         renderRows("review-center-opportunities-body", safe.opportunityReviews, 10, "暂无机会复盘记录", function (row) {
             return [
-                timeText(row.time), row.symbol, row.opportunityType, row.planMode,
-                boolText(row.wasPushed), boolText(row.wasClicked), boolText(row.wasExecuted), row.outcome,
-                row.maxFavorableExcursion, row.maxAdverseExcursion
+                timeText(row.time), displayText(row.symbol), genericBusinessLabel(row.opportunityType), genericBusinessLabel(row.planMode),
+                boolText(row.wasPushed), boolText(row.wasClicked), boolText(row.wasExecuted), genericBusinessLabel(row.outcome, "待确认"),
+                amountText(row.maxFavorableExcursion), amountText(row.maxAdverseExcursion)
             ];
         });
         renderRows("review-center-pushes-body", safe.pushReviews, 9, "暂无推送复盘记录", function (row) {
             return [
-                timeText(row.pushTime), row.symbol, row.pushType, row.telegramStatus, boolText(row.clicked),
-                row.recheckStatus, boolText(row.expired), row.failReason, row.outcome
+                timeText(row.pushTime), displayText(row.symbol), genericBusinessLabel(row.pushType), genericBusinessLabel(row.telegramStatus), boolText(row.clicked),
+                genericBusinessLabel(row.recheckStatus), boolText(row.expired), genericBusinessLabel(row.failReason, "暂无"), genericBusinessLabel(row.outcome, "待确认")
             ];
         });
         renderRows("review-center-rules-body", safe.ruleFeedback, 9, "暂无规则反馈记录", function (row) {
             return [
-                timeText(row.time), row.symbol, row.reviewType, row.errorType, boolText(row.ruleIssue),
-                boolText(row.executionDeviation), row.suggestion, row.ruleVersion, row.status
+                timeText(row.time), displayText(row.symbol), reviewTypeLabel(row.reviewType), genericBusinessLabel(row.errorType), boolText(row.ruleIssue),
+                boolText(row.executionDeviation), displayText(row.suggestion, "暂未填写"), displayText(row.ruleVersion, "—"), genericBusinessLabel(row.status, "待确认")
             ];
         });
     }
