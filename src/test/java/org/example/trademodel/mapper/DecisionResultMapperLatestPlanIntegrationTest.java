@@ -30,8 +30,8 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?)",
                 "ana-mapper-it-1", "BTCUSDT", "1h", 87);
         jdbcTemplate.update(
-                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, invalid_condition, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
-                "dec-mapper-it-1", "ana-mapper-it-1", "BTCUSDT", "decision-invalid");
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, valid_period, invalid_condition, create_time) VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)",
+                "dec-mapper-it-1", "ana-mapper-it-1", "BTCUSDT", "2h", "decision-invalid");
         jdbcTemplate.update(
                 "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, invalid_condition, create_time) "
                         + "VALUES (?,?,?,?,?,?,?,?,?,?, TIMESTAMP '2020-01-01 00:00:00')",
@@ -52,6 +52,8 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getLeverageSuggestion()).isEqualTo("5x");
         assertThat(row.getPositionSuggestion()).isEqualTo("pos-new");
         assertThat(row.getInvalidCondition()).isEqualTo("invalid-new");
+        assertThat(row.getExecutionPlanSummary()).isEqualTo("2h | invalid-new");
+        assertThat(row.getExecutionPlanSummary()).doesNotContain("invalid-old", "decision-invalid");
         assertThat(row.getDataQualityScore()).isEqualTo(87);
         assertThat(row.getTimeframe()).isEqualTo("1h");
     }
@@ -83,6 +85,7 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getLeverageSuggestion()).isEqualTo("lev-z");
         assertThat(row.getPositionSuggestion()).isEqualTo("pos-z");
         assertThat(row.getInvalidCondition()).isEqualTo("invalid-z");
+        assertThat(row.getExecutionPlanSummary()).isEqualTo("invalid-z");
         assertThat(row.getDataQualityScore()).isEqualTo(73);
         assertThat(row.getTimeframe()).isEqualTo("1h");
     }
@@ -93,8 +96,8 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?)",
                 "ana-mapper-it-3", "SOLUSDT", "15m", 66);
         jdbcTemplate.update(
-                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, invalid_condition, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
-                "dec-mapper-it-3", "ana-mapper-it-3", "SOLUSDT", "decision-fallback-invalid");
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, valid_period, invalid_condition, create_time) VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)",
+                "dec-mapper-it-3", "ana-mapper-it-3", "SOLUSDT", "2h", "decision-fallback-invalid");
         jdbcTemplate.update(
                 "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, invalid_condition, create_time) "
                         + "VALUES (?,?,?,?,?,?,?,?,?,?, TIMESTAMP '2025-06-01 00:00:00')",
@@ -105,5 +108,6 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row).isNotNull();
         assertThat(row.getEntryZone()).isEqualTo("sol-zone");
         assertThat(row.getInvalidCondition()).isEqualTo("decision-fallback-invalid");
+        assertThat(row.getExecutionPlanSummary()).isEqualTo("2h | decision-fallback-invalid");
     }
 }
