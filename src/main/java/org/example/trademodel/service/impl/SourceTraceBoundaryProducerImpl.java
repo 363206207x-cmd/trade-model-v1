@@ -14,6 +14,7 @@ import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceEntrySourceReviewModeEnum;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.planboundary.SourceTraceBoundaryProducer;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -24,6 +25,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+@Service
 public class SourceTraceBoundaryProducerImpl implements SourceTraceBoundaryProducer {
 
     private static final String SOURCE_OWNER = "MARKET_STRUCTURE_BOUNDARY_EXTRACTOR";

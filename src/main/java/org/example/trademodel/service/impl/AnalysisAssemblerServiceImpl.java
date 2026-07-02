@@ -11,26 +11,36 @@ import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.common.EvidenceTypeConstants;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
+import org.example.trademodel.dto.planboundary.MarketStructureBoundaryDTO;
+import org.example.trademodel.dto.planboundary.MarketStructureBoundaryRequest;
+import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceBoundaryProducerResult;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.entity.*;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.HotResetEventTypeEnum;
 import org.example.trademodel.mapper.*;
 import org.example.trademodel.service.*;
+import org.example.trademodel.service.planboundary.MarketStructureBoundaryExtractor;
+import org.example.trademodel.service.planboundary.SourceTraceBoundaryProducer;
 import org.example.trademodel.vo.*;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Map;
@@ -64,6 +74,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private final HotResetService hotResetService;
     private final MissedOpportunityService missedOpportunityService;
     private final OpportunityLogService opportunityLogService;
+    private final PersistedOhlcvQueryService persistedOhlcvQueryService;
+    private final RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService;
+    private final MarketStructureBoundaryExtractor marketStructureBoundaryExtractor;
+    private final SourceTraceBoundaryProducer sourceTraceBoundaryProducer;
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -75,6 +89,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     /** 现货 24h + Funding + OI 附录均成功（见 {@code OI_MINIMAL_ACCESS_CONTRACT.md}）。 */
     private static final String MARKET_ENV_SOURCE_SPOT_PERP_OI_MIN = "BINANCE_SPOT_PERP_OI_MIN_HEURISTIC";
     private static final String MARKET_ENV_SOURCE_FALLBACK = "PLACEHOLDER_FALLBACK";
+    private static final int BOUNDARY_REQUIRED_WINDOW_SIZE = 50;
+    private static final int BOUNDARY_MIN_BARS = 7;
+    private static final int BOUNDARY_MAX_TARGETS = 2;
+    private static final long BOUNDARY_FALLBACK_MAX_READ_LAG_MS = 15L * 60_000L;
+    private static final String BOUNDARY_DIRECTION_LONG = "LONG";
+    private static final String BOUNDARY_DIRECTION_SHORT = "SHORT";
 
     /**
      * 现货启发式已成功时写入快照的 {@code source_type}（Funding / OI 附录组合见 {@code OI_MINIMAL_ACCESS_CONTRACT.md} 组合表）。
@@ -115,6 +135,36 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                                         HotResetService hotResetService,
                                         MissedOpportunityService missedOpportunityService,
                                         OpportunityLogService opportunityLogService) {
+        this(evidenceService, scoreService, planService, decisionEngineService, realMarketEnvironmentService,
+                assetStateService, ruleConfigService, analysisRunMapper, evidenceItemMapper, scoreItemMapper,
+                decisionResultMapper, executionPlanMapper, accountRiskSnapshotMapper,
+                marketEnvironmentSnapshotMapper, pushSnapshotService, monitorAlertWriteService, hotResetService,
+                missedOpportunityService, opportunityLogService, null, null, null, null);
+    }
+
+    @Autowired
+    public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
+                                        PlanService planService,
+                                        DecisionEngineService decisionEngineService,
+                                        RealMarketEnvironmentService realMarketEnvironmentService,
+                                        AssetStateService assetStateService,
+                                        RuleConfigService ruleConfigService,
+                                        AnalysisRunMapper analysisRunMapper,
+                                        EvidenceItemMapper evidenceItemMapper,
+                                        ScoreItemMapper scoreItemMapper,
+                                        DecisionResultMapper decisionResultMapper,
+                                        ExecutionPlanMapper executionPlanMapper,
+                                        AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+                                        MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
+                                        PushSnapshotService pushSnapshotService,
+                                        MonitorAlertWriteService monitorAlertWriteService,
+                                        HotResetService hotResetService,
+                                        MissedOpportunityService missedOpportunityService,
+                                        OpportunityLogService opportunityLogService,
+                                        PersistedOhlcvQueryService persistedOhlcvQueryService,
+                                        RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService,
+                                        MarketStructureBoundaryExtractor marketStructureBoundaryExtractor,
+                                        SourceTraceBoundaryProducer sourceTraceBoundaryProducer) {
         this.evidenceService = evidenceService;
         this.scoreService = scoreService;
         this.planService = planService;
@@ -134,6 +184,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.hotResetService = hotResetService;
         this.missedOpportunityService = missedOpportunityService;
         this.opportunityLogService = opportunityLogService;
+        this.persistedOhlcvQueryService = persistedOhlcvQueryService;
+        this.runtimeKlineContextAssemblyService = runtimeKlineContextAssemblyService;
+        this.marketStructureBoundaryExtractor = marketStructureBoundaryExtractor;
+        this.sourceTraceBoundaryProducer = sourceTraceBoundaryProducer;
     }
 
 
@@ -199,7 +253,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     trendStructureScore,
                     scoreInput.getEventImpactInput());
 
-            ExecutionPlanVO plan = planService.generateExecutionPlan(decision, scores, marketEnv, new AssetAnalysisVO());
+            ExecutionPlanVO plan = generateExecutionPlanFailClosed(
+                    decision,
+                    scores,
+                    marketEnv,
+                    scoreInput,
+                    effectiveContext);
 
             AssetAnalysisVO analysis = new AssetAnalysisVO();
             analysis.setAnalysisId(analysisId);
@@ -228,6 +287,142 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 System.out.println("[PERF] first_analysis_run=" + assembleCostMs + " ms");
             }
         }
+    }
+
+    private ExecutionPlanVO generateExecutionPlanFailClosed(
+            DecisionBundleVO decision,
+            List<ScoreItemVO> scores,
+            MarketEnvironmentVO marketEnv,
+            AssetAnalysisVO analysisContext,
+            AnalysisExecutionContext executionContext
+    ) {
+        SourceTraceBoundaryProducerResult boundaryResult = buildBoundaryProducerResult(
+                decision,
+                marketEnv,
+                executionContext);
+        if (boundaryResult != null) {
+            return planService.generateExecutionPlan(decision, scores, marketEnv, analysisContext, boundaryResult);
+        }
+        return planService.generateExecutionPlan(decision, scores, marketEnv, analysisContext);
+    }
+
+    private SourceTraceBoundaryProducerResult buildBoundaryProducerResult(
+            DecisionBundleVO decision,
+            MarketEnvironmentVO marketEnv,
+            AnalysisExecutionContext executionContext
+    ) {
+        if (persistedOhlcvQueryService == null
+                || runtimeKlineContextAssemblyService == null
+                || marketStructureBoundaryExtractor == null
+                || sourceTraceBoundaryProducer == null
+                || executionContext == null) {
+            return null;
+        }
+        String direction = boundaryDirection(decision);
+        if (direction == null) {
+            return null;
+        }
+        try {
+            String symbol = executionContext.getSymbol();
+            String timeframe = executionContext.getTimeframe();
+            long maxReadLagMs = maxBoundaryReadLagMs(timeframe);
+            PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadiness(
+                    symbol,
+                    timeframe,
+                    BOUNDARY_REQUIRED_WINDOW_SIZE,
+                    maxReadLagMs);
+            RuntimeKlineContextDTO runtimeKlineContext = runtimeKlineContextAssemblyService.assemble(readiness);
+            if (!isBoundaryRuntimeKlineReady(runtimeKlineContext)) {
+                return null;
+            }
+
+            LocalDateTime generatedAt = executionContext.getAnalysisTime() != null
+                    ? executionContext.getAnalysisTime()
+                    : LocalDateTime.now();
+            MarketStructureBoundaryRequest request = new MarketStructureBoundaryRequest();
+            request.setSymbol(symbol);
+            request.setDirection(direction);
+            request.setTimeframe(timeframe);
+            request.setGeneratedAt(generatedAt);
+            request.setGeneratedAtEpochMs(generatedAt.toInstant(ZoneOffset.UTC).toEpochMilli());
+            request.setBars(runtimeKlineContext.getKlineItems());
+            request.setAllowRrLadder(false);
+            request.setMaxTargets(BOUNDARY_MAX_TARGETS);
+            request.setMinBars(BOUNDARY_MIN_BARS);
+            request.setFreshnessLimitMs(maxReadLagMs);
+            request.setLeverageSuggestion(marketEnv != null ? marketEnv.getLeverageSuggestion() : null);
+
+            MarketStructureBoundaryDTO boundary = marketStructureBoundaryExtractor.extract(request);
+            return sourceTraceBoundaryProducer.produce(boundary);
+        } catch (RuntimeException e) {
+            log.warn("[plan-boundary] fail closed for analysisId={} symbol={} timeframe={} reason={}",
+                    executionContext.getAnalysisId(),
+                    executionContext.getSymbol(),
+                    executionContext.getTimeframe(),
+                    e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private static boolean isBoundaryRuntimeKlineReady(RuntimeKlineContextDTO runtimeKlineContext) {
+        return runtimeKlineContext != null
+                && runtimeKlineContext.getFallbackStatus() == null
+                && runtimeKlineContext.getMissingFields().isEmpty()
+                && runtimeKlineContext.getKlineItems() != null
+                && !runtimeKlineContext.getKlineItems().isEmpty();
+    }
+
+    private static String boundaryDirection(DecisionBundleVO decision) {
+        if (decision == null || decision.getMarketBiasHierarchy() == null) {
+            return null;
+        }
+        String raw = decision.getMarketBiasHierarchy().trim();
+        if (raw.isEmpty()) {
+            return null;
+        }
+        String normalized = raw.toUpperCase(Locale.ROOT);
+        if ("BULLISH".equals(normalized) || BOUNDARY_DIRECTION_LONG.equals(normalized) || "做多".equals(raw)) {
+            return BOUNDARY_DIRECTION_LONG;
+        }
+        if ("BEARISH".equals(normalized) || BOUNDARY_DIRECTION_SHORT.equals(normalized) || "做空".equals(raw)) {
+            return BOUNDARY_DIRECTION_SHORT;
+        }
+        return null;
+    }
+
+    private static long maxBoundaryReadLagMs(String timeframe) {
+        Long intervalMs = parseBoundaryTimeframeMs(timeframe);
+        if (intervalMs == null) {
+            return BOUNDARY_FALLBACK_MAX_READ_LAG_MS;
+        }
+        return Math.max(BOUNDARY_FALLBACK_MAX_READ_LAG_MS, intervalMs * 2);
+    }
+
+    private static Long parseBoundaryTimeframeMs(String timeframe) {
+        if (timeframe == null || timeframe.isBlank() || timeframe.length() < 2) {
+            return null;
+        }
+        String unit = timeframe.substring(timeframe.length() - 1);
+        String amountText = timeframe.substring(0, timeframe.length() - 1);
+        long amount;
+        try {
+            amount = Long.parseLong(amountText);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (amount <= 0) {
+            return null;
+        }
+        return switch (unit) {
+            case "m" -> amount * 60_000L;
+            case "h" -> amount * 60L * 60_000L;
+            case "d" -> amount * 24L * 60L * 60_000L;
+            default -> null;
+        };
+    }
+
+    private static Boolean booleanOrTrue(Boolean value) {
+        return value != null ? value : Boolean.TRUE;
     }
 
     private AnalysisExecutionContext normalizeExecutionContext(AnalysisExecutionContext context) {
@@ -459,10 +654,18 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setLeverageSuggestion(plan.getLeverageSuggestion());
                 pdo.setPositionSuggestion(plan.getPositionSuggestion());
                 pdo.setAccountRiskJson(buildExecutionAccountRiskJson(analysis.getAnalysisId()));
-                // invalid condition 第三刀：execution 对象同源镜像承接 decision 侧真值，不做二次推导。
-                pdo.setInvalidCondition(decisionInvalidCondition != null && !decisionInvalidCondition.trim().isEmpty()
+                String planInvalidCondition = plan.getInvalidCondition();
+                pdo.setInvalidCondition(planInvalidCondition != null && !planInvalidCondition.trim().isEmpty()
+                        ? planInvalidCondition
+                        : decisionInvalidCondition != null && !decisionInvalidCondition.trim().isEmpty()
                         ? decisionInvalidCondition
                         : null);
+                pdo.setManualReviewRequired(booleanOrTrue(plan.getManualReviewRequired()));
+                pdo.setNotTradeInstruction(booleanOrTrue(plan.getNotTradeInstruction()));
+                pdo.setNotExecutable(booleanOrTrue(plan.getNotExecutable()));
+                pdo.setNotAutoTrading(booleanOrTrue(plan.getNotAutoTrading()));
+                pdo.setNotOrderExecution(booleanOrTrue(plan.getNotOrderExecution()));
+                pdo.setNotUserPositionCreation(booleanOrTrue(plan.getNotUserPositionCreation()));
                 pdo.setCreateTime(LocalDateTime.now());
                 executionPlanMapper.insert(pdo);
                 persistedPlan = pdo;

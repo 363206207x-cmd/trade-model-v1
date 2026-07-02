@@ -1,6 +1,7 @@
 package org.example.trademodel.service;
 
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceBoundaryProducerResult;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
@@ -31,5 +32,20 @@ public interface PlanService {
             MarketEnvironmentVO marketEnvironment,
             AssetAnalysisVO analysisContext,
             SourceTraceDTO sourceTrace,
+            org.example.trademodel.vo.DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay);
+
+    ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decision,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnvironment,
+            AssetAnalysisVO analysisContext,
+            SourceTraceBoundaryProducerResult boundaryResult);
+
+    ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decision,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnvironment,
+            AssetAnalysisVO analysisContext,
+            SourceTraceBoundaryProducerResult boundaryResult,
             org.example.trademodel.vo.DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay);
 }
