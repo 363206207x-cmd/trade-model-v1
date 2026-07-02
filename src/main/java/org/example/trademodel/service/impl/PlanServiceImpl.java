@@ -83,6 +83,7 @@ public class PlanServiceImpl implements PlanService {
         return plan;
     }
 
+    @Override
     public ExecutionPlanVO generateExecutionPlan(
             DecisionBundleVO decisionBundle,
             List<ScoreItemVO> scoreList,
@@ -93,6 +94,7 @@ public class PlanServiceImpl implements PlanService {
         return generateExecutionPlan(decisionBundle, scoreList, marketEnv, assetAnalysis, boundaryResult, null);
     }
 
+    @Override
     public ExecutionPlanVO generateExecutionPlan(
             DecisionBundleVO decisionBundle,
             List<ScoreItemVO> scoreList,

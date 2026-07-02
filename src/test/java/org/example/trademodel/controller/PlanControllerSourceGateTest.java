@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.dto.planboundary.SourceTraceBoundaryProducerResult;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -82,6 +83,29 @@ class PlanControllerSourceGateTest {
                 MarketEnvironmentVO marketEnvironment,
                 AssetAnalysisVO analysisContext,
                 SourceTraceDTO sourceTrace,
+                DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+        ) {
+            return plan;
+        }
+
+        @Override
+        public ExecutionPlanVO generateExecutionPlan(
+                DecisionBundleVO decision,
+                List<ScoreItemVO> scoreList,
+                MarketEnvironmentVO marketEnvironment,
+                AssetAnalysisVO analysisContext,
+                SourceTraceBoundaryProducerResult boundaryResult
+        ) {
+            return plan;
+        }
+
+        @Override
+        public ExecutionPlanVO generateExecutionPlan(
+                DecisionBundleVO decision,
+                List<ScoreItemVO> scoreList,
+                MarketEnvironmentVO marketEnvironment,
+                AssetAnalysisVO analysisContext,
+                SourceTraceBoundaryProducerResult boundaryResult,
                 DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
         ) {
             return plan;

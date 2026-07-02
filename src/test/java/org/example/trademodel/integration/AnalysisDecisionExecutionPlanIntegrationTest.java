@@ -1,17 +1,24 @@
 package org.example.trademodel.integration;
 
 import org.example.trademodel.TradeModelApplication;
+import org.example.trademodel.ai.AiOrchestratorResult;
+import org.example.trademodel.analysisrun.AnalysisRunCommand;
+import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
+import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.ScoreItemDO;
+import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.ScoreItemMapper;
+import org.example.trademodel.service.AiDecisionOrchestratorService;
 import org.example.trademodel.service.DashboardHomeService;
+import org.example.trademodel.service.RealMarketDataFetcherService;
 import org.example.trademodel.service.impl.PlanServiceImpl;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionBundleVO;
@@ -22,15 +29,25 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = TradeModelApplication.class)
 @Transactional
@@ -53,7 +70,16 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     @Autowired
     private DashboardHomeService dashboardHomeService;
     @Autowired
+    private AnalysisRunOrchestrator analysisRunOrchestrator;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private RealMarketDataFetcherService realMarketDataFetcherService;
+    @MockBean
+    private RealMarketEnvironmentService realMarketEnvironmentService;
+    @MockBean
+    private AiDecisionOrchestratorService aiDecisionOrchestratorService;
 
     @BeforeEach
     void cleanDashboardRuntimeTables() {
@@ -68,11 +94,97 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                 "tm_score_item",
                 "tm_evidence_item",
                 "tm_market_environment_snapshot",
+                "tm_persisted_ohlcv_bar",
                 "tm_ai_call_log",
                 "tm_user_position",
                 "tm_analysis_run")) {
             jdbcTemplate.update("DELETE FROM " + table);
         }
+        when(realMarketEnvironmentService.tryBuildFromRealQuote(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(aiDecisionOrchestratorService.review(any())).thenReturn(new AiOrchestratorResult());
+        when(aiDecisionOrchestratorService.providerReadiness()).thenReturn(List.of());
+        stubDecisionKlines(true);
+    }
+
+    @Test
+    void assemblerUsesFreshPersistedOhlcvToPersistBoundaryBackedPlanIntoDashboardHome() {
+        long latestCloseMs = persistBoundaryBars(SYMBOL, "1m", true);
+        String analysisTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
+
+        AnalysisRunResult result = analysisRunOrchestrator.run(
+                AnalysisRunCommand.manual(SYMBOL, "1m", "req-boundary-long", analysisTime));
+
+        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(plan).isNotNull();
+        assertThat(plan.getEntryZone()).contains("入场区间").doesNotContain("暂无");
+        assertThat(plan.getStopLoss()).contains("止损参考").doesNotContain("暂无");
+        assertThat(plan.getTakeProfitRules()).contains("分批止盈").doesNotContain("暂无");
+        assertThat(plan.getInvalidCondition()).contains("失效条件").doesNotContain("decision invalidation fallback");
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotTradeInstruction()).isTrue();
+        assertThat(plan.getNotExecutable()).isTrue();
+        assertThat(plan.getNotAutoTrading()).isTrue();
+        assertThat(plan.getNotOrderExecution()).isTrue();
+        assertThat(plan.getNotUserPositionCreation()).isTrue();
+
+        DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
+        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BULLISH");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo(plan.getEntryZone());
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo(plan.getStopLoss());
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo(plan.getTakeProfitRules());
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isEqualTo(plan.getInvalidCondition());
+        assertThat(count("tm_user_position")).isZero();
+        assertThat(count("tm_push_recheck_log")).isZero();
+        assertThat(count("tm_ai_call_log")).isZero();
+        assertReviewOnlySafety(home.getSafety());
+    }
+
+    @Test
+    void assemblerUsesFreshPersistedOhlcvForBearishBoundaryBackedPlan() {
+        String symbol = "ETHUSDT";
+        stubDecisionKlines(false);
+        long latestCloseMs = persistBoundaryBars(symbol, "1m", false);
+        String analysisTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
+
+        AnalysisRunResult result = analysisRunOrchestrator.run(
+                AnalysisRunCommand.manual(symbol, "1m", "req-boundary-short", analysisTime));
+
+        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(plan).isNotNull();
+        assertThat(plan.getEntryZone()).contains("入场区间").doesNotContain("暂无");
+        assertThat(plan.getStopLoss()).contains("止损参考").doesNotContain("暂无");
+        assertThat(plan.getTakeProfitRules()).contains("分批止盈").doesNotContain("暂无");
+        assertThat(plan.getInvalidCondition()).contains("失效条件");
+
+        DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
+        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BEARISH");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo(plan.getEntryZone());
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo(plan.getStopLoss());
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo(plan.getTakeProfitRules());
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isEqualTo(plan.getInvalidCondition());
+        assertThat(count("tm_user_position")).isZero();
+    }
+
+    @Test
+    void assemblerFallsBackWithoutPersistedOhlcvAndDoesNotInventBoundaryPlan() {
+        String analysisTime = LocalDateTime.now(ZoneOffset.UTC).toString();
+
+        AnalysisRunResult result = analysisRunOrchestrator.run(
+                AnalysisRunCommand.manual("XRPUSDT", "1m", "req-boundary-no-ohlcv", analysisTime));
+
+        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(plan).isNotNull();
+        assertThat(plan.getEntryZone()).isEqualTo("暂无");
+        assertThat(plan.getStopLoss()).isEqualTo("暂无");
+        assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
+        assertThat(plan.getInvalidCondition()).contains("结构失效");
+        assertThat(count("tm_user_position")).isZero();
     }
 
     @Test
@@ -300,6 +412,97 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         plan.setNotUserPositionCreation(true);
         plan.setCreateTime(now.plusSeconds(2));
         executionPlanMapper.insert(plan);
+    }
+
+    private void stubDecisionKlines(boolean bullish) {
+        List<String[]> klines = bullish
+                ? List.of(
+                kline("100", "105"),
+                kline("101", "106"),
+                kline("102", "107"))
+                : List.of(
+                kline("107", "102"),
+                kline("106", "101"),
+                kline("105", "100"));
+        when(realMarketDataFetcherService.fetchKlines(anyString(), eq("1m"), anyInt())).thenReturn(klines);
+        when(realMarketDataFetcherService.fetchKlines(anyString(), eq("5m"), anyInt())).thenReturn(klines);
+    }
+
+    private String[] kline(String open, String close) {
+        BigDecimal openValue = new BigDecimal(open);
+        BigDecimal closeValue = new BigDecimal(close);
+        BigDecimal high = openValue.max(closeValue).add(new BigDecimal("1.00"));
+        BigDecimal low = openValue.min(closeValue).subtract(new BigDecimal("1.00"));
+        return new String[]{"0", open, high.toPlainString(), low.toPlainString(), close};
+    }
+
+    private long persistBoundaryBars(String symbol, String timeframe, boolean bullishStructure) {
+        long intervalMs = 60_000L;
+        long latestOpenMs = (System.currentTimeMillis() / intervalMs) * intervalMs - intervalMs;
+        long latestCloseMs = latestOpenMs + intervalMs - 1L;
+        long firstOpenMs = latestOpenMs - (49L * intervalMs);
+        String batchId = "batch-" + symbol + "-" + latestOpenMs;
+        for (int i = 0; i < 50; i++) {
+            BigDecimal open = new BigDecimal("101.00");
+            BigDecimal high = new BigDecimal("103.00");
+            BigDecimal low = new BigDecimal("99.00");
+            BigDecimal close = new BigDecimal("102.00");
+            if (bullishStructure) {
+                if (i == 44) {
+                    open = new BigDecimal("100.00");
+                    high = new BigDecimal("102.00");
+                    low = new BigDecimal("95.00");
+                    close = new BigDecimal("100.50");
+                }
+                if (i == 46) {
+                    open = new BigDecimal("102.00");
+                    high = new BigDecimal("110.00");
+                    low = new BigDecimal("100.00");
+                    close = new BigDecimal("104.00");
+                }
+            } else {
+                if (i == 44) {
+                    open = new BigDecimal("104.00");
+                    high = new BigDecimal("110.00");
+                    low = new BigDecimal("101.00");
+                    close = new BigDecimal("103.00");
+                }
+                if (i == 46) {
+                    open = new BigDecimal("100.00");
+                    high = new BigDecimal("103.00");
+                    low = new BigDecimal("95.00");
+                    close = new BigDecimal("98.00");
+                }
+            }
+            long openTimeMs = firstOpenMs + (i * intervalMs);
+            long closeTimeMs = openTimeMs + intervalMs - 1L;
+            jdbcTemplate.update("""
+                            INSERT INTO tm_persisted_ohlcv_bar(
+                                symbol, timeframe, open_time_ms, close_time_ms,
+                                open_price, high_price, low_price, close_price, volume,
+                                is_closed, provider, provider_market_type, source_endpoint,
+                                source_batch_id, source_trace_id, source_version, ingested_at,
+                                updated_at, quality_status, is_deleted)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
+                                CURRENT_TIMESTAMP, 'OK', 0)
+                            """,
+                    symbol,
+                    timeframe,
+                    openTimeMs,
+                    closeTimeMs,
+                    open,
+                    high,
+                    low,
+                    close,
+                    new BigDecimal("1000.00"),
+                    "TEST_FIXTURE",
+                    "SPOT",
+                    "/test/klines",
+                    batchId,
+                    "trace-" + symbol + "-" + i,
+                    1);
+        }
+        return latestCloseMs;
     }
 
     private int count(String table) {
