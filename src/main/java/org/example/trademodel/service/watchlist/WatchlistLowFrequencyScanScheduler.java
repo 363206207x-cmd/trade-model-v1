@@ -1,9 +1,14 @@
 package org.example.trademodel.service.watchlist;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(
+        name = {"trade-model.schedulers.enabled", "trade-model.schedulers.watchlist.enabled"},
+        havingValue = "true",
+        matchIfMissing = true)
 public class WatchlistLowFrequencyScanScheduler {
 
     public static final long NORMAL_WATCHLIST_POOL_SCAN_INTERVAL_MILLIS = 15L * 60L * 1000L;

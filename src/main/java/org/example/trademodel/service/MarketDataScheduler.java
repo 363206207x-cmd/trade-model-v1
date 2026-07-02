@@ -4,12 +4,17 @@ import org.example.trademodel.analysisrun.AnalysisRunProperties;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(
+        name = {"trade-model.schedulers.enabled", "trade-model.schedulers.market-data.enabled"},
+        havingValue = "true",
+        matchIfMissing = true)
 public class MarketDataScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(MarketDataScheduler.class);
