@@ -5,7 +5,6 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +19,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
-@ConditionalOnProperty(
-        name = {"trade-model.schedulers.enabled", "trade-model.schedulers.push-recheck.enabled"},
-        havingValue = "true",
-        matchIfMissing = true)
 public class PushRecheckScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(PushRecheckScheduler.class);
@@ -49,6 +44,8 @@ public class PushRecheckScheduler {
     private final MarketQuoteClient marketQuoteClient;
     private final PushRecheckService pushRecheckService;
     private final PushRecheckDispatchConfigService dispatchConfigService;
+    private final boolean schedulersEnabled;
+    private final boolean pushRecheckSchedulerEnabled;
 
     public PushRecheckScheduler(
             PushSnapshotMapper pushSnapshotMapper,
@@ -58,17 +55,24 @@ public class PushRecheckScheduler {
             PushRecheckDispatchConfigService dispatchConfigService,
             @Value("${trademodel.recheck.dispatch.limit:50}") int defaultLimit,
             @Value("${trademodel.recheck.dispatch.maxAttempts:3}") int maxAttempts,
-            @Value("${trademodel.recheck.dispatch.minRetryMinutes:5}") int minRetryMinutes) {
+            @Value("${trademodel.recheck.dispatch.minRetryMinutes:5}") int minRetryMinutes,
+            @Value("${trade-model.schedulers.enabled:true}") boolean schedulersEnabled,
+            @Value("${trade-model.schedulers.push-recheck.enabled:true}") boolean pushRecheckSchedulerEnabled) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.marketQuoteClient = marketQuoteClient;
         this.pushRecheckService = pushRecheckService;
         this.dispatchConfigService = dispatchConfigService;
+        this.schedulersEnabled = schedulersEnabled;
+        this.pushRecheckSchedulerEnabled = pushRecheckSchedulerEnabled;
         applyRuntimeConfig(dispatchConfigService.loadOrInit(defaultLimit, maxAttempts, minRetryMinutes));
     }
 
     @Scheduled(initialDelay = 15000, fixedRate = 30000)
     public void recheckPendingPushesScheduled() {
+        if (!scheduledExecutionEnabled()) {
+            return;
+        }
         try {
             refreshRuntimeConfigFromStore();
             if (!PushRecheckStatusContract.isPendingPushStatusForScheduler(PENDING_PUSH_STATUS_CAPTURED)
@@ -184,5 +188,9 @@ public class PushRecheckScheduler {
     private int resolveAttempt(Long pushId) {
         Integer cnt = pushRecheckLogMapper.countByPushId(pushId);
         return cnt == null ? 1 : cnt + 1;
+    }
+
+    private boolean scheduledExecutionEnabled() {
+        return schedulersEnabled && pushRecheckSchedulerEnabled;
     }
 }

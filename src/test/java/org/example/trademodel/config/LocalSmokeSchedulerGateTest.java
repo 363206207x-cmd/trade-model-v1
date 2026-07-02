@@ -20,11 +20,13 @@ import org.springframework.context.annotation.Import;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,33 +48,44 @@ class LocalSmokeSchedulerGateTest {
     }
 
     @Test
-    void pushRecheckSchedulerDisabledPropertyPreventsBeanCreation() {
+    void pushRecheckSchedulerDisabledPropertyKeepsBeanAndNoopsExecution() {
         SchedulerMocks mocks = new SchedulerMocks();
 
         runner(mocks)
                 .withPropertyValues("trade-model.schedulers.push-recheck.enabled=false")
                 .run(context -> {
-                    assertThat(context).doesNotHaveBean(PushRecheckScheduler.class);
+                    assertThat(context).hasSingleBean(PushRecheckScheduler.class);
                     assertThat(context).hasSingleBean(PositionSyncScheduler.class);
                     assertThat(context).hasSingleBean(MarketDataScheduler.class);
+                    reset(mocks.pushSnapshotMapper, mocks.pushRecheckService);
+
+                    context.getBean(PushRecheckScheduler.class).recheckPendingPushesScheduled();
+
+                    verify(mocks.pushSnapshotMapper, never()).listPendingRecheckNext(
+                            any(), any(), any(), anyInt(), anyInt(), anyInt());
+                    verify(mocks.pushRecheckService, never()).recheck(
+                            anyLong(), any(BigDecimal.class), any(RecheckExecutionCommand.class));
                 });
     }
 
     @Test
-    void positionSyncSchedulerDisabledPropertyPreventsBeanCreation() {
+    void positionSyncSchedulerDisabledPropertyKeepsBeanAndNoopsExecution() {
         SchedulerMocks mocks = new SchedulerMocks();
 
         runner(mocks)
                 .withPropertyValues("trade-model.schedulers.position-sync.enabled=false")
                 .run(context -> {
                     assertThat(context).hasSingleBean(PushRecheckScheduler.class);
-                    assertThat(context).doesNotHaveBean(PositionSyncScheduler.class);
+                    assertThat(context).hasSingleBean(PositionSyncScheduler.class);
                     assertThat(context).hasSingleBean(MarketDataScheduler.class);
+                    context.getBean(PositionSyncScheduler.class).syncPositionsScheduled();
+
+                    verify(mocks.positionSyncService, never()).syncPositions();
                 });
     }
 
     @Test
-    void localSmokePropertiesDisableAllNonAnalysisSchedulerBeans() {
+    void localSmokePropertiesKeepBeansAndDisableAllNonAnalysisSchedulerExecution() {
         SchedulerMocks mocks = new SchedulerMocks();
 
         runner(mocks)
@@ -83,25 +96,67 @@ class LocalSmokeSchedulerGateTest {
                         "trade-model.schedulers.watchlist.enabled=false",
                         "trade-model.analysis.scheduler.enabled=false")
                 .run(context -> {
-                    assertThat(context).doesNotHaveBean(PushRecheckScheduler.class);
-                    assertThat(context).doesNotHaveBean(PositionSyncScheduler.class);
-                    assertThat(context).doesNotHaveBean(MarketDataScheduler.class);
-                    assertThat(context).doesNotHaveBean(WatchlistLowFrequencyScanScheduler.class);
+                    assertThat(context).hasSingleBean(PushRecheckScheduler.class);
+                    assertThat(context).hasSingleBean(PositionSyncScheduler.class);
+                    assertThat(context).hasSingleBean(MarketDataScheduler.class);
+                    assertThat(context).hasSingleBean(WatchlistLowFrequencyScanScheduler.class);
                     assertThat(context.getBean(AnalysisRunProperties.class).getScheduler().isEnabled()).isFalse();
+                    reset(mocks.pushSnapshotMapper, mocks.pushRecheckService, mocks.positionSyncService,
+                            mocks.analysisSchedulerService);
+
+                    context.getBean(PushRecheckScheduler.class).recheckPendingPushesScheduled();
+                    context.getBean(PositionSyncScheduler.class).syncPositionsScheduled();
+                    context.getBean(MarketDataScheduler.class).fetchRealMarketDataScheduled();
+                    WatchlistLowFrequencyScanScheduler.ScanRunResult result = context
+                            .getBean(WatchlistLowFrequencyScanScheduler.class)
+                            .runScheduledScan();
+
+                    assertThat(result.getStatus())
+                            .isEqualTo(WatchlistLowFrequencyScanScheduler.ScanStatus.DISABLED);
+                    assertThat(result.getReason()).isEqualTo("SCHEDULER_DISABLED_BY_CONFIG");
+                    verify(mocks.pushSnapshotMapper, never()).listPendingRecheckNext(
+                            any(), any(), any(), anyInt(), anyInt(), anyInt());
+                    verify(mocks.pushRecheckService, never()).recheck(
+                            anyLong(), any(BigDecimal.class), any(RecheckExecutionCommand.class));
+                    verify(mocks.positionSyncService, never()).syncPositions();
+                    verify(mocks.analysisSchedulerService, never()).runScheduledCycle();
                 });
     }
 
     @Test
-    void globalSchedulerDisabledPropertyPreventsSchedulerBeanCreation() {
+    void globalSchedulerDisabledPropertyKeepsBeansAndNoopsExecution() {
         SchedulerMocks mocks = new SchedulerMocks();
 
         runner(mocks)
                 .withPropertyValues("trade-model.schedulers.enabled=false")
                 .run(context -> {
-                    assertThat(context).doesNotHaveBean(PushRecheckScheduler.class);
-                    assertThat(context).doesNotHaveBean(PositionSyncScheduler.class);
-                    assertThat(context).doesNotHaveBean(MarketDataScheduler.class);
-                    assertThat(context).doesNotHaveBean(WatchlistLowFrequencyScanScheduler.class);
+                    assertThat(context).hasSingleBean(PushRecheckScheduler.class);
+                    assertThat(context).hasSingleBean(PositionSyncScheduler.class);
+                    assertThat(context).hasSingleBean(MarketDataScheduler.class);
+                    assertThat(context).hasSingleBean(WatchlistLowFrequencyScanScheduler.class);
+                });
+    }
+
+    @Test
+    void defaultEnabledSchedulerMethodsStillDelegateToExistingDependencies() {
+        SchedulerMocks mocks = new SchedulerMocks();
+
+        runner(mocks, () -> {
+                    AnalysisRunProperties properties = new AnalysisRunProperties();
+                    properties.getScheduler().setEnabled(true);
+                    return properties;
+                })
+                .run(context -> {
+                    reset(mocks.pushSnapshotMapper, mocks.positionSyncService, mocks.analysisSchedulerService);
+
+                    context.getBean(PushRecheckScheduler.class).recheckPendingPushesScheduled();
+                    context.getBean(PositionSyncScheduler.class).syncPositionsScheduled();
+                    context.getBean(MarketDataScheduler.class).fetchRealMarketDataScheduled();
+
+                    verify(mocks.pushSnapshotMapper).listPendingRecheckNext(
+                            any(), any(), any(), anyInt(), anyInt(), anyInt());
+                    verify(mocks.positionSyncService).syncPositions();
+                    verify(mocks.analysisSchedulerService).runScheduledCycle();
                 });
     }
 
@@ -121,6 +176,12 @@ class LocalSmokeSchedulerGateTest {
     }
 
     private static ApplicationContextRunner runner(SchedulerMocks mocks) {
+        return runner(mocks, AnalysisRunProperties::new);
+    }
+
+    private static ApplicationContextRunner runner(
+            SchedulerMocks mocks,
+            Supplier<AnalysisRunProperties> analysisRunPropertiesSupplier) {
         return new ApplicationContextRunner()
                 .withUserConfiguration(SchedulerGateTestConfig.class)
                 .withBean(PositionSyncService.class, () -> mocks.positionSyncService)
@@ -130,7 +191,7 @@ class LocalSmokeSchedulerGateTest {
                 .withBean(PushRecheckService.class, () -> mocks.pushRecheckService)
                 .withBean(PushRecheckDispatchConfigService.class, () -> mocks.dispatchConfigService)
                 .withBean(AnalysisSchedulerService.class, () -> mocks.analysisSchedulerService)
-                .withBean(AnalysisRunProperties.class, AnalysisRunProperties::new);
+                .withBean(AnalysisRunProperties.class, analysisRunPropertiesSupplier);
     }
 
     @Configuration(proxyBeanMethods = false)
