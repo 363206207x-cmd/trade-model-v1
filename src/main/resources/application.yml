@@ -44,6 +44,16 @@ trade-model:
     enabled: ${TRADE_MODEL_AUTH_ENABLED:true}
     admin-username: ${APP_ADMIN_USERNAME:admin}
     admin-password: ${APP_ADMIN_PASSWORD:dev-local-password}
+  schedulers:
+    enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:true}
+    push-recheck:
+      enabled: ${TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED:true}
+    position-sync:
+      enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:true}
+    market-data:
+      enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:true}
+    watchlist:
+      enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:true}
   analysis:
     scheduler:
       enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}

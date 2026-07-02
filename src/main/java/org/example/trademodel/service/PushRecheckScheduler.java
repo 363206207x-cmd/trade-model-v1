@@ -5,6 +5,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(
+        name = {"trade-model.schedulers.enabled", "trade-model.schedulers.push-recheck.enabled"},
+        havingValue = "true",
+        matchIfMissing = true)
 public class PushRecheckScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(PushRecheckScheduler.class);
