@@ -1,7 +1,11 @@
 package org.example.trademodel.service.impl;
 
+import org.example.trademodel.dto.planboundary.BoundaryEntryDTO;
+import org.example.trademodel.dto.planboundary.BoundaryStopDTO;
+import org.example.trademodel.dto.planboundary.BoundaryTakeProfitLevelDTO;
 import org.example.trademodel.dto.planboundary.ExecutionPlanSourceGate;
 import org.example.trademodel.dto.planboundary.ExecutionPlanSourceGateResultDTO;
+import org.example.trademodel.dto.planboundary.SourceTraceBoundaryProducerResult;
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
@@ -13,6 +17,7 @@ import org.example.trademodel.vo.ExecutionPlanVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.springframework.stereotype.Service;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +42,7 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public ExecutionPlanVO generateExecutionPlan(DecisionBundleVO decisionBundle, List<ScoreItemVO> scoreList,
                                                  MarketEnvironmentVO marketEnv, AssetAnalysisVO assetAnalysis) {
-        return generateExecutionPlan(decisionBundle, scoreList, marketEnv, assetAnalysis, null);
+        return generateExecutionPlan(decisionBundle, scoreList, marketEnv, assetAnalysis, (SourceTraceDTO) null);
     }
 
     @Override
@@ -75,6 +80,37 @@ public class PlanServiceImpl implements PlanService {
         applySourceTraceReadiness(plan, sourceTrace);
         applyRiskActionGuardReadiness(plan, riskActionGuardDisplay);
         applyExternalContextReadiness(plan, decisionBundle);
+        return plan;
+    }
+
+    public ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decisionBundle,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnv,
+            AssetAnalysisVO assetAnalysis,
+            SourceTraceBoundaryProducerResult boundaryResult
+    ) {
+        return generateExecutionPlan(decisionBundle, scoreList, marketEnv, assetAnalysis, boundaryResult, null);
+    }
+
+    public ExecutionPlanVO generateExecutionPlan(
+            DecisionBundleVO decisionBundle,
+            List<ScoreItemVO> scoreList,
+            MarketEnvironmentVO marketEnv,
+            AssetAnalysisVO assetAnalysis,
+            SourceTraceBoundaryProducerResult boundaryResult,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        SourceTraceDTO sourceTrace = boundaryResult == null ? null : boundaryResult.getSourceTrace();
+        ExecutionPlanVO plan = generateExecutionPlan(
+                decisionBundle,
+                scoreList,
+                marketEnv,
+                assetAnalysis,
+                sourceTrace,
+                riskActionGuardDisplay
+        );
+        applyBoundaryProducerResult(plan, boundaryResult, marketEnv);
         return plan;
     }
 
@@ -225,6 +261,122 @@ public class PlanServiceImpl implements PlanService {
         }
         plan.setSourceBlockerReasons(blockers);
         plan.setSourceCompletenessSummary("external context gate BLOCKED");
+    }
+
+    private static void applyBoundaryProducerResult(
+            ExecutionPlanVO plan,
+            SourceTraceBoundaryProducerResult boundaryResult,
+            MarketEnvironmentVO marketEnv
+    ) {
+        if (plan == null || boundaryResult == null) {
+            return;
+        }
+        plan.setManualReviewRequired(true);
+        plan.setNotTradeInstruction(true);
+        plan.setNotExecutable(true);
+        plan.setNotAutoTrading(true);
+        plan.setNotOrderExecution(true);
+        plan.setNotUserPositionCreation(true);
+        appendUnique(plan.getMissingSourceReasons(), boundaryResult.getMissingFields());
+        appendUnique(plan.getSourceBlockerReasons(), boundaryResult.getBlockingReasons());
+        if (!boundaryResult.isBoundaryReady() || !hasRequiredBoundaryEvidence(boundaryResult)) {
+            return;
+        }
+
+        plan.setEntryZone(formatEntryZone(boundaryResult.getEntry()));
+        plan.setStopLoss(formatStopLoss(boundaryResult.getStop()));
+        plan.setTakeProfitRules(formatTakeProfitRules(boundaryResult.getTakeProfitLevels()));
+        plan.setInvalidCondition(formatInvalidCondition(boundaryResult.getStop()));
+        if (marketEnv != null && !isBlankStatic(marketEnv.getLeverageSuggestion())) {
+            plan.setLeverageSuggestion(marketEnv.getLeverageSuggestion().trim());
+        }
+        plan.setPlanMode(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+    }
+
+    private static boolean hasRequiredBoundaryEvidence(SourceTraceBoundaryProducerResult boundaryResult) {
+        BoundaryEntryDTO entry = boundaryResult.getEntry();
+        BoundaryStopDTO stop = boundaryResult.getStop();
+        List<BoundaryTakeProfitLevelDTO> takeProfitLevels = boundaryResult.getTakeProfitLevels();
+        return entry != null
+                && entry.getEntryZoneLow() != null
+                && entry.getEntryZoneHigh() != null
+                && stop != null
+                && stop.getStopPrice() != null
+                && takeProfitLevels != null
+                && !takeProfitLevels.isEmpty()
+                && takeProfitLevels.stream().allMatch(level -> level != null && level.getPrice() != null);
+    }
+
+    private static String formatEntryZone(BoundaryEntryDTO entry) {
+        StringBuilder builder = new StringBuilder("入场区间 ");
+        builder.append(formatDecimal(entry.getEntryZoneLow()))
+                .append("-")
+                .append(formatDecimal(entry.getEntryZoneHigh()));
+        appendReason(builder, entry.getReason());
+        return builder.toString();
+    }
+
+    private static String formatStopLoss(BoundaryStopDTO stop) {
+        StringBuilder builder = new StringBuilder("止损参考 ");
+        builder.append(formatDecimal(stop.getStopPrice()));
+        appendReason(builder, stop.getReason());
+        return builder.toString();
+    }
+
+    private static String formatTakeProfitRules(List<BoundaryTakeProfitLevelDTO> takeProfitLevels) {
+        List<String> parts = new ArrayList<>();
+        for (BoundaryTakeProfitLevelDTO level : takeProfitLevels) {
+            StringBuilder builder = new StringBuilder();
+            builder.append("TP").append(level.getLevel() == null ? parts.size() + 1 : level.getLevel())
+                    .append(" ")
+                    .append(resolveTakeProfitLabel(level.getSource()))
+                    .append(" ")
+                    .append(formatDecimal(level.getPrice()));
+            if (level.getRr() != null) {
+                builder.append(" RR ").append(formatDecimal(level.getRr()));
+            }
+            appendReason(builder, level.getReason());
+            parts.add(builder.toString());
+        }
+        return "分批止盈：" + String.join("；", parts);
+    }
+
+    private static String formatInvalidCondition(BoundaryStopDTO stop) {
+        StringBuilder builder = new StringBuilder("失效条件：结构边界失效或触及止损参考 ");
+        builder.append(formatDecimal(stop.getStopPrice()));
+        appendReason(builder, stop.getReason());
+        return builder.toString();
+    }
+
+    private static String resolveTakeProfitLabel(String source) {
+        if (!isBlankStatic(source) && "RR_LADDER".equalsIgnoreCase(source.trim())) {
+            return "RR 阶梯";
+        }
+        return "目标参考";
+    }
+
+    private static void appendReason(StringBuilder builder, String reason) {
+        if (!isBlankStatic(reason)) {
+            builder.append("（").append(reason.trim()).append("）");
+        }
+    }
+
+    private static String formatDecimal(BigDecimal value) {
+        if (value == null) {
+            return PLACEHOLDER_NOT_AVAILABLE;
+        }
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private static void appendUnique(List<String> target, List<String> source) {
+        if (target == null || source == null) {
+            return;
+        }
+        for (String value : source) {
+            if (!isBlankStatic(value) && !target.contains(value)) {
+                target.add(value);
+            }
+        }
     }
 
     private static String resolveRiskActionGuardReason(
