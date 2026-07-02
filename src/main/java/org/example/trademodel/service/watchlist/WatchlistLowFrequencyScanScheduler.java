@@ -1,14 +1,11 @@
 package org.example.trademodel.service.watchlist;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(
-        name = {"trade-model.schedulers.enabled", "trade-model.schedulers.watchlist.enabled"},
-        havingValue = "true",
-        matchIfMissing = true)
 public class WatchlistLowFrequencyScanScheduler {
 
     public static final long NORMAL_WATCHLIST_POOL_SCAN_INTERVAL_MILLIS = 15L * 60L * 1000L;
@@ -19,19 +16,34 @@ public class WatchlistLowFrequencyScanScheduler {
     public static final long POSITION_MONITOR_INTERVAL_MAX_MILLIS = 60L * 1000L;
 
     private final boolean enabled;
+    private final boolean schedulersEnabled;
+    private final boolean watchlistSchedulerEnabled;
 
     public WatchlistLowFrequencyScanScheduler() {
-        this(false);
+        this(false, true, true);
     }
 
     public WatchlistLowFrequencyScanScheduler(boolean enabled) {
+        this(enabled, true, true);
+    }
+
+    @Autowired
+    public WatchlistLowFrequencyScanScheduler(
+            @Value("${trade-model.watchlist.low-frequency.enabled:false}") boolean enabled,
+            @Value("${trade-model.schedulers.enabled:true}") boolean schedulersEnabled,
+            @Value("${trade-model.schedulers.watchlist.enabled:true}") boolean watchlistSchedulerEnabled) {
         this.enabled = enabled;
+        this.schedulersEnabled = schedulersEnabled;
+        this.watchlistSchedulerEnabled = watchlistSchedulerEnabled;
     }
 
     @Scheduled(
             initialDelay = NORMAL_WATCHLIST_POOL_SCAN_INTERVAL_MILLIS,
             fixedDelay = NORMAL_WATCHLIST_POOL_SCAN_INTERVAL_MILLIS)
     public ScanRunResult runScheduledScan() {
+        if (!scheduledExecutionEnabled()) {
+            return ScanRunResult.disabled("SCHEDULER_DISABLED_BY_CONFIG");
+        }
         if (!enabled) {
             return ScanRunResult.disabled("LOW_FREQUENCY_SCAN_DISABLED_BY_DEFAULT");
         }
@@ -40,6 +52,10 @@ public class WatchlistLowFrequencyScanScheduler {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    private boolean scheduledExecutionEnabled() {
+        return schedulersEnabled && watchlistSchedulerEnabled;
     }
 
     public enum ScanStatus {
