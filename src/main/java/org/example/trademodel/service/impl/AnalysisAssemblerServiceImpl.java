@@ -325,6 +325,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         try {
             String symbol = executionContext.getSymbol();
             String timeframe = executionContext.getTimeframe();
+            if (!AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe(timeframe)) {
+                log.info("[plan-boundary] fail closed unsupported execution-plan timeframe analysisId={} symbol={} timeframe={}",
+                        executionContext.getAnalysisId(), symbol, timeframe);
+                return null;
+            }
             long maxReadLagMs = maxBoundaryReadLagMs(timeframe);
             PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadiness(
                     symbol,
@@ -657,8 +662,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 String planInvalidCondition = plan.getInvalidCondition();
                 pdo.setInvalidCondition(planInvalidCondition != null && !planInvalidCondition.trim().isEmpty()
                         ? planInvalidCondition
-                        : decisionInvalidCondition != null && !decisionInvalidCondition.trim().isEmpty()
-                        ? decisionInvalidCondition
                         : null);
                 pdo.setManualReviewRequired(booleanOrTrue(plan.getManualReviewRequired()));
                 pdo.setNotTradeInstruction(booleanOrTrue(plan.getNotTradeInstruction()));

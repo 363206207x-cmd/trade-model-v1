@@ -143,7 +143,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         verify(executionPlanMapper).insert(planCaptor.capture());
         String accountRiskJson = planCaptor.getValue().getAccountRiskJson();
         assertThat(accountRiskJson).isNotBlank();
-        assertThat(planCaptor.getValue().getInvalidCondition()).isEqualTo("price breaks decision support");
+        assertThat(planCaptor.getValue().getInvalidCondition()).isNull();
 
         JsonNode node = JSON.readTree(accountRiskJson);
         Set<String> names = new HashSet<>();
@@ -212,7 +212,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         verify(executionPlanMapper).insert(planCaptor.capture());
         String accountRiskJson = planCaptor.getValue().getAccountRiskJson();
         assertThat(accountRiskJson).isNotBlank();
-        assertThat(planCaptor.getValue().getInvalidCondition()).isEqualTo("decision says invalid after trend reversal");
+        assertThat(planCaptor.getValue().getInvalidCondition()).isNull();
         JsonNode jsonNode = JSON.readTree(accountRiskJson);
         assertThat(jsonNode.path("riskReasonCode").asText()).isEqualTo("DECISION_NOT_WORTH_OPENING");
 

@@ -465,6 +465,58 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void oneMinuteDecisionDoesNotExposeFormalExecutionSuggestionBoundary() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 85, 10,
+                "LEVEL_1", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setTimeframe("1m");
+        decision.setEntryZone("63000-64000");
+        decision.setStopLoss("61000");
+        decision.setTakeProfitRules("66000 / 69000");
+        decision.setLeverageSuggestion("20x");
+        decision.setPositionSuggestion("10%");
+        decision.setValidPeriod("2026-07-03 00:34:21 ~ 2026-07-04 00:34:21");
+        decision.setInvalidCondition("结构失效：当前价高于近端 1m 摆动高点");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BULLISH");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
+        assertThat(home.getExecutionSuggestion().getLeverageSuggestion()).isNull();
+        assertThat(home.getExecutionSuggestion().getPositionSuggestion()).isNull();
+        assertThat(home.getExecutionSuggestion().getValidPeriod())
+                .isEqualTo("周期不支持，需使用 5m / 15m / 1h / 4h");
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
+    }
+
+    @Test
+    void incompleteExecutionBoundaryShowsStructurePendingValidPeriod() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 85, 10,
+                "LEVEL_1", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setTimeframe("5m");
+        decision.setEntryZone("暂无");
+        decision.setStopLoss("61000");
+        decision.setTakeProfitRules("66000 / 69000");
+        decision.setLeverageSuggestion("3x");
+        decision.setPositionSuggestion("10%");
+        decision.setValidPeriod("2026-07-03 00:34:21 ~ 2026-07-04 00:34:21");
+        decision.setInvalidCondition("结构失效：当前价高于近端 5m 摆动高点");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo("61000");
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo("66000 / 69000");
+        assertThat(home.getExecutionSuggestion().getValidPeriod()).isEqualTo("边界不足，等待结构确认");
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
+    }
+
+    @Test
     void aiDecisionMapsStructuredRoleEvidenceOnly() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");

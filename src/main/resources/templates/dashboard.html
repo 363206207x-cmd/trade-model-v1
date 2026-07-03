@@ -1712,6 +1712,28 @@
             gap: 10px;
             align-items: stretch;
         }
+        .execution-fail-status {
+            display: grid;
+            gap: 2px;
+            padding: 8px 10px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(255, 255, 255, 0.96) 100%);
+        }
+        .execution-fail-status .main {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+            font-weight: 780;
+            line-height: 1.25;
+        }
+        .execution-fail-status .sub {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 620;
+            line-height: 1.3;
+        }
         .execution-plan-panel,
         .execution-chart-panel {
             min-width: 0;
@@ -4829,6 +4851,46 @@
         return t;
     }
 
+    function isConcretePlanText(raw) {
+        var text = raw == null ? "" : String(raw).trim();
+        return !!text && text !== "—" && text !== "暂无" && text !== "待生成";
+    }
+
+    function executionBoundaryComplete(entryZone, stopLoss, takeProfitRules) {
+        return isConcretePlanText(entryZone) && isConcretePlanText(stopLoss) && isConcretePlanText(takeProfitRules);
+    }
+
+    function executionFailClosedReason(raw, entryZone, stopLoss, takeProfitRules) {
+        var text = raw == null ? "" : String(raw).trim();
+        if (text.indexOf("周期不支持") >= 0) return text;
+        if (text.indexOf("边界不足") >= 0 || !executionBoundaryComplete(entryZone, stopLoss, takeProfitRules)) {
+            return "边界不足，等待结构确认";
+        }
+        return "";
+    }
+
+    function executionFailClosedStatusHtml(raw, entryZone, stopLoss, takeProfitRules) {
+        var reason = executionFailClosedReason(raw, entryZone, stopLoss, takeProfitRules);
+        if (!reason) return "";
+        return '<div class="execution-fail-status" role="status">'
+            + '<p class="main">当前暂无完整执行计划</p>'
+            + '<p class="sub">' + escapeHtml(reason) + '</p>'
+            + '</div>';
+    }
+
+    function formatExecutionValidPeriod(raw, entryZone, stopLoss, takeProfitRules) {
+        var text = raw == null ? "" : String(raw).trim();
+        if (text.indexOf("周期不支持") >= 0 || text.indexOf("边界不足") >= 0) return "";
+        if (!executionBoundaryComplete(entryZone, stopLoss, takeProfitRules)) return "";
+        if (text.indexOf("已失效") >= 0) return text;
+        if (!text || text === "—" || text === "暂无" || text === "待生成") return "";
+        var parts = text.split("~");
+        var end = parts.length > 1 ? parts[parts.length - 1].trim() : "";
+        var match = end.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/);
+        if (match) return "有效至 " + match[2] + "-" + match[3] + " " + match[4];
+        return normalizeReadableText(text);
+    }
+
     function normalizeDisplaySymbol(raw) {
         return String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     }
@@ -5303,8 +5365,9 @@
     function renderHomeExecution(d) {
         var box = document.getElementById("homeExecutionContent");
         if (!box) return;
-        function renderExecutionRows(rows) {
+        function renderExecutionRows(rows, statusHtml) {
             box.innerHTML = '<div class="execution-card-body">'
+                + (statusHtml || "")
                 + '<div class="execution-plan-panel"><table class="execution-plan-table"><tbody>'
                 + rows.map(function (r) { return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(cleanBlankValue(r[1])) + '</td></tr>'; }).join("")
                 + '</tbody></table></div>'
@@ -5337,8 +5400,15 @@
         var takeProfitRules = planValue(["takeProfitRules", "take_profit_rules"], ["takeProfitRules", "take_profit_rules"]);
         var leverageSuggestion = planValue(["leverageSuggestion", "leverage_suggestion"], ["leverageSuggestion", "leverage_suggestion"]);
         var positionSuggestion = planValue(["positionSuggestion", "position_suggestion"], ["positionSuggestion", "position_suggestion"]);
-        var validPeriod = planValue(["validPeriod", "valid_period"], ["validPeriod", "valid_period"]);
-        var invalidCondition = planValue(["invalidCondition", "invalid_condition"], ["invalidCondition", "invalid_condition"]);
+        var rawValidPeriod = planValue(["validPeriod", "valid_period"], ["validPeriod", "valid_period"]);
+        var statusHtml = executionFailClosedStatusHtml(rawValidPeriod, entryZone, stopLoss, takeProfitRules);
+        var validPeriod = formatExecutionValidPeriod(
+            rawValidPeriod,
+            entryZone,
+            stopLoss,
+            takeProfitRules
+        );
+        var invalidCondition = statusHtml ? "" : planValue(["invalidCondition", "invalid_condition"], ["invalidCondition", "invalid_condition"]);
         var hasPlan = [entryZone, stopLoss, takeProfitRules, leverageSuggestion, positionSuggestion, validPeriod, invalidCondition]
             .some(function (v) { return v !== "—"; });
         var rows = [
@@ -5351,7 +5421,7 @@
             ["有效期", hasPlan ? validPeriod : ""],
             ["失效条件", hasPlan ? invalidCondition : ""]
         ];
-        renderExecutionRows(rows);
+        renderExecutionRows(rows, statusHtml);
     }
 
     function readAiRolePayload(d) {
@@ -5808,17 +5878,23 @@
         var s = suggestion || {};
         var direction = biasText(s.direction);
         if (direction === "—") direction = s.direction || "";
+        var entryZone = s.entryZone || "";
+        var stopLoss = s.stopLoss || "";
+        var takeProfitRules = s.takeProfitRules || "";
+        var statusHtml = executionFailClosedStatusHtml(s.validPeriod || "", entryZone, stopLoss, takeProfitRules);
+        var validPeriod = formatExecutionValidPeriod(s.validPeriod || "", entryZone, stopLoss, takeProfitRules);
         var rows = [
             ["方向", direction],
-            ["入场区间", s.entryZone || ""],
-            ["止损价", s.stopLoss || ""],
-            ["阶梯止盈", s.takeProfitRules || ""],
+            ["入场区间", entryZone],
+            ["止损价", stopLoss],
+            ["阶梯止盈", takeProfitRules],
             ["杠杆", s.leverageSuggestion || ""],
             ["仓位建议", s.positionSuggestion || ""],
-            ["有效期", s.validPeriod || ""],
-            ["失效条件", s.invalidCondition || ""]
+            ["有效期", validPeriod],
+            ["失效条件", statusHtml ? "" : (s.invalidCondition || "")]
         ];
         box.innerHTML = '<div class="execution-card-body">'
+            + (statusHtml || "")
             + '<div class="execution-plan-panel"><table class="execution-plan-table"><tbody>'
             + rows.map(function (r) { return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(cleanBlankValue(r[1])) + '</td></tr>'; }).join("")
             + '</tbody></table></div>'

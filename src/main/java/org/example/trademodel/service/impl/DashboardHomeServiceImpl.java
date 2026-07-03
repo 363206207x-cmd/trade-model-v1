@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
@@ -61,6 +62,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             "CONFUSED_BLOCKED",
             "EXPIRED"
     );
+    private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
 
     private final DecisionService decisionService;
     private final MonitorService monitorService;
@@ -373,13 +375,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
-        suggestion.setEntryZone(trimToNull(decision.getEntryZone()));
-        suggestion.setStopLoss(trimToNull(decision.getStopLoss()));
-        suggestion.setTakeProfitRules(trimToNull(decision.getTakeProfitRules()));
+        String entryZone = trimPlanValue(decision.getEntryZone());
+        String stopLoss = trimPlanValue(decision.getStopLoss());
+        String takeProfitRules = trimPlanValue(decision.getTakeProfitRules());
+        boolean boundaryComplete = entryZone != null && stopLoss != null && takeProfitRules != null;
+
+        if (!AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe(decision.getTimeframe())) {
+            suggestion.setValidPeriod(AnalysisTimePolicy.unsupportedExecutionPlanTimeframeMessage());
+            return suggestion;
+        }
+
+        suggestion.setEntryZone(entryZone);
+        suggestion.setStopLoss(stopLoss);
+        suggestion.setTakeProfitRules(takeProfitRules);
         suggestion.setLeverageSuggestion(trimToNull(decision.getLeverageSuggestion()));
         suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
-        suggestion.setValidPeriod(trimToNull(decision.getValidPeriod()));
-        suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
+        suggestion.setValidPeriod(boundaryComplete ? trimToNull(decision.getValidPeriod()) : BOUNDARY_INCOMPLETE_VALID_PERIOD);
+        suggestion.setInvalidCondition(boundaryComplete ? trimToNull(decision.getInvalidCondition()) : null);
         return suggestion;
     }
 
@@ -1041,6 +1053,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String trimPlanValue(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null || "暂无".equals(trimmed) || "—".equals(trimmed) || "待生成".equals(trimmed)) {
+            return null;
+        }
+        return trimmed;
     }
 
     private String firstNonBlank(String... values) {
