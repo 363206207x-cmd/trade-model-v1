@@ -109,12 +109,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Test
     void assemblerUsesFreshPersistedOhlcvToPersistBoundaryBackedPlanIntoDashboardHome() {
-        long latestCloseMs = persistBoundaryBars(SYMBOL, "1m", true);
+        long latestCloseMs = persistBoundaryBars(SYMBOL, "5m", true);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
         AnalysisRunResult result = analysisRunOrchestrator.run(
-                AnalysisRunCommand.manual(SYMBOL, "1m", "req-boundary-long", analysisTime));
+                AnalysisRunCommand.manual(SYMBOL, "5m", "req-boundary-long", analysisTime));
 
         assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
@@ -146,12 +146,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     void assemblerUsesFreshPersistedOhlcvForBearishBoundaryBackedPlan() {
         String symbol = "ETHUSDT";
         stubDecisionKlines(false);
-        long latestCloseMs = persistBoundaryBars(symbol, "1m", false);
+        long latestCloseMs = persistBoundaryBars(symbol, "5m", false);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
         AnalysisRunResult result = analysisRunOrchestrator.run(
-                AnalysisRunCommand.manual(symbol, "1m", "req-boundary-short", analysisTime));
+                AnalysisRunCommand.manual(symbol, "5m", "req-boundary-short", analysisTime));
 
         assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
@@ -175,7 +175,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         String analysisTime = LocalDateTime.now(ZoneOffset.UTC).toString();
 
         AnalysisRunResult result = analysisRunOrchestrator.run(
-                AnalysisRunCommand.manual("XRPUSDT", "1m", "req-boundary-no-ohlcv", analysisTime));
+                AnalysisRunCommand.manual("XRPUSDT", "5m", "req-boundary-no-ohlcv", analysisTime));
 
         assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
@@ -183,7 +183,34 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getEntryZone()).isEqualTo("暂无");
         assertThat(plan.getStopLoss()).isEqualTo("暂无");
         assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
-        assertThat(plan.getInvalidCondition()).contains("结构失效");
+        assertThat(plan.getInvalidCondition()).isNull();
+        assertThat(count("tm_user_position")).isZero();
+    }
+
+    @Test
+    void oneMinuteAnalysisDoesNotGenerateFormalExecutionPlanBoundaryEvenWithFreshBars() {
+        long latestCloseMs = persistBoundaryBars("ADAUSDT", "1m", true);
+        String analysisTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
+
+        AnalysisRunResult result = analysisRunOrchestrator.run(
+                AnalysisRunCommand.manual("ADAUSDT", "1m", "req-boundary-1m-unsupported", analysisTime));
+
+        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(plan).isNotNull();
+        assertThat(plan.getEntryZone()).isEqualTo("暂无");
+        assertThat(plan.getStopLoss()).isEqualTo("暂无");
+        assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
+        assertThat(plan.getInvalidCondition()).isNull();
+
+        DashboardHomeVO home = dashboardHomeService.getHome("ADAUSDT", 6);
+        assertThat(home.getExecutionSuggestion().getValidPeriod())
+                .isEqualTo("周期不支持，需使用 5m / 15m / 1h / 4h");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
         assertThat(count("tm_user_position")).isZero();
     }
 
@@ -261,7 +288,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
         assertThat(plan.getLeverageSuggestion()).isEqualTo("1-5x");
         assertThat(plan.getPositionSuggestion()).isEqualTo("单笔风险不超过总资金 2%");
-        assertThat(plan.getInvalidCondition()).isEqualTo("decision invalidation placeholder");
+        assertThat(plan.getInvalidCondition()).isNull();
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
         assertThat(plan.getNotExecutable()).isTrue();
@@ -437,7 +464,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     private long persistBoundaryBars(String symbol, String timeframe, boolean bullishStructure) {
-        long intervalMs = 60_000L;
+        long intervalMs = timeframeMs(timeframe);
         long latestOpenMs = (System.currentTimeMillis() / intervalMs) * intervalMs - intervalMs;
         long latestCloseMs = latestOpenMs + intervalMs - 1L;
         long firstOpenMs = latestOpenMs - (49L * intervalMs);
@@ -503,6 +530,18 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                     1);
         }
         return latestCloseMs;
+    }
+
+    private long timeframeMs(String timeframe) {
+        if (timeframe == null || timeframe.isBlank() || timeframe.length() < 2) {
+            return 60_000L;
+        }
+        long amount = Long.parseLong(timeframe.substring(0, timeframe.length() - 1));
+        String unit = timeframe.substring(timeframe.length() - 1);
+        if ("h".equals(unit)) {
+            return amount * 60L * 60_000L;
+        }
+        return amount * 60_000L;
     }
 
     private int count(String table) {

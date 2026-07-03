@@ -301,7 +301,7 @@ class PlanServiceImplTest {
     }
 
     @Test
-    void generateExecutionPlan_failClosedProducerDoesNotMapPreciseBoundariesAndKeepsDecisionFallback() {
+    void generateExecutionPlan_failClosedProducerDoesNotMapPreciseBoundariesOrDecisionInvalidationFallback() {
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setIsWorthOpening(true);
         decision.setPushInvalidationSummary("decision invalidation fallback");
@@ -322,7 +322,7 @@ class PlanServiceImplTest {
         assertThat(plan.getEntryZone()).isEqualTo("暂无");
         assertThat(plan.getStopLoss()).isEqualTo("暂无");
         assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
-        assertThat(plan.getInvalidCondition()).isEqualTo("decision invalidation fallback");
+        assertThat(plan.getInvalidCondition()).isNull();
         assertThat(plan.getSourceBlockerReasons()).contains("boundaryReady=false");
         assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
         assertThat(plan.getManualReviewRequired()).isTrue();

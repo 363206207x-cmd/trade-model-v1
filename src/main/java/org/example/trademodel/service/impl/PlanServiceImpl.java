@@ -73,9 +73,6 @@ public class PlanServiceImpl implements PlanService {
         plan.setTakeProfitRules(PLACEHOLDER_NOT_AVAILABLE);
         plan.setLeverageSuggestion("1-5x");
         plan.setPositionSuggestion("单笔风险不超过总资金 2%");
-        if (decisionBundle.getPushInvalidationSummary() != null && !decisionBundle.getPushInvalidationSummary().isBlank()) {
-            plan.setInvalidCondition(decisionBundle.getPushInvalidationSummary());
-        }
         plan.setPlanMode(resolvePlanMode(plan, decisionBundle));
         applySourceTraceReadiness(plan, sourceTrace);
         applyRiskActionGuardReadiness(plan, riskActionGuardDisplay);

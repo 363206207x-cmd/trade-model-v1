@@ -26,12 +26,25 @@ public final class AnalysisTimePolicy {
             Map.entry("8h", new BucketSpec(ChronoUnit.HOURS, 8)),
             Map.entry("12h", new BucketSpec(ChronoUnit.HOURS, 12)),
             Map.entry("1d", new BucketSpec(ChronoUnit.DAYS, 1)));
+    private static final Set<String> EXECUTION_PLAN_PRIMARY_TIMEFRAMES = Set.of("5m", "15m", "1h", "4h");
 
     private AnalysisTimePolicy() {
     }
 
     public static Set<String> supportedTimeframes() {
         return SUPPORTED.keySet();
+    }
+
+    public static Set<String> executionPlanPrimaryTimeframes() {
+        return EXECUTION_PLAN_PRIMARY_TIMEFRAMES;
+    }
+
+    public static boolean isExecutionPlanPrimaryTimeframe(String raw) {
+        return raw != null && EXECUTION_PLAN_PRIMARY_TIMEFRAMES.contains(raw.trim());
+    }
+
+    public static String unsupportedExecutionPlanTimeframeMessage() {
+        return "周期不支持，需使用 5m / 15m / 1h / 4h";
     }
 
     public static String requireSupportedTimeframe(String raw) {

@@ -56,4 +56,17 @@ class AnalysisTimePolicyTest {
                 .isInstanceOf(AnalysisRunInputException.class)
                 .hasMessageContaining("analysisTime is invalid");
     }
+
+    @Test
+    void executionPlanPrimaryTimeframesExcludeOneMinuteMicrostructure() {
+        assertThat(AnalysisTimePolicy.executionPlanPrimaryTimeframes())
+                .containsExactlyInAnyOrder("5m", "15m", "1h", "4h");
+        assertThat(AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe("5m")).isTrue();
+        assertThat(AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe("15m")).isTrue();
+        assertThat(AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe("1h")).isTrue();
+        assertThat(AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe("4h")).isTrue();
+        assertThat(AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe("1m")).isFalse();
+        assertThat(AnalysisTimePolicy.unsupportedExecutionPlanTimeframeMessage())
+                .isEqualTo("周期不支持，需使用 5m / 15m / 1h / 4h");
+    }
 }
