@@ -12,17 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-M3 Auth + Access Control Gate"
-active_block_cn: "PDR-M3 认证与访问控制门禁"
+active_block: "PDR-PF1 Status Source Cleanup"
+active_block_cn: "PDR-PF1 状态源清理"
 
-next_required_action: "Autodeliver the PDR-M3 auth access-control gate when approved. Keep Production Deployment Readiness BLOCKED until a separate production release gate explicitly clears it."
+next_required_action: "Complete PDR-PF1 status-source cleanup, then proceed only to the next explicitly scoped remediation package. Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this status-source cleanup is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-m3-auth-access-control-gate"
+current_branch: "codex/pdr-pf1-status-source-cleanup"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -58,8 +59,18 @@ pdr_m1_status: "DONE/effective on merged main: PostgreSQL runtime smoke coverage
 pdr_m1_effective: true
 pdr_m2_status: "DONE/effective on merged main: server deployment smoke skeleton"
 pdr_m2_effective: true
-pdr_m3_status: "IN_PROGRESS on branch codex/pdr-m3-auth-access-control-gate: single-operator Basic Auth access-control gate"
-pdr_m3_effective: false
+pdr_m3_status: "DONE/effective on merged main: single-operator Basic Auth access-control gate"
+pdr_m3_effective: true
+pdr_m4_status: "DONE/effective on merged main: observability and production smoke gate"
+pdr_m4_effective: true
+pdr_m5_status: "DONE/effective on merged main: real data provider readonly readiness"
+pdr_m5_effective: true
+pdr_m6a_status: "DONE/effective on merged main: real server acceptance evidence gate"
+pdr_m6a_effective: true
+pdr_m7_status: "DONE/effective on merged main: opt-in real provider live smoke harness; historical latest production-readiness package"
+pdr_m7_effective: true
+pdr_pf1_status: "IN_PROGRESS on branch codex/pdr-pf1-status-source-cleanup: status-source cleanup after production readiness preflight"
+pdr_pf1_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -77,7 +88,8 @@ notes:
   - "PDR-1 Production Config / Profile Lock is merged/effective on main: application-prod.yml and ProductionProfileSafetyGuard exist."
   - "PDR-2A records database migration decisions only: PostgreSQL target, Flyway SQL-first migration target, forward-only migrations plus pre-migration backup/restore rollback, manual pre-deploy migration, RPO 24h, RTO 4h, and schema.sql local/test bootstrap."
   - "PDR-M2 server deployment skeleton is merged/effective on main as e49346a."
-  - "PDR-M3 adds a single-operator Spring Security Basic Auth gate, APP_ADMIN_USERNAME / APP_ADMIN_PASSWORD configuration, prod credential fail-closed checks, auth-aware smoke behavior, and tests while preserving Production Deployment Readiness as BLOCKED."
-  - "PDR-M3 does not add database users, signup, OAuth, role UI, real secrets, real server deployment, Telegram send, Push send, order/execution, or auto-trading."
-  - "Production Deployment Readiness remains BLOCKED and no production-ready claim is made."
-  - "No UserPosition mutation, order execution, auto-trading, Push send, external channel action, schema changes, mapper SQL changes, Flyway migration changes, or business API contract changes are part of this auth gate."
+  - "PDR-M7 is historical latest production-readiness package evidence, not the only currently allowed work."
+  - "PDR-PF1 cleans stale status-source instructions only; it does not change runtime behavior."
+  - "Current allowed work is status-source cleanup, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
+  - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

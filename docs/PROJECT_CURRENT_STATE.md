@@ -6,11 +6,11 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: Post-1066 Status Closure after PR #1066 Global Audit Gap Closure
+Current Work Package: PDR-PF1 Status Source Cleanup
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
-Next Business Phase Allowed: YES for the next scoped business package; NO for production deployment
+Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
-Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
@@ -90,10 +90,10 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 ## Current Allowed Work
 
-Only the following work is allowed after the post-1066 status closure:
+Only the following work is allowed during and after the post-1068 / PDR-PF1 status-source cleanup:
 
-1. Docs/status closure work that keeps source-of-truth documents consistent with merged `main`.
-2. The next scoped business package after PR #1066.
+1. Status-source cleanup.
+2. The next explicitly scoped remediation package.
 3. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
@@ -102,7 +102,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked after the post-1066 status closure:
+The following work remains blocked during and after the post-1068 / PDR-PF1 status-source cleanup:
 
 1. no auto-open
 2. no auto-close
