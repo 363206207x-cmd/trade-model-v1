@@ -9,7 +9,8 @@ branch: "codex/pdr-pf1-status-source-cleanup"
 risk: "A-risk docs/status-source cleanup only"
 current_pr: "none"
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
-next_business_phase_allowed: true
+next_business_phase_allowed: false
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this status-source cleanup is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 next_allowed_action: "Complete PDR-PF1 status-source cleanup. After merge, proceed only to the next explicitly scoped remediation package. Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
