@@ -26,6 +26,27 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
     private static final Set<String> ALLOWED_ACTUATOR_EXPOSURE = Set.of("HEALTH");
 
+    private static final Set<String> ALLOWED_SCHEDULER_POLICIES = Set.of(
+            "LOCKED_DOWN",
+            "EXPLICIT_OPT_IN"
+    );
+
+    private static final Set<String> ALLOWED_SCHEDULER_CLASSIFICATIONS = Set.of(
+            "PROD_ALLOWED_DEFAULT_OFF",
+            "PROD_ALLOWED_EXPLICIT_OPT_IN",
+            "PROD_BLOCKED",
+            "LOCAL_ONLY"
+    );
+
+    private static final List<SchedulerPolicyItem> PRODUCTION_SCHEDULERS = List.of(
+            new SchedulerPolicyItem("push-recheck", "trade-model.schedulers.push-recheck.enabled", false),
+            new SchedulerPolicyItem("position-sync", "trade-model.schedulers.position-sync.enabled", false),
+            new SchedulerPolicyItem("market-data", "trade-model.schedulers.market-data.enabled", false),
+            new SchedulerPolicyItem("watchlist", "trade-model.schedulers.watchlist.enabled", false),
+            new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", true),
+            new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false)
+    );
+
     private final Environment environment;
 
     public ProductionProfileSafetyGuard(Environment environment) {
@@ -105,8 +126,56 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             errors.add("production admin password uses an unsafe default value");
         }
 
+        validateProductionSchedulerPolicy(environment, errors);
+
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Unsafe prod profile config: " + String.join("; ", errors));
+        }
+    }
+
+    private static void validateProductionSchedulerPolicy(Environment environment, List<String> errors) {
+        String policy = normalized(property(environment, "trade-model.production.scheduler-policy"));
+        if (isBlank(policy)) {
+            errors.add("production scheduler policy missing");
+            return;
+        }
+        if (!ALLOWED_SCHEDULER_POLICIES.contains(policy)) {
+            errors.add("unsupported production scheduler policy: " + policy);
+            return;
+        }
+
+        boolean globalSchedulersEnabled = isTrue(property(environment, "trade-model.schedulers.enabled"));
+        if ("LOCKED_DOWN".equals(policy) && globalSchedulersEnabled) {
+            errors.add("production global scheduler switch must be disabled under LOCKED_DOWN policy");
+        }
+        for (SchedulerPolicyItem scheduler : PRODUCTION_SCHEDULERS) {
+            String classification = normalized(property(environment, scheduler.approvalProperty()));
+            if (isBlank(classification)) {
+                errors.add("production scheduler classification missing for " + scheduler.name());
+                continue;
+            }
+            if (!ALLOWED_SCHEDULER_CLASSIFICATIONS.contains(classification)) {
+                errors.add("unsupported production scheduler classification for "
+                        + scheduler.name() + ": " + classification);
+                continue;
+            }
+
+            boolean schedulerEnabled = isTrue(property(environment, scheduler.enabledProperty()));
+            boolean effectivelyEnabled = schedulerEnabled && ("analysis".equals(scheduler.name()) || globalSchedulersEnabled);
+            if (scheduler.defaultOffRequired() && schedulerEnabled) {
+                errors.add("production position-monitor scheduler must remain default-off");
+            }
+            if ("LOCKED_DOWN".equals(policy) && effectivelyEnabled) {
+                errors.add("production scheduler must be disabled under LOCKED_DOWN policy: " + scheduler.name());
+            }
+            if ("EXPLICIT_OPT_IN".equals(policy)
+                    && effectivelyEnabled
+                    && !"PROD_ALLOWED_EXPLICIT_OPT_IN".equals(classification)) {
+                errors.add("production scheduler enabled without explicit opt-in classification: " + scheduler.name());
+            }
+            if (effectivelyEnabled && ("PROD_BLOCKED".equals(classification) || "LOCAL_ONLY".equals(classification))) {
+                errors.add("production scheduler classification blocks enabled scheduler: " + scheduler.name());
+            }
         }
     }
 
@@ -162,6 +231,12 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
         if (isBlank(property(environment, propertyPrefix + ".base-url"))) {
             errors.add(displayName + " base URL missing for explicitly enabled production AI provider");
+        }
+    }
+
+    private record SchedulerPolicyItem(String name, String enabledProperty, boolean defaultOffRequired) {
+        String approvalProperty() {
+            return "trade-model.production.scheduler-approval." + name;
         }
     }
 

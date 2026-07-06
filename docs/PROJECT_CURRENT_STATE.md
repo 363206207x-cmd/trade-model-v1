@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF1 Status Source Cleanup
+Current Work Package: PDR-PF2 Production Scheduler Policy
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -47,6 +47,24 @@ The following prohibited items remain outside V1 scope:
 - no external push send
 - no fake positions
 - no fake review records
+
+
+## PDR-PF2 Production Scheduler Policy
+
+PDR-PF2 is the current scoped remediation package. It defines production scheduler policy, requires explicit production scheduler classification, and keeps production deployment fail-closed unless each scheduler is explicitly approved.
+
+Current production scheduler policy status:
+
+1. `application-prod.yml` exposes production scheduler flags as explicit default-off settings.
+2. `ProductionProfileSafetyGuard` rejects missing production scheduler policy and missing scheduler classifications.
+3. `LOCKED_DOWN` mode requires all production schedulers to stay disabled.
+4. `EXPLICIT_OPT_IN` mode requires scheduler-specific `PROD_ALLOWED_EXPLICIT_OPT_IN` classification before an effective scheduler can run.
+5. Position Monitor scheduler remains default-off and production guard rejects enabling it in this package.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommended remediation package after PDR-PF2: `PDR-PF3 PostgreSQL Migration Evidence`.
+
+---
 
 ## Effective State Rule
 
@@ -90,10 +108,10 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after the post-1068 / PDR-PF1 status-source cleanup:
+Only the following work is allowed during and after PDR-PF2 production scheduler policy:
 
-1. Status-source cleanup.
-2. The next explicitly scoped remediation package.
+1. Production scheduler policy / safety guard work.
+2. The next explicitly scoped remediation package after PDR-PF2, preferably PDR-PF3 PostgreSQL Migration Evidence.
 3. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
@@ -102,7 +120,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after the post-1068 / PDR-PF1 status-source cleanup:
+The following work remains blocked during and after PDR-PF2 production scheduler policy:
 
 1. no auto-open
 2. no auto-close

@@ -138,6 +138,76 @@ class ProductionProfileSafetyGuardTest {
                 .hasMessageContaining("production actuator web exposure must be limited to health");
     }
 
+
+    @Test
+    void rejectsMissingProductionSchedulerPolicy() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", " ");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production scheduler policy missing");
+    }
+
+    @Test
+    void rejectsMissingProductionSchedulerClassification() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-approval.push-recheck", "");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production scheduler classification missing for push-recheck");
+    }
+
+    @Test
+    void rejectsLockedDownPolicyWithGlobalSchedulerEnabled() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production global scheduler switch must be disabled under LOCKED_DOWN policy");
+    }
+
+    @Test
+    void rejectsSchedulerEnabledWithoutExplicitOptInClassification() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.push-recheck.enabled", "true");
+        environment.setProperty("trade-model.production.scheduler-approval.push-recheck", "PROD_BLOCKED");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production scheduler enabled without explicit opt-in classification: push-recheck")
+                .hasMessageContaining("production scheduler classification blocks enabled scheduler: push-recheck");
+    }
+
+    @Test
+    void allowsExplicitOptInSchedulerWhenClassificationApproves() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.push-recheck.enabled", "true");
+        environment.setProperty("trade-model.production.scheduler-approval.push-recheck", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsProductionPositionMonitorSchedulerEnabled() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.position-monitor.enabled", "true");
+        environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production position-monitor scheduler must remain default-off");
+    }
+
     @Test
     void allowsSafeExternalDatasourceLookingConfig() {
         MockEnvironment environment = safeEnvironment();
@@ -160,6 +230,20 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.auth.admin-username", "operator");
         environment.setProperty("trade-model.auth.admin-password", "configured-admin-password");
         environment.setProperty("management.endpoints.web.exposure.include", "health");
+        environment.setProperty("trade-model.production.scheduler-policy", "LOCKED_DOWN");
+        environment.setProperty("trade-model.schedulers.enabled", "false");
+        environment.setProperty("trade-model.schedulers.push-recheck.enabled", "false");
+        environment.setProperty("trade-model.schedulers.position-sync.enabled", "false");
+        environment.setProperty("trade-model.schedulers.market-data.enabled", "false");
+        environment.setProperty("trade-model.schedulers.watchlist.enabled", "false");
+        environment.setProperty("trade-model.schedulers.position-monitor.enabled", "false");
+        environment.setProperty("trade-model.analysis.scheduler.enabled", "false");
+        environment.setProperty("trade-model.production.scheduler-approval.push-recheck", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.production.scheduler-approval.position-sync", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.production.scheduler-approval.market-data", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.production.scheduler-approval.watchlist", "LOCAL_ONLY");
+        environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_DEFAULT_OFF");
+        environment.setProperty("trade-model.production.scheduler-approval.analysis", "PROD_ALLOWED_EXPLICIT_OPT_IN");
         return environment;
     }
 }
