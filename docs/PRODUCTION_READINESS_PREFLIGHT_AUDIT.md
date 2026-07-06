@@ -47,7 +47,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 | 11 | Review Center readonly behavior | PASS | `ReviewCenterServiceImplTest.emptySourcesReturnEmptyArraysWithoutSyntheticRows` proves empty arrays without synthetic records; mapping test uses existing readonly sources. |
 | 12 | Dashboard Home no fake position / no fake review behavior | PASS | `DashboardHomeServiceImplTest` proves open manual UserPosition is the source for home positions and LONG/SHORT PnL is calculated from real UserPosition plus monitor/quote data, without ExecutionPlan-to-position fallback. Review Center tests prove no fake review rows. |
 | 13 | Delivery-check and v1-state consistency | PASS | `bash scripts/v1-delivery-check.sh` PASS and `bash scripts/v1-state.sh` PASS on the clean branch before report generation. Both report `MAIN_SYNC: OK`; v1-state reports `PRODUCTION_DEPLOYMENT_READINESS: BLOCKED`. |
-| 14 | Production-readiness docs no longer contain stale PDR-only scope | FAIL | `PROJECT_CURRENT_STATE.md` and `GLOBAL_AUDIT_PROGRESS_REPORT.md` were corrected by #1067, but `ACTIVE_MAINLINE_STATUS.yml`, `CODEX_NEXT_TASK.yml`, and parts of `V1_PROGRESS_SOURCE_OF_TRUTH.md` still contain stale PDR-M3/PDR-M7 action wording. |
+| 14 | Production-readiness docs no longer contain stale PDR-only scope | PDR-PF1 CLEANUP | `PROJECT_CURRENT_STATE.md` and `GLOBAL_AUDIT_PROGRESS_REPORT.md` were corrected by #1067. PDR-PF1 updates `ACTIVE_MAINLINE_STATUS.yml`, `CODEX_NEXT_TASK.yml`, and `V1_PROGRESS_SOURCE_OF_TRUTH.md` so PDR-M7 is historical evidence, not the only currently allowed work. |
 | 15 | Production readiness remains BLOCKED unless every gate is proven | PASS | Current source-of-truth and delivery matrix still keep `PRODUCTION_DEPLOYMENT_READINESS: BLOCKED`; this audit does not loosen that gate. |
 
 ## Blocker List
@@ -61,13 +61,12 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 7. Production scheduler policy is not fully locked; multiple non-analysis schedulers default true unless explicitly disabled.
 8. Live provider proof is missing for Binance public market data and optional AI/external-context providers.
 9. Push Recheck quote-unavailable behavior needs a focused test-only guard, even though implementation fail-closes.
-10. Production-readiness source-of-truth docs still contain stale PDR-only wording outside the two #1067-updated docs.
 11. Metrics dashboards, log aggregation, alerting, and operational incident evidence are missing.
 12. No completed production release-gate evidence bundle exists.
 
 ## Required Remediation Packages
 
-1. `PDR-PF1 Status Source Cleanup`: update stale production-readiness docs (`ACTIVE_MAINLINE_STATUS.yml`, `CODEX_NEXT_TASK.yml`, `V1_PROGRESS_SOURCE_OF_TRUTH.md`) so they no longer imply old PDR-only scope.
+1. `PDR-PF1 Status Source Cleanup`: current cleanup package; updates stale production-readiness docs so they no longer imply old PDR-only scope.
 2. `PDR-PF2 Production Scheduler Policy`: explicitly define production scheduler defaults and required env overrides; keep Position Monitor default-off unless separately approved.
 3. `PDR-PF3 PostgreSQL Migration Evidence`: run Flyway migrations against empty PostgreSQL with retained logs and prove V1/V2/V3 success.
 4. `PDR-PF4 Current-State Migration + Rollback Drill`: rehearse migration from a current-main-like database state, including backup, restore, and rollback verification evidence.

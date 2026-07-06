@@ -31,6 +31,16 @@
   - no fake positions
   - no fake review records
 
+## Post-1068 / PDR-PF1 Status Source Cleanup
+
+- PR #1068 production-readiness preflight audit is merged into `main`.
+- Current Work Package: PDR-PF1 Status Source Cleanup.
+- V1 remains local acceptance-ready.
+- Production readiness remains BLOCKED.
+- Production deployment cannot proceed.
+- PDR-M7 is historical production-readiness evidence, not the only currently allowed work.
+- Next scoped remediation/business package is allowed, but production deployment remains blocked until every production gate is proven and explicitly approved.
+
 ## Scope
 
 This package closes selected V1 gaps from the replay / AI conflict scheme and the position monitor scheme. It remains a read-only / review-only trading decision assistant. It does not introduce exchange order execution or external push sending.
