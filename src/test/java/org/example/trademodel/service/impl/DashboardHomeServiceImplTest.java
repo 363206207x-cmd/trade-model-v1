@@ -392,7 +392,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void homePositionUsesLatestPersistedMonitorLogWithoutCalculatingPnl() {
+    void homePositionUsesLatestPersistedMonitorLogAndCalculatesLongPnl() {
         UserPositionVO position = new UserPositionVO();
         position.setId(9L);
         position.setAssetSymbol("BTCUSDT");
@@ -417,7 +417,38 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.PositionVO homePosition = home.getPositions().get(0);
         assertThat(homePosition.getCurrentPrice()).isEqualByComparingTo("63500");
         assertThat(homePosition.getMonitorConclusion()).isEqualTo("FOLLOW_PLAN");
-        assertThat(homePosition.getFloatingPnl()).isNull();
+        assertThat(homePosition.getFloatingPnl()).isEqualByComparingTo("300.0");
+        assertThat(homePosition.getPnlPct()).isEqualByComparingTo("2.41935500");
+        assertThat(homePosition.getAccountImpactPct()).isEqualByComparingTo("4.83871000");
+    }
+
+    @Test
+    void homePositionCalculatesShortPnlWithoutExecutionPlanFallback() {
+        UserPositionVO position = new UserPositionVO();
+        position.setId(10L);
+        position.setAssetSymbol("ETHUSDT");
+        position.setSide("SHORT");
+        position.setStatus("OPEN");
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(new BigDecimal("2"));
+        position.setLeverage(new BigDecimal("3"));
+        position.setSourceType("MANUAL");
+
+        PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
+        monitorLog.setPositionId(10L);
+        monitorLog.setCurrentPrice(new BigDecimal("90"));
+        monitorLog.setLogicStatus("LOGIC_VALID");
+
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionId(10L, 1)).thenReturn(List.of(monitorLog));
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        DashboardHomeVO.PositionVO homePosition = home.getPositions().get(0);
+        assertThat(homePosition.getFloatingPnl()).isEqualByComparingTo("20");
+        assertThat(homePosition.getPnlPct()).isEqualByComparingTo("10.00000000");
+        assertThat(homePosition.getAccountImpactPct()).isEqualByComparingTo("30.00000000");
+        assertThat(homePosition.getSuggestedManualActionText()).isEqualTo("人工复核");
     }
 
     @Test

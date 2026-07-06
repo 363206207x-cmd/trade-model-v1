@@ -115,7 +115,12 @@ class PositionMonitorServiceImplTest {
         PositionMonitorResultDTO result = service.monitorUserPosition(1L);
 
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(result.getEntryLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(result.getDirectionSupportStatus()).isEqualTo("SUPPORTED");
+        assertThat(result.getReversalStatus()).isEqualTo("NO_REVERSAL_SIGNAL");
         assertThat(result.getSuggestedAction()).isEqualTo("HOLD");
+        assertThat(result.getSuggestedManualAction()).isEqualTo("HOLD");
+        assertThat(result.getSuggestedManualActionText()).contains("人工");
         assertThat(result.isNearStopLoss()).isFalse();
         assertThat(result.isNearTakeProfit()).isFalse();
         assertThat(result.getMonitorLogId()).isNotNull();

@@ -22,6 +22,8 @@ import org.example.trademodel.service.HotResetCommand;
 import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
+import org.example.trademodel.service.support.RuleConfigContractService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +59,7 @@ public class HotResetServiceImpl implements HotResetService {
     private final ConfusedStateService confusedStateService;
     private final UserPositionRiskAdapter userPositionRiskAdapter;
     private final ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider;
+    private final RuleConfigContractService ruleConfigContractService;
 
     public HotResetServiceImpl(AssetStateMapper assetStateMapper,
                                HotResetEventMapper hotResetEventMapper,
@@ -66,6 +69,20 @@ public class HotResetServiceImpl implements HotResetService {
                                ConfusedStateService confusedStateService,
                                UserPositionRiskAdapter userPositionRiskAdapter,
                                ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider) {
+        this(assetStateMapper, hotResetEventMapper, decisionResultMapper, executionPlanMapper, pushSnapshotMapper,
+                confusedStateService, userPositionRiskAdapter, analysisSchedulerServiceProvider, null);
+    }
+
+    @Autowired
+    public HotResetServiceImpl(AssetStateMapper assetStateMapper,
+                               HotResetEventMapper hotResetEventMapper,
+                               DecisionResultMapper decisionResultMapper,
+                               ExecutionPlanMapper executionPlanMapper,
+                               PushSnapshotMapper pushSnapshotMapper,
+                               ConfusedStateService confusedStateService,
+                               UserPositionRiskAdapter userPositionRiskAdapter,
+                               ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider,
+                               RuleConfigContractService ruleConfigContractService) {
         this.assetStateMapper = assetStateMapper;
         this.hotResetEventMapper = hotResetEventMapper;
         this.decisionResultMapper = decisionResultMapper;
@@ -74,6 +91,7 @@ public class HotResetServiceImpl implements HotResetService {
         this.confusedStateService = confusedStateService;
         this.userPositionRiskAdapter = userPositionRiskAdapter;
         this.analysisSchedulerServiceProvider = analysisSchedulerServiceProvider;
+        this.ruleConfigContractService = ruleConfigContractService;
     }
 
     @Override
@@ -83,13 +101,13 @@ public class HotResetServiceImpl implements HotResetService {
 
     @Override
     public boolean shouldTriggerHotReset(HotResetCommand command) {
-        return HotResetPolicy.evaluate(command).isTriggered();
+        return evaluatePolicy(command).isTriggered();
     }
 
     @Override
     @Transactional
     public HotResetResult evaluateAndExecute(HotResetCommand command) {
-        HotResetPolicy.Evaluation evaluation = HotResetPolicy.evaluate(command);
+        HotResetPolicy.Evaluation evaluation = evaluatePolicy(command);
         HotResetResult result = baseResult(command, evaluation);
         if (!evaluation.isTriggered()) {
             result.setExecutionStatus("NOT_TRIGGERED");
@@ -169,6 +187,17 @@ public class HotResetServiceImpl implements HotResetService {
         command.setDecisionContext(context);
         evaluateAndExecute(command);
         return currentResult;
+    }
+
+    private HotResetPolicy.Evaluation evaluatePolicy(HotResetCommand command) {
+        try {
+            HotResetPolicy.Thresholds thresholds = ruleConfigContractService != null
+                    ? ruleConfigContractService.requireHotResetThresholds()
+                    : null;
+            return HotResetPolicy.evaluate(command, thresholds);
+        } catch (RuntimeException ex) {
+            return HotResetPolicy.Evaluation.notTriggered("HOT_RESET_CONFIG_NOT_READY", List.of(redact(ex.getMessage())));
+        }
     }
 
     private HotResetResult baseResult(HotResetCommand command, HotResetPolicy.Evaluation evaluation) {

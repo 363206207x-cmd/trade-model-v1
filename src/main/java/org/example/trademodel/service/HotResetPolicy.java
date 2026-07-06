@@ -10,16 +10,18 @@ import java.util.List;
 
 public final class HotResetPolicy {
 
-    public static final BigDecimal EXTREME_PRICE_MOVE_RATIO_THRESHOLD = new BigDecimal("0.08");
-    public static final BigDecimal OI_COLLAPSE_CHANGE_RATIO_THRESHOLD = new BigDecimal("-0.30");
-    public static final BigDecimal LIQUIDITY_DRAIN_CHANGE_RATIO_THRESHOLD = new BigDecimal("-0.40");
-    public static final int SYSTEMIC_SHOCK_SEVERITY_THRESHOLD = 85;
-
     private HotResetPolicy() {
     }
 
     public static Evaluation evaluate(HotResetCommand command) {
+        return Evaluation.notTriggered("HOT_RESET_CONFIG_NOT_READY");
+    }
+
+    public static Evaluation evaluate(HotResetCommand command, Thresholds thresholds) {
         List<String> reasons = new ArrayList<>();
+        if (thresholds == null) {
+            return Evaluation.notTriggered("HOT_RESET_CONFIG_NOT_READY");
+        }
         if (command == null) {
             return Evaluation.notTriggered("COMMAND_MISSING");
         }
@@ -34,10 +36,10 @@ public final class HotResetPolicy {
         }
         HotResetEventTypeEnum type = command.getEventType();
         return switch (type) {
-            case EXTREME_PRICE_MOVE -> evaluateExtremePriceMove(command, reasons);
-            case OI_COLLAPSE -> evaluateOiCollapse(command, reasons);
-            case LIQUIDITY_DRAIN -> evaluateLiquidityDrain(command, reasons);
-            case SYSTEMIC_SHOCK -> evaluateSystemicShock(command, reasons);
+            case EXTREME_PRICE_MOVE -> evaluateExtremePriceMove(command, reasons, thresholds);
+            case OI_COLLAPSE -> evaluateOiCollapse(command, reasons, thresholds);
+            case LIQUIDITY_DRAIN -> evaluateLiquidityDrain(command, reasons, thresholds);
+            case SYSTEMIC_SHOCK -> evaluateSystemicShock(command, reasons, thresholds);
         };
     }
 
@@ -78,7 +80,8 @@ public final class HotResetPolicy {
         }
     }
 
-    private static Evaluation evaluateExtremePriceMove(HotResetCommand command, List<String> reasons) {
+    private static Evaluation evaluateExtremePriceMove(HotResetCommand command, List<String> reasons,
+                                                       Thresholds thresholds) {
         BigDecimal ratio = absoluteRatio(command.getPriceMoveRatio());
         if (ratio == null) {
             ratio = absoluteRatio(calculateRatio(command.getCurrentPrice(), command.getReferencePrice()));
@@ -87,13 +90,15 @@ public final class HotResetPolicy {
             return Evaluation.notTriggered("PRICE_MOVE_EVIDENCE_MISSING");
         }
         reasons.add("PRICE_MOVE_RATIO=" + ratio);
-        if (ratio.compareTo(EXTREME_PRICE_MOVE_RATIO_THRESHOLD) >= 0) {
+        reasons.add("CONFIG_THRESHOLD=" + thresholds.getExtremePriceMoveRatioThreshold());
+        if (ratio.compareTo(thresholds.getExtremePriceMoveRatioThreshold()) >= 0) {
             return Evaluation.triggered("EXTREME_PRICE_MOVE_THRESHOLD_REACHED", reasons);
         }
         return Evaluation.notTriggered("PRICE_MOVE_BELOW_THRESHOLD", reasons);
     }
 
-    private static Evaluation evaluateOiCollapse(HotResetCommand command, List<String> reasons) {
+    private static Evaluation evaluateOiCollapse(HotResetCommand command, List<String> reasons,
+                                                 Thresholds thresholds) {
         if (isBlank(command.getSourceType()) || isBlank(command.getSourceReference())) {
             return Evaluation.notTriggered("OI_SOURCE_MISSING");
         }
@@ -105,13 +110,15 @@ public final class HotResetPolicy {
             return Evaluation.notTriggered("OI_EVIDENCE_MISSING");
         }
         reasons.add("OPEN_INTEREST_CHANGE_RATIO=" + ratio);
-        if (ratio.compareTo(OI_COLLAPSE_CHANGE_RATIO_THRESHOLD) <= 0) {
+        reasons.add("CONFIG_THRESHOLD=" + thresholds.getOiCollapseChangeRatioThreshold());
+        if (ratio.compareTo(thresholds.getOiCollapseChangeRatioThreshold()) <= 0) {
             return Evaluation.triggered("OI_COLLAPSE_THRESHOLD_REACHED", reasons);
         }
         return Evaluation.notTriggered("OI_COLLAPSE_BELOW_THRESHOLD", reasons);
     }
 
-    private static Evaluation evaluateLiquidityDrain(HotResetCommand command, List<String> reasons) {
+    private static Evaluation evaluateLiquidityDrain(HotResetCommand command, List<String> reasons,
+                                                     Thresholds thresholds) {
         BigDecimal ratio = command.getLiquidityChangeRatio();
         if (ratio == null) {
             ratio = calculateRatio(command.getCurrentLiquidity(), command.getBaselineLiquidity());
@@ -120,13 +127,15 @@ public final class HotResetPolicy {
             return Evaluation.notTriggered("LIQUIDITY_EVIDENCE_MISSING");
         }
         reasons.add("LIQUIDITY_CHANGE_RATIO=" + ratio);
-        if (ratio.compareTo(LIQUIDITY_DRAIN_CHANGE_RATIO_THRESHOLD) <= 0) {
+        reasons.add("CONFIG_THRESHOLD=" + thresholds.getLiquidityDrainChangeRatioThreshold());
+        if (ratio.compareTo(thresholds.getLiquidityDrainChangeRatioThreshold()) <= 0) {
             return Evaluation.triggered("LIQUIDITY_DRAIN_THRESHOLD_REACHED", reasons);
         }
         return Evaluation.notTriggered("LIQUIDITY_DRAIN_BELOW_THRESHOLD", reasons);
     }
 
-    private static Evaluation evaluateSystemicShock(HotResetCommand command, List<String> reasons) {
+    private static Evaluation evaluateSystemicShock(HotResetCommand command, List<String> reasons,
+                                                    Thresholds thresholds) {
         if (!Boolean.TRUE.equals(command.getSystemicShock())) {
             return Evaluation.notTriggered("SYSTEMIC_SHOCK_FALSE");
         }
@@ -135,7 +144,8 @@ public final class HotResetPolicy {
         }
         int severity = command.getSeverityScore() != null ? command.getSeverityScore() : 0;
         reasons.add("SYSTEMIC_SHOCK_SEVERITY=" + severity);
-        if (severity >= SYSTEMIC_SHOCK_SEVERITY_THRESHOLD) {
+        reasons.add("CONFIG_THRESHOLD=" + thresholds.getSystemicShockSeverityThreshold());
+        if (severity >= thresholds.getSystemicShockSeverityThreshold()) {
             return Evaluation.triggered("SYSTEMIC_SHOCK_THRESHOLD_REACHED", reasons);
         }
         return Evaluation.notTriggered("SYSTEMIC_SHOCK_BELOW_THRESHOLD", reasons);
@@ -192,5 +202,47 @@ public final class HotResetPolicy {
         public boolean isTriggered() { return triggered; }
         public String getReasonCode() { return reasonCode; }
         public List<String> getReasonCodes() { return reasonCodes; }
+    }
+
+    public static final class Thresholds {
+        private final BigDecimal extremePriceMoveRatioThreshold;
+        private final BigDecimal oiCollapseChangeRatioThreshold;
+        private final BigDecimal liquidityDrainChangeRatioThreshold;
+        private final int systemicShockSeverityThreshold;
+
+        public Thresholds(BigDecimal extremePriceMoveRatioThreshold,
+                          BigDecimal oiCollapseChangeRatioThreshold,
+                          BigDecimal liquidityDrainChangeRatioThreshold,
+                          int systemicShockSeverityThreshold) {
+            this.extremePriceMoveRatioThreshold = requirePositive(
+                    extremePriceMoveRatioThreshold, "hot_reset_config.extreme_price_move_ratio_threshold");
+            this.oiCollapseChangeRatioThreshold = requireNegative(
+                    oiCollapseChangeRatioThreshold, "hot_reset_config.oi_collapse_change_ratio_threshold");
+            this.liquidityDrainChangeRatioThreshold = requireNegative(
+                    liquidityDrainChangeRatioThreshold, "hot_reset_config.liquidity_drain_change_ratio_threshold");
+            if (systemicShockSeverityThreshold < 0 || systemicShockSeverityThreshold > 100) {
+                throw new IllegalStateException("hot_reset_config.systemic_shock_severity_threshold must be 0..100");
+            }
+            this.systemicShockSeverityThreshold = systemicShockSeverityThreshold;
+        }
+
+        public BigDecimal getExtremePriceMoveRatioThreshold() { return extremePriceMoveRatioThreshold; }
+        public BigDecimal getOiCollapseChangeRatioThreshold() { return oiCollapseChangeRatioThreshold; }
+        public BigDecimal getLiquidityDrainChangeRatioThreshold() { return liquidityDrainChangeRatioThreshold; }
+        public int getSystemicShockSeverityThreshold() { return systemicShockSeverityThreshold; }
+
+        private static BigDecimal requirePositive(BigDecimal value, String key) {
+            if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalStateException(key + " must be positive");
+            }
+            return value;
+        }
+
+        private static BigDecimal requireNegative(BigDecimal value, String key) {
+            if (value == null || value.compareTo(BigDecimal.ZERO) >= 0) {
+                throw new IllegalStateException(key + " must be negative");
+            }
+            return value;
+        }
     }
 }

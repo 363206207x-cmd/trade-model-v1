@@ -519,10 +519,18 @@ public class DashboardHomeVO {
         private BigDecimal entryPrice;
         private BigDecimal currentPrice;
         private BigDecimal floatingPnl;
+        private BigDecimal pnlPct;
+        private BigDecimal accountImpactPct;
         private BigDecimal leverage;
         private BigDecimal positionSize;
         private String positionStatus;
         private String monitorConclusion;
+        private String entryLogicStatus;
+        private String directionSupportStatus;
+        private String reversalStatus;
+        private String riskLevel;
+        private String suggestedManualAction;
+        private String suggestedManualActionText;
         private LocalDateTime updatedAt;
 
         public Long getPositionId() {
@@ -573,6 +581,22 @@ public class DashboardHomeVO {
             this.floatingPnl = floatingPnl;
         }
 
+        public BigDecimal getPnlPct() {
+            return pnlPct;
+        }
+
+        public void setPnlPct(BigDecimal pnlPct) {
+            this.pnlPct = pnlPct;
+        }
+
+        public BigDecimal getAccountImpactPct() {
+            return accountImpactPct;
+        }
+
+        public void setAccountImpactPct(BigDecimal accountImpactPct) {
+            this.accountImpactPct = accountImpactPct;
+        }
+
         public BigDecimal getLeverage() {
             return leverage;
         }
@@ -603,6 +627,54 @@ public class DashboardHomeVO {
 
         public void setMonitorConclusion(String monitorConclusion) {
             this.monitorConclusion = monitorConclusion;
+        }
+
+        public String getEntryLogicStatus() {
+            return entryLogicStatus;
+        }
+
+        public void setEntryLogicStatus(String entryLogicStatus) {
+            this.entryLogicStatus = entryLogicStatus;
+        }
+
+        public String getDirectionSupportStatus() {
+            return directionSupportStatus;
+        }
+
+        public void setDirectionSupportStatus(String directionSupportStatus) {
+            this.directionSupportStatus = directionSupportStatus;
+        }
+
+        public String getReversalStatus() {
+            return reversalStatus;
+        }
+
+        public void setReversalStatus(String reversalStatus) {
+            this.reversalStatus = reversalStatus;
+        }
+
+        public String getRiskLevel() {
+            return riskLevel;
+        }
+
+        public void setRiskLevel(String riskLevel) {
+            this.riskLevel = riskLevel;
+        }
+
+        public String getSuggestedManualAction() {
+            return suggestedManualAction;
+        }
+
+        public void setSuggestedManualAction(String suggestedManualAction) {
+            this.suggestedManualAction = suggestedManualAction;
+        }
+
+        public String getSuggestedManualActionText() {
+            return suggestedManualActionText;
+        }
+
+        public void setSuggestedManualActionText(String suggestedManualActionText) {
+            this.suggestedManualActionText = suggestedManualActionText;
         }
 
         public LocalDateTime getUpdatedAt() {

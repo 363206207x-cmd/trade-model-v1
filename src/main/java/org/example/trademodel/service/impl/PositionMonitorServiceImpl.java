@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -256,6 +257,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setStopLoss(stopLoss);
         result.setTakeProfit(takeProfit);
         result.setLogicStatus(logicStatus);
+        result.setEntryLogicStatus(logicStatus);
+        result.setDirectionSupportStatus(directionSupportStatus(logicStatus));
+        result.setReversalStatus(reversalStatus(planInvalidated, stopLossBreached, externalBlocked, riskBlocked));
         result.setRiskLevel(riskLevel);
         result.setRiskBlocked(riskBlocked);
         result.setRiskIncreased(riskIncreased);
@@ -264,6 +268,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setStopLossBreached(stopLossBreached);
         result.setTakeProfitReached(takeProfitReached);
         result.setSuggestedAction(suggestedAction);
+        result.setSuggestedManualAction(suggestedAction);
+        result.setSuggestedManualActionText(suggestedActionText(suggestedAction));
+        applyPnl(result, side, position.getEntryPrice(), currentPrice, position.getQuantity(), position.getLeverage());
         result.setReasonCodes(new ArrayList<>(reasons));
         applyExternalContext(result, externalContext);
         result.setMonitorLogId(log.getLogId());
@@ -303,6 +310,64 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         } catch (RuntimeException ex) {
             return UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE");
         }
+    }
+
+    private static void applyPnl(PositionMonitorResultDTO result, String side, BigDecimal entryPrice,
+                                 BigDecimal currentPrice, BigDecimal quantity, BigDecimal leverage) {
+        if (!positive(entryPrice) || !positive(currentPrice)) {
+            return;
+        }
+        BigDecimal pct;
+        if ("SHORT".equals(side)) {
+            pct = entryPrice.subtract(currentPrice).divide(entryPrice, 8, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"));
+        } else {
+            pct = currentPrice.subtract(entryPrice).divide(entryPrice, 8, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"));
+        }
+        result.setPnlPct(pct);
+        if (positive(quantity)) {
+            BigDecimal unitPnl = "SHORT".equals(side)
+                    ? entryPrice.subtract(currentPrice)
+                    : currentPrice.subtract(entryPrice);
+            result.setPnlAmount(unitPnl.multiply(quantity));
+        }
+        if (positive(leverage)) {
+            result.setAccountImpactPct(pct.multiply(leverage));
+        }
+    }
+
+    private static String directionSupportStatus(String logicStatus) {
+        return switch (normalize(logicStatus)) {
+            case "LOGIC_VALID" -> "SUPPORTED";
+            case "LOGIC_WEAKENED" -> "WEAKENED";
+            case "PLAN_INVALIDATED" -> "NOT_SUPPORTED";
+            case "HIGH_RISK" -> "RISK_BLOCKED";
+            default -> "WAITING_REVIEW";
+        };
+    }
+
+    private static String reversalStatus(boolean planInvalidated, boolean stopLossBreached,
+                                         boolean externalBlocked, boolean riskBlocked) {
+        if (riskBlocked || externalBlocked) {
+            return "RISK_REVIEW";
+        }
+        if (planInvalidated || stopLossBreached) {
+            return "MANUAL_REVIEW_REQUIRED";
+        }
+        return "NO_REVERSAL_SIGNAL";
+    }
+
+    private static String suggestedActionText(String suggestedAction) {
+        return switch (normalize(suggestedAction)) {
+            case "HOLD" -> "继续人工观察";
+            case "MANUAL_REVIEW" -> "人工复核";
+            case "TIGHTEN_STOP_REVIEW" -> "复核是否收紧止损";
+            case "REDUCE_POSITION_REVIEW" -> "复核是否降低仓位";
+            case "RECHECK_PLAN" -> "复核执行计划";
+            case "RISK_REVIEW" -> "风险复核";
+            default -> "人工复核";
+        };
     }
 
     private PlanContext resolvePlanContext(UserPositionDO position, Set<String> reasons) {

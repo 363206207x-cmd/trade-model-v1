@@ -79,7 +79,22 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         summary.setPushReviewCount(vo.getPushReviews().size());
         summary.setRuleFeedbackCount(vo.getRuleFeedback().size());
         vo.setSummary(summary);
+        vo.setDiagnostics(buildDiagnostics(vo));
         return vo;
+    }
+
+    private ReviewCenterDashboardVO.Diagnostics buildDiagnostics(ReviewCenterDashboardVO vo) {
+        ReviewCenterDashboardVO.Diagnostics diagnostics = new ReviewCenterDashboardVO.Diagnostics();
+        diagnostics.setPositionReviewStatus(sourceStatus(vo.getPositionReviews().size()));
+        diagnostics.setOpportunityLogStatus(sourceStatus(vo.getOpportunityReviews().size()));
+        diagnostics.setPushRecheckStatus(sourceStatus(vo.getPushReviews().size()));
+        diagnostics.setRuleFeedbackStatus(sourceStatus(vo.getRuleFeedback().size()));
+        diagnostics.setReviewCenterStatus("READY_READONLY");
+        return diagnostics;
+    }
+
+    private static String sourceStatus(int count) {
+        return count > 0 ? "READY" : "EMPTY";
     }
 
     private List<ReviewCenterDashboardVO.PositionReviewItem> positionReviews() {

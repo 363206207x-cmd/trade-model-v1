@@ -50,6 +50,10 @@ trade-model:
       enabled: ${TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED:true}
     position-sync:
       enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:true}
+    position-monitor:
+      enabled: ${TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED:false}
+      initial-delay-ms: ${TRADE_MODEL_POSITION_MONITOR_INITIAL_DELAY_MS:15000}
+      fixed-rate-ms: ${TRADE_MODEL_POSITION_MONITOR_FIXED_RATE_MS:30000}
     market-data:
       enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:true}
     watchlist:

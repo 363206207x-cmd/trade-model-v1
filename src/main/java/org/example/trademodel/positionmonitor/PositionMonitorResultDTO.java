@@ -18,6 +18,9 @@ public class PositionMonitorResultDTO {
     private BigDecimal stopLoss;
     private BigDecimal takeProfit;
     private String logicStatus;
+    private String entryLogicStatus;
+    private String directionSupportStatus;
+    private String reversalStatus;
     private String riskLevel;
     private boolean riskBlocked;
     private boolean riskIncreased;
@@ -26,6 +29,11 @@ public class PositionMonitorResultDTO {
     private boolean stopLossBreached;
     private boolean takeProfitReached;
     private String suggestedAction;
+    private String suggestedManualAction;
+    private String suggestedManualActionText;
+    private BigDecimal pnlPct;
+    private BigDecimal pnlAmount;
+    private BigDecimal accountImpactPct;
     private List<String> reasonCodes = new ArrayList<>();
     private String externalContextStatus;
     private Integer activeExternalEventCount;
@@ -72,6 +80,12 @@ public class PositionMonitorResultDTO {
     public void setTakeProfit(BigDecimal takeProfit) { this.takeProfit = takeProfit; }
     public String getLogicStatus() { return logicStatus; }
     public void setLogicStatus(String logicStatus) { this.logicStatus = logicStatus; }
+    public String getEntryLogicStatus() { return entryLogicStatus; }
+    public void setEntryLogicStatus(String entryLogicStatus) { this.entryLogicStatus = entryLogicStatus; }
+    public String getDirectionSupportStatus() { return directionSupportStatus; }
+    public void setDirectionSupportStatus(String directionSupportStatus) { this.directionSupportStatus = directionSupportStatus; }
+    public String getReversalStatus() { return reversalStatus; }
+    public void setReversalStatus(String reversalStatus) { this.reversalStatus = reversalStatus; }
     public String getRiskLevel() { return riskLevel; }
     public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
     public boolean isRiskBlocked() { return riskBlocked; }
@@ -88,6 +102,16 @@ public class PositionMonitorResultDTO {
     public void setTakeProfitReached(boolean takeProfitReached) { this.takeProfitReached = takeProfitReached; }
     public String getSuggestedAction() { return suggestedAction; }
     public void setSuggestedAction(String suggestedAction) { this.suggestedAction = suggestedAction; }
+    public String getSuggestedManualAction() { return suggestedManualAction; }
+    public void setSuggestedManualAction(String suggestedManualAction) { this.suggestedManualAction = suggestedManualAction; }
+    public String getSuggestedManualActionText() { return suggestedManualActionText; }
+    public void setSuggestedManualActionText(String suggestedManualActionText) { this.suggestedManualActionText = suggestedManualActionText; }
+    public BigDecimal getPnlPct() { return pnlPct; }
+    public void setPnlPct(BigDecimal pnlPct) { this.pnlPct = pnlPct; }
+    public BigDecimal getPnlAmount() { return pnlAmount; }
+    public void setPnlAmount(BigDecimal pnlAmount) { this.pnlAmount = pnlAmount; }
+    public BigDecimal getAccountImpactPct() { return accountImpactPct; }
+    public void setAccountImpactPct(BigDecimal accountImpactPct) { this.accountImpactPct = accountImpactPct; }
     public List<String> getReasonCodes() { return Collections.unmodifiableList(reasonCodes); }
     public void setReasonCodes(List<String> reasonCodes) { this.reasonCodes = reasonCodes == null ? new ArrayList<>() : new ArrayList<>(reasonCodes); }
     public String getExternalContextStatus() { return externalContextStatus; }

@@ -6,6 +6,8 @@ import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.service.DashboardHomeService;
@@ -25,9 +27,11 @@ import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -74,6 +78,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     private final ProviderReadinessService providerReadinessService;
     private final ObjectMapper objectMapper;
+    private final MarketQuoteClient marketQuoteClient;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -85,6 +90,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
                                     ProviderReadinessService providerReadinessService,
                                     ObjectMapper objectMapper) {
+        this(decisionService, monitorService, userPositionService, positionMonitorLogService, positionSyncService,
+                pushSnapshotMapper, pushRecheckLogMapper, externalContextEvidenceBuilder, providerReadinessService,
+                objectMapper, null);
+    }
+
+    @Autowired
+    public DashboardHomeServiceImpl(DecisionService decisionService,
+                                    MonitorService monitorService,
+                                    UserPositionService userPositionService,
+                                    PositionMonitorLogService positionMonitorLogService,
+                                    PositionSyncService positionSyncService,
+                                    PushSnapshotMapper pushSnapshotMapper,
+                                    PushRecheckLogMapper pushRecheckLogMapper,
+                                    ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
+                                    ProviderReadinessService providerReadinessService,
+                                    ObjectMapper objectMapper,
+                                    MarketQuoteClient marketQuoteClient) {
         this.decisionService = decisionService;
         this.monitorService = monitorService;
         this.userPositionService = userPositionService;
@@ -95,6 +117,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
         this.providerReadinessService = providerReadinessService;
         this.objectMapper = objectMapper;
+        this.marketQuoteClient = marketQuoteClient;
     }
 
     @Override
@@ -338,12 +361,21 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
             row.setDirection(trimToNull(position.getSide()));
             row.setEntryPrice(position.getEntryPrice());
-            row.setCurrentPrice(latestMonitorLog != null ? latestMonitorLog.getCurrentPrice() : null);
-            row.setFloatingPnl(null);
+            BigDecimal currentPrice = latestMonitorLog != null && positive(latestMonitorLog.getCurrentPrice())
+                    ? latestMonitorLog.getCurrentPrice()
+                    : safeCurrentPrice(position.getAssetSymbol());
+            row.setCurrentPrice(currentPrice);
+            applyPositionPnl(row, position, currentPrice);
             row.setLeverage(position.getLeverage());
             row.setPositionSize(position.getQuantity());
             row.setPositionStatus(trimToNull(position.getStatus()));
             row.setMonitorConclusion(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null);
+            row.setEntryLogicStatus(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : "WAITING_MONITOR");
+            row.setDirectionSupportStatus(directionSupportStatus(latestMonitorLog));
+            row.setReversalStatus(reversalStatus(latestMonitorLog));
+            row.setRiskLevel(latestMonitorLog != null ? trimToNull(latestMonitorLog.getRiskLevel()) : "WAITING_SYNC");
+            row.setSuggestedManualAction(latestMonitorLog != null ? trimToNull(latestMonitorLog.getSuggestedAction()) : "MANUAL_REVIEW");
+            row.setSuggestedManualActionText(suggestedActionText(row.getSuggestedManualAction(), latestMonitorLog));
             row.setUpdatedAt(position.getUpdatedAt());
             rows.add(row);
         }
@@ -367,6 +399,78 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         } catch (RuntimeException ignored) {
             return null;
         }
+    }
+
+    private BigDecimal safeCurrentPrice(String assetSymbol) {
+        String symbol = trimToNull(assetSymbol);
+        if (symbol == null || marketQuoteClient == null) {
+            return null;
+        }
+        try {
+            MarketQuoteSnapshot snapshot = marketQuoteClient.fetch24hTicker(symbol).orElse(null);
+            return snapshot != null && positive(snapshot.getLastPrice()) ? snapshot.getLastPrice() : null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void applyPositionPnl(DashboardHomeVO.PositionVO row, UserPositionVO position, BigDecimal currentPrice) {
+        if (row == null || position == null || !positive(position.getEntryPrice()) || !positive(currentPrice)) {
+            return;
+        }
+        String side = trimToNull(position.getSide());
+        BigDecimal pnlPct = "SHORT".equalsIgnoreCase(side)
+                ? position.getEntryPrice().subtract(currentPrice).divide(position.getEntryPrice(), 8, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100"))
+                : currentPrice.subtract(position.getEntryPrice()).divide(position.getEntryPrice(), 8, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("100"));
+        row.setPnlPct(pnlPct);
+        if (positive(position.getQuantity())) {
+            BigDecimal unitPnl = "SHORT".equalsIgnoreCase(side)
+                    ? position.getEntryPrice().subtract(currentPrice)
+                    : currentPrice.subtract(position.getEntryPrice());
+            row.setFloatingPnl(unitPnl.multiply(position.getQuantity()));
+        }
+        if (positive(position.getLeverage())) {
+            row.setAccountImpactPct(pnlPct.multiply(position.getLeverage()));
+        }
+    }
+
+    private String directionSupportStatus(PositionMonitorLogDTO latestMonitorLog) {
+        String logic = latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null;
+        return switch (logic == null ? "" : logic.toUpperCase(Locale.ROOT)) {
+            case "LOGIC_VALID" -> "SUPPORTED";
+            case "LOGIC_WEAKENED" -> "WEAKENED";
+            case "PLAN_INVALIDATED" -> "NOT_SUPPORTED";
+            case "HIGH_RISK" -> "RISK_BLOCKED";
+            default -> "WAITING_SYNC";
+        };
+    }
+
+    private String reversalStatus(PositionMonitorLogDTO latestMonitorLog) {
+        String logic = latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null;
+        if ("PLAN_INVALIDATED".equalsIgnoreCase(logic)) {
+            return "MANUAL_REVIEW_REQUIRED";
+        }
+        if ("HIGH_RISK".equalsIgnoreCase(logic)) {
+            return "RISK_REVIEW";
+        }
+        return latestMonitorLog == null ? "WAITING_MONITOR" : "NO_REVERSAL_SIGNAL";
+    }
+
+    private String suggestedActionText(String suggestedAction, PositionMonitorLogDTO latestMonitorLog) {
+        if (latestMonitorLog == null) {
+            return "等待监控";
+        }
+        return switch (suggestedAction == null ? "" : suggestedAction.toUpperCase(Locale.ROOT)) {
+            case "HOLD" -> "人工继续观察";
+            case "MANUAL_REVIEW" -> "人工复核";
+            case "TIGHTEN_STOP_REVIEW" -> "复核是否收紧止损";
+            case "REDUCE_POSITION_REVIEW" -> "复核是否降低仓位";
+            case "RECHECK_PLAN" -> "复核执行计划";
+            case "RISK_REVIEW" -> "风险复核";
+            default -> "人工复核";
+        };
     }
 
     private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(DecisionResultVO decision) {
@@ -1075,6 +1179,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private boolean hasText(String value) {
         return trimToNull(value) != null;
+    }
+
+    private boolean positive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
     private String upper(String value) {
