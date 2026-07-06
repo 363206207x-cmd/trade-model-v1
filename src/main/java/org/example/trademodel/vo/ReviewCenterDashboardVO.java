@@ -13,6 +13,7 @@ public class ReviewCenterDashboardVO {
     private List<OpportunityReviewItem> opportunityReviews = new ArrayList<>();
     private List<PushReviewItem> pushReviews = new ArrayList<>();
     private List<RuleFeedbackItem> ruleFeedback = new ArrayList<>();
+    private Diagnostics diagnostics = new Diagnostics();
 
     public Summary getSummary() { return summary; }
     public void setSummary(Summary summary) { this.summary = summary; }
@@ -24,6 +25,8 @@ public class ReviewCenterDashboardVO {
     public void setPushReviews(List<PushReviewItem> pushReviews) { this.pushReviews = pushReviews; }
     public List<RuleFeedbackItem> getRuleFeedback() { return ruleFeedback; }
     public void setRuleFeedback(List<RuleFeedbackItem> ruleFeedback) { this.ruleFeedback = ruleFeedback; }
+    public Diagnostics getDiagnostics() { return diagnostics; }
+    public void setDiagnostics(Diagnostics diagnostics) { this.diagnostics = diagnostics; }
 
     public static class Summary {
         private int positionReviewCount;
@@ -39,6 +42,25 @@ public class ReviewCenterDashboardVO {
         public void setPushReviewCount(int pushReviewCount) { this.pushReviewCount = pushReviewCount; }
         public int getRuleFeedbackCount() { return ruleFeedbackCount; }
         public void setRuleFeedbackCount(int ruleFeedbackCount) { this.ruleFeedbackCount = ruleFeedbackCount; }
+    }
+
+    public static class Diagnostics {
+        private String positionReviewStatus;
+        private String opportunityLogStatus;
+        private String pushRecheckStatus;
+        private String ruleFeedbackStatus;
+        private String reviewCenterStatus;
+
+        public String getPositionReviewStatus() { return positionReviewStatus; }
+        public void setPositionReviewStatus(String positionReviewStatus) { this.positionReviewStatus = positionReviewStatus; }
+        public String getOpportunityLogStatus() { return opportunityLogStatus; }
+        public void setOpportunityLogStatus(String opportunityLogStatus) { this.opportunityLogStatus = opportunityLogStatus; }
+        public String getPushRecheckStatus() { return pushRecheckStatus; }
+        public void setPushRecheckStatus(String pushRecheckStatus) { this.pushRecheckStatus = pushRecheckStatus; }
+        public String getRuleFeedbackStatus() { return ruleFeedbackStatus; }
+        public void setRuleFeedbackStatus(String ruleFeedbackStatus) { this.ruleFeedbackStatus = ruleFeedbackStatus; }
+        public String getReviewCenterStatus() { return reviewCenterStatus; }
+        public void setReviewCenterStatus(String reviewCenterStatus) { this.reviewCenterStatus = reviewCenterStatus; }
     }
 
     public static class PositionReviewItem {

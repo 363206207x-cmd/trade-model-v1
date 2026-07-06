@@ -85,6 +85,8 @@ class ReviewCenterServiceImplTest {
         assertThat(vo.getSummary().getOpportunityReviewCount()).isZero();
         assertThat(vo.getSummary().getPushReviewCount()).isZero();
         assertThat(vo.getSummary().getRuleFeedbackCount()).isZero();
+        assertThat(vo.getDiagnostics().getOpportunityLogStatus()).isEqualTo("EMPTY");
+        assertThat(vo.getDiagnostics().getReviewCenterStatus()).isEqualTo("READY_READONLY");
         verify(userPositionReviewAdapter, never()).buildSummary(any());
         verify(pushRecheckLogMapper, never()).selectLatestByPushId(any());
     }
@@ -132,6 +134,8 @@ class ReviewCenterServiceImplTest {
         assertThat(rule.getRuleIssue()).isTrue();
         assertThat(rule.getExecutionDeviation()).isNull();
         assertThat(rule.getStatus()).isNull();
+        assertThat(vo.getDiagnostics().getOpportunityLogStatus()).isEqualTo("READY");
+        assertThat(vo.getDiagnostics().getPushRecheckStatus()).isEqualTo("READY");
 
         verify(pushRecheckLogMapper).selectLatestByPushId(3L);
     }

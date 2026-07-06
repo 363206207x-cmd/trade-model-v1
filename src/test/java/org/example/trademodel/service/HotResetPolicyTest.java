@@ -15,7 +15,7 @@ class HotResetPolicyTest {
         HotResetCommand command = base(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
         command.setPriceMoveRatio(new BigDecimal("0.08"));
 
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isTrue();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isTrue();
     }
 
     @Test
@@ -23,7 +23,18 @@ class HotResetPolicyTest {
         HotResetCommand command = base(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
         command.setPriceMoveRatio(new BigDecimal("0.079"));
 
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isFalse();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isFalse();
+    }
+
+    @Test
+    void extremePriceMoveUsesConfiguredThreshold() {
+        HotResetCommand command = base(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
+        command.setPriceMoveRatio(new BigDecimal("0.09"));
+
+        HotResetPolicy.Thresholds stricter = new HotResetPolicy.Thresholds(
+                new BigDecimal("0.10"), new BigDecimal("-0.30"), new BigDecimal("-0.40"), 85);
+
+        assertThat(HotResetPolicy.evaluate(command, stricter).isTriggered()).isFalse();
     }
 
     @Test
@@ -33,10 +44,10 @@ class HotResetPolicyTest {
         command.setSourceType("OI_SOURCE");
         command.setSourceReference("openInterestDelta");
 
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isTrue();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isTrue();
 
         command.setSourceReference(null);
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isFalse();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isFalse();
     }
 
     @Test
@@ -46,12 +57,12 @@ class HotResetPolicyTest {
         command.setSourceType("LIQUIDITY_SOURCE");
         command.setSourceReference("liquidityChangeRatio");
 
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isTrue();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isTrue();
 
         command.setLiquidityChangeRatio(null);
         command.setCurrentLiquidity(null);
         command.setBaselineLiquidity(null);
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isFalse();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isFalse();
     }
 
     @Test
@@ -62,10 +73,10 @@ class HotResetPolicyTest {
         command.setSourceType("SYSTEMIC_SOURCE");
         command.setSourceReference("shock-feed-1");
 
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isTrue();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isTrue();
 
         command.setSourceType(null);
-        assertThat(HotResetPolicy.evaluate(command).isTriggered()).isFalse();
+        assertThat(HotResetPolicy.evaluate(command, thresholds()).isTriggered()).isFalse();
     }
 
     @Test
@@ -87,5 +98,10 @@ class HotResetPolicyTest {
         command.setAnalysisId("ana-test");
         command.setEventType(eventType);
         return command;
+    }
+
+    private static HotResetPolicy.Thresholds thresholds() {
+        return new HotResetPolicy.Thresholds(
+                new BigDecimal("0.08"), new BigDecimal("-0.30"), new BigDecimal("-0.40"), 85);
     }
 }

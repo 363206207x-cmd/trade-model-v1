@@ -3,6 +3,8 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.enums.RecheckStatusEnum;
+import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
@@ -11,6 +13,7 @@ import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
+import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +50,10 @@ class PushRecheckServiceImplTest {
     private PushRecheckDispatchConfigService dispatchConfigService;
     @Mock
     private UserPositionRiskAdapter userPositionRiskAdapter;
+    @Mock
+    private MarketQuoteClient marketQuoteClient;
+    @Mock
+    private RuleConfigContractService ruleConfigContractService;
 
     private PushRecheckServiceImpl service;
 
@@ -57,8 +64,13 @@ class PushRecheckServiceImplTest {
                 accountRiskSnapshotMapper,
                 pushRecheckLogMapper,
                 dispatchConfigService,
-                userPositionRiskAdapter);
+                userPositionRiskAdapter,
+                marketQuoteClient,
+                ruleConfigContractService);
         lenient().when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        lenient().when(ruleConfigContractService.requirePushRecheckThresholds())
+                .thenReturn(new RuleConfigContractService.PushRecheckThresholds(
+                        new BigDecimal("0.02"), 70, 85, 60));
     }
 
     @Test
@@ -128,6 +140,28 @@ class PushRecheckServiceImplTest {
         assertThat(r.isReviewPassed()).isFalse();
         assertSafeReviewOnlyResult(r);
         verify(pushSnapshotMapper).updatePushStatus(41L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void missingCurrentPriceFetchesCurrentQuoteReadOnly() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol("BTCUSDT");
+        s.setTriggerPrice(new BigDecimal("100"));
+        s.setConfusedScoreSnapshot(10);
+        when(pushSnapshotMapper.selectByPushId(42L)).thenReturn(s);
+        MarketQuoteSnapshot quote = new MarketQuoteSnapshot();
+        quote.setLastPrice(new BigDecimal("101"));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(java.util.Optional.of(quote));
+
+        RecheckResult r = service.recheck(42L, null);
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
+        assertThat(r.getCurrentPrice()).isEqualByComparingTo("101");
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getCurrentPrice()).isEqualByComparingTo("101");
+        assertThat(cap.getValue().getExecutionErrorCode()).isNull();
     }
 
     @Test
@@ -287,7 +321,7 @@ class PushRecheckServiceImplTest {
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
         verify(pushRecheckLogMapper).insert(cap.capture());
         assertThat(cap.getValue().getCurrentAccountRiskAllowed()).isFalse();
-        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("USER_POSITION_RISK_BLOCKED");
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("RISK_BLOCKED");
         assertThat(cap.getValue().getFailReasonJson()).contains("HIGH_LEVERAGE_RISK");
         verify(pushSnapshotMapper).updatePushStatus(82L, "RECHECK_RISK_BLOCKED");
     }

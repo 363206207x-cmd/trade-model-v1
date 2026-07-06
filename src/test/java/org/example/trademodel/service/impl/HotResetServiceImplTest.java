@@ -18,7 +18,9 @@ import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
 import org.example.trademodel.service.HotResetCommand;
+import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
+import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,14 +58,17 @@ class HotResetServiceImplTest {
     @Mock private UserPositionRiskAdapter userPositionRiskAdapter;
     @Mock private ObjectProvider<AnalysisSchedulerService> schedulerProvider;
     @Mock private AnalysisSchedulerService scheduler;
+    @Mock private RuleConfigContractService ruleConfigContractService;
 
     private HotResetServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new HotResetServiceImpl(assetStateMapper, hotResetEventMapper, decisionResultMapper,
-                executionPlanMapper, pushSnapshotMapper, confusedStateService, userPositionRiskAdapter, schedulerProvider);
+                executionPlanMapper, pushSnapshotMapper, confusedStateService, userPositionRiskAdapter,
+                schedulerProvider, ruleConfigContractService);
         lenient().when(schedulerProvider.getIfAvailable()).thenReturn(scheduler);
+        lenient().when(ruleConfigContractService.requireHotResetThresholds()).thenReturn(thresholds());
     }
 
     @AfterEach
@@ -83,6 +88,21 @@ class HotResetServiceImplTest {
         assertThat(result.isTriggered()).isFalse();
         verify(assetStateMapper, never()).mergeUpsertCore(any());
         verify(decisionResultMapper, never()).markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any());
+        verify(scheduler, never()).runHotResetRebuild(anyString(), anyString(), anyString(), any(), any());
+    }
+
+    @Test
+    void hotResetConfigUnavailableFailsClosedWithoutBusinessWrites() {
+        when(ruleConfigContractService.requireHotResetThresholds()).thenThrow(new IllegalStateException("missing config"));
+        HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
+        command.setPriceMoveRatio(new BigDecimal("0.20"));
+
+        HotResetResult result = service.evaluateAndExecute(command);
+
+        assertThat(result.isTriggered()).isFalse();
+        assertThat(result.getReasonCodes()).contains("HOT_RESET_CONFIG_NOT_READY");
+        verify(assetStateMapper, never()).mergeUpsertCore(any());
+        verify(hotResetEventMapper, never()).insert(any());
         verify(scheduler, never()).runHotResetRebuild(anyString(), anyString(), anyString(), any(), any());
     }
 
@@ -358,6 +378,11 @@ class HotResetServiceImplTest {
         context.setAiConflictScore(80);
         command.setDecisionContext(context);
         return command;
+    }
+
+    private static HotResetPolicy.Thresholds thresholds() {
+        return new HotResetPolicy.Thresholds(
+                new BigDecimal("0.08"), new BigDecimal("-0.30"), new BigDecimal("-0.40"), 85);
     }
 
     private static AssetStateDO row(AssetStateEnum state, int confusedScore, int lowStreak) {
