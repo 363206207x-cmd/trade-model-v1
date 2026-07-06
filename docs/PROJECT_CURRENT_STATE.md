@@ -6,13 +6,47 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-M7 Real Provider Live Smoke Harness
+Current Work Package: Post-1066 Status Closure after PR #1066 Global Audit Gap Closure
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
-Next Business Phase Allowed: NO for production deployment; V1 is frozen for local acceptance only
+Next Business Phase Allowed: YES for the next scoped business package; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
+
+## Post-1066 Status Closure
+
+PR #1066 is merged into `main` by merge commit `694c68d8418a207ac54c825f6c8e7e63f0853859`.
+
+Post-merge local validation is recorded as passed:
+
+1. `./mvnw test -q` PASS.
+2. `bash scripts/v1-delivery-check.sh` PASS.
+3. `V1_STATE_RESULT` PASS.
+4. `WORKTREE_CLEAN` Yes.
+5. `MAIN_SYNC` OK.
+6. `OPEN_PR_STATUS` NONE.
+7. `BLOCKERS` none.
+
+Current package status after #1066:
+
+- Review + AI conflict package: current round DONE / usable, progress 86%.
+- Position monitor package: current round DONE / usable, progress 83%.
+- Overall project real progress: 74%.
+- Project real status: V1 local acceptance-ready, not production-ready.
+- Production readiness remains BLOCKED.
+- Next business phase allowed: YES.
+
+The following prohibited items remain outside V1 scope:
+
+- no auto-open
+- no auto-close
+- no auto-reverse
+- no order execution
+- no auto-trading
+- no external push send
+- no fake positions
+- no fake review records
 
 ## Effective State Rule
 
@@ -56,23 +90,30 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 ## Current Allowed Work
 
-Only the following work is allowed after this P3-3 docs/status closure:
+Only the following work is allowed after the post-1066 status closure:
 
-1. Autodeliver this PDR-M7 real provider live smoke harness if approved.
-2. Keep P3-3 V1 local acceptance-ready final freeze effective.
-3. Have the user run real-server acceptance evidence collection and provider live smoke with server-side keys only under a separate explicit release-gate review.
-4. Preserve Production Deployment Readiness as BLOCKED until a separate production release gate clears it.
+1. Docs/status closure work that keeps source-of-truth documents consistent with merged `main`.
+2. The next scoped business package after PR #1066.
+3. Production-readiness remediation only when explicitly scoped.
+
+PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
 
 ---
 
 ## Current Forbidden Work
 
-The following work remains blocked after this P3-3 closure:
+The following work remains blocked after the post-1066 status closure:
 
-1. Java business service/controller code, tests requiring network or real keys, schema.sql, mapper SQL, Flyway migration SQL, dashboard, review UI, business API contract, scheduler, Push, Telegram, order, execution, auto-trading, real server deployment, real secrets, committed `.env`, real PostgreSQL connection, restore execution against a real database, sensitive actuator exposure, metrics/alerting stack, or trading-logic changes inside this PDR-M7 provider smoke package.
-2. Production-ready claims.
-3. Telegram send, Push send, external-channel delivery, order placement, execution, auto-open, auto-close, or auto-trading of any kind.
-4. Treating this local acceptance freeze as production deployment approval.
+1. no auto-open
+2. no auto-close
+3. no auto-reverse
+4. no order execution
+5. no auto-trading
+6. no external push send
+7. no fake positions
+8. no fake review records
+9. no production-ready claim
+10. Treating local acceptance readiness as production deployment approval.
 
 ---
 
