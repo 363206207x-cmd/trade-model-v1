@@ -146,6 +146,18 @@ PDR-PF4 defines the current-state migration and rollback rehearsal process. It d
 - Current package evidence: no production DB was accessed, no destructive DB operation was run, and no long PostgreSQL/Docker/Testcontainers smoke was rerun.
 - Production readiness remains BLOCKED until a complete staging/server-backed evidence bundle is reviewed and every remaining production gate is proven.
 
+## PDR-PF5 Secrets and Access Hardening
+
+PDR-PF5 defines production secrets/access hardening requirements and records existing fail-closed guard evidence. It does not access real secrets, production servers, or production DB, and it does not approve production deployment.
+
+- Evidence doc: `docs/SECRETS_AND_ACCESS_HARDENING.md`.
+- Existing guards: prod startup rejects missing/H2 datasource, blank datasource password, simulated position provider, missing Binance credentials, blank/unsafe admin credentials, unsafe public bind, sensitive actuator exposure, and missing scheduler policy/classifications.
+- Provider keys: AI provider keys are required only when the provider is explicitly enabled; provider live smoke defaults to no external calls and must not print keys.
+- Secret handling: `.env`, real secrets, database dumps, screenshots with credentials, and terminal transcripts containing secrets must not be committed or pasted into evidence.
+- Required future evidence: secrets manager integration, credential rotation drill, HTTPS/reverse-proxy proof, access/auth audit logging, rate limiting, and real server auth smoke.
+- Current package evidence: no real secrets were accessed, no production server was accessed, and no production DB was accessed.
+- Production readiness remains BLOCKED until the hardening evidence is implemented/collected and every remaining production gate is proven.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
