@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF5 Secrets and Access Hardening
+Current Work Package: PDR-PF6 Provider Live Smoke Evidence
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -143,7 +143,7 @@ Next recommendation: collect PDR-PF4 evidence in a safe staging/server-backed Po
 
 ## PDR-PF5 Secrets and Access Hardening
 
-PDR-PF5 is the current scoped remediation package. It defines production secrets/access hardening requirements and safe guard evidence without accessing real secrets, production servers, or production DB.
+PDR-PF5 is DONE/effective on merged main by PR #1073. It defines production secrets/access hardening requirements and safe guard evidence without accessing real secrets, production servers, or production DB.
 
 Current PDR-PF5 status:
 
@@ -158,13 +158,27 @@ Next recommendation: implement or collect evidence for secrets manager integrati
 
 ---
 
+## PDR-PF6 Provider Live Smoke Evidence
+
+PDR-PF6 is the current scoped remediation package. It records provider live-smoke readiness evidence, safe default-disabled smoke behavior, provider result statuses, and redaction policy without accessing real secrets or making unapproved live external calls.
+
+Current PDR-PF6 status:
+
+1. `docs/PROVIDER_LIVE_SMOKE_EVIDENCE.md` records provider paths reviewed, safe no-call smoke output, result per provider, redaction policy, remaining blockers, and blocked production readiness.
+2. `scripts/prod-provider-smoke.sh` defaults to `PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=false` and returns SKIPPED without provider network calls.
+3. Binance public, OpenAI, Gemini, xAI/Grok, and external context provider evidence is recorded as skipped/disabled by default unless explicitly approved and configured in a safe environment.
+4. No real secrets were accessed, no secret values were printed, no production server was accessed, and no production DB was accessed by this package.
+5. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-PF7 Push Recheck Quote-Unavailable Guard`, or a separately scoped controlled-server provider evidence rerun if secrets manager / server env exists and the operator explicitly approves live external calls.
+
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF5 Secrets and Access Hardening:
+Only the following work is allowed during and after PDR-PF6 Provider Live Smoke Evidence:
 
-1. Secrets/access hardening planning/evidence definition.
-2. Safe implementation of secrets manager, rotation, HTTPS/reverse proxy, audit/access logging, or rate limiting only when explicitly scoped.
-3. The next explicitly scoped remediation package after PF5 evidence is reviewed.
+1. Provider live-smoke evidence and safe default-disabled/no-call smoke recording.
+2. Safe controlled-server provider evidence rerun only when explicitly scoped and approved, with redacted output and timeouts.
+3. The next explicitly scoped remediation package after PF6 evidence is reviewed.
 4. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
@@ -173,7 +187,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF5 Secrets and Access Hardening:
+The following work remains blocked during and after PDR-PF6 Provider Live Smoke Evidence:
 
 1. no auto-open
 2. no auto-close

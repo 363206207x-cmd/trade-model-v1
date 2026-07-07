@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-PF5 Secrets and Access Hardening"
-active_block_cn: "PDR-PF5 密钥与访问加固"
+active_block: "PDR-PF6 Provider Live Smoke Evidence"
+active_block_cn: "PDR-PF6 Provider Live Smoke Evidence"
 
-next_required_action: "Complete PDR-PF5 Secrets and Access Hardening plan and guard evidence. PDR-PF4 is merged/effective as rollback drill planning evidence; PF5 must define secrets manager, rotation, HTTPS/reverse-proxy, audit/access logging, rate limiting, actuator policy, and required env evidence without accessing real secrets. Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
+next_required_action: "Complete PDR-PF6 Provider Live Smoke Evidence. PF5 is merged/effective as secrets/access hardening evidence; PF6 must record provider smoke defaults, safe no-call evidence, provider result status, redaction policy, remaining blockers, and blocked production readiness without accessing real secrets or making unapproved live external calls."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this secrets/access hardening package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this provider live-smoke evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-pf5-secrets-access-hardening"
+current_branch: "codex/pdr-pf6-provider-live-smoke-evidence"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -77,8 +77,10 @@ pdr_pf3_status: "DONE/effective on merged main by PR #1071: PostgreSQL migration
 pdr_pf3_effective: true
 pdr_pf4_status: "DONE/effective on merged main by PR #1072: current-state migration + rollback drill planning/evidence requirements; no production DB access or destructive DB operation"
 pdr_pf4_effective: true
-pdr_pf5_status: "IN_PROGRESS on branch codex/pdr-pf5-secrets-access-hardening: secrets/access hardening plan and guard evidence; no real secrets, production server access, or production DB access"
-pdr_pf5_effective: false
+pdr_pf5_status: "DONE/effective on merged main by PR #1073: secrets/access hardening plan and guard evidence; no real secrets, production server access, or production DB access"
+pdr_pf5_effective: true
+pdr_pf6_status: "IN_PROGRESS on branch codex/pdr-pf6-provider-live-smoke-evidence: provider live-smoke evidence; safe no-call smoke only unless explicitly approved, no real secrets printed or committed"
+pdr_pf6_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -102,6 +104,7 @@ notes:
   - "PDR-PF3 records PostgreSQL migration evidence; empty PostgreSQL migration evidence is BLOCKED_TIMEOUT after an approximately 1h27m manual interruption, with no production DB access and no destructive DB operation."
   - "PDR-PF4 defines current-state migration plus rollback drill process and evidence requirements; it does not run destructive DB operations or access production DB."
   - "PDR-PF5 defines secrets/access hardening requirements and existing guard evidence; it does not access real secrets, production servers, or production DB."
-  - "Current allowed work is secrets/access hardening planning/evidence definition, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-PF6 records provider live-smoke evidence and safe no-call smoke status; it does not access real secrets, run unapproved live external calls, or claim provider connectivity."
+  - "Current allowed work is provider live-smoke evidence, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."
