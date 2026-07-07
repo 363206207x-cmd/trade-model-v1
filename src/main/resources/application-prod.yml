@@ -32,3 +32,26 @@ binance:
 trade-model:
   production:
     allow-public-bind: ${TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND:false}
+    scheduler-policy: ${TRADE_MODEL_PRODUCTION_SCHEDULER_POLICY:}
+    scheduler-approval:
+      push-recheck: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_PUSH_RECHECK:}
+      position-sync: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_POSITION_SYNC:}
+      market-data: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_MARKET_DATA:}
+      watchlist: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_WATCHLIST:}
+      position-monitor: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_POSITION_MONITOR:}
+      analysis: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_ANALYSIS:}
+  schedulers:
+    enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:false}
+    push-recheck:
+      enabled: ${TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED:false}
+    position-sync:
+      enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:false}
+    position-monitor:
+      enabled: ${TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED:false}
+    market-data:
+      enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:false}
+    watchlist:
+      enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:false}
+  analysis:
+    scheduler:
+      enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
