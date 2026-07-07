@@ -203,6 +203,17 @@ PDR-PF9 recovers the PostgreSQL migration evidence trail after PDR-PF3 `BLOCKED_
 - Migration proof status: no PostgreSQL container ran, no Flyway V1/V2/V3 success log exists, and no PostgreSQL migration PASS is claimed.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-PF10 PostgreSQL Environment Provisioning Evidence
+
+PDR-PF10 records whether the current local/server environment can support Docker/Testcontainers-backed PostgreSQL migration smoke evidence. It does not access production DB, run destructive DB operations, change Flyway SQL, or approve production deployment.
+
+- Evidence doc: `docs/POSTGRESQL_ENVIRONMENT_PROVISIONING_EVIDENCE.md`.
+- Docker availability result: `DOCKER_MISSING`.
+- Socket result: `/var/run/docker.sock` and `~/.docker/run/docker.sock` unavailable.
+- Migration smoke result: `SKIPPED_ENV_UNAVAILABLE` because Docker availability was not confirmed.
+- Migration proof status: no PostgreSQL container ran, no Flyway V1/V2/V3 success log exists, and no PostgreSQL migration PASS is claimed.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
