@@ -20,7 +20,7 @@ Preflight validation was run from a clean branch created from the current `main`
 - `BLOCKERS`: none for starting the next scoped package
 - `PRODUCTION_DEPLOYMENT_READINESS`: BLOCKED
 
-Important validation note: PostgreSQL Testcontainers smoke is designed to skip when Docker is unavailable. The full Maven run passed, but local production readiness still cannot claim real PostgreSQL migration evidence unless Docker-backed or server-backed migration evidence is supplied.
+Important validation note: PostgreSQL Testcontainers smoke is designed to skip when Docker is unavailable. PDR-PF3 later recorded empty PostgreSQL migration evidence as BLOCKED_TIMEOUT after an approximately 1h27m interrupted run. Local production readiness still cannot claim real PostgreSQL migration evidence unless Docker-backed or server-backed migration evidence is supplied.
 
 ## Production Readiness Decision
 
@@ -36,7 +36,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 |---|---|---|---|
 | 1 | Production profile safety | PASS | `ProductionProfileSafetyGuard` rejects H2 memory DB, blank datasource credentials, enabled H2 console, simulated provider, missing Binance credentials, unsafe admin password, public bind without opt-in, and sensitive actuator exposure. Tests cover these guardrails. |
 | 2 | Datasource config and secret handling | FAIL | `application-prod.yml` requires datasource and Binance secrets from environment, which is good, but there is no secrets manager integration, credential rotation evidence, or real server secret injection proof. |
-| 3 | Schema migration from empty DB | PARTIAL | Flyway V1/V2/V3 migrations exist and `PostgreSqlFlywayMigrationSmokeTest` validates empty PostgreSQL migration when Docker/Testcontainers is available. Current local run skipped Docker, so production gate remains unproven. |
+| 3 | Schema migration from empty DB | PDR-PF3 BLOCKED_TIMEOUT | Flyway V1/V2/V3 migrations exist and were reviewed. PDR-PF3 empty PostgreSQL migration evidence did not complete within acceptable time and was manually interrupted after approximately 1h27m, so empty PostgreSQL migration success remains unproven. |
 | 4 | Schema migration from current main state | FAIL | There is no completed migration-from-existing-live-state evidence, no real current production DB baseline, no backfill/compatibility rehearsal, and no restore drill. |
 | 5 | Scheduler default states | PDR-PF2 POLICY ADDED | PDR-PF2 adds `docs/PRODUCTION_SCHEDULER_POLICY.md`, production default-off scheduler flags in `application-prod.yml`, and `ProductionProfileSafetyGuard` validation for missing scheduler policy/classifications and unsafe opt-in. Production deployment remains BLOCKED until later release-gate evidence. |
 | 6 | Position Monitor scheduler default-off | PASS | `trade-model.schedulers.position-monitor.enabled` defaults to false, and `PositionMonitorSchedulerTest` proves the monitor batch does not run unless explicitly enabled. |
@@ -53,7 +53,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 ## Blocker List
 
 1. Real production PostgreSQL connection is not proven.
-2. Empty PostgreSQL migration evidence is conditional on Docker/Testcontainers or real server execution; current local run cannot prove it.
+2. Empty PostgreSQL migration evidence is still unproven locally: PDR-PF3 evidence is BLOCKED_TIMEOUT after an approximately 1h27m interrupted Docker/Testcontainers/PostgreSQL smoke path.
 3. Migration from current main/live state is not rehearsed and has no rollback evidence.
 4. Backup and restore drill evidence is missing.
 5. Secrets manager integration, credential rotation, and redacted server-side secret injection evidence are missing.
@@ -68,7 +68,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 
 1. `PDR-PF1 Status Source Cleanup`: DONE/effective on merged main; stale production-readiness docs no longer imply old PDR-only scope.
 2. `PDR-PF2 Production Scheduler Policy`: current package; defines production scheduler defaults, required env overrides, fail-closed guard validation, and Position Monitor default-off status.
-3. `PDR-PF3 PostgreSQL Migration Evidence`: run Flyway migrations against empty PostgreSQL with retained logs and prove V1/V2/V3 success.
+3. `PDR-PF3 PostgreSQL Migration Evidence`: current package; records migration-file review and BLOCKED_TIMEOUT evidence after an approximately 1h27m interrupted run. Resolve Docker/Testcontainers availability or rerun in a server-backed PostgreSQL environment before claiming PASS.
 4. `PDR-PF4 Current-State Migration + Rollback Drill`: rehearse migration from a current-main-like database state, including backup, restore, and rollback verification evidence.
 5. `PDR-PF5 Secrets and Access Hardening`: add or document secrets manager integration, credential rotation, HTTPS/reverse-proxy hardening, audit logging, and rate limiting.
 6. `PDR-PF6 Provider Live Smoke Evidence`: collect redacted server-side evidence for Binance public data and any explicitly enabled AI/external providers.
@@ -93,4 +93,4 @@ The following remain prohibited in V1 and in all production-readiness packages u
 
 Production deployment should not proceed.
 
-The next work can proceed only as a scoped remediation package. After PDR-PF2 is merged/effective, the safest next package is `PDR-PF3 PostgreSQL Migration Evidence`, followed by current-state migration/rollback evidence. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
+The next work can proceed only as a scoped remediation package. After PDR-PF3 is merged/effective, resolve Docker/Testcontainers availability or rerun PostgreSQL migration evidence in a server-backed environment; once empty migration evidence passes, continue to current-state migration/rollback evidence. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.

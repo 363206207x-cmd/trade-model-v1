@@ -1,13 +1,18 @@
-# Flyway Migration Placeholder
+# Flyway PostgreSQL Migrations
 
-This directory is reserved for future Flyway migrations.
+This directory contains the current PostgreSQL-target Flyway migration drafts/evidence path.
 
-Do not add executable `V*.sql` migration files until PDR-2C creates a PostgreSQL-compatible baseline migration.
+Current migration files:
 
-Current `src/main/resources/schema.sql` remains the local/test bootstrap. The default local and test classpath must continue to use the existing H2 + `schema.sql` behavior.
+- `V1__baseline_schema_tables.sql`: PostgreSQL baseline table creation.
+- `V2__baseline_schema_indexes.sql`: PostgreSQL baseline index creation.
+- `V3__scheme_rule_config_defaults.sql`: PostgreSQL rule-config default upserts.
+
+`src/main/resources/schema.sql` remains the H2 local/test bootstrap path. It is intentionally separate from the PostgreSQL Flyway migration path.
 
 Production target database: PostgreSQL.
+Migration framework target: Flyway, SQL-first.
+Migration execution model: explicit manual pre-deploy migration.
+Rollback policy: forward-only migrations plus verified pre-migration backup and restore.
 
-Flyway is selected as the SQL-first migration framework, but this PDR-2B skeleton does not create a real baseline migration and does not connect a production database.
-
-Production Deployment Readiness remains `BLOCKED`.
+PDR-PF3 status: empty PostgreSQL migration evidence is `BLOCKED_TIMEOUT` after an approximately 1h27m manually interrupted Docker/Testcontainers/PostgreSQL evidence run. Production Deployment Readiness remains `BLOCKED` until Docker-backed or server-backed migration evidence, current-state migration evidence, backup evidence, and restore evidence are complete.

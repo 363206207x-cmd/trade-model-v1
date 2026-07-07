@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-PF2 Production Scheduler Policy"
-active_block_cn: "PDR-PF2 生产调度策略"
+active_block: "PDR-PF3 PostgreSQL Migration Evidence"
+active_block_cn: "PDR-PF3 PostgreSQL 迁移证据"
 
-next_required_action: "Complete PDR-PF2 production scheduler policy, then proceed only to PDR-PF3 PostgreSQL Migration Evidence or another explicitly scoped remediation package. Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
+next_required_action: "Finalize PDR-PF3 PostgreSQL migration timeout evidence. Empty PostgreSQL migration evidence is BLOCKED_TIMEOUT after an approximately 1h27m interrupted run; resolve Docker/Testcontainers availability or rerun in a server-backed PostgreSQL environment before PDR-PF4 Current-State Migration + Rollback Drill. Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this production scheduler policy package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this PostgreSQL migration evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-pf2-production-scheduler-policy"
+current_branch: "codex/pdr-pf3-postgresql-migration-evidence"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -71,8 +71,10 @@ pdr_m7_status: "DONE/effective on merged main: opt-in real provider live smoke h
 pdr_m7_effective: true
 pdr_pf1_status: "DONE/effective on merged main by PR #1069: status-source cleanup after production readiness preflight"
 pdr_pf1_effective: true
-pdr_pf2_status: "IN_PROGRESS on branch codex/pdr-pf2-production-scheduler-policy: production scheduler policy / safety guard"
-pdr_pf2_effective: false
+pdr_pf2_status: "DONE/effective on merged main by PR #1070: production scheduler policy / safety guard"
+pdr_pf2_effective: true
+pdr_pf3_status: "IN_PROGRESS on branch codex/pdr-pf3-postgresql-migration-evidence: PostgreSQL migration evidence; empty PostgreSQL migration evidence BLOCKED_TIMEOUT after approximately 1h27m manual interruption; no production DB access or destructive DB operation"
+pdr_pf3_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -93,6 +95,7 @@ notes:
   - "PDR-M7 is historical latest production-readiness package evidence, not the only currently allowed work."
   - "PDR-PF1 cleaned stale status-source instructions only; it did not change runtime behavior."
   - "PDR-PF2 defines and enforces production scheduler policy; it does not add trading runtime behavior."
-  - "Current allowed work is production scheduler policy, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-PF3 records PostgreSQL migration evidence; empty PostgreSQL migration evidence is BLOCKED_TIMEOUT after an approximately 1h27m manual interruption, with no production DB access and no destructive DB operation."
+  - "Current allowed work is PostgreSQL migration timeout evidence closure, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

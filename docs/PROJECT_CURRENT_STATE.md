@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF2 Production Scheduler Policy
+Current Work Package: PDR-PF3 PostgreSQL Migration Evidence
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -106,13 +106,32 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 ---
 
+
+## PDR-PF3 PostgreSQL Migration Evidence
+
+PDR-PF3 is the current scoped remediation package. It records PostgreSQL migration evidence for current Flyway files without changing business runtime behavior.
+
+Current PDR-PF3 evidence status:
+
+1. Reviewed migration files: `V1__baseline_schema_tables.sql`, `V2__baseline_schema_indexes.sql`, and `V3__scheme_rule_config_defaults.sql`.
+2. Static scan found no H2-only `AUTO_INCREMENT`, `MERGE INTO`, `ON DUPLICATE`, `DATEADD`, `FORMATDATETIME`, or `CLOB` usage inside Flyway migration SQL.
+3. `schema.sql` remains H2 local/test bootstrap and still contains H2-specific syntax; it is not production Flyway migration SQL.
+4. `PostgreSqlFlywayMigrationSmokeTest` is present and designed to verify empty PostgreSQL migration with Testcontainers.
+5. Empty PostgreSQL migration result is `BLOCKED_TIMEOUT`: the PostgreSQL migration evidence run lasted approximately 1h27m before manual interruption and produced no completed trustworthy migration success log.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: first resolve Docker/Testcontainers availability or rerun PDR-PF3 in a controlled server-backed PostgreSQL test environment. Proceed to `PDR-PF4 Current-State Migration + Rollback Drill` only after empty migration evidence is PASS.
+
+---
+
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF2 production scheduler policy:
+Only the following work is allowed during and after PDR-PF3 PostgreSQL migration evidence:
 
-1. Production scheduler policy / safety guard work.
-2. The next explicitly scoped remediation package after PDR-PF2, preferably PDR-PF3 PostgreSQL Migration Evidence.
-3. Production-readiness remediation only when explicitly scoped.
+1. PostgreSQL migration evidence recording.
+2. A rerun of PDR-PF3 in a Docker-capable or server-backed PostgreSQL environment after the current BLOCKED_TIMEOUT evidence is closed.
+3. The next explicitly scoped remediation package after empty migration evidence passes, preferably PDR-PF4 Current-State Migration + Rollback Drill.
+4. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
 
@@ -120,7 +139,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF2 production scheduler policy:
+The following work remains blocked during and after PDR-PF3 PostgreSQL migration evidence:
 
 1. no auto-open
 2. no auto-close
