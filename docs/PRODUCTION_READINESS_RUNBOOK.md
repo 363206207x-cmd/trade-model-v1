@@ -134,6 +134,18 @@ PDR-M7 adds an explicit opt-in live provider smoke harness. It does not run live
 - Key policy: real keys must live only in the server `.env` or future secrets manager. Never commit `.env`, paste keys into evidence, or enable Binance withdrawal/trading/order permissions.
 - Evidence policy: record only redacted output lines such as `BINANCE_PUBLIC_SMOKE: PASS`, `OPENAI_SMOKE: PASS`, and `PROVIDER_LIVE_SMOKE: PASS/INCOMPLETE/FAIL`.
 
+## PDR-PF4 Current-State Migration + Rollback Drill
+
+PDR-PF4 defines the current-state migration and rollback rehearsal process. It does not run migration, backup, restore, or release-gate commands, and it does not approve production deployment.
+
+- Evidence doc: `docs/CURRENT_STATE_MIGRATION_ROLLBACK_DRILL.md`.
+- Required preconditions: staging/clone database, redacted env-only secrets, pre-migration backup, separate recovery restore drill, human rollback owner, and no prohibited trading/push/fake-record surfaces.
+- Backup path: `scripts/prod-backup.sh` requires explicit PostgreSQL environment variables and writes a local dump file.
+- Restore path: `scripts/prod-restore.sh` requires explicit restore environment variables and refuses to run without `RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA`.
+- Release gate path: `scripts/prod-release-gate.sh` can require backup evidence but never runs restore automatically; restore and human evidence remain external evidence requirements.
+- Current package evidence: no production DB was accessed, no destructive DB operation was run, and no long PostgreSQL/Docker/Testcontainers smoke was rerun.
+- Production readiness remains BLOCKED until a complete staging/server-backed evidence bundle is reviewed and every remaining production gate is proven.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.

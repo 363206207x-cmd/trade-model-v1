@@ -16,3 +16,6 @@ Migration execution model: explicit manual pre-deploy migration.
 Rollback policy: forward-only migrations plus verified pre-migration backup and restore.
 
 PDR-PF3 status: empty PostgreSQL migration evidence is `BLOCKED_TIMEOUT` after an approximately 1h27m manually interrupted Docker/Testcontainers/PostgreSQL evidence run. Production Deployment Readiness remains `BLOCKED` until Docker-backed or server-backed migration evidence, current-state migration evidence, backup evidence, and restore evidence are complete.
+
+
+PDR-PF4 status: current-state migration and rollback drill requirements are documented in `docs/CURRENT_STATE_MIGRATION_ROLLBACK_DRILL.md`. The drill documentation does not execute migrations, backups, restores, destructive DB operations, or production DB access.
