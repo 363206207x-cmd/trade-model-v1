@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF6 Provider Live Smoke Evidence
+Current Work Package: PDR-PF7 Push Recheck Quote-Unavailable Guard
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -160,7 +160,7 @@ Next recommendation: implement or collect evidence for secrets manager integrati
 
 ## PDR-PF6 Provider Live Smoke Evidence
 
-PDR-PF6 is the current scoped remediation package. It records provider live-smoke readiness evidence, safe default-disabled smoke behavior, provider result statuses, and redaction policy without accessing real secrets or making unapproved live external calls.
+PDR-PF6 is DONE/effective on merged main by PR #1074. It records provider live-smoke readiness evidence, safe default-disabled smoke behavior, provider result statuses, and redaction policy without accessing real secrets or making unapproved live external calls.
 
 Current PDR-PF6 status:
 
@@ -172,13 +172,31 @@ Current PDR-PF6 status:
 
 Next recommendation: `PDR-PF7 Push Recheck Quote-Unavailable Guard`, or a separately scoped controlled-server provider evidence rerun if secrets manager / server env exists and the operator explicitly approves live external calls.
 
+
+---
+
+## PDR-PF7 Push Recheck Quote-Unavailable Guard
+
+PDR-PF7 is the current scoped remediation package. It adds focused Push Recheck quote-unavailable guard tests and records evidence that missing `currentPrice` plus unavailable quote data fails closed as review-only/non-executable.
+
+Current PDR-PF7 status:
+
+1. `PushRecheckServiceImplTest` now covers `Optional.empty`, null `lastPrice`, quote client exception, missing snapshot symbol, and provided valid current price behavior.
+2. Missing quote paths write `fail_reason_json.code = QUOTE_UNAVAILABLE` and `RecheckStatusEnum.INVALIDATED`.
+3. Missing snapshot symbol writes `fail_reason_json.code = PRICE_REQUIRED` and `RecheckStatusEnum.INVALIDATED`.
+4. Fail-closed paths update push status to `RECHECK_INVALIDATED` and keep `RecheckResult` review-only, non-executable, not order execution, not auto-trading, not user-position creation, and not position mutation.
+5. No production code change was required; this package is test/docs/status-source guard evidence.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: continue only with the next explicitly scoped production-readiness remediation package; production release-gate closure is not allowed until every remaining gate is proven.
+
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF6 Provider Live Smoke Evidence:
+Only the following work is allowed during and after PDR-PF7 Push Recheck Quote-Unavailable Guard:
 
-1. Provider live-smoke evidence and safe default-disabled/no-call smoke recording.
-2. Safe controlled-server provider evidence rerun only when explicitly scoped and approved, with redacted output and timeouts.
-3. The next explicitly scoped remediation package after PF6 evidence is reviewed.
+1. Push Recheck quote-unavailable fail-closed guard tests and documentation.
+2. Strict fail-closed Push Recheck safety fixes only if tests reveal a real bug.
+3. The next explicitly scoped remediation package after PF7 evidence is reviewed.
 4. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
@@ -187,7 +205,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF6 Provider Live Smoke Evidence:
+The following work remains blocked during and after PDR-PF7 Push Recheck Quote-Unavailable Guard:
 
 1. no auto-open
 2. no auto-close
