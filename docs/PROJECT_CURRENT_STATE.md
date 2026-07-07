@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE1 Controlled Live Dependency Acceptance
+Current Work Package: PDR-LIVE2 Controlled PostgreSQL Evidence Setup
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -275,9 +275,9 @@ Next recommendation after PF11: `PDR-LIVE1 Controlled Live Dependency Acceptance
 
 ## PDR-LIVE1 Controlled Live Dependency Acceptance
 
-PDR-LIVE1 is the current scoped controlled live dependency acceptance package. It prepares or records real dependency acceptance evidence in a controlled staging, pre-prod, or local-controlled environment. It is not production deployment, not public release, and not auto-trading.
+PDR-LIVE1 is DONE/effective on merged main by PR #1080. It prepares or records real dependency acceptance evidence in a controlled staging, pre-prod, or local-controlled environment. It is not production deployment, not public release, and not auto-trading.
 
-Current PDR-LIVE1 status:
+PDR-LIVE1 status:
 
 1. Controlled PostgreSQL DB result is `SKIPPED_MISSING_CONTROLLED_DB` because no disposable non-production PostgreSQL URL was present in environment.
 2. Binance public market data smoke result is `SKIPPED_DISABLED` because live external calls were not explicitly enabled.
@@ -290,19 +290,38 @@ Current PDR-LIVE1 status:
 9. No production DB was accessed, no destructive DB operation was run, and no secrets were printed or committed.
 10. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: `PDR-LIVE2 Controlled Non-Production Dependency Evidence Run`, after disposable DB and provider opt-in environment are supplied outside chat and with redacted output. The next package must not be deployment.
+Next recommendation after LIVE1: `PDR-LIVE2 Controlled PostgreSQL Evidence Setup`. The next package must not be deployment.
+
+---
+
+## PDR-LIVE2 Controlled PostgreSQL Evidence Setup
+
+PDR-LIVE2 is the current scoped controlled PostgreSQL evidence setup package. It prepares the next concrete path to obtain PostgreSQL Flyway migration PASS evidence in a controlled environment. It is not production deployment and does not run a migration in this package.
+
+Current PDR-LIVE2 status:
+
+1. Existing migration files V1/V2/V3 are present and reviewed.
+2. Existing `PostgreSqlFlywayMigrationSmokeTest` is present and remains the Docker/Testcontainers path.
+3. Docker result is `DOCKER_MISSING`.
+4. Controlled PostgreSQL DB env result is `SKIPPED_MISSING_CONTROLLED_DB`.
+5. No external controlled-DB Flyway runner exists yet.
+6. `scripts/controlled-postgresql-evidence-plan.sh` is added as a no-op dry-run setup helper only; it never connects to DB or runs Flyway.
+7. No production DB was accessed and no destructive DB operation was run.
+8. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-LIVE3 Controlled PostgreSQL Flyway Runner Or Evidence Run`, after Docker/Testcontainers or disposable controlled PostgreSQL env is available. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE1 Controlled Live Dependency Acceptance:
+Only the following work is allowed during and after PDR-LIVE2 Controlled PostgreSQL Evidence Setup:
 
-1. Controlled live dependency acceptance documentation and status-source updates.
-2. Safe controlled DB/provider env presence checks without printing values.
-3. Bounded provider smoke only when explicit opt-in env and non-secret redacted output are available.
-4. Bounded focused safety tests for production profile, scheduler policy, and Push Recheck fail-closed behavior.
-5. The next explicitly scoped remediation package after LIVE1 evidence is reviewed.
+1. Controlled PostgreSQL evidence setup documentation and status-source updates.
+2. Safe controlled DB env presence checks without printing values.
+3. Safe Docker availability checks without long Docker/Testcontainers commands.
+4. No-op/dry-run setup helper work that refuses production-like indicators and never prints secrets.
+5. The next explicitly scoped remediation package after LIVE2 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -311,7 +330,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE1 Controlled Live Dependency Acceptance:
+The following work remains blocked during and after PDR-LIVE2 Controlled PostgreSQL Evidence Setup:
 
 1. no auto-open
 2. no auto-close
@@ -324,7 +343,7 @@ The following work remains blocked during and after PDR-LIVE1 Controlled Live De
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating PF9, PF10, PF11, or LIVE1 skipped/blocked dependency evidence as PostgreSQL/provider/release-gate PASS.
+12. Treating PF9, PF10, PF11, LIVE1, or LIVE2 skipped/blocked/setup evidence as PostgreSQL/provider/release-gate PASS.
 
 ---
 
@@ -421,7 +440,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE2 Controlled Non-Production Dependency Evidence Run with disposable DB/provider opt-in env supplied outside chat and redacted output.
+1. PDR-LIVE3 Controlled PostgreSQL Flyway Runner Or Evidence Run after Docker/Testcontainers or disposable controlled PostgreSQL env is available.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 

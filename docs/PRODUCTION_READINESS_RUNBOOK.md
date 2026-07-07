@@ -239,6 +239,17 @@ PDR-LIVE1 records controlled live dependency acceptance evidence. It is not prod
 - Push Recheck quote-unavailable result: PASS; behavior remains fail-closed/review-only.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-LIVE2 Controlled PostgreSQL Evidence Setup
+
+PDR-LIVE2 prepares the next concrete path to PostgreSQL Flyway PASS evidence. It does not run Flyway, access production DB, run destructive DB operations, print secrets, or approve production deployment.
+
+- Evidence doc: `docs/CONTROLLED_POSTGRESQL_EVIDENCE_SETUP.md`.
+- Docker/Testcontainers path: `DOCKER_MISSING` in the current environment.
+- Controlled external PostgreSQL path: `SKIPPED_MISSING_CONTROLLED_DB` because no disposable non-production PostgreSQL URL was present.
+- Setup helper: `scripts/controlled-postgresql-evidence-plan.sh` is no-op/dry-run only; it redacts env presence, refuses production-like indicators, and never connects to a database.
+- Migration proof status: no Flyway V1/V2/V3 PostgreSQL PASS evidence is claimed.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -478,7 +489,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE2 Controlled Non-Production Dependency Evidence Run with a disposable controlled PostgreSQL URL and provider opt-in env supplied outside chat.
+1. PDR-LIVE3 Controlled PostgreSQL Flyway Runner Or Evidence Run after Docker/Testcontainers or disposable controlled PostgreSQL env is available.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
