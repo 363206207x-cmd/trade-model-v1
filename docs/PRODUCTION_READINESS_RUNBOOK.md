@@ -158,6 +158,19 @@ PDR-PF5 defines production secrets/access hardening requirements and records exi
 - Current package evidence: no real secrets were accessed, no production server was accessed, and no production DB was accessed.
 - Production readiness remains BLOCKED until the hardening evidence is implemented/collected and every remaining production gate is proven.
 
+
+## PDR-PF6 Provider Live Smoke Evidence
+
+PDR-PF6 records provider live-smoke evidence policy and safe no-call output. It does not access real secrets, run unapproved live external calls, connect to production servers, connect to production DB, or approve production deployment.
+
+- Evidence doc: `docs/PROVIDER_LIVE_SMOKE_EVIDENCE.md`.
+- Default smoke evidence: `PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=false` returns provider `SKIPPED` statuses without external network calls.
+- Provider result policy: missing secrets or unavailable providers must be recorded as `SKIPPED_MISSING_SECRET`, `SKIPPED_DISABLED_BY_DEFAULT`, `SKIPPED_TIMEOUT`, `BLOCKED_PROVIDER_UNAVAILABLE`, or `FAIL`; never as fake PASS.
+- Redaction policy: evidence must not include API key values, authorization headers, datasource URLs with credentials, response bodies, `.env` contents, or screenshots/transcripts containing secrets.
+- Live rerun policy: run live provider smoke only after server/env secrets are ready, the operator explicitly approves external calls, and each command has a timeout.
+- Current package evidence: no real secrets were accessed, no secret values were printed, no production server was accessed, and no production DB was accessed.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -389,17 +402,17 @@ The restore script must only target a controlled recovery database until a separ
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
-- Provider readiness is readonly after PDR-M5: config-only status exists for Binance public market data, AI providers, and external context placeholders, but no live provider connection proof, secrets manager integration, or real server provider smoke exists yet.
+- Provider readiness is readonly after PDR-M5 and PDR-PF6 records safe no-call provider smoke evidence, but live provider connection proof, secrets manager integration, and real server provider smoke still do not exist yet.
 - PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
-- PDR-M7 provider live smoke harness exists, but the live checks are opt-in and no real provider smoke evidence has been collected yet.
+- PDR-M7 provider live smoke harness exists and PDR-PF6 records default-disabled/no-call evidence, but live checks remain opt-in and no real provider PASS evidence has been collected yet.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
 1. User-run real server acceptance evidence collection using `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` and `scripts/prod-release-gate.sh`.
-2. User-run provider live smoke with redacted evidence after server keys are configured.
-3. PDR-M8 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
+2. Controlled user-run provider live smoke with redacted evidence after server keys are configured and explicit external-call approval is given.
+3. PDR-PF7 Push Recheck Quote-Unavailable Guard or PDR-M8 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening when explicitly scoped.
 
 ## Explicit Non-Scope
 
