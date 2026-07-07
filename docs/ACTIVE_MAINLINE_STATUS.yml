@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-PF7 Push Recheck Quote-Unavailable Guard"
-active_block_cn: "PDR-PF7 Push Recheck Quote-Unavailable Guard"
+active_block: "PDR-PF8 Production Release Gate Closure"
+active_block_cn: "PDR-PF8 Production Release Gate Closure"
 
-next_required_action: "Complete PDR-PF7 Push Recheck Quote-Unavailable Guard. PF6 is merged/effective as provider live-smoke evidence; PF7 must prove missing currentPrice plus unavailable MarketQuoteClient quote fails closed with QUOTE_UNAVAILABLE or PRICE_REQUIRED, keeps recheck INVALIDATED/review-only/non-executable, and does not add trading behavior."
+next_required_action: "Complete PDR-PF8 Production Release Gate Closure. PF7 is merged/effective as Push Recheck quote-unavailable guard evidence; PF8 must aggregate PF1-PF7 evidence, record final release-gate decision as BLOCKED / DO NOT DEPLOY, and keep production deployment disallowed."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this Push Recheck quote-unavailable guard package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this production release-gate closure package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-pf7-push-recheck-quote-unavailable-guard"
+current_branch: "codex/pdr-pf8-production-release-gate-closure"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -81,8 +81,10 @@ pdr_pf5_status: "DONE/effective on merged main by PR #1073: secrets/access harde
 pdr_pf5_effective: true
 pdr_pf6_status: "DONE/effective on merged main by PR #1074: provider live-smoke evidence; safe no-call smoke only, no real secrets printed or committed"
 pdr_pf6_effective: true
-pdr_pf7_status: "IN_PROGRESS on branch codex/pdr-pf7-push-recheck-quote-unavailable-guard: focused Push Recheck quote-unavailable fail-closed guard"
-pdr_pf7_effective: false
+pdr_pf7_status: "DONE/effective on merged main by PR #1075: Push Recheck quote-unavailable fail-closed guard; missing quote writes QUOTE_UNAVAILABLE or PRICE_REQUIRED and remains review-only/non-executable"
+pdr_pf7_effective: true
+pdr_pf8_status: "IN_PROGRESS on branch codex/pdr-pf8-production-release-gate-closure: production release-gate decision closure as BLOCKED / DO NOT DEPLOY"
+pdr_pf8_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -108,6 +110,7 @@ notes:
   - "PDR-PF5 defines secrets/access hardening requirements and existing guard evidence; it does not access real secrets, production servers, or production DB."
   - "PDR-PF6 records provider live-smoke evidence and safe no-call smoke status; it does not access real secrets, run unapproved live external calls, or claim provider connectivity."
   - "PDR-PF7 records Push Recheck quote-unavailable fail-closed guard evidence; it does not add trading runtime behavior."
-  - "Current allowed work is Push Recheck quote-unavailable guard evidence, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-PF8 records the production release-gate decision from PF1-PF7 evidence as BLOCKED / DO NOT DEPLOY; it does not access production DB, secrets, or servers."
+  - "Current allowed work is production release-gate closure, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."
