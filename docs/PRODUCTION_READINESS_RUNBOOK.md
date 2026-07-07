@@ -171,6 +171,27 @@ PDR-PF6 records provider live-smoke evidence policy and safe no-call output. It 
 - Current package evidence: no real secrets were accessed, no secret values were printed, no production server was accessed, and no production DB was accessed.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-PF7 Push Recheck Quote-Unavailable Guard
+
+PDR-PF7 records focused fail-closed evidence for Push Recheck when callers omit `currentPrice` and market quotes are unavailable. It does not approve production deployment.
+
+- Evidence doc: `docs/PUSH_RECHECK_QUOTE_UNAVAILABLE_GUARD.md`.
+- Missing quote behavior: unavailable, empty, null, non-positive, or throwing quote sources produce `fail_reason_json.code = QUOTE_UNAVAILABLE` and `RecheckStatusEnum.INVALIDATED`.
+- Missing symbol behavior: snapshot symbol missing produces `fail_reason_json.code = PRICE_REQUIRED` and `RecheckStatusEnum.INVALIDATED`.
+- Safety boundary: fail-closed paths remain review-only/non-executable and do not create orders, auto-open, auto-close, auto-reverse, auto-trade, send external push, create fake positions, or create fake review records.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
+## PDR-PF8 Production Release Gate Closure
+
+PDR-PF8 aggregates PF1-PF7 evidence and records the production release-gate decision. It does not access production DB, real secrets, or production servers, and it does not approve production deployment.
+
+- Evidence doc: `docs/PRODUCTION_RELEASE_GATE_DECISION.md`.
+- Final gate decision: `BLOCKED`.
+- Production deployment decision: `DO NOT DEPLOY`.
+- V1 status: local acceptance-ready only, not production-ready.
+- Blocking evidence: PDR-PF3 PostgreSQL migration evidence remains `BLOCKED_TIMEOUT`; PDR-PF4 rollback/current-state migration drill is documented but not executed; PDR-PF5 secrets/access hardening evidence is incomplete; PDR-PF6 provider live smoke is `SKIPPED_DISABLED_BY_DEFAULT`; production release evidence bundle is incomplete.
+- Next package must be explicit remediation, not deployment.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.

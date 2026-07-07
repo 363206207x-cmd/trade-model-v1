@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF7 Push Recheck Quote-Unavailable Guard
+Current Work Package: PDR-PF8 Production Release Gate Closure
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -177,35 +177,54 @@ Next recommendation: `PDR-PF7 Push Recheck Quote-Unavailable Guard`, or a separa
 
 ## PDR-PF7 Push Recheck Quote-Unavailable Guard
 
-PDR-PF7 is the current scoped remediation package. It adds focused Push Recheck quote-unavailable guard tests and records evidence that missing `currentPrice` plus unavailable quote data fails closed as review-only/non-executable.
+PDR-PF7 is DONE/effective on merged main by PR #1075. It adds focused Push Recheck quote-unavailable guard tests and records evidence that missing `currentPrice` plus unavailable quote data fails closed as review-only/non-executable.
 
 Current PDR-PF7 status:
 
-1. `PushRecheckServiceImplTest` now covers `Optional.empty`, null `lastPrice`, quote client exception, missing snapshot symbol, and provided valid current price behavior.
+1. `PushRecheckServiceImplTest` covers `Optional.empty`, null `lastPrice`, quote client exception, missing snapshot symbol, and provided valid current price behavior.
 2. Missing quote paths write `fail_reason_json.code = QUOTE_UNAVAILABLE` and `RecheckStatusEnum.INVALIDATED`.
 3. Missing snapshot symbol writes `fail_reason_json.code = PRICE_REQUIRED` and `RecheckStatusEnum.INVALIDATED`.
 4. Fail-closed paths update push status to `RECHECK_INVALIDATED` and keep `RecheckResult` review-only, non-executable, not order execution, not auto-trading, not user-position creation, and not position mutation.
 5. No production code change was required; this package is test/docs/status-source guard evidence.
 6. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: continue only with the next explicitly scoped production-readiness remediation package; production release-gate closure is not allowed until every remaining gate is proven.
+Next recommendation after PF7: run PDR-PF8 Production Release Gate Closure to aggregate PF1-PF7 evidence and record the final release-gate decision.
+
+---
+
+## PDR-PF8 Production Release Gate Closure
+
+PDR-PF8 is the current scoped release-gate conclusion package. It aggregates PF1-PF7 production-readiness evidence and records the final production release-gate decision without changing runtime behavior.
+
+Current PDR-PF8 status:
+
+1. `docs/PRODUCTION_RELEASE_GATE_DECISION.md` records the gate decision as `BLOCKED` and production deployment decision as `DO NOT DEPLOY`.
+2. PDR-PF3 PostgreSQL empty migration evidence remains `BLOCKED_TIMEOUT` and not proven.
+3. PDR-PF4 current-state migration plus rollback drill is documented but not executed against a production-like database.
+4. PDR-PF5 secrets/access hardening is documented but lacks a complete secrets manager, rotation, HTTPS/reverse-proxy, audit logging, and rate limiting evidence bundle.
+5. PDR-PF6 provider live smoke remains `SKIPPED_DISABLED_BY_DEFAULT` and has no live provider PASS evidence.
+6. PDR-PF7 quote-unavailable guard is PASS safety evidence, but it is not enough to unlock production deployment.
+7. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-PF9 PostgreSQL Migration Evidence Recovery` or another explicitly scoped remediation package for one remaining blocker. The next package must not be deployment.
+
+---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF7 Push Recheck Quote-Unavailable Guard:
+Only the following work is allowed during and after PDR-PF8 Production Release Gate Closure:
 
-1. Push Recheck quote-unavailable fail-closed guard tests and documentation.
-2. Strict fail-closed Push Recheck safety fixes only if tests reveal a real bug.
-3. The next explicitly scoped remediation package after PF7 evidence is reviewed.
-4. Production-readiness remediation only when explicitly scoped.
+1. Production release-gate decision documentation and status-source updates.
+2. The next explicitly scoped remediation package after PF8 evidence is reviewed.
+3. Production-readiness remediation only when explicitly scoped.
 
-PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
+PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
 
 ---
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF7 Push Recheck Quote-Unavailable Guard:
+The following work remains blocked during and after PDR-PF8 Production Release Gate Closure:
 
 1. no auto-open
 2. no auto-close
@@ -217,6 +236,7 @@ The following work remains blocked during and after PDR-PF7 Push Recheck Quote-U
 8. no fake review records
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
+11. Treating PF8 release-gate closure as deployment approval.
 
 ---
 

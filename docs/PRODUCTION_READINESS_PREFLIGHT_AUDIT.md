@@ -43,7 +43,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 | 7 | No auto-open / auto-close / auto-reverse / order execution / auto-trading | PASS | Static and service tests preserve review-only/manual-review/no-order/no-auto-trading boundaries. No production trading behavior was added by the preflight audit. |
 | 8 | MarketQuoteClient failure behavior | PASS | `MarketControllerTest.quoteStatusEndpointFailsClosedWhenQuoteMissing` returns `MARKETQUOTE_MISSING_FAIL_CLOSED`, `QUOTE_UNAVAILABLE`, review-only, and not-trading-signal fields. Live provider proof remains missing. |
 | 9 | AI provider unavailable / budget blocked / timeout fallback behavior | PASS | `AiUsageGuard` fail-closes disabled, not-configured, rate-limit, budget, and log-unavailable states. `AiDecisionOrchestratorServiceImplTest` covers disabled global fallback, provider failure partial fallback, provider timeout, and overall timeout fallback. |
-| 10 | Push Recheck quote unavailable fail-closed behavior | PDR-PF7 CURRENT GUARD | `PushRecheckServiceImpl` maps missing quote paths to `PRICE_REQUIRED` or `QUOTE_UNAVAILABLE` and invalidates review-only. PDR-PF7 adds focused tests for empty quote, null lastPrice, quote exception, missing symbol, and valid currentPrice no-fallback behavior. |
+| 10 | Push Recheck quote unavailable fail-closed behavior | PDR-PF7 PASS SAFETY GUARD | `PushRecheckServiceImpl` maps missing quote paths to `PRICE_REQUIRED` or `QUOTE_UNAVAILABLE` and invalidates review-only. PDR-PF7 adds focused tests for empty quote, null lastPrice, quote exception, missing symbol, and valid currentPrice no-fallback behavior. This is safety evidence only, not production deployment approval. |
 | 11 | Review Center readonly behavior | PASS | `ReviewCenterServiceImplTest.emptySourcesReturnEmptyArraysWithoutSyntheticRows` proves empty arrays without synthetic records; mapping test uses existing readonly sources. |
 | 12 | Dashboard Home no fake position / no fake review behavior | PASS | `DashboardHomeServiceImplTest` proves open manual UserPosition is the source for home positions and LONG/SHORT PnL is calculated from real UserPosition plus monitor/quote data, without ExecutionPlan-to-position fallback. Review Center tests prove no fake review rows. |
 | 13 | Delivery-check and v1-state consistency | PASS | `bash scripts/v1-delivery-check.sh` PASS and `bash scripts/v1-state.sh` PASS on the clean branch before report generation. Both report `MAIN_SYNC: OK`; v1-state reports `PRODUCTION_DEPLOYMENT_READINESS: BLOCKED`. |
@@ -60,7 +60,8 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 6. HTTPS/reverse-proxy hardening, audit logging, rate limiting, and real server auth smoke evidence are planned by PDR-PF5 but not implemented/evidenced.
 7. Production scheduler policy is addressed by PDR-PF2 guard/config/docs, but production deployment still needs merged evidence and a later release-gate run.
 8. Live provider proof is missing for Binance public market data and optional AI/external-context providers.
-9. Push Recheck quote-unavailable behavior is being locked by PDR-PF7 focused tests; production readiness still remains blocked until all release gates are proven.
+9. Push Recheck quote-unavailable behavior is locked by PDR-PF7 focused tests; production readiness still remains blocked until all release gates are proven.
+10. PDR-PF8 release-gate closure records the aggregate decision as BLOCKED / DO NOT DEPLOY because migration, rollback, secrets/access, provider live smoke, and release evidence remain incomplete.
 11. Metrics dashboards, log aggregation, alerting, and operational incident evidence are missing.
 12. No completed production release-gate evidence bundle exists.
 
@@ -72,8 +73,8 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 4. `PDR-PF4 Current-State Migration + Rollback Drill`: DONE/effective on merged main by PR #1072; defines safe backup, restore, current-state migration rehearsal, rollback decision tree, and evidence bundle requirements without production DB access or destructive DB operations.
 5. `PDR-PF5 Secrets and Access Hardening`: DONE/effective on merged main by PR #1073; defines existing secret guards, missing hardening evidence, required env vars, secrets manager/rotation plan, HTTPS/reverse-proxy checklist, audit/access logging checklist, rate limiting checklist, and actuator policy without real secret access.
 6. `PDR-PF6 Provider Live Smoke Evidence`: DONE/effective on merged main by PR #1074; records provider smoke defaults, safe no-call evidence, result per provider, redaction policy, and remaining blockers. Collect redacted server-side live evidence only in a separately approved safe environment.
-7. `PDR-PF7 Push Recheck Quote-Unavailable Guard`: current package; adds focused guard tests proving no current price plus unavailable quote writes `QUOTE_UNAVAILABLE` or `PRICE_REQUIRED` and remains review-only/fail-closed.
-8. `PDR-PF8 Production Release Gate Closure`: only after all evidence is present, run the release-gate review and decide whether production readiness can move out of BLOCKED.
+7. `PDR-PF7 Push Recheck Quote-Unavailable Guard`: DONE/effective on merged main by PR #1075; adds focused guard tests proving no current price plus unavailable quote writes `QUOTE_UNAVAILABLE` or `PRICE_REQUIRED` and remains review-only/fail-closed.
+8. `PDR-PF8 Production Release Gate Closure`: current package; aggregate PF1-PF7 evidence and record the release-gate decision as BLOCKED / DO NOT DEPLOY because every production gate is not proven.
 
 ## Prohibited Items
 
@@ -93,4 +94,4 @@ The following remain prohibited in V1 and in all production-readiness packages u
 
 Production deployment should not proceed.
 
-The next work can proceed only as a scoped remediation package. After PDR-PF7 is merged/effective, proceed only to the next explicitly scoped remediation package. Provider connectivity and production release-gate evidence remain unproven unless controlled-server evidence supplies redacted PASS output with explicit approval and timeouts. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
+The next work can proceed only as a scoped remediation package. PDR-PF8 records the release-gate decision as BLOCKED / DO NOT DEPLOY. After PF8 is merged/effective, proceed only to the next explicitly scoped remediation package such as PDR-PF9 PostgreSQL Migration Evidence Recovery. Provider connectivity and production release-gate evidence remain unproven unless controlled-server evidence supplies redacted PASS output with explicit approval and timeouts. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
