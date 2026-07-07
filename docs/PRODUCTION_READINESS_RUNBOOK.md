@@ -192,6 +192,17 @@ PDR-PF8 aggregates PF1-PF7 evidence and records the production release-gate deci
 - Blocking evidence: PDR-PF3 PostgreSQL migration evidence remains `BLOCKED_TIMEOUT`; PDR-PF4 rollback/current-state migration drill is documented but not executed; PDR-PF5 secrets/access hardening evidence is incomplete; PDR-PF6 provider live smoke is `SKIPPED_DISABLED_BY_DEFAULT`; production release evidence bundle is incomplete.
 - Next package must be explicit remediation, not deployment.
 
+## PDR-PF9 PostgreSQL Migration Evidence Recovery
+
+PDR-PF9 recovers the PostgreSQL migration evidence trail after PDR-PF3 `BLOCKED_TIMEOUT`. It does not access production DB, run destructive DB operations, change Flyway SQL, or approve production deployment.
+
+- Evidence doc: `docs/POSTGRESQL_MIGRATION_EVIDENCE_RECOVERY.md`.
+- Bounded command: `./mvnw -q -Dtest=PostgreSqlFlywayMigrationSmokeTest test` run through a Python 600-second timeout wrapper.
+- Result: `BLOCKED_ENV_UNAVAILABLE`.
+- Evidence: command completed in 1.61 seconds with `Tests run: 1, Failures: 0, Errors: 0, Skipped: 1`; Testcontainers could not find Docker or `/var/run/docker.sock`.
+- Migration proof status: no PostgreSQL container ran, no Flyway V1/V2/V3 success log exists, and no PostgreSQL migration PASS is claimed.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.

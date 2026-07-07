@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF8 Production Release Gate Closure
+Current Work Package: PDR-PF9 PostgreSQL Migration Evidence Recovery
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -194,7 +194,7 @@ Next recommendation after PF7: run PDR-PF8 Production Release Gate Closure to ag
 
 ## PDR-PF8 Production Release Gate Closure
 
-PDR-PF8 is the current scoped release-gate conclusion package. It aggregates PF1-PF7 production-readiness evidence and records the final production release-gate decision without changing runtime behavior.
+PDR-PF8 is DONE/effective on merged main by PR #1076. It aggregates PF1-PF7 production-readiness evidence and records the final production release-gate decision without changing runtime behavior.
 
 Current PDR-PF8 status:
 
@@ -206,17 +206,37 @@ Current PDR-PF8 status:
 6. PDR-PF7 quote-unavailable guard is PASS safety evidence, but it is not enough to unlock production deployment.
 7. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: `PDR-PF9 PostgreSQL Migration Evidence Recovery` or another explicitly scoped remediation package for one remaining blocker. The next package must not be deployment.
+Next recommendation after PF8: `PDR-PF9 PostgreSQL Migration Evidence Recovery`.
+
+---
+
+## PDR-PF9 PostgreSQL Migration Evidence Recovery
+
+PDR-PF9 is the current scoped PostgreSQL migration evidence recovery package. It reruns only a bounded targeted PostgreSQL/Flyway smoke path and records the real local evidence status.
+
+Current PDR-PF9 status:
+
+1. Existing targeted test exists: `PostgreSqlFlywayMigrationSmokeTest`.
+2. Existing skip condition is present and works when Docker/Testcontainers is unavailable.
+3. Local `timeout` command is unavailable, so the targeted Maven command was run through a Python 600-second timeout wrapper.
+4. Local `docker` command is unavailable and Testcontainers cannot find `/var/run/docker.sock`.
+5. Bounded command completed in 1.61 seconds with JUnit skip: `Tests run: 1, Failures: 0, Errors: 0, Skipped: 1`.
+6. Result is `BLOCKED_ENV_UNAVAILABLE`, not PASS, because no PostgreSQL container ran and no Flyway V1/V2/V3 success log exists.
+7. No production DB was accessed and no destructive DB operation was run.
+8. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-PF10 PostgreSQL Environment Provisioning Evidence`, or another explicitly scoped remediation package that can provide Docker/Testcontainers or controlled server-backed PostgreSQL migration PASS evidence. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF8 Production Release Gate Closure:
+Only the following work is allowed during and after PDR-PF9 PostgreSQL Migration Evidence Recovery:
 
-1. Production release-gate decision documentation and status-source updates.
-2. The next explicitly scoped remediation package after PF8 evidence is reviewed.
-3. Production-readiness remediation only when explicitly scoped.
+1. PostgreSQL migration evidence recovery documentation and status-source updates.
+2. Bounded PostgreSQL/Flyway migration smoke evidence collection only.
+3. The next explicitly scoped remediation package after PF9 evidence is reviewed.
+4. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
 
@@ -224,7 +244,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF8 Production Release Gate Closure:
+The following work remains blocked during and after PDR-PF9 PostgreSQL Migration Evidence Recovery:
 
 1. no auto-open
 2. no auto-close
@@ -237,6 +257,7 @@ The following work remains blocked during and after PDR-PF8 Production Release G
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
+12. Treating PF9 environment-blocked migration evidence as PostgreSQL migration PASS.
 
 ---
 
