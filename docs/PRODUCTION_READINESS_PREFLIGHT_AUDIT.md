@@ -36,7 +36,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 |---|---|---|---|
 | 1 | Production profile safety | PASS | `ProductionProfileSafetyGuard` rejects H2 memory DB, blank datasource credentials, enabled H2 console, simulated provider, missing Binance credentials, unsafe admin password, public bind without opt-in, and sensitive actuator exposure. Tests cover these guardrails. |
 | 2 | Datasource config and secret handling | PDR-PF5 DONE / PF6 EVIDENCE CURRENT | `application-prod.yml` requires datasource and Binance secrets from environment and `ProductionProfileSafetyGuard` fails closed for missing/unsafe values. PDR-PF5 defines secrets manager, rotation, HTTPS/reverse-proxy, audit/access logging, and rate limiting requirements, but no real server secret injection proof exists yet. PDR-PF6 records provider smoke defaults and no-call evidence without accessing secrets. |
-| 3 | Schema migration from empty DB | PDR-PF9 BLOCKED_ENV_UNAVAILABLE | Flyway V1/V2/V3 migrations exist and were reviewed. PDR-PF3 empty PostgreSQL migration evidence timed out; PDR-PF9 reran the targeted smoke with a 600-second wrapper and it skipped in 1.61 seconds because Docker/Testcontainers is unavailable. Empty PostgreSQL migration success remains unproven. |
+| 3 | Schema migration from empty DB | PDR-PF10 SKIPPED_ENV_UNAVAILABLE | Flyway V1/V2/V3 migrations exist and were reviewed. PDR-PF9 recovery found Docker/Testcontainers unavailable; PDR-PF10 confirms Docker CLI and Docker sockets are missing, so the migration smoke was skipped and empty PostgreSQL migration success remains unproven. |
 | 4 | Schema migration from current main state | PDR-PF4 PLANNING | PDR-PF4 defines the current-state migration and rollback drill process, but no staging/server-backed evidence has been executed yet. Current-state migration success remains unproven. |
 | 5 | Scheduler default states | PDR-PF2 POLICY ADDED | PDR-PF2 adds `docs/PRODUCTION_SCHEDULER_POLICY.md`, production default-off scheduler flags in `application-prod.yml`, and `ProductionProfileSafetyGuard` validation for missing scheduler policy/classifications and unsafe opt-in. Production deployment remains BLOCKED until later release-gate evidence. |
 | 6 | Position Monitor scheduler default-off | PASS | `trade-model.schedulers.position-monitor.enabled` defaults to false, and `PositionMonitorSchedulerTest` proves the monitor batch does not run unless explicitly enabled. |
@@ -53,7 +53,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 ## Blocker List
 
 1. Real production PostgreSQL connection is not proven.
-2. Empty PostgreSQL migration evidence is still unproven locally: PDR-PF3 evidence is BLOCKED_TIMEOUT, and PDR-PF9 recovery is BLOCKED_ENV_UNAVAILABLE because Docker/Testcontainers is unavailable and the bounded targeted smoke skipped.
+2. Empty PostgreSQL migration evidence is still unproven locally: PDR-PF3 evidence is BLOCKED_TIMEOUT, PDR-PF9 recovery is BLOCKED_ENV_UNAVAILABLE, and PDR-PF10 environment provisioning evidence is SKIPPED_ENV_UNAVAILABLE because Docker CLI and sockets are missing.
 3. Migration from current main/live state is not executed; PDR-PF4 defines the rehearsal plan and required evidence only.
 4. Backup and restore drill evidence is still missing until run in a safe staging/server-backed environment.
 5. Secrets manager integration, credential rotation, and redacted server-side secret injection evidence are planned by PDR-PF5 but not implemented/evidenced.
@@ -62,7 +62,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 8. Live provider proof is missing for Binance public market data and optional AI/external-context providers.
 9. Push Recheck quote-unavailable behavior is locked by PDR-PF7 focused tests; production readiness still remains blocked until all release gates are proven.
 10. PDR-PF8 release-gate closure records the aggregate decision as BLOCKED / DO NOT DEPLOY because migration, rollback, secrets/access, provider live smoke, and release evidence remain incomplete.
-11. PDR-PF9 migration evidence recovery identifies Docker/Testcontainers unavailability as the local blocker; no PostgreSQL migration PASS evidence exists yet.
+11. PDR-PF9 migration evidence recovery identifies Docker/Testcontainers unavailability as the local blocker; PDR-PF10 confirms Docker CLI and sockets are missing. No PostgreSQL migration PASS evidence exists yet.
 11. Metrics dashboards, log aggregation, alerting, and operational incident evidence are missing.
 12. No completed production release-gate evidence bundle exists.
 
@@ -76,7 +76,8 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 6. `PDR-PF6 Provider Live Smoke Evidence`: DONE/effective on merged main by PR #1074; records provider smoke defaults, safe no-call evidence, result per provider, redaction policy, and remaining blockers. Collect redacted server-side live evidence only in a separately approved safe environment.
 7. `PDR-PF7 Push Recheck Quote-Unavailable Guard`: DONE/effective on merged main by PR #1075; adds focused guard tests proving no current price plus unavailable quote writes `QUOTE_UNAVAILABLE` or `PRICE_REQUIRED` and remains review-only/fail-closed.
 8. `PDR-PF8 Production Release Gate Closure`: DONE/effective on merged main by PR #1076; aggregates PF1-PF7 evidence and records the release-gate decision as BLOCKED / DO NOT DEPLOY because every production gate is not proven.
-9. `PDR-PF9 PostgreSQL Migration Evidence Recovery`: current package; bounded targeted smoke completed quickly but skipped because Docker/Testcontainers is unavailable, so result is BLOCKED_ENV_UNAVAILABLE and not PASS.
+9. `PDR-PF9 PostgreSQL Migration Evidence Recovery`: DONE/effective on merged main by PR #1077; bounded targeted smoke completed quickly but skipped because Docker/Testcontainers is unavailable, so result is BLOCKED_ENV_UNAVAILABLE and not PASS.
+10. `PDR-PF10 PostgreSQL Environment Provisioning Evidence`: current package; Docker CLI and sockets are missing, Testcontainers cannot be considered available, and migration smoke is SKIPPED_ENV_UNAVAILABLE.
 
 ## Prohibited Items
 
@@ -96,4 +97,4 @@ The following remain prohibited in V1 and in all production-readiness packages u
 
 Production deployment should not proceed.
 
-The next work can proceed only as a scoped remediation package. PDR-PF9 records migration evidence recovery as BLOCKED_ENV_UNAVAILABLE, not PASS. After PF9 is merged/effective, proceed only to the next explicitly scoped remediation package such as PDR-PF10 PostgreSQL Environment Provisioning Evidence. Provider connectivity and production release-gate evidence remain unproven unless controlled-server evidence supplies redacted PASS output with explicit approval and timeouts. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
+The next work can proceed only as a scoped remediation package. PDR-PF10 records PostgreSQL environment provisioning evidence as DOCKER_MISSING / SKIPPED_ENV_UNAVAILABLE, not PASS. After PF10 is merged/effective, proceed only to the next explicitly scoped remediation package such as PDR-PF11 Docker/Testcontainers Provisioning Or Server-Backed PostgreSQL Smoke. Provider connectivity and production release-gate evidence remain unproven unless controlled-server evidence supplies redacted PASS output with explicit approval and timeouts. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
