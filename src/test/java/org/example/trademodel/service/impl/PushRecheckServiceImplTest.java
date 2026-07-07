@@ -28,12 +28,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -151,7 +153,7 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(42L)).thenReturn(s);
         MarketQuoteSnapshot quote = new MarketQuoteSnapshot();
         quote.setLastPrice(new BigDecimal("101"));
-        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(java.util.Optional.of(quote));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote));
 
         RecheckResult r = service.recheck(42L, null);
 
@@ -162,6 +164,111 @@ class PushRecheckServiceImplTest {
         verify(pushRecheckLogMapper).insert(cap.capture());
         assertThat(cap.getValue().getCurrentPrice()).isEqualByComparingTo("101");
         assertThat(cap.getValue().getExecutionErrorCode()).isNull();
+    }
+
+    @Test
+    void missingCurrentPriceQuoteEmptyFailsClosedWithQuoteUnavailable() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol("BTCUSDT");
+        when(pushSnapshotMapper.selectByPushId(43L)).thenReturn(s);
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
+
+        RecheckResult r = service.recheck(43L, null);
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("QUOTE_UNAVAILABLE");
+        assertThat(cap.getValue().getFailReasonJson()).contains("\"code\":\"QUOTE_UNAVAILABLE\"");
+        assertThat(cap.getValue().getCurrentPrice()).isNull();
+        verify(pushSnapshotMapper).updatePushStatus(43L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void missingCurrentPriceQuoteNullLastPriceFailsClosedWithQuoteUnavailable() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol("BTCUSDT");
+        when(pushSnapshotMapper.selectByPushId(44L)).thenReturn(s);
+        MarketQuoteSnapshot quote = new MarketQuoteSnapshot();
+        quote.setLastPrice(null);
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote));
+
+        RecheckResult r = service.recheck(44L, null);
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("QUOTE_UNAVAILABLE");
+        assertThat(cap.getValue().getFailReasonJson()).contains("\"code\":\"QUOTE_UNAVAILABLE\"");
+        assertThat(cap.getValue().getCurrentPrice()).isNull();
+        verify(pushSnapshotMapper).updatePushStatus(44L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void missingCurrentPriceQuoteThrowsFailsClosedWithQuoteUnavailable() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol("BTCUSDT");
+        when(pushSnapshotMapper.selectByPushId(45L)).thenReturn(s);
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT"))
+                .thenThrow(new RuntimeException("provider unavailable"));
+
+        RecheckResult r = service.recheck(45L, null);
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("QUOTE_UNAVAILABLE");
+        assertThat(cap.getValue().getFailReasonJson()).contains("\"code\":\"QUOTE_UNAVAILABLE\"");
+        assertThat(cap.getValue().getCurrentPrice()).isNull();
+        verify(pushSnapshotMapper).updatePushStatus(45L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void missingCurrentPriceSnapshotSymbolMissingFailsClosedWithPriceRequired() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol(null);
+        when(pushSnapshotMapper.selectByPushId(46L)).thenReturn(s);
+
+        RecheckResult r = service.recheck(46L, null);
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(r.isReviewPassed()).isFalse();
+        assertSafeReviewOnlyResult(r);
+        verifyNoInteractions(marketQuoteClient);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("PRICE_REQUIRED");
+        assertThat(cap.getValue().getFailReasonJson()).contains("\"code\":\"PRICE_REQUIRED\"");
+        assertThat(cap.getValue().getCurrentPrice()).isNull();
+        verify(pushSnapshotMapper).updatePushStatus(46L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
+    void providedCurrentPriceKeepsExistingBehaviorAndDoesNotFetchQuote() {
+        TmPushSnapshotDO s = baseSnap();
+        s.setSymbol("BTCUSDT");
+        s.setTriggerPrice(new BigDecimal("100"));
+        s.setConfusedScoreSnapshot(10);
+        when(pushSnapshotMapper.selectByPushId(47L)).thenReturn(s);
+
+        RecheckResult r = service.recheck(47L, new BigDecimal("100"));
+
+        assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
+        assertThat(r.isValid()).isFalse();
+        assertThat(r.isReviewPassed()).isTrue();
+        assertSafeReviewOnlyResult(r);
+        verifyNoInteractions(marketQuoteClient);
+        verify(pushSnapshotMapper).updatePushStatus(47L, "RECHECK_REVIEW_PASSED");
     }
 
     @Test
