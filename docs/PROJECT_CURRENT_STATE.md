@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF3 PostgreSQL Migration Evidence
+Current Work Package: PDR-PF4 Current-State Migration + Rollback Drill
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -51,7 +51,7 @@ The following prohibited items remain outside V1 scope:
 
 ## PDR-PF2 Production Scheduler Policy
 
-PDR-PF2 is the current scoped remediation package. It defines production scheduler policy, requires explicit production scheduler classification, and keeps production deployment fail-closed unless each scheduler is explicitly approved.
+PDR-PF2 is DONE/effective on merged main. It defines production scheduler policy, requires explicit production scheduler classification, and keeps production deployment fail-closed unless each scheduler is explicitly approved.
 
 Current production scheduler policy status:
 
@@ -109,7 +109,7 @@ P3-3 Final Delivery & System Freeze is effective because final docs/status closu
 
 ## PDR-PF3 PostgreSQL Migration Evidence
 
-PDR-PF3 is the current scoped remediation package. It records PostgreSQL migration evidence for current Flyway files without changing business runtime behavior.
+PDR-PF3 is DONE/effective on merged main by PR #1071. It records PostgreSQL migration evidence for current Flyway files without changing business runtime behavior.
 
 Current PDR-PF3 evidence status:
 
@@ -124,13 +124,30 @@ Next recommendation: first resolve Docker/Testcontainers availability or rerun P
 
 ---
 
+## PDR-PF4 Current-State Migration + Rollback Drill
+
+PDR-PF4 is the current scoped remediation package. It defines safe current-state migration and rollback rehearsal requirements without accessing production DB, running destructive DB operations, changing runtime behavior, or claiming production readiness.
+
+Current PDR-PF4 status:
+
+1. `docs/CURRENT_STATE_MIGRATION_ROLLBACK_DRILL.md` defines required preconditions, backup plan, restore drill plan, current-state migration rehearsal plan, rollback decision tree, evidence bundle, and safe staging/server-backed command templates.
+2. Existing `scripts/prod-backup.sh` requires explicit database environment variables and has no hardcoded DB URL or secrets.
+3. Existing `scripts/prod-restore.sh` requires explicit restore environment variables and refuses to run without `RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA`.
+4. Existing `scripts/prod-release-gate.sh` does not run restore automatically and keeps release-gate status incomplete until restore/human evidence exists.
+5. No production DB was accessed and no destructive DB operation was run by this package.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: collect PDR-PF4 evidence in a safe staging/server-backed PostgreSQL environment, or first resolve Docker/Testcontainers/PostgreSQL availability. After backup, restore, migration, rollback, and smoke evidence exists, continue to the next explicitly scoped remediation package.
+
+---
+
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF3 PostgreSQL migration evidence:
+Only the following work is allowed during and after PDR-PF4 Current-State Migration + Rollback Drill:
 
-1. PostgreSQL migration evidence recording.
-2. A rerun of PDR-PF3 in a Docker-capable or server-backed PostgreSQL environment after the current BLOCKED_TIMEOUT evidence is closed.
-3. The next explicitly scoped remediation package after empty migration evidence passes, preferably PDR-PF4 Current-State Migration + Rollback Drill.
+1. Current-state migration and rollback drill planning/evidence definition.
+2. Safe staging/server-backed PostgreSQL evidence collection when explicitly scoped.
+3. The next explicitly scoped remediation package after PF4 evidence is reviewed.
 4. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
@@ -139,7 +156,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF3 PostgreSQL migration evidence:
+The following work remains blocked during and after PDR-PF4 Current-State Migration + Rollback Drill:
 
 1. no auto-open
 2. no auto-close

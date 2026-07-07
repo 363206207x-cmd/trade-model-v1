@@ -37,7 +37,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 | 1 | Production profile safety | PASS | `ProductionProfileSafetyGuard` rejects H2 memory DB, blank datasource credentials, enabled H2 console, simulated provider, missing Binance credentials, unsafe admin password, public bind without opt-in, and sensitive actuator exposure. Tests cover these guardrails. |
 | 2 | Datasource config and secret handling | FAIL | `application-prod.yml` requires datasource and Binance secrets from environment, which is good, but there is no secrets manager integration, credential rotation evidence, or real server secret injection proof. |
 | 3 | Schema migration from empty DB | PDR-PF3 BLOCKED_TIMEOUT | Flyway V1/V2/V3 migrations exist and were reviewed. PDR-PF3 empty PostgreSQL migration evidence did not complete within acceptable time and was manually interrupted after approximately 1h27m, so empty PostgreSQL migration success remains unproven. |
-| 4 | Schema migration from current main state | FAIL | There is no completed migration-from-existing-live-state evidence, no real current production DB baseline, no backfill/compatibility rehearsal, and no restore drill. |
+| 4 | Schema migration from current main state | PDR-PF4 PLANNING | PDR-PF4 defines the current-state migration and rollback drill process, but no staging/server-backed evidence has been executed yet. Current-state migration success remains unproven. |
 | 5 | Scheduler default states | PDR-PF2 POLICY ADDED | PDR-PF2 adds `docs/PRODUCTION_SCHEDULER_POLICY.md`, production default-off scheduler flags in `application-prod.yml`, and `ProductionProfileSafetyGuard` validation for missing scheduler policy/classifications and unsafe opt-in. Production deployment remains BLOCKED until later release-gate evidence. |
 | 6 | Position Monitor scheduler default-off | PASS | `trade-model.schedulers.position-monitor.enabled` defaults to false, and `PositionMonitorSchedulerTest` proves the monitor batch does not run unless explicitly enabled. |
 | 7 | No auto-open / auto-close / auto-reverse / order execution / auto-trading | PASS | Static and service tests preserve review-only/manual-review/no-order/no-auto-trading boundaries. No production trading behavior was added by the preflight audit. |
@@ -54,8 +54,8 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 
 1. Real production PostgreSQL connection is not proven.
 2. Empty PostgreSQL migration evidence is still unproven locally: PDR-PF3 evidence is BLOCKED_TIMEOUT after an approximately 1h27m interrupted Docker/Testcontainers/PostgreSQL smoke path.
-3. Migration from current main/live state is not rehearsed and has no rollback evidence.
-4. Backup and restore drill evidence is missing.
+3. Migration from current main/live state is not executed; PDR-PF4 defines the rehearsal plan and required evidence only.
+4. Backup and restore drill evidence is still missing until run in a safe staging/server-backed environment.
 5. Secrets manager integration, credential rotation, and redacted server-side secret injection evidence are missing.
 6. HTTPS/reverse-proxy hardening, audit logging, rate limiting, and real server auth smoke evidence are missing.
 7. Production scheduler policy is addressed by PDR-PF2 guard/config/docs, but production deployment still needs merged evidence and a later release-gate run.
@@ -67,9 +67,9 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 ## Required Remediation Packages
 
 1. `PDR-PF1 Status Source Cleanup`: DONE/effective on merged main; stale production-readiness docs no longer imply old PDR-only scope.
-2. `PDR-PF2 Production Scheduler Policy`: current package; defines production scheduler defaults, required env overrides, fail-closed guard validation, and Position Monitor default-off status.
-3. `PDR-PF3 PostgreSQL Migration Evidence`: current package; records migration-file review and BLOCKED_TIMEOUT evidence after an approximately 1h27m interrupted run. Resolve Docker/Testcontainers availability or rerun in a server-backed PostgreSQL environment before claiming PASS.
-4. `PDR-PF4 Current-State Migration + Rollback Drill`: rehearse migration from a current-main-like database state, including backup, restore, and rollback verification evidence.
+2. `PDR-PF2 Production Scheduler Policy`: DONE/effective on merged main; defines production scheduler defaults, required env overrides, fail-closed guard validation, and Position Monitor default-off status.
+3. `PDR-PF3 PostgreSQL Migration Evidence`: DONE/effective on merged main by PR #1071; records migration-file review and BLOCKED_TIMEOUT evidence after an approximately 1h27m interrupted run. Resolve Docker/Testcontainers availability or rerun in a server-backed PostgreSQL environment before claiming PASS.
+4. `PDR-PF4 Current-State Migration + Rollback Drill`: current package; defines safe backup, restore, current-state migration rehearsal, rollback decision tree, and evidence bundle requirements without production DB access or destructive DB operations.
 5. `PDR-PF5 Secrets and Access Hardening`: add or document secrets manager integration, credential rotation, HTTPS/reverse-proxy hardening, audit logging, and rate limiting.
 6. `PDR-PF6 Provider Live Smoke Evidence`: collect redacted server-side evidence for Binance public data and any explicitly enabled AI/external providers.
 7. `PDR-PF7 Push Recheck Quote-Unavailable Guard`: add a focused test-only guard proving no current price plus unavailable quote writes `QUOTE_UNAVAILABLE` and remains review-only/fail-closed.
@@ -93,4 +93,4 @@ The following remain prohibited in V1 and in all production-readiness packages u
 
 Production deployment should not proceed.
 
-The next work can proceed only as a scoped remediation package. After PDR-PF3 is merged/effective, resolve Docker/Testcontainers availability or rerun PostgreSQL migration evidence in a server-backed environment; once empty migration evidence passes, continue to current-state migration/rollback evidence. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
+The next work can proceed only as a scoped remediation package. After PDR-PF4 is merged/effective, collect current-state migration/rollback evidence in a safe staging/server-backed environment and continue resolving PostgreSQL empty-migration proof before any release-gate decision. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
