@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence"
-active_block_cn: "PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence"
+active_block: "PDR-LIVE1 Controlled Live Dependency Acceptance"
+active_block_cn: "PDR-LIVE1 Controlled Live Dependency Acceptance"
 
-next_required_action: "Complete PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence. PF10 is merged/effective as DOCKER_MISSING / SKIPPED_ENV_UNAVAILABLE; PF11 must attempt controlled PostgreSQL smoke only after Docker/Testcontainers availability is confirmed, record blockers honestly, and keep production deployment disallowed."
+next_required_action: "Complete PDR-LIVE1 Controlled Live Dependency Acceptance. PF11 is merged/effective as DOCKER_MISSING / BLOCKED_ENV_UNAVAILABLE; LIVE1 must record controlled DB, provider, app-prod safety, scheduler policy, and Push Recheck evidence without production DB access, destructive operations, secrets disclosure, or production deployment approval."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this controlled PostgreSQL migration smoke evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this controlled live dependency acceptance package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-pf11-controlled-postgresql-migration-smoke"
+current_branch: "codex/pdr-live1-controlled-live-dependency-acceptance"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -89,8 +89,10 @@ pdr_pf9_status: "DONE/effective on merged main by PR #1077: PostgreSQL migration
 pdr_pf9_effective: true
 pdr_pf10_status: "DONE/effective on merged main by PR #1078: PostgreSQL environment provisioning evidence recorded DOCKER_MISSING / SKIPPED_ENV_UNAVAILABLE; no PostgreSQL migration PASS claimed"
 pdr_pf10_effective: true
-pdr_pf11_status: "IN_PROGRESS on branch codex/pdr-pf11-controlled-postgresql-migration-smoke: controlled PostgreSQL migration smoke evidence"
-pdr_pf11_effective: false
+pdr_pf11_status: "DONE/effective on merged main by PR #1079: controlled PostgreSQL migration smoke evidence recorded DOCKER_MISSING / BLOCKED_ENV_UNAVAILABLE; no PostgreSQL migration PASS claimed"
+pdr_pf11_effective: true
+pdr_live1_status: "IN_PROGRESS on branch codex/pdr-live1-controlled-live-dependency-acceptance: controlled live dependency acceptance evidence; controlled DB missing, provider live calls disabled or missing secrets, app-prod safety/scheduler/Push Recheck guards pass"
+pdr_live1_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -119,7 +121,8 @@ notes:
   - "PDR-PF8 records the production release-gate decision from PF1-PF7 evidence as BLOCKED / DO NOT DEPLOY; it does not access production DB, secrets, or servers."
   - "PDR-PF9 records PostgreSQL migration evidence recovery; the bounded local smoke is BLOCKED_ENV_UNAVAILABLE because Docker/Testcontainers is unavailable, so no PostgreSQL migration PASS is claimed."
   - "PDR-PF10 records PostgreSQL environment provisioning evidence; Docker CLI and sockets are unavailable, so migration smoke is SKIPPED_ENV_UNAVAILABLE and no PostgreSQL migration PASS is claimed."
-  - "PDR-PF11 records controlled PostgreSQL migration smoke evidence; Docker is still missing, so the bounded migration smoke is BLOCKED_ENV_UNAVAILABLE and no PostgreSQL migration PASS is claimed."
-  - "Current allowed work is controlled PostgreSQL migration smoke evidence, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-PF11 is DONE/effective on merged main by PR #1079; Docker is still missing, so the bounded migration smoke is BLOCKED_ENV_UNAVAILABLE and no PostgreSQL migration PASS is claimed."
+  - "PDR-LIVE1 records controlled live dependency acceptance evidence: controlled DB is missing, provider live smoke is disabled by default or missing secrets, app-prod safety / scheduler policy / Push Recheck guard tests pass, and production readiness remains BLOCKED."
+  - "Current allowed work is controlled live dependency acceptance evidence, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

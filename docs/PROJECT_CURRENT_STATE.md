@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence
+Current Work Package: PDR-LIVE1 Controlled Live Dependency Acceptance
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -253,9 +253,9 @@ Next recommendation after PF10: `PDR-PF11 Controlled PostgreSQL Migration Smoke 
 
 ## PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence
 
-PDR-PF11 is the current scoped controlled PostgreSQL migration smoke package. It attempts to obtain a trustworthy bounded Flyway V1/V2/V3 success log only if Docker/Testcontainers or a controlled non-production PostgreSQL environment is available.
+PDR-PF11 is DONE/effective on merged main by PR #1079. It attempts to obtain a trustworthy bounded Flyway V1/V2/V3 success log only if Docker/Testcontainers or a controlled non-production PostgreSQL environment is available.
 
-Current PDR-PF11 status:
+PDR-PF11 status:
 
 1. `command -v docker` returns no path.
 2. `docker version || true` and `docker info || true` return `zsh:1: command not found: docker`.
@@ -269,19 +269,41 @@ Current PDR-PF11 status:
 10. No production DB was accessed and no destructive DB operation was run.
 11. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: `PDR-PF12 Server-Backed Disposable PostgreSQL Migration Smoke`, or another explicitly scoped remediation package that can provide Docker/Testcontainers availability or controlled disposable PostgreSQL migration PASS evidence. The next package must not be deployment.
+Next recommendation after PF11: `PDR-LIVE1 Controlled Live Dependency Acceptance`, focused on controlled DB/provider/app-prod/scheduler/Push Recheck evidence without production deployment approval.
+
+---
+
+## PDR-LIVE1 Controlled Live Dependency Acceptance
+
+PDR-LIVE1 is the current scoped controlled live dependency acceptance package. It prepares or records real dependency acceptance evidence in a controlled staging, pre-prod, or local-controlled environment. It is not production deployment, not public release, and not auto-trading.
+
+Current PDR-LIVE1 status:
+
+1. Controlled PostgreSQL DB result is `SKIPPED_MISSING_CONTROLLED_DB` because no disposable non-production PostgreSQL URL was present in environment.
+2. Binance public market data smoke result is `SKIPPED_DISABLED` because live external calls were not explicitly enabled.
+3. AI provider results are `SKIPPED_MISSING_SECRET` for OpenAI, Gemini, and xAI because keys were not present.
+4. External context/news/macro provider result is `SKIPPED_MISSING_SECRET` because keys/configuration were not present.
+5. `ProductionProfileSafetyGuardTest`, `PositionMonitorSchedulerTest`, and `PushRecheckServiceImplTest` passed in a bounded run.
+6. application-prod safety remains fail-closed.
+7. Production scheduler policy remains fail-closed and Position Monitor scheduler remains default-off.
+8. Push Recheck quote-unavailable behavior remains fail-closed/review-only.
+9. No production DB was accessed, no destructive DB operation was run, and no secrets were printed or committed.
+10. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-LIVE2 Controlled Non-Production Dependency Evidence Run`, after disposable DB and provider opt-in environment are supplied outside chat and with redacted output. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence:
+Only the following work is allowed during and after PDR-LIVE1 Controlled Live Dependency Acceptance:
 
-1. Controlled PostgreSQL migration smoke evidence documentation and status-source updates.
-2. Safe Docker/Testcontainers environment checks.
-3. Bounded PostgreSQL/Flyway migration smoke only if Docker/Testcontainers availability is confirmed.
-4. The next explicitly scoped remediation package after PF11 evidence is reviewed.
-5. Production-readiness remediation only when explicitly scoped.
+1. Controlled live dependency acceptance documentation and status-source updates.
+2. Safe controlled DB/provider env presence checks without printing values.
+3. Bounded provider smoke only when explicit opt-in env and non-secret redacted output are available.
+4. Bounded focused safety tests for production profile, scheduler policy, and Push Recheck fail-closed behavior.
+5. The next explicitly scoped remediation package after LIVE1 evidence is reviewed.
+6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
 
@@ -289,7 +311,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence:
+The following work remains blocked during and after PDR-LIVE1 Controlled Live Dependency Acceptance:
 
 1. no auto-open
 2. no auto-close
@@ -302,7 +324,7 @@ The following work remains blocked during and after PDR-PF11 Controlled PostgreS
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating PF9, PF10, or PF11 environment-blocked migration evidence as PostgreSQL migration PASS.
+12. Treating PF9, PF10, PF11, or LIVE1 skipped/blocked dependency evidence as PostgreSQL/provider/release-gate PASS.
 
 ---
 
@@ -399,9 +421,9 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. User-run real server acceptance evidence collection using `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md`, `scripts/prod-release-gate.sh`, and `scripts/prod-provider-smoke.sh`.
-2. PDR-M8 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening.
-3. PDR-M9 Production release-gate status closure only after completed redacted evidence and explicit approval.
+1. PDR-LIVE2 Controlled Non-Production Dependency Evidence Run with disposable DB/provider opt-in env supplied outside chat and redacted output.
+2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
+3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
 ### PDR-2B Flyway Baseline Skeleton
 
