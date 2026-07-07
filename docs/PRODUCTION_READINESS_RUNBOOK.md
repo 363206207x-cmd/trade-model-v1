@@ -225,6 +225,20 @@ PDR-PF11 attempts controlled PostgreSQL migration smoke evidence using Docker/Te
 - Migration proof status: no PostgreSQL container ran, no controlled non-production PostgreSQL server was provided, no Flyway V1/V2/V3 success log exists, and no PostgreSQL migration PASS is claimed.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-LIVE1 Controlled Live Dependency Acceptance
+
+PDR-LIVE1 records controlled live dependency acceptance evidence. It is not production deployment, not public release, and not auto-trading. It does not access production DB, run destructive DB operations, print secrets, or approve production deployment.
+
+- Evidence doc: `docs/CONTROLLED_LIVE_DEPENDENCY_ACCEPTANCE.md`.
+- Controlled PostgreSQL result: `SKIPPED_MISSING_CONTROLLED_DB` because no disposable non-production PostgreSQL URL was present in environment.
+- Binance public smoke result: `SKIPPED_DISABLED` because live external calls were not explicitly enabled.
+- AI provider results: `SKIPPED_MISSING_SECRET` for OpenAI, Gemini, and xAI.
+- External context/news/macro provider result: `SKIPPED_MISSING_SECRET`.
+- application-prod safety result: PASS from focused safety tests.
+- Scheduler policy result: PASS; Position Monitor scheduler remains default-off.
+- Push Recheck quote-unavailable result: PASS; behavior remains fail-closed/review-only.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -464,9 +478,9 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. User-run real server acceptance evidence collection using `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` and `scripts/prod-release-gate.sh`.
-2. Controlled user-run provider live smoke with redacted evidence after server keys are configured and explicit external-call approval is given.
-3. PDR-PF7 Push Recheck Quote-Unavailable Guard or PDR-M8 Secrets Manager / HTTPS / Reverse Proxy / Credential Rotation / Audit Hardening when explicitly scoped.
+1. PDR-LIVE2 Controlled Non-Production Dependency Evidence Run with a disposable controlled PostgreSQL URL and provider opt-in env supplied outside chat.
+2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
+3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
 ## Explicit Non-Scope
 
