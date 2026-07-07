@@ -39,15 +39,15 @@ The following do not count as completed:
 
 ## Current Active Block
 
-- Current merged main evidence: PDR-M7 real provider live smoke harness, PR #1068 production-readiness preflight audit, PR #1069 status-source cleanup, plus prior P3-3 local acceptance freeze, Review Center readonly integration, and PDR-1 through PDR-M6A production-readiness remediation evidence.
-- Current active block: `PDR-PF2 Production Scheduler Policy`
+- Current merged main evidence: PDR-M7 real provider live smoke harness, PR #1068 production-readiness preflight audit, PR #1069 status-source cleanup, PR #1070 production scheduler policy, plus prior P3-3 local acceptance freeze, Review Center readonly integration, and PDR-1 through PDR-M6A production-readiness remediation evidence.
+- Current active block: `PDR-PF3 PostgreSQL Migration Evidence`
 - Current level: `LOCAL_ACCEPTANCE_FREEZE_DONE effective; PRODUCTION_DEPLOYMENT_READINESS blocked`
 - Capability movement from this status closure: P3-3 Final Delivery & System Freeze is recorded as local/acceptance-ready final freeze. This does not prove production deployment readiness, Push send, Telegram send, external channel, order execution, or auto-trading.
-- Latest production readiness remediation movement: PR #1069 cleans stale status-source documents after the production-readiness preflight audit. PDR-PF2 now defines production scheduler policy while keeping Production Deployment Readiness BLOCKED and production deployment unable to proceed.
-- Next required action: complete PDR-PF2 production scheduler policy, then proceed only to PDR-PF3 PostgreSQL Migration Evidence or another explicitly scoped remediation package. Production Deployment Readiness remains BLOCKED until every production gate is proven and explicitly approved.
+- Latest production readiness remediation movement: PR #1070 defines production scheduler policy. PDR-PF3 now records PostgreSQL migration evidence as BLOCKED_TIMEOUT after an approximately 1h27m interrupted run. Production Deployment Readiness remains BLOCKED and production deployment cannot proceed.
+- Next required action: finalize PDR-PF3 PostgreSQL migration timeout evidence, then resolve Docker/Testcontainers availability or rerun in a server-backed PostgreSQL environment before PDR-PF4 Current-State Migration + Rollback Drill. Production Deployment Readiness remains BLOCKED until every production gate is proven and explicitly approved.
 - Validation evidence: P0-0 through P3-2 remain DONE/effective. Dashboard Home Aggregation API and Dashboard Data Fill P1-P5 are merged/effective; `GET /api/dashboard/home` returned HTTP 200 success with `header`, `systemState`, `assets`, `positions`, `executionSuggestion`, `aiDecision`, `pushInbox`, `diagnostics`, and `safety`. Review Center readonly integration is merged/effective; `GET /api/review/center` returned HTTP 200 success with `summary`, `positionReviews`, `opportunityReviews`, `pushReviews`, and `ruleFeedback`. Mainline validation passed on clean `main`: no open PRs, MAIN_SYNC OK, `./mvnw test -q` PASS, `bash scripts/v1-delivery-check.sh` PASS, and `bash scripts/v1-state.sh` PASS with blockers none. Production Deployment Readiness remains BLOCKED.
 
-PDR-M7 is historical production-readiness evidence, not the only currently allowed work. Current allowed work is production scheduler policy, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped. No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed.
+PDR-M7 is historical production-readiness evidence, not the only currently allowed work. Current allowed work is PostgreSQL migration timeout evidence closure, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped. No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed.
 
 ## Historical Runtime Slice Log
 
