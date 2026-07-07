@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF4 Current-State Migration + Rollback Drill
+Current Work Package: PDR-PF5 Secrets and Access Hardening
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -126,7 +126,7 @@ Next recommendation: first resolve Docker/Testcontainers availability or rerun P
 
 ## PDR-PF4 Current-State Migration + Rollback Drill
 
-PDR-PF4 is the current scoped remediation package. It defines safe current-state migration and rollback rehearsal requirements without accessing production DB, running destructive DB operations, changing runtime behavior, or claiming production readiness.
+PDR-PF4 is DONE/effective on merged main by PR #1072. It defines safe current-state migration and rollback rehearsal requirements without accessing production DB, running destructive DB operations, changing runtime behavior, or claiming production readiness.
 
 Current PDR-PF4 status:
 
@@ -141,13 +141,30 @@ Next recommendation: collect PDR-PF4 evidence in a safe staging/server-backed Po
 
 ---
 
+## PDR-PF5 Secrets and Access Hardening
+
+PDR-PF5 is the current scoped remediation package. It defines production secrets/access hardening requirements and safe guard evidence without accessing real secrets, production servers, or production DB.
+
+Current PDR-PF5 status:
+
+1. `docs/SECRETS_AND_ACCESS_HARDENING.md` records existing secret-related guards, missing hardening evidence, required env vars, secrets manager / rotation plan, HTTPS / reverse proxy checklist, audit/access logging checklist, rate limiting checklist, actuator exposure policy, and prohibited secret handling.
+2. Existing `ProductionProfileSafetyGuard` rejects missing/unsafe production datasource, admin, Binance, public bind, actuator, and scheduler policy settings.
+3. AI provider secrets are required only when the matching provider is explicitly enabled.
+4. Existing scripts avoid printing passwords and default live provider smoke to skipped/no external calls.
+5. No real secrets were accessed, no production server was accessed, and no production DB was accessed by this package.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: implement or collect evidence for secrets manager integration, credential rotation, HTTPS/reverse-proxy hardening, access/audit logging, and rate limiting before any release-gate decision.
+
+---
+
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF4 Current-State Migration + Rollback Drill:
+Only the following work is allowed during and after PDR-PF5 Secrets and Access Hardening:
 
-1. Current-state migration and rollback drill planning/evidence definition.
-2. Safe staging/server-backed PostgreSQL evidence collection when explicitly scoped.
-3. The next explicitly scoped remediation package after PF4 evidence is reviewed.
+1. Secrets/access hardening planning/evidence definition.
+2. Safe implementation of secrets manager, rotation, HTTPS/reverse proxy, audit/access logging, or rate limiting only when explicitly scoped.
+3. The next explicitly scoped remediation package after PF5 evidence is reviewed.
 4. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears it.
@@ -156,7 +173,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF4 Current-State Migration + Rollback Drill:
+The following work remains blocked during and after PDR-PF5 Secrets and Access Hardening:
 
 1. no auto-open
 2. no auto-close
