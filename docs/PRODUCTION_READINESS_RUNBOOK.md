@@ -214,6 +214,17 @@ PDR-PF10 records whether the current local/server environment can support Docker
 - Migration proof status: no PostgreSQL container ran, no Flyway V1/V2/V3 success log exists, and no PostgreSQL migration PASS is claimed.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence
+
+PDR-PF11 attempts controlled PostgreSQL migration smoke evidence using Docker/Testcontainers or a controlled non-production PostgreSQL environment. It does not access production DB, run destructive DB operations, change Flyway SQL, or approve production deployment.
+
+- Evidence doc: `docs/CONTROLLED_POSTGRESQL_MIGRATION_SMOKE_EVIDENCE.md`.
+- Docker availability result: `DOCKER_MISSING`.
+- Socket result: `/var/run/docker.sock` and `~/.docker/run/docker.sock` unavailable.
+- Migration smoke result: `BLOCKED_ENV_UNAVAILABLE` because Docker/Testcontainers availability was not confirmed.
+- Migration proof status: no PostgreSQL container ran, no controlled non-production PostgreSQL server was provided, no Flyway V1/V2/V3 success log exists, and no PostgreSQL migration PASS is claimed.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.

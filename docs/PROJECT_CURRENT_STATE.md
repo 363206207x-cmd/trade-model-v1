@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-PF10 PostgreSQL Environment Provisioning Evidence
+Current Work Package: PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -231,7 +231,7 @@ Next recommendation after PF9: `PDR-PF10 PostgreSQL Environment Provisioning Evi
 
 ## PDR-PF10 PostgreSQL Environment Provisioning Evidence
 
-PDR-PF10 is the current scoped PostgreSQL/Testcontainers environment evidence package. It checks whether this local/server environment can support PostgreSQL migration smoke evidence before any migration smoke is attempted.
+PDR-PF10 is DONE/effective on merged main by PR #1078. It checks whether this local/server environment can support PostgreSQL migration smoke evidence before any migration smoke is attempted.
 
 Current PDR-PF10 status:
 
@@ -247,18 +247,40 @@ Current PDR-PF10 status:
 10. No production DB was accessed and no destructive DB operation was run.
 11. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: `PDR-PF11 Docker/Testcontainers Provisioning Or Server-Backed PostgreSQL Smoke`, or another explicitly scoped remediation package that can provide Docker/Testcontainers availability or controlled disposable PostgreSQL migration PASS evidence. The next package must not be deployment.
+Next recommendation after PF10: `PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence`.
+
+---
+
+## PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence
+
+PDR-PF11 is the current scoped controlled PostgreSQL migration smoke package. It attempts to obtain a trustworthy bounded Flyway V1/V2/V3 success log only if Docker/Testcontainers or a controlled non-production PostgreSQL environment is available.
+
+Current PDR-PF11 status:
+
+1. `command -v docker` returns no path.
+2. `docker version || true` and `docker info || true` return `zsh:1: command not found: docker`.
+3. `/var/run/docker.sock` is unavailable.
+4. `~/.docker/run/docker.sock` is unavailable.
+5. Existing PostgreSQL/Flyway smoke tests are present, including `PostgreSqlFlywayMigrationSmokeTest`.
+6. Bounded Maven/Testcontainers migration smoke was not run because Docker/Testcontainers availability was not confirmed.
+7. Docker availability result is `DOCKER_MISSING`.
+8. Migration smoke result is `BLOCKED_ENV_UNAVAILABLE`.
+9. Flyway V1/V2/V3 PostgreSQL success is not proven.
+10. No production DB was accessed and no destructive DB operation was run.
+11. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-PF12 Server-Backed Disposable PostgreSQL Migration Smoke`, or another explicitly scoped remediation package that can provide Docker/Testcontainers availability or controlled disposable PostgreSQL migration PASS evidence. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-PF10 PostgreSQL Environment Provisioning Evidence:
+Only the following work is allowed during and after PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence:
 
-1. PostgreSQL environment provisioning evidence documentation and status-source updates.
+1. Controlled PostgreSQL migration smoke evidence documentation and status-source updates.
 2. Safe Docker/Testcontainers environment checks.
 3. Bounded PostgreSQL/Flyway migration smoke only if Docker/Testcontainers availability is confirmed.
-4. The next explicitly scoped remediation package after PF10 evidence is reviewed.
+4. The next explicitly scoped remediation package after PF11 evidence is reviewed.
 5. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -267,7 +289,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-PF10 PostgreSQL Environment Provisioning Evidence:
+The following work remains blocked during and after PDR-PF11 Controlled PostgreSQL Migration Smoke Evidence:
 
 1. no auto-open
 2. no auto-close
@@ -280,7 +302,7 @@ The following work remains blocked during and after PDR-PF10 PostgreSQL Environm
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating PF9 or PF10 environment-blocked migration evidence as PostgreSQL migration PASS.
+12. Treating PF9, PF10, or PF11 environment-blocked migration evidence as PostgreSQL migration PASS.
 
 ---
 
