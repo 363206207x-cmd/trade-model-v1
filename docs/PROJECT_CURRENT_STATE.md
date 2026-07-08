@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation
+Current Work Package: PDR-LIVE13 HTTPS Reverse Proxy Evidence
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -456,7 +456,7 @@ Current PDR-LIVE11 status:
 
 ## PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation
 
-PDR-LIVE12 is the current controlled security evidence and remediation package. It adds application-level access logging, authentication failure audit logging, sensitive-data redaction, and rate-limit guard evidence. It is not production deployment and does not access production server, production DB, or real secrets.
+PDR-LIVE12 is DONE/effective on merged main by PR #1091. It was the controlled security evidence and remediation package. It adds application-level access logging, authentication failure audit logging, sensitive-data redaction, and rate-limit guard evidence. It is not production deployment and does not access production server, production DB, or real secrets.
 
 Current PDR-LIVE12 status:
 
@@ -471,17 +471,33 @@ Current PDR-LIVE12 status:
 
 Next recommendation after LIVE12: `PDR-LIVE13 HTTPS / Reverse Proxy Evidence`, or a controlled secrets-manager / credential-rotation evidence package. The next package must not be deployment.
 
+## PDR-LIVE13 HTTPS Reverse Proxy Evidence
+
+PDR-LIVE13 is the current controlled HTTPS / reverse proxy evidence package. It records template-only reverse proxy configuration, TLS/redirect/HSTS/proxy-header checklists, and remaining real-server smoke blockers. It is not production deployment and does not access production server, production DB, or real secrets.
+
+Current PDR-LIVE13 status:
+
+1. `docs/HTTPS_REVERSE_PROXY_EVIDENCE_RUN.md` records HTTPS / reverse proxy status as `DOCUMENTED_WITH_CONFIG`.
+2. The package provides an Nginx-style template marked TEMPLATE ONLY / NOT PRODUCTION SECRET.
+3. TLS certificate, HTTP-to-HTTPS redirect, HSTS, and proxy-header requirements are documented with concrete evidence criteria.
+4. App actuator exposure remains `GUARD_PASS`; proxy routing to only health/liveness/readiness is documented but not smoke-tested through a real proxy.
+5. Auth smoke through HTTPS proxy remains `MISSING_EVIDENCE`.
+6. Access logging, auth audit logging, and rate limiting remain app-level `GUARD_PASS`; proxy-level retention/aggregation and forwarded-IP evidence remain missing.
+7. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE13: `PDR-LIVE14 Secrets Manager / Credential Rotation Evidence`, or a controlled real-server HTTPS reverse-proxy smoke package if an approved non-production server endpoint is available. The next package must not be deployment.
+
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation:
+Only the following work is allowed during and after PDR-LIVE13 HTTPS Reverse Proxy Evidence:
 
-1. Controlled access logging, auth audit logging, sensitive-data redaction, and rate-limit guard evidence.
-2. Safe tests and production guard validation for the access/audit/rate-limit security package.
+1. Controlled HTTPS/reverse-proxy evidence documentation and template-only configuration guidance.
+2. TLS, redirect, HSTS, proxy-header, actuator, auth-smoke, access-log, audit-log, and rate-limit evidence checklist updates.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE12 evidence is reviewed.
+5. The next explicitly scoped remediation package after LIVE13 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -490,7 +506,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation:
+The following work remains blocked during and after PDR-LIVE13 HTTPS Reverse Proxy Evidence:
 
 1. no auto-open
 2. no auto-close
@@ -569,7 +585,7 @@ Blocking evidence:
 - PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
 - PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
 - Dockerfile, Docker Compose skeleton, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed.
-- Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, secrets manager integration, real server auth smoke, or production release gate exists yet.
+- Single-operator Basic Auth exists after PDR-M3, but no real-server HTTPS/reverse-proxy smoke, credential rotation, secrets manager integration, real server auth smoke, or production release gate exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, readonly provider readiness checks exist after PDR-M5, the PDR-M6A acceptance evidence framework exists, and the PDR-M7 opt-in provider live smoke harness exists, but no completed real-server evidence, metrics dashboards, log aggregation, alerting, full provider connection proof, or production release approval exists yet.
 - No production database is connected in this package.
 - No full observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, verified external-provider integration, or production release gate exists yet.
@@ -600,7 +616,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE11 HTTPS / Access Logging / Rate Limit Remediation, or another explicitly scoped provider/secrets/access evidence package.
+1. PDR-LIVE14 Secrets Manager / Credential Rotation Evidence, a controlled real-server HTTPS reverse-proxy smoke package, or another explicitly scoped provider/secrets/access evidence package.
 2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
