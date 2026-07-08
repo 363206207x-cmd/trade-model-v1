@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence"
-active_block_cn: "PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence"
+active_block: "PDR-LIVE8 Controlled Provider Live Smoke Evidence Run"
+active_block_cn: "PDR-LIVE8 Controlled Provider Live Smoke Evidence Run"
 
-next_required_action: "Complete PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence. Record operator-provided PostgreSQL 16 container-native backup/restore PASS_CLEAN evidence and keep production readiness BLOCKED."
+next_required_action: "Complete PDR-LIVE8 Controlled Provider Live Smoke Evidence Run. Record controlled Binance public live smoke evidence, AI/external provider skipped status, redaction confirmation, and keep production readiness BLOCKED."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this PostgreSQL 16 clean restore evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this provider live smoke evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live7-postgresql16-clean-restore-evidence"
+current_branch: "codex/pdr-live8-provider-live-smoke-evidence-run"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -103,8 +103,10 @@ pdr_live5_status: "DONE/effective on merged main by PR #1084: guarded controlled
 pdr_live5_effective: true
 pdr_live6_status: "DONE/effective on merged main by PR #1085: records disposable local backup PASS, restore PASS_WITH_WARNING due transaction_timeout, restored tm table count 27, and Flyway success count 3; production readiness remains BLOCKED"
 pdr_live6_effective: true
-pdr_live7_status: "IN_PROGRESS on branch codex/pdr-live7-postgresql16-clean-restore-evidence: records PostgreSQL 16 container-native backup PASS, restore PASS_CLEAN, restored tm table count 27, and Flyway success count 3; production readiness remains BLOCKED"
-pdr_live7_effective: false
+pdr_live7_status: "DONE/effective on merged main by PR #1086: records PostgreSQL 16 container-native backup PASS, restore PASS_CLEAN, restored tm table count 27, and Flyway success count 3; production readiness remains BLOCKED"
+pdr_live7_effective: true
+pdr_live8_status: "IN_PROGRESS on branch codex/pdr-live8-provider-live-smoke-evidence-run: records controlled provider live smoke evidence; Binance public PASS, AI/external providers skipped due missing secrets or missing live harness, and production readiness remains BLOCKED"
+pdr_live8_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -137,6 +139,6 @@ notes:
   - "PDR-LIVE1 is DONE/effective on merged main by PR #1080: controlled DB is missing, provider live smoke is disabled by default or missing secrets, app-prod safety / scheduler policy / Push Recheck guard tests pass, and production readiness remains BLOCKED."
   - "PDR-LIVE2 is DONE/effective on merged main by PR #1081: Docker is missing, controlled DB env is missing, a no-op redacted setup helper is added, and no migration PASS is claimed."
   - "PDR-LIVE3 is DONE/effective by PR #1082: guarded controlled PostgreSQL Flyway smoke runner and test-only external DB smoke path are merged."
-  - "Current allowed work is PostgreSQL 16 clean restore evidence documentation, production-like current-state migration/rollback planning, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "Current allowed work is controlled provider live smoke evidence documentation, secrets/access/HTTPS evidence planning, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

@@ -344,6 +344,24 @@ Recorded evidence:
 
 This resolves the prior local `transaction_timeout` warning for PostgreSQL 16-aligned disposable restore evidence only. It does not complete production-like current-state migration, rollback, provider, secrets/access, real server, or release-owner evidence.
 
+## PDR-LIVE8 Controlled Provider Live Smoke Evidence Run
+
+PDR-LIVE8 records controlled provider live-smoke evidence. It is not production deployment, does not place orders, does not send external Push, does not print or commit secrets, and does not approve production deployment.
+
+Recorded evidence:
+
+1. Default no-call provider smoke returned `PROVIDER_LIVE_SMOKE: SKIPPED` and skipped Binance/OpenAI/Gemini/xAI without external network calls.
+2. Controlled Binance public smoke was run with `PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true` and `PROVIDER_SMOKE_BINANCE_PUBLIC_ENABLED=true` through a bounded 300-second wrapper.
+3. Binance public result: `PASS`; the public futures time endpoint was reachable.
+4. OpenAI result: `SKIPPED_MISSING_SECRET`; no OpenAI endpoint was called.
+5. Gemini result: `SKIPPED_MISSING_SECRET`; no Gemini endpoint was called.
+6. xAI / Grok result: `SKIPPED_MISSING_SECRET`; no xAI endpoint was called.
+7. External context/news/macro result: `SKIPPED_MISSING_SECRET`; keys/configuration were absent and no live external-context call is implemented by the harness.
+8. No secret values were printed, no orders were placed, no external Push was sent, and no production DB was accessed.
+9. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+This closes only the controlled Binance public provider smoke evidence gap. It does not close AI provider proof, external context proof, secrets manager, HTTPS/reverse-proxy, real server smoke, or release-owner evidence.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -357,7 +375,7 @@ This resolves the prior local `transaction_timeout` warning for PostgreSQL 16-al
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy, secrets manager, credential rotation, real server auth smoke, or production release approval exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no real server smoke evidence, log aggregation, metrics dashboards, or alerting exists yet.
 - PDR-M6A adds the real-server acceptance evidence template and conservative release gate runner, but no real server evidence has been collected yet.
-- PDR-M7 adds the opt-in provider live smoke harness, but no real provider evidence has been collected yet.
+- PDR-M7 adds the opt-in provider live smoke harness, and PDR-LIVE8 records controlled Binance public provider PASS evidence; AI/external provider proof remains missing.
 
 ## Migration Execution Policy
 
@@ -575,15 +593,15 @@ The restore script must only target a controlled recovery database until a separ
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
-- Provider readiness is readonly after PDR-M5 and PDR-PF6 records safe no-call provider smoke evidence, but live provider connection proof, secrets manager integration, and real server provider smoke still do not exist yet.
+- Provider readiness is readonly after PDR-M5, PDR-PF6 records safe no-call provider smoke evidence, and PDR-LIVE8 records controlled Binance public provider PASS evidence; AI/external provider live proof, secrets manager integration, and real server provider smoke still do not exist yet.
 - PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
-- PDR-M7 provider live smoke harness exists and PDR-PF6 records default-disabled/no-call evidence, but live checks remain opt-in and no real provider PASS evidence has been collected yet.
+- PDR-M7 provider live smoke harness exists, PDR-PF6 records default-disabled/no-call evidence, and PDR-LIVE8 records controlled Binance public PASS evidence. AI/external checks remain opt-in and not proven.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders only, including admin credentials; no secrets manager integration exists.
 
 ## Next Packages
 
-1. PDR-LIVE8 Production-like Current-State Migration Rollback Evidence in a controlled non-production environment.
+1. PDR-LIVE9 Secrets / HTTPS / Access Evidence, or another explicitly scoped controlled secrets/access/provider evidence package.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 

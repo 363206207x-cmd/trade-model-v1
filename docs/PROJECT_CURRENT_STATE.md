@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence
+Current Work Package: PDR-LIVE8 Controlled Provider Live Smoke Evidence Run
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -202,7 +202,7 @@ Current PDR-PF8 status:
 2. PDR-PF3 PostgreSQL empty migration evidence remains `BLOCKED_TIMEOUT` and not proven.
 3. PDR-PF4 current-state migration plus rollback drill is documented but not executed against a production-like database.
 4. PDR-PF5 secrets/access hardening is documented but lacks a complete secrets manager, rotation, HTTPS/reverse-proxy, audit logging, and rate limiting evidence bundle.
-5. PDR-PF6 provider live smoke remains `SKIPPED_DISABLED_BY_DEFAULT` and has no live provider PASS evidence.
+5. PDR-PF6 provider live smoke was `SKIPPED_DISABLED_BY_DEFAULT` for that release-gate closure; later LIVE8 adds controlled Binance public `PASS`, while AI/external provider proof remains missing.
 6. PDR-PF7 quote-unavailable guard is PASS safety evidence, but it is not enough to unlock production deployment.
 7. Production readiness remains BLOCKED and production deployment cannot proceed.
 
@@ -377,7 +377,7 @@ Current PDR-LIVE6 status:
 
 ## PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence
 
-PDR-LIVE7 is the current docs/status-source evidence package. It records operator-provided PostgreSQL 16 container-native backup/restore evidence. It is not production deployment and does not access production DB.
+PDR-LIVE7 is DONE/effective on merged main by PR #1086. It records operator-provided PostgreSQL 16 container-native backup/restore evidence. It is not production deployment and does not access production DB.
 
 Current PDR-LIVE7 status:
 
@@ -391,20 +391,37 @@ Current PDR-LIVE7 status:
 8. No production DB was accessed, no destructive operation outside disposable controlled DB was run, and no secrets were printed or committed.
 9. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: `PDR-LIVE8 Production-like Current-State Migration Rollback Evidence`. The next package must not be deployment.
+Next recommendation after LIVE7: `PDR-LIVE8 Controlled Provider Live Smoke Evidence Run`. The next package must not be deployment.
+
+## PDR-LIVE8 Controlled Provider Live Smoke Evidence Run
+
+PDR-LIVE8 is the current docs/status-source evidence package. It records controlled provider live-smoke evidence after the PostgreSQL clean restore evidence packages. It is not production deployment, does not place orders, does not send external Push, and does not print or commit secrets.
+
+Current PDR-LIVE8 status:
+
+1. `scripts/prod-provider-smoke.sh` was inspected and remains opt-in for live external calls.
+2. Default no-call provider smoke returned `PROVIDER_LIVE_SMOKE: SKIPPED` and skipped Binance/OpenAI/Gemini/xAI without network calls.
+3. Controlled Binance public smoke was run with explicit opt-in flags and returned `BINANCE_PUBLIC_SMOKE: PASS` against the public futures time endpoint.
+4. OpenAI, Gemini, and xAI were not called because keys were missing and provider flags remained disabled; results are recorded as `SKIPPED_MISSING_SECRET`.
+5. External context/news/macro provider smoke is recorded as `SKIPPED_MISSING_SECRET` because keys/configuration were missing and no live external-context call is implemented by the harness.
+6. No secret values were printed, no `.env` was committed, no orders were placed, and no external Push was sent.
+7. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE8: `PDR-LIVE9 Secrets / HTTPS / Access Evidence`. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence:
+Only the following work is allowed during and after PDR-LIVE8 Controlled Provider Live Smoke Evidence Run:
 
-1. PostgreSQL 16 clean restore evidence documentation and status-source updates.
-2. Recording operator-provided disposable local clean restore evidence without printing secrets.
-3. Production-like current-state migration/rollback planning.
-4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE7 evidence is reviewed.
-6. Production-readiness remediation only when explicitly scoped.
+1. Controlled provider live smoke evidence documentation and status-source updates.
+2. Recording bounded Binance public provider smoke evidence without secrets or private trading permissions.
+3. Recording AI/external provider skipped status unless server-side keys are already present and explicitly approved for smoke.
+4. Secrets/access/HTTPS evidence planning.
+5. Keeping production readiness BLOCKED and production deployment blocked.
+6. The next explicitly scoped remediation package after LIVE8 evidence is reviewed.
+7. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
 
@@ -412,7 +429,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence:
+The following work remains blocked during and after PDR-LIVE8 Controlled Provider Live Smoke Evidence Run:
 
 1. no auto-open
 2. no auto-close
@@ -425,7 +442,7 @@ The following work remains blocked during and after PDR-LIVE7 PostgreSQL 16-alig
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, or LIVE7 clean local restore evidence as full production deployment approval; they are not release-gate approval.
+12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, or LIVE8 Binance public PASS evidence as full production deployment approval; they are not release-gate approval.
 
 ---
 
@@ -492,7 +509,7 @@ Blocking evidence:
 - PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
 - Dockerfile, Docker Compose skeleton, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed.
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, secrets manager integration, real server auth smoke, or production release gate exists yet.
-- Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, readonly provider readiness checks exist after PDR-M5, the PDR-M6A acceptance evidence framework exists, and the PDR-M7 opt-in provider live smoke harness exists, but no completed real-server evidence, metrics dashboards, log aggregation, alerting, live provider connection proof, or production release approval exists yet.
+- Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, readonly provider readiness checks exist after PDR-M5, the PDR-M6A acceptance evidence framework exists, and the PDR-M7 opt-in provider live smoke harness exists, but no completed real-server evidence, metrics dashboards, log aggregation, alerting, full provider connection proof, or production release approval exists yet.
 - No production database is connected in this package.
 - No full observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, verified external-provider integration, or production release gate exists yet.
 
@@ -514,7 +531,7 @@ Database / deployment remaining blockers after PDR-M7:
 - Flyway remains non-default for runtime startup; PDR-M1 adds only test/manual smoke coverage.
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but local evidence depends on Docker availability.
 - Mapper PostgreSQL variants cover known upsert and DATEADD / FORMATDATETIME blockers; broader live mapper execution remains deferred.
-- Docker Compose deployment skeleton, `.env.example`, smoke/backup/restore scripts, the PDR-M6A evidence template, the conservative release gate runner, and the opt-in provider live smoke harness exist, but real server deployment smoke, real provider smoke evidence, and real restore drill evidence are still missing.
+- Docker Compose deployment skeleton, `.env.example`, smoke/backup/restore scripts, the PDR-M6A evidence template, the conservative release gate runner, and the opt-in provider live smoke harness exist, but real server deployment smoke, AI/external provider smoke evidence, and production-like restore drill evidence are still missing.
 - Auth/access control baseline exists as single-operator Basic Auth, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, and secrets manager integration remain missing.
 - Observability is minimal: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Deployment packaging is skeletal only and not release-gated.
@@ -522,8 +539,8 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE8 Production-like Current-State Migration Rollback Evidence in a controlled non-production environment.
-2. Provider live smoke / secrets-access evidence only after explicitly scoped controlled environment evidence is available.
+1. PDR-LIVE9 Secrets / HTTPS / Access Evidence, or another explicitly scoped provider/secrets/access evidence package.
+2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
 ### PDR-2B Flyway Baseline Skeleton
