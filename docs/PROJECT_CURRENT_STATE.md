@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE10 Secrets HTTPS Access Logging Rate Limit Evidence
+Current Work Package: PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -428,7 +428,7 @@ Next recommendation after LIVE9: `PDR-LIVE10 Secrets HTTPS Access Logging Rate L
 
 ## PDR-LIVE10 Secrets HTTPS Access Logging Rate Limit Evidence
 
-PDR-LIVE10 is the current docs/status-source evidence package. It records production security evidence status for secrets, HTTPS/reverse proxy, access logging, auth audit logging, rate limiting, actuator exposure, and production guard behavior. It is not production deployment and does not access production server, production DB, or real secrets.
+PDR-LIVE10 is DONE/effective on merged main by PR #1089. It records production security evidence status for secrets, HTTPS/reverse proxy, access logging, auth audit logging, rate limiting, actuator exposure, and production guard behavior. It is not production deployment and does not access production server, production DB, or real secrets.
 
 Current PDR-LIVE10 status:
 
@@ -441,19 +441,32 @@ Current PDR-LIVE10 status:
 7. Access logging, auth audit logging, and rate limiting are `MISSING_EVIDENCE`.
 8. No production server was accessed, no production DB was accessed, no real secrets were printed or committed, and production readiness remains BLOCKED.
 
-Next recommendation after LIVE10: `PDR-LIVE11 HTTPS / Access Logging / Rate Limit Remediation`, or a controlled secrets-manager/credential-rotation evidence package. The next package must not be deployment.
+## PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure
+
+PDR-LIVE11 is the current docs/status-source release evidence bundle package. It aggregates controlled PostgreSQL, provider, AI-provider, and security/access evidence into a single release-gate status report. It is not production deployment and does not access production server, production DB, or real secrets.
+
+Current PDR-LIVE11 status:
+
+1. `docs/RELEASE_EVIDENCE_BUNDLE_CURRENT_STATUS.md` records the current release evidence table and blocker closure status.
+2. PostgreSQL controlled evidence is materially improved: empty Flyway V1/V2/V3 is `PASS`, PostgreSQL 16 backup is `PASS`, clean restore is `PASS_CLEAN`, restored `tm_*` table count is `27`, and restored Flyway success count is `3`.
+3. Provider evidence is partial: Binance public smoke is `PASS`, while OpenAI/Gemini/xAI and external context providers remain `SKIPPED_MISSING_SECRET`.
+4. Security/access evidence is partial: production profile guard, auth access control, actuator exposure, and repository secret hygiene are `GUARD_PASS`; secrets manager, credential rotation, access logging, auth audit logging, and rate limiting are `MISSING_EVIDENCE`; HTTPS/reverse proxy is `DOCUMENTED_NOT_EVIDENCED`.
+5. Production readiness remains `BLOCKED`; production deployment decision remains `DO NOT DEPLOY`.
+6. No production server was accessed, no production DB was accessed, no secrets were printed or committed, and no runtime trading behavior changed.
+
+Next recommendation after LIVE11: `PDR-LIVE12 HTTPS / Access Logging / Rate Limit Remediation`, or another explicitly scoped security evidence package. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE10 Secrets HTTPS Access Logging Rate Limit Evidence:
+Only the following work is allowed during and after PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure:
 
-1. Secrets/HTTPS/access evidence documentation and status-source updates.
-2. Recording production guard, auth, and actuator evidence status without secrets.
-3. Recording missing evidence for secrets manager, HTTPS/reverse proxy, access logging, auth audit logging, and rate limiting.
+1. Release evidence bundle documentation and status-source updates.
+2. Aggregating controlled PostgreSQL, provider, AI-provider, and security/access evidence statuses.
+3. Recording exact remaining blockers and the next explicitly scoped remediation package.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE10 evidence is reviewed.
+5. The next explicitly scoped remediation package after LIVE11 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -462,7 +475,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE10 Secrets HTTPS Access Logging Rate Limit Evidence:
+The following work remains blocked during and after PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure:
 
 1. no auto-open
 2. no auto-close
@@ -475,7 +488,7 @@ The following work remains blocked during and after PDR-LIVE10 Secrets HTTPS Acc
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, or LIVE10 guard-pass evidence as full production deployment approval; they are not release-gate approval.
+12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, or LIVE11 release evidence bundle status as full production deployment approval; they are not release-gate approval.
 
 ---
 
