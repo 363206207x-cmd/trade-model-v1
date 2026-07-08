@@ -305,6 +305,25 @@ Default/no-env result recorded by LIVE5:
 
 Actual controlled execution requires disposable source/recovery DB env, PostgreSQL client tools, explicit non-production confirmation, explicit backup confirmation, and explicit restore confirmation.
 
+## PDR-LIVE6 Controlled Backup Restore Evidence Run
+
+PDR-LIVE6 records operator-provided disposable local PostgreSQL backup/restore evidence. It does not access production DB, commit secrets, or approve production deployment.
+
+Recorded evidence:
+
+1. Source DB was disposable local PostgreSQL at `localhost:55432` / `trade_model_smoke`.
+2. Restore DB was disposable local PostgreSQL at `localhost:55433` / `trade_model_restore`.
+3. `pg_dump` custom-format backup result: `PASS`.
+4. `pg_restore` result: `PASS_WITH_WARNING`.
+5. Restore warning: `unrecognized configuration parameter "transaction_timeout"`; `errors ignored on restore: 1`.
+6. Restored `tm_*` table count: `27`.
+7. Restored successful Flyway migration count: `3`.
+8. Restore validation result: `PASS`.
+9. No production DB was accessed, no destructive operation outside disposable controlled DB was run, and no secrets were printed or committed.
+10. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+The `transaction_timeout` warning must be remediated or explicitly accepted by a controlled restore policy before this evidence can be used in a later production release gate.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -544,7 +563,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE6 Controlled Current-State Drill Execution after disposable controlled source/recovery PostgreSQL env and PostgreSQL client tools are available.
+1. PDR-LIVE7 Restore Warning Policy + Current-State Drill Closure for the `transaction_timeout` restore warning.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
