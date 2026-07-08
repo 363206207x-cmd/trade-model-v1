@@ -262,6 +262,25 @@ PDR-LIVE3 adds a guarded controlled PostgreSQL Flyway smoke runner. It does not 
 - Migration proof status: no Flyway V1/V2/V3 PostgreSQL PASS evidence is claimed until the runner passes against a disposable controlled PostgreSQL DB.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run
+
+PDR-LIVE4 records operator-provided evidence from the guarded controlled PostgreSQL Flyway smoke runner.
+
+Recorded evidence:
+
+1. Command used explicit disposable non-production and schema-writing confirmations.
+2. PostgreSQL target was disposable local Docker PostgreSQL at `localhost:55432` / `trade_model_smoke`.
+3. PostgreSQL version was `16.14`.
+4. Flyway validated 3 migrations.
+5. Applied V1 baseline schema tables, V2 baseline schema indexes, and V3 scheme rule config defaults.
+6. Final schema version was `v3`.
+7. `CONTROLLED_POSTGRESQL_FLYWAY_RESULT: PASS`.
+8. No production DB was accessed, no destructive operation outside the disposable controlled DB was run, and no secrets were printed.
+9. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+This evidence closes the disposable controlled empty PostgreSQL Flyway migration gate only. It does not close current-state migration, rollback, restore, provider live smoke, secrets/access, real server smoke, release-owner approval, or full production release-gate evidence.
+
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -501,7 +520,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run after disposable controlled PostgreSQL env is available and explicitly approved.
+1. PDR-LIVE5 Current-State Migration And Rollback Evidence in a safe controlled non-production or production-like environment.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 

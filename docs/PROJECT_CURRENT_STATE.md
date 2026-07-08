@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner
+Current Work Package: PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -315,7 +315,7 @@ Next recommendation after LIVE2: `PDR-LIVE3 Controlled PostgreSQL Flyway Smoke R
 
 ## PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner
 
-PDR-LIVE3 is the current scoped controlled PostgreSQL Flyway smoke runner package. It adds a guarded external controlled-DB runner and a test-only external smoke path. It is not production deployment and does not run a migration unless explicit disposable non-production DB env and run confirmations are supplied.
+PDR-LIVE3 is DONE/effective on merged main by PR #1082. It adds a guarded external controlled-DB runner and a test-only external smoke path. It is not production deployment and does not run a migration unless explicit disposable non-production DB env and run confirmations are supplied.
 
 Current PDR-LIVE3 status:
 
@@ -324,24 +324,38 @@ Current PDR-LIVE3 status:
 3. Missing controlled DB env produces `SKIPPED_MISSING_CONTROLLED_DB` and no database access.
 4. Runner requires explicit non-production confirmation and explicit Flyway run confirmation.
 5. Runner refuses production-like JDBC URL indicators and does not print DB URL, username, password, host, or database name.
-6. Local result remains `SKIPPED_MISSING_CONTROLLED_DB`; no Flyway V1/V2/V3 PASS evidence is claimed.
-7. No production DB was accessed and no destructive DB operation was run.
-8. Production readiness remains BLOCKED and production deployment cannot proceed.
+6. No production DB was accessed and no destructive DB operation was run by the runner package.
+7. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation: `PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run`, only after a disposable non-production PostgreSQL URL is supplied through environment variables and the operator explicitly approves the bounded runner command. The next package must not be deployment.
+## PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run
+
+PDR-LIVE4 is the current docs/status-source evidence package. It records operator-provided PASS evidence from a disposable local Docker PostgreSQL run. It is not production deployment and does not access production DB.
+
+Current PDR-LIVE4 status:
+
+1. The operator ran `scripts/controlled-postgresql-flyway-smoke.sh` with explicit disposable non-production and schema-write confirmations.
+2. The controlled PostgreSQL target was `localhost:55432` / `trade_model_smoke`.
+3. PostgreSQL version was `16.14`.
+4. Flyway validated 3 migrations.
+5. Applied migrations: V1 baseline schema tables, V2 baseline schema indexes, and V3 scheme rule config defaults.
+6. Final schema version was `v3`.
+7. `CONTROLLED_POSTGRESQL_FLYWAY_RESULT: PASS`.
+8. No production DB was accessed, no destructive operation outside the disposable controlled DB was run, and no secrets were printed.
+9. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation: `PDR-LIVE5 Current-State Migration And Rollback Evidence`. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner:
+Only the following work is allowed during and after PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run:
 
-1. Controlled PostgreSQL Flyway smoke runner documentation and status-source updates.
-2. Safe controlled DB env presence checks without printing values.
-3. Guarded external controlled-DB Flyway runner work that skips without env and refuses production-like indicators.
-4. Targeted smoke test execution only in missing-env skip mode unless disposable non-production DB env is supplied.
-5. The next explicitly scoped remediation package after LIVE3 evidence is reviewed.
-6. Production-readiness remediation only when explicitly scoped.
+1. Controlled PostgreSQL Flyway PASS evidence documentation and status-source updates.
+2. Recording operator-provided disposable local PostgreSQL evidence without printing secrets.
+3. Keeping production readiness BLOCKED and production deployment blocked.
+4. The next explicitly scoped remediation package after LIVE4 evidence is reviewed.
+5. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
 
@@ -349,7 +363,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner:
+The following work remains blocked during and after PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run:
 
 1. no auto-open
 2. no auto-close
@@ -362,7 +376,7 @@ The following work remains blocked during and after PDR-LIVE3 Controlled Postgre
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating PF9, PF10, PF11, LIVE1, LIVE2, or LIVE3 skipped/blocked/setup evidence as PostgreSQL/provider/release-gate PASS.
+12. Treating LIVE4 controlled PostgreSQL Flyway PASS as full production deployment approval; it is one gate only.
 
 ---
 
@@ -459,7 +473,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run after disposable controlled PostgreSQL env is available.
+1. PDR-LIVE5 Current-State Migration And Rollback Evidence in a safe controlled non-production or production-like environment.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
