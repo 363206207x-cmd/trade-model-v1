@@ -209,6 +209,20 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsDisabledOrInvalidRateLimitInProduction() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.security.rate-limit.enabled", "false");
+        environment.setProperty("trade-model.security.rate-limit.requests-per-minute", "0");
+        environment.setProperty("trade-model.security.rate-limit.window-ms", " ");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production rate limit must be enabled")
+                .hasMessageContaining("production rate limit requests-per-minute must be positive")
+                .hasMessageContaining("production rate limit window-ms must be positive");
+    }
+
+    @Test
     void allowsSafeExternalDatasourceLookingConfig() {
         MockEnvironment environment = safeEnvironment();
 
@@ -230,6 +244,9 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.auth.admin-username", "operator");
         environment.setProperty("trade-model.auth.admin-password", "configured-admin-password");
         environment.setProperty("management.endpoints.web.exposure.include", "health");
+        environment.setProperty("trade-model.security.rate-limit.enabled", "true");
+        environment.setProperty("trade-model.security.rate-limit.requests-per-minute", "120");
+        environment.setProperty("trade-model.security.rate-limit.window-ms", "60000");
         environment.setProperty("trade-model.production.scheduler-policy", "LOCKED_DOWN");
         environment.setProperty("trade-model.schedulers.enabled", "false");
         environment.setProperty("trade-model.schedulers.push-recheck.enabled", "false");

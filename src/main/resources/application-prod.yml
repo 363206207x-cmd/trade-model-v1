@@ -30,6 +30,11 @@ binance:
     secret: ${BINANCE_API_SECRET}
 
 trade-model:
+  security:
+    rate-limit:
+      enabled: ${TRADE_MODEL_SECURITY_RATE_LIMIT_ENABLED:true}
+      requests-per-minute: ${TRADE_MODEL_SECURITY_RATE_LIMIT_RPM:120}
+      window-ms: ${TRADE_MODEL_SECURITY_RATE_LIMIT_WINDOW_MS:60000}
   production:
     allow-public-bind: ${TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND:false}
     scheduler-policy: ${TRADE_MODEL_PRODUCTION_SCHEDULER_POLICY:}

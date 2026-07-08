@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure"
-active_block_cn: "PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure"
+active_block: "PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation"
+active_block_cn: "PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation"
 
-next_required_action: "Complete PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure. Aggregate controlled PostgreSQL, provider, AI-provider, secrets/HTTPS/access evidence into one release evidence bundle and keep production readiness BLOCKED."
+next_required_action: "Complete PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation. Add controlled access logging, auth audit logging, sensitive-data redaction, and rate-limit guard evidence while keeping production readiness BLOCKED."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this release evidence bundle package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this access/audit/rate-limit evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live11-release-evidence-bundle-closure"
+current_branch: "codex/pdr-live12-access-audit-rate-limit-evidence"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -111,8 +111,10 @@ pdr_live9_status: "DONE/effective on merged main by PR #1088: records controlled
 pdr_live9_effective: true
 pdr_live10_status: "DONE/effective on merged main by PR #1089: records secrets/HTTPS/access logging/auth audit/rate-limit evidence; production guard/auth/actuator/repo-secret hygiene GUARD_PASS, secrets manager and logging/rate-limit evidence MISSING_EVIDENCE, HTTPS DOCUMENTED_NOT_EVIDENCED"
 pdr_live10_effective: true
-pdr_live11_status: "IN_PROGRESS on branch codex/pdr-live11-release-evidence-bundle-closure: aggregates controlled production-readiness evidence into a release evidence bundle and records remaining blockers; production readiness remains BLOCKED"
-pdr_live11_effective: false
+pdr_live11_status: "DONE/effective on merged main by PR #1090: aggregates controlled production-readiness evidence into a release evidence bundle and records production readiness as BLOCKED / DO NOT DEPLOY"
+pdr_live11_effective: true
+pdr_live12_status: "IN_PROGRESS on branch codex/pdr-live12-access-audit-rate-limit-evidence: adds controlled access logging, auth audit logging, sensitive-data redaction, and rate-limit guard evidence; production readiness remains BLOCKED"
+pdr_live12_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -146,7 +148,8 @@ notes:
   - "PDR-LIVE2 is DONE/effective on merged main by PR #1081: Docker is missing, controlled DB env is missing, a no-op redacted setup helper is added, and no migration PASS is claimed."
   - "PDR-LIVE3 is DONE/effective by PR #1082: guarded controlled PostgreSQL Flyway smoke runner and test-only external DB smoke path are merged."
   - "PDR-LIVE10 is DONE/effective on merged main by PR #1089: production profile/auth/actuator/repo-secret hygiene guard evidence is GUARD_PASS, while secrets manager, HTTPS, access logging, auth audit logging, and rate limiting remain missing or not evidenced."
-  - "PDR-LIVE11 is the current release evidence bundle closure package; it does not deploy, access production servers or DBs, print secrets, or claim production readiness."
-  - "Current allowed work is release evidence bundle documentation, remaining-blocker closure reporting, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-LIVE11 is DONE/effective on merged main by PR #1090: it records the release evidence bundle as BLOCKED / DO NOT DEPLOY."
+  - "PDR-LIVE12 is the current access/audit/rate-limit evidence remediation package; it does not deploy, access production servers or DBs, print secrets, or claim production readiness."
+  - "Current allowed work is access logging, auth audit logging, sensitive-data redaction, rate-limit guard evidence, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

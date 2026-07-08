@@ -1,10 +1,10 @@
 package org.example.trademodel.config;
 
+import org.example.trademodel.security.AuthAuditAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -22,7 +22,9 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                            @Value("${trade-model.auth.enabled:true}") boolean authEnabled) throws Exception {
+                                            @Value("${trade-model.auth.enabled:true}") boolean authEnabled,
+                                            AuthAuditAuthenticationEntryPoint authAuditAuthenticationEntryPoint)
+            throws Exception {
         // V1 APIs are stateless JSON endpoints used with Basic Auth; CSRF tokens would break the current fetch/API clients.
         http.csrf(AbstractHttpConfigurer::disable);
 
@@ -32,7 +34,8 @@ public class SecurityConfig {
 
         return http
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .httpBasic(Customizer.withDefaults())
+                .httpBasic(basic -> basic.authenticationEntryPoint(authAuditAuthenticationEntryPoint))
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(authAuditAuthenticationEntryPoint))
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
