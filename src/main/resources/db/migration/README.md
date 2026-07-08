@@ -19,3 +19,6 @@ PDR-PF3 status: empty PostgreSQL migration evidence is `BLOCKED_TIMEOUT` after a
 
 
 PDR-PF4 status: current-state migration and rollback drill requirements are documented in `docs/CURRENT_STATE_MIGRATION_ROLLBACK_DRILL.md`. The drill documentation does not execute migrations, backups, restores, destructive DB operations, or production DB access.
+
+
+PDR-LIVE3 status: controlled external PostgreSQL Flyway smoke runner is available through `scripts/controlled-postgresql-flyway-smoke.sh` and `ControlledPostgreSqlFlywaySmokeTest`. It skips when controlled DB env is missing, requires explicit non-production and run confirmations, redacts connection values, and does not claim PASS until a disposable controlled PostgreSQL database is supplied.
