@@ -324,6 +324,26 @@ Recorded evidence:
 
 The `transaction_timeout` warning must be remediated or explicitly accepted by a controlled restore policy before this evidence can be used in a later production release gate.
 
+## PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence
+
+PDR-LIVE7 records operator-provided disposable local PostgreSQL backup/restore evidence using PostgreSQL 16 container-native tools. It does not access production DB, commit secrets, or approve production deployment.
+
+Recorded evidence:
+
+1. Source container: `trade-model-pg-smoke`.
+2. Restore container: `trade-model-pg-restore`.
+3. Source DB: `trade_model_smoke`.
+4. Restore DB: `trade_model_restore`.
+5. Backup tool: `pg_dump` from `postgres:16-alpine`; result `PASS`.
+6. Restore tool: `pg_restore` from `postgres:16-alpine`; result `PASS_CLEAN`.
+7. Restored `tm_*` table count: `27`.
+8. Restored successful Flyway migration count: `3`.
+9. Restore validation result: `PASS`.
+10. No production DB was accessed, no destructive operation outside disposable controlled DB was run, and no secrets were printed or committed.
+11. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+This resolves the prior local `transaction_timeout` warning for PostgreSQL 16-aligned disposable restore evidence only. It does not complete production-like current-state migration, rollback, provider, secrets/access, real server, or release-owner evidence.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -563,7 +583,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE7 Restore Warning Policy + Current-State Drill Closure for the `transaction_timeout` restore warning.
+1. PDR-LIVE8 Production-like Current-State Migration Rollback Evidence in a controlled non-production environment.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
