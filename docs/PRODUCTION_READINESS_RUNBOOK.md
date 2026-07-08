@@ -415,6 +415,21 @@ Recorded evidence bundle:
 
 This bundle improves evidence visibility but does not close release readiness. The next package should remediate or collect evidence for HTTPS/reverse proxy, access logging, auth audit logging, rate limiting, secrets manager injection, and credential rotation.
 
+## PDR-LIVE12 Access Logging Auth Audit Rate Limit Evidence Remediation
+
+PDR-LIVE12 records controlled application-level access/audit/rate-limit evidence. It is not production deployment, does not access production server, does not access production DB, does not print or commit secrets, and does not approve production deployment.
+
+Recorded evidence:
+
+1. Access logging status: `GUARD_PASS`; `ACCESS_LOG` records include method, sanitized path, status, duration, request id, and remote address without request body, query string, Authorization, Cookie, API key, password, token, datasource URL, or provider secret values.
+2. Auth audit logging status: `GUARD_PASS`; `AUTH_AUDIT outcome=FAILURE` records authentication challenges without credential values.
+3. Rate limiting status: `GUARD_PASS`; excessive requests return HTTP 429 with `Retry-After` and a compact JSON body.
+4. Sensitive data redaction status: `GUARD_PASS`; sensitive headers are redacted by `SensitiveLogSanitizer` and covered by tests.
+5. Production config guard status: `GUARD_PASS`; prod startup rejects disabled or invalid rate-limit settings.
+6. Production readiness remains `BLOCKED`, and production deployment cannot proceed.
+
+This closes the controlled application-level evidence gap for access logging, auth audit logging, and rate limiting. It does not close HTTPS/reverse-proxy evidence, real server log retention/aggregation evidence, secrets manager integration, credential rotation, AI provider PASS evidence, external-context provider proof, real server smoke, or release-owner approval.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -428,7 +443,7 @@ This bundle improves evidence visibility but does not close release readiness. T
 - Single-operator Basic Auth exists after PDR-M3, but no HTTPS/reverse-proxy, secrets manager, credential rotation, real server auth smoke, or production release approval exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no real server smoke evidence, log aggregation, metrics dashboards, or alerting exists yet.
 - PDR-M6A adds the real-server acceptance evidence template and conservative release gate runner, but no real server evidence has been collected yet.
-- PDR-M7 adds the opt-in provider live smoke harness, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records OpenAI/Gemini/xAI as SKIPPED_MISSING_SECRET, PDR-LIVE10 records guard-pass plus missing security evidence status, and PDR-LIVE11 aggregates the release evidence bundle as BLOCKED / DO NOT DEPLOY; AI PASS evidence, external provider proof, and real security hardening evidence remain missing.
+- PDR-M7 adds the opt-in provider live smoke harness, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records OpenAI/Gemini/xAI as SKIPPED_MISSING_SECRET, PDR-LIVE10 records guard-pass plus missing security evidence status, PDR-LIVE11 aggregates the release evidence bundle as BLOCKED / DO NOT DEPLOY, and PDR-LIVE12 records controlled access/audit/rate-limit `GUARD_PASS`; AI PASS evidence, external provider proof, HTTPS/reverse-proxy proof, secrets manager integration, credential rotation, and real server hardening evidence remain missing.
 
 ## Migration Execution Policy
 
@@ -646,7 +661,7 @@ The restore script must only target a controlled recovery database until a separ
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Basic Auth access control exists after PDR-M3, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, and secrets manager integration remain missing.
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
-- Provider readiness is readonly after PDR-M5, PDR-PF6 records safe no-call provider smoke evidence, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records AI provider missing-secret skipped evidence, and PDR-LIVE11 records the aggregate release evidence bundle as BLOCKED / DO NOT DEPLOY; AI/external provider live PASS proof, secrets manager integration, HTTPS/access logging/rate-limit evidence, and real server provider smoke still do not exist yet.
+- Provider readiness is readonly after PDR-M5, PDR-PF6 records safe no-call provider smoke evidence, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records AI provider missing-secret skipped evidence, PDR-LIVE11 records the aggregate release evidence bundle as BLOCKED / DO NOT DEPLOY, and PDR-LIVE12 records application-level access/audit/rate-limit `GUARD_PASS`; AI/external provider live PASS proof, secrets manager integration, HTTPS/reverse-proxy evidence, and real server provider smoke still do not exist yet.
 - PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
 - PDR-M7 provider live smoke harness exists, PDR-PF6 records default-disabled/no-call evidence, PDR-LIVE8 records controlled Binance public PASS evidence, and PDR-LIVE9 records AI providers as SKIPPED_MISSING_SECRET. AI/external PASS checks remain opt-in and not proven.
 - Deployment packaging is skeletal only and not release-gated.
@@ -654,7 +669,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE12 HTTPS / Access Logging / Rate Limit Remediation, or another explicitly scoped controlled secrets/access/provider evidence package.
+1. PDR-LIVE13 HTTPS / Reverse Proxy Evidence, or another explicitly scoped controlled secrets/access/provider evidence package.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 

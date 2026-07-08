@@ -29,9 +29,9 @@ This document aggregates the current controlled production-readiness evidence af
 | Secrets manager integration | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No real secrets manager injection evidence exists. |
 | Credential rotation | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No credential rotation drill/evidence exists. |
 | HTTPS / reverse proxy | DOCUMENTED_NOT_EVIDENCED | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | Requirements are documented but no server evidence exists. |
-| Access logging | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No access logging evidence bundle exists. |
-| Auth audit logging | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No auth audit evidence bundle exists. |
-| Rate limiting / brute-force protection | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No rate-limit evidence exists. |
+| Access logging | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | Application-level sanitized `ACCESS_LOG` evidence exists and tests prove sensitive values are not printed. |
+| Auth audit logging | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | `AUTH_AUDIT outcome=FAILURE` evidence exists and tests prove credential values are not printed. |
+| Rate limiting / brute-force protection | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | Application-level rate-limit guard returns HTTP 429 with `Retry-After`; prod guard rejects disabled/invalid rate-limit config. |
 | Real server release-owner approval | MISSING_EVIDENCE | `docs/PRODUCTION_READINESS_RUNBOOK.md` | No release owner has approved a complete production evidence bundle. |
 
 ## Production Readiness Decision
@@ -44,7 +44,7 @@ This bundle materially improves controlled evidence for PostgreSQL migration/res
 
 Production deployment decision: DO NOT DEPLOY.
 
-Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, secrets manager and rotation evidence, HTTPS/reverse-proxy evidence, access logging, auth audit logging, rate limiting, real server smoke, and release-owner approval remain incomplete.
+Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, secrets manager and rotation evidence, HTTPS/reverse-proxy evidence, real server smoke, and release-owner approval remain incomplete.
 
 ## Exact Remaining Blockers
 
@@ -53,11 +53,8 @@ Production deployment cannot proceed because AI provider live PASS evidence, ext
 3. Secrets manager injection evidence is missing.
 4. Credential rotation evidence is missing.
 5. HTTPS/reverse-proxy evidence is documented but not evidenced.
-6. Access logging evidence is missing.
-7. Auth audit logging evidence is missing.
-8. Rate limiting / brute-force protection evidence is missing.
-9. Real server production-profile smoke through the intended deployment entrypoint is missing.
-10. A complete redacted release evidence bundle has not been approved by the release owner.
+6. Real server production-profile smoke through the intended deployment entrypoint is missing.
+7. A complete redacted release evidence bundle has not been approved by the release owner.
 
 ## Required To Move From BLOCKED To CONDITIONALLY_READY
 
@@ -66,9 +63,8 @@ Production deployment cannot proceed because AI provider live PASS evidence, ext
 3. Provide secrets manager injection evidence without printing or committing secrets.
 4. Provide credential rotation evidence for admin/database/provider credentials.
 5. Provide HTTPS/reverse-proxy evidence, including authenticated dashboard/review API smoke through the intended entrypoint.
-6. Provide access logging, auth audit logging, and rate-limit evidence.
-7. Run a real server or production-like smoke bundle with redacted logs and no production secrets disclosed.
-8. Keep all no-trading/no-order/no-external-push guardrails intact.
+6. Run a real server or production-like smoke bundle with redacted logs and no production secrets disclosed.
+7. Keep all no-trading/no-order/no-external-push guardrails intact.
 
 ## Required To Move From CONDITIONALLY_READY To READY
 
@@ -94,6 +90,6 @@ The following remain prohibited:
 
 ## Next Recommended Package
 
-Recommended next package: `PDR-LIVE12 HTTPS / Access Logging / Rate Limit Remediation`, or another explicitly scoped security evidence package that closes secrets manager, credential rotation, HTTPS/reverse-proxy, access logging, auth audit logging, and rate-limit evidence.
+Recommended next package: `PDR-LIVE13 HTTPS / Reverse Proxy Evidence`, or another explicitly scoped security evidence package that closes secrets manager, credential rotation, and HTTPS/reverse-proxy evidence.
 
 Production deployment must remain blocked until a later release-gate package records complete PASS evidence and explicit approval.

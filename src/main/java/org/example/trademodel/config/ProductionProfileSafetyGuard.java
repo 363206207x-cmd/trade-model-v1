@@ -127,6 +127,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
 
         validateProductionSchedulerPolicy(environment, errors);
+        validateProductionRateLimit(environment, errors);
 
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Unsafe prod profile config: " + String.join("; ", errors));
@@ -179,11 +180,39 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
     }
 
+    private static void validateProductionRateLimit(Environment environment, List<String> errors) {
+        if (!isTrue(property(environment, "trade-model.security.rate-limit.enabled"))) {
+            errors.add("production rate limit must be enabled");
+        }
+        if (!isPositiveInteger(property(environment, "trade-model.security.rate-limit.requests-per-minute"))) {
+            errors.add("production rate limit requests-per-minute must be positive");
+        }
+        if (!isPositiveLong(property(environment, "trade-model.security.rate-limit.window-ms"))) {
+            errors.add("production rate limit window-ms must be positive");
+        }
+    }
+
     private static String property(Environment environment, String key) {
         try {
             return environment.getProperty(key);
         } catch (IllegalArgumentException ex) {
             return null;
+        }
+    }
+
+    private static boolean isPositiveInteger(String value) {
+        try {
+            return Integer.parseInt(trim(value)) > 0;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
+
+    private static boolean isPositiveLong(String value) {
+        try {
+            return Long.parseLong(trim(value)) > 0;
+        } catch (NumberFormatException ex) {
+            return false;
         }
     }
 

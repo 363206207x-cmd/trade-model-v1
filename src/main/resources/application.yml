@@ -44,6 +44,11 @@ trade-model:
     enabled: ${TRADE_MODEL_AUTH_ENABLED:true}
     admin-username: ${APP_ADMIN_USERNAME:admin}
     admin-password: ${APP_ADMIN_PASSWORD:dev-local-password}
+  security:
+    rate-limit:
+      enabled: ${TRADE_MODEL_SECURITY_RATE_LIMIT_ENABLED:true}
+      requests-per-minute: ${TRADE_MODEL_SECURITY_RATE_LIMIT_RPM:1200}
+      window-ms: ${TRADE_MODEL_SECURITY_RATE_LIMIT_WINDOW_MS:60000}
   schedulers:
     enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:true}
     push-recheck:
