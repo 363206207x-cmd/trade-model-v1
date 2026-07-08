@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE2 Controlled PostgreSQL Evidence Setup"
-active_block_cn: "PDR-LIVE2 Controlled PostgreSQL Evidence Setup"
+active_block: "PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner"
+active_block_cn: "PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner"
 
-next_required_action: "Complete PDR-LIVE2 Controlled PostgreSQL Evidence Setup. LIVE1 is merged/effective as SKIPPED_MISSING_CONTROLLED_DB / SKIPPED_DISABLED / SKIPPED_MISSING_SECRET; LIVE2 must define the safe controlled PostgreSQL evidence path without production DB access, destructive operations, secret disclosure, or production deployment approval."
+next_required_action: "Complete PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner. LIVE2 is merged/effective with a setup-only path; LIVE3 must add a guarded bounded runner that skips without controlled DB env and does not access production DB, run destructive operations, print secrets, or approve production deployment."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this controlled PostgreSQL evidence setup package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this controlled PostgreSQL Flyway smoke runner package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live2-controlled-postgresql-evidence-setup"
+current_branch: "codex/pdr-live3-controlled-postgresql-flyway-smoke-runner"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -93,8 +93,10 @@ pdr_pf11_status: "DONE/effective on merged main by PR #1079: controlled PostgreS
 pdr_pf11_effective: true
 pdr_live1_status: "DONE/effective on merged main by PR #1080: controlled live dependency acceptance recorded controlled DB SKIPPED_MISSING_CONTROLLED_DB, Binance SKIPPED_DISABLED, AI/external providers SKIPPED_MISSING_SECRET, and focused safety guards PASS"
 pdr_live1_effective: true
-pdr_live2_status: "IN_PROGRESS on branch codex/pdr-live2-controlled-postgresql-evidence-setup: controlled PostgreSQL evidence setup; Docker missing and controlled DB env missing, safe no-op setup helper added"
-pdr_live2_effective: false
+pdr_live2_status: "DONE/effective on merged main by PR #1081: controlled PostgreSQL evidence setup recorded Docker missing, controlled DB env missing, and safe no-op setup helper added"
+pdr_live2_effective: true
+pdr_live3_status: "IN_PROGRESS on branch codex/pdr-live3-controlled-postgresql-flyway-smoke-runner: guarded controlled PostgreSQL Flyway smoke runner; skips when controlled DB env is missing"
+pdr_live3_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -125,7 +127,8 @@ notes:
   - "PDR-PF10 records PostgreSQL environment provisioning evidence; Docker CLI and sockets are unavailable, so migration smoke is SKIPPED_ENV_UNAVAILABLE and no PostgreSQL migration PASS is claimed."
   - "PDR-PF11 is DONE/effective on merged main by PR #1079; Docker is still missing, so the bounded migration smoke is BLOCKED_ENV_UNAVAILABLE and no PostgreSQL migration PASS is claimed."
   - "PDR-LIVE1 is DONE/effective on merged main by PR #1080: controlled DB is missing, provider live smoke is disabled by default or missing secrets, app-prod safety / scheduler policy / Push Recheck guard tests pass, and production readiness remains BLOCKED."
-  - "PDR-LIVE2 records controlled PostgreSQL evidence setup: Docker is missing, controlled DB env is missing, a no-op redacted setup helper is added, and no migration PASS is claimed."
-  - "Current allowed work is controlled PostgreSQL evidence setup, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-LIVE2 is DONE/effective on merged main by PR #1081: Docker is missing, controlled DB env is missing, a no-op redacted setup helper is added, and no migration PASS is claimed."
+  - "PDR-LIVE3 adds a guarded controlled PostgreSQL Flyway smoke runner and test-only external DB smoke path; current local result is SKIPPED_MISSING_CONTROLLED_DB and no PostgreSQL PASS is claimed."
+  - "Current allowed work is controlled PostgreSQL Flyway smoke runner evidence, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

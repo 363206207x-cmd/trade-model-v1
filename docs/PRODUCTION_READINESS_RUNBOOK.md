@@ -250,6 +250,18 @@ PDR-LIVE2 prepares the next concrete path to PostgreSQL Flyway PASS evidence. It
 - Migration proof status: no Flyway V1/V2/V3 PostgreSQL PASS evidence is claimed.
 - Production readiness remains BLOCKED and production deployment cannot proceed.
 
+## PDR-LIVE3 Controlled PostgreSQL Flyway Smoke Runner
+
+PDR-LIVE3 adds a guarded controlled PostgreSQL Flyway smoke runner. It does not access production DB, run destructive DB operations, print secrets, or approve production deployment.
+
+- Evidence doc: `docs/CONTROLLED_POSTGRESQL_FLYWAY_SMOKE_RUNNER.md`.
+- Runner script: `scripts/controlled-postgresql-flyway-smoke.sh`.
+- Test-only external smoke: `ControlledPostgreSqlFlywaySmokeTest`.
+- Current local result: `SKIPPED_MISSING_CONTROLLED_DB` because no disposable non-production PostgreSQL URL was present.
+- Runner requirements: explicit non-production confirmation, explicit Flyway run confirmation, no production-like JDBC URL indicators, timeout 300 seconds.
+- Migration proof status: no Flyway V1/V2/V3 PostgreSQL PASS evidence is claimed until the runner passes against a disposable controlled PostgreSQL DB.
+- Production readiness remains BLOCKED and production deployment cannot proceed.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -489,7 +501,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE3 Controlled PostgreSQL Flyway Runner Or Evidence Run after Docker/Testcontainers or disposable controlled PostgreSQL env is available.
+1. PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run after disposable controlled PostgreSQL env is available and explicitly approved.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
