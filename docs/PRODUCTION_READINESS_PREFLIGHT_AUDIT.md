@@ -59,7 +59,7 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 5. Secrets manager integration, credential rotation, and redacted server-side secret injection evidence are planned by PDR-PF5 but not implemented/evidenced.
 6. HTTPS/reverse-proxy hardening, audit logging, rate limiting, and real server auth smoke evidence are planned by PDR-PF5 but not implemented/evidenced.
 7. Production scheduler policy is addressed by PDR-PF2 guard/config/docs, but production deployment still needs merged evidence and a later release-gate run.
-8. Live provider proof is missing for Binance public market data and optional AI/external-context providers. LIVE1 records Binance as SKIPPED_DISABLED and AI/external-context providers as SKIPPED_MISSING_SECRET.
+8. Provider proof is partial: LIVE8 records controlled Binance public market data `PASS`, but AI provider and external-context provider live proof remains missing because keys/configuration were absent or no live external-context harness exists.
 9. Push Recheck quote-unavailable behavior is locked by PDR-PF7 focused tests; production readiness still remains blocked until all release gates are proven.
 10. PDR-PF8 release-gate closure records the aggregate decision as BLOCKED / DO NOT DEPLOY because migration, rollback, secrets/access, provider live smoke, and release evidence remain incomplete.
 11. PDR-PF9/PF10/PF11 evidence identifies Docker/Testcontainers unavailability as the local blocker. LIVE4 records controlled local Docker PostgreSQL Flyway PASS evidence for the empty migration gate only; current-state migration and rollback evidence remain missing.
@@ -85,7 +85,8 @@ Reason: the repository is local acceptance-ready and can continue scoped package
 15. `PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run`: DONE/effective on merged main by PR #1083; records operator-provided disposable local PostgreSQL 16.14 Flyway V1/V2/V3 PASS evidence with final schema version v3, while production readiness remains BLOCKED.
 16. `PDR-LIVE5 Controlled Current-State Migration + Restore Drill Evidence`: DONE/effective on merged main by PR #1084; adds a guarded no-op/default helper and records backup `SKIPPED_MISSING_CONTROLLED_DB`, restore `SKIPPED_MISSING_RECOVERY_DB`, and current-state migration rehearsal `SKIPPED`.
 17. `PDR-LIVE6 Controlled Backup Restore Evidence Run`: DONE/effective on merged main by PR #1085; records backup `PASS`, restore `PASS_WITH_WARNING` due `transaction_timeout`, restored `tm_*` table count `27`, and Flyway success count `3`.
-18. `PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence`: current package; records PostgreSQL 16 container-native backup `PASS`, restore `PASS_CLEAN`, restored `tm_*` table count `27`, and Flyway success count `3`.
+18. `PDR-LIVE7 PostgreSQL 16-aligned Clean Restore Evidence`: DONE/effective on merged main by PR #1086; records PostgreSQL 16 container-native backup `PASS`, restore `PASS_CLEAN`, restored `tm_*` table count `27`, and Flyway success count `3`.
+19. `PDR-LIVE8 Controlled Provider Live Smoke Evidence Run`: current package; records bounded provider smoke evidence with Binance public `PASS`, AI providers `SKIPPED_MISSING_SECRET`, external context `SKIPPED_MISSING_SECRET`, no secret printing, no order placement, and no external Push send.
 
 ## Prohibited Items
 
@@ -105,4 +106,4 @@ The following remain prohibited in V1 and in all production-readiness packages u
 
 Production deployment should not proceed.
 
-The next work can proceed only as a scoped remediation package. PDR-LIVE7 records PostgreSQL 16-aligned clean local restore evidence, but it remains local/disposable only. After LIVE7 is merged/effective, proceed only to the next explicitly scoped remediation package such as PDR-LIVE8 Production-like Current-State Migration Rollback Evidence. Provider connectivity and production release-gate evidence remain unproven unless controlled non-production/server evidence supplies redacted PASS output with explicit approval and timeouts. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
+The next work can proceed only as a scoped remediation package. PDR-LIVE7 records PostgreSQL 16-aligned clean local restore evidence, but it remains local/disposable only. PDR-LIVE8 records controlled Binance public provider `PASS`, but AI/external provider proof, secrets/access/HTTPS evidence, real server smoke, and production release-gate evidence remain incomplete. Proceed only to the next explicitly scoped remediation package such as PDR-LIVE9 Secrets / HTTPS / Access Evidence. Runtime trading behavior, order execution, external push sending, fake records, and production-ready claims must remain blocked.
