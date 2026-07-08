@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run"
-active_block_cn: "PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run"
+active_block: "PDR-LIVE5 Controlled Current-State Migration + Restore Drill Evidence"
+active_block_cn: "PDR-LIVE5 Controlled Current-State Migration + Restore Drill Evidence"
 
-next_required_action: "Complete PDR-LIVE4 Controlled PostgreSQL Flyway Evidence Run. Record operator-provided disposable local PostgreSQL 16.14 Flyway V1/V2/V3 PASS evidence while keeping production readiness BLOCKED and production deployment blocked."
+next_required_action: "Complete PDR-LIVE5 Controlled Current-State Migration + Restore Drill Evidence. Record controlled backup/restore/current-state drill status, skip safely when source/recovery DB env is missing, and keep production readiness BLOCKED."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this controlled PostgreSQL Flyway evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this controlled current-state migration + restore drill package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live4-controlled-postgresql-flyway-evidence-run"
+current_branch: "codex/pdr-live5-current-state-migration-restore-drill"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -97,8 +97,10 @@ pdr_live2_status: "DONE/effective on merged main by PR #1081: controlled Postgre
 pdr_live2_effective: true
 pdr_live3_status: "DONE/effective on merged main by PR #1082: guarded controlled PostgreSQL Flyway smoke runner added; skips without controlled DB env and does not access production DB"
 pdr_live3_effective: true
-pdr_live4_status: "IN_PROGRESS on branch codex/pdr-live4-controlled-postgresql-flyway-evidence-run: records disposable local PostgreSQL 16.14 Flyway V1/V2/V3 PASS evidence; production readiness remains BLOCKED"
-pdr_live4_effective: false
+pdr_live4_status: "DONE/effective on merged main by PR #1083: records disposable local PostgreSQL 16.14 Flyway V1/V2/V3 PASS evidence with final schema version v3; production readiness remains BLOCKED"
+pdr_live4_effective: true
+pdr_live5_status: "IN_PROGRESS on branch codex/pdr-live5-current-state-migration-restore-drill: prepares controlled current-state migration + restore drill evidence; current run is SKIPPED_MISSING_CONTROLLED_DB / SKIPPED_MISSING_RECOVERY_DB until disposable source/recovery DB env and PostgreSQL client tools are available"
+pdr_live5_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -131,6 +133,6 @@ notes:
   - "PDR-LIVE1 is DONE/effective on merged main by PR #1080: controlled DB is missing, provider live smoke is disabled by default or missing secrets, app-prod safety / scheduler policy / Push Recheck guard tests pass, and production readiness remains BLOCKED."
   - "PDR-LIVE2 is DONE/effective on merged main by PR #1081: Docker is missing, controlled DB env is missing, a no-op redacted setup helper is added, and no migration PASS is claimed."
   - "PDR-LIVE3 is DONE/effective by PR #1082: guarded controlled PostgreSQL Flyway smoke runner and test-only external DB smoke path are merged."
-  - "Current allowed work is controlled PostgreSQL Flyway PASS evidence documentation, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "Current allowed work is controlled current-state migration + restore drill evidence, safe no-op/dry-run helper work, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

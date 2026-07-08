@@ -281,6 +281,30 @@ Recorded evidence:
 This evidence closes the disposable controlled empty PostgreSQL Flyway migration gate only. It does not close current-state migration, rollback, restore, provider live smoke, secrets/access, real server smoke, release-owner approval, or full production release-gate evidence.
 
 
+## PDR-LIVE5 Controlled Current-State Migration + Restore Drill Evidence
+
+PDR-LIVE5 adds a guarded controlled current-state migration + restore drill helper and records the local evidence status. It does not access production DB or run destructive operations outside a disposable controlled DB.
+
+Helper script:
+
+```bash
+bash scripts/controlled-current-state-migration-restore-drill.sh
+```
+
+Default/no-env result recorded by LIVE5:
+
+1. Controlled source DB env is missing.
+2. Controlled recovery DB env is missing.
+3. Local PostgreSQL client tools `pg_dump`, `pg_restore`, and `psql` are missing.
+4. Backup result is `SKIPPED_MISSING_CONTROLLED_DB`.
+5. Restore result is `SKIPPED_MISSING_RECOVERY_DB`.
+6. Current-state migration rehearsal result is `SKIPPED`.
+7. No database access was attempted.
+8. No production DB was accessed, no destructive operation outside a disposable controlled DB was run, and no secrets were printed.
+9. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Actual controlled execution requires disposable source/recovery DB env, PostgreSQL client tools, explicit non-production confirmation, explicit backup confirmation, and explicit restore confirmation.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -520,7 +544,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE5 Current-State Migration And Rollback Evidence in a safe controlled non-production or production-like environment.
+1. PDR-LIVE6 Controlled Current-State Drill Execution after disposable controlled source/recovery PostgreSQL env and PostgreSQL client tools are available.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
