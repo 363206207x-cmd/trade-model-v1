@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE8 Controlled Provider Live Smoke Evidence Run
+Current Work Package: PDR-LIVE9 Controlled AI Provider Smoke Evidence Run
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -395,7 +395,7 @@ Next recommendation after LIVE7: `PDR-LIVE8 Controlled Provider Live Smoke Evide
 
 ## PDR-LIVE8 Controlled Provider Live Smoke Evidence Run
 
-PDR-LIVE8 is the current docs/status-source evidence package. It records controlled provider live-smoke evidence after the PostgreSQL clean restore evidence packages. It is not production deployment, does not place orders, does not send external Push, and does not print or commit secrets.
+PDR-LIVE8 is DONE/effective on merged main by PR #1087. It records controlled provider live-smoke evidence after the PostgreSQL clean restore evidence packages. It is not production deployment, does not place orders, does not send external Push, and does not print or commit secrets.
 
 Current PDR-LIVE8 status:
 
@@ -407,20 +407,37 @@ Current PDR-LIVE8 status:
 6. No secret values were printed, no `.env` was committed, no orders were placed, and no external Push was sent.
 7. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation after LIVE8: `PDR-LIVE9 Secrets / HTTPS / Access Evidence`. The next package must not be deployment.
+Next recommendation after LIVE8: `PDR-LIVE9 Controlled AI Provider Smoke Evidence Run`. The next package must not be deployment.
+
+## PDR-LIVE9 Controlled AI Provider Smoke Evidence Run
+
+PDR-LIVE9 is the current docs/status-source evidence package. It records controlled AI provider smoke evidence for OpenAI, Gemini, and xAI/Grok. It is not production deployment, does not place orders, does not send external Push, and does not print or commit secrets.
+
+Current PDR-LIVE9 status:
+
+1. `scripts/prod-provider-smoke.sh`, AI provider config, `.env.example`, and provider smoke docs were inspected.
+2. AI key presence was checked as boolean-only redacted status: OpenAI, Gemini, and xAI keys were missing.
+3. Controlled AI provider smoke was run with AI provider flags enabled and Binance disabled through a bounded 300-second wrapper.
+4. OpenAI returned `NOT_CONFIGURED - OPENAI_API_KEY missing`, recorded as `SKIPPED_MISSING_SECRET`.
+5. Gemini returned `NOT_CONFIGURED - GEMINI_API_KEY missing`, recorded as `SKIPPED_MISSING_SECRET`.
+6. xAI/Grok returned `NOT_CONFIGURED - XAI_API_KEY missing`, recorded as `SKIPPED_MISSING_SECRET`.
+7. No AI provider endpoint was called, no secret values were printed, no `.env` was committed, no orders were placed, and no external Push was sent.
+8. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE9: `PDR-LIVE10 Secrets / HTTPS / Access Evidence`, or a controlled AI provider rerun after approved server-side secret handling exists. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE8 Controlled Provider Live Smoke Evidence Run:
+Only the following work is allowed during and after PDR-LIVE9 Controlled AI Provider Smoke Evidence Run:
 
-1. Controlled provider live smoke evidence documentation and status-source updates.
-2. Recording bounded Binance public provider smoke evidence without secrets or private trading permissions.
-3. Recording AI/external provider skipped status unless server-side keys are already present and explicitly approved for smoke.
+1. Controlled AI provider smoke evidence documentation and status-source updates.
+2. Recording bounded OpenAI/Gemini/xAI smoke evidence without secrets.
+3. Recording missing-key skipped status unless server-side keys are already present and explicitly approved for smoke.
 4. Secrets/access/HTTPS evidence planning.
 5. Keeping production readiness BLOCKED and production deployment blocked.
-6. The next explicitly scoped remediation package after LIVE8 evidence is reviewed.
+6. The next explicitly scoped remediation package after LIVE9 evidence is reviewed.
 7. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -429,7 +446,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE8 Controlled Provider Live Smoke Evidence Run:
+The following work remains blocked during and after PDR-LIVE9 Controlled AI Provider Smoke Evidence Run:
 
 1. no auto-open
 2. no auto-close
@@ -442,7 +459,7 @@ The following work remains blocked during and after PDR-LIVE8 Controlled Provide
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, or LIVE8 Binance public PASS evidence as full production deployment approval; they are not release-gate approval.
+12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, or LIVE9 AI skipped evidence as full production deployment approval; they are not release-gate approval.
 
 ---
 
@@ -539,7 +556,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE9 Secrets / HTTPS / Access Evidence, or another explicitly scoped provider/secrets/access evidence package.
+1. PDR-LIVE10 Secrets / HTTPS / Access Evidence, or another explicitly scoped provider/secrets/access evidence package.
 2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
