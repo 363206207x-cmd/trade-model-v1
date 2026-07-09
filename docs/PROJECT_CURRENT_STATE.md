@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE17 AI External Provider Release Policy Evidence
+Current Work Package: PDR-LIVE18 Release Owner Decision Register / Waiver Policy
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -551,17 +551,34 @@ Current LIVE17 policy status:
 
 Next recommendation after LIVE17: record release-owner provider policy decisions, run controlled real-server PASS evidence if infrastructure becomes available, or collect controlled secrets/rotation/proxy evidence. The next package must not be deployment.
 
+## PDR-LIVE18 Release Owner Decision Register / Waiver Policy
+
+PDR-LIVE18 is the current release-owner decision register and waiver policy evidence package. It records remaining gates that require explicit human approval, waiver, or controlled evidence before readiness can move beyond BLOCKED. It is not production deployment and does not access production server, production DB, real secrets, or provider endpoints.
+
+Evidence doc: `docs/RELEASE_OWNER_DECISION_REGISTER.md`.
+
+Current LIVE18 register status:
+
+1. Release owner status is `MISSING_EVIDENCE`; no named owner approval was found.
+2. Real server smoke, HTTPS/proxy auth smoke, secret-store injection, credential rotation drill, release timing, rollback owner, incident owner, and final release approval remain required gates.
+3. OpenAI, Gemini, xAI/Grok, and external context/news/macro/ETF remain `RELEASE_OWNER_DECISION_REQUIRED` unless controlled PASS evidence or explicit owner waiver/disablement is recorded.
+4. No waiver is approved by this package.
+5. `SKIPPED_MISSING_SECRET`, `DOCUMENTED_WITH_PLAN`, and `DOCUMENTED_WITH_CONFIG` are not PASS.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE18: capture explicit release-owner decisions if available, or collect controlled real-server, HTTPS/proxy auth, secret-store injection, or credential-rotation evidence. The next package must not be deployment.
+
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE17 AI External Provider Release Policy Evidence:
+Only the following work is allowed during and after PDR-LIVE18 Release Owner Decision Register / Waiver Policy:
 
-1. AI / external provider release policy evidence documentation.
-2. Release-owner decision mapping for missing AI/external providers without upgrading skipped/missing evidence to PASS.
+1. Release-owner decision register and waiver policy evidence documentation.
+2. Decision mapping for remaining release gates without approving waivers or upgrading skipped/missing/planned/config-only evidence to PASS.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE17 evidence is reviewed.
+5. The next explicitly scoped remediation package after LIVE18 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -570,7 +587,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE17 AI External Provider Release Policy Evidence:
+The following work remains blocked during and after PDR-LIVE18 Release Owner Decision Register / Waiver Policy:
 
 1. no auto-open
 2. no auto-close
@@ -583,7 +600,7 @@ The following work remains blocked during and after PDR-LIVE17 AI External Provi
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, LIVE16 blocked readiness review, or LIVE17 provider policy evidence as full production deployment approval; they are not release-gate approval.
+12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, LIVE16 blocked readiness review, LIVE17 provider policy evidence, or LIVE18 decision-register evidence as full production deployment approval; they are not release-gate approval.
 
 ---
 
@@ -680,7 +697,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. A release-owner provider policy decision package, controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped provider/secrets/access evidence package.
+1. A release-owner decision capture package if actual owner decisions are available, controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped provider/secrets/access evidence package.
 2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
