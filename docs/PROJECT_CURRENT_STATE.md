@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE15 Real Server Smoke Evidence Plan / Gate
+Current Work Package: PDR-LIVE16 Final Conditional Readiness Review
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -515,19 +515,36 @@ Current PDR-LIVE15 status:
 6. No production server was accessed, no production DB was accessed, no orders were placed, no external Push was sent, and no secrets were printed or committed.
 7. Production readiness remains BLOCKED and production deployment cannot proceed.
 
-Next recommendation after LIVE15: run this gate in an approved controlled non-production server environment when infrastructure exists, or proceed to `PDR-LIVE16 AI Provider / External Context Release Policy Evidence`. The next package must not be deployment.
+Next recommendation after LIVE15: PDR-LIVE16 Final Conditional Readiness Review was selected to aggregate LIVE1-LIVE15 evidence before any later provider or real-server PASS evidence package. The next package must not be deployment.
+
+## PDR-LIVE16 Final Conditional Readiness Review
+
+PDR-LIVE16 is the current final conditional readiness review package. It aggregates LIVE1-LIVE15 evidence and decides whether production readiness can move beyond BLOCKED. It is not production deployment and does not access production server, production DB, real secrets, or provider endpoints.
+
+Evidence doc: `docs/FINAL_CONDITIONAL_READINESS_REVIEW.md`.
+
+Current LIVE16 decision:
+
+1. Readiness decision remains `BLOCKED`.
+2. Deployment decision remains `DO NOT DEPLOY`.
+3. V1 cannot move to `CONDITIONALLY_READY_CANDIDATE` because real server smoke is `SKIPPED_MISSING_CONTROLLED_SERVER`, real HTTPS/proxy auth smoke is missing, real secret-store injection and rotation drill evidence are missing, AI/external providers remain skipped or missing, and release-owner approval is missing.
+4. PostgreSQL, Binance public smoke, application access/auth/rate-limit guards, production profile guard, auth access control, actuator exposure, and repo secret hygiene remain meaningful PASS/GUARD_PASS evidence.
+5. `DOCUMENTED_WITH_PLAN`, `DOCUMENTED_WITH_CONFIG`, `SKIPPED`, and `MISSING_EVIDENCE` are not treated as PASS.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE16: run a controlled real-server PASS evidence package if infrastructure is available, or proceed to an AI Provider / External Context Release Policy Evidence package. The next package must not be deployment.
 
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE15 Real Server Smoke Evidence Plan / Gate:
+Only the following work is allowed during and after PDR-LIVE16 Final Conditional Readiness Review:
 
-1. Controlled real-server smoke evidence documentation.
-2. Safe default-skip smoke wrapper maintenance that does not access servers without explicit controlled endpoint env.
+1. Final conditional readiness review documentation.
+2. Conservative aggregation of LIVE1-LIVE15 evidence without upgrading skipped/planned/config-only items to PASS.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE15 evidence is reviewed.
+5. The next explicitly scoped remediation package after LIVE16 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -536,7 +553,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE15 Real Server Smoke Evidence Plan / Gate:
+The following work remains blocked during and after PDR-LIVE16 Final Conditional Readiness Review:
 
 1. no auto-open
 2. no auto-close
@@ -549,7 +566,7 @@ The following work remains blocked during and after PDR-LIVE15 Real Server Smoke
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, or LIVE15 skipped real-server smoke gate evidence as full production deployment approval; they are not release-gate approval.
+12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, or LIVE16 blocked readiness review as full production deployment approval; they are not release-gate approval.
 
 ---
 
@@ -646,7 +663,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE16 AI Provider / External Context Release Policy Evidence, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped provider/secrets/access evidence package.
+1. PDR-LIVE17 Controlled Real Server PASS Evidence Run if infrastructure becomes available, PDR-LIVE17 AI Provider / External Context Release Policy Evidence, or another explicitly scoped provider/secrets/access evidence package.
 2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 

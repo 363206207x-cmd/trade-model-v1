@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE15 Real Server Smoke Evidence Plan / Gate"
-active_block_cn: "PDR-LIVE15 Real Server Smoke Evidence Plan / Gate"
+active_block: "PDR-LIVE16 Final Conditional Readiness Review"
+active_block_cn: "PDR-LIVE16 Final Conditional Readiness Review"
 
-next_required_action: "Complete PDR-LIVE15 Real Server Smoke Evidence Plan / Gate. Record controlled server smoke gate evidence while keeping production readiness BLOCKED."
+next_required_action: "Complete PDR-LIVE16 Final Conditional Readiness Review. Aggregate LIVE1-LIVE15 evidence and keep production readiness BLOCKED unless every gate has PASS or approved conditional evidence."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this real-server smoke evidence gate package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this final conditional readiness review package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live15-real-server-smoke-evidence-gate"
+current_branch: "codex/pdr-live16-final-conditional-readiness-review"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -119,8 +119,10 @@ pdr_live13_status: "DONE/effective on merged main by PR #1092: records controlle
 pdr_live13_effective: true
 pdr_live14_status: "DONE/effective on merged main by PR #1093: records controlled secrets manager / credential rotation evidence as DOCUMENTED_WITH_PLAN and remaining real secret-store blockers; production readiness remains BLOCKED"
 pdr_live14_effective: true
-pdr_live15_status: "IN_PROGRESS on branch codex/pdr-live15-real-server-smoke-evidence-gate: records controlled real-server smoke evidence gate; missing controlled server env skips without server access; production readiness remains BLOCKED"
-pdr_live15_effective: false
+pdr_live15_status: "DONE/effective on merged main by PR #1094: records controlled real-server smoke evidence gate as SKIPPED_MISSING_CONTROLLED_SERVER and keeps production readiness BLOCKED"
+pdr_live15_effective: true
+pdr_live16_status: "IN_PROGRESS on branch codex/pdr-live16-final-conditional-readiness-review: final conditional readiness review; expected decision remains BLOCKED unless every release gate has PASS or approved conditional evidence"
+pdr_live16_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -158,7 +160,8 @@ notes:
   - "PDR-LIVE12 is DONE/effective on merged main by PR #1091: access logging, auth audit logging, sensitive-data redaction, and rate-limit guard evidence are GUARD_PASS while production readiness remains BLOCKED."
   - "PDR-LIVE13 is DONE/effective on merged main by PR #1092: HTTPS/reverse-proxy evidence is DOCUMENTED_WITH_CONFIG while real proxy smoke remains missing."
   - "PDR-LIVE14 is DONE/effective on merged main by PR #1093: secrets manager / credential rotation is DOCUMENTED_WITH_PLAN while real secret-store injection and rotation drills remain missing."
-  - "PDR-LIVE15 is the current real-server smoke evidence gate; it records a default-skip controlled server smoke wrapper and missing controlled server env without accessing production servers, DBs, or secrets."
-  - "Current allowed work is real-server smoke evidence gate docs, safe default-skip smoke wrapper, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
+  - "PDR-LIVE16 is the current final conditional readiness review; it aggregates LIVE1-LIVE15 and must not mark DOCUMENTED_WITH_PLAN, DOCUMENTED_WITH_CONFIG, SKIPPED, or MISSING_EVIDENCE as PASS."
+  - "Current allowed work is final conditional readiness review docs, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."
