@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE14 Secrets Manager Credential Rotation Evidence"
-active_block_cn: "PDR-LIVE14 Secrets Manager Credential Rotation Evidence"
+active_block: "PDR-LIVE15 Real Server Smoke Evidence Plan / Gate"
+active_block_cn: "PDR-LIVE15 Real Server Smoke Evidence Plan / Gate"
 
-next_required_action: "Complete PDR-LIVE14 Secrets Manager Credential Rotation Evidence. Record controlled secrets manager and credential rotation evidence plan while keeping production readiness BLOCKED."
+next_required_action: "Complete PDR-LIVE15 Real Server Smoke Evidence Plan / Gate. Record controlled server smoke gate evidence while keeping production readiness BLOCKED."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this secrets manager / credential rotation evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this real-server smoke evidence gate package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live14-secrets-manager-credential-rotation-evidence"
+current_branch: "codex/pdr-live15-real-server-smoke-evidence-gate"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -117,8 +117,10 @@ pdr_live12_status: "DONE/effective on merged main by PR #1091: adds controlled a
 pdr_live12_effective: true
 pdr_live13_status: "DONE/effective on merged main by PR #1092: records controlled HTTPS/reverse-proxy template evidence as DOCUMENTED_WITH_CONFIG and remaining real-server smoke blockers; production readiness remains BLOCKED"
 pdr_live13_effective: true
-pdr_live14_status: "IN_PROGRESS on branch codex/pdr-live14-secrets-manager-credential-rotation-evidence: records controlled secrets manager / credential rotation evidence plan and remaining real secret-store blockers; production readiness remains BLOCKED"
-pdr_live14_effective: false
+pdr_live14_status: "DONE/effective on merged main by PR #1093: records controlled secrets manager / credential rotation evidence as DOCUMENTED_WITH_PLAN and remaining real secret-store blockers; production readiness remains BLOCKED"
+pdr_live14_effective: true
+pdr_live15_status: "IN_PROGRESS on branch codex/pdr-live15-real-server-smoke-evidence-gate: records controlled real-server smoke evidence gate; missing controlled server env skips without server access; production readiness remains BLOCKED"
+pdr_live15_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -155,7 +157,8 @@ notes:
   - "PDR-LIVE11 is DONE/effective on merged main by PR #1090: it records the release evidence bundle as BLOCKED / DO NOT DEPLOY."
   - "PDR-LIVE12 is DONE/effective on merged main by PR #1091: access logging, auth audit logging, sensitive-data redaction, and rate-limit guard evidence are GUARD_PASS while production readiness remains BLOCKED."
   - "PDR-LIVE13 is DONE/effective on merged main by PR #1092: HTTPS/reverse-proxy evidence is DOCUMENTED_WITH_CONFIG while real proxy smoke remains missing."
-  - "PDR-LIVE14 is the current secrets manager / credential rotation evidence package; it records documented plans and remaining real secret-store blockers without accessing production servers, DBs, or secrets."
-  - "Current allowed work is secrets manager / credential rotation evidence planning, placeholder-only checklist docs, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-LIVE14 is DONE/effective on merged main by PR #1093: secrets manager / credential rotation is DOCUMENTED_WITH_PLAN while real secret-store injection and rotation drills remain missing."
+  - "PDR-LIVE15 is the current real-server smoke evidence gate; it records a default-skip controlled server smoke wrapper and missing controlled server env without accessing production servers, DBs, or secrets."
+  - "Current allowed work is real-server smoke evidence gate docs, safe default-skip smoke wrapper, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

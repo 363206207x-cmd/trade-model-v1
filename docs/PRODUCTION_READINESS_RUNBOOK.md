@@ -466,6 +466,22 @@ Current LIVE14 evidence:
 
 This moves secrets manager / credential rotation from pure `MISSING_EVIDENCE` toward `DOCUMENTED_WITH_PLAN`, but it does not close production readiness. Real secret-store injection, actual credential rotation drills, AI/external provider release policy, real server smoke, and release-owner approval remain incomplete.
 
+## PDR-LIVE15 Real Server Smoke Evidence Plan / Gate
+
+PDR-LIVE15 records a controlled real-server / staging-server smoke evidence gate. It is not production deployment, does not access production DB, does not place orders, does not send external Push, does not print or commit secrets, and does not approve production deployment.
+
+Evidence doc: `docs/REAL_SERVER_SMOKE_EVIDENCE_GATE.md`.
+
+Current LIVE15 evidence:
+
+1. Controlled server env presence is `SKIPPED_MISSING_CONTROLLED_SERVER`; no controlled endpoint was present and no server was contacted.
+2. Server smoke, HTTPS endpoint classification, health/readiness smoke, and authenticated dashboard/review smoke are all `SKIPPED_MISSING_CONTROLLED_SERVER`.
+3. Access logging / auth audit / rate-limit through server remains `SKIPPED_MISSING_CONTROLLED_SERVER`; LIVE12 app-level guards remain `GUARD_PASS`.
+4. `scripts/controlled-real-server-smoke.sh` provides a default-skip wrapper that checks controlled env presence without printing values, requires HTTPS for non-local endpoints, and delegates authenticated checks to `scripts/prod-smoke.sh` only when credentials are already present.
+5. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Future controlled server smoke must be run only with a non-production endpoint and credentials provisioned outside chat. The evidence bundle must redact URL, username, password, tokens, cookies, response bodies, and secret values.
+
 ## Current Schema State
 
 - `schema.sql` remains the local/test bootstrap for now.
@@ -479,7 +495,7 @@ This moves secrets manager / credential rotation from pure `MISSING_EVIDENCE` to
 - Single-operator Basic Auth exists after PDR-M3, and PDR-LIVE13 records HTTPS/reverse-proxy template evidence, but no real HTTPS proxy smoke, real secrets manager injection, actual credential rotation drill, real server auth smoke, or production release approval exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, but no real server smoke evidence, log aggregation, metrics dashboards, or alerting exists yet.
 - PDR-M6A adds the real-server acceptance evidence template and conservative release gate runner, but no real server evidence has been collected yet.
-- PDR-M7 adds the opt-in provider live smoke harness, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records OpenAI/Gemini/xAI as SKIPPED_MISSING_SECRET, PDR-LIVE10 records guard-pass plus missing security evidence status, PDR-LIVE11 aggregates the release evidence bundle as BLOCKED / DO NOT DEPLOY, and PDR-LIVE12 records controlled access/audit/rate-limit `GUARD_PASS`; PDR-LIVE13 records HTTPS/reverse-proxy `DOCUMENTED_WITH_CONFIG`; PDR-LIVE14 records secrets manager / credential rotation `DOCUMENTED_WITH_PLAN`; AI PASS evidence, external provider proof, real HTTPS proxy smoke, real secret-store injection, actual rotation drill, and real server hardening evidence remain missing.
+- PDR-M7 adds the opt-in provider live smoke harness, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records OpenAI/Gemini/xAI as SKIPPED_MISSING_SECRET, PDR-LIVE10 records guard-pass plus missing security evidence status, PDR-LIVE11 aggregates the release evidence bundle as BLOCKED / DO NOT DEPLOY, and PDR-LIVE12 records controlled access/audit/rate-limit `GUARD_PASS`; PDR-LIVE13 records HTTPS/reverse-proxy `DOCUMENTED_WITH_CONFIG`; PDR-LIVE14 records secrets manager / credential rotation `DOCUMENTED_WITH_PLAN`; PDR-LIVE15 records real-server smoke as `SKIPPED_MISSING_CONTROLLED_SERVER`; AI PASS evidence, external provider proof, real HTTPS proxy smoke, real secret-store injection, actual rotation drill, and real server hardening evidence remain missing.
 
 ## Migration Execution Policy
 
@@ -697,7 +713,7 @@ The restore script must only target a controlled recovery database until a separ
 - Docker Compose deployment skeleton, `.env.example`, and smoke/backup/restore scripts exist; real server deployment smoke and real restore drill evidence are still missing.
 - Basic Auth access control exists after PDR-M3, and PDR-LIVE13 records HTTPS/reverse-proxy template evidence, but real server auth smoke, real HTTPS proxy smoke, actual credential rotation drill, and real secrets manager integration remain missing.
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
-- Provider readiness is readonly after PDR-M5, PDR-PF6 records safe no-call provider smoke evidence, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records AI provider missing-secret skipped evidence, PDR-LIVE11 records the aggregate release evidence bundle as BLOCKED / DO NOT DEPLOY, and PDR-LIVE12 records application-level access/audit/rate-limit `GUARD_PASS`; AI/external provider live PASS proof, real secrets manager injection, actual credential rotation drill, real HTTPS proxy smoke, and real server provider smoke still do not exist yet.
+- Provider readiness is readonly after PDR-M5, PDR-PF6 records safe no-call provider smoke evidence, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records AI provider missing-secret skipped evidence, PDR-LIVE11 records the aggregate release evidence bundle as BLOCKED / DO NOT DEPLOY, PDR-LIVE12 records application-level access/audit/rate-limit `GUARD_PASS`, PDR-LIVE13 records HTTPS/reverse-proxy `DOCUMENTED_WITH_CONFIG`, PDR-LIVE14 records secrets manager / credential rotation `DOCUMENTED_WITH_PLAN`, and PDR-LIVE15 records real-server smoke as `SKIPPED_MISSING_CONTROLLED_SERVER`; AI/external provider live PASS proof, real secrets manager injection, actual credential rotation drill, real HTTPS proxy smoke, and real server provider smoke still do not exist yet.
 - PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
 - PDR-M7 provider live smoke harness exists, PDR-PF6 records default-disabled/no-call evidence, PDR-LIVE8 records controlled Binance public PASS evidence, and PDR-LIVE9 records AI providers as SKIPPED_MISSING_SECRET. AI/external PASS checks remain opt-in and not proven.
 - Deployment packaging is skeletal only and not release-gated.
@@ -705,7 +721,7 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. PDR-LIVE15 AI Provider / External Context Release Policy Evidence, a controlled real-server smoke package, or another explicitly scoped controlled secrets/access/provider evidence package.
+1. PDR-LIVE16 AI Provider / External Context Release Policy Evidence, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped controlled secrets/access/provider evidence package.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
