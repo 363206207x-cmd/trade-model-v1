@@ -1084,10 +1084,41 @@
             line-height: 1.42;
             white-space: pre-line;
         }
+        .consistency-panel {
+            display: grid;
+            gap: 9px;
+        }
+        .consistency-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
+        }
+        .consistency-status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            max-width: 100%;
+            padding: 5px 10px;
+            border: 1px solid rgba(47, 117, 255, 0.18);
+            border-radius: 999px;
+            background: rgba(47, 117, 255, 0.08);
+            color: var(--brand-accent);
+            font-size: 0.75rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .consistency-score-wrap {
+            display: grid;
+            justify-items: center;
+            gap: 3px;
+            flex: 0 0 auto;
+        }
         .consistency-ring {
-            width: 86px;
-            height: 86px;
-            margin: 0 auto 8px;
+            width: 70px;
+            height: 70px;
+            margin: 0;
             border-radius: 50%;
             display: grid;
             place-items: center;
@@ -1097,7 +1128,7 @@
         .consistency-ring::after {
             content: "";
             position: absolute;
-            inset: 9px;
+            inset: 8px;
             border-radius: 50%;
             background: var(--bg-surface);
         }
@@ -1114,15 +1145,15 @@
         .consistency-ring.is-empty span {
             color: var(--text-secondary);
         }
-        .consistency-card-grid {
-            display: grid;
-            grid-template-columns: 96px minmax(0, 1fr);
-            gap: 8px;
-            align-items: center;
+        .consistency-ring-label {
+            color: var(--text-secondary);
+            font-size: 0.64rem;
+            font-weight: 700;
+            white-space: nowrap;
         }
         .consistency-list {
             display: grid;
-            gap: 7px;
+            gap: 6px;
             font-size: 0.74rem;
         }
         .consistency-row {
@@ -1146,11 +1177,31 @@
             text-align: right;
             overflow-wrap: anywhere;
         }
+        .consistency-summary {
+            display: grid;
+            gap: 4px;
+            padding: 8px 10px;
+            border: 1px solid rgba(226, 232, 240, 0.55);
+            border-radius: 8px;
+            background: rgba(248, 250, 252, 0.72);
+        }
+        .consistency-summary span {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 750;
+        }
+        .consistency-summary p {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 0.74rem;
+            font-weight: 650;
+            line-height: 1.42;
+        }
         @media (max-width: 900px) {
             .ai-review-grid,
             .ai-summary-strip,
-            .ai-evidence-list,
-            .consistency-card-grid { grid-template-columns: 1fr; }
+            .ai-evidence-list { grid-template-columns: 1fr; }
+            .consistency-topline { align-items: flex-start; }
             .ai-downgrade-row { grid-template-columns: 1fr; gap: 4px; }
             .ai-evidence-summary { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
             .ai-review-cell { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
@@ -2687,23 +2738,38 @@
                             <div class="ai-summary-item"><span class="ai-summary-label">最终结论</span><span class="ai-summary-value">等待同步</span></div>
                         </div>
                         <div class="ai-evidence-list">
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">核心支持证据</span><span class="ai-evidence-value">暂无证据</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">核心反对证据</span><span class="ai-evidence-value">暂无证据</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">决策摘要</span><span class="ai-evidence-value">等待同步</span></div>
+                            <div class="ai-evidence-item"><span class="ai-evidence-label">风险等级</span><span class="ai-evidence-value">暂无</span></div>
+                            <div class="ai-evidence-item"><span class="ai-evidence-label">AI 计划模式</span><span class="ai-evidence-value">等待同步</span></div>
+                            <div class="ai-evidence-item"><span class="ai-evidence-label">是否值得开仓</span><span class="ai-evidence-value">等待同步</span></div>
+                            <div class="ai-evidence-item"><span class="ai-evidence-label">裁决摘要</span><span class="ai-evidence-value">等待同步</span></div>
+                            <div class="ai-evidence-item"><span class="ai-evidence-label">最终采纳的核心支持证据</span><span class="ai-evidence-value">暂无该角色证据</span></div>
+                            <div class="ai-evidence-item"><span class="ai-evidence-label">最终考虑的核心反证</span><span class="ai-evidence-value">暂无该角色证据</span></div>
                         </div>
-                        <div class="ai-downgrade-row"><span class="ai-downgrade-label">暂无该角色证据</span><span class="ai-downgrade-value">等待同步</span></div>
+                        <div class="ai-downgrade-row"><span class="ai-downgrade-label">降级 / 阻断原因</span><span class="ai-downgrade-value">暂无该角色证据</span></div>
                     </div>
                 </div>
             </section>
             <section class="card" id="homeConsistencyPanel" aria-label="裁决一致性">
                 <p class="ai-card-title" style="margin-bottom:9px;">裁决一致性</p>
-                <div id="homeConsistencyContent" class="consistency-card-grid">
-                    <div class="consistency-ring is-empty" style="--consistency-score:0%"><span>—</span></div>
+                <div id="homeConsistencyContent" class="consistency-panel">
+                    <div class="consistency-topline">
+                        <span class="consistency-status-pill">等待同步</span>
+                        <div class="consistency-score-wrap">
+                            <div class="consistency-ring is-empty" style="--consistency-score:0%"><span>--</span></div>
+                            <span class="consistency-ring-label">一致性评分</span>
+                        </div>
+                    </div>
                     <div class="consistency-list">
-                        <div class="consistency-row"><span>最终倾向</span><span class="value"></span></div>
-                        <div class="consistency-row"><span>冲突等级</span><span class="value"></span></div>
-                        <div class="consistency-row"><span>AI 计划模式</span><span class="value"></span></div>
+                        <div class="consistency-row"><span>一致性等级</span><span class="value">等待同步</span></div>
+                        <div class="consistency-row"><span>最终倾向</span><span class="value">暂无</span></div>
+                        <div class="consistency-row"><span>冲突等级</span><span class="value">等待同步</span></div>
+                        <div class="consistency-row"><span>AI 计划模式</span><span class="value">等待同步</span></div>
                         <div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">否</span></div>
+                        <div class="consistency-row"><span>降级原因</span><span class="value">暂无降级原因</span></div>
+                    </div>
+                    <div class="consistency-summary">
+                        <span>一句话摘要</span>
+                        <p>等待 AI 三角色结果同步后生成一致性结论</p>
                     </div>
                 </div>
             </section>
@@ -5551,11 +5617,6 @@
         return text || fallback;
     }
 
-    function aiRoleHasData(role, keys) {
-        role = role || {};
-        return (keys || []).some(function (key) { return !!aiRoleValue(role[key]); });
-    }
-
     function aiRoleSummaryStrip(items) {
         return '<div class="ai-summary-strip">' + (items || []).map(function (item) {
             return aiSummaryItem(item[0], aiRoleFallbackValue(item[1], item[2] || "等待同步"));
@@ -5574,17 +5635,63 @@
             + '</span></div>';
     }
 
-    function aiRoleEmptyState() {
-        return '<div class="ai-evidence-grid"><div class="ai-downgrade-row"><span class="ai-downgrade-label">暂无该角色证据</span><span class="ai-downgrade-value">等待同步</span></div></div>';
+    function actualConsistencyScore(consistency) {
+        consistency = consistency || {};
+        var raw = firstNonEmpty(
+            consistency.consistencyScore,
+            consistency.agreementScore,
+            consistency.consistency_score,
+            consistency.agreement_score
+        );
+        if (raw == null || String(raw).trim() === "") return null;
+        var score = Number(raw);
+        if (!isFinite(score)) return null;
+        return Math.max(0, Math.min(100, Math.round(score)));
+    }
+
+    function consistencyStatusText(level, confused) {
+        if (confused === true) return "极端分歧";
+        var raw = String(level || "").trim();
+        if (!raw) return "等待同步";
+        var upper = raw.toUpperCase();
+        if (upper.indexOf("EXTREME") >= 0 || upper.indexOf("CRITICAL") >= 0 || upper.indexOf("LEVEL_4") >= 0 || upper.indexOf("L4") >= 0 || raw.indexOf("极端") >= 0) return "极端分歧";
+        if (upper.indexOf("HIGH") >= 0 || upper.indexOf("SIGNIFICANT") >= 0 || upper.indexOf("LEVEL_3") >= 0 || upper.indexOf("L3") >= 0 || raw.indexOf("显著") >= 0 || raw.indexOf("高") >= 0) return "显著分歧";
+        if (upper.indexOf("MEDIUM") >= 0 || upper.indexOf("MODERATE") >= 0 || upper.indexOf("MINOR") >= 0 || upper.indexOf("LOW") >= 0 || upper.indexOf("LEVEL_2") >= 0 || upper.indexOf("L2") >= 0 || raw.indexOf("轻微") >= 0 || raw.indexOf("中") >= 0 || raw.indexOf("低") >= 0) return "轻微分歧";
+        if (upper.indexOf("NONE") >= 0 || upper.indexOf("NO_CONFLICT") >= 0 || upper.indexOf("CONSISTENT") >= 0 || upper.indexOf("ALIGNED") >= 0 || upper.indexOf("LEVEL_1") >= 0 || upper.indexOf("L1") >= 0 || raw.indexOf("一致") >= 0 || raw.indexOf("无") >= 0) return "一致";
+        return "等待同步";
+    }
+
+    function consistencyRow(label, value, fallback) {
+        return '<div class="consistency-row"><span>' + escapeHtml(label) + '</span><span class="value">'
+            + escapeHtml(aiRoleFallbackValue(value, fallback || "等待同步"))
+            + '</span></div>';
+    }
+
+    function renderHomeConsistencyCard(options) {
+        options = options || {};
+        var consistency = options.consistency || {};
+        var score = actualConsistencyScore(consistency);
+        var status = consistencyStatusText(options.level || options.conflictLevel, options.confused);
+        var ringClass = score == null ? ' is-empty' : '';
+        var scoreText = score == null ? "--" : String(score);
+        var summary = aiRoleFallbackValue(options.summary, "等待 AI 三角色结果同步后生成一致性结论");
+        return '<div class="consistency-topline">'
+            + '<span class="consistency-status-pill">' + escapeHtml(status) + '</span>'
+            + '<div class="consistency-score-wrap"><div class="consistency-ring' + ringClass + '" style="--consistency-score:' + (score != null ? score : 0) + '%"><span>' + escapeHtml(scoreText) + '</span></div><span class="consistency-ring-label">一致性评分</span></div>'
+            + '</div>'
+            + '<div class="consistency-list">'
+            + consistencyRow("一致性等级", status, "等待同步")
+            + consistencyRow("最终倾向", options.finalTendency, "暂无")
+            + consistencyRow("冲突等级", options.conflictLevel, "等待同步")
+            + consistencyRow("AI 计划模式", options.planMode, "等待同步")
+            + consistencyRow("是否进入冲突阻断", options.confused ? "是" : "否", "否")
+            + consistencyRow("降级原因", options.downgradeReason, "暂无降级原因")
+            + '</div>'
+            + '<div class="consistency-summary"><span>一句话摘要</span><p>' + escapeHtml(summary) + '</p></div>';
     }
 
     function renderGptFinalHomeRole(role) {
-        var keys = [
-            "finalMarketBias", "finalConfidence", "finalRiskLevel", "finalPlanMode", "worthOpening",
-            "finalConclusion", "coreSupportingEvidence", "coreCounterEvidence", "decisionSummary",
-            "direction", "confidenceLevel", "supportEvidence", "againstEvidence", "reviewConclusion"
-        ];
-        if (!aiRoleHasData(role, keys)) return aiRoleEmptyState();
+        role = role || {};
         var finalBias = role.finalMarketBias || role.direction;
         var confidence = role.finalConfidence || role.confidenceLevel;
         var conclusion = role.finalConclusion || role.reviewConclusion;
@@ -5595,57 +5702,51 @@
                 ["最终结论", conclusion, "等待同步"]
             ])
             + aiRoleEvidenceList([
-                ["风险等级", localizeVisibleStatus(role.finalRiskLevel || ""), "等待同步"],
+                ["风险等级", localizeVisibleStatus(role.finalRiskLevel || ""), "暂无"],
                 ["AI 计划模式", localizeVisibleStatus(role.finalPlanMode || ""), "等待同步"],
                 ["是否值得开仓", role.worthOpening, "等待同步"],
-                ["核心支持证据", role.coreSupportingEvidence || role.supportEvidence, "暂无证据"],
-                ["核心反对证据", role.coreCounterEvidence || role.againstEvidence, "暂无证据"]
+                ["裁决摘要", role.decisionSummary || conclusion, "等待同步"],
+                ["最终采纳的核心支持证据", role.coreSupportingEvidence || role.supportEvidence, "暂无该角色证据"],
+                ["最终考虑的核心反证", role.coreCounterEvidence || role.againstEvidence, "暂无该角色证据"]
             ])
-            + aiRoleFooter("决策摘要", role.decisionSummary || conclusion, "等待同步")
+            + aiRoleFooter("降级 / 阻断原因", role.downgradeReason, "暂无该角色证据")
             + '</div>';
     }
 
     function renderGeminiReviewHomeRole(role) {
-        var keys = [
-            "reviewVerdict", "detectedContradictions", "weakEvidence", "logicGaps",
-            "downgradeRecommendation", "riskAdjustmentSuggestion", "manualReviewRequired", "reviewConclusion"
-        ];
-        if (!aiRoleHasData(role, keys)) return aiRoleEmptyState();
+        role = role || {};
         return '<div class="ai-evidence-grid">'
             + aiRoleSummaryStrip([
-                ["复核判断", role.reviewVerdict, "等待同步"],
-                ["是否需要人工复核", role.manualReviewRequired, "等待同步"],
-                ["复核结论", role.reviewConclusion, "等待同步"]
+                ["复核结论", role.reviewConclusion, "等待同步"],
+                ["复核意见", role.reviewVerdict, "等待同步"],
+                ["是否需要人工复核", role.manualReviewRequired, "等待同步"]
             ])
             + aiRoleEvidenceList([
-                ["发现的冲突", role.detectedContradictions, "暂无证据"],
-                ["证据不足点", role.weakEvidence, "暂无证据"],
-                ["逻辑缺口", role.logicGaps, "暂无证据"],
-                ["风险调整建议", role.riskAdjustmentSuggestion, "等待同步"]
+                ["发现的冲突", role.detectedContradictions, "暂无该角色证据"],
+                ["证据不足点", role.weakEvidence, "暂无该角色证据"],
+                ["逻辑漏洞", role.logicGaps, "暂无该角色证据"],
+                ["是否建议降级", role.downgradeRecommendation, "等待同步"],
+                ["风险调整建议", role.riskAdjustmentSuggestion, "等待同步"],
+                ["复核摘要", role.reviewConclusion || role.reviewVerdict, "等待同步"]
             ])
-            + aiRoleFooter("降级建议", role.downgradeRecommendation, "等待同步")
             + '</div>';
     }
 
     function renderGrokChallengeHomeRole(role) {
-        var keys = [
-            "challengeThesis", "eventRisks", "sentimentReversalRisks", "microstructureTraps",
-            "liquidityRisks", "counterEvidence", "challengeConclusion"
-        ];
-        if (!aiRoleHasData(role, keys)) return aiRoleEmptyState();
+        role = role || {};
         return '<div class="ai-evidence-grid">'
             + aiRoleSummaryStrip([
                 ["反方论点", role.challengeThesis, "等待同步"],
-                ["突发新闻或事件风险", role.eventRisks, "暂无证据"],
-                ["挑战结论", role.challengeConclusion, "等待同步"]
+                ["反方挑战结论", role.challengeConclusion, "等待同步"],
+                ["风险提示摘要", role.challengeConclusion || role.challengeThesis, "等待同步"]
             ])
             + aiRoleEvidenceList([
-                ["情绪反转风险", role.sentimentReversalRisks, "暂无证据"],
-                ["微结构陷阱", role.microstructureTraps, "暂无证据"],
-                ["流动性 / 插针 / 挤压风险", role.liquidityRisks, "暂无证据"],
-                ["反方证据", role.counterEvidence, "暂无证据"]
+                ["突发新闻 / 事件风险", role.eventRisks, "暂无该角色证据"],
+                ["情绪反转风险", role.sentimentReversalRisks, "暂无该角色证据"],
+                ["微观结构陷阱", role.microstructureTraps, "暂无该角色证据"],
+                ["流动性 / 插针 / 挤仓风险", role.liquidityRisks, "暂无该角色证据"],
+                ["反向证据", role.counterEvidence, "暂无该角色证据"]
             ])
-            + aiRoleFooter("挑战结论", role.challengeConclusion, "等待同步")
             + '</div>';
     }
 
@@ -5801,18 +5902,15 @@
         var planMode = d ? firstNonEmpty(d.aiPlanMode, d.ai_plan_mode, "—") : "—";
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
-            var conflictScore = c.score != null && isFinite(Number(c.score)) ? Number(c.score) : null;
-            var consistencyScore = conflictScore != null ? Math.max(8, Math.min(98, 100 - conflictScore)) : null;
-            var emptyRingClass = consistencyScore == null ? ' is-empty' : '';
-            consistency.innerHTML = '<div class="consistency-card-grid">'
-                + '<div class="consistency-ring' + emptyRingClass + '" style="--consistency-score:' + (consistencyScore != null ? consistencyScore : 0) + '%"><span>' + escapeHtml(consistencyScore != null ? (consistencyScore + "%") : "—") + '</span></div>'
-                + '<div class="consistency-list">'
-                + '<div class="consistency-row"><span>最终倾向</span><span class="value">' + escapeHtml(d ? cleanBlankValue(assetDirectionText(d)) : "") + '</span></div>'
-                + '<div class="consistency-row"><span>冲突等级</span><span class="value">' + escapeHtml(d ? cleanBlankValue(formatWithSource(c.label, c.source)) : "") + '</span></div>'
-                + '<div class="consistency-row"><span>AI 计划模式</span><span class="value">' + escapeHtml(cleanBlankValue(planMode)) + '</span></div>'
-                + '<div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">' + escapeHtml(d && resolveIsConfused(d) ? "是" : "否") + '</span></div>'
-                + '</div>'
-                + '</div>';
+            consistency.innerHTML = renderHomeConsistencyCard({
+                consistency: c,
+                level: d ? c.label : "",
+                finalTendency: d ? cleanBlankValue(assetDirectionText(d)) : "",
+                conflictLevel: d ? cleanBlankValue(formatWithSource(c.label, c.source)) : "",
+                planMode: cleanBlankValue(planMode),
+                confused: !!(d && resolveIsConfused(d)),
+                downgradeReason: d ? aiDowngradeReason(d) : ""
+            });
         }
     }
 
@@ -6050,16 +6148,16 @@
             var finalRole = tabList.find(function (t) { return t.role === "GPT_FINAL"; }) || {};
             var finalBias = finalRole.finalMarketBias || finalRole.direction || "";
             var planMode = finalRole.finalPlanMode || "";
-            var score = c.score != null ? Math.max(8, Math.min(98, 100 - Number(c.score))) : null;
-            var ringClass = score == null ? ' is-empty' : '';
-            consistency.innerHTML = '<div class="consistency-card-grid">'
-                + '<div class="consistency-ring' + ringClass + '" style="--consistency-score:' + (score != null ? score : 0) + '%"><span>' + escapeHtml(score != null ? (score + "%") : "—") + '</span></div>'
-                + '<div class="consistency-list">'
-                + '<div class="consistency-row"><span>最终倾向</span><span class="value">' + escapeHtml(aiRoleFallbackValue(biasText(finalBias) !== "—" ? biasText(finalBias) : finalBias, "")) + '</span></div>'
-                + '<div class="consistency-row"><span>冲突等级</span><span class="value">' + escapeHtml(localizeVisibleStatus(c.level || "")) + '</span></div>'
-                + '<div class="consistency-row"><span>AI 计划模式</span><span class="value">' + escapeHtml(aiRoleFallbackValue(localizeVisibleStatus(planMode), "")) + '</span></div>'
-                + '<div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">' + escapeHtml(c.confused ? "是" : "否") + '</span></div>'
-                + '</div></div>';
+            consistency.innerHTML = renderHomeConsistencyCard({
+                consistency: c,
+                level: c.level || "",
+                finalTendency: biasText(finalBias) !== "—" ? biasText(finalBias) : finalBias,
+                conflictLevel: localizeVisibleStatus(c.level || ""),
+                planMode: localizeVisibleStatus(planMode),
+                confused: !!c.confused,
+                downgradeReason: finalRole.downgradeReason || c.downgradeReason || c.blockReason || "",
+                summary: c.summary || c.conclusion || c.oneSentenceSummary || ""
+            });
         }
     }
 

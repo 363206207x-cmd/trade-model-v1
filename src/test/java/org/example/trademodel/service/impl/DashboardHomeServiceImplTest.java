@@ -570,6 +570,7 @@ class DashboardHomeServiceImplTest {
         assertThat(gpt.getCoreSupportingEvidence()).containsExactly("规则方向一致", "量能确认");
         assertThat(gpt.getCoreCounterEvidence()).containsExactly("事件窗口待复核");
         assertThat(gpt.getDecisionSummary()).isEqualTo("最终裁决只读摘要");
+        assertThat(gpt.getDowngradeReason()).isEqualTo("等待事件落地");
         assertThat(gpt.getDirection()).isEqualTo("BULLISH");
         assertThat(gpt.getSupportEvidence()).containsExactly("规则方向一致", "量能确认");
         assertThat(gpt.getReviewVerdict()).isNull();
@@ -723,7 +724,8 @@ class DashboardHomeServiceImplTest {
                       "finalConclusion": "保持人工复核",
                       "coreSupportingEvidence": ["规则方向一致", "量能确认"],
                       "coreCounterEvidence": ["事件窗口待复核"],
-                      "decisionSummary": "最终裁决只读摘要"
+                      "decisionSummary": "最终裁决只读摘要",
+                      "downgradeOrBlockReason": "等待事件落地"
                     },
                     {
                       "providerRole": "GEMINI_CONSISTENCY_REVIEW",
