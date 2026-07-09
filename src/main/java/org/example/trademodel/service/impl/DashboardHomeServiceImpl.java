@@ -520,19 +520,114 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AiTabVO tab = new DashboardHomeVO.AiTabVO();
         tab.setRole(role);
         tab.setRoleLabel(roleLabel(role));
-        tab.setDirection(text(roleNode, "direction", "marketBias", "bias", "finalDirection",
-                "directionJudgement", "directionJudgment"));
-        tab.setConfidenceLevel(text(roleNode, "confidenceLevel", "confidence", "confidence_level"));
-        tab.setSupportEvidence(textList(roleNode, "supportEvidence", "supportingEvidence", "positiveEvidence",
-                "coreSupportEvidence", "evidenceSupport", "supports", "support"));
-        tab.setAgainstEvidence(textList(roleNode, "againstEvidence", "opposingEvidence", "negativeEvidence",
-                "counterEvidence", "contradictionEvidence", "opposition", "against"));
-        tab.setRiskPoints(textList(roleNode, "riskPoints", "risks", "riskWarnings", "riskSummary", "risk_points"));
-        tab.setDowngradeReason(text(roleNode, "downgradeReason", "blockReason", "downgradeOrBlockReason",
-                "downgrade_reason", "rejectReason"));
-        tab.setReviewConclusion(text(roleNode, "reviewConclusion", "conclusion", "finalOpinion",
-                "reviewOpinion", "summary", "decisionSummary"));
+        if (roleNode == null) {
+            return tab;
+        }
+        switch (role) {
+            case "GPT_FINAL" -> populateFinalDecisionRole(tab, roleNode, decision);
+            case "GEMINI_REVIEW" -> populateConflictReviewRole(tab, roleNode);
+            case "GROK_CHALLENGE" -> populateChallengeRole(tab, roleNode);
+            default -> {
+            }
+        }
         return tab;
+    }
+
+    private void populateFinalDecisionRole(DashboardHomeVO.AiTabVO tab, JsonNode roleNode, DecisionResultVO decision) {
+        String finalMarketBias = firstNonBlank(
+                text(roleNode, "finalMarketBias", "final_market_bias", "finalBias", "marketBias", "bias",
+                        "direction", "finalDirection", "directionJudgement", "directionJudgment"),
+                decision != null ? decision.getMarketBiasHierarchy() : null
+        );
+        String finalConfidence = firstNonBlank(
+                text(roleNode, "finalConfidence", "confidenceLevel", "confidence", "confidence_level"),
+                decision != null ? decision.getConfidenceLevel() : null
+        );
+        String finalRiskLevel = firstNonBlank(
+                text(roleNode, "finalRiskLevel", "riskLevel", "risk_level"),
+                decision != null ? decision.getRiskLevel() : null
+        );
+        String finalPlanMode = firstNonBlank(
+                text(roleNode, "finalPlanMode", "planMode", "aiPlanMode", "ai_plan_mode"),
+                decision != null ? decision.getAiPlanMode() : null,
+                decision != null ? decision.getPlanMode() : null
+        );
+        String worthOpening = firstNonBlank(
+                text(roleNode, "worthOpening", "worth_opening", "openingWorth", "worthOpen", "isWorthOpening"),
+                worthOpeningLabel(decision != null ? decision.getIsWorthOpening() : null)
+        );
+        String finalConclusion = text(roleNode, "finalConclusion", "finalOpinion", "conclusion", "reviewConclusion");
+        List<String> coreSupportingEvidence = textList(roleNode,
+                "coreSupportingEvidence", "core_supporting_evidence", "coreSupportEvidence",
+                "finalSupportingEvidence", "supportEvidence", "supportingEvidence", "positiveEvidence",
+                "evidenceSupport", "supports", "support");
+        List<String> coreCounterEvidence = textList(roleNode,
+                "coreCounterEvidence", "core_counter_evidence", "finalCounterEvidence", "againstEvidence",
+                "opposingEvidence", "negativeEvidence", "counterEvidence", "contradictionEvidence",
+                "opposition", "against");
+        String decisionSummary = text(roleNode, "decisionSummary", "summary", "finalSummary");
+
+        tab.setFinalMarketBias(finalMarketBias);
+        tab.setFinalConfidence(finalConfidence);
+        tab.setFinalRiskLevel(finalRiskLevel);
+        tab.setFinalPlanMode(finalPlanMode);
+        tab.setWorthOpening(worthOpening);
+        tab.setFinalConclusion(finalConclusion);
+        tab.setCoreSupportingEvidence(coreSupportingEvidence);
+        tab.setCoreCounterEvidence(coreCounterEvidence);
+        tab.setDecisionSummary(decisionSummary);
+
+        tab.setDirection(finalMarketBias);
+        tab.setConfidenceLevel(finalConfidence);
+        tab.setSupportEvidence(coreSupportingEvidence);
+        tab.setAgainstEvidence(coreCounterEvidence);
+        tab.setReviewConclusion(firstNonBlank(finalConclusion, decisionSummary));
+    }
+
+    private void populateConflictReviewRole(DashboardHomeVO.AiTabVO tab, JsonNode roleNode) {
+        tab.setReviewVerdict(text(roleNode, "reviewVerdict", "verdict", "reviewOpinion", "decisionSummary", "summary"));
+        tab.setDetectedContradictions(textList(roleNode,
+                "detectedContradictions", "detected_contradictions", "contradictions", "contradictionEvidence",
+                "negativeEvidence", "againstEvidence", "opposingEvidence"));
+        tab.setWeakEvidence(textList(roleNode,
+                "weakEvidence", "weak_evidence", "weakEvidencePoints", "evidenceGaps", "evidenceWeakness",
+                "positiveEvidence", "supportEvidence"));
+        tab.setLogicGaps(textList(roleNode,
+                "logicGaps", "logic_gaps", "gaps", "risks", "riskWarnings", "risk_points"));
+        tab.setDowngradeRecommendation(text(roleNode,
+                "downgradeRecommendation", "downgrade_reason", "downgradeReason", "downgradeOrBlockReason",
+                "rejectReason", "blockReason"));
+        tab.setRiskAdjustmentSuggestion(text(roleNode,
+                "riskAdjustmentSuggestion", "risk_adjustment_suggestion", "riskAdjustment", "riskSuggestion"));
+        tab.setManualReviewRequired(text(roleNode,
+                "manualReviewRequired", "manual_review_required", "needManualReview", "manualReview"));
+        tab.setReviewConclusion(text(roleNode, "reviewConclusion", "conclusion", "decisionSummary", "summary"));
+    }
+
+    private void populateChallengeRole(DashboardHomeVO.AiTabVO tab, JsonNode roleNode) {
+        tab.setChallengeThesis(text(roleNode,
+                "challengeThesis", "challenge_thesis", "thesis", "challenge", "adversarialThesis",
+                "finalOpinion", "summary"));
+        tab.setEventRisks(textList(roleNode,
+                "eventRisks", "event_risks", "eventRisk", "suddenEventRisk", "suddenNewsRisk", "newsRisk"));
+        tab.setSentimentReversalRisks(textList(roleNode,
+                "sentimentReversalRisks", "sentiment_reversal_risks", "sentimentReversalRisk", "sentimentRisk"));
+        tab.setMicrostructureTraps(textList(roleNode,
+                "microstructureTraps", "microstructure_traps", "microstructureTrap", "trap", "shortTermTrap"));
+        tab.setLiquidityRisks(textList(roleNode,
+                "liquidityRisks", "liquidity_risks", "liquidityRisk", "wickRisk", "squeezeRisk",
+                "liquidityWickSqueezeRisk", "riskPoints", "risk_points", "risks"));
+        tab.setCounterEvidence(textList(roleNode,
+                "counterEvidence", "counter_evidence", "againstEvidence", "opposingEvidence", "negativeEvidence"));
+        tab.setChallengeConclusion(text(roleNode, "challengeConclusion", "reviewConclusion", "conclusion", "decisionSummary", "summary"));
+        tab.setReviewConclusion(tab.getChallengeConclusion());
+    }
+
+    private String worthOpeningLabel(Boolean worthOpening) {
+        if (worthOpening == null) {
+            return null;
+        }
+        return worthOpening ? "是" : "否";
     }
 
     private PushInboxContext buildPushInbox(List<UserPositionVO> positions, int limit) {

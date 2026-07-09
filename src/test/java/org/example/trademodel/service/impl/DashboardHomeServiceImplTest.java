@@ -548,46 +548,8 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void aiDecisionMapsStructuredRoleEvidenceOnly() {
-        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
-                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
-        decision.setAiRoleResults("""
-                {
-                  "roles": [
-                    {
-                      "role": "GPT_FINAL",
-                      "direction": "BULLISH",
-                      "confidence": "HIGH",
-                      "supportEvidence": ["规则方向一致", "量能确认"],
-                      "againstEvidence": "事件窗口待复核",
-                      "riskWarnings": ["高波动"],
-                      "downgradeOrBlockReason": "等待事件落地",
-                      "finalOpinion": "保持人工复核"
-                    },
-                    {
-                      "providerRole": "GEMINI_CONSISTENCY_REVIEW",
-                      "bias": "RANGE",
-                      "confidence_level": "MEDIUM",
-                      "positiveEvidence": "一致性支持",
-                      "negativeEvidence": ["结构分歧"],
-                      "risks": "假突破",
-                      "rejectReason": "冲突降级",
-                      "decisionSummary": "保持观察"
-                    },
-                    {
-                      "aiRole": "GROK_ADVERSARIAL_CHALLENGE",
-                      "finalDirection": "BEARISH",
-                      "confidenceLevel": "LOW",
-                      "coreSupportEvidence": ["反方压力"],
-                      "counterEvidence": "趋势未确认",
-                      "risk_points": ["流动性不足"],
-                      "blockReason": "反方阻断",
-                      "reviewConclusion": "挑战成立"
-                    }
-                  ]
-                }
-                """);
-
+    void gptFinalTabShowsFinalDecisionFieldsOnly() {
+        DecisionResultVO decision = decisionWithStructuredAiRoles();
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
@@ -599,54 +561,92 @@ class DashboardHomeServiceImplTest {
                 .containsExactly("最终裁决官", "冲突复核官", "反方挑战官");
 
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
+        assertThat(gpt.getFinalMarketBias()).isEqualTo("BULLISH");
+        assertThat(gpt.getFinalConfidence()).isEqualTo("HIGH");
+        assertThat(gpt.getFinalRiskLevel()).isEqualTo("MEDIUM");
+        assertThat(gpt.getFinalPlanMode()).isEqualTo("REVIEW_ONLY");
+        assertThat(gpt.getWorthOpening()).isEqualTo("需要人工确认");
+        assertThat(gpt.getFinalConclusion()).isEqualTo("保持人工复核");
+        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("规则方向一致", "量能确认");
+        assertThat(gpt.getCoreCounterEvidence()).containsExactly("事件窗口待复核");
+        assertThat(gpt.getDecisionSummary()).isEqualTo("最终裁决只读摘要");
         assertThat(gpt.getDirection()).isEqualTo("BULLISH");
-        assertThat(gpt.getConfidenceLevel()).isEqualTo("HIGH");
         assertThat(gpt.getSupportEvidence()).containsExactly("规则方向一致", "量能确认");
-        assertThat(gpt.getAgainstEvidence()).containsExactly("事件窗口待复核");
-        assertThat(gpt.getRiskPoints()).containsExactly("高波动");
-        assertThat(gpt.getDowngradeReason()).isEqualTo("等待事件落地");
-        assertThat(gpt.getReviewConclusion()).isEqualTo("保持人工复核");
-
-        DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
-        assertThat(gemini.getDirection()).isEqualTo("RANGE");
-        assertThat(gemini.getConfidenceLevel()).isEqualTo("MEDIUM");
-        assertThat(gemini.getSupportEvidence()).containsExactly("一致性支持");
-        assertThat(gemini.getAgainstEvidence()).containsExactly("结构分歧");
-        assertThat(gemini.getRiskPoints()).containsExactly("假突破");
-        assertThat(gemini.getDowngradeReason()).isEqualTo("冲突降级");
-        assertThat(gemini.getReviewConclusion()).isEqualTo("保持观察");
-
-        DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
-        assertThat(grok.getDirection()).isEqualTo("BEARISH");
-        assertThat(grok.getConfidenceLevel()).isEqualTo("LOW");
-        assertThat(grok.getSupportEvidence()).containsExactly("反方压力");
-        assertThat(grok.getAgainstEvidence()).containsExactly("趋势未确认");
-        assertThat(grok.getRiskPoints()).containsExactly("流动性不足");
-        assertThat(grok.getDowngradeReason()).isEqualTo("反方阻断");
-        assertThat(grok.getReviewConclusion()).isEqualTo("挑战成立");
+        assertThat(gpt.getReviewVerdict()).isNull();
+        assertThat(gpt.getChallengeThesis()).isNull();
     }
 
     @Test
-    void aiDecisionReturnsThreeEmptyTabsWhenRoleDataMissing() {
+    void geminiReviewTabShowsConflictReviewFieldsOnly() {
+        DecisionResultVO decision = decisionWithStructuredAiRoles();
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
+        assertThat(gemini.getReviewVerdict()).isEqualTo("存在分歧");
+        assertThat(gemini.getDetectedContradictions()).containsExactly("结构分歧");
+        assertThat(gemini.getWeakEvidence()).containsExactly("成交量不足");
+        assertThat(gemini.getLogicGaps()).containsExactly("缺少高周期确认");
+        assertThat(gemini.getDowngradeRecommendation()).isEqualTo("降级为人工复核");
+        assertThat(gemini.getRiskAdjustmentSuggestion()).isEqualTo("提高风险等级");
+        assertThat(gemini.getManualReviewRequired()).isEqualTo("是");
+        assertThat(gemini.getReviewConclusion()).isEqualTo("暂缓正式计划");
+        assertThat(gemini.getDirection()).isNull();
+        assertThat(gemini.getFinalMarketBias()).isNull();
+        assertThat(gemini.getChallengeThesis()).isNull();
+        assertThat(gemini.getSupportEvidence()).isEmpty();
+    }
+
+    @Test
+    void grokChallengeTabShowsCounterEvidenceFieldsOnly() {
+        DecisionResultVO decision = decisionWithStructuredAiRoles();
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
+        assertThat(grok.getChallengeThesis()).isEqualTo("反方认为假突破");
+        assertThat(grok.getEventRisks()).containsExactly("突发宏观窗口");
+        assertThat(grok.getSentimentReversalRisks()).containsExactly("情绪反转");
+        assertThat(grok.getMicrostructureTraps()).containsExactly("插针诱多");
+        assertThat(grok.getLiquidityRisks()).containsExactly("流动性不足");
+        assertThat(grok.getCounterEvidence()).containsExactly("趋势未确认");
+        assertThat(grok.getChallengeConclusion()).isEqualTo("挑战成立");
+        assertThat(grok.getDirection()).isNull();
+        assertThat(grok.getFinalMarketBias()).isNull();
+        assertThat(grok.getReviewVerdict()).isNull();
+        assertThat(grok.getSupportEvidence()).isEmpty();
+    }
+
+    @Test
+    void missingRoleDataDoesNotCloneOtherRoleContent() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
-        decision.setAiRoleResults("{\"role\":\"UNKNOWN\",\"supportEvidence\":[\"不应映射\"],\"summary\":\"不应映射\"}");
+        decision.setAiRoleResults("{\"GPT_FINAL\":{\"finalMarketBias\":\"BULLISH\",\"coreSupportingEvidence\":[\"GPT only evidence\"],\"decisionSummary\":\"GPT only summary\"}}");
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
 
-        assertThat(home.getAiDecision().getTabs()).extracting(DashboardHomeVO.AiTabVO::getRole)
-                .containsExactly("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
-        assertThat(home.getAiDecision().getTabs()).allSatisfy(tab -> {
-            assertThat(tab.getDirection()).isNull();
-            assertThat(tab.getConfidenceLevel()).isNull();
-            assertThat(tab.getSupportEvidence()).isEmpty();
-            assertThat(tab.getAgainstEvidence()).isEmpty();
-            assertThat(tab.getRiskPoints()).isEmpty();
-            assertThat(tab.getDowngradeReason()).isNull();
-            assertThat(tab.getReviewConclusion()).isNull();
-        });
+        DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
+        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("GPT only evidence");
+        assertThat(gpt.getDecisionSummary()).isEqualTo("GPT only summary");
+
+        DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
+        assertThat(gemini.getReviewVerdict()).isNull();
+        assertThat(gemini.getDetectedContradictions()).isEmpty();
+        assertThat(gemini.getWeakEvidence()).isEmpty();
+        assertThat(gemini.getReviewConclusion()).isNull();
+        assertThat(gemini.getDirection()).isNull();
+        assertThat(gemini.getSupportEvidence()).isEmpty();
+
+        DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
+        assertThat(grok.getChallengeThesis()).isNull();
+        assertThat(grok.getCounterEvidence()).isEmpty();
+        assertThat(grok.getChallengeConclusion()).isNull();
+        assertThat(grok.getDirection()).isNull();
+        assertThat(grok.getSupportEvidence()).isEmpty();
     }
 
     @Test
@@ -705,6 +705,51 @@ class DashboardHomeServiceImplTest {
 
         assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).containsExactly("ETH evidence");
         assertThat(aiTab(defaultHome, "GPT_FINAL").getSupportEvidence()).containsExactly("BTC evidence");
+    }
+
+    private DecisionResultVO decisionWithStructuredAiRoles() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setAiRoleResults("""
+                {
+                  "roles": [
+                    {
+                      "role": "GPT_FINAL",
+                      "finalMarketBias": "BULLISH",
+                      "finalConfidence": "HIGH",
+                      "finalRiskLevel": "MEDIUM",
+                      "finalPlanMode": "REVIEW_ONLY",
+                      "worthOpening": "需要人工确认",
+                      "finalConclusion": "保持人工复核",
+                      "coreSupportingEvidence": ["规则方向一致", "量能确认"],
+                      "coreCounterEvidence": ["事件窗口待复核"],
+                      "decisionSummary": "最终裁决只读摘要"
+                    },
+                    {
+                      "providerRole": "GEMINI_CONSISTENCY_REVIEW",
+                      "reviewVerdict": "存在分歧",
+                      "detectedContradictions": ["结构分歧"],
+                      "weakEvidence": ["成交量不足"],
+                      "logicGaps": ["缺少高周期确认"],
+                      "downgradeRecommendation": "降级为人工复核",
+                      "riskAdjustmentSuggestion": "提高风险等级",
+                      "manualReviewRequired": "是",
+                      "reviewConclusion": "暂缓正式计划"
+                    },
+                    {
+                      "aiRole": "GROK_ADVERSARIAL_CHALLENGE",
+                      "challengeThesis": "反方认为假突破",
+                      "eventRisks": ["突发宏观窗口"],
+                      "sentimentReversalRisks": ["情绪反转"],
+                      "microstructureTraps": ["插针诱多"],
+                      "liquidityRisks": ["流动性不足"],
+                      "counterEvidence": ["趋势未确认"],
+                      "challengeConclusion": "挑战成立"
+                    }
+                  ]
+                }
+                """);
+        return decision;
     }
 
     private DecisionResultVO decision(String symbol,
@@ -784,6 +829,29 @@ class DashboardHomeServiceImplTest {
             assertThat(tab.getRiskPoints()).isEmpty();
             assertThat(tab.getDowngradeReason()).isNull();
             assertThat(tab.getReviewConclusion()).isNull();
+            assertThat(tab.getFinalMarketBias()).isNull();
+            assertThat(tab.getFinalConfidence()).isNull();
+            assertThat(tab.getFinalRiskLevel()).isNull();
+            assertThat(tab.getFinalPlanMode()).isNull();
+            assertThat(tab.getWorthOpening()).isNull();
+            assertThat(tab.getFinalConclusion()).isNull();
+            assertThat(tab.getCoreSupportingEvidence()).isEmpty();
+            assertThat(tab.getCoreCounterEvidence()).isEmpty();
+            assertThat(tab.getDecisionSummary()).isNull();
+            assertThat(tab.getReviewVerdict()).isNull();
+            assertThat(tab.getDetectedContradictions()).isEmpty();
+            assertThat(tab.getWeakEvidence()).isEmpty();
+            assertThat(tab.getLogicGaps()).isEmpty();
+            assertThat(tab.getDowngradeRecommendation()).isNull();
+            assertThat(tab.getRiskAdjustmentSuggestion()).isNull();
+            assertThat(tab.getManualReviewRequired()).isNull();
+            assertThat(tab.getChallengeThesis()).isNull();
+            assertThat(tab.getEventRisks()).isEmpty();
+            assertThat(tab.getSentimentReversalRisks()).isEmpty();
+            assertThat(tab.getMicrostructureTraps()).isEmpty();
+            assertThat(tab.getLiquidityRisks()).isEmpty();
+            assertThat(tab.getCounterEvidence()).isEmpty();
+            assertThat(tab.getChallengeConclusion()).isNull();
         });
     }
 

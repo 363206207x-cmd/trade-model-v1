@@ -180,6 +180,33 @@ class DashboardControllerTest {
     }
 
     @Test
+    void dashboardTemplateUsesRoleSpecificAiHomeRendering() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("renderGptFinalHomeRole");
+        assertThat(html).contains("renderGeminiReviewHomeRole");
+        assertThat(html).contains("renderGrokChallengeHomeRole");
+        assertThat(html).contains("最终倾向");
+        assertThat(html).contains("最终结论");
+        assertThat(html).contains("发现的冲突");
+        assertThat(html).contains("证据不足点");
+        assertThat(html).contains("反方论点");
+        assertThat(html).contains("突发新闻或事件风险");
+        assertThat(html).contains("暂无该角色证据");
+    }
+
+    @Test
+    void consistencyCardLayoutIsReadable() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("grid-template-columns: minmax(7em, max-content) minmax(0, 1fr)");
+        assertThat(html).contains(".consistency-row > span:first-child");
+        assertThat(html).contains("white-space: nowrap");
+        assertThat(html).contains("word-break: keep-all");
+        assertThat(html).contains("overflow-wrap: anywhere");
+    }
+
+    @Test
     void dashboardTemplateShowsReviewOnlyPositionSyncProviderStatusMapping() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 

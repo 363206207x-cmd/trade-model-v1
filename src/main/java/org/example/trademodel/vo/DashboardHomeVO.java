@@ -801,6 +801,29 @@ public class DashboardHomeVO {
         private List<String> riskPoints = new ArrayList<>();
         private String downgradeReason;
         private String reviewConclusion;
+        private String finalMarketBias;
+        private String finalConfidence;
+        private String finalRiskLevel;
+        private String finalPlanMode;
+        private String worthOpening;
+        private String finalConclusion;
+        private List<String> coreSupportingEvidence = new ArrayList<>();
+        private List<String> coreCounterEvidence = new ArrayList<>();
+        private String decisionSummary;
+        private String reviewVerdict;
+        private List<String> detectedContradictions = new ArrayList<>();
+        private List<String> weakEvidence = new ArrayList<>();
+        private List<String> logicGaps = new ArrayList<>();
+        private String downgradeRecommendation;
+        private String riskAdjustmentSuggestion;
+        private String manualReviewRequired;
+        private String challengeThesis;
+        private List<String> eventRisks = new ArrayList<>();
+        private List<String> sentimentReversalRisks = new ArrayList<>();
+        private List<String> microstructureTraps = new ArrayList<>();
+        private List<String> liquidityRisks = new ArrayList<>();
+        private List<String> counterEvidence = new ArrayList<>();
+        private String challengeConclusion;
 
         public String getRole() {
             return role;
@@ -872,6 +895,190 @@ public class DashboardHomeVO {
 
         public void setReviewConclusion(String reviewConclusion) {
             this.reviewConclusion = reviewConclusion;
+        }
+
+        public String getFinalMarketBias() {
+            return finalMarketBias;
+        }
+
+        public void setFinalMarketBias(String finalMarketBias) {
+            this.finalMarketBias = finalMarketBias;
+        }
+
+        public String getFinalConfidence() {
+            return finalConfidence;
+        }
+
+        public void setFinalConfidence(String finalConfidence) {
+            this.finalConfidence = finalConfidence;
+        }
+
+        public String getFinalRiskLevel() {
+            return finalRiskLevel;
+        }
+
+        public void setFinalRiskLevel(String finalRiskLevel) {
+            this.finalRiskLevel = finalRiskLevel;
+        }
+
+        public String getFinalPlanMode() {
+            return finalPlanMode;
+        }
+
+        public void setFinalPlanMode(String finalPlanMode) {
+            this.finalPlanMode = finalPlanMode;
+        }
+
+        public String getWorthOpening() {
+            return worthOpening;
+        }
+
+        public void setWorthOpening(String worthOpening) {
+            this.worthOpening = worthOpening;
+        }
+
+        public String getFinalConclusion() {
+            return finalConclusion;
+        }
+
+        public void setFinalConclusion(String finalConclusion) {
+            this.finalConclusion = finalConclusion;
+        }
+
+        public List<String> getCoreSupportingEvidence() {
+            return coreSupportingEvidence;
+        }
+
+        public void setCoreSupportingEvidence(List<String> coreSupportingEvidence) {
+            this.coreSupportingEvidence = coreSupportingEvidence;
+        }
+
+        public List<String> getCoreCounterEvidence() {
+            return coreCounterEvidence;
+        }
+
+        public void setCoreCounterEvidence(List<String> coreCounterEvidence) {
+            this.coreCounterEvidence = coreCounterEvidence;
+        }
+
+        public String getDecisionSummary() {
+            return decisionSummary;
+        }
+
+        public void setDecisionSummary(String decisionSummary) {
+            this.decisionSummary = decisionSummary;
+        }
+
+        public String getReviewVerdict() {
+            return reviewVerdict;
+        }
+
+        public void setReviewVerdict(String reviewVerdict) {
+            this.reviewVerdict = reviewVerdict;
+        }
+
+        public List<String> getDetectedContradictions() {
+            return detectedContradictions;
+        }
+
+        public void setDetectedContradictions(List<String> detectedContradictions) {
+            this.detectedContradictions = detectedContradictions;
+        }
+
+        public List<String> getWeakEvidence() {
+            return weakEvidence;
+        }
+
+        public void setWeakEvidence(List<String> weakEvidence) {
+            this.weakEvidence = weakEvidence;
+        }
+
+        public List<String> getLogicGaps() {
+            return logicGaps;
+        }
+
+        public void setLogicGaps(List<String> logicGaps) {
+            this.logicGaps = logicGaps;
+        }
+
+        public String getDowngradeRecommendation() {
+            return downgradeRecommendation;
+        }
+
+        public void setDowngradeRecommendation(String downgradeRecommendation) {
+            this.downgradeRecommendation = downgradeRecommendation;
+        }
+
+        public String getRiskAdjustmentSuggestion() {
+            return riskAdjustmentSuggestion;
+        }
+
+        public void setRiskAdjustmentSuggestion(String riskAdjustmentSuggestion) {
+            this.riskAdjustmentSuggestion = riskAdjustmentSuggestion;
+        }
+
+        public String getManualReviewRequired() {
+            return manualReviewRequired;
+        }
+
+        public void setManualReviewRequired(String manualReviewRequired) {
+            this.manualReviewRequired = manualReviewRequired;
+        }
+
+        public String getChallengeThesis() {
+            return challengeThesis;
+        }
+
+        public void setChallengeThesis(String challengeThesis) {
+            this.challengeThesis = challengeThesis;
+        }
+
+        public List<String> getEventRisks() {
+            return eventRisks;
+        }
+
+        public void setEventRisks(List<String> eventRisks) {
+            this.eventRisks = eventRisks;
+        }
+
+        public List<String> getSentimentReversalRisks() {
+            return sentimentReversalRisks;
+        }
+
+        public void setSentimentReversalRisks(List<String> sentimentReversalRisks) {
+            this.sentimentReversalRisks = sentimentReversalRisks;
+        }
+
+        public List<String> getMicrostructureTraps() {
+            return microstructureTraps;
+        }
+
+        public void setMicrostructureTraps(List<String> microstructureTraps) {
+            this.microstructureTraps = microstructureTraps;
+        }
+
+        public List<String> getLiquidityRisks() {
+            return liquidityRisks;
+        }
+
+        public void setLiquidityRisks(List<String> liquidityRisks) {
+            this.liquidityRisks = liquidityRisks;
+        }
+
+        public List<String> getCounterEvidence() {
+            return counterEvidence;
+        }
+
+        public void setCounterEvidence(List<String> counterEvidence) {
+            this.counterEvidence = counterEvidence;
+        }
+
+        public String getChallengeConclusion() {
+            return challengeConclusion;
+        }
+
+        public void setChallengeConclusion(String challengeConclusion) {
+            this.challengeConclusion = challengeConclusion;
         }
     }
 
