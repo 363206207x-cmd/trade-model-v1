@@ -5210,7 +5210,12 @@
     }
 
     function positionCurrentAdviceHtml(d) {
-        var advice = positionAdviceText(pickField(d, [
+        var backendAdviceText = cleanBlankValue(pickField(d, [
+            "suggestedManualActionText", "suggested_manual_action_text",
+            "manualActionText", "manual_action_text"
+        ]));
+        var advice = backendAdviceText || positionAdviceText(pickField(d, [
+            "suggestedManualAction", "suggested_manual_action",
             "currentAdvice", "current_advice",
             "positionAdvice", "position_advice",
             "monitorAdvice", "monitor_advice",
@@ -5417,7 +5422,7 @@
         var positionSide = pickField(d, ["side", "positionSide", "position_side", "direction"]);
         var positionStatus = pickField(d, ["positionStatus", "position_status", "status"]);
         var positionOpenedAt = pickField(d, ["openedAt", "opened_at", "openTime", "open_time", "positionOpenTime", "position_open_time", "entryTime", "entry_time"]);
-        var unrealizedPnl = pickField(d, ["unrealizedPnlPct", "unrealized_pnl_pct", "floatingPnl", "floating_pnl", "pnl", "pnlPct", "pnl_pct"]);
+        var floatingPnlAmount = pickField(d, ["floatingPnl", "floating_pnl", "unrealizedPnl", "unrealized_pnl", "pnl"]);
         var latestPrice = pickField(d, ["latestPrice", "latest_price", "currentPrice", "current_price", "monitorPrice", "monitor_price"]);
         var assetCell = positionAssetCellHtml(symbol, positionSide, [
             { label: "用户开仓价", value: cleanBlankValue(formatPrice(avgOpenPrice)) },
@@ -5425,12 +5430,12 @@
             { label: "仓位", value: positionQuantity != null ? String(positionQuantity) : "" },
             { label: "开仓时间", value: cleanBlankValue(formatDateTime(positionOpenedAt)) },
             { label: "当前价", value: cleanBlankValue(formatPrice(latestPrice)) },
-            { label: "浮动盈亏", value: cleanBlankValue(formatPct(unrealizedPnl)) }
+            { label: "浮动盈亏", value: cleanBlankValue(formatSignedAmount(floatingPnlAmount)) }
         ]);
         box.innerHTML = tableHead + '<tr>'
             + '<td class="position-asset-cell">' + assetCell + '</td>'
-            + '<td>' + positionMonitorFieldHtml(d, ["entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
-            + '<td>' + positionMonitorFieldHtml(d, ["directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
+            + '<td>' + positionMonitorFieldHtml(d, ["entryLogicStatus", "entry_logic_status", "entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
+            + '<td>' + positionMonitorFieldHtml(d, ["directionSupportStatus", "direction_support_status", "directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
             + '<td>' + positionMonitorFieldHtml(d, ["reversalStatus", "reversal_status", "positionReversalStatus", "position_reversal_status", "monitorReversalStatus", "monitor_reversal_status"], "等待监控") + '</td>'
             + '<td>' + positionRiskHtml(d) + '</td>'
             + '<td>' + positionCurrentAdviceHtml(d) + '</td>'
@@ -5671,7 +5676,7 @@
         options = options || {};
         var consistency = options.consistency || {};
         var score = actualConsistencyScore(consistency);
-        var status = consistencyStatusText(options.level || options.conflictLevel, options.confused);
+        var status = consistencyStatusText(options.level, options.confused);
         var ringClass = score == null ? ' is-empty' : '';
         var scoreText = score == null ? "--" : String(score);
         var summary = aiRoleFallbackValue(options.summary, "等待 AI 三角色结果同步后生成一致性结论");
@@ -6079,12 +6084,12 @@
                 { label: "仓位", value: p.positionSize != null ? String(p.positionSize) : "" },
                 { label: "开仓时间", value: cleanBlankValue(formatDateTime(p.openedAt || p.opened_at || p.openTime || p.open_time || p.entryTime || p.entry_time)) },
                 { label: "当前价", value: cleanBlankValue(formatPrice(p.currentPrice)) },
-                { label: "浮动盈亏", value: cleanBlankValue(formatPct(p.floatingPnl)) }
+                { label: "浮动盈亏", value: cleanBlankValue(formatSignedAmount(p.floatingPnl)) }
             ]);
             return '<tr>'
                 + '<td class="position-asset-cell">' + assetCell + '</td>'
-                + '<td>' + positionMonitorFieldHtml(p, ["entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
-                + '<td>' + positionMonitorFieldHtml(p, ["directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
+                + '<td>' + positionMonitorFieldHtml(p, ["entryLogicStatus", "entry_logic_status", "entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
+                + '<td>' + positionMonitorFieldHtml(p, ["directionSupportStatus", "direction_support_status", "directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
                 + '<td>' + positionMonitorFieldHtml(p, ["reversalStatus", "reversal_status", "positionReversalStatus", "position_reversal_status", "monitorReversalStatus", "monitor_reversal_status"], "等待监控") + '</td>'
                 + '<td>' + positionRiskHtml(p) + '</td>'
                 + '<td>' + positionCurrentAdviceHtml(p) + '</td>'
@@ -6150,13 +6155,13 @@
             var planMode = finalRole.finalPlanMode || "";
             consistency.innerHTML = renderHomeConsistencyCard({
                 consistency: c,
-                level: c.level || "",
+                level: c.consistencyLevel || c.consistency_level || "",
                 finalTendency: biasText(finalBias) !== "—" ? biasText(finalBias) : finalBias,
                 conflictLevel: localizeVisibleStatus(c.level || ""),
                 planMode: localizeVisibleStatus(planMode),
                 confused: !!c.confused,
-                downgradeReason: finalRole.downgradeReason || c.downgradeReason || c.blockReason || "",
-                summary: c.summary || c.conclusion || c.oneSentenceSummary || ""
+                downgradeReason: c.downgradeReason || c.downgrade_reason || finalRole.downgradeReason || c.blockReason || "",
+                summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
             });
         }
     }
@@ -6216,11 +6221,16 @@
         var alertBox = document.getElementById("sidebarAlertList");
         var sys = systemStatus || {};
         var ps = positionProviderStatus || {};
+        var diagnostics = window.__lastHomeDiagnostics || {};
+        var marketStatus = localizeVisibleStatus(firstNonEmpty(sys.status, diagnostics.marketDataProvider, diagnostics.market_data_provider, "WAITING_SYNC"));
+        var schedulerStatus = localizeVisibleStatus(firstNonEmpty((window.__lastHealth && window.__lastHealth.schedulerStatus), diagnostics.scheduler, "WAITING_SYNC"));
+        var aiStatus = localizeVisibleStatus(firstNonEmpty(diagnostics.aiProvider, diagnostics.ai_provider, "WAITING_SYNC"));
+        var sourceStatus = localizeVisibleStatus(firstNonEmpty(ps.text, diagnostics.dataSource, diagnostics.data_source, diagnostics.marketDataProvider, "WAITING_SYNC"));
         if (sysBox) {
-            sysBox.innerHTML = '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>行情连接</span><span class="sidebar-health-badge">' + escapeHtml((sys.status || "OK") === "OK" ? "正常" : (sys.status || "关注")) + '</span></div>'
-                + '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>定时任务</span><span class="sidebar-health-badge">' + escapeHtml(firstNonEmpty((window.__lastHealth && window.__lastHealth.schedulerStatus), "正常")) + '</span></div>'
-                + '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>AI 服务</span><span class="sidebar-health-badge">正常</span></div>'
-                + '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>数据源健康</span><span class="sidebar-health-badge" id="providerStatusValue">' + escapeHtml(ps.text || "正常") + '</span></div>'
+            sysBox.innerHTML = '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>行情连接</span><span class="sidebar-health-badge">' + escapeHtml(marketStatus) + '</span></div>'
+                + '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>定时任务</span><span class="sidebar-health-badge">' + escapeHtml(schedulerStatus) + '</span></div>'
+                + '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>AI 服务</span><span class="sidebar-health-badge">' + escapeHtml(aiStatus) + '</span></div>'
+                + '<div class="sidebar-health-row"><span class="sidebar-check">✓</span><span>数据源健康</span><span class="sidebar-health-badge" id="providerStatusValue">' + escapeHtml(sourceStatus) + '</span></div>'
                 + '<span id="providerOpenCountValue" hidden>' + escapeHtml(displayPositionSyncValue(ps.currentOpenPositionCount, Number(openPositionCount || 0))) + '</span>'
                 + '<span id="providerActiveValue" hidden>' + escapeHtml(ps.activeProviderType || "UNKNOWN") + '</span>'
                 + '<span id="providerConfiguredValue" hidden>' + escapeHtml(ps.configuredProviderType || "UNKNOWN") + '</span>'
@@ -6519,6 +6529,13 @@
         else if (abs >= 0.01) digits = 6;
         else digits = 8;
         return n.toFixed(digits).replace(/\.?0+$/, "");
+    }
+
+    function formatSignedAmount(v) {
+        var formatted = formatPrice(v);
+        if (formatted === "—") return formatted;
+        var n = Number(v);
+        return (n > 0 ? "+" : "") + formatted;
     }
 
     function formatChangePct(v) {

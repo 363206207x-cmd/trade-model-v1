@@ -1086,6 +1086,10 @@ public class DashboardHomeVO {
         private String level;
         private Integer score;
         private Boolean confused;
+        private Integer consistencyScore;
+        private String consistencyLevel;
+        private String consistencySummary;
+        private String downgradeReason;
 
         public String getLevel() {
             return level;
@@ -1109,6 +1113,38 @@ public class DashboardHomeVO {
 
         public void setConfused(Boolean confused) {
             this.confused = confused;
+        }
+
+        public Integer getConsistencyScore() {
+            return consistencyScore;
+        }
+
+        public void setConsistencyScore(Integer consistencyScore) {
+            this.consistencyScore = consistencyScore;
+        }
+
+        public String getConsistencyLevel() {
+            return consistencyLevel;
+        }
+
+        public void setConsistencyLevel(String consistencyLevel) {
+            this.consistencyLevel = consistencyLevel;
+        }
+
+        public String getConsistencySummary() {
+            return consistencySummary;
+        }
+
+        public void setConsistencySummary(String consistencySummary) {
+            this.consistencySummary = consistencySummary;
+        }
+
+        public String getDowngradeReason() {
+            return downgradeReason;
+        }
+
+        public void setDowngradeReason(String downgradeReason) {
+            this.downgradeReason = downgradeReason;
         }
     }
 
