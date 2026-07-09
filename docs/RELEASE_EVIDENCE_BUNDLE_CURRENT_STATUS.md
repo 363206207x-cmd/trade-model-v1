@@ -26,8 +26,8 @@ This document aggregates the current controlled production-readiness evidence af
 | Auth access control | GUARD_PASS | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | Dashboard/review/API/write/recheck routes require Basic Auth; no executable trading route surface was introduced. |
 | Actuator exposure | GUARD_PASS | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | Minimal health/liveness/readiness only; sensitive actuator endpoints are not exposed. |
 | Repository secret hygiene | GUARD_PASS | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | `.env.example` is placeholder-only and no real `.env` is tracked. |
-| Secrets manager integration | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No real secrets manager injection evidence exists. |
-| Credential rotation | MISSING_EVIDENCE | `docs/SECRETS_HTTPS_ACCESS_EVIDENCE_RUN.md` | No credential rotation drill/evidence exists. |
+| Secrets manager integration | DOCUMENTED_WITH_PLAN | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | Secret-store options, injection evidence requirements, access ownership, and redaction requirements are documented; real secret-store injection evidence is still missing. |
+| Credential rotation | DOCUMENTED_WITH_PLAN | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | Admin, datasource, Binance/API provider, and AI provider rotation checklists exist; no actual rotation drill has run. |
 | HTTPS / reverse proxy | DOCUMENTED_WITH_CONFIG | `docs/HTTPS_REVERSE_PROXY_EVIDENCE_RUN.md` | Template-only reverse proxy configuration and evidence checklist exist; real TLS/redirect/HSTS/auth smoke through a proxy is still missing. |
 | Access logging | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | Application-level sanitized `ACCESS_LOG` evidence exists and tests prove sensitive values are not printed. |
 | Auth audit logging | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | `AUTH_AUDIT outcome=FAILURE` evidence exists and tests prove credential values are not printed. |
@@ -44,14 +44,14 @@ This bundle materially improves controlled evidence for PostgreSQL migration/res
 
 Production deployment decision: DO NOT DEPLOY.
 
-Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, secrets manager and rotation evidence, real HTTPS reverse-proxy smoke, real server smoke, and release-owner approval remain incomplete.
+Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, real secret-store injection and rotation drill evidence, real HTTPS reverse-proxy smoke, real server smoke, and release-owner approval remain incomplete.
 
 ## Exact Remaining Blockers
 
 1. OpenAI, Gemini, and xAI/Grok smoke evidence is `SKIPPED_MISSING_SECRET`, not PASS.
 2. External context/news/macro provider live evidence is not proven.
-3. Secrets manager injection evidence is missing.
-4. Credential rotation evidence is missing.
+3. Secrets manager integration is `DOCUMENTED_WITH_PLAN`, but real secret-store injection evidence is missing.
+4. Credential rotation is `DOCUMENTED_WITH_PLAN`, but actual rotation drill evidence is missing.
 5. HTTPS/reverse-proxy evidence is `DOCUMENTED_WITH_CONFIG`, but real TLS/redirect/HSTS/auth smoke through a proxy is still missing.
 6. Real server production-profile smoke through the intended deployment entrypoint is missing.
 7. A complete redacted release evidence bundle has not been approved by the release owner.
@@ -60,8 +60,8 @@ Production deployment cannot proceed because AI provider live PASS evidence, ext
 
 1. Provide controlled, redacted PASS evidence for required AI providers or record an explicit release-owner decision that a missing provider is not required for the target release.
 2. Provide external context/news/macro provider PASS evidence or an explicit release-owner waiver for the target release.
-3. Provide secrets manager injection evidence without printing or committing secrets.
-4. Provide credential rotation evidence for admin/database/provider credentials.
+3. Provide real secrets manager injection evidence without printing or committing secrets.
+4. Provide actual credential rotation drill evidence for admin/database/provider credentials.
 5. Provide real HTTPS/reverse-proxy smoke evidence, including TLS certificate status, HTTP-to-HTTPS redirect, HSTS header, forwarded-header behavior, and authenticated dashboard/review API checks through the intended entrypoint.
 6. Run a real server or production-like smoke bundle with redacted logs and no production secrets disclosed.
 7. Keep all no-trading/no-order/no-external-push guardrails intact.
@@ -90,6 +90,6 @@ The following remain prohibited:
 
 ## Next Recommended Package
 
-Recommended next package: `PDR-LIVE14 Secrets Manager / Credential Rotation Evidence`, a controlled real-server HTTPS reverse-proxy smoke package, or another explicitly scoped security evidence package that closes secrets manager, credential rotation, and real proxy smoke evidence.
+Recommended next package: `PDR-LIVE15 AI Provider / External Context Release Policy Evidence`, a controlled real-server smoke package, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
 
 Production deployment must remain blocked until a later release-gate package records complete PASS evidence and explicit approval.
