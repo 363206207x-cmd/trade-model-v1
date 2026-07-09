@@ -6,11 +6,31 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE18 Release Owner Decision Register / Waiver Policy
-Next Business Phase: Post-freeze user acceptance / production readiness remediation
-Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
+Current Work Package: P1 Dashboard Stress Test Plan & Harness Preparation
+Next Business Phase: Dashboard stress-test execution after explicit approval / production readiness remediation
+Next Business Phase Allowed: YES for local-only stress-test preparation and scoped remediation/business packages; NO for stress-test execution in this PR and NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## P1 Dashboard Stress Test Plan & Harness Preparation
+
+P1 Dashboard Stress Test Plan & Harness Preparation is the current package after P0 backend/frontend alignment closure. It prepares a local-only dashboard stress-test plan, guarded dry-run harness, and evidence template. It does not execute stress traffic.
+
+Current P1 preparation status:
+
+1. P0 blockers are closed by `docs/P0_BACKEND_FRONTEND_ALIGNMENT_CLOSURE_REVIEW.md`.
+2. `STRESS_TEST_PREPARATION_ALLOWED: YES`.
+3. `STRESS_TEST_EXECUTION_ALLOWED: NO` for this preparation PR.
+4. Default target is local only: `http://localhost:8081`.
+5. Allowed endpoints are only `GET /actuator/health`, `GET /dashboard`, and `GET /api/dashboard/home`.
+6. The harness requires `DASHBOARD_STRESS_CONFIRM=YES` before any future execution and defaults to dry-run.
+7. No production server, production DB, provider endpoint, write endpoint, Push/Recheck/Telegram send, order execution, auto-open, auto-close, auto-reverse, or auto-trading behavior is allowed.
+
+Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after P1 preparation: run a separate explicitly approved local dashboard stress execution package, or continue scoped remediation/business work. The next package must not be production deployment.
 
 ---
 
@@ -553,11 +573,11 @@ Next recommendation after LIVE17: record release-owner provider policy decisions
 
 ## PDR-LIVE18 Release Owner Decision Register / Waiver Policy
 
-PDR-LIVE18 is the current release-owner decision register and waiver policy evidence package. It records remaining gates that require explicit human approval, waiver, or controlled evidence before readiness can move beyond BLOCKED. It is not production deployment and does not access production server, production DB, real secrets, or provider endpoints.
+PDR-LIVE18 is DONE/effective as the release-owner decision register and waiver policy evidence package. It records remaining gates that require explicit human approval, waiver, or controlled evidence before readiness can move beyond BLOCKED. It is not production deployment and does not access production server, production DB, real secrets, or provider endpoints.
 
 Evidence doc: `docs/RELEASE_OWNER_DECISION_REGISTER.md`.
 
-Current LIVE18 register status:
+LIVE18 register status:
 
 1. Release owner status is `MISSING_EVIDENCE`; no named owner approval was found.
 2. Real server smoke, HTTPS/proxy auth smoke, secret-store injection, credential rotation drill, release timing, rollback owner, incident owner, and final release approval remain required gates.
@@ -572,13 +592,13 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE18 Release Owner Decision Register / Waiver Policy:
+Only the following work is allowed during and after P1 Dashboard Stress Test Plan & Harness Preparation:
 
-1. Release-owner decision register and waiver policy evidence documentation.
-2. Decision mapping for remaining release gates without approving waivers or upgrading skipped/missing/planned/config-only evidence to PASS.
+1. Local-only dashboard stress-test plan and guarded harness preparation.
+2. Dry-run validation of the harness with no stress traffic.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE18 evidence is reviewed.
+5. The next explicitly scoped remediation/business package after P1 preparation is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -587,7 +607,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE18 Release Owner Decision Register / Waiver Policy:
+The following work remains blocked during and after P1 Dashboard Stress Test Plan & Harness Preparation:
 
 1. no auto-open
 2. no auto-close
@@ -601,6 +621,8 @@ The following work remains blocked during and after PDR-LIVE18 Release Owner Dec
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
 12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, LIVE16 blocked readiness review, LIVE17 provider policy evidence, or LIVE18 decision-register evidence as full production deployment approval; they are not release-gate approval.
+13. Executing dashboard stress traffic in the P1 preparation PR.
+14. Stressing any non-local target or any endpoint outside `GET /actuator/health`, `GET /dashboard`, and `GET /api/dashboard/home`.
 
 ---
 

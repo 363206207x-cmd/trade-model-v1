@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE18 Release Owner Decision Register / Waiver Policy"
-active_block_cn: "PDR-LIVE18 Release Owner Decision Register / Waiver Policy"
+active_block: "P1 Dashboard Stress Test Plan & Harness Preparation"
+active_block_cn: "P1 首页压力测试方案与脚本准备"
 
-next_required_action: "Complete PDR-LIVE18 Release Owner Decision Register / Waiver Policy. Record remaining gates requiring owner approval, waiver, or controlled evidence without approving any waiver."
-next_business_phase: "Post-freeze user acceptance / production readiness remediation"
+next_required_action: "Complete P1 Dashboard Stress Test Plan & Harness Preparation. Prepare local-only dry-run harness, metrics, stop conditions, and evidence template without executing stress traffic."
+next_business_phase: "Dashboard stress-test execution after explicit approval / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this release-owner decision register package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this stress-test preparation package is merged/effective; stress-test execution still requires a separate explicit approval package."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live18-release-owner-decision-register"
+current_branch: "codex/p1-dashboard-stress-test-plan-harness"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -125,8 +125,10 @@ pdr_live16_status: "DONE/effective on merged main by PR #1095: final conditional
 pdr_live16_effective: true
 pdr_live17_status: "DONE/effective on merged main by PR #1096: AI/external provider release policy evidence recorded; missing provider keys remain SKIPPED_MISSING_SECRET unless release owner explicitly waives or disables them"
 pdr_live17_effective: true
-pdr_live18_status: "IN_PROGRESS on branch codex/pdr-live18-release-owner-decision-register: release-owner decision register / waiver policy evidence; no waiver or deployment approval is granted"
-pdr_live18_effective: false
+pdr_live18_status: "DONE/effective on merged main: release-owner decision register / waiver policy evidence; no waiver or deployment approval is granted"
+pdr_live18_effective: true
+p1_dashboard_stress_test_plan_status: "IN_PROGRESS on branch codex/p1-dashboard-stress-test-plan-harness: local-only stress-test plan and guarded dry-run harness preparation; stress execution not allowed in this PR"
+p1_dashboard_stress_test_plan_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -167,6 +169,7 @@ notes:
   - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
   - "PDR-LIVE16 is DONE/effective on merged main by PR #1095: readiness remains BLOCKED and deployment decision remains DO NOT DEPLOY."
   - "PDR-LIVE17 is DONE/effective on merged main by PR #1096: provider policy evidence is recorded, but no missing provider is waived or treated as PASS."
-  - "Current allowed work is release-owner decision register / waiver policy evidence, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "Current allowed work is local-only dashboard stress-test plan and guarded harness preparation, status-source updates, the next explicitly scoped remediation/business package, and production-readiness remediation only when explicitly scoped."
+  - "Stress-test execution is not allowed in the preparation PR; it requires a separate explicit approval package."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."
