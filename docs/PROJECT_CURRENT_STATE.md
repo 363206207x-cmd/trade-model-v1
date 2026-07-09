@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P1 Dashboard Stress Test Plan & Harness Preparation
-Next Business Phase: Dashboard stress-test execution after explicit approval / production readiness remediation
-Next Business Phase Allowed: YES for local-only stress-test preparation and scoped remediation/business packages; NO for stress-test execution in this PR and NO for production deployment
+Current Work Package: P2 V1 Business Stress Test
+Next Business Phase: Business stress follow-up fixes or local dashboard/API stress execution after explicit approval / production readiness remediation
+Next Business Phase Allowed: YES for local deterministic business stress testing and scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -31,6 +31,22 @@ Current P1 preparation status:
 Production readiness remains BLOCKED and production deployment cannot proceed.
 
 Next recommendation after P1 preparation: run a separate explicitly approved local dashboard stress execution package, or continue scoped remediation/business work. The next package must not be production deployment.
+
+---
+
+## P2 V1 Business Stress Test
+
+P2 V1 Business Stress Test is the current local deterministic business-loop stress package. It verifies opportunity discovery, manual execution-plan completeness, paper/manual position monitoring usefulness, Push Recheck freshness validation, and closed-position exclusion without production access, provider calls, external Push/Telegram send, or trading/order behavior.
+
+Current P2 stress status:
+
+1. Deterministic `SYNTHETIC_SCENARIO_DATA` is used for opportunity and monitoring scenarios.
+2. `V1BusinessStressTest` covers bullish, bearish, no-trade, high-risk, confused/conflict, price-drift, monitor-valid, monitor-weakened, reversal, take-profit, stop-zone, and closed-position scenarios.
+3. `scripts/v1-business-stress-local.sh` defaults to dry-run and requires `V1_BUSINESS_STRESS_CONFIRM=YES` before running the local JUnit harness.
+4. No production server, production DB, provider endpoint, write endpoint, Push/Recheck send, Telegram send, order execution, auto-open, auto-close, auto-reverse, or auto-trading behavior is allowed.
+5. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after P2: review any business stress findings and run a separate explicitly approved local UI/API stress execution package if needed. The next package must not be production deployment.
 
 ---
 
@@ -592,13 +608,13 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after P1 Dashboard Stress Test Plan & Harness Preparation:
+Only the following work is allowed during and after P2 V1 Business Stress Test:
 
-1. Local-only dashboard stress-test plan and guarded harness preparation.
-2. Dry-run validation of the harness with no stress traffic.
+1. Local deterministic V1 business stress testing with synthetic/test fixtures.
+2. Guarded local harness dry-run or confirmed local JUnit execution only.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation/business package after P1 preparation is reviewed.
+5. The next explicitly scoped remediation/business package after P2 stress evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -607,7 +623,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after P1 Dashboard Stress Test Plan & Harness Preparation:
+The following work remains blocked during and after P2 V1 Business Stress Test:
 
 1. no auto-open
 2. no auto-close
@@ -623,6 +639,7 @@ The following work remains blocked during and after P1 Dashboard Stress Test Pla
 12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, LIVE16 blocked readiness review, LIVE17 provider policy evidence, or LIVE18 decision-register evidence as full production deployment approval; they are not release-gate approval.
 13. Executing dashboard stress traffic in the P1 preparation PR.
 14. Stressing any non-local target or any endpoint outside `GET /actuator/health`, `GET /dashboard`, and `GET /api/dashboard/home`.
+15. Treating deterministic local business stress PASS as production readiness, live profitability, or release approval.
 
 ---
 

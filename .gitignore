@@ -19,6 +19,7 @@ target/
 *.swp
 tmp/stress/
 build/stress-dashboard/
+build/v1-business-stress/
 
 # Local deployment secrets and backups
 .env
