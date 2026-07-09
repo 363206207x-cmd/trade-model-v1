@@ -95,6 +95,11 @@ Missing OpenAI, Gemini, xAI/Grok, and external context provider proof blocks a c
 2. Release owner classifies the provider as `OPTIONAL_WITH_WAIVER` for the target release and records the waiver.
 3. Release owner classifies the provider as `DISABLED_FOR_RELEASE` or `NOT_APPLICABLE`, and the release bundle proves no feature in the target release depends on that provider.
 
+
+## Post-LIVE18 Decision Register Link
+
+PDR-LIVE18 adds `docs/RELEASE_OWNER_DECISION_REGISTER.md` as the central register for provider waivers and other release-owner decisions. LIVE18 approves no waiver. OpenAI, Gemini, xAI/Grok, and external context/news/macro/ETF remain `RELEASE_OWNER_DECISION_REQUIRED` unless a later package records controlled PASS evidence or explicit release-owner waiver/disablement.
+
 ## Safety Confirmation
 
 - No production server was accessed.

@@ -729,13 +729,13 @@ The restore script must only target a controlled recovery database until a separ
 - Observability is minimal after PDR-M4: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Provider readiness is readonly after PDR-M5, PDR-PF6 records safe no-call provider smoke evidence, PDR-LIVE8 records controlled Binance public provider PASS evidence, PDR-LIVE9 records AI provider missing-secret skipped evidence, PDR-LIVE11 records the aggregate release evidence bundle as BLOCKED / DO NOT DEPLOY, PDR-LIVE12 records application-level access/audit/rate-limit `GUARD_PASS`, PDR-LIVE13 records HTTPS/reverse-proxy `DOCUMENTED_WITH_CONFIG`, PDR-LIVE14 records secrets manager / credential rotation `DOCUMENTED_WITH_PLAN`, and PDR-LIVE15 records real-server smoke as `SKIPPED_MISSING_CONTROLLED_SERVER`; AI/external provider live PASS proof, real secrets manager injection, actual credential rotation drill, real HTTPS proxy smoke, and real server provider smoke still do not exist yet.
 - PDR-M6A release-gate framework exists, but the required real-server evidence template is not completed yet.
-- PDR-M7 provider live smoke harness exists, PDR-PF6 records default-disabled/no-call evidence, PDR-LIVE8 records controlled Binance public PASS evidence, PDR-LIVE9 records AI providers as SKIPPED_MISSING_SECRET, and PDR-LIVE17 records that missing AI/external provider proof requires explicit release-owner classification before waiver/disablement can count for a target release. AI/external PASS checks remain opt-in and not proven.
+- PDR-M7 provider live smoke harness exists, PDR-PF6 records default-disabled/no-call evidence, PDR-LIVE8 records controlled Binance public PASS evidence, PDR-LIVE9 records AI providers as SKIPPED_MISSING_SECRET, PDR-LIVE17 records that missing AI/external provider proof requires explicit release-owner classification, and PDR-LIVE18 records the decision register / waiver policy while approving no waiver. AI/external PASS checks remain opt-in and not proven.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders and LIVE14 documents secret-store and rotation plans; no real secret-store injection or rotation drill exists.
 
 ## Next Packages
 
-1. Release-owner provider policy decisions after PDR-LIVE17, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped controlled secrets/access/provider evidence package.
+1. Actual release-owner decision capture after PDR-LIVE18, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped controlled secrets/access/provider evidence package.
 2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 

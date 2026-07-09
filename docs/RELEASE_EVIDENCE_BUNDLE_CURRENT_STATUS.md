@@ -1,8 +1,8 @@
 # Release Evidence Bundle Current Status
 
 Package: Release Evidence Bundle Current Status
-Branch: codex/pdr-live17-ai-external-provider-release-policy
-Current main commit: 32ce23b9
+Branch: codex/pdr-live18-release-owner-decision-register
+Current main commit: f0998b3a
 Status date: 2026-07-09
 
 This document aggregates the current controlled production-readiness evidence after PDR-LIVE16. It is a release evidence bundle status report only. It is not production deployment, does not access a production server, does not access a production database, does not print or commit secrets, and does not approve production readiness.
@@ -35,6 +35,7 @@ This document aggregates the current controlled production-readiness evidence af
 | Real server smoke | SKIPPED | `docs/REAL_SERVER_SMOKE_EVIDENCE_GATE.md` | Exact result: `SKIPPED_MISSING_CONTROLLED_SERVER`; no controlled non-production server endpoint was present and no server was contacted. |
 | Final conditional readiness review | BLOCKED | `docs/FINAL_CONDITIONAL_READINESS_REVIEW.md` | LIVE16 reviewed LIVE1-LIVE15 and keeps readiness BLOCKED because skipped/planned/missing gates are not PASS. |
 | AI / external provider release policy | RELEASE_OWNER_DECISION_REQUIRED | `docs/AI_EXTERNAL_PROVIDER_RELEASE_POLICY_EVIDENCE.md` | LIVE17 records that missing provider keys remain SKIPPED_MISSING_SECRET unless release owner explicitly waives or disables the provider for the target release. |
+| Release owner decision register | RELEASE_OWNER_DECISION_REQUIRED | `docs/RELEASE_OWNER_DECISION_REGISTER.md` | LIVE18 records all remaining owner decisions and approves no waiver. |
 | Real server release-owner approval | MISSING_EVIDENCE | `docs/PRODUCTION_READINESS_RUNBOOK.md` | No release owner has approved a complete production evidence bundle. |
 
 ## Production Readiness Decision
@@ -57,7 +58,7 @@ Production deployment cannot proceed because AI/external provider PASS evidence 
 4. Credential rotation is `DOCUMENTED_WITH_PLAN`, but actual rotation drill evidence is missing.
 5. HTTPS/reverse-proxy evidence is `DOCUMENTED_WITH_CONFIG`, but real TLS/redirect/HSTS/auth smoke through a proxy is still missing.
 6. Real server production-profile smoke through the intended deployment entrypoint is `SKIPPED_MISSING_CONTROLLED_SERVER`, not PASS.
-7. A complete redacted release evidence bundle has not been approved by the release owner.
+7. A complete redacted release evidence bundle has not been approved by the release owner; LIVE18 records the decision register and finds owner approval still missing.
 
 ## Required To Move From BLOCKED To CONDITIONALLY_READY
 
@@ -93,6 +94,6 @@ The following remain prohibited:
 
 ## Next Recommended Package
 
-Recommended next package: a release-owner provider policy decision package, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
+Recommended next package: actual release-owner decision capture if decisions are available, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
 
 Production deployment must remain blocked until a later release-gate package records complete PASS evidence and explicit approval.

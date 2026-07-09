@@ -2,7 +2,7 @@
 
 Package: PDR-LIVE16 Final Conditional Readiness Review
 Branch: `codex/pdr-live16-final-conditional-readiness-review`
-Current main commit: `32ce23b9`
+Current main commit: `f0998b3a`
 Status date: 2026-07-09
 
 Production deployment readiness: BLOCKED
@@ -47,6 +47,7 @@ It is not production deployment. It does not access a production server, product
 | Real rotation drill | MISSING_EVIDENCE | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | No credential rotation drill has run. |
 | Release owner approval | MISSING_EVIDENCE | `docs/PRODUCTION_READINESS_RUNBOOK.md` | No release owner has approved a complete evidence bundle. |
 | AI / external provider release policy | RELEASE_OWNER_DECISION_REQUIRED | `docs/AI_EXTERNAL_PROVIDER_RELEASE_POLICY_EVIDENCE.md` | LIVE17 records missing AI/external providers as release-owner-decision-required, not PASS. |
+| Release owner decision register | RELEASE_OWNER_DECISION_REQUIRED | `docs/RELEASE_OWNER_DECISION_REGISTER.md` | LIVE18 records remaining owner decisions and waivers required; no waiver is approved. |
 
 ## Readiness Decision
 
@@ -120,6 +121,11 @@ A later release gate may move to `READY` only after `CONDITIONALLY_READY_CANDIDA
 
 PDR-LIVE17 records AI / external provider release policy evidence. It does not change the LIVE16 readiness decision. OpenAI, Gemini, xAI/Grok, and external context provider proof remains `SKIPPED_MISSING_SECRET` or missing unless the release owner explicitly records `REQUIRED_PASS`, `OPTIONAL_WITH_WAIVER`, `DISABLED_FOR_RELEASE`, or `NOT_APPLICABLE` per provider for the target release. Missing provider keys are not PASS.
 
+
+## Post-LIVE18 Release Owner Register Addendum
+
+PDR-LIVE18 records a release-owner decision register and waiver policy. It does not change the readiness decision. Release owner approval remains `MISSING_EVIDENCE`; real server smoke, HTTPS/proxy auth smoke, secret-store injection, credential rotation drill, provider classifications, release timing, rollback owner, and incident owner remain required gates. No waiver is approved by LIVE18.
+
 ## Prohibited Items
 
 The following remain prohibited:
@@ -137,6 +143,6 @@ The following remain prohibited:
 
 ## Next Recommended Package
 
-Recommended next package: `PDR-LIVE17 Controlled Real Server PASS Evidence Run` if a controlled non-production server endpoint and redacted credentials are available outside chat; otherwise `PDR-LIVE17 AI Provider / External Context Release Policy Evidence` to decide required providers and waivers before the next release gate.
+Recommended next package: actual release-owner decision capture if available, controlled real-server PASS evidence if a controlled non-production endpoint and redacted credentials are available outside chat, or controlled secrets/proxy/provider evidence before the next release gate.
 
 Production deployment must remain blocked until a later release-gate package records complete PASS or approved conditional evidence and explicit release-owner approval.
