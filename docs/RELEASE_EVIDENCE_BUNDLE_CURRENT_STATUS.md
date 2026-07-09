@@ -1,8 +1,8 @@
 # Release Evidence Bundle Current Status
 
 Package: Release Evidence Bundle Current Status
-Branch: codex/pdr-live16-final-conditional-readiness-review
-Current main commit: c9ef6a04
+Branch: codex/pdr-live17-ai-external-provider-release-policy
+Current main commit: 32ce23b9
 Status date: 2026-07-09
 
 This document aggregates the current controlled production-readiness evidence after PDR-LIVE16. It is a release evidence bundle status report only. It is not production deployment, does not access a production server, does not access a production database, does not print or commit secrets, and does not approve production readiness.
@@ -34,6 +34,7 @@ This document aggregates the current controlled production-readiness evidence af
 | Rate limiting / brute-force protection | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | Application-level rate-limit guard returns HTTP 429 with `Retry-After`; prod guard rejects disabled/invalid rate-limit config. |
 | Real server smoke | SKIPPED | `docs/REAL_SERVER_SMOKE_EVIDENCE_GATE.md` | Exact result: `SKIPPED_MISSING_CONTROLLED_SERVER`; no controlled non-production server endpoint was present and no server was contacted. |
 | Final conditional readiness review | BLOCKED | `docs/FINAL_CONDITIONAL_READINESS_REVIEW.md` | LIVE16 reviewed LIVE1-LIVE15 and keeps readiness BLOCKED because skipped/planned/missing gates are not PASS. |
+| AI / external provider release policy | RELEASE_OWNER_DECISION_REQUIRED | `docs/AI_EXTERNAL_PROVIDER_RELEASE_POLICY_EVIDENCE.md` | LIVE17 records that missing provider keys remain SKIPPED_MISSING_SECRET unless release owner explicitly waives or disables the provider for the target release. |
 | Real server release-owner approval | MISSING_EVIDENCE | `docs/PRODUCTION_READINESS_RUNBOOK.md` | No release owner has approved a complete production evidence bundle. |
 
 ## Production Readiness Decision
@@ -46,12 +47,12 @@ This bundle materially improves controlled evidence for PostgreSQL migration/res
 
 Production deployment decision: DO NOT DEPLOY.
 
-Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, real secret-store injection and rotation drill evidence, real HTTPS reverse-proxy smoke, real server smoke PASS evidence, and release-owner approval remain incomplete.
+Production deployment cannot proceed because AI/external provider PASS evidence or explicit release-owner waivers, real secret-store injection and rotation drill evidence, real HTTPS reverse-proxy smoke, real server smoke PASS evidence, and release-owner approval remain incomplete.
 
 ## Exact Remaining Blockers
 
-1. OpenAI, Gemini, and xAI/Grok smoke evidence is `SKIPPED_MISSING_SECRET`, not PASS.
-2. External context/news/macro provider live evidence is not proven.
+1. OpenAI, Gemini, and xAI/Grok smoke evidence is `SKIPPED_MISSING_SECRET`, not PASS, and each provider still requires release-owner policy classification.
+2. External context/news/macro provider live evidence is not proven and still requires release-owner policy classification.
 3. Secrets manager integration is `DOCUMENTED_WITH_PLAN`, but real secret-store injection evidence is missing.
 4. Credential rotation is `DOCUMENTED_WITH_PLAN`, but actual rotation drill evidence is missing.
 5. HTTPS/reverse-proxy evidence is `DOCUMENTED_WITH_CONFIG`, but real TLS/redirect/HSTS/auth smoke through a proxy is still missing.
@@ -92,6 +93,6 @@ The following remain prohibited:
 
 ## Next Recommended Package
 
-Recommended next package: `PDR-LIVE17 AI Provider / External Context Release Policy Evidence`, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
+Recommended next package: a release-owner provider policy decision package, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
 
 Production deployment must remain blocked until a later release-gate package records complete PASS evidence and explicit approval.

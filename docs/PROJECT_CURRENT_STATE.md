@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE16 Final Conditional Readiness Review
+Current Work Package: PDR-LIVE17 AI External Provider Release Policy Evidence
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -534,17 +534,34 @@ Current LIVE16 decision:
 
 Next recommendation after LIVE16: run a controlled real-server PASS evidence package if infrastructure is available, or proceed to an AI Provider / External Context Release Policy Evidence package. The next package must not be deployment.
 
+## PDR-LIVE17 AI External Provider Release Policy Evidence
+
+PDR-LIVE17 is the current AI / external provider release policy evidence package. It determines whether AI providers and external context/news/macro providers are required release gates or optional/waivable dependencies for the next controlled release candidate. It is not production deployment and does not access production server, production DB, real secrets, or provider endpoints.
+
+Evidence doc: `docs/AI_EXTERNAL_PROVIDER_RELEASE_POLICY_EVIDENCE.md`.
+
+Current LIVE17 policy status:
+
+1. Binance public market data remains `PASS` from controlled LIVE8 evidence, limited to public market-data reachability.
+2. OpenAI, Gemini, and xAI/Grok remain `SKIPPED_MISSING_SECRET`; they are not PASS and were not called by this package.
+3. External context/news, macro calendar, and ETF flow remain `SKIPPED_MISSING_SECRET` or missing live harness evidence.
+4. Missing providers are `RELEASE_OWNER_DECISION_REQUIRED` until each provider is classified as `REQUIRED_PASS`, `OPTIONAL_WITH_WAIVER`, `DISABLED_FOR_RELEASE`, or `NOT_APPLICABLE`.
+5. Pure-rule fallback may be accepted only by an explicit release-owner decision for the target release.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE17: record release-owner provider policy decisions, run controlled real-server PASS evidence if infrastructure becomes available, or collect controlled secrets/rotation/proxy evidence. The next package must not be deployment.
+
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE16 Final Conditional Readiness Review:
+Only the following work is allowed during and after PDR-LIVE17 AI External Provider Release Policy Evidence:
 
-1. Final conditional readiness review documentation.
-2. Conservative aggregation of LIVE1-LIVE15 evidence without upgrading skipped/planned/config-only items to PASS.
+1. AI / external provider release policy evidence documentation.
+2. Release-owner decision mapping for missing AI/external providers without upgrading skipped/missing evidence to PASS.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE16 evidence is reviewed.
+5. The next explicitly scoped remediation package after LIVE17 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -553,7 +570,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE16 Final Conditional Readiness Review:
+The following work remains blocked during and after PDR-LIVE17 AI External Provider Release Policy Evidence:
 
 1. no auto-open
 2. no auto-close
@@ -566,7 +583,7 @@ The following work remains blocked during and after PDR-LIVE16 Final Conditional
 9. no production-ready claim
 10. Treating local acceptance readiness as production deployment approval.
 11. Treating PF8 release-gate closure as deployment approval.
-12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, or LIVE16 blocked readiness review as full production deployment approval; they are not release-gate approval.
+12. Treating LIVE4 Flyway PASS, LIVE6 backup/restore warning evidence, LIVE7 clean local restore evidence, LIVE8 Binance public PASS evidence, LIVE9 AI skipped evidence, LIVE10 guard-pass evidence, LIVE11 release evidence bundle status, LIVE12 access/audit/rate-limit guard evidence, LIVE13 HTTPS template evidence, LIVE14 secrets/rotation plan evidence, LIVE15 skipped real-server smoke gate evidence, LIVE16 blocked readiness review, or LIVE17 provider policy evidence as full production deployment approval; they are not release-gate approval.
 
 ---
 
@@ -663,7 +680,7 @@ Database / deployment remaining blockers after PDR-M7:
 
 Next production-readiness packages:
 
-1. PDR-LIVE17 Controlled Real Server PASS Evidence Run if infrastructure becomes available, PDR-LIVE17 AI Provider / External Context Release Policy Evidence, or another explicitly scoped provider/secrets/access evidence package.
+1. A release-owner provider policy decision package, controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped provider/secrets/access evidence package.
 2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
