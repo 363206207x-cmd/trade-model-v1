@@ -1,11 +1,11 @@
 # Release Evidence Bundle Current Status
 
-Package: PDR-LIVE11 Release Evidence Bundle + Remaining Blockers Closure
-Branch: codex/pdr-live11-release-evidence-bundle-closure
-Current main commit: c289a697
-Status date: 2026-07-08
+Package: Release Evidence Bundle Current Status
+Branch: codex/pdr-live15-real-server-smoke-evidence-gate
+Current main commit: 51b0b699
+Status date: 2026-07-09
 
-This document aggregates the current controlled production-readiness evidence after PDR-LIVE10. It is a release evidence bundle status report only. It is not production deployment, does not access a production server, does not access a production database, does not print or commit secrets, and does not approve production readiness.
+This document aggregates the current controlled production-readiness evidence after PDR-LIVE15. It is a release evidence bundle status report only. It is not production deployment, does not access a production server, does not access a production database, does not print or commit secrets, and does not approve production readiness.
 
 ## Evidence Summary
 
@@ -32,6 +32,7 @@ This document aggregates the current controlled production-readiness evidence af
 | Access logging | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | Application-level sanitized `ACCESS_LOG` evidence exists and tests prove sensitive values are not printed. |
 | Auth audit logging | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | `AUTH_AUDIT outcome=FAILURE` evidence exists and tests prove credential values are not printed. |
 | Rate limiting / brute-force protection | GUARD_PASS | `docs/ACCESS_AUDIT_RATE_LIMIT_EVIDENCE_RUN.md` | Application-level rate-limit guard returns HTTP 429 with `Retry-After`; prod guard rejects disabled/invalid rate-limit config. |
+| Real server smoke | SKIPPED | `docs/REAL_SERVER_SMOKE_EVIDENCE_GATE.md` | Exact result: `SKIPPED_MISSING_CONTROLLED_SERVER`; no controlled non-production server endpoint was present and no server was contacted. |
 | Real server release-owner approval | MISSING_EVIDENCE | `docs/PRODUCTION_READINESS_RUNBOOK.md` | No release owner has approved a complete production evidence bundle. |
 
 ## Production Readiness Decision
@@ -44,7 +45,7 @@ This bundle materially improves controlled evidence for PostgreSQL migration/res
 
 Production deployment decision: DO NOT DEPLOY.
 
-Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, real secret-store injection and rotation drill evidence, real HTTPS reverse-proxy smoke, real server smoke, and release-owner approval remain incomplete.
+Production deployment cannot proceed because AI provider live PASS evidence, external provider evidence, real secret-store injection and rotation drill evidence, real HTTPS reverse-proxy smoke, real server smoke PASS evidence, and release-owner approval remain incomplete.
 
 ## Exact Remaining Blockers
 
@@ -53,7 +54,7 @@ Production deployment cannot proceed because AI provider live PASS evidence, ext
 3. Secrets manager integration is `DOCUMENTED_WITH_PLAN`, but real secret-store injection evidence is missing.
 4. Credential rotation is `DOCUMENTED_WITH_PLAN`, but actual rotation drill evidence is missing.
 5. HTTPS/reverse-proxy evidence is `DOCUMENTED_WITH_CONFIG`, but real TLS/redirect/HSTS/auth smoke through a proxy is still missing.
-6. Real server production-profile smoke through the intended deployment entrypoint is missing.
+6. Real server production-profile smoke through the intended deployment entrypoint is `SKIPPED_MISSING_CONTROLLED_SERVER`, not PASS.
 7. A complete redacted release evidence bundle has not been approved by the release owner.
 
 ## Required To Move From BLOCKED To CONDITIONALLY_READY
@@ -63,7 +64,7 @@ Production deployment cannot proceed because AI provider live PASS evidence, ext
 3. Provide real secrets manager injection evidence without printing or committing secrets.
 4. Provide actual credential rotation drill evidence for admin/database/provider credentials.
 5. Provide real HTTPS/reverse-proxy smoke evidence, including TLS certificate status, HTTP-to-HTTPS redirect, HSTS header, forwarded-header behavior, and authenticated dashboard/review API checks through the intended entrypoint.
-6. Run a real server or production-like smoke bundle with redacted logs and no production secrets disclosed.
+6. Run a real server or production-like smoke bundle with redacted logs and no production secrets disclosed; LIVE15 provides the default-skip gate but no controlled server was available.
 7. Keep all no-trading/no-order/no-external-push guardrails intact.
 
 ## Required To Move From CONDITIONALLY_READY To READY
@@ -90,6 +91,6 @@ The following remain prohibited:
 
 ## Next Recommended Package
 
-Recommended next package: `PDR-LIVE15 AI Provider / External Context Release Policy Evidence`, a controlled real-server smoke package, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
+Recommended next package: `PDR-LIVE16 AI Provider / External Context Release Policy Evidence`, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped security evidence package that closes real secret-store injection, actual credential rotation drills, provider policy, and real proxy smoke evidence.
 
 Production deployment must remain blocked until a later release-gate package records complete PASS evidence and explicit approval.
