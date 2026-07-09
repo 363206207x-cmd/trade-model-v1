@@ -352,7 +352,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private List<DashboardHomeVO.PositionVO> buildPositions(List<UserPositionVO> positions) {
         List<DashboardHomeVO.PositionVO> rows = new ArrayList<>();
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
-            if (!isManualPosition(position)) {
+            if (!isActiveManualPosition(position)) {
                 continue;
             }
             PositionMonitorLogDTO latestMonitorLog = latestPositionMonitorLog(position.getId());
@@ -384,6 +384,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private boolean isManualPosition(UserPositionVO position) {
         return position != null && "MANUAL".equalsIgnoreCase(trimToNull(position.getSourceType()));
+    }
+
+    private boolean isActiveManualPosition(UserPositionVO position) {
+        return isManualPosition(position) && isOpenPositionStatus(position.getStatus());
+    }
+
+    private boolean isOpenPositionStatus(String status) {
+        String normalized = trimToNull(status);
+        return "OPEN".equalsIgnoreCase(normalized) || "PARTIALLY_CLOSED".equalsIgnoreCase(normalized);
     }
 
     private PositionMonitorLogDTO latestPositionMonitorLog(Long positionId) {
@@ -512,6 +521,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         consistency.setLevel(decision != null ? trimToNull(decision.getAiConflictLevel()) : null);
         consistency.setScore(decision != null ? decision.getAiConflictScore() : null);
         consistency.setConfused(decision != null && decision.getConfusedScore() != null && decision.getConfusedScore() > 0);
+        DashboardHomeVO.AiTabVO finalRole = tabs.stream()
+                .filter(tab -> "GPT_FINAL".equals(tab.getRole()))
+                .findFirst()
+                .orElse(null);
+        consistency.setConsistencyScore(null);
+        consistency.setConsistencyLevel(null);
+        consistency.setConsistencySummary(null);
+        consistency.setDowngradeReason(finalRole != null ? trimToNull(finalRole.getDowngradeReason()) : null);
         ai.setConsistency(consistency);
         return ai;
     }
@@ -674,7 +691,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private boolean hasOpenManualPosition(List<UserPositionVO> positions) {
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
-            if (isManualPosition(position)) {
+            if (isActiveManualPosition(position)) {
                 return true;
             }
         }

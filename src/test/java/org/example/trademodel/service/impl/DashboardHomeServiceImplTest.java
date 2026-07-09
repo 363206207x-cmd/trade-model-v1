@@ -423,6 +423,75 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void positionMonitorUsesRealMonitorFields() {
+        UserPositionVO position = new UserPositionVO();
+        position.setId(19L);
+        position.setAssetSymbol("BTCUSDT");
+        position.setSide("LONG");
+        position.setStatus("OPEN");
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(new BigDecimal("1"));
+        position.setSourceType("MANUAL");
+
+        PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
+        monitorLog.setPositionId(19L);
+        monitorLog.setCurrentPrice(new BigDecimal("105"));
+        monitorLog.setLogicStatus("LOGIC_VALID");
+        monitorLog.setRiskLevel("LOW");
+        monitorLog.setSuggestedAction("TIGHTEN_STOP_REVIEW");
+
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionId(19L, 1)).thenReturn(List.of(monitorLog));
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(home.getPositions()).hasSize(1);
+        DashboardHomeVO.PositionVO row = home.getPositions().get(0);
+        assertThat(row.getEntryLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(row.getDirectionSupportStatus()).isEqualTo("SUPPORTED");
+        assertThat(row.getReversalStatus()).isEqualTo("NO_REVERSAL_SIGNAL");
+        assertThat(row.getRiskLevel()).isEqualTo("LOW");
+        assertThat(row.getSuggestedManualAction()).isEqualTo("TIGHTEN_STOP_REVIEW");
+        assertThat(row.getSuggestedManualActionText()).isEqualTo("复核是否收紧止损");
+    }
+
+    @Test
+    void closedPositionNotDisplayedAsActiveMonitoring() {
+        UserPositionVO closedPosition = new UserPositionVO();
+        closedPosition.setId(21L);
+        closedPosition.setAssetSymbol("BTCUSDT");
+        closedPosition.setStatus("CLOSED");
+        closedPosition.setSourceType("MANUAL");
+
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(closedPosition));
+
+        DashboardHomeVO home = service.getHome(null, 6);
+
+        assertThat(home.getPositions()).isEmpty();
+        assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
+        assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_ONLY");
+    }
+
+    @Test
+    void executionSuggestionDoesNotBecomePosition() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 85, 10,
+                "LEVEL_1", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setEntryZone("63000-64000");
+        decision.setStopLoss("61000");
+        decision.setTakeProfitRules("66000 / 69000");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getPositions()).isEmpty();
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo("63000-64000");
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo("61000");
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo("66000 / 69000");
+    }
+
+    @Test
     void homePositionCalculatesShortPnlWithoutExecutionPlanFallback() {
         UserPositionVO position = new UserPositionVO();
         position.setId(10L);
@@ -706,6 +775,50 @@ class DashboardHomeServiceImplTest {
 
         assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).containsExactly("ETH evidence");
         assertThat(aiTab(defaultHome, "GPT_FINAL").getSupportEvidence()).containsExactly("BTC evidence");
+    }
+
+    @Test
+    void adjudicationConsistencyHasExplicitBackendContract() {
+        DecisionResultVO decision = decisionWithStructuredAiRoles();
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
+        assertThat(consistency.getLevel()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(consistency.getScore()).isEqualTo(25);
+        assertThat(consistency.getConsistencyScore()).isNull();
+        assertThat(consistency.getConsistencyLevel()).isNull();
+        assertThat(consistency.getConsistencySummary()).isNull();
+        assertThat(consistency.getDowngradeReason()).isEqualTo("等待事件落地");
+    }
+
+    @Test
+    void adjudicationConsistencyDoesNotFakeScore() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 80,
+                "LEVEL_4_EXTREME_DIVERGENCE", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setAiRoleResults("{\"GPT_FINAL\":{\"downgradeReason\":\"冲突过高\"}}");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
+        assertThat(consistency.getScore()).isEqualTo(80);
+        assertThat(consistency.getConsistencyScore()).isNull();
+        assertThat(consistency.getScore()).isNotEqualTo(20);
+        assertThat(consistency.getDowngradeReason()).isEqualTo("冲突过高");
+    }
+
+    @Test
+    void noFakeAiEvidenceOrProviderCalls() {
+        assertThat(Arrays.stream(DashboardHomeServiceImpl.class.getDeclaredFields())
+                .map(field -> field.getType().getSimpleName()))
+                .doesNotContain("OpenAiClient", "OpenAIClient", "GeminiClient", "GrokClient", "XaiClient");
+        assertThat(Arrays.stream(DashboardHomeServiceImpl.class.getDeclaredConstructors())
+                .flatMap(constructor -> Arrays.stream(constructor.getParameterTypes()))
+                .map(Class::getSimpleName))
+                .doesNotContain("OpenAiClient", "OpenAIClient", "GeminiClient", "GrokClient", "XaiClient");
     }
 
     private DecisionResultVO decisionWithStructuredAiRoles() {

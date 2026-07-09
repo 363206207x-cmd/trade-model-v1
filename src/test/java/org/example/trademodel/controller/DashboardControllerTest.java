@@ -292,6 +292,7 @@ public class DashboardControllerTest {
         assertThat(html).contains("consistency.consistencyScore", "consistency.agreementScore");
         assertThat(html).doesNotContain("100 - Number(c.score)");
         assertThat(html).doesNotContain("100 - conflictScore");
+        assertThat(html).doesNotContain("options.level || options.conflictLevel");
     }
 
     @Test
@@ -311,6 +312,40 @@ public class DashboardControllerTest {
         assertThat(card).doesNotContain("自动反手");
         assertThat(card).doesNotContain("自动下单");
         assertThat(card).doesNotContain("order submitted");
+    }
+
+    @Test
+    void positionMonitorTemplateRendersRealMonitorFields() throws Exception {
+        String positionRows = functionBody("renderHomePositionsFromPayload");
+        String advice = functionBody("positionCurrentAdviceHtml");
+
+        assertThat(positionRows).contains("entryLogicStatus", "entry_logic_status");
+        assertThat(positionRows).contains("directionSupportStatus", "direction_support_status");
+        assertThat(advice).contains("suggestedManualActionText", "suggested_manual_action_text");
+        assertThat(advice).contains("suggestedManualAction", "suggested_manual_action");
+    }
+
+    @Test
+    void floatingPnlDisplayedAsAmountNotPercent() throws Exception {
+        String homePayloadRows = functionBody("renderHomePositionsFromPayload");
+        String legacyRow = functionBody("renderHomePosition");
+
+        assertThat(homePayloadRows).contains("formatSignedAmount(p.floatingPnl)");
+        assertThat(homePayloadRows).doesNotContain("formatPct(p.floatingPnl)");
+        assertThat(legacyRow).contains("formatSignedAmount(floatingPnlAmount)");
+        assertThat(legacyRow).doesNotContain("formatPct(unrealizedPnl)");
+    }
+
+    @Test
+    void sidebarHealthDoesNotHardcodeHealthy() throws Exception {
+        String sidebar = functionBody("renderSidebarPanel");
+
+        assertThat(sidebar).contains("window.__lastHomeDiagnostics");
+        assertThat(sidebar).contains("WAITING_SYNC");
+        assertThat(sidebar).contains("diagnostics.aiProvider", "diagnostics.marketDataProvider");
+        assertThat(sidebar).doesNotContain("AI 服务</span><span class=\"sidebar-health-badge\">正常");
+        assertThat(sidebar).doesNotContain("ps.text || \"正常\"");
+        assertThat(sidebar).doesNotContain("schedulerStatus), \"正常\"");
     }
 
     @Test
