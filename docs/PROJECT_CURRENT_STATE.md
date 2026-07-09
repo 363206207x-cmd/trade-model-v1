@@ -6,7 +6,7 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: PDR-LIVE13 HTTPS Reverse Proxy Evidence
+Current Work Package: PDR-LIVE14 Secrets Manager Credential Rotation Evidence
 Next Business Phase: Post-freeze user acceptance / production readiness remediation
 Next Business Phase Allowed: YES for scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
@@ -473,7 +473,7 @@ Next recommendation after LIVE12: `PDR-LIVE13 HTTPS / Reverse Proxy Evidence`, o
 
 ## PDR-LIVE13 HTTPS Reverse Proxy Evidence
 
-PDR-LIVE13 is the current controlled HTTPS / reverse proxy evidence package. It records template-only reverse proxy configuration, TLS/redirect/HSTS/proxy-header checklists, and remaining real-server smoke blockers. It is not production deployment and does not access production server, production DB, or real secrets.
+PDR-LIVE13 is DONE/effective on merged main by PR #1092. It was the controlled HTTPS / reverse proxy evidence package. It records template-only reverse proxy configuration, TLS/redirect/HSTS/proxy-header checklists, and remaining real-server smoke blockers. It is not production deployment and does not access production server, production DB, or real secrets.
 
 Current PDR-LIVE13 status:
 
@@ -487,17 +487,33 @@ Current PDR-LIVE13 status:
 
 Next recommendation after LIVE13: `PDR-LIVE14 Secrets Manager / Credential Rotation Evidence`, or a controlled real-server HTTPS reverse-proxy smoke package if an approved non-production server endpoint is available. The next package must not be deployment.
 
+## PDR-LIVE14 Secrets Manager Credential Rotation Evidence
+
+PDR-LIVE14 is the current controlled secrets manager / credential rotation evidence package. It records repository secret hygiene, production env/secret requirements, guard coverage, secrets manager plan status, and credential rotation checklists. It is not production deployment and does not access production server, production DB, secret manager, or real secrets.
+
+Current PDR-LIVE14 status:
+
+1. `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` records repo secret hygiene as `GUARD_PASS` for tracked-file hygiene.
+2. `application-prod.yml` env/secret requirements are `GUARD_PASS`.
+3. `ProductionProfileSafetyGuard` secret validation is `GUARD_PASS`.
+4. Secrets manager integration is `DOCUMENTED_WITH_PLAN`; no real secret-store injection evidence exists.
+5. Credential rotation evidence is `DOCUMENTED_WITH_PLAN`; no actual admin, datasource, Binance/API, or AI provider rotation drill was run.
+6. No production server, production DB, secret manager, real secret, or untracked `.env` was accessed.
+7. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after LIVE14: `PDR-LIVE15 AI Provider / External Context Release Policy Evidence`, a controlled real-server smoke package, or a release-owner waiver package for optional providers. The next package must not be deployment.
+
 ---
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after PDR-LIVE13 HTTPS Reverse Proxy Evidence:
+Only the following work is allowed during and after PDR-LIVE14 Secrets Manager Credential Rotation Evidence:
 
-1. Controlled HTTPS/reverse-proxy evidence documentation and template-only configuration guidance.
-2. TLS, redirect, HSTS, proxy-header, actuator, auth-smoke, access-log, audit-log, and rate-limit evidence checklist updates.
+1. Controlled secrets manager / credential rotation evidence documentation and placeholder-only checklist guidance.
+2. Admin, datasource, Binance/API provider, and AI provider rotation checklist updates.
 3. Status-source and production-readiness evidence documentation updates.
 4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation package after LIVE13 evidence is reviewed.
+5. The next explicitly scoped remediation package after LIVE14 evidence is reviewed.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -506,7 +522,7 @@ PDR-M7 is the historical latest production-readiness package, not the only curre
 
 ## Current Forbidden Work
 
-The following work remains blocked during and after PDR-LIVE13 HTTPS Reverse Proxy Evidence:
+The following work remains blocked during and after PDR-LIVE14 Secrets Manager Credential Rotation Evidence:
 
 1. no auto-open
 2. no auto-close
@@ -585,7 +601,7 @@ Blocking evidence:
 - PDR-1 added `src/main/resources/application-prod.yml` and `ProductionProfileSafetyGuard`, but this is only a production config/profile safety gate and does not prove production deployment readiness.
 - PostgreSQL JDBC driver, test-only Testcontainers/Flyway smoke, mapper DATEADD / FORMATDATETIME variants, and backup/restore templates exist after PDR-M1, but no real production database is connected.
 - Dockerfile, Docker Compose skeleton, `.env.example`, readonly smoke script, and backup/restore template scripts exist after PDR-M2, but no real server is deployed.
-- Single-operator Basic Auth exists after PDR-M3, but no real-server HTTPS/reverse-proxy smoke, credential rotation, secrets manager integration, real server auth smoke, or production release gate exists yet.
+- Single-operator Basic Auth exists after PDR-M3, but no real-server HTTPS/reverse-proxy smoke, real credential rotation drill, real secrets manager integration, real server auth smoke, or production release gate exists yet.
 - Minimal public health/readiness endpoints and authenticated smoke checks exist after PDR-M4, readonly provider readiness checks exist after PDR-M5, the PDR-M6A acceptance evidence framework exists, and the PDR-M7 opt-in provider live smoke harness exists, but no completed real-server evidence, metrics dashboards, log aggregation, alerting, full provider connection proof, or production release approval exists yet.
 - No production database is connected in this package.
 - No full observability stack, real server deployment smoke/rollback evidence, real restore drill evidence, secrets manager integration, verified external-provider integration, or production release gate exists yet.
@@ -609,14 +625,14 @@ Database / deployment remaining blockers after PDR-M7:
 - PostgreSQL baseline schema SQL has a Testcontainers smoke path, but local evidence depends on Docker availability.
 - Mapper PostgreSQL variants cover known upsert and DATEADD / FORMATDATETIME blockers; broader live mapper execution remains deferred.
 - Docker Compose deployment skeleton, `.env.example`, smoke/backup/restore scripts, the PDR-M6A evidence template, the conservative release gate runner, and the opt-in provider live smoke harness exist, but real server deployment smoke, AI/external provider smoke evidence, and production-like restore drill evidence are still missing.
-- Auth/access control baseline exists as single-operator Basic Auth, but real server auth smoke, HTTPS/reverse-proxy hardening, credential rotation, audit logging, rate limiting, and secrets manager integration remain missing.
+- Auth/access control baseline exists as single-operator Basic Auth; LIVE14 records secrets manager / credential rotation as DOCUMENTED_WITH_PLAN, but real server auth smoke, real HTTPS proxy smoke, actual credential rotation drill, and real secrets manager integration remain missing.
 - Observability is minimal: health/readiness exists, but metrics dashboards, log aggregation, alerting, real server smoke evidence, and restore drill evidence remain missing.
 - Deployment packaging is skeletal only and not release-gated.
-- Secrets contract exists as placeholders only, including admin credentials; secrets manager integration is missing.
+- Secrets contract exists as placeholders and LIVE14 documents the rotation plan; actual secret-store injection and rotation evidence remain missing.
 
 Next production-readiness packages:
 
-1. PDR-LIVE14 Secrets Manager / Credential Rotation Evidence, a controlled real-server HTTPS reverse-proxy smoke package, or another explicitly scoped provider/secrets/access evidence package.
+1. PDR-LIVE15 AI Provider / External Context Release Policy Evidence, a controlled real-server smoke package, or another explicitly scoped provider/secrets/access evidence package.
 2. Secrets/access/HTTPS evidence only after explicitly scoped controlled environment evidence is available.
 3. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
