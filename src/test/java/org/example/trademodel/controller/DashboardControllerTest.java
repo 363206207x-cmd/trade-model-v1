@@ -63,6 +63,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -191,8 +192,81 @@ class DashboardControllerTest {
         assertThat(html).contains("发现的冲突");
         assertThat(html).contains("证据不足点");
         assertThat(html).contains("反方论点");
-        assertThat(html).contains("突发新闻或事件风险");
+        assertThat(html).contains("突发新闻 / 事件风险");
         assertThat(html).contains("暂无该角色证据");
+    }
+
+    @Test
+    void gptFinalEmptyDataStillShowsFinalDecisionSemanticFields() throws Exception {
+        String panel = functionBody("renderGptFinalHomeRole");
+
+        assertThat(panel).contains("最终倾向");
+        assertThat(panel).contains("置信度");
+        assertThat(panel).contains("风险等级");
+        assertThat(panel).contains("AI 计划模式");
+        assertThat(panel).contains("是否值得开仓");
+        assertThat(panel).contains("最终结论");
+        assertThat(panel).contains("核心支持证据");
+        assertThat(panel).contains("核心反证");
+        assertThat(panel).contains("降级 / 阻断原因");
+        assertThat(panel).doesNotContain("return aiRoleEmptyState");
+    }
+
+    @Test
+    void geminiReviewEmptyDataStillShowsReviewSemanticFields() throws Exception {
+        String panel = functionBody("renderGeminiReviewHomeRole");
+
+        assertThat(panel).contains("复核结论");
+        assertThat(panel).contains("复核意见");
+        assertThat(panel).contains("发现的冲突");
+        assertThat(panel).contains("证据不足点");
+        assertThat(panel).contains("逻辑漏洞");
+        assertThat(panel).contains("是否建议降级");
+        assertThat(panel).contains("是否需要人工复核");
+        assertThat(panel).contains("复核摘要");
+        assertThat(panel).doesNotContain("return aiRoleEmptyState");
+    }
+
+    @Test
+    void grokChallengeEmptyDataStillShowsChallengeSemanticFields() throws Exception {
+        String panel = functionBody("renderGrokChallengeHomeRole");
+
+        assertThat(panel).contains("反方论点");
+        assertThat(panel).contains("突发新闻 / 事件风险");
+        assertThat(panel).contains("情绪反转风险");
+        assertThat(panel).contains("微观结构陷阱");
+        assertThat(panel).contains("反向证据");
+        assertThat(panel).contains("反方挑战结论");
+        assertThat(panel).contains("风险提示摘要");
+        assertThat(panel).doesNotContain("return aiRoleEmptyState");
+    }
+
+    @Test
+    void rolePanelsDoNotUseSameFieldList() throws Exception {
+        Set<String> gptLabels = Set.of("最终倾向", "风险等级", "AI 计划模式", "是否值得开仓", "最终结论", "核心支持证据", "核心反证");
+        Set<String> geminiLabels = Set.of("复核结论", "复核意见", "发现的冲突", "证据不足点", "逻辑漏洞", "是否建议降级", "是否需要人工复核");
+        Set<String> grokLabels = Set.of("反方论点", "突发新闻 / 事件风险", "情绪反转风险", "微观结构陷阱", "流动性 / 插针 / 挤仓风险", "反向证据");
+
+        assertThat(functionBody("renderGptFinalHomeRole")).contains(gptLabels.toArray(String[]::new));
+        assertThat(functionBody("renderGeminiReviewHomeRole")).contains(geminiLabels.toArray(String[]::new));
+        assertThat(functionBody("renderGrokChallengeHomeRole")).contains(grokLabels.toArray(String[]::new));
+        assertThat(gptLabels).isNotEqualTo(geminiLabels).isNotEqualTo(grokLabels);
+    }
+
+    @Test
+    void missingDataDoesNotCollapseRolePanelToSingleRow() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).doesNotContain("function aiRoleEmptyState()");
+        assertThat(html).doesNotContain("return aiRoleEmptyState()");
+        assertThat(functionBody("renderGptFinalHomeRole")).contains("aiRoleSummaryStrip", "aiRoleEvidenceList", "aiRoleFooter");
+        assertThat(functionBody("renderGeminiReviewHomeRole")).contains("aiRoleSummaryStrip", "aiRoleEvidenceList");
+        assertThat(functionBody("renderGrokChallengeHomeRole")).contains("aiRoleSummaryStrip", "aiRoleEvidenceList");
+    }
+
+    @Test
+    void consistencyCardRemainsReadable() throws Exception {
+        consistencyCardLayoutIsReadable();
     }
 
     @Test
@@ -3292,6 +3366,16 @@ class DashboardControllerTest {
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
         when(monitorService.getRecentAlerts(3)).thenReturn(Collections.emptyList());
+    }
+
+    private String functionBody(String functionName) throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String start = "function " + functionName + "(";
+        int startIndex = html.indexOf(start);
+        assertThat(startIndex).isGreaterThanOrEqualTo(0);
+        int nextFunctionIndex = html.indexOf("\n    function ", startIndex + start.length());
+        assertThat(nextFunctionIndex).isGreaterThan(startIndex);
+        return html.substring(startIndex, nextFunctionIndex);
     }
 
     private String normalizedInternalPushPreviewDisplay() throws Exception {

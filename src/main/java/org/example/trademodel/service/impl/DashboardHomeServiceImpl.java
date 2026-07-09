@@ -566,6 +566,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 "opposingEvidence", "negativeEvidence", "counterEvidence", "contradictionEvidence",
                 "opposition", "against");
         String decisionSummary = text(roleNode, "decisionSummary", "summary", "finalSummary");
+        String downgradeReason = text(roleNode, "downgradeReason", "blockReason", "downgradeOrBlockReason",
+                "downgrade_reason", "rejectReason");
 
         tab.setFinalMarketBias(finalMarketBias);
         tab.setFinalConfidence(finalConfidence);
@@ -576,6 +578,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         tab.setCoreSupportingEvidence(coreSupportingEvidence);
         tab.setCoreCounterEvidence(coreCounterEvidence);
         tab.setDecisionSummary(decisionSummary);
+        tab.setDowngradeReason(downgradeReason);
 
         tab.setDirection(finalMarketBias);
         tab.setConfidenceLevel(finalConfidence);
