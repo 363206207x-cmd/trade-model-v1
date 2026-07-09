@@ -80,7 +80,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @ExtendWith(MockitoExtension.class)
 @Tag("smoke")
-class DashboardControllerTest {
+public class DashboardControllerTest {
     private static final Path DASHBOARD_TEMPLATE =
             Path.of("src/main/resources/templates/dashboard.html");
     private static final String INTERNAL_PUSH_PREVIEW_START =
@@ -267,6 +267,50 @@ class DashboardControllerTest {
     @Test
     void consistencyCardRemainsReadable() throws Exception {
         consistencyCardLayoutIsReadable();
+    }
+
+    @Test
+    void consistencyCardShowsSemanticLabels() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("一致性等级");
+        assertThat(html).contains("一致性评分");
+        assertThat(html).contains("最终倾向");
+        assertThat(html).contains("冲突等级");
+        assertThat(html).contains("AI 计划模式");
+        assertThat(html).contains("是否进入冲突阻断");
+        assertThat(html).contains("降级原因");
+        assertThat(html).contains("一句话摘要");
+    }
+
+    @Test
+    void consistencyCardDoesNotFakeScore() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("actualConsistencyScore");
+        assertThat(html).contains("<span>--</span>");
+        assertThat(html).contains("consistency.consistencyScore", "consistency.agreementScore");
+        assertThat(html).doesNotContain("100 - Number(c.score)");
+        assertThat(html).doesNotContain("100 - conflictScore");
+    }
+
+    @Test
+    void consistencyCardExplainsWaitingState() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("等待同步");
+        assertThat(html).contains("等待 AI 三角色结果同步后生成一致性结论");
+    }
+
+    @Test
+    void consistencyCardHasNoTradingInstruction() throws Exception {
+        String card = consistencyCardSection();
+
+        assertThat(card).doesNotContain("自动开仓");
+        assertThat(card).doesNotContain("自动平仓");
+        assertThat(card).doesNotContain("自动反手");
+        assertThat(card).doesNotContain("自动下单");
+        assertThat(card).doesNotContain("order submitted");
     }
 
     @Test
@@ -3376,6 +3420,15 @@ class DashboardControllerTest {
         int nextFunctionIndex = html.indexOf("\n    function ", startIndex + start.length());
         assertThat(nextFunctionIndex).isGreaterThan(startIndex);
         return html.substring(startIndex, nextFunctionIndex);
+    }
+
+    private String consistencyCardSection() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        int startIndex = html.indexOf("id=\"homeConsistencyPanel\"");
+        assertThat(startIndex).isGreaterThanOrEqualTo(0);
+        int endIndex = html.indexOf("id=\"watchlistStatusPanel\"", startIndex);
+        assertThat(endIndex).isGreaterThan(startIndex);
+        return html.substring(startIndex, endIndex);
     }
 
     private String normalizedInternalPushPreviewDisplay() throws Exception {
