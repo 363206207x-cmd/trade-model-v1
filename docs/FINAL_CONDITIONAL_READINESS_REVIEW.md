@@ -2,7 +2,7 @@
 
 Package: PDR-LIVE16 Final Conditional Readiness Review
 Branch: `codex/pdr-live16-final-conditional-readiness-review`
-Current main commit: `c9ef6a04`
+Current main commit: `32ce23b9`
 Status date: 2026-07-09
 
 Production deployment readiness: BLOCKED
@@ -46,6 +46,7 @@ It is not production deployment. It does not access a production server, product
 | Real secret-store injection | MISSING_EVIDENCE | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | Plan exists, but no actual store injection proof exists. |
 | Real rotation drill | MISSING_EVIDENCE | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | No credential rotation drill has run. |
 | Release owner approval | MISSING_EVIDENCE | `docs/PRODUCTION_READINESS_RUNBOOK.md` | No release owner has approved a complete evidence bundle. |
+| AI / external provider release policy | RELEASE_OWNER_DECISION_REQUIRED | `docs/AI_EXTERNAL_PROVIDER_RELEASE_POLICY_EVIDENCE.md` | LIVE17 records missing AI/external providers as release-owner-decision-required, not PASS. |
 
 ## Readiness Decision
 
@@ -113,6 +114,11 @@ A later release gate may move to `READY` only after `CONDITIONALLY_READY_CANDIDA
 4. Incident response, monitoring, log retention, and credential rotation ownership confirmed.
 5. Release owner approval for deployment timing and rollback authority.
 6. Confirmation that no auto-open, auto-close, auto-reverse, order execution, auto-trading, external Push send, fake positions, or fake review records were introduced.
+
+
+## Post-LIVE17 Provider Policy Addendum
+
+PDR-LIVE17 records AI / external provider release policy evidence. It does not change the LIVE16 readiness decision. OpenAI, Gemini, xAI/Grok, and external context provider proof remains `SKIPPED_MISSING_SECRET` or missing unless the release owner explicitly records `REQUIRED_PASS`, `OPTIONAL_WITH_WAIVER`, `DISABLED_FOR_RELEASE`, or `NOT_APPLICABLE` per provider for the target release. Missing provider keys are not PASS.
 
 ## Prohibited Items
 

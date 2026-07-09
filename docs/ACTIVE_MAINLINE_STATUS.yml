@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "PDR-LIVE16 Final Conditional Readiness Review"
-active_block_cn: "PDR-LIVE16 Final Conditional Readiness Review"
+active_block: "PDR-LIVE17 AI External Provider Release Policy Evidence"
+active_block_cn: "PDR-LIVE17 AI External Provider Release Policy Evidence"
 
-next_required_action: "Complete PDR-LIVE16 Final Conditional Readiness Review. Aggregate LIVE1-LIVE15 evidence and keep production readiness BLOCKED unless every gate has PASS or approved conditional evidence."
+next_required_action: "Complete PDR-LIVE17 AI External Provider Release Policy Evidence. Classify missing AI/external provider proof as release-owner-decision-required unless PASS evidence or explicit waiver exists."
 next_business_phase: "Post-freeze user acceptance / production readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this final conditional readiness review package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this AI/external provider release policy evidence package is merged/effective; runtime v1-state derives actual next-phase allowance on clean synced main."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/pdr-live16-final-conditional-readiness-review"
+current_branch: "codex/pdr-live17-ai-external-provider-release-policy"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -121,8 +121,10 @@ pdr_live14_status: "DONE/effective on merged main by PR #1093: records controlle
 pdr_live14_effective: true
 pdr_live15_status: "DONE/effective on merged main by PR #1094: records controlled real-server smoke evidence gate as SKIPPED_MISSING_CONTROLLED_SERVER and keeps production readiness BLOCKED"
 pdr_live15_effective: true
-pdr_live16_status: "IN_PROGRESS on branch codex/pdr-live16-final-conditional-readiness-review: final conditional readiness review; expected decision remains BLOCKED unless every release gate has PASS or approved conditional evidence"
-pdr_live16_effective: false
+pdr_live16_status: "DONE/effective on merged main by PR #1095: final conditional readiness review records readiness BLOCKED / DO NOT DEPLOY because skipped/planned/missing gates are not PASS"
+pdr_live16_effective: true
+pdr_live17_status: "IN_PROGRESS on branch codex/pdr-live17-ai-external-provider-release-policy: AI/external provider release policy evidence; missing provider keys remain SKIPPED_MISSING_SECRET unless release owner explicitly waives or disables them"
+pdr_live17_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -161,7 +163,7 @@ notes:
   - "PDR-LIVE13 is DONE/effective on merged main by PR #1092: HTTPS/reverse-proxy evidence is DOCUMENTED_WITH_CONFIG while real proxy smoke remains missing."
   - "PDR-LIVE14 is DONE/effective on merged main by PR #1093: secrets manager / credential rotation is DOCUMENTED_WITH_PLAN while real secret-store injection and rotation drills remain missing."
   - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
-  - "PDR-LIVE16 is the current final conditional readiness review; it aggregates LIVE1-LIVE15 and must not mark DOCUMENTED_WITH_PLAN, DOCUMENTED_WITH_CONFIG, SKIPPED, or MISSING_EVIDENCE as PASS."
-  - "Current allowed work is final conditional readiness review docs, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
+  - "PDR-LIVE16 is DONE/effective on merged main by PR #1095: readiness remains BLOCKED and deployment decision remains DO NOT DEPLOY."
+  - "Current allowed work is AI/external provider release policy evidence, status-source updates, the next explicitly scoped remediation package, and production-readiness remediation only when explicitly scoped."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."
