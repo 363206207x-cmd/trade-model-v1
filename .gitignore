@@ -17,6 +17,8 @@ target/
 *.log
 *.tmp
 *.swp
+tmp/stress/
+build/stress-dashboard/
 
 # Local deployment secrets and backups
 .env

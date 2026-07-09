@@ -86,3 +86,20 @@ Recommended P1 preparation scope:
 
 Production readiness remains `BLOCKED`; this closure review is only about P0 dashboard backend/frontend semantic alignment, not release readiness.
 
+## 6. P1 Preparation Handoff
+
+P1 Dashboard Stress Test Plan & Harness Preparation is authorized as the next package after this P0 closure. The P1 package may define local-only targets, guarded dry-run behavior, metrics, stop conditions, and evidence templates. It must not execute stress traffic in the preparation PR.
+
+Required P1 handoff state:
+
+- `STRESS_TEST_PREPARATION_ALLOWED: YES`
+- `STRESS_TEST_EXECUTION_ALLOWED: NO`
+- local-only default target: `http://localhost:8081`
+- allowed endpoints only: `GET /actuator/health`, `GET /dashboard`, `GET /api/dashboard/home`
+- no production server / DB access
+- no provider calls
+- no write endpoints
+- no Push/Recheck/Telegram send
+- no order execution / auto-trading behavior
+
+Stress-test execution remains a separate future package requiring explicit approval.
