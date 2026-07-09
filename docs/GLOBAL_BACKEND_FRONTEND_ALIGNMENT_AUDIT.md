@@ -319,6 +319,33 @@ This audit found no need to add or permit:
 - fake review records
 - production-ready claim
 
+## 13. P0 Closure Addendum (2026-07-10, after PR #1101)
+
+PR #1101 was merged into main as `1b0cf721`, closing the P0 dashboard backend/frontend alignment blockers identified in this audit.
+
+Closure review document: `docs/P0_BACKEND_FRONTEND_ALIGNMENT_CLOSURE_REVIEW.md`
+
+`P0_ALIGNMENT_STATUS: CLOSED`
+
+`STRESS_TEST_PREPARATION_ALLOWED: YES`
+
+`STRESS_TEST_EXECUTION_ALLOWED: NO`
+
+Production readiness remains `BLOCKED`.
+
+P0 closure matrix:
+
+| P0 blocker | Closure status | Closure evidence |
+|---|---|---|
+| Position monitor renderer did not consume `entryLogicStatus`, `directionSupportStatus`, `suggestedManualAction`, or `suggestedManualActionText`. | `CLOSED` | `DashboardHomeVO.PositionVO` exposes the fields; `DashboardHomeServiceImpl.buildPositions()` populates them from latest `PositionMonitorLogDTO`; `dashboard.html` reads the exact camel/snake fields; tests cover real monitor fields, CLOSED exclusion, and no ExecutionSuggestion-as-position fallback. |
+| `floatingPnl` rendered as percent though backend `floatingPnl` is amount. | `CLOSED` | `dashboard.html` now uses `formatSignedAmount(p.floatingPnl)` and no longer applies `formatPct()` to `floatingPnl`; service keeps `floatingPnl` amount and `pnlPct` percent separate. |
+| Adjudication consistency lacked explicit backend contract and risked confusing AI conflict score with consistency score. | `CLOSED` | `ConsistencyVO` now has `consistencyScore`, `consistencyLevel`, `consistencySummary`, and `downgradeReason`; missing consistency score remains `null`; the UI shows `--` and does not derive `100 - aiConflictScore` or use conflict level as consistency fallback. |
+| Sidebar/system status hardcoded healthy labels such as `AI 服务 正常`. | `CLOSED` | `renderSidebarPanel()` now uses backend diagnostics/readiness and `WAITING_SYNC` fallback; tests prevent hardcoded healthy sidebar labels. |
+
+Remaining non-P0 items from this audit stay open for later packages, including diagnostics `opportunityLog` / `review` cleanup, explicit execution boundary status fields, top-card helper copy polish, asset score contract, and selected-symbol event-window clarification.
+
+Stress-test preparation may proceed as the next package, but stress-test execution still requires an explicit plan/harness package defining target, scope, baseline data, safety guard, pass/fail criteria, evidence outputs, and stop conditions.
+
 ## Validation Notes
 
 No runtime code was changed by this audit package. The report was authored from read-only repository inspection through the GitHub connector because the local Codex shell in this session could not start `/bin/zsh`, `/bin/bash`, or `/bin/sh` after context transition.
