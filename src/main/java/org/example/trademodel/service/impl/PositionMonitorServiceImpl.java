@@ -9,8 +9,11 @@ import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
-import org.example.trademodel.market.client.MarketQuoteClient;
-import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorPolicy;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
@@ -29,6 +32,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -37,11 +41,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final UserPositionMapper userPositionMapper;
-    private final MarketQuoteClient marketQuoteClient;
+    private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final UserPositionRiskAdapter userPositionRiskAdapter;
     private final ExecutionPlanMapper executionPlanMapper;
     private final PositionMonitorLogService positionMonitorLogService;
@@ -52,7 +57,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
-                                      MarketQuoteClient marketQuoteClient,
+                                      MarketPriceSnapshotService marketPriceSnapshotService,
                                       UserPositionRiskAdapter userPositionRiskAdapter,
                                       ExecutionPlanMapper executionPlanMapper,
                                       PositionMonitorLogService positionMonitorLogService,
@@ -60,13 +65,13 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       ScoreItemMapper scoreItemMapper,
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper) {
-        this(userPositionMapper, marketQuoteClient, userPositionRiskAdapter, executionPlanMapper,
+        this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
                 positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper, objectMapper, null);
     }
 
     @Autowired
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
-                                      MarketQuoteClient marketQuoteClient,
+                                      MarketPriceSnapshotService marketPriceSnapshotService,
                                       UserPositionRiskAdapter userPositionRiskAdapter,
                                       ExecutionPlanMapper executionPlanMapper,
                                       PositionMonitorLogService positionMonitorLogService,
@@ -76,7 +81,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       ObjectMapper objectMapper,
                                       ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
         this.userPositionMapper = userPositionMapper;
-        this.marketQuoteClient = marketQuoteClient;
+        this.marketPriceSnapshotService = marketPriceSnapshotService;
         this.userPositionRiskAdapter = userPositionRiskAdapter;
         this.executionPlanMapper = executionPlanMapper;
         this.positionMonitorLogService = positionMonitorLogService;
@@ -289,14 +294,17 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     }
 
     private BigDecimal readCurrentPrice(String assetSymbol) {
-        MarketQuoteSnapshot snapshot;
+        ProviderCallResult<MarketPriceSnapshot> result;
         try {
-            snapshot = marketQuoteClient.fetch24hTicker(assetSymbol)
-                    .orElseThrow(() -> new IllegalStateException("QUOTE_UNAVAILABLE"));
+            result = marketPriceSnapshotService.get(assetSymbol, AssetPriority.P0_POSITION,
+                    Duration.ofSeconds(15), "position-monitor-" + UUID.randomUUID());
         } catch (RuntimeException ex) {
             throw new IllegalStateException("QUOTE_UNAVAILABLE", ex);
         }
-        BigDecimal lastPrice = snapshot.getLastPrice();
+        if (!MarketPriceSnapshotPolicy.isFresh(result)) {
+            throw new IllegalStateException(MarketPriceSnapshotPolicy.failureCode(result));
+        }
+        BigDecimal lastPrice = result.payload().lastPrice();
         if (!positive(lastPrice)) {
             throw new IllegalStateException("INVALID_MARKET_PRICE");
         }

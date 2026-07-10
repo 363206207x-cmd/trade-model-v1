@@ -93,6 +93,23 @@ public class ScanProfileTransitionService {
                 state.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
     }
 
+    public RuntimeScanProfile currentProfile(String symbol) {
+        if (symbol == null || symbol.isBlank()) return RuntimeScanProfile.LOW;
+        State state = states.get(symbol.trim().toUpperCase());
+        return state == null ? RuntimeScanProfile.LOW : state.profile;
+    }
+
+    public ProfileTransitionResult current(String symbol, String traceId) {
+        String normalized = required(symbol, "symbol").toUpperCase();
+        State state = states.get(normalized);
+        if (state == null) {
+            return result(normalized, RuntimeScanProfile.LOW, RuntimeScanProfile.LOW,
+                    "NO_RUNTIME_ESCALATION", null, null, "UNKNOWN", false, required(traceId, "traceId"));
+        }
+        return result(normalized, state.profile, state.profile, "CURRENT_RUNTIME_STATE", state.since,
+                state.nextDowngradeEligibleAt, "RUNTIME", false, required(traceId, "traceId"));
+    }
+
     private Requested requested(ProfileTransitionSignal signal, Thresholds t) {
         if (signal == null) return new Requested(RuntimeScanProfile.LOW, "NO_ESCALATION_SIGNAL", null);
         if (signal.hotReset()) return new Requested(RuntimeScanProfile.EMERGENCY, "HOT_RESET", "true");

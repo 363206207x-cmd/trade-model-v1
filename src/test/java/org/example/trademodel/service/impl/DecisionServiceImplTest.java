@@ -59,7 +59,7 @@ class DecisionServiceImplTest {
         service = new DecisionServiceImpl(
                 decisionResultMapper,
                 analysisRunMapper,
-                marketQuoteClient,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 userPositionMapper,
                 assetStateService,
                 assetStateMapper,

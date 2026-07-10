@@ -8,8 +8,11 @@ import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
-import org.example.trademodel.market.client.MarketQuoteClient;
-import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.service.DashboardHomeService;
@@ -35,6 +38,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -42,6 +46,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 @Service
 public class DashboardHomeServiceImpl implements DashboardHomeService {
@@ -81,7 +86,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final ProviderReadinessService providerReadinessService;
     private final ObjectMapper objectMapper;
     private final AiRoleResultsCodec aiRoleResultsCodec;
-    private final MarketQuoteClient marketQuoteClient;
+    private final MarketPriceSnapshotService marketPriceSnapshotService;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -109,7 +114,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
                                     ProviderReadinessService providerReadinessService,
                                     ObjectMapper objectMapper,
-                                    MarketQuoteClient marketQuoteClient) {
+                                    MarketPriceSnapshotService marketPriceSnapshotService) {
         this.decisionService = decisionService;
         this.monitorService = monitorService;
         this.userPositionService = userPositionService;
@@ -121,7 +126,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.providerReadinessService = providerReadinessService;
         this.objectMapper = objectMapper;
         this.aiRoleResultsCodec = new AiRoleResultsCodec(objectMapper);
-        this.marketQuoteClient = marketQuoteClient;
+        this.marketPriceSnapshotService = marketPriceSnapshotService;
     }
 
     @Override
@@ -416,12 +421,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private BigDecimal safeCurrentPrice(String assetSymbol) {
         String symbol = trimToNull(assetSymbol);
-        if (symbol == null || marketQuoteClient == null) {
+        if (symbol == null || marketPriceSnapshotService == null) {
             return null;
         }
         try {
-            MarketQuoteSnapshot snapshot = marketQuoteClient.fetch24hTicker(symbol).orElse(null);
-            return snapshot != null && positive(snapshot.getLastPrice()) ? snapshot.getLastPrice() : null;
+            ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.peek(symbol,
+                    AssetPriority.P0_POSITION, Duration.ofSeconds(15), "dashboard-home-" + UUID.randomUUID());
+            return MarketPriceSnapshotPolicy.isFresh(result) ? result.payload().lastPrice() : null;
         } catch (RuntimeException ignored) {
             return null;
         }

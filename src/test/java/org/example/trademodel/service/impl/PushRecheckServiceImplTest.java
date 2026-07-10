@@ -67,7 +67,7 @@ class PushRecheckServiceImplTest {
                 pushRecheckLogMapper,
                 dispatchConfigService,
                 userPositionRiskAdapter,
-                marketQuoteClient,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 ruleConfigContractService);
         lenient().when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         lenient().when(ruleConfigContractService.requirePushRecheckThresholds())
@@ -537,7 +537,7 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
-    void recheckResult_shouldNotExposeExecutableActionFields() {
+    void pushRecheckRemainsReviewOnly() {
         List<String> fieldNames = Arrays.stream(RecheckResult.class.getDeclaredFields())
                 .map(java.lang.reflect.Field::getName)
                 .toList();

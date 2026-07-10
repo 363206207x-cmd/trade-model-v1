@@ -28,7 +28,7 @@ class ProviderArchitectureGuardTest {
     }
 
     @Test
-    void productionSchedulersRemainDefaultOff() throws Exception {
+    void productionProviderSchedulerRemainsDefaultOff() throws Exception {
         String prod = Files.readString(Path.of("src/main/resources/application-prod.yml"));
         assertThat(prod).contains(
                 "enabled: ${TRADE_MODEL_PROVIDER_CALL_ENABLED:false}",
@@ -45,13 +45,13 @@ class ProviderArchitectureGuardTest {
     }
 
     @Test
-    void noPositionMonitorMutatesPosition() throws Exception {
+    void positionMonitorDoesNotMutateUserPosition() throws Exception {
         String source = readIfPresent(MAIN.resolve("service/impl/PositionMonitorServiceImpl.java"));
         assertThat(source).doesNotContain("userPositionMapper.update", "manualClose(", "setStatus(\"CLOSED\")");
     }
 
     @Test
-    void noAutoOpenCloseReverseOrderOrTrading() throws Exception {
+    void noAutoOpenCloseReverseOrOrder() throws Exception {
         String source = readTree(MAIN.resolve("providercall"));
         assertThat(source).doesNotContain("manualOpen(", "manualClose(", "autoReverse", "OrderMapper", "submitOrder");
     }

@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 class DecisionEngineServiceTest {
 
     @Mock
-    private RealMarketDataFetcherService marketDataFetcher;
+    private DecisionOhlcvSnapshotSource ohlcvSnapshotSource;
     @Mock
     private AiConflictResolverService aiConflictResolverService;
     @Mock
@@ -47,7 +47,7 @@ class DecisionEngineServiceTest {
     @BeforeEach
     void setUp() {
         service = new DecisionEngineService(
-                marketDataFetcher,
+                ohlcvSnapshotSource,
                 aiConflictResolverService,
                 confusedStateService,
                 assetStateService,
@@ -73,7 +73,7 @@ class DecisionEngineServiceTest {
                 ));
         lenient().when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, false, false, "none"));
-        when(marketDataFetcher.fetchKlines(anyString(), anyString(), any(Integer.class)))
+        when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenAnswer(invocation -> "1m".equals(invocation.getArgument(1))
                         ? bullishKlines()
                         : bullishKlines());
@@ -138,7 +138,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_marketBiasHierarchyAlwaysUsesRuleLayerBaseDirection() {
-        when(marketDataFetcher.fetchKlines(anyString(), anyString(), any(Integer.class)))
+        when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenReturn(bearishKlines());
         when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
@@ -302,7 +302,7 @@ class DecisionEngineServiceTest {
         review.setReasonCodes(List.of("AI_CHALLENGE"));
         when(aiDecisionOrchestratorService.review(any())).thenReturn(review);
         DecisionEngineService serviceWithAi = new DecisionEngineService(
-                marketDataFetcher,
+                ohlcvSnapshotSource,
                 aiConflictResolverService,
                 confusedStateService,
                 assetStateService,
@@ -330,7 +330,7 @@ class DecisionEngineServiceTest {
     void makeDecision_aiProviderFailureFallsBackWithoutFailingDecision() {
         when(aiDecisionOrchestratorService.review(any())).thenThrow(new IllegalStateException("provider unavailable"));
         DecisionEngineService serviceWithAi = new DecisionEngineService(
-                marketDataFetcher,
+                ohlcvSnapshotSource,
                 aiConflictResolverService,
                 confusedStateService,
                 assetStateService,

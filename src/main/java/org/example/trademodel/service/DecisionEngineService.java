@@ -38,7 +38,7 @@ public class DecisionEngineService {
 
     private static final Logger logger = LoggerFactory.getLogger(DecisionEngineService.class);
 
-    private final RealMarketDataFetcherService marketDataFetcher;
+    private final DecisionOhlcvSnapshotSource ohlcvSnapshotSource;
     private final AiConflictResolverService aiConflictResolverService;
     private final ConfusedStateService confusedStateService;
     private final AssetStateService assetStateService;
@@ -67,35 +67,35 @@ public class DecisionEngineService {
     private static final int MIN_DATA_QUALITY_SCORE_FOR_OPENING = 60;
     private static final int MIN_TREND_STRUCTURE_SCORE_FOR_OPENING = 50;
 
-    public DecisionEngineService(RealMarketDataFetcherService marketDataFetcher,
+    public DecisionEngineService(DecisionOhlcvSnapshotSource ohlcvSnapshotSource,
                                  AiConflictResolverService aiConflictResolverService,
                                  ConfusedStateService confusedStateService,
                                  AssetStateService assetStateService,
                                  RuleConfigService ruleConfigService) {
-        this(marketDataFetcher, aiConflictResolverService, confusedStateService,
+        this(ohlcvSnapshotSource, aiConflictResolverService, confusedStateService,
                 assetStateService, ruleConfigService, null, new AiRoleResultsCodec(new ObjectMapper()));
     }
 
-    public DecisionEngineService(RealMarketDataFetcherService marketDataFetcher,
+    public DecisionEngineService(DecisionOhlcvSnapshotSource ohlcvSnapshotSource,
                                  AiConflictResolverService aiConflictResolverService,
                                  ConfusedStateService confusedStateService,
                                  AssetStateService assetStateService,
                                  RuleConfigService ruleConfigService,
                                  AiDecisionOrchestratorService aiDecisionOrchestratorService) {
-        this(marketDataFetcher, aiConflictResolverService, confusedStateService, assetStateService,
+        this(ohlcvSnapshotSource, aiConflictResolverService, confusedStateService, assetStateService,
                 ruleConfigService, aiDecisionOrchestratorService,
                 new AiRoleResultsCodec(new ObjectMapper()));
     }
 
     @Autowired
-    public DecisionEngineService(RealMarketDataFetcherService marketDataFetcher,
+    public DecisionEngineService(DecisionOhlcvSnapshotSource ohlcvSnapshotSource,
                                  AiConflictResolverService aiConflictResolverService,
                                  ConfusedStateService confusedStateService,
                                  AssetStateService assetStateService,
                                  RuleConfigService ruleConfigService,
                                  AiDecisionOrchestratorService aiDecisionOrchestratorService,
                                  AiRoleResultsCodec aiRoleResultsCodec) {
-        this.marketDataFetcher = marketDataFetcher;
+        this.ohlcvSnapshotSource = ohlcvSnapshotSource;
         this.aiConflictResolverService = aiConflictResolverService;
         this.confusedStateService = confusedStateService;
         this.assetStateService = assetStateService;
@@ -145,27 +145,30 @@ public class DecisionEngineService {
                     KEY_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE,
                     DEFAULT_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE);
 
-            // ==================== 1. 真实 K 线数据 ====================
-            List<String[]> klines1m = marketDataFetcher.fetchKlines(symbol, "1m", 3);
-            List<String[]> klines5m = marketDataFetcher.fetchKlines(symbol, "5m", 3);
+            // ==================== 1. 权威落库 K 线快照（同一 run trace） ====================
+            String marketTraceId = analysisId == null || analysisId.isBlank() ? decisionId : analysisId;
+            List<String[]> klines5m = ohlcvSnapshotSource.readClosedBars(symbol, "5m", 3, marketTraceId);
+            List<String[]> klines15m = ohlcvSnapshotSource.readClosedBars(symbol, "15m", 3, marketTraceId);
+            List<String[]> klines1h = ohlcvSnapshotSource.readClosedBars(symbol, "1h", 3, marketTraceId);
+            List<String[]> klines4h = ohlcvSnapshotSource.readClosedBars(symbol, "4h", 3, marketTraceId);
 
             // 最后一根 K 线判断涨跌（close > open = 看涨）
-            boolean isBullish1m = !klines1m.isEmpty() && 
-                Double.parseDouble(klines1m.get(klines1m.size()-1)[4]) > 
-                Double.parseDouble(klines1m.get(klines1m.size()-1)[1]);
-
             boolean isBullish5m = !klines5m.isEmpty() && 
                 Double.parseDouble(klines5m.get(klines5m.size()-1)[4]) > 
                 Double.parseDouble(klines5m.get(klines5m.size()-1)[1]);
+            boolean isBullish15m = bullish(klines15m);
+            boolean isBullish1h = bullish(klines1h);
+            boolean isBullish4h = bullish(klines4h);
 
-            boolean multiTfConvergence = isBullish1m == isBullish5m;
+            boolean multiTfConvergence = isBullish5m == isBullish15m
+                    && isBullish5m == isBullish1h && isBullish5m == isBullish4h;
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
             // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================
-            int baseScore = isBullish1m ? 82 : 58;
+            int baseScore = isBullish5m ? 82 : 58;
             int finalScore = baseScore + convergenceScore;
 
-            String ruleMarketBias = isBullish1m ? "BULLISH" : "BEARISH";
+            String ruleMarketBias = isBullish5m ? "BULLISH" : "BEARISH";
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
             boolean worthOpening = finalScore >= worthOpeningMinScore;
@@ -204,7 +207,7 @@ public class DecisionEngineService {
                     ruleMarketBias, confidenceLevel, riskTier, effectiveWorthOpening,
                     dataQualityScore, trendStructureScore, multiTfConvergence,
                     externalContextInput, baseScore, convergenceScore, finalScore,
-                    isBullish1m, isBullish5m, externalContextBlocked);
+                    isBullish5m, isBullish4h, externalContextBlocked);
             ctx.setGptConsistentWithRule(aiReview.isGptConsistentWithRule());
             ctx.setGeminiConsistentWithRule(aiReview.isGeminiConsistentWithRule());
             ctx.setGrokConsistentWithRule(aiReview.isGrokConsistentWithRule());
@@ -251,20 +254,20 @@ public class DecisionEngineService {
                     dataQualityScore,
                     trendStructureScore);
 
-            // Push 快照专用：与本 run 1m K 线一致，供 tm_push_snapshot / Recheck 漂移、过期、结构化失效
+            // Push 快照专用：使用正式 5m 主周期边界，不使用 1m 作为执行计划失效条件。
             BigDecimal pushTriggerPrice = null;
             LocalDateTime pushExpiresAt = LocalDateTime.now().plusHours(24);
             BigDecimal pushInvalidPriceBelow = null;
             BigDecimal pushInvalidPriceAbove = null;
             String pushInvalidationSummary = null;
-            if (!klines1m.isEmpty()) {
-                String[] lastBar = klines1m.get(klines1m.size() - 1);
+            if (!klines5m.isEmpty()) {
+                String[] lastBar = klines5m.get(klines5m.size() - 1);
                 if (lastBar.length > 4) {
                     pushTriggerPrice = new BigDecimal(lastBar[4]);
                 }
                 BigDecimal minLow = null;
                 BigDecimal maxHigh = null;
-                for (String[] bar : klines1m) {
+                for (String[] bar : klines5m) {
                     if (bar.length > 4) {
                         BigDecimal high = new BigDecimal(bar[2]);
                         BigDecimal low = new BigDecimal(bar[3]);
@@ -274,10 +277,10 @@ public class DecisionEngineService {
                 }
                 if ("BULLISH".equals(ruleMarketBias)) {
                     pushInvalidPriceBelow = minLow;
-                    pushInvalidationSummary = "结构失效：当前价低于近端 1m 摆动低点";
+                    pushInvalidationSummary = "结构失效：当前价低于近端 5m 摆动低点";
                 } else {
                     pushInvalidPriceAbove = maxHigh;
-                    pushInvalidationSummary = "结构失效：当前价高于近端 1m 摆动高点";
+                    pushInvalidationSummary = "结构失效：当前价高于近端 5m 摆动高点";
                 }
             }
 
@@ -365,6 +368,13 @@ public class DecisionEngineService {
         }
     }
 
+    private static boolean bullish(List<String[]> bars) {
+        if (bars == null || bars.isEmpty()) return false;
+        String[] last = bars.get(bars.size() - 1);
+        return last != null && last.length > 4
+                && new BigDecimal(last[4]).compareTo(new BigDecimal(last[1])) > 0;
+    }
+
     private static AssetStateEnum parseAssetState(String raw, AssetStateEnum fallback) {
         if (raw == null || raw.isBlank()) {
             return fallback;
@@ -401,7 +411,7 @@ public class DecisionEngineService {
                                              boolean multiTfConvergence,
                                              EventImpactInputVO externalContextInput,
                                              int baseScore, int convergenceScore, int finalScore,
-                                             boolean isBullish1m, boolean isBullish5m,
+                                             boolean isBullish5m, boolean isBullish4h,
                                              boolean externalContextBlocked) {
         String traceId = analysisId != null && !analysisId.isBlank()
                 ? analysisId + "-ai-review"
@@ -422,11 +432,11 @@ public class DecisionEngineService {
         request.setTrendStructureScore(trendStructureScore);
         request.setMultiTimeframeState(multiTfConvergence ? "ALIGNED" : "MISALIGNED");
         request.setExternalContextState(externalContextSummary(externalContextInput, externalContextBlocked));
-        request.setEvidenceSummary("Rule layer produced base direction from current 1m/5m klines; AI may only review or challenge.");
+        request.setEvidenceSummary("Rule layer produced base direction from authoritative 5m/15m/1h/4h klines; AI may only review or challenge.");
         request.setScoreSummary("baseScore=" + baseScore + ", convergenceScore=" + convergenceScore + ", finalScore=" + finalScore);
         Map<String, Object> facts = new LinkedHashMap<>();
-        facts.put("isBullish1m", isBullish1m);
         facts.put("isBullish5m", isBullish5m);
+        facts.put("isBullish4h", isBullish4h);
         facts.put("multiTimeframeAligned", multiTfConvergence);
         facts.put("externalContextBlocked", externalContextBlocked);
         facts.put("reviewOnly", true);

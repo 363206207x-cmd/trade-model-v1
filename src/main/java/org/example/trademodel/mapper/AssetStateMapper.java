@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.Insert;
 import org.example.trademodel.entity.AssetStateDO;
 
+import java.util.List;
+
 @Mapper
 public interface AssetStateMapper {
 
@@ -25,6 +27,10 @@ public interface AssetStateMapper {
 
     @Select("SELECT * FROM tm_asset_state WHERE symbol = #{symbol}")
     AssetStateDO selectBySymbol(@Param("symbol") String symbol);
+
+    @Select("SELECT * FROM tm_asset_state WHERE state IN ('CANDIDATE', 'WAITING_TRIGGER') "
+            + "ORDER BY last_update_time DESC, id DESC LIMIT #{limit}")
+    List<AssetStateDO> listCandidateOrWaitingTrigger(@Param("limit") int limit);
 
     /** 全库当前态：confused_score 大于 0 的 symbol 行数。 */
     @Select("SELECT COUNT(*) FROM tm_asset_state WHERE confused_score > 0")

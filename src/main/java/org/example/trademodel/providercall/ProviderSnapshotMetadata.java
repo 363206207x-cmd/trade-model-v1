@@ -25,8 +25,15 @@ public record ProviderSnapshotMetadata(
     }
 
     public ProviderSnapshotMetadata asCacheHit(SnapshotFreshnessStatus freshness, boolean fallback) {
+        return asCacheHit(freshness, fallback, expiresAt);
+    }
+
+    public ProviderSnapshotMetadata asCacheHit(
+            SnapshotFreshnessStatus freshness,
+            boolean fallback,
+            Instant requestedExpiresAt) {
         return new ProviderSnapshotMetadata(provider, datasetType, symbol, timeframe, providerDataTime,
-                fetchTime, expiresAt, fallback ? UnifiedSourceStatus.STALE : sourceStatus, freshness,
+                fetchTime, requestedExpiresAt, fallback ? UnifiedSourceStatus.STALE : sourceStatus, freshness,
                 traceId, requestKey, true, fallback, errorCode, reasonCodes);
     }
 }

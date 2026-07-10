@@ -1,15 +1,20 @@
 package org.example.trademodel.service.impl;
 
 import java.time.LocalDate;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.UUID;
 
 import org.example.trademodel.entity.UserPositionDO;
-import org.example.trademodel.market.client.MarketQuoteClient;
-import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
@@ -33,7 +38,7 @@ public class DecisionServiceImpl implements DecisionService {
 
     private final DecisionResultMapper decisionResultMapper;
     private final AnalysisRunMapper analysisRunMapper;
-    private final MarketQuoteClient marketQuoteClient;
+    private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final UserPositionMapper userPositionMapper;
     private final AssetStateService assetStateService;
     private final AssetStateMapper assetStateMapper;
@@ -42,7 +47,7 @@ public class DecisionServiceImpl implements DecisionService {
     private final RuntimeMetricService runtimeMetricService;
 
     public DecisionServiceImpl(DecisionResultMapper decisionResultMapper, AnalysisRunMapper analysisRunMapper,
-                               MarketQuoteClient marketQuoteClient, UserPositionMapper userPositionMapper,
+                               MarketPriceSnapshotService marketPriceSnapshotService, UserPositionMapper userPositionMapper,
                                AssetStateService assetStateService,
                                AssetStateMapper assetStateMapper,
                                PushSnapshotMapper pushSnapshotMapper,
@@ -50,7 +55,7 @@ public class DecisionServiceImpl implements DecisionService {
                                RuntimeMetricService runtimeMetricService) {
         this.decisionResultMapper = decisionResultMapper;
         this.analysisRunMapper = analysisRunMapper;
-        this.marketQuoteClient = marketQuoteClient;
+        this.marketPriceSnapshotService = marketPriceSnapshotService;
         this.userPositionMapper = userPositionMapper;
         this.assetStateService = assetStateService;
         this.assetStateMapper = assetStateMapper;
@@ -123,7 +128,7 @@ public class DecisionServiceImpl implements DecisionService {
             System.out.println("[PERF] service_get_latest_decision_results=" + methodCostMs + " ms");
             return new ArrayList<>();
         }
-        Map<String, MarketQuoteSnapshot> quoteCache = new HashMap<>();
+        Map<String, MarketPriceSnapshot> quoteCache = new HashMap<>();
         Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap();
         for (DecisionResultVO item : results) {
             if (item == null) {
@@ -131,11 +136,12 @@ public class DecisionServiceImpl implements DecisionService {
             }
             String symbol = item.getSymbol();
             if (symbol != null && !symbol.trim().isEmpty()) {
-                MarketQuoteSnapshot snapshot = quoteCache.computeIfAbsent(symbol, this::safeFetchQuote);
+                MarketPriceSnapshot snapshot = quoteCache.computeIfAbsent(symbol, this::safeFetchQuote);
                 if (snapshot != null) {
-                    item.setLatestPrice(snapshot.getLastPrice());
-                    item.setPriceChangePct(snapshot.getPriceChangePercent24h());
-                    item.setPriceUpdateTimeMs(snapshot.getFetchedAtEpochMillis());
+                    item.setLatestPrice(snapshot.lastPrice());
+                    item.setPriceChangePct(snapshot.priceChangePercent24h());
+                    Instant fetchedAt = snapshot.sourceFetchedAt();
+                    item.setPriceUpdateTimeMs(fetchedAt == null ? null : fetchedAt.toEpochMilli());
                 }
             }
             applyManualUserPosition(item, openPositionMap.get(normalizeSymbol(item.getSymbol())));
@@ -159,11 +165,11 @@ public class DecisionServiceImpl implements DecisionService {
             return null;
         }
 
-        MarketQuoteSnapshot snapshot = safeFetchQuote(row.getSymbol());
+        MarketPriceSnapshot snapshot = safeFetchQuote(row.getSymbol());
         if (snapshot != null) {
-            row.setLatestPrice(snapshot.getLastPrice());
-            row.setPriceChangePct(snapshot.getPriceChangePercent24h());
-            row.setPriceUpdateTimeMs(snapshot.getFetchedAtEpochMillis());
+            row.setLatestPrice(snapshot.lastPrice());
+            row.setPriceChangePct(snapshot.priceChangePercent24h());
+            row.setPriceUpdateTimeMs(snapshot.sourceFetchedAt() == null ? null : snapshot.sourceFetchedAt().toEpochMilli());
         }
 
         Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap();
@@ -192,10 +198,12 @@ public class DecisionServiceImpl implements DecisionService {
         }
     }
 
-    private MarketQuoteSnapshot safeFetchQuote(String symbol) {
+    private MarketPriceSnapshot safeFetchQuote(String symbol) {
         try {
-            Optional<MarketQuoteSnapshot> snapshot = marketQuoteClient.fetch24hTicker(symbol);
-            return snapshot.orElse(null);
+            if (marketPriceSnapshotService == null) return null;
+            ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.peek(symbol,
+                    AssetPriority.P1_CORE, Duration.ofSeconds(30), "decision-read-" + UUID.randomUUID());
+            return MarketPriceSnapshotPolicy.isFresh(result) ? result.payload() : null;
         } catch (Exception ignored) {
             return null;
         }

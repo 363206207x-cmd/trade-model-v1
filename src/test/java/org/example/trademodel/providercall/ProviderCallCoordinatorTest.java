@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProviderCallCoordinatorTest {
 
     @Test
-    void sameProviderRequestKeyUsesSingleFlight() throws Exception {
+    void sameSymbolAcrossDashboardMonitorRecheckUsesSingleFlight() throws Exception {
         ProviderSingleFlightGuard guard = new ProviderSingleFlightGuard();
         ProviderRequestKey key = key(ProviderDatasetType.PRICE);
         CountDownLatch ownerStarted = new CountDownLatch(1);
@@ -63,7 +63,7 @@ class ProviderCallCoordinatorTest {
     }
 
     @Test
-    void decisionDashboardMonitorShareOneSnapshot() {
+    void dashboardAndPositionMonitorShareFreshPriceSnapshot() {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 10);
         AtomicInteger calls = new AtomicInteger();
         ProviderCallRequest<String> request = request(key(ProviderDatasetType.PRICE), AssetPriority.P0_POSITION,
@@ -74,6 +74,57 @@ class ProviderCallCoordinatorTest {
         String monitor = context.coordinator.execute(request).payload();
 
         assertThat(decision).isEqualTo(dashboard).isEqualTo(monitor);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void pushRecheckReusesPositionMonitorSnapshot() {
+        assertSharedPriceReads(2);
+    }
+
+    @Test
+    void dashboardReadDoesNotCreateDuplicateProviderCall() {
+        TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 15);
+        AtomicInteger calls = new AtomicInteger();
+        ProviderRequestKey key = key(ProviderDatasetType.PRICE);
+        ProviderCallRequest<String> request = request(key, AssetPriority.P0_POSITION,
+                () -> ProviderAdapterResponse.ready("65000", context.clock.instant()), calls,
+                Duration.ofSeconds(15));
+        context.coordinator.execute(request);
+
+        ProviderCallResult<String> dashboard = context.coordinator.peek(key, AssetPriority.P0_POSITION,
+                Duration.ofSeconds(15), "dashboard-read");
+
+        assertThat(dashboard.payload()).isEqualTo("65000");
+        assertThat(dashboard.metadata().cacheHit()).isTrue();
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void sharedSnapshotHonorsStricterConsumerFreshness() {
+        TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 15);
+        AtomicInteger calls = new AtomicInteger();
+        ProviderRequestKey key = key(ProviderDatasetType.PRICE);
+        ProviderCallRequest<String> dashboard = request(key, AssetPriority.P1_CORE,
+                () -> ProviderAdapterResponse.ready("65000", context.clock.instant()), calls,
+                Duration.ofSeconds(15));
+        ProviderCallRequest<String> highMonitor = request(key, AssetPriority.P0_POSITION,
+                () -> ProviderAdapterResponse.ready("65001", context.clock.instant()), calls,
+                Duration.ofSeconds(5));
+        context.coordinator.execute(dashboard);
+        context.clock.advance(Duration.ofSeconds(6));
+
+        assertThat(context.coordinator.execute(highMonitor).payload()).isEqualTo("65001");
+        assertThat(calls).hasValue(2);
+    }
+
+    private static void assertSharedPriceReads(int reads) {
+        TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 15);
+        AtomicInteger calls = new AtomicInteger();
+        ProviderCallRequest<String> request = request(key(ProviderDatasetType.PRICE), AssetPriority.P0_POSITION,
+                () -> ProviderAdapterResponse.ready("65000", context.clock.instant()), calls,
+                Duration.ofSeconds(15));
+        for (int i = 0; i < reads; i++) assertThat(context.coordinator.execute(request).payload()).isEqualTo("65000");
         assertThat(calls).hasValue(1);
     }
 
@@ -129,7 +180,7 @@ class ProviderCallCoordinatorTest {
     }
 
     @Test
-    void staleSnapshotIsExplicitlyStale() {
+    void stalePriceIsNotRenderedAsFresh() {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 10);
         AtomicInteger calls = new AtomicInteger();
         ProviderCallRequest<String> ready = request(key(ProviderDatasetType.PRICE), AssetPriority.P0_POSITION,
@@ -147,7 +198,7 @@ class ProviderCallCoordinatorTest {
     }
 
     @Test
-    void missingProviderNeverBecomesHealthyOrLowRisk() {
+    void noDerivativesDoesNotBecomeLowRisk() {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 10);
         context.properties.setExternalCallsEnabled(false);
         ProviderCallResult<String> result = context.coordinator.execute(request(key(ProviderDatasetType.DERIVATIVES),

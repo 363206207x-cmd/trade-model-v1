@@ -3,6 +3,9 @@ package org.example.trademodel.providercall;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Component
 @ConfigurationProperties(prefix = "trade-model.provider-call")
 public class ProviderCallProperties {
@@ -20,6 +23,9 @@ public class ProviderCallProperties {
     private int maxPoolAssets = 20;
     private int failureThreshold = 3;
     private int circuitOpenSeconds = 60;
+    private List<String> coreAssets = new ArrayList<>(List.of(
+            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"));
+    private String scanUserId = "admin";
     private final ProviderBudgets providerBudgets = new ProviderBudgets();
     private final Profiles profiles = new Profiles();
     private final ProfileTransition profileTransition = new ProfileTransition();
@@ -52,6 +58,12 @@ public class ProviderCallProperties {
     public void setFailureThreshold(int failureThreshold) { this.failureThreshold = failureThreshold; }
     public int getCircuitOpenSeconds() { return circuitOpenSeconds; }
     public void setCircuitOpenSeconds(int circuitOpenSeconds) { this.circuitOpenSeconds = circuitOpenSeconds; }
+    public List<String> getCoreAssets() { return List.copyOf(coreAssets); }
+    public void setCoreAssets(List<String> coreAssets) {
+        this.coreAssets = coreAssets == null ? new ArrayList<>() : new ArrayList<>(coreAssets);
+    }
+    public String getScanUserId() { return scanUserId; }
+    public void setScanUserId(String scanUserId) { this.scanUserId = scanUserId; }
     public ProviderBudgets getProviderBudgets() { return providerBudgets; }
     public Profiles getProfiles() { return profiles; }
     public ProfileTransition getProfileTransition() { return profileTransition; }

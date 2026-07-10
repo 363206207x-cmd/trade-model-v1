@@ -17,9 +17,16 @@ public class SnapshotCacheService {
 
     @SuppressWarnings("unchecked")
     public <T> SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now) {
+        return lookup(key, now, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now, Duration requestedFreshTtl) {
         CacheEntry<T> entry = (CacheEntry<T>) entries.get(key);
         if (entry == null) return SnapshotLookup.unavailable();
-        if (now.isBefore(entry.metadata.expiresAt())) {
+        Instant requestedExpiry = requestedFreshTtl == null || entry.metadata.fetchTime() == null
+                ? entry.metadata.expiresAt() : entry.metadata.fetchTime().plus(requestedFreshTtl);
+        if (now.isBefore(requestedExpiry)) {
             return new SnapshotLookup<>(entry.payload, entry.metadata, SnapshotFreshnessStatus.FRESH);
         }
         if (now.isBefore(entry.staleUntil)) {

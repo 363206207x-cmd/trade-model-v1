@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService;
+import static org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.derivativesService;
 
 class RealMarketEnvironmentServiceTest {
 
@@ -54,7 +56,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLowPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertEquals(BigDecimal.ONE, env.get().getPriceChangePercent24h());
@@ -68,7 +70,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLowPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         String summary = env.get().getSummary();
@@ -84,7 +86,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLowPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         String summary = env.get().getSummary();
@@ -97,7 +99,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLastPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         String summary = env.get().getSummary();
@@ -116,7 +118,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLowPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertEquals(4.0, env.get().getRangePct24h(), 1e-9);
@@ -132,7 +134,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLowPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("ETH", "15m");
         assertTrue(env.isPresent());
         assertEquals(0.5, env.get().getRangePct24h(), 1e-9);
@@ -152,7 +154,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLastPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient funding = __ -> Optional.of(new BigDecimal("0.0001"));
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, funding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(funding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertTrue(Boolean.TRUE.equals(env.get().getPerpFundingApplied()));
@@ -167,7 +169,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLastPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient funding = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, funding, NO_OI);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(funding, NO_OI));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertFalse(Boolean.TRUE.equals(env.get().getPerpFundingApplied()));
@@ -188,7 +190,7 @@ class RealMarketEnvironmentServiceTest {
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
         OpenInterestClient oi = __ -> Optional.of(new BigDecimal("75797.837"));
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, oi);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, oi));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertTrue(Boolean.TRUE.equals(env.get().getOiApplied()));
@@ -205,7 +207,7 @@ class RealMarketEnvironmentServiceTest {
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient noFunding = __ -> Optional.empty();
         OpenInterestClient oi = __ -> Optional.empty();
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, noFunding, oi);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(noFunding, oi));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertFalse(Boolean.TRUE.equals(env.get().getOiApplied()));
@@ -219,7 +221,7 @@ class RealMarketEnvironmentServiceTest {
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient funding = __ -> Optional.of(new BigDecimal("0.0001"));
         OpenInterestClient oi = __ -> Optional.of(new BigDecimal("1000"));
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, funding, oi);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(funding, oi));
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertTrue(Boolean.TRUE.equals(env.get().getPerpFundingApplied()));
@@ -240,7 +242,7 @@ class RealMarketEnvironmentServiceTest {
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient funding = __ -> Optional.of(new BigDecimal("-0.0002"));
         OpenInterestClient oi = __ -> Optional.of(new BigDecimal("800"));
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, funding, oi);
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(funding, oi));
 
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
 
@@ -256,7 +258,7 @@ class RealMarketEnvironmentServiceTest {
         q.setLastPrice(new BigDecimal("100"));
         MarketQuoteClient client = s -> Optional.of(q);
         PerpFundingRateClient funding = __ -> Optional.of(new BigDecimal("0.0002"));
-        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(client, funding, __ -> Optional.empty());
+        RealMarketEnvironmentService svc = new RealMarketEnvironmentService(snapshotService(client), derivativesService(funding, __ -> Optional.empty()));
 
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
 
