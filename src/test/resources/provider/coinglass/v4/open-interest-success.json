@@ -1,0 +1,18 @@
+{
+  "_fixture": "synthetic contract fixture based on CoinGlass v4 official Exchange List schema",
+  "code": "0",
+  "msg": "success",
+  "data": [
+    {
+      "exchange": "All",
+      "symbol": "BTC",
+      "open_interest_usd": 1000.00,
+      "open_interest_change_percent_5m": 0.34,
+      "open_interest_change_percent_15m": 0.59,
+      "open_interest_change_percent_1h": 2.27
+    },
+    { "exchange": "Binance", "symbol": "BTC", "open_interest_usd": 400.00 },
+    { "exchange": "OKX", "symbol": "BTC", "open_interest_usd": 300.00 },
+    { "exchange": "Bybit", "symbol": "BTC", "open_interest_usd": 200.00 }
+  ]
+}

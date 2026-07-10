@@ -1,0 +1,14 @@
+{
+  "_fixture": "synthetic contract fixture based on CoinGlass v4 official OI Weight History schema",
+  "code": "0",
+  "msg": "success",
+  "data": [
+    {
+      "time": 1783677540000,
+      "open": "0.004603",
+      "high": "0.009388",
+      "low": "-0.005063",
+      "close": "0.009229"
+    }
+  ]
+}

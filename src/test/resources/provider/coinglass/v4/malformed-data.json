@@ -1,0 +1,6 @@
+{
+  "_fixture": "synthetic malformed contract fixture",
+  "code": "0",
+  "msg": "success",
+  "data": { "unexpected": true }
+}

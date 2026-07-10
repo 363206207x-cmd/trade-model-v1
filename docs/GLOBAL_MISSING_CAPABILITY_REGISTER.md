@@ -33,6 +33,7 @@
 | GAP-P1-010 | Manual optional-field truth | browser silently sends quantity/leverage `1` | `RENDERED_NOT_BACKED` | omit unsupported values or visibly require/default them with an explicit backend contract. |
 | GAP-P1-011 | Opportunity real outcome automation | evaluation is explicit and OHLCV-blocked | `BLOCKED_NO_REAL_DATA` | bounded scheduler/operator policy evaluates due rows from authoritative bars without trading effects. |
 | GAP-P1-012 | Rule-config consumption completeness | confused/AI/missed groups exist but are not consumed | `BACKEND_FIELD_UNUSED` | policies load active version fail-closed and tests prove threshold changes. |
+| GAP-P1-013 | CoinGlass derivatives business adoption | CG-1 supplies normalized OI/Funding/liquidation/global-account-ratio snapshots, but scoring, Decision, Confused, plan, monitor advice, and Push do not consume them | `PROVIDER_READY_BUSINESS_NOT_WIRED` | BIZ-1 explicitly maps source-backed fields into configurable business rules with fail-closed tests; no adapter-level trading judgment. |
 
 ## P2 Register
 

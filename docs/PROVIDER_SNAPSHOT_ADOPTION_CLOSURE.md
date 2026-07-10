@@ -45,7 +45,8 @@ No primary business consumer is classified `FORBIDDEN_DIRECT_READER`.
 | `PUSH_RECHECK_SNAPSHOT_STATUS` | `PASS` |
 | `DASHBOARD_SNAPSHOT_STATUS` | `PASS` |
 | `RUNTIME_SCAN_UNIVERSE_STATUS` | `PASS` |
-| `DERIVATIVES_WITHOUT_COINGLASS_STATUS` | `NOT_CONFIGURED` |
+| `COINGLASS_PROVIDER_ADAPTER_STATUS` | `CG-1 IMPLEMENTED_ON_BRANCH / DEFAULT_OFF` |
+| `COINGLASS_BUSINESS_DECISION_INTEGRATION` | `NOT_STARTED` |
 | `POSTGRESQL_V5_MIGRATION_STATUS` | `SKIPPED_DOCKER_UNAVAILABLE` |
 | `POSTGRESQL_V5_RUNTIME_STATUS` | `SKIPPED_DOCKER_UNAVAILABLE` |
 | `LIVE_PROVIDER_CALLS` | `0` |
@@ -65,7 +66,7 @@ No primary business consumer is classified `FORBIDDEN_DIRECT_READER`.
 
 Available persisted signals feed `ScanProfileTransitionService`: near stop/target, plan invalidation, Push Recheck drift/invalidation, high risk, reversal, external-context block, confused score, Hot Reset, and data-quality deterioration. These transitions remain symbol-scoped; one asset's event does not promote the global scan profile. Missing ATR/volume/spread and CoinGlass data stay null. Downgrade hysteresis and transition audit remain active.
 
-`DefaultProviderDatasetRefreshPort` routes PRICE through the shared price snapshot and OHLCV through the coordinated four-timeframe writer path. Before each OHLCV refresh it reads the latest authoritative closed bar and calls the coordinator only when the next closed bar is due; missing/read-error state permits a fail-closed recovery attempt. Routine scan never invokes AI. CoinGlass-backed derivatives are explicitly `NOT_CONFIGURED`; external context is explicit `NOT_CONFIGURED` until an authoritative provider snapshot exists.
+`DefaultProviderDatasetRefreshPort` routes PRICE through the shared price snapshot, OHLCV through the coordinated four-timeframe writer path, and aggregate DERIVATIVES through the four isolated CoinGlass dataset snapshot services. Before each OHLCV refresh it reads the latest authoritative closed bar and calls the coordinator only when the next closed bar is due; missing/read-error state permits a fail-closed recovery attempt. Routine scan never invokes AI. CoinGlass remains `DISABLED` or `NOT_CONFIGURED` without explicit gates/key and makes no transport call in those states; external context remains explicit `NOT_CONFIGURED` until an authoritative provider snapshot exists.
 
 ## Runtime Visibility
 
@@ -87,7 +88,8 @@ Local bounded execution on 2026-07-10 completed with exit code 0 and Testcontain
 
 ## Remaining Boundaries
 
-- CoinGlass is not connected; liquidation/long-short/full derivatives fields remain unavailable.
+- CoinGlass v4 source/normalization is implemented default-off in CG-1; live authenticated evidence is skipped because no key is present.
+- CoinGlass values are not wired into score, decision, Confused, plan, monitor advice, or Push; BIZ-1 remains not started.
 - External context provider refresh remains not configured.
 - Live provider calls and production deployment evidence are outside this local test package.
 - Production readiness remains `BLOCKED`.

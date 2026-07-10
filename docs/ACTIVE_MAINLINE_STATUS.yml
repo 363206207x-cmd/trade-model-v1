@@ -12,18 +12,18 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P4 Versioned Real Local Historical Fixture + Direct Replay Adapter"
-active_block_cn: "P4 版本化真实本地历史数据 + 直接回放适配器"
+active_block: "CG-1 CoinGlass v4 Provider Adapter and Derivatives Snapshot"
+active_block_cn: "CG-1 CoinGlass v4 Provider 适配与衍生品快照"
 
-next_required_action: "Provide a provenance-backed real fixture in an allowed local path, review redistribution status, populate the manifest/hash, and rerun P4 direct replay validation."
-next_business_phase: "Fixture provisioning and P4 direct replay rerun / explicitly scoped replay-input remediation"
+next_required_action: "Complete CG-1 deterministic validation and merge review; keep BIZ-1 score/decision/plan/monitor/push integration separate and not started."
+next_business_phase: "BIZ-1 derivatives business-rule adoption only after CG-1 is merged/effective and separately scoped"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false while P4 is blocked by the missing real fixture; production deployment remains blocked."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until CG-1 is merged/effective; BIZ-1 and production deployment remain blocked on this branch."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "none"
-current_branch: "codex/p4-real-historical-fixture-direct-replay"
+current_branch: "codex/cg1-coinglass-v4-provider"
 current_package_pr: "none"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
@@ -135,6 +135,9 @@ p3_historical_market_replay_status: "DONE/effective on merged main by PR #1105: 
 p3_historical_market_replay_effective: true
 p4_real_historical_fixture_replay_status: "BLOCKED_MISSING_REAL_FIXTURE on branch codex/p4-real-historical-fixture-direct-replay: contract, manifest, loader, integrity and no-lookahead guards prepared; real pipeline not run"
 p4_real_historical_fixture_replay_effective: false
+cg1_coinglass_v4_provider_status: "IN_PROGRESS on branch: official v4 endpoint matrix verified; four isolated datasets and fail-closed normalized snapshot implemented; no live call"
+cg1_coinglass_v4_provider_effective: false
+biz1_derivatives_business_integration_status: "NOT_STARTED"
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -175,7 +178,8 @@ notes:
   - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
   - "PDR-LIVE16 is DONE/effective on merged main by PR #1095: readiness remains BLOCKED and deployment decision remains DO NOT DEPLOY."
   - "PDR-LIVE17 is DONE/effective on merged main by PR #1096: provider policy evidence is recorded, but no missing provider is waived or treated as PASS."
-  - "Current allowed work is P4 fixture contract/loader/no-lookahead preparation, provenance-backed fixture provisioning in an allowed local path, status-source updates, and explicitly scoped replay-input remediation."
+  - "Current allowed work is CG-1 CoinGlass v4 provider adapter, four isolated derivative datasets, deterministic fixtures/tests, controlled default-off smoke, and status-source updates."
+  - "CG-1 does not change score, decision, Confused, ExecutionPlan, Position Monitor advice, Push text, or UserPosition; BIZ-1 remains NOT_STARTED."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."
   - "P4 is BLOCKED_MISSING_REAL_FIXTURE; no real replay, provider validation, profitability, or production-readiness PASS is claimed."

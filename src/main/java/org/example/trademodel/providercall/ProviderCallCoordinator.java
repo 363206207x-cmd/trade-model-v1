@@ -103,6 +103,17 @@ public class ProviderCallCoordinator {
             return audited(request, new ProviderCallResult<>(response.payload(), metadata,
                     budget.state(provider, circuitBreaker.state(provider))));
         }
+        if (response != null && response.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED) {
+            circuitBreaker.recordSuccess(provider);
+            Instant fetchTime = clock.instant();
+            ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
+                    fetchTime.plus(request.freshTtl()), UnifiedSourceStatus.EMPTY_CONFIRMED,
+                    SnapshotFreshnessStatus.FRESH, false, false, response.reasonCode(),
+                    response.reasonCode() == null ? List.of() : List.of(response.reasonCode()));
+            cache.put(request.key(), null, metadata, request.staleTtl());
+            return audited(request, new ProviderCallResult<>(null, metadata,
+                    budget.state(provider, circuitBreaker.state(provider))));
+        }
 
         int status = response == null ? 0 : response.httpStatus();
         String reason = response == null || response.reasonCode() == null
@@ -132,14 +143,14 @@ public class ProviderCallCoordinator {
                 if (response == null || response.ready()) return response;
                 int status = response.httpStatus();
                 if (status == 401 || status == 403 || status == 429) return response;
-                if (status >= 500 && status <= 599 && attempt < 3) {
+                if (status >= 500 && status <= 599 && attempt <= request.maxRetry5xx()) {
                     boundedBackoff(attempt);
                     continue;
                 }
                 return response;
             } catch (TimeoutException timeout) {
                 timeoutCount++;
-                if (timeoutCount >= 2) {
+                if (timeoutCount > request.maxRetryTimeout()) {
                     return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0,
                             "PROVIDER_TIMEOUT", null);
                 }

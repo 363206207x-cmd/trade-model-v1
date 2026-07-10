@@ -11,8 +11,20 @@ public record ProviderCallRequest<T>(
         Duration staleTtl,
         Duration timeout,
         String traceId,
+        int maxRetry5xx,
+        int maxRetryTimeout,
         Supplier<ProviderAdapterResponse<T>> adapterCall
 ) {
+    public ProviderCallRequest(ProviderRequestKey key,
+                               AssetPriority priority,
+                               Duration freshTtl,
+                               Duration staleTtl,
+                               Duration timeout,
+                               String traceId,
+                               Supplier<ProviderAdapterResponse<T>> adapterCall) {
+        this(key, priority, freshTtl, staleTtl, timeout, traceId, 2, 1, adapterCall);
+    }
+
     public ProviderCallRequest {
         key = Objects.requireNonNull(key, "key");
         priority = Objects.requireNonNull(priority, "priority");
@@ -20,6 +32,8 @@ public record ProviderCallRequest<T>(
         staleTtl = positive(staleTtl, "staleTtl");
         timeout = positive(timeout, "timeout");
         if (traceId == null || traceId.isBlank()) throw new IllegalArgumentException("traceId is required");
+        if (maxRetry5xx < 0) throw new IllegalArgumentException("maxRetry5xx must not be negative");
+        if (maxRetryTimeout < 0) throw new IllegalArgumentException("maxRetryTimeout must not be negative");
         adapterCall = Objects.requireNonNull(adapterCall, "adapterCall");
     }
 

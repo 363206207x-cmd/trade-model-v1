@@ -46,7 +46,7 @@ public class SnapshotCacheService {
         static <T> SnapshotLookup<T> unavailable() {
             return new SnapshotLookup<>(null, null, SnapshotFreshnessStatus.UNAVAILABLE);
         }
-        public boolean fresh() { return freshness == SnapshotFreshnessStatus.FRESH && payload != null; }
-        public boolean staleReadable() { return freshness == SnapshotFreshnessStatus.STALE && payload != null; }
+        public boolean fresh() { return freshness == SnapshotFreshnessStatus.FRESH && metadata != null; }
+        public boolean staleReadable() { return freshness == SnapshotFreshnessStatus.STALE && metadata != null; }
     }
 }

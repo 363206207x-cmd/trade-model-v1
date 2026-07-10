@@ -1,0 +1,12 @@
+{
+  "_fixture": "synthetic contract fixture based on CoinGlass v4 official Coin Liquidation History schema",
+  "code": "0",
+  "msg": "success",
+  "data": [
+    { "time": 1783677540000, "aggregated_long_liquidation_usd": 10, "aggregated_short_liquidation_usd": 20 },
+    { "time": 1783677480000, "aggregated_long_liquidation_usd": 11, "aggregated_short_liquidation_usd": 21 },
+    { "time": 1783677420000, "aggregated_long_liquidation_usd": 12, "aggregated_short_liquidation_usd": 22 },
+    { "time": 1783677360000, "aggregated_long_liquidation_usd": 13, "aggregated_short_liquidation_usd": 23 },
+    { "time": 1783677300000, "aggregated_long_liquidation_usd": 14, "aggregated_short_liquidation_usd": 24 }
+  ]
+}

@@ -67,7 +67,7 @@ Priority: P0
 
 Depends on: Package B.
 
-Current status: coordination, cache, single-flight, budget, scan-profile, bounded-universe, snapshot contracts, and default-off scheduler foundation implemented; repository-wide business-reader migration remains open.
+Current status: coordination, cache, single-flight, budget, scan-profile, bounded-universe, snapshot contracts, and primary business-reader adoption are complete. CG-1 adds the default-off official CoinGlass v4 source/normalization layer; CoinGlass business-rule adoption remains a separate BIZ-1 package.
 
 Scope:
 
@@ -81,6 +81,8 @@ Done when:
 - all legacy business direct provider-reader calls are removed;
 - one request key produces one provider call within its freshness window;
 - controlled provider evidence is recorded separately without treating missing keys as PASS.
+
+CG-1 update: four isolated CoinGlass v4 datasets now assemble into a traceable `DerivativesRiskSnapshot` with partial/stale/fail-closed semantics. No CoinGlass field changes scoring, direction, plan, Position Monitor advice, or Push in this package. BIZ-1 remains `NOT_STARTED`.
 
 ### Package D: External Context No-Data Contract
 
