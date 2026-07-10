@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P2 V1 Business Stress Test
-Next Business Phase: Business stress follow-up fixes or local dashboard/API stress execution after explicit approval / production readiness remediation
-Next Business Phase Allowed: YES for local deterministic business stress testing and scoped remediation/business packages; NO for production deployment
+Current Work Package: P3 Historical Market Replay Business Validation
+Next Business Phase: Real local historical fixture ingestion or replay-gap remediation after explicit scope / production-readiness remediation
+Next Business Phase Allowed: YES for local replay validation and scoped remediation/business packages; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -16,7 +16,7 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 
 ## P1 Dashboard Stress Test Plan & Harness Preparation
 
-P1 Dashboard Stress Test Plan & Harness Preparation is the current package after P0 backend/frontend alignment closure. It prepares a local-only dashboard stress-test plan, guarded dry-run harness, and evidence template. It does not execute stress traffic.
+P1 Dashboard Stress Test Plan & Harness Preparation is merged/effective historical preparation after P0 backend/frontend alignment closure. It prepared a local-only dashboard stress-test plan, guarded dry-run harness, and evidence template. It did not execute stress traffic.
 
 Current P1 preparation status:
 
@@ -36,7 +36,7 @@ Next recommendation after P1 preparation: run a separate explicitly approved loc
 
 ## P2 V1 Business Stress Test
 
-P2 V1 Business Stress Test is the current local deterministic business-loop stress package. It verifies opportunity discovery, manual execution-plan completeness, paper/manual position monitoring usefulness, Push Recheck freshness validation, and closed-position exclusion without production access, provider calls, external Push/Telegram send, or trading/order behavior.
+P2 V1 Business Stress Test is merged/effective on main by PR #1104. It verifies opportunity discovery, manual execution-plan completeness, paper/manual position monitoring usefulness, Push Recheck freshness validation, and closed-position exclusion without production access, provider calls, external Push/Telegram send, or trading/order behavior.
 
 Current P2 stress status:
 
@@ -45,8 +45,26 @@ Current P2 stress status:
 3. `scripts/v1-business-stress-local.sh` defaults to dry-run and requires `V1_BUSINESS_STRESS_CONFIRM=YES` before running the local JUnit harness.
 4. No production server, production DB, provider endpoint, write endpoint, Push/Recheck send, Telegram send, order execution, auto-open, auto-close, auto-reverse, or auto-trading behavior is allowed.
 5. Production readiness remains BLOCKED and production deployment cannot proceed.
+6. P2 deterministic business stress result is PASS.
 
-Next recommendation after P2: review any business stress findings and run a separate explicitly approved local UI/API stress execution package if needed. The next package must not be production deployment.
+Next recommendation after P2: run P3 local historical/replay-style validation while keeping synthetic fixture claims separate from real historical/provider evidence.
+
+---
+
+## P3 Historical Market Replay Business Validation
+
+P3 is the current local-only replay package. It feeds clearly labeled in-memory OHLCV paths through the existing Decision Engine, review-only execution-plan boundary adapter, Push Recheck, and Position Monitor services.
+
+Current P3 status:
+
+1. Replay source is `LOCAL_REPLAY_FIXTURE_NOT_PROVIDER`; no real local historical CSV/JSON fixture exists.
+2. At least nine decision/recheck paths and six paper-monitor outcomes cover uptrend, downtrend, fake breakout, range, wick, crash/rebound, pullback, high-risk, drift, TP, stop, reversal, and closed-position exclusion.
+3. Focused opportunity, execution-plan, and position-monitor assertions pass for the local replay contract.
+4. Package-level result remains `PARTIAL` because synthetic replay is not real historical data and the production system lacks a first-class candle replay session.
+5. No provider, production server/DB, external send, order execution, auto-open, auto-close, auto-reverse, or auto-trading surface is used.
+6. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after P3: add a versioned real local historical fixture and direct replay adapter in a separately scoped local-only package, or remediate the replay gaps recorded in `docs/V1_HISTORICAL_REPLAY_VALIDATION_EVIDENCE.md`.
 
 ---
 

@@ -12,13 +12,13 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P2 V1 Business Stress Test"
-active_block_cn: "P2 V1 业务闭环压力测试"
+active_block: "P3 Historical Market Replay Business Validation"
+active_block_cn: "P3 历史行情回放业务验证"
 
-next_required_action: "Complete P2 V1 Business Stress Test. Run deterministic local paper-only scenarios for opportunity discovery, manual execution-plan completeness, and position monitor usefulness without providers or trading behavior."
-next_business_phase: "Business stress follow-up fixes or local dashboard/API stress execution after explicit approval / production readiness remediation"
+next_required_action: "Complete P3 local replay-style validation with clearly labeled non-provider fixtures and record honest PARTIAL evidence unless real local history exists."
+next_business_phase: "Real local historical fixture ingestion or replay-gap remediation after explicit scope / production-readiness remediation"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this business stress package is merged/effective; production deployment remains blocked."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false until this replay package is merged/effective; production deployment remains blocked."
 
 production_deployment_readiness: "BLOCKED"
 
@@ -129,8 +129,10 @@ pdr_live18_status: "DONE/effective on merged main: release-owner decision regist
 pdr_live18_effective: true
 p1_dashboard_stress_test_plan_status: "DONE/effective on merged main by PR #1103: local-only stress-test plan and guarded dry-run harness preparation; stress execution remains separate"
 p1_dashboard_stress_test_plan_effective: true
-p2_v1_business_stress_test_status: "IN_PROGRESS on branch codex/p2-v1-business-stress-test: deterministic local paper-only business stress scenarios; no production access, provider calls, external send, or trading behavior"
-p2_v1_business_stress_test_effective: false
+p2_v1_business_stress_test_status: "DONE/effective on merged main by PR #1104: deterministic local paper-only business stress PASS; no production access, provider calls, external send, or trading behavior"
+p2_v1_business_stress_test_effective: true
+p3_historical_market_replay_status: "IN_PROGRESS on branch codex/p3-historical-market-replay-validation: local replay-style validation using LOCAL_REPLAY_FIXTURE_NOT_PROVIDER; package result remains PARTIAL without real local historical fixtures"
+p3_historical_market_replay_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -171,7 +173,8 @@ notes:
   - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
   - "PDR-LIVE16 is DONE/effective on merged main by PR #1095: readiness remains BLOCKED and deployment decision remains DO NOT DEPLOY."
   - "PDR-LIVE17 is DONE/effective on merged main by PR #1096: provider policy evidence is recorded, but no missing provider is waived or treated as PASS."
-  - "Current allowed work is deterministic local V1 business stress testing with synthetic/test fixtures, status-source updates, the next explicitly scoped remediation/business package, and production-readiness remediation only when explicitly scoped."
-  - "P2 business stress is paper-only and local-only; it is not production readiness, live profitability, provider smoke, or release approval."
+  - "Current allowed work is local V1 replay validation with clearly labeled synthetic/test fixtures, status-source updates, the next explicitly scoped remediation/business package, and production-readiness remediation only when explicitly scoped."
+  - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
+  - "P3 replay validation is local-only and uses LOCAL_REPLAY_FIXTURE_NOT_PROVIDER; it is not real historical evidence, production readiness, live profitability, provider smoke, or release approval."
   - "Production Deployment Readiness remains BLOCKED and production deployment cannot proceed."
   - "No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed."

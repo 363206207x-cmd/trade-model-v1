@@ -20,6 +20,7 @@ target/
 tmp/stress/
 build/stress-dashboard/
 build/v1-business-stress/
+build/v1-historical-replay/
 
 # Local deployment secrets and backups
 .env
