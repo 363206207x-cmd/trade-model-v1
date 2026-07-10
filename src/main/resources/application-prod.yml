@@ -46,6 +46,13 @@ trade-model:
       watchlist: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_WATCHLIST:}
       position-monitor: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_POSITION_MONITOR:}
       analysis: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_ANALYSIS:}
+      provider-scan: ${TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_PROVIDER_SCAN:}
+  provider-call:
+    enabled: ${TRADE_MODEL_PROVIDER_CALL_ENABLED:false}
+    scheduler-enabled: ${TRADE_MODEL_PROVIDER_SCAN_SCHEDULER_ENABLED:false}
+    profile-escalation-enabled: ${TRADE_MODEL_PROFILE_ESCALATION_ENABLED:false}
+    auto-escalation-enabled: ${TRADE_MODEL_PROVIDER_AUTO_ESCALATION_ENABLED:false}
+    external-calls-enabled: ${TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED:false}
   schedulers:
     enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:false}
     push-recheck:

@@ -257,6 +257,23 @@ class ProductionProfileSafetyGuardTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
+    void rejectsProviderScanWithoutExplicitCoordinatorAndExternalOptIn() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.provider-call.scheduler-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call features require explicitly enabled coordinator")
+                .hasMessageContaining("production provider-call scheduler requires explicit external-call opt-in");
+    }
+
+    @Test
+    void providerCallProductionSwitchesAreFailClosedByDefault() {
+        MockEnvironment environment = safeEnvironment();
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
     private MockEnvironment safeEnvironment() {
         MockEnvironment environment = new MockEnvironment();
         environment.setProperty("spring.datasource.url", "jdbc:postgresql://db.internal/trade_model_v1");
@@ -290,6 +307,12 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.production.scheduler-approval.watchlist", "LOCAL_ONLY");
         environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_DEFAULT_OFF");
         environment.setProperty("trade-model.production.scheduler-approval.analysis", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.production.scheduler-approval.provider-scan", "PROD_ALLOWED_DEFAULT_OFF");
+        environment.setProperty("trade-model.provider-call.enabled", "false");
+        environment.setProperty("trade-model.provider-call.scheduler-enabled", "false");
+        environment.setProperty("trade-model.provider-call.profile-escalation-enabled", "false");
+        environment.setProperty("trade-model.provider-call.auto-escalation-enabled", "false");
+        environment.setProperty("trade-model.provider-call.external-calls-enabled", "false");
         environment.setProperty("trade-model.ohlcv.public-provider.enabled", "false");
         environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "false");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");

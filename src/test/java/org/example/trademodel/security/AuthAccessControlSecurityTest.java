@@ -1,5 +1,6 @@
 package org.example.trademodel.security;
 
+import org.example.trademodel.mapper.RuleVersionLogMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -16,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,6 +35,9 @@ class AuthAccessControlSecurityTest {
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
     private RequestMappingHandlerMapping handlerMapping;
+
+    @Autowired
+    private RuleVersionLogMapper ruleVersionLogMapper;
 
     @Test
     void dashboardPageRequiresAuthenticationAndAllowsBasicAuth() throws Exception {
@@ -91,6 +96,31 @@ class AuthAccessControlSecurityTest {
             mockMvc.perform(get(path))
                     .andExpect(status().isUnauthorized());
         }
+    }
+
+    @Test
+    void scanProfileUpdateIsAuthenticatedAndAudited() throws Exception {
+        mockMvc.perform(put("/api/config/scan-profile")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/api/config/scan-profile")
+                        .with(httpBasic("operator", "operator-secret"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "baseProfile": "HIGH",
+                                  "positionMonitorProfile": "HIGH",
+                                  "poolProfile": "LOW",
+                                  "autoEscalationEnabled": true,
+                                  "updateReason": "authenticated safety profile test"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        assertThat(ruleVersionLogMapper.queryLogs(null, null, "operator", null, null,
+                "SCAN_PROFILE_CONFIG", null, null, null, 10)).isNotEmpty();
     }
 
     @Test

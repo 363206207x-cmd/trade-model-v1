@@ -46,7 +46,8 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             new SchedulerPolicyItem("ohlcv-ingestion", "trade-model.schedulers.ohlcv-ingestion.enabled", false),
             new SchedulerPolicyItem("watchlist", "trade-model.schedulers.watchlist.enabled", false),
             new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", true),
-            new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false)
+            new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false),
+            new SchedulerPolicyItem("provider-scan", "trade-model.provider-call.scheduler-enabled", true)
     );
 
     private final Environment environment;
@@ -130,6 +131,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
         validateProductionSchedulerPolicy(environment, errors);
         validateOhlcvIngestionPolicy(environment, errors);
+        validateProviderCallPolicy(environment, errors);
         validateProductionRateLimit(environment, errors);
 
         if (!errors.isEmpty()) {
@@ -207,6 +209,21 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
                 .toList());
         if (!timeframes.equals(Set.of("5m", "15m", "1h", "4h"))) {
             errors.add("production OHLCV ingestion must use exactly 5m,15m,1h,4h timeframes");
+        }
+    }
+
+    private static void validateProviderCallPolicy(Environment environment, List<String> errors) {
+        boolean coordinatorEnabled = isTrue(property(environment, "trade-model.provider-call.enabled"));
+        boolean schedulerEnabled = isTrue(property(environment, "trade-model.provider-call.scheduler-enabled"));
+        boolean escalationEnabled = isTrue(property(environment, "trade-model.provider-call.profile-escalation-enabled"));
+        boolean autoEscalationEnabled = isTrue(property(environment, "trade-model.provider-call.auto-escalation-enabled"));
+        boolean externalCallsEnabled = isTrue(property(environment, "trade-model.provider-call.external-calls-enabled"));
+        if ((schedulerEnabled || escalationEnabled || autoEscalationEnabled || externalCallsEnabled)
+                && !coordinatorEnabled) {
+            errors.add("production provider-call features require explicitly enabled coordinator");
+        }
+        if (schedulerEnabled && !externalCallsEnabled) {
+            errors.add("production provider-call scheduler requires explicit external-call opt-in");
         }
     }
 

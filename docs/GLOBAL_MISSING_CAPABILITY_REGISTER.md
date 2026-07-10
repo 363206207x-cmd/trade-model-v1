@@ -15,6 +15,7 @@
 | GAP-P0-003 | UserPosition source provenance | VO hardcodes every row to `MANUAL` | `WRONG_SOURCE_MAPPING` | Persisted source passes through mapper/service and Home excludes non-manual rows in a regression test. |
 | GAP-P0-004 | Fail-closed external-context no-data state | absent imports return `READY/OK/LOW` | `SEMANTIC_DRIFT` | No-config, waiting, empty-confirmed, stale, degraded, and error states are typed and decision/monitor behavior is conservative. |
 | GAP-P0-005 | Product-contract multi-timeframe decision | Decision engine reads only `1m`/`5m` and ignores requested primary set | `SEMANTIC_DRIFT` | `5m/15m/1h/4h` source inputs and convergence are traceable, configurable, and tested. |
+| GAP-P0-006 | Unified provider-call and snapshot adoption | Shared coordinator/cache/single-flight/budget/profile contracts exist, but legacy Dashboard/Decision/PositionMonitor/PushRecheck quote readers are not all migrated | `PARTIAL_CONTRACT_WIRED` | All business provider reads use snapshot services; no legacy direct provider reader remains; controlled external-call evidence is separately proven. |
 
 ## P1 Register
 
