@@ -61,6 +61,13 @@ trade-model:
       fixed-rate-ms: ${TRADE_MODEL_POSITION_MONITOR_FIXED_RATE_MS:30000}
     market-data:
       enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:true}
+    ohlcv-ingestion:
+      enabled: ${TRADE_MODEL_OHLCV_INGESTION_SCHEDULER_ENABLED:false}
+      initial-delay-ms: ${TRADE_MODEL_OHLCV_INGESTION_INITIAL_DELAY_MS:60000}
+      fixed-delay-ms: ${TRADE_MODEL_OHLCV_INGESTION_FIXED_DELAY_MS:60000}
+      symbols: ${TRADE_MODEL_OHLCV_INGESTION_SYMBOLS:}
+      timeframes: ${TRADE_MODEL_OHLCV_INGESTION_TIMEFRAMES:5m,15m,1h,4h}
+      bar-limit: ${TRADE_MODEL_OHLCV_INGESTION_BAR_LIMIT:100}
     watchlist:
       enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:true}
   analysis:
@@ -73,6 +80,12 @@ trade-model:
     idempotency:
       lease-seconds: ${TRADE_MODEL_ANALYSIS_IDEMPOTENCY_LEASE_SECONDS:120}
       max-recovery-attempts: ${TRADE_MODEL_ANALYSIS_IDEMPOTENCY_MAX_RECOVERY_ATTEMPTS:3}
+  ohlcv:
+    future-tolerance-ms: ${TRADE_MODEL_OHLCV_FUTURE_TOLERANCE_MS:30000}
+    freshness-tolerance-ms: ${TRADE_MODEL_OHLCV_FRESHNESS_TOLERANCE_MS:30000}
+    public-provider:
+      enabled: ${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}
+      external-calls-enabled: ${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}
   ai:
     enabled: ${TRADE_MODEL_AI_ENABLED:false}
     request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}

@@ -90,6 +90,18 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
                     "Persisted OHLCV source ownership is incomplete.", ownershipMissing, bars);
         }
 
+        if (bars.stream().anyMatch(bar -> !"READY".equals(bar.getSourceStatus()))) {
+            return finish(result, PersistedOhlcvReadinessStatus.INVALID,
+                    PersistedOhlcvStaleReasonCode.SOURCE_STATUS_NOT_READY,
+                    "Persisted OHLCV source status is not READY.", List.of("sourceStatus"), bars);
+        }
+
+        if (bars.stream().anyMatch(bar -> !"FRESH".equals(bar.getFreshnessStatus()))) {
+            return finish(result, PersistedOhlcvReadinessStatus.STALE,
+                    PersistedOhlcvStaleReasonCode.PERSISTED_FRESHNESS_STATUS_STALE,
+                    "Persisted OHLCV was stale when ingested.", List.of("freshnessStatus"), bars);
+        }
+
         List<String> qualityMissing = nonOkQualityFields(bars);
         if (!qualityMissing.isEmpty()) {
             return finish(result, PersistedOhlcvReadinessStatus.INVALID,
@@ -109,6 +121,13 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
             return finish(result, PersistedOhlcvReadinessStatus.INVALID,
                     PersistedOhlcvStaleReasonCode.VOLUME_FIELD_MISSING,
                     "One or more persisted OHLCV bars has missing or invalid volume.", volumeMissing, bars);
+        }
+
+        if (bars.stream().anyMatch(this::invalidTimestampOrder)) {
+            return finish(result, PersistedOhlcvReadinessStatus.INVALID,
+                    PersistedOhlcvStaleReasonCode.TIMESTAMP_ORDER_INVALID,
+                    "One or more persisted OHLCV bars has invalid timestamp order.",
+                    List.of("timestampOrder"), bars);
         }
 
         if (!isContiguous(bars, intervalMs)) {
@@ -181,6 +200,11 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
             addWhenBlank(bar.getSourceBatchId(), "sourceBatchId", fields);
             addWhenBlank(bar.getSourceTraceId(), "sourceTraceId", fields);
             addWhenNull(bar.getSourceVersion(), "sourceVersion", fields);
+            addWhenNull(bar.getFetchTime(), "fetchTime", fields);
+            addWhenBlank(bar.getSourceStatus(), "sourceStatus", fields);
+            addWhenBlank(bar.getFreshnessStatus(), "freshnessStatus", fields);
+            addWhenBlank(bar.getProvenanceVersion(), "provenanceVersion", fields);
+            addWhenBlank(bar.getIngestionRunId(), "ingestionRunId", fields);
             addWhenNull(bar.getIngestedAt(), "ingestedAt", fields);
         }
         return fields;
@@ -206,6 +230,22 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
             if (bar.getHighPrice() != null && bar.getLowPrice() != null
                     && bar.getHighPrice().compareTo(bar.getLowPrice()) < 0) {
                 addUnique("ohlcRange", fields);
+            }
+            if (bar.getHighPrice() != null && bar.getOpenPrice() != null
+                    && bar.getHighPrice().compareTo(bar.getOpenPrice()) < 0) {
+                addUnique("ohlcGeometry", fields);
+            }
+            if (bar.getHighPrice() != null && bar.getClosePrice() != null
+                    && bar.getHighPrice().compareTo(bar.getClosePrice()) < 0) {
+                addUnique("ohlcGeometry", fields);
+            }
+            if (bar.getLowPrice() != null && bar.getOpenPrice() != null
+                    && bar.getLowPrice().compareTo(bar.getOpenPrice()) > 0) {
+                addUnique("ohlcGeometry", fields);
+            }
+            if (bar.getLowPrice() != null && bar.getClosePrice() != null
+                    && bar.getLowPrice().compareTo(bar.getClosePrice()) > 0) {
+                addUnique("ohlcGeometry", fields);
             }
         }
         return fields;
@@ -243,6 +283,11 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
             case "d" -> amount * 24L * 60L * 60_000L;
             default -> null;
         };
+    }
+
+    private boolean invalidTimestampOrder(PersistedOhlcvBarDO bar) {
+        return bar.getOpenTimeMs() == null || bar.getCloseTimeMs() == null
+                || bar.getOpenTimeMs() < 0 || bar.getCloseTimeMs() <= bar.getOpenTimeMs();
     }
 
     private void addWhenBlank(String value, String field, List<String> fields) {

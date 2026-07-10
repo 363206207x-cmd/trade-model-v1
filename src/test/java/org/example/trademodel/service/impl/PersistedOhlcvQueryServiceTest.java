@@ -201,8 +201,9 @@ class PersistedOhlcvQueryServiceTest {
                         + "close_price, volume, quote_volume, trade_count, taker_buy_base_volume, "
                         + "taker_buy_quote_volume, is_closed, provider, provider_market_type, source_endpoint, "
                         + "source_batch_id, source_trace_id, source_version, ingested_at, updated_at, "
+                        + "fetch_time, source_status, freshness_status, provenance_version, ingestion_run_id, "
                         + "quality_status, quality_reason, raw_payload_hash, is_deleted) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 symbol,
                 "1m",
                 openTimeMs,
@@ -225,6 +226,11 @@ class PersistedOhlcvQueryServiceTest {
                 1,
                 ingestedAt,
                 ingestedAt,
+                ingestedAt,
+                "READY",
+                "FRESH",
+                "query-fixture-v1",
+                "run-" + symbol,
                 qualityStatus,
                 "OK".equals(qualityStatus) ? null : "fixture-quality-not-ok",
                 "hash-" + symbol + "-" + openTimeMs,

@@ -19,6 +19,10 @@ import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.ScoreItemDO;
+import org.example.trademodel.dto.ohlcv.OhlcvBarInput;
+import org.example.trademodel.dto.ohlcv.OhlcvIngestionBatch;
+import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
+import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
@@ -28,6 +32,7 @@ import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.RealMarketDataFetcherService;
+import org.example.trademodel.service.PersistedOhlcvIngestionService;
 import org.example.trademodel.service.impl.PlanServiceImpl;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionBundleVO;
@@ -86,6 +91,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private AiRoleResultsCodec aiRoleResultsCodec;
+    @Autowired
+    private PersistedOhlcvIngestionService persistedOhlcvIngestionService;
 
     @MockBean
     private RealMarketDataFetcherService realMarketDataFetcherService;
@@ -270,8 +277,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     @Test
-    void oneMinuteAnalysisDoesNotGenerateFormalExecutionPlanBoundaryEvenWithFreshBars() {
-        long latestCloseMs = persistBoundaryBars("ADAUSDT", "1m", true);
+    void oneMinuteAnalysisDoesNotGenerateFormalExecutionPlanBoundary() {
+        long latestCloseMs = System.currentTimeMillis() - 1_000L;
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
@@ -618,6 +625,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         long latestCloseMs = latestOpenMs + intervalMs - 1L;
         long firstOpenMs = latestOpenMs - (49L * intervalMs);
         String batchId = "batch-" + symbol + "-" + latestOpenMs;
+        List<OhlcvBarInput> bars = new java.util.ArrayList<>();
         for (int i = 0; i < 50; i++) {
             BigDecimal open = new BigDecimal("101.00");
             BigDecimal high = new BigDecimal("103.00");
@@ -652,32 +660,17 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
             }
             long openTimeMs = firstOpenMs + (i * intervalMs);
             long closeTimeMs = openTimeMs + intervalMs - 1L;
-            jdbcTemplate.update("""
-                            INSERT INTO tm_persisted_ohlcv_bar(
-                                symbol, timeframe, open_time_ms, close_time_ms,
-                                open_price, high_price, low_price, close_price, volume,
-                                is_closed, provider, provider_market_type, source_endpoint,
-                                source_batch_id, source_trace_id, source_version, ingested_at,
-                                updated_at, quality_status, is_deleted)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
-                                CURRENT_TIMESTAMP, 'OK', 0)
-                            """,
-                    symbol,
-                    timeframe,
-                    openTimeMs,
-                    closeTimeMs,
-                    open,
-                    high,
-                    low,
-                    close,
-                    new BigDecimal("1000.00"),
-                    "TEST_FIXTURE",
-                    "SPOT",
-                    "/test/klines",
-                    batchId,
-                    "trace-" + symbol + "-" + i,
-                    1);
+            bars.add(new OhlcvBarInput(symbol, timeframe, openTimeMs, closeTimeMs,
+                    open, high, low, close, new BigDecimal("1000.00"),
+                    new BigDecimal("100000.00"), 100L, new BigDecimal("500.00"),
+                    new BigDecimal("50000.00"), true));
         }
+        OhlcvIngestionResult ingestion = persistedOhlcvIngestionService.ingest(new OhlcvIngestionBatch(
+                "TEST_PUBLIC_PROVIDER", "SPOT", "/controlled-test/klines", OhlcvSourceState.READY,
+                Instant.ofEpochMilli(latestCloseMs + 1_000L), "integration-fixture-v1", 1,
+                "trace-" + symbol, batchId, bars));
+        assertThat(ingestion.ready()).isTrue();
+        assertThat(ingestion.insertedCount()).isEqualTo(50);
         return latestCloseMs;
     }
 

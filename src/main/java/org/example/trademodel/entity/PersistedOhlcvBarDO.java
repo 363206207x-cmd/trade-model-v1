@@ -25,6 +25,11 @@ public class PersistedOhlcvBarDO {
     private String sourceBatchId;
     private String sourceTraceId;
     private Integer sourceVersion;
+    private LocalDateTime fetchTime;
+    private String sourceStatus;
+    private String freshnessStatus;
+    private String provenanceVersion;
+    private String ingestionRunId;
     private LocalDateTime ingestedAt;
     private LocalDateTime updatedAt;
     private String qualityStatus;
@@ -198,6 +203,46 @@ public class PersistedOhlcvBarDO {
 
     public void setSourceVersion(Integer sourceVersion) {
         this.sourceVersion = sourceVersion;
+    }
+
+    public LocalDateTime getFetchTime() {
+        return fetchTime;
+    }
+
+    public void setFetchTime(LocalDateTime fetchTime) {
+        this.fetchTime = fetchTime;
+    }
+
+    public String getSourceStatus() {
+        return sourceStatus;
+    }
+
+    public void setSourceStatus(String sourceStatus) {
+        this.sourceStatus = sourceStatus;
+    }
+
+    public String getFreshnessStatus() {
+        return freshnessStatus;
+    }
+
+    public void setFreshnessStatus(String freshnessStatus) {
+        this.freshnessStatus = freshnessStatus;
+    }
+
+    public String getProvenanceVersion() {
+        return provenanceVersion;
+    }
+
+    public void setProvenanceVersion(String provenanceVersion) {
+        this.provenanceVersion = provenanceVersion;
+    }
+
+    public String getIngestionRunId() {
+        return ingestionRunId;
+    }
+
+    public void setIngestionRunId(String ingestionRunId) {
+        this.ingestionRunId = ingestionRunId;
     }
 
     public LocalDateTime getIngestedAt() {

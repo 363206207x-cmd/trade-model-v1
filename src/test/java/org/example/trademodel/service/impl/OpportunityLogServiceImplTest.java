@@ -502,9 +502,21 @@ class OpportunityLogServiceImplTest {
         row.setHighPrice(new BigDecimal(high));
         row.setLowPrice(new BigDecimal(low));
         row.setClosePrice(new BigDecimal(close));
+        row.setVolume(new BigDecimal("1000"));
         row.setClosed(true);
         row.setProvider("LOCAL_PERSISTED_OHLCV");
+        row.setProviderMarketType("SPOT");
+        row.setSourceEndpoint("/controlled-test/klines");
+        row.setSourceBatchId("batch-bars");
         row.setSourceTraceId("trace-bars");
+        row.setSourceVersion(1);
+        row.setFetchTime(openTime.plusHours(1));
+        row.setSourceStatus("READY");
+        row.setFreshnessStatus("FRESH");
+        row.setProvenanceVersion("opportunity-test-v1");
+        row.setIngestionRunId("run-bars");
+        row.setIngestedAt(openTime.plusHours(1));
+        row.setQualityStatus("OK");
         return row;
     }
 }

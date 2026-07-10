@@ -3,6 +3,8 @@ package org.example.trademodel.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
+import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
+import org.example.trademodel.dto.ohlcv.PublicKlineFetchResult;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +44,16 @@ public class RealMarketDataFetcherService {
      * 新增：返回真实 K 线数据（供 DecisionEngineService 使用）
      */
     public List<String[]> fetchKlines(String symbol, String interval, int limit) {
+        return fetchKlinesDetailed(symbol, interval, limit).rows();
+    }
+
+    /**
+     * Public Binance spot K-line fetch with an explicit source state. This method uses no API key and
+     * never calls account, order, or position endpoints.
+     */
+    public PublicKlineFetchResult fetchKlinesDetailed(String symbol, String interval, int limit) {
         String fetchId = "FETCH-" + Instant.now().toEpochMilli();
+        Instant fetchTime = Instant.now();
         try {
             String url = baseUrl + "/api/v3/klines?symbol=" + symbol.toUpperCase()
                         + "&interval=" + interval + "&limit=" + limit;
@@ -54,16 +65,25 @@ public class RealMarketDataFetcherService {
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             String raw = response.getBody();
 
-            if (raw == null || raw.trim().isEmpty()) return List.of();
+            if (raw == null || raw.trim().isEmpty()) {
+                return new PublicKlineFetchResult(OhlcvSourceState.EMPTY_CONFIRMED,
+                        "PUBLIC_KLINE_RESPONSE_EMPTY", fetchTime, List.of());
+            }
 
             List<List<Object>> data = objectMapper.readValue(raw, new TypeReference<>() {});
-            return data.stream()
+            List<String[]> rows = data.stream()
                     .map(row -> row.stream().map(Object::toString).toArray(String[]::new))
                     .toList();
+            if (rows.isEmpty()) {
+                return new PublicKlineFetchResult(OhlcvSourceState.EMPTY_CONFIRMED,
+                        "PUBLIC_KLINE_RESULT_EMPTY", fetchTime, rows);
+            }
+            return new PublicKlineFetchResult(OhlcvSourceState.READY, null, fetchTime, rows);
 
         } catch (Exception e) {
             logger.error("[{}] fetchKlines failed for {} {}: {}", fetchId, symbol, interval, e.getMessage());
-            return List.of();
+            return new PublicKlineFetchResult(OhlcvSourceState.ERROR,
+                    "PUBLIC_KLINE_FETCH_ERROR", fetchTime, List.of());
         }
     }
 

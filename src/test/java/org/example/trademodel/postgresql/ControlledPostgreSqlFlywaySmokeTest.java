@@ -61,7 +61,9 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     "idx_tm_user_position_status_opened_at",
                     "idx_tm_push_snapshot_analysis_id",
                     "idx_tm_ai_call_log_trace_id",
-                    "uk_tm_review_result_analysis_id"));
+                    "uk_tm_review_result_analysis_id",
+                    "uk_tm_persisted_ohlcv_bar_source",
+                    "idx_tm_persisted_ohlcv_bar_ingestion_run"));
             assertFlywayHistorySucceeded(connection);
         }
     }
@@ -141,7 +143,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(3);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(4);
             }
         }
     }

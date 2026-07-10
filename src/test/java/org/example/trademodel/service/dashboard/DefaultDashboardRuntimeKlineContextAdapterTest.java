@@ -277,6 +277,11 @@ class DefaultDashboardRuntimeKlineContextAdapterTest {
         bar.setSourceBatchId("batch-1");
         bar.setSourceTraceId("trace-1");
         bar.setSourceVersion(1);
+        bar.setFetchTime(LocalDateTime.of(2026, 5, 17, 10, 0));
+        bar.setSourceStatus("READY");
+        bar.setFreshnessStatus("FRESH");
+        bar.setProvenanceVersion("dashboard-runtime-v1");
+        bar.setIngestionRunId("run-dashboard-runtime");
         bar.setIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
         bar.setQualityStatus("OK");
         bar.setIsDeleted(0);

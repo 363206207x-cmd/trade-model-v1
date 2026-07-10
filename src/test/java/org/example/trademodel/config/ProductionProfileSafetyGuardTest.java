@@ -209,6 +209,33 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsOhlcvSchedulerWithoutExplicitPublicProviderOptIn() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV ingestion requires explicitly enabled public provider")
+                .hasMessageContaining("production OHLCV ingestion requires explicit external-call opt-in");
+    }
+
+    @Test
+    void allowsBoundedExplicitOhlcvSchedulerOptIn() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
+        environment.setProperty("trade-model.ohlcv.public-provider.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "true");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
     void rejectsDisabledOrInvalidRateLimitInProduction() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.security.rate-limit.enabled", "false");
@@ -252,15 +279,21 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.push-recheck.enabled", "false");
         environment.setProperty("trade-model.schedulers.position-sync.enabled", "false");
         environment.setProperty("trade-model.schedulers.market-data.enabled", "false");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "false");
         environment.setProperty("trade-model.schedulers.watchlist.enabled", "false");
         environment.setProperty("trade-model.schedulers.position-monitor.enabled", "false");
         environment.setProperty("trade-model.analysis.scheduler.enabled", "false");
         environment.setProperty("trade-model.production.scheduler-approval.push-recheck", "PROD_ALLOWED_EXPLICIT_OPT_IN");
         environment.setProperty("trade-model.production.scheduler-approval.position-sync", "PROD_ALLOWED_EXPLICIT_OPT_IN");
         environment.setProperty("trade-model.production.scheduler-approval.market-data", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.production.scheduler-approval.ohlcv-ingestion", "PROD_ALLOWED_EXPLICIT_OPT_IN");
         environment.setProperty("trade-model.production.scheduler-approval.watchlist", "LOCAL_ONLY");
         environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_DEFAULT_OFF");
         environment.setProperty("trade-model.production.scheduler-approval.analysis", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.ohlcv.public-provider.enabled", "false");
+        environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "false");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
         return environment;
     }
 }

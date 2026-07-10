@@ -283,6 +283,11 @@ CREATE TABLE IF NOT EXISTS tm_persisted_ohlcv_bar (
     source_batch_id VARCHAR(64) NOT NULL,
     source_trace_id VARCHAR(64) NOT NULL,
     source_version INT NOT NULL,
+    fetch_time TIMESTAMP,
+    source_status VARCHAR(32),
+    freshness_status VARCHAR(32),
+    provenance_version VARCHAR(32),
+    ingestion_run_id VARCHAR(64),
     ingested_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     quality_status VARCHAR(32) NOT NULL,
@@ -301,6 +306,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_source_batch
     ON tm_persisted_ohlcv_bar(source_batch_id);
 CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_source_trace
     ON tm_persisted_ohlcv_bar(source_trace_id);
+CREATE INDEX IF NOT EXISTS idx_tm_persisted_ohlcv_bar_ingestion_run
+    ON tm_persisted_ohlcv_bar(ingestion_run_id);
 
 CREATE TABLE IF NOT EXISTS tm_rule_config (
     rule_id VARCHAR(64) PRIMARY KEY,
