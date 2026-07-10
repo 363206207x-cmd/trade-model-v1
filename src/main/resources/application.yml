@@ -59,7 +59,7 @@ trade-model:
     circuit-open-seconds: 60
     provider-budgets:
       binance-public-advertised-rpm: 1200
-      coinglass-advertised-rpm: 300
+      coinglass-advertised-rpm: ${COINGLASS_ADVERTISED_RPM:300}
       ai-advertised-rpm: 60
       external-context-advertised-rpm: 60
     profiles:
@@ -81,6 +81,21 @@ trade-model:
       emergency-min-hold-seconds: 120
       recovery-confirm-cycles: 2
       downgrade-cooldown-seconds: 300
+  providers:
+    coinglass:
+      enabled: ${TRADE_MODEL_COINGLASS_ENABLED:false}
+      external-calls-enabled: ${TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED:${TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED:false}}
+      api-key: ${COINGLASS_API_KEY:}
+      base-url: ${COINGLASS_API_BASE_URL:https://open-api-v4.coinglass.com}
+      auth-header-name: ${COINGLASS_API_AUTH_HEADER:CG-API-KEY}
+      advertised-rpm: ${COINGLASS_ADVERTISED_RPM:300}
+      internal-budget-ratio: 0.80
+      request-timeout-ms: 5000
+      fresh-ttl-seconds: 60
+      stale-ttl-seconds: 180
+      emergency-min-refresh-gap-seconds: 40
+      max-retry-5xx: 2
+      max-retry-timeout: 1
   auth:
     enabled: ${TRADE_MODEL_AUTH_ENABLED:true}
     admin-username: ${APP_ADMIN_USERNAME:admin}

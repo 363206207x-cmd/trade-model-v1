@@ -53,6 +53,14 @@ trade-model:
     profile-escalation-enabled: ${TRADE_MODEL_PROFILE_ESCALATION_ENABLED:false}
     auto-escalation-enabled: ${TRADE_MODEL_PROVIDER_AUTO_ESCALATION_ENABLED:false}
     external-calls-enabled: ${TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED:false}
+  providers:
+    coinglass:
+      enabled: ${TRADE_MODEL_COINGLASS_ENABLED:false}
+      external-calls-enabled: ${TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED:${TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED:false}}
+      api-key: ${COINGLASS_API_KEY:}
+      base-url: ${COINGLASS_API_BASE_URL:https://open-api-v4.coinglass.com}
+      auth-header-name: ${COINGLASS_API_AUTH_HEADER:CG-API-KEY}
+      advertised-rpm: ${COINGLASS_ADVERTISED_RPM:300}
   schedulers:
     enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:false}
     push-recheck:

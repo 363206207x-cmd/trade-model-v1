@@ -1,0 +1,8 @@
+{
+  "_fixture": "synthetic stale provider timestamp fixture",
+  "code": "0",
+  "msg": "success",
+  "data": [
+    { "time": 1783674000000, "open": "0.001", "high": "0.001", "low": "0.001", "close": "0.001" }
+  ]
+}

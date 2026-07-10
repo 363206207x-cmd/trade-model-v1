@@ -8,7 +8,9 @@ import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.coinglass.CoinGlassDerivativesSnapshotService;
 import org.example.trademodel.providercall.snapshot.CoordinatedOhlcvSnapshotService;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.springframework.stereotype.Service;
@@ -24,17 +26,20 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     private final MarketPriceSnapshotService priceService;
     private final CoordinatedOhlcvSnapshotService ohlcvService;
     private final PersistedOhlcvBarMapper ohlcvBarMapper;
+    private final CoinGlassDerivativesSnapshotService derivativesService;
     private final ProviderCallProperties properties;
     private final ProviderRefreshStateRegistry registry;
 
     public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
                                              CoordinatedOhlcvSnapshotService ohlcvService,
                                              PersistedOhlcvBarMapper ohlcvBarMapper,
+                                             CoinGlassDerivativesSnapshotService derivativesService,
                                              ProviderCallProperties properties,
                                              ProviderRefreshStateRegistry registry) {
         this.priceService = priceService;
         this.ohlcvService = ohlcvService;
         this.ohlcvBarMapper = ohlcvBarMapper;
+        this.derivativesService = derivativesService;
         this.properties = properties;
         this.registry = registry;
     }
@@ -46,13 +51,23 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
         switch (datasetType) {
             case PRICE -> refreshPrice(item, traceId, attemptedAt);
             case OHLCV -> refreshOhlcv(item, traceId, attemptedAt);
-            case DERIVATIVES -> unavailable(item, datasetType, UnifiedSourceStatus.NOT_CONFIGURED,
-                    "COINGLASS_NOT_CONFIGURED", traceId, attemptedAt);
+            case DERIVATIVES -> refreshDerivatives(item, traceId, attemptedAt);
+            case COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING, COINGLASS_LIQUIDATION,
+                    COINGLASS_LONG_SHORT_RATIO -> unavailable(item, datasetType, UnifiedSourceStatus.DISABLED,
+                    "COINGLASS_COMPONENT_DATASET_INTERNAL_ONLY", traceId, attemptedAt);
             case EXTERNAL_CONTEXT -> unavailable(item, datasetType, UnifiedSourceStatus.NOT_CONFIGURED,
                     "EXTERNAL_CONTEXT_PROVIDER_NOT_CONFIGURED", traceId, attemptedAt);
             case AI_REVIEW -> unavailable(item, datasetType, UnifiedSourceStatus.DISABLED,
                     "AI_ROUTINE_SCAN_DISABLED", traceId, attemptedAt);
         }
+    }
+
+    private void refreshDerivatives(ScanPlanItem item, String traceId, Instant attemptedAt) {
+        int seconds = properties.intervalSeconds(item.effectiveProfile(), item.effectivePriority(),
+                ProviderDatasetType.DERIVATIVES);
+        ProviderCallResult<DerivativesRiskSnapshot> result = derivativesService.get(item.symbol(),
+                item.effectivePriority(), Duration.ofSeconds(Math.max(1, seconds)), traceId);
+        record(item.symbol(), ProviderDatasetType.DERIVATIVES, result, attemptedAt, traceId);
     }
 
     private void refreshPrice(ScanPlanItem item, String traceId, Instant attemptedAt) {

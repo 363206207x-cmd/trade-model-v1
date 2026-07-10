@@ -2,7 +2,7 @@
 
 ## Scope and Safety
 
-This package adds the bounded coordination foundation for shared provider reads. It does not enable a live provider, connect CoinGlass, call an AI/news provider, send Push/Telegram, create a position, mutate a position, create an order, or execute a trade. All new runtime switches are disabled by default and production readiness remains `BLOCKED`.
+This contract began as the bounded coordination foundation for shared provider reads. CG-1 now adds a default-off CoinGlass v4 adapter below that foundation; it does not make a default live call or connect CoinGlass to score, decision, plan, monitor advice, Push, UserPosition, order, or trading behavior. Production readiness remains `BLOCKED`.
 
 ## Previous Call-Path Audit
 
@@ -22,7 +22,7 @@ Business Service
   -> Provider Adapter
 ```
 
-`MarketPriceSnapshotService`, `BinanceDerivativesSnapshotService`, and `CoordinatedOhlcvSnapshotService` implement the provider boundary. Dashboard Home and Decision read models use the read-only snapshot peek; Position Monitor and Push Recheck may refresh through the coordinator. Decision Engine and plan assembly use authoritative persisted OHLCV. Repository-wide primary-business single-entry adoption is `PASS`; remaining direct clients are provider adapters or the legacy diagnostic market endpoint only.
+`MarketPriceSnapshotService`, `BinanceDerivativesSnapshotService`, `CoordinatedOhlcvSnapshotService`, and the four CoinGlass dataset snapshot services implement the provider boundary. Dashboard Home and Decision read models use the read-only snapshot peek; Position Monitor and Push Recheck may refresh through the coordinator. Decision Engine and plan assembly use authoritative persisted OHLCV. Repository-wide primary-business single-entry adoption is `PASS`; remaining direct clients are provider adapters or the legacy diagnostic market endpoint only.
 
 ## Request Identity
 
@@ -34,7 +34,7 @@ Business Service
 - timeframe;
 - time bucket.
 
-Its canonical form is `PROVIDER|DATASET|SYMBOL|TIMEFRAME|BUCKET`. PRICE uses one stable `LATEST` key per symbol; cache lookup applies each consumer's freshness requirement, so a strict monitor cannot accept the looser age of a read model while all consumers still share one stored snapshot. Dataset types are intentionally separate: `PRICE`, `OHLCV`, `DERIVATIVES`, `EXTERNAL_CONTEXT`, and `AI_REVIEW`.
+Its canonical form is `PROVIDER|DATASET|SYMBOL|TIMEFRAME|BUCKET`. PRICE uses one stable `LATEST` key per symbol; cache lookup applies each consumer's freshness requirement, so a strict monitor cannot accept the looser age of a read model while all consumers still share one stored snapshot. Dataset types are intentionally separate: `PRICE`, `OHLCV`, aggregate `DERIVATIVES`, four `COINGLASS_*` datasets, `EXTERNAL_CONTEXT`, and `AI_REVIEW`.
 
 ## Cache and Freshness
 
@@ -66,7 +66,7 @@ Configured cadence provides independent TTL ownership for position/core/candidat
 - circuit state;
 - last rejected priority.
 
-Defaults are `internalBudgetRatio=0.80` and `emergencyReserveRatio=0.20`. CoinGlass has a contract-only advertised default of 300 RPM; no CoinGlass endpoint or key is present. Lower priorities are rejected earlier: pool, candidate, core, then position. The P0 position tier can use the emergency reserve, and a depleted derivatives-provider budget does not consume the independent Binance price budget.
+Defaults are `internalBudgetRatio=0.80` and `emergencyReserveRatio=0.20`. CoinGlass has an environment-overridable advertised default of 300 RPM. Four isolated dataset requests share the actual provider/API-key quota and each request increments it; no key is present in the current environment. Lower priorities are rejected earlier: pool, candidate, core, then position. The P0 position tier can use the emergency reserve, and a depleted derivatives-provider budget does not consume the independent Binance price budget.
 
 ## Retry and Circuit Policy
 
@@ -106,7 +106,7 @@ The package defines:
 - `ProviderSnapshotMetadata`;
 - `AnalysisInputBundle`.
 
-Metadata includes provider, dataset, symbol/timeframe, provider data time, fetch/expiry times, source/freshness states, trace ID, canonical request key, cache/fallback flags, error code, and reason codes. Derivatives fields are nullable by design because no real CoinGlass source is connected.
+Metadata includes provider, dataset, symbol/timeframe, provider data time, fetch/expiry times, source/freshness states, trace ID, canonical request key, cache/fallback flags, error code, and reason codes. CG-1 fills source-backed CoinGlass fields and keeps unsupported/missing fields null. Partial success is `DEGRADED`; adapter-level risk scores remain null for BIZ-1 rule ownership.
 
 `AnalysisInputBundleAssembler` requires authoritative `5m`, `15m`, `1h`, and `4h` references and one trace ID across OHLCV, price, derivatives, and external context. It rejects mixed-trace inputs. `AuthoritativePersistedDecisionOhlcvSource` now supplies the four decision timeframes from the persisted readiness boundary; `1m` is no longer used as the formal decision or push-invalidation timeframe.
 
@@ -172,8 +172,10 @@ The following production switches default to `false`:
 - `trade-model.provider-call.scheduler-enabled`;
 - `trade-model.provider-call.profile-escalation-enabled`;
 - `trade-model.provider-call.external-calls-enabled`.
+- `trade-model.providers.coinglass.enabled`;
+- `trade-model.providers.coinglass.external-calls-enabled`.
 
-`ProductionProfileSafetyGuard` requires coordinator enablement before any child feature and explicit external-call opt-in before the provider-scan scheduler. Position Monitor remains default-off. The scheduler has bounded universe, due-dataset, priority, and overlap guards, and has no direction, plan, position, order, Push, or Telegram surface.
+`ProductionProfileSafetyGuard` requires coordinator enablement before any child feature and explicit external-call opt-in before the provider-scan scheduler. An active CoinGlass call additionally requires provider enablement, key presence, a valid HTTPS base URL, official `CG-API-KEY` authentication, and valid rate settings. Position Monitor remains default-off. The scheduler has bounded universe, due-dataset, priority, and overlap guards, and has no direction, plan, position, order, Push, or Telegram surface.
 
 ## Persistence and Migration Evidence
 
@@ -185,4 +187,4 @@ The following production switches default to `false`:
 
 Focused tests cover bounded assets, priority deduplication, position cadence, closed-position removal, per-dataset cadence, shared cache, deterministic single flight, priority budget/reserve, Retry-After, stale/error metadata, transition thresholds/hysteresis/audit, authenticated profile update, consistent analysis bundles, AI skip/run policy, authoritative OHLCV writer reuse, architecture guards, production defaults, and no trading/external-send surfaces.
 
-The full Maven suite passes with no live provider calls. Production readiness remains `BLOCKED`.
+CG-1 deterministic tests cover official response mapping, null/no-data behavior, partial/stale assembly, auth/rate/retry bounds, cache/single flight, scan isolation, production defaults, and safety boundaries. The full Maven suite runs with the CoinGlass smoke disabled and no live provider calls. Production readiness remains `BLOCKED`.

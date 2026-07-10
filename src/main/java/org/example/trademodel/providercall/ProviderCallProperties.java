@@ -78,8 +78,12 @@ public class ProviderCallProperties {
         if (profile == RuntimeScanProfile.EMERGENCY && priority == AssetPriority.P3_POOL) {
             cadence = profiles.low;
         }
-        CadenceByPriority values = datasetType == ProviderDatasetType.DERIVATIVES
-                ? cadence.derivatives : cadence.price;
+        boolean derivativesDataset = switch (datasetType) {
+            case DERIVATIVES, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
+                    COINGLASS_LIQUIDATION, COINGLASS_LONG_SHORT_RATIO -> true;
+            default -> false;
+        };
+        CadenceByPriority values = derivativesDataset ? cadence.derivatives : cadence.price;
         return switch (priority) {
             case P0_POSITION -> values.positionSeconds;
             case P1_CORE -> values.coreSeconds;

@@ -1,0 +1,6 @@
+{
+  "_fixture": "synthetic provider error fixture",
+  "code": "40001",
+  "msg": "invalid request",
+  "data": null
+}

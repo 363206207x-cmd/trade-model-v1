@@ -1,0 +1,6 @@
+{
+  "_fixture": "synthetic partial-dataset upstream failure fixture",
+  "code": "50001",
+  "msg": "dataset temporarily unavailable",
+  "data": null
+}

@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P4 Versioned Real Local Historical Fixture + Direct Replay Adapter
-Next Business Phase: Supply a provenance-backed fixture in an allowed local path, then rerun P4 direct replay / explicitly scoped remediation
-Next Business Phase Allowed: YES for fixture provisioning and scoped local remediation; NO for production deployment
+Current Work Package: CG-1 CoinGlass v4 Provider Adapter and Normalized Derivatives Snapshot
+Next Business Phase: BIZ-1 derivatives business-rule adoption after CG-1 is merged/effective and separately scoped
+Next Business Phase Allowed: NO on the unmerged CG-1 branch; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -83,6 +83,23 @@ Current P4 status:
 7. Production readiness remains BLOCKED and production deployment cannot proceed.
 
 Next recommendation after P4: provide a provenance-backed real fixture through one of the three allowed paths, review redistribution status, populate the manifest/hash, and then add the smallest time-bounded full-pipeline replay input seam.
+
+---
+
+## CG-1 CoinGlass v4 Provider Adapter
+
+CG-1 is the current provider-adapter package. It implements only the source, normalization, cache, rate-budget, health, and trace boundary for CoinGlass v4.
+
+Current CG-1 status:
+
+1. Official v4 documentation verifies the OI exchange list, OI-weighted funding history, aggregated liquidation history, and Binance global account ratio contracts.
+2. OI, Funding, liquidation, and long/short ratio use four independent request keys, caches, freshness/error states, and endpoint capability IDs under the shared CoinGlass provider budget.
+3. `DefaultProviderDatasetRefreshPort` routes aggregate derivatives refresh through `CoinGlassDerivativesSnapshotService` and `ProviderCallCoordinator`.
+4. Partial data is `DEGRADED`; missing values remain null; stale time remains `STALE`; disabled/missing-key states make no transport call.
+5. CoinGlass and external calls remain default-off. No key is present in the current environment, so live smoke is `SKIPPED` and live calls are zero.
+6. The normalized snapshot does not change score, decision, Confused state, ExecutionPlan, Position Monitor advice, Push text, or UserPosition.
+7. BIZ-1 remains `NOT_STARTED` until CG-1 is merged/effective and separately authorized.
+8. Production readiness remains BLOCKED and production deployment cannot proceed.
 
 ---
 

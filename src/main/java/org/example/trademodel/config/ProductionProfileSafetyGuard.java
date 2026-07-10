@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.net.URI;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -132,6 +133,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         validateProductionSchedulerPolicy(environment, errors);
         validateOhlcvIngestionPolicy(environment, errors);
         validateProviderCallPolicy(environment, errors);
+        validateCoinGlassPolicy(environment, errors);
         validateProductionRateLimit(environment, errors);
 
         if (!errors.isEmpty()) {
@@ -227,6 +229,40 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
     }
 
+    private static void validateCoinGlassPolicy(Environment environment, List<String> errors) {
+        boolean enabled = isTrue(property(environment, "trade-model.providers.coinglass.enabled"));
+        boolean externalEnabled = isTrue(property(environment,
+                "trade-model.providers.coinglass.external-calls-enabled"));
+        if (!enabled && !externalEnabled) return;
+        if (externalEnabled && !enabled) {
+            errors.add("production CoinGlass external calls require explicitly enabled provider");
+            return;
+        }
+        if (!externalEnabled) return;
+        if (!isTrue(property(environment, "trade-model.provider-call.enabled"))) {
+            errors.add("production CoinGlass requires explicitly enabled provider coordinator");
+        }
+        if (!isTrue(property(environment, "trade-model.provider-call.external-calls-enabled"))) {
+            errors.add("production CoinGlass requires global external-call opt-in");
+        }
+        if (isBlank(property(environment, "trade-model.providers.coinglass.api-key"))) {
+            errors.add("production CoinGlass API key missing");
+        }
+        if (!isOfficialCoinGlassUrl(property(environment, "trade-model.providers.coinglass.base-url"))) {
+            errors.add("production CoinGlass base URL must be valid HTTPS");
+        }
+        if (!"CG-API-KEY".equals(trim(property(environment,
+                "trade-model.providers.coinglass.auth-header-name")))) {
+            errors.add("production CoinGlass v4 auth header must be CG-API-KEY");
+        }
+        if (!isPositiveInteger(property(environment, "trade-model.providers.coinglass.advertised-rpm"))) {
+            errors.add("production CoinGlass advertised-rpm must be positive");
+        }
+        if (!isRatio(property(environment, "trade-model.providers.coinglass.internal-budget-ratio"))) {
+            errors.add("production CoinGlass internal-budget-ratio must be between 0 and 1");
+        }
+    }
+
     private static void validateProductionRateLimit(Environment environment, List<String> errors) {
         if (!isTrue(property(environment, "trade-model.security.rate-limit.enabled"))) {
             errors.add("production rate limit must be enabled");
@@ -259,6 +295,25 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         try {
             return Long.parseLong(trim(value)) > 0;
         } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
+
+    private static boolean isRatio(String value) {
+        try {
+            double parsed = Double.parseDouble(trim(value));
+            return parsed > 0.0d && parsed < 1.0d;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
+
+    private static boolean isOfficialCoinGlassUrl(String value) {
+        try {
+            URI uri = URI.create(trim(value));
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && "open-api-v4.coinglass.com".equalsIgnoreCase(uri.getHost());
+        } catch (IllegalArgumentException ex) {
             return false;
         }
     }

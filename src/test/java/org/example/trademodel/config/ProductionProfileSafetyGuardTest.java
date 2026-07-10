@@ -274,6 +274,53 @@ class ProductionProfileSafetyGuardTest {
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
     }
 
+    @Test
+    void rejectsCoinGlassExternalCallsWithoutExplicitProviderEnablement() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production CoinGlass external calls require explicitly enabled provider");
+    }
+
+    @Test
+    void rejectsEnabledCoinGlassWithoutSafeCredentialsAndCoordinatorOptIn() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.providers.coinglass.enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.api-key", "");
+        environment.setProperty("trade-model.providers.coinglass.base-url", "http://invalid.example");
+        environment.setProperty("trade-model.providers.coinglass.auth-header-name", "Authorization");
+        environment.setProperty("trade-model.providers.coinglass.advertised-rpm", "0");
+        environment.setProperty("trade-model.providers.coinglass.internal-budget-ratio", "1");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production CoinGlass requires explicitly enabled provider coordinator")
+                .hasMessageContaining("production CoinGlass API key missing")
+                .hasMessageContaining("production CoinGlass base URL must be valid HTTPS")
+                .hasMessageContaining("production CoinGlass v4 auth header must be CG-API-KEY")
+                .hasMessageContaining("production CoinGlass advertised-rpm must be positive")
+                .hasMessageContaining("production CoinGlass internal-budget-ratio must be between 0 and 1");
+    }
+
+    @Test
+    void allowsExplicitFailClosedCoinGlassConfiguration() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.providers.coinglass.enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.api-key", "configured-key");
+        environment.setProperty("trade-model.providers.coinglass.base-url", "https://open-api-v4.coinglass.com");
+        environment.setProperty("trade-model.providers.coinglass.auth-header-name", "CG-API-KEY");
+        environment.setProperty("trade-model.providers.coinglass.advertised-rpm", "300");
+        environment.setProperty("trade-model.providers.coinglass.internal-budget-ratio", "0.8");
+        environment.setProperty("trade-model.provider-call.enabled", "true");
+        environment.setProperty("trade-model.provider-call.external-calls-enabled", "true");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
     private MockEnvironment safeEnvironment() {
         MockEnvironment environment = new MockEnvironment();
         environment.setProperty("spring.datasource.url", "jdbc:postgresql://db.internal/trade_model_v1");
@@ -315,6 +362,8 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.provider-call.external-calls-enabled", "false");
         environment.setProperty("trade-model.ohlcv.public-provider.enabled", "false");
         environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "false");
+        environment.setProperty("trade-model.providers.coinglass.enabled", "false");
+        environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "false");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
         return environment;

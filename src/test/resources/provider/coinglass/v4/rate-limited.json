@@ -1,0 +1,6 @@
+{
+  "_fixture": "synthetic provider rate-limit fixture",
+  "code": "429",
+  "msg": "rate limited",
+  "data": null
+}

@@ -1,0 +1,13 @@
+{
+  "_fixture": "synthetic contract fixture based on CoinGlass v4 official Global Account Ratio schema",
+  "code": "0",
+  "msg": "success",
+  "data": [
+    {
+      "time": 1783677540000,
+      "global_account_long_percent": 73.88,
+      "global_account_short_percent": 26.12,
+      "global_account_long_short_ratio": 2.83
+    }
+  ]
+}

@@ -7,6 +7,8 @@ import org.example.trademodel.providercall.scan.DefaultProviderDatasetRefreshPor
 import org.example.trademodel.providercall.scan.ProviderRefreshObservation;
 import org.example.trademodel.providercall.scan.ProviderRefreshStateRegistry;
 import org.example.trademodel.providercall.scan.ScanPlanItem;
+import org.example.trademodel.providercall.coinglass.CoinGlassDerivativesSnapshotService;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.providercall.snapshot.CoordinatedOhlcvSnapshotService;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
@@ -31,22 +33,26 @@ class DefaultProviderDatasetRefreshPortTest {
     private CoordinatedOhlcvSnapshotService ohlcvService;
     private ProviderRefreshStateRegistry registry;
     private PersistedOhlcvBarMapper ohlcvBarMapper;
+    private CoinGlassDerivativesSnapshotService derivativesService;
     private DefaultProviderDatasetRefreshPort port;
 
     @BeforeEach void setUp() {
         priceService = mock(MarketPriceSnapshotService.class);
         ohlcvService = mock(CoordinatedOhlcvSnapshotService.class);
         ohlcvBarMapper = mock(PersistedOhlcvBarMapper.class);
+        derivativesService = mock(CoinGlassDerivativesSnapshotService.class);
         registry = new ProviderRefreshStateRegistry();
         port = new DefaultProviderDatasetRefreshPort(priceService, ohlcvService, ohlcvBarMapper,
-                new ProviderCallProperties(), registry);
+                derivativesService, new ProviderCallProperties(), registry);
     }
 
-    @Test void derivativesRemainNotConfiguredWithoutCoinGlass() {
+    @Test void derivativesRefreshPortUsesCoinGlassSnapshotService() {
+        when(derivativesService.get(anyString(), any(), any(), anyString()))
+                .thenReturn((ProviderCallResult) result(ProviderDatasetType.DERIVATIVES));
         port.refresh(item(), ProviderDatasetType.DERIVATIVES);
         ProviderRefreshObservation out = registry.get("BTCUSDT", ProviderDatasetType.DERIVATIVES);
-        assertThat(out.sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
-        assertThat(out.reasonCode()).isEqualTo("COINGLASS_NOT_CONFIGURED");
+        verify(derivativesService).get(anyString(), any(), any(), anyString());
+        assertThat(out.sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
     }
 
     @Test void routineScanDoesNotInvokeAi() {
