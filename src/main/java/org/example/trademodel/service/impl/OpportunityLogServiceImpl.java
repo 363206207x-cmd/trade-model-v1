@@ -623,7 +623,27 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         return bar != null && Boolean.TRUE.equals(bar.getClosed())
                 && positive(bar.getOpenPrice()) && positive(bar.getHighPrice())
                 && positive(bar.getLowPrice()) && positive(bar.getClosePrice())
-                && bar.getOpenTimeMs() != null && bar.getCloseTimeMs() != null;
+                && bar.getVolume() != null && bar.getVolume().compareTo(BigDecimal.ZERO) >= 0
+                && bar.getOpenTimeMs() != null && bar.getCloseTimeMs() != null
+                && bar.getOpenTimeMs() >= 0 && bar.getCloseTimeMs() > bar.getOpenTimeMs()
+                && bar.getHighPrice().compareTo(bar.getLowPrice()) >= 0
+                && bar.getHighPrice().compareTo(bar.getOpenPrice()) >= 0
+                && bar.getHighPrice().compareTo(bar.getClosePrice()) >= 0
+                && bar.getLowPrice().compareTo(bar.getOpenPrice()) <= 0
+                && bar.getLowPrice().compareTo(bar.getClosePrice()) <= 0
+                && "OK".equals(bar.getQualityStatus())
+                && "READY".equals(bar.getSourceStatus())
+                && "FRESH".equals(bar.getFreshnessStatus())
+                && !blank(bar.getProvider())
+                && !blank(bar.getProviderMarketType())
+                && !blank(bar.getSourceEndpoint())
+                && !blank(bar.getSourceBatchId())
+                && !blank(bar.getSourceTraceId())
+                && bar.getSourceVersion() != null
+                && bar.getFetchTime() != null
+                && !blank(bar.getProvenanceVersion())
+                && !blank(bar.getIngestionRunId())
+                && bar.getIngestedAt() != null;
     }
 
     private static boolean positive(BigDecimal value) {

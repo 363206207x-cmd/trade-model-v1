@@ -182,6 +182,26 @@ public class RuntimeKlineContextAssemblyServiceImpl implements RuntimeKlineConte
                 && bar.getHighPrice().compareTo(bar.getLowPrice()) < 0) {
             addUnique("ohlcRange", fields);
         }
+        if (bar.getHighPrice() != null && bar.getOpenPrice() != null
+                && bar.getHighPrice().compareTo(bar.getOpenPrice()) < 0) {
+            addUnique("ohlcGeometry", fields);
+        }
+        if (bar.getHighPrice() != null && bar.getClosePrice() != null
+                && bar.getHighPrice().compareTo(bar.getClosePrice()) < 0) {
+            addUnique("ohlcGeometry", fields);
+        }
+        if (bar.getLowPrice() != null && bar.getOpenPrice() != null
+                && bar.getLowPrice().compareTo(bar.getOpenPrice()) > 0) {
+            addUnique("ohlcGeometry", fields);
+        }
+        if (bar.getLowPrice() != null && bar.getClosePrice() != null
+                && bar.getLowPrice().compareTo(bar.getClosePrice()) > 0) {
+            addUnique("ohlcGeometry", fields);
+        }
+        if (bar.getOpenTimeMs() != null && bar.getCloseTimeMs() != null
+                && (bar.getOpenTimeMs() < 0 || bar.getCloseTimeMs() <= bar.getOpenTimeMs())) {
+            addUnique("timestampOrder", fields);
+        }
         if (bar.getClosed() == null || !bar.getClosed()) {
             addUnique("closed", fields);
         }
@@ -194,7 +214,18 @@ public class RuntimeKlineContextAssemblyServiceImpl implements RuntimeKlineConte
         addWhenBlank(bar.getSourceBatchId(), "sourceBatchId", fields);
         addWhenBlank(bar.getSourceTraceId(), "sourceTraceId", fields);
         addWhenNull(bar.getSourceVersion(), "sourceVersion", fields);
+        addWhenNull(bar.getFetchTime(), "fetchTime", fields);
+        addWhenBlank(bar.getSourceStatus(), "sourceStatus", fields);
+        addWhenBlank(bar.getFreshnessStatus(), "freshnessStatus", fields);
+        addWhenBlank(bar.getProvenanceVersion(), "provenanceVersion", fields);
+        addWhenBlank(bar.getIngestionRunId(), "ingestionRunId", fields);
         addWhenNull(bar.getIngestedAt(), "ingestedAt", fields);
+        if (!"READY".equals(bar.getSourceStatus())) {
+            addUnique("sourceStatus", fields);
+        }
+        if (!"FRESH".equals(bar.getFreshnessStatus())) {
+            addUnique("freshnessStatus", fields);
+        }
         if (!QUALITY_OK.equals(bar.getQualityStatus())) {
             addUnique("qualityStatus", fields);
         }
@@ -225,6 +256,11 @@ public class RuntimeKlineContextAssemblyServiceImpl implements RuntimeKlineConte
             item.setSourceBatchId(bar.getSourceBatchId());
             item.setSourceTraceId(bar.getSourceTraceId());
             item.setSourceVersion(bar.getSourceVersion());
+            item.setFetchTime(bar.getFetchTime());
+            item.setSourceStatus(bar.getSourceStatus());
+            item.setFreshnessStatus(bar.getFreshnessStatus());
+            item.setProvenanceVersion(bar.getProvenanceVersion());
+            item.setIngestionRunId(bar.getIngestionRunId());
             item.setIngestedAt(bar.getIngestedAt());
             item.setQualityStatus(bar.getQualityStatus());
             items.add(item);

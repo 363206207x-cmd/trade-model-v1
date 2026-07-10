@@ -567,6 +567,11 @@ class DefaultDashboardSourceTraceDetailAdapterTest {
         bar.setSourceBatchId("batch-1");
         bar.setSourceTraceId("trace-1");
         bar.setSourceVersion(1);
+        bar.setFetchTime(LocalDateTime.of(2026, 5, 17, 10, 0));
+        bar.setSourceStatus("READY");
+        bar.setFreshnessStatus("FRESH");
+        bar.setProvenanceVersion("dashboard-trace-v1");
+        bar.setIngestionRunId("run-dashboard-trace");
         bar.setIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
         bar.setQualityStatus("OK");
         bar.setIsDeleted(0);

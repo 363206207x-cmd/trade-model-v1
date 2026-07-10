@@ -3,7 +3,7 @@
 ## Schema and Migration Baseline
 
 - `schema.sql` and Flyway `V1__baseline_schema_tables.sql` define the same 27 business tables.
-- Flyway V2 adds indexes and V3 adds scheme rule-config defaults.
+- Flyway V2 adds indexes, V3 adds scheme rule-config defaults, and V4 adds additive OHLCV ingestion provenance fields.
 - Repository evidence records controlled PostgreSQL 16 V1/V2/V3 migration PASS, backup PASS, and clean restore PASS with 27 `tm_*` tables and three successful Flyway rows.
 - That evidence proves schema migration mechanics, not every PostgreSQL runtime query or production deployment.
 
@@ -19,7 +19,7 @@
 | `tm_decision_result` | Decision service/assembler | Home, plan, review, trace | `IMPLEMENTED_AND_TRACED` |
 | `tm_execution_plan` | Plan service/assembler | Home suggestion, monitor, push recheck | `BLOCKED_NO_REAL_DATA` for complete boundaries |
 | `tm_market_environment_snapshot` | assembler/market environment service | trace/review | `IMPLEMENTED_AND_TRACED` |
-| `tm_persisted_ohlcv_bar` | no production writer found | plan boundary and opportunity evaluation | `BLOCKED_NO_REAL_DATA` |
+| `tm_persisted_ohlcv_bar` | `PersistedOhlcvIngestionService` only for normal runtime writes | plan boundary and opportunity evaluation | `IMPLEMENTED_AND_TRACED`; public provider and scheduler default off |
 | `tm_rule_config` | seeded migration/admin mapper | Hot Reset, Push Recheck, audit | `BACKEND_FIELD_UNUSED` for confused/AI/missed groups |
 | `tm_user_config` | mapper/service only | no complete product flow | `IMPLEMENTED_NOT_RENDERED` |
 | `tm_real_position` | Position Sync import path | system position status | `IMPLEMENTED_AND_TRACED` but separate from manual UI |
@@ -43,7 +43,7 @@
 
 | Gap | Evidence | Classification |
 |---|---|---|
-| OHLCV has consumers but no runtime producer | only tests directly insert `tm_persisted_ohlcv_bar` | `BLOCKED_NO_REAL_DATA` |
+| OHLCV producer/consumer chain | public adapter -> validated/idempotent writer -> plan boundary and OpportunityLog integrations | `IMPLEMENTED_AND_TRACED` |
 | AI role payload is not structured | decision row stores compact text; Home parser requires JSON | `WRONG_SOURCE_MAPPING` |
 | Opportunity truth is split | Review Center reads `tm_opportunity_log`; aggregate reads legacy `tm_missed_opportunity` | `SEMANTIC_DRIFT` |
 | Manual source is not preserved | persisted UserPosition source becomes hardcoded `MANUAL` in VO | `WRONG_SOURCE_MAPPING` |
@@ -62,6 +62,7 @@
 | Manual open | no external request idempotency contract | `MISSING_TEST_COVERAGE` |
 | Push recheck/replay | each invocation intentionally writes an audit log; no global request key | `MISSING_TEST_COVERAGE` |
 | Position monitor scheduler | repeated scans can append logs; no distributed claim proven | `MISSING_TEST_COVERAGE` |
+| OHLCV ingestion | deterministic source key, full-batch preflight, identical-content idempotency, conflicting-content rejection, and same-key overlap guard | `IMPLEMENTED_AND_TRACED` for a single process; distributed scheduling remains outside this closure |
 
 ## PostgreSQL Runtime Compatibility
 
@@ -70,6 +71,7 @@
 | Upserts/mapper variants | major H2 upserts have PostgreSQL database-id variants | `IMPLEMENTED_AND_TRACED` |
 | Dashboard overview latency | `DashboardAggregationFacade` uses H2 `DATEDIFF('MILLISECOND', ...)` without a PostgreSQL variant | `MISSING_TEST_COVERAGE` |
 | Migration SQL | controlled PostgreSQL 16 migration/restore evidence exists | `IMPLEMENTED_AND_TRACED` |
+| OHLCV V4 migration | additive PostgreSQL-compatible columns/index plus bounded static SQL guard; controlled PostgreSQL V4 execution not rerun here | `MISSING_TEST_COVERAGE` for live PostgreSQL V4 evidence |
 | Full runtime SQL | no all-mapper PostgreSQL execution suite | `MISSING_TEST_COVERAGE` |
 
 ## Time and Identifier Semantics

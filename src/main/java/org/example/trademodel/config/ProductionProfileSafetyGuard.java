@@ -1,6 +1,7 @@
 package org.example.trademodel.config;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -42,6 +43,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             new SchedulerPolicyItem("push-recheck", "trade-model.schedulers.push-recheck.enabled", false),
             new SchedulerPolicyItem("position-sync", "trade-model.schedulers.position-sync.enabled", false),
             new SchedulerPolicyItem("market-data", "trade-model.schedulers.market-data.enabled", false),
+            new SchedulerPolicyItem("ohlcv-ingestion", "trade-model.schedulers.ohlcv-ingestion.enabled", false),
             new SchedulerPolicyItem("watchlist", "trade-model.schedulers.watchlist.enabled", false),
             new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", true),
             new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false)
@@ -127,6 +129,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
 
         validateProductionSchedulerPolicy(environment, errors);
+        validateOhlcvIngestionPolicy(environment, errors);
         validateProductionRateLimit(environment, errors);
 
         if (!errors.isEmpty()) {
@@ -164,7 +167,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             boolean schedulerEnabled = isTrue(property(environment, scheduler.enabledProperty()));
             boolean effectivelyEnabled = schedulerEnabled && ("analysis".equals(scheduler.name()) || globalSchedulersEnabled);
             if (scheduler.defaultOffRequired() && schedulerEnabled) {
-                errors.add("production position-monitor scheduler must remain default-off");
+                errors.add("production " + scheduler.name() + " scheduler must remain default-off");
             }
             if ("LOCKED_DOWN".equals(policy) && effectivelyEnabled) {
                 errors.add("production scheduler must be disabled under LOCKED_DOWN policy: " + scheduler.name());
@@ -177,6 +180,33 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             if (effectivelyEnabled && ("PROD_BLOCKED".equals(classification) || "LOCAL_ONLY".equals(classification))) {
                 errors.add("production scheduler classification blocks enabled scheduler: " + scheduler.name());
             }
+        }
+    }
+
+    private static void validateOhlcvIngestionPolicy(Environment environment, List<String> errors) {
+        boolean globallyEnabled = isTrue(property(environment, "trade-model.schedulers.enabled"));
+        boolean ingestionEnabled = isTrue(property(environment, "trade-model.schedulers.ohlcv-ingestion.enabled"));
+        if (!globallyEnabled || !ingestionEnabled) {
+            return;
+        }
+        if (!isTrue(property(environment, "trade-model.ohlcv.public-provider.enabled"))) {
+            errors.add("production OHLCV ingestion requires explicitly enabled public provider");
+        }
+        if (!isTrue(property(environment, "trade-model.ohlcv.public-provider.external-calls-enabled"))) {
+            errors.add("production OHLCV ingestion requires explicit external-call opt-in");
+        }
+        String symbols = trim(property(environment, "trade-model.schedulers.ohlcv-ingestion.symbols"));
+        long symbolCount = List.of(symbols.split(",")).stream().map(String::trim).filter(value -> !value.isEmpty()).distinct().count();
+        if (symbolCount < 1 || symbolCount > 2) {
+            errors.add("production OHLCV ingestion symbol allowlist must contain 1-2 symbols");
+        }
+        Set<String> timeframes = Set.copyOf(Arrays.stream(trim(property(environment,
+                        "trade-model.schedulers.ohlcv-ingestion.timeframes")).split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList());
+        if (!timeframes.equals(Set.of("5m", "15m", "1h", "4h"))) {
+            errors.add("production OHLCV ingestion must use exactly 5m,15m,1h,4h timeframes");
         }
     }
 

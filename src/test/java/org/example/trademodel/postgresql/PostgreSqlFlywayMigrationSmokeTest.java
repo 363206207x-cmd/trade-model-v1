@@ -55,7 +55,10 @@ class PostgreSqlFlywayMigrationSmokeTest {
                         "idx_tm_user_position_status_opened_at",
                         "idx_tm_push_snapshot_analysis_id",
                         "idx_tm_ai_call_log_trace_id",
-                        "uk_tm_review_result_analysis_id"));
+                        "uk_tm_review_result_analysis_id",
+                        "uk_tm_persisted_ohlcv_bar_source",
+                        "idx_tm_persisted_ohlcv_bar_ingestion_run"));
+                assertOhlcvProvenanceColumnsExist(connection);
                 assertFlywayHistorySucceeded(connection);
                 assertUserPositionIdentityGeneratedKey(connection);
             }
@@ -128,7 +131,24 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(2);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(4);
+            }
+        }
+    }
+
+    private static void assertOhlcvProvenanceColumnsExist(Connection connection) throws Exception {
+        for (String column : List.of("fetch_time", "source_status", "freshness_status",
+                "provenance_version", "ingestion_run_id")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'tm_persisted_ohlcv_bar'
+                      AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt(1)).as("OHLCV column %s", column).isEqualTo(1);
+                }
             }
         }
     }
