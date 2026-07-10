@@ -590,7 +590,9 @@ public class DerivativesBusinessIntegrationService {
             liquidationSpike5m = decimal(map, "derivatives_evidence_config.liquidation_spike_5m", "1000000", fallbacks);
             liquidationSpike15m = decimal(map, "derivatives_evidence_config.liquidation_spike_15m", "3000000", fallbacks);
             liquidationImbalance = decimal(map, "derivatives_evidence_config.liquidation_imbalance_ratio", "2.0", fallbacks);
-            exchangeConcentrationHigh = decimal(map, "derivatives_evidence_config.exchange_concentration_high", "70", fallbacks);
+            exchangeConcentrationHigh = boundedDecimal(map,
+                    "derivatives_evidence_config.exchange_concentration_high", "0.70",
+                    BigDecimal.ZERO, BigDecimal.ONE, fallbacks);
             maxDataAgeSeconds = integer(map, "derivatives_decision_config.derivatives_max_data_age_seconds", 120, fallbacks);
             requiredForConfirm = bool(map, "derivatives_decision_config.derivatives_required_for_confirm", true, fallbacks);
             minimumDatasetCount = integer(map, "derivatives_decision_config.derivatives_minimum_dataset_count", 2, fallbacks);
@@ -654,6 +656,17 @@ public class DerivativesBusinessIntegrationService {
             if (value < minimum || value > maximum) {
                 reasons.add("RULE_CONFIG_OUT_OF_RANGE:" + key);
                 return fallback;
+            }
+            return value;
+        }
+
+        private static BigDecimal boundedDecimal(Map<String, RuleConfigDO> map, String key, String fallback,
+                                                 BigDecimal minimumExclusive, BigDecimal maximumInclusive,
+                                                 List<String> reasons) {
+            BigDecimal value = decimal(map, key, fallback, reasons);
+            if (value.compareTo(minimumExclusive) <= 0 || value.compareTo(maximumInclusive) > 0) {
+                reasons.add("RULE_CONFIG_OUT_OF_RANGE:" + key);
+                return new BigDecimal(fallback);
             }
             return value;
         }

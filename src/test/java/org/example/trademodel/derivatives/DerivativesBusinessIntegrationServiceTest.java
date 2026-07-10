@@ -33,7 +33,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void bullishPriceAndOiExpansionConfirmsBullishRuleDirection() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
-                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(types(result)).contains(DerivativesEvidenceType.OPEN_INTEREST_PRICE_CONFIRMATION);
         assertThat(result.baseDirection()).isEqualTo("BULLISH");
         assertThat(result.scoreDeltas().get(DerivativesBusinessIntegrationService.CAPITAL_SCORE)).isPositive();
@@ -42,7 +42,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void bearishPriceAndOiExpansionConfirmsBearishRuleDirection() {
         DerivativesBusinessAssessment result = service.evaluate(input("BEARISH", bd("90"), bd("100"),
-                all("BEARISH"), complete(bd("0.06"), bd("-0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BEARISH"), complete(bd("0.06"), bd("-0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(result.evidence()).anyMatch(item -> item.evidenceType() == DerivativesEvidenceType.OPEN_INTEREST_PRICE_CONFIRMATION
                 && "BEARISH".equals(item.direction()));
     }
@@ -52,7 +52,7 @@ class DerivativesBusinessIntegrationServiceTest {
         DerivativesBusinessInput input = new DerivativesBusinessInput("BTCUSDT", "BULLISH",
                 bd("110"), bd("100"), false, all("BULLISH"), true, 90, true, false,
                 false, null, complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("1000"),
-                bd("1000"), bd("20")), "trace-biz1", "analysis-biz1", "v1.0");
+                bd("1000"), bd("0.20")), "trace-biz1", "analysis-biz1", "v1.0");
 
         DerivativesBusinessAssessment result = service.evaluate(input);
 
@@ -63,7 +63,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void priceUpAndOiDownIsShortCoveringNotStrongBullConfirmation() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
-                all("BULLISH"), complete(bd("-0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BULLISH"), complete(bd("-0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(result.reasonCodes()).contains("PRICE_UP_OI_DOWN_SHORT_COVERING");
         assertThat(result.scoreDeltas().get(DerivativesBusinessIntegrationService.CAPITAL_SCORE)).isNegative();
     }
@@ -71,7 +71,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void priceDownAndOiDownIsDeleveragingNotAutomaticBearishEntry() {
         DerivativesBusinessAssessment result = service.evaluate(input("BEARISH", bd("90"), bd("100"),
-                all("BEARISH"), complete(bd("-0.06"), bd("-0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BEARISH"), complete(bd("-0.06"), bd("-0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(result.reasonCodes()).contains("PRICE_DOWN_OI_DOWN_DELEVERAGING");
         assertThat(result.confirmEligible()).isFalse();
     }
@@ -79,7 +79,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void extremePositiveFundingRaisesRiskWithoutFlippingDirection() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
-                all("BULLISH"), complete(bd("0.06"), bd("0.001"), bd("1.4"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BULLISH"), complete(bd("0.06"), bd("0.001"), bd("1.4"), bd("1000"), bd("1000"), bd("0.20")), false));
         DecisionBundleVO decision = decision("BULLISH");
         service.applyDecisionAdjustments(decision, result);
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
@@ -89,7 +89,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void extremeNegativeFundingRaisesSqueezeRiskWithoutFlippingDirection() {
         DerivativesBusinessAssessment result = service.evaluate(input("BEARISH", bd("90"), bd("100"),
-                all("BEARISH"), complete(bd("0.06"), bd("-0.001"), bd("0.6"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BEARISH"), complete(bd("0.06"), bd("-0.001"), bd("0.6"), bd("1000"), bd("1000"), bd("0.20")), false));
         DecisionBundleVO decision = decision("BEARISH");
         service.applyDecisionAdjustments(decision, result);
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BEARISH");
@@ -99,7 +99,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void longCrowdingDoesNotCreateAutomaticShortSignal() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
-                all("BULLISH"), complete(bd("0.03"), bd("0.0001"), bd("1.4"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BULLISH"), complete(bd("0.03"), bd("0.0001"), bd("1.4"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(result.baseDirection()).isEqualTo("BULLISH");
         assertThat(result.evidence()).anyMatch(item -> item.evidenceType() == DerivativesEvidenceType.LONG_CROWDING
                 && "NEUTRAL".equals(item.direction()));
@@ -108,7 +108,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void shortCrowdingDoesNotCreateAutomaticLongSignal() {
         DerivativesBusinessAssessment result = service.evaluate(input("BEARISH", bd("90"), bd("100"),
-                all("BEARISH"), complete(bd("0.03"), bd("-0.0001"), bd("0.6"), bd("1000"), bd("1000"), bd("20")), false));
+                all("BEARISH"), complete(bd("0.03"), bd("-0.0001"), bd("0.6"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(result.baseDirection()).isEqualTo("BEARISH");
         assertThat(result.evidence()).anyMatch(item -> item.evidenceType() == DerivativesEvidenceType.SHORT_CROWDING);
     }
@@ -116,7 +116,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void liquidationSpikeRaisesRiskAndCanTriggerHotResetCandidate() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
-                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("4000000"), bd("500000"), bd("20")), false));
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("4000000"), bd("500000"), bd("0.20")), false));
         assertThat(result.hotResetCandidate()).isTrue();
         assertThat(result.riskAdjustment()).isEqualTo("HIGH");
         assertThat(result.pushMode()).isEqualTo("WARNING_PUSH");
@@ -125,15 +125,68 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void exchangeConcentrationRaisesDataAndExecutionRisk() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
-                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("90")), false));
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("0.90")), false));
         assertThat(types(result)).contains(DerivativesEvidenceType.EXCHANGE_CONCENTRATION_HIGH);
         assertThat(result.scoreDeltas().get(DerivativesBusinessIntegrationService.LIQUIDITY_SCORE)).isNegative();
         assertThat(result.hotResetCandidate()).isTrue();
     }
 
     @Test
+    void exchangeConcentrationAtInclusiveBoundaryTriggersRisk() {
+        DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"),
+                        bd("1000"), bd("1000"), bd("0.70")), false));
+
+        assertThat(types(result)).contains(DerivativesEvidenceType.EXCHANGE_CONCENTRATION_HIGH);
+    }
+
+    @Test
+    void exchangeConcentrationBelowBoundaryDoesNotTriggerRisk() {
+        DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"),
+                        bd("1000"), bd("1000"), bd("0.60")), false));
+
+        assertThat(types(result)).doesNotContain(DerivativesEvidenceType.EXCHANGE_CONCENTRATION_HIGH);
+        assertThat(result.hotResetCandidate()).isFalse();
+    }
+
+    @Test
+    void percentageStyleConcentrationConfigFailsClosedToRatioDefault() {
+        RuleConfigService configService = mock(RuleConfigService.class);
+        String key = "derivatives_evidence_config.exchange_concentration_high";
+        when(configService.getRuleConfigMap()).thenReturn(Map.of(key, config(key, "90")));
+        DerivativesBusinessIntegrationService configured = new DerivativesBusinessIntegrationService(configService);
+
+        DerivativesBusinessAssessment result = configured.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"),
+                        bd("1000"), bd("1000"), bd("0.80")), false));
+
+        assertThat(types(result)).contains(DerivativesEvidenceType.EXCHANGE_CONCENTRATION_HIGH);
+        assertThat(result.configFallbackReasons()).contains("RULE_CONFIG_OUT_OF_RANGE:" + key);
+    }
+
+    @Test
+    void zeroNegativeAndGreaterThanOneConcentrationConfigFailClosed() {
+        String key = "derivatives_evidence_config.exchange_concentration_high";
+
+        for (String invalidValue : List.of("0", "-0.10", "1.01")) {
+            RuleConfigService configService = mock(RuleConfigService.class);
+            when(configService.getRuleConfigMap()).thenReturn(Map.of(key, config(key, invalidValue)));
+            DerivativesBusinessIntegrationService configured =
+                    new DerivativesBusinessIntegrationService(configService);
+
+            DerivativesBusinessAssessment result = configured.evaluate(input("BULLISH", bd("110"), bd("100"),
+                    all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"),
+                            bd("1000"), bd("1000"), bd("0.80")), false));
+
+            assertThat(types(result)).contains(DerivativesEvidenceType.EXCHANGE_CONCENTRATION_HIGH);
+            assertThat(result.configFallbackReasons()).contains("RULE_CONFIG_OUT_OF_RANGE:" + key);
+        }
+    }
+
+    @Test
     void derivativesPartialLowersConfidence() {
-        DerivativesRiskSnapshot partial = snapshot(bd("0.06"), bd("0.0001"), null, null, null, bd("20"),
+        DerivativesRiskSnapshot partial = snapshot(bd("0.06"), bd("0.0001"), null, null, null, bd("0.20"),
                 UnifiedSourceStatus.DEGRADED, SnapshotFreshnessStatus.FRESH, "PARTIAL",
                 List.of(OI, FUNDING), List.of(LIQUIDATION, LONG_SHORT), List.of(LIQUIDATION, LONG_SHORT), Instant.now());
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), partial, false));
@@ -143,7 +196,7 @@ class DerivativesBusinessIntegrationServiceTest {
 
     @Test
     void derivativesStaleBlocksConfirmPush() {
-        DerivativesRiskSnapshot stale = snapshot(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20"),
+        DerivativesRiskSnapshot stale = snapshot(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20"),
                 UnifiedSourceStatus.STALE, SnapshotFreshnessStatus.STALE, "COMPLETE",
                 List.of(OI, FUNDING, LIQUIDATION, LONG_SHORT), List.of(), List.of(), Instant.now().minusSeconds(600));
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), stale, true));
@@ -154,7 +207,7 @@ class DerivativesBusinessIntegrationServiceTest {
 
     @Test
     void missingOiBlocksConfirmPlanWhenRequired() {
-        DerivativesRiskSnapshot missing = snapshot(null, bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20"),
+        DerivativesRiskSnapshot missing = snapshot(null, bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20"),
                 UnifiedSourceStatus.DEGRADED, SnapshotFreshnessStatus.FRESH, "PARTIAL",
                 List.of(FUNDING, LIQUIDATION, LONG_SHORT), List.of(OI), List.of(OI), Instant.now());
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), missing, true));
@@ -167,7 +220,7 @@ class DerivativesBusinessIntegrationServiceTest {
 
     @Test
     void missingFundingBlocksConfirmPlanWhenRequired() {
-        DerivativesRiskSnapshot missing = snapshot(bd("0.06"), null, bd("1"), bd("1000"), bd("1000"), bd("20"),
+        DerivativesRiskSnapshot missing = snapshot(bd("0.06"), null, bd("1"), bd("1000"), bd("1000"), bd("0.20"),
                 UnifiedSourceStatus.DEGRADED, SnapshotFreshnessStatus.FRESH, "PARTIAL",
                 List.of(OI, LIQUIDATION, LONG_SHORT), List.of(FUNDING), List.of(FUNDING), Instant.now());
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), missing, true));
@@ -177,7 +230,7 @@ class DerivativesBusinessIntegrationServiceTest {
 
     @Test
     void missingLiquidationDoesNotBecomeZero() {
-        DerivativesRiskSnapshot missing = snapshot(bd("0.06"), bd("0.0001"), bd("1"), null, null, bd("20"),
+        DerivativesRiskSnapshot missing = snapshot(bd("0.06"), bd("0.0001"), bd("1"), null, null, bd("0.20"),
                 UnifiedSourceStatus.DEGRADED, SnapshotFreshnessStatus.FRESH, "PARTIAL",
                 List.of(OI, FUNDING, LONG_SHORT), List.of(LIQUIDATION), List.of(LIQUIDATION), Instant.now());
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), missing, false));
@@ -196,7 +249,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void allEightScoresParticipateInDecisionAggregation() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("0.06"), bd("0.001"), bd("1.4"), bd("4000000"), bd("500000"), bd("90")), false));
+                complete(bd("0.06"), bd("0.001"), bd("1.4"), bd("4000000"), bd("500000"), bd("0.90")), false));
         List<ScoreItemVO> scores = scores();
         service.applyScoreAdjustments(scores, result);
         assertThat(result.scoreDeltas().keySet()).containsExactlyInAnyOrder(
@@ -228,7 +281,7 @@ class DerivativesBusinessIntegrationServiceTest {
 
         DerivativesBusinessAssessment result = configured.evaluate(input("BULLISH", bd("110"), bd("100"),
                 all("BULLISH"), complete(bd("0.06"), bd("0.001"), bd("1.4"),
-                        bd("4000000"), bd("500000"), bd("90")), true));
+                        bd("4000000"), bd("500000"), bd("0.90")), true));
 
         assertThat(result.confirmEligible()).isFalse();
         assertThat(result.scoreDeltas().get(DerivativesBusinessIntegrationService.TREND_SCORE))
@@ -244,7 +297,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void derivativeEvidenceCannotOverrideBaseDirection() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("90"), bd("100"), all("BEARISH"),
-                complete(bd("0.08"), bd("-0.001"), bd("0.5"), bd("1000"), bd("1000"), bd("20")), false));
+                complete(bd("0.08"), bd("-0.001"), bd("0.5"), bd("1000"), bd("1000"), bd("0.20")), false));
         DecisionBundleVO decision = decision("BULLISH");
         service.applyDecisionAdjustments(decision, result);
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
@@ -254,7 +307,7 @@ class DerivativesBusinessIntegrationServiceTest {
     void fourTimeframesAreUsedForFormalConvergence() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
                 Map.of("5m", "BEARISH", "15m", "BULLISH", "1h", "BULLISH", "4h", "BULLISH"),
-                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")), false));
+                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")), false));
         assertThat(result.opportunityState()).isEqualTo(AssetStateEnum.WAITING_TRIGGER);
     }
 
@@ -262,14 +315,14 @@ class DerivativesBusinessIntegrationServiceTest {
     void onlyOneOrTwoTimeframesCannotProduceConfirmPlan() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
                 Map.of("1h", "BULLISH", "4h", "BULLISH"),
-                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")), true));
+                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")), true));
         assertThat(result.confirmEligible()).isFalse();
         assertThat(result.opportunityState()).isEqualTo(AssetStateEnum.CANDIDATE);
     }
 
     @Test
     void candidateCanBeDiscoveredFromPool() {
-        DerivativesRiskSnapshot partial = snapshot(bd("0.03"), bd("0.0001"), null, null, null, bd("20"),
+        DerivativesRiskSnapshot partial = snapshot(bd("0.03"), bd("0.0001"), null, null, null, bd("0.20"),
                 UnifiedSourceStatus.DEGRADED, SnapshotFreshnessStatus.FRESH, "PARTIAL",
                 List.of(OI, FUNDING), List.of(LIQUIDATION, LONG_SHORT), List.of(), Instant.now());
         assertThat(service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), partial, false)))
@@ -279,13 +332,13 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void candidateCanUpgradeToWaitingTrigger() {
         assertThat(service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")), false)))
+                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")), false)))
                 .extracting(DerivativesBusinessAssessment::opportunityState).isEqualTo(AssetStateEnum.WAITING_TRIGGER);
     }
 
     @Test
     void waitingTriggerCanUpgradeToTriggeredOnlyWithCompletePlan() {
-        DerivativesRiskSnapshot snapshot = complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20"));
+        DerivativesRiskSnapshot snapshot = complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20"));
         assertThat(service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), snapshot, false)).opportunityState())
                 .isEqualTo(AssetStateEnum.WAITING_TRIGGER);
         assertThat(service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), snapshot, true)).opportunityState())
@@ -294,10 +347,10 @@ class DerivativesBusinessIntegrationServiceTest {
 
     @Test
     void highRiskAndConfusedCannotProduceConfirmPush() {
-        DerivativesRiskSnapshot risky = complete(bd("0.06"), bd("0.001"), bd("1.5"), bd("1000"), bd("1000"), bd("20"));
+        DerivativesRiskSnapshot risky = complete(bd("0.06"), bd("0.001"), bd("1.5"), bd("1000"), bd("1000"), bd("0.20"));
         DerivativesBusinessAssessment highRisk = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), risky, true));
         DerivativesBusinessAssessment confused = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")), true,
+                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")), true,
                 AssetStateEnum.CONFUSED));
         assertThat(highRisk.pushMode()).isNotEqualTo("CONFIRM_PUSH");
         assertThat(confused.pushMode()).isNotEqualTo("CONFIRM_PUSH");
@@ -306,7 +359,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void executionPlanUsesOhlcvForEntryStopAndTargets() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")), true));
+                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")), true));
         ExecutionPlanVO plan = plan();
         service.applyPlanAdjustments(plan, result);
         assertThat(plan.getEntryZone()).isEqualTo("100-105");
@@ -317,7 +370,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void fundingRiskReducesLeverageAndPositionSuggestion() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("0.06"), bd("0.001"), bd("1.5"), bd("1000"), bd("1000"), bd("20")), true));
+                complete(bd("0.06"), bd("0.001"), bd("1.5"), bd("1000"), bd("1000"), bd("0.20")), true));
         ExecutionPlanVO plan = plan();
         service.applyPlanAdjustments(plan, result);
         assertThat(plan.getLeverageSuggestion()).contains("低杠杆");
@@ -328,7 +381,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void strongDerivativesReversalRequiresManualConfirmation() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("-0.08"), bd("0.001"), bd("1.5"), bd("4000000"), bd("1000"), bd("20")), true));
+                complete(bd("-0.08"), bd("0.001"), bd("1.5"), bd("4000000"), bd("1000"), bd("0.20")), true));
         ExecutionPlanVO plan = plan();
         service.applyPlanAdjustments(plan, result);
         assertThat(plan.getManualReviewRequired()).isTrue();
@@ -339,7 +392,7 @@ class DerivativesBusinessIntegrationServiceTest {
     void positionLogicCanBecomeWeakenedFromDerivativesDivergence() {
         DerivativesBusinessInput positionInput = new DerivativesBusinessInput("BTCUSDT", "LONG",
                 bd("110"), bd("100"), false, Map.of(), true, 90, true, false, true, null,
-                complete(bd("-0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")),
+                complete(bd("-0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")),
                 "trace-position", "analysis-position", "v1.0");
         DerivativesBusinessAssessment result = service.evaluate(positionInput);
         assertThat(result.positionOpen()).isTrue();
@@ -350,7 +403,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void deterministicEndToEndDerivativesBusinessIntegration() {
         DerivativesBusinessInput input = input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
-                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("20")), true);
+                complete(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20")), true);
         DerivativesBusinessAssessment first = service.evaluate(input);
         DerivativesBusinessAssessment second = service.evaluate(input);
         DecisionBundleVO decision = decision("BULLISH");

@@ -1040,7 +1040,7 @@ class DashboardHomeServiceImplTest {
                 new BigDecimal("0.0001"), null, BigDecimal.ONE, "GLOBAL_ACCOUNT",
                 null, new BigDecimal("1000"), null, null,
                 null, new BigDecimal("1000"), null, null,
-                null, new BigDecimal("20"), datasets, List.of(), List.of(), UnifiedSourceStatus.READY,
+                null, new BigDecimal("0.20"), datasets, List.of(), List.of(), UnifiedSourceStatus.READY,
                 SnapshotFreshnessStatus.FRESH, "COMPLETE", List.of(), "trace-dashboard-derivatives",
                 Map.of(), null);
     }

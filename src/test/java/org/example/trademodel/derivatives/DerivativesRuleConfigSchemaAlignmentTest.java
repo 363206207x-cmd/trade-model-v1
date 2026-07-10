@@ -44,6 +44,8 @@ class DerivativesRuleConfigSchemaAlignmentTest {
             assertThat(h2).contains(key);
             assertThat(postgres).contains(key);
         }
+        assertThat(h2).contains("'derivatives_evidence_config.exchange_concentration_high', '0.70'");
+        assertThat(postgres).contains("'derivatives_evidence_config.exchange_concentration_high', '0.70'");
         assertThat(postgres).contains("ON CONFLICT (rule_key) DO UPDATE");
         assertThat(REQUIRED_KEYS).hasSize(24);
     }

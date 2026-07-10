@@ -334,7 +334,7 @@ class PushRecheckServiceImplTest {
                 new BigDecimal("0.0001"), null, BigDecimal.ONE, "GLOBAL_ACCOUNT",
                 null, new BigDecimal("1000"), null, null,
                 null, new BigDecimal("1000"), null, null,
-                null, new BigDecimal("20"), datasets, List.of(), List.of(), status, freshness,
+                null, new BigDecimal("0.20"), datasets, List.of(), List.of(), status, freshness,
                 availability, List.of(), "trace-push-derivatives", Map.of(), null);
     }
 

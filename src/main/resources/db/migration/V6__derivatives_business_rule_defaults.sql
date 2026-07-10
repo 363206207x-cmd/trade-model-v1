@@ -10,7 +10,7 @@ INSERT INTO tm_rule_config(rule_id, rule_type, rule_key, rule_value, description
 ('cfg-deriv-liquidation-5m', 'derivatives_evidence_config', 'derivatives_evidence_config.liquidation_spike_5m', '1000000', '5m liquidation spike USD threshold', 'v1.0', TRUE),
 ('cfg-deriv-liquidation-15m', 'derivatives_evidence_config', 'derivatives_evidence_config.liquidation_spike_15m', '3000000', '15m liquidation spike USD threshold', 'v1.0', TRUE),
 ('cfg-deriv-liquidation-imbalance', 'derivatives_evidence_config', 'derivatives_evidence_config.liquidation_imbalance_ratio', '2.0', 'Liquidation imbalance ratio threshold', 'v1.0', TRUE),
-('cfg-deriv-exchange-concentration', 'derivatives_evidence_config', 'derivatives_evidence_config.exchange_concentration_high', '70', 'Exchange concentration high threshold', 'v1.0', TRUE),
+('cfg-deriv-exchange-concentration', 'derivatives_evidence_config', 'derivatives_evidence_config.exchange_concentration_high', '0.70', 'Exchange concentration high ratio threshold (0.70 = 70%)', 'v1.0', TRUE),
 ('cfg-deriv-max-age', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_max_data_age_seconds', '120', 'Maximum derivatives data age in seconds', 'v1.0', TRUE),
 ('cfg-deriv-required-confirm', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_required_for_confirm', 'true', 'Require OI and Funding for confirm paths', 'v1.0', TRUE),
 ('cfg-deriv-min-datasets', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_minimum_dataset_count', '2', 'Minimum derivatives dataset count', 'v1.0', TRUE),

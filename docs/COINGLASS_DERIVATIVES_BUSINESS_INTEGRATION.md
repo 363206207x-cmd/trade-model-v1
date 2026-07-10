@@ -38,6 +38,8 @@ Source-backed evidence types include:
 - Exchange concentration risk.
 - Derivatives partial, stale, and unavailable states.
 
+`exchangeConcentrationScore` has one canonical unit: a decimal ratio in the range `0.0..1.0` computed as the largest valid exchange OI divided by aggregate OI. The provider value is not multiplied by 100. The default high-concentration threshold is `0.70`, which means 70%; values at the boundary are included. A configured threshold outside `(0.0, 1.0]` fails closed to `0.70` and records `RULE_CONFIG_OUT_OF_RANGE:derivatives_evidence_config.exchange_concentration_high`.
+
 Each evidence item preserves symbol, direction, strength, confidence, current/comparison values, timeframe, provider, provider data time, fetch time, source/freshness states, source field, reason code, trace ID, analysis ID, and rule version. Missing numeric values remain null and are never converted to zero.
 
 ## Eight-Score Contract

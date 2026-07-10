@@ -31,7 +31,7 @@ The selected long/short source is only `BINANCE_GLOBAL_ACCOUNT_RATIO`. Taker flo
 | `openInterestUsd` | `exchange=All.open_interest_usd`; a single exchange is never treated as aggregate OI |
 | `openInterestChange1m` | `null`; the verified endpoint does not document a 1m OI-change field |
 | `openInterestChange5m/15m/1h` | Corresponding documented percent fields on the `All` row |
-| `exchangeConcentrationScore` | Largest valid exchange OI divided by `All.open_interest_usd`; null when the ratio cannot be computed reliably |
+| `exchangeConcentrationScore` | Largest valid exchange OI divided by `All.open_interest_usd`; canonical decimal ratio range is `0.0..1.0`, `0.70` means 70%, and the value is never multiplied by 100; null when the ratio cannot be computed reliably |
 | `weightedFundingRate` | Latest non-future `close` from the OI-weighted funding history |
 | `fundingExtremityScore` | `null`; threshold ownership is deferred to BIZ-1 rule configuration |
 | liquidation 1m/5m/15m/1h | Sum the latest 1/5/15/60 complete 1m records under one latest provider-time boundary; an incomplete window remains null |
