@@ -113,7 +113,7 @@ class ScanUniverseResolverTest {
     }
 
     @Test
-    void positionPriceRefreshDoesNotRefreshDerivatives() {
+    void priceRefreshDoesNotRefreshDerivatives() {
         Map<ScanUniverseInput.DatasetRefreshKey, Instant> last = Map.of(
                 new ScanUniverseInput.DatasetRefreshKey("BTCUSDT", ProviderDatasetType.PRICE), NOW.minusSeconds(6),
                 new ScanUniverseInput.DatasetRefreshKey("BTCUSDT", ProviderDatasetType.DERIVATIVES), NOW.minusSeconds(6));

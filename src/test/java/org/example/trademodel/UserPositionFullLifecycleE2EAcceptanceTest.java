@@ -89,7 +89,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         UserPositionServiceImpl userPositionService = new UserPositionServiceImpl(userPositionMapper);
         PositionMonitorService positionMonitorService = new PositionMonitorServiceImpl(
                 userPositionMapper,
-                marketQuoteClient,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 riskAdapter,
                 executionPlanMapper,
                 monitorLogService,

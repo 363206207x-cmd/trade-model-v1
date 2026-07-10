@@ -117,6 +117,8 @@ Done when:
 - every score has a tested owner/use;
 - threshold changes are versioned and reproducible.
 
+CALL-1B update: the four-timeframe provider/OHLCV adoption part is complete. Eight-score influence remains a separate P1 item and is not implied complete by this closure.
+
 ### Package F: Plan and Asset-State Contract Cleanup
 
 Priority: P1

@@ -32,9 +32,9 @@ import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
 import org.example.trademodel.service.DecisionEngineService;
+import org.example.trademodel.service.DecisionOhlcvSnapshotSource;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.RecheckResult;
-import org.example.trademodel.service.RealMarketDataFetcherService;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.PushRecheckServiceImpl;
@@ -69,6 +69,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.matches;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -205,14 +206,15 @@ class V1BusinessStressTest {
     }
 
     private OpportunityResult runOpportunityScenario(OpportunityScenario scenario) {
-        RealMarketDataFetcherService fetcher = mock(RealMarketDataFetcherService.class);
+        DecisionOhlcvSnapshotSource fetcher = mock(DecisionOhlcvSnapshotSource.class);
         AiConflictResolverService conflictResolver = mock(AiConflictResolverService.class);
         ConfusedStateService confusedStateService = mock(ConfusedStateService.class);
         AssetStateService assetStateService = mock(AssetStateService.class);
         RuleConfigService ruleConfigService = mock(RuleConfigService.class);
         when(ruleConfigService.getRuleConfigMap()).thenReturn(Map.of());
-        when(fetcher.fetchKlines(eq(scenario.symbol()), eq("1m"), anyInt())).thenReturn(scenario.klines1m());
-        when(fetcher.fetchKlines(eq(scenario.symbol()), eq("5m"), anyInt())).thenReturn(scenario.klines5m());
+        when(fetcher.readClosedBars(eq(scenario.symbol()), eq("5m"), anyInt(), anyString())).thenReturn(scenario.klines1m());
+        when(fetcher.readClosedBars(eq(scenario.symbol()), matches("15m|1h|4h"), anyInt(), anyString()))
+                .thenReturn(scenario.klines5m());
         when(conflictResolver.resolve(any(DecisionContext.class))).thenReturn(scenario.conflictResult());
         when(confusedStateService.calculateConfused(eq(scenario.symbol()), any(DecisionContext.class)))
                 .thenReturn(scenario.confusedResult());
@@ -231,8 +233,10 @@ class V1BusinessStressTest {
         assertThat(decision.getIsWorthOpening()).isEqualTo(scenario.expectWorthOpening());
         assertThat(decision.getAssetState()).isEqualTo(scenario.expectedState());
         assertThat(decision.getAiRoleResults()).contains("RULE_ONLY_FALLBACK");
-        verify(fetcher).fetchKlines(scenario.symbol(), "1m", 3);
-        verify(fetcher).fetchKlines(scenario.symbol(), "5m", 3);
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("5m"), eq(3), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("15m"), eq(3), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("1h"), eq(3), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("4h"), eq(3), anyString());
         return new OpportunityResult(scenario, decision, plan);
     }
 
@@ -253,7 +257,9 @@ class V1BusinessStressTest {
         snapshot.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(701L)).thenReturn(snapshot);
         PushRecheckServiceImpl service = new PushRecheckServiceImpl(pushSnapshotMapper, accountRiskSnapshotMapper,
-                pushRecheckLogMapper, dispatchConfigService, riskAdapter, marketQuoteClient, ruleConfigContractService);
+                pushRecheckLogMapper, dispatchConfigService, riskAdapter,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
+                ruleConfigContractService);
 
         RecheckResult result = service.recheck(701L, new BigDecimal("110"));
 
@@ -635,7 +641,9 @@ class V1BusinessStressTest {
         private final PositionMonitorServiceImpl service;
 
         private MonitorHarness() {
-            service = new PositionMonitorServiceImpl(userPositionMapper, marketQuoteClient, riskAdapter, executionPlanMapper,
+            service = new PositionMonitorServiceImpl(userPositionMapper,
+                    org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
+                    riskAdapter, executionPlanMapper,
                     monitorLogService, mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class),
                     mock(DecisionResultMapper.class), new ObjectMapper(), null);
         }

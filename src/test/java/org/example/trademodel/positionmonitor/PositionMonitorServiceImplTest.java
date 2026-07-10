@@ -82,7 +82,7 @@ class PositionMonitorServiceImplTest {
     void setUp() {
         service = new PositionMonitorServiceImpl(
                 userPositionMapper,
-                marketQuoteClient,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 userPositionRiskAdapter,
                 executionPlanMapper,
                 positionMonitorLogService,
@@ -293,7 +293,7 @@ class PositionMonitorServiceImplTest {
     void activeBlockingExternalContextMakesHighRiskReviewWithoutPositionMutation() {
         service = new PositionMonitorServiceImpl(
                 userPositionMapper,
-                marketQuoteClient,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 userPositionRiskAdapter,
                 executionPlanMapper,
                 positionMonitorLogService,
@@ -336,7 +336,7 @@ class PositionMonitorServiceImplTest {
                 macroService(List.of(equitiesEvent)), newsService(List.of()));
         service = new PositionMonitorServiceImpl(
                 userPositionMapper,
-                marketQuoteClient,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 userPositionRiskAdapter,
                 executionPlanMapper,
                 positionMonitorLogService,

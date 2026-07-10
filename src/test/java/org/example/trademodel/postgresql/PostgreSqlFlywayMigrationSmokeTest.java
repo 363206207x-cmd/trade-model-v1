@@ -24,7 +24,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
     private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:16-alpine");
 
     @Test
-    void flywayBaselineMigrationsApplyToPostgreSqlAndIdentityKeysWork() throws Exception {
+    void postgreSqlV5MigrationRuntimeTest() throws Exception {
         assumeTrue(dockerAvailable(), "Docker/Testcontainers is unavailable; PostgreSQL smoke skipped");
 
         try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(POSTGRES_IMAGE)) {
@@ -59,6 +59,10 @@ class PostgreSqlFlywayMigrationSmokeTest {
                         "uk_tm_persisted_ohlcv_bar_source",
                         "idx_tm_persisted_ohlcv_bar_ingestion_run"));
                 assertOhlcvProvenanceColumnsExist(connection);
+                assertProviderScanProfileV5ColumnsExist(connection);
+                assertProviderScanRuleDefaultsExist(connection);
+                assertProviderScanProfileSaveLoadAndAudit(connection);
+                assertProviderScanProfileRollbackIsAtomic(connection);
                 assertFlywayHistorySucceeded(connection);
                 assertUserPositionIdentityGeneratedKey(connection);
             }
@@ -131,7 +135,92 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(4);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(5);
+            }
+        }
+    }
+
+    private static void assertProviderScanProfileV5ColumnsExist(Connection connection) throws Exception {
+        for (String column : List.of("scan_base_profile", "scan_position_profile", "scan_pool_profile",
+                "scan_auto_escalation_enabled", "scan_manual_override_until", "scan_update_reason",
+                "scan_updated_at")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'tm_user_config' AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt(1)).as("V5 column %s", column).isEqualTo(1);
+                }
+            }
+        }
+    }
+
+    private static void assertProviderScanRuleDefaultsExist(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*) FROM tm_rule_config WHERE rule_key LIKE 'provider.scan.%'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(16);
+            }
+        }
+    }
+
+    private static void assertProviderScanProfileSaveLoadAndAudit(Connection connection) throws Exception {
+        Timestamp now = Timestamp.valueOf(LocalDateTime.of(2026, 7, 10, 12, 0));
+        try (PreparedStatement insert = connection.prepareStatement("""
+                INSERT INTO tm_user_config(user_id, scan_base_profile, scan_position_profile, scan_pool_profile,
+                  scan_auto_escalation_enabled, scan_manual_override_until, scan_update_reason, scan_updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """)) {
+            insert.setString(1, "pg-v5-smoke"); insert.setString(2, "AUTO"); insert.setString(3, "HIGH");
+            insert.setString(4, "LOW"); insert.setBoolean(5, true); insert.setTimestamp(6, now);
+            insert.setString(7, "V5_POSTGRESQL_SMOKE"); insert.setTimestamp(8, now);
+            assertThat(insert.executeUpdate()).isEqualTo(1);
+        }
+        try (PreparedStatement query = connection.prepareStatement("""
+                SELECT scan_base_profile, scan_position_profile, scan_pool_profile,
+                       scan_auto_escalation_enabled, scan_manual_override_until, scan_update_reason, scan_updated_at
+                FROM tm_user_config WHERE user_id = ?
+                """)) {
+            query.setString(1, "pg-v5-smoke");
+            try (ResultSet rs = query.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo("AUTO");
+                assertThat(rs.getString(2)).isEqualTo("HIGH");
+                assertThat(rs.getBoolean(4)).isTrue();
+                assertThat(rs.getTimestamp(5)).isEqualTo(now);
+            }
+        }
+        try (PreparedStatement audit = connection.prepareStatement("""
+                INSERT INTO tm_rule_version_log(id, rule_version, change_category, change_summary, change_detail,
+                  operator, publish_time, rollback_flag, created_by, updated_by, is_deleted, version_no)
+                VALUES ('pg-v5-audit', 'v5', 'SCAN_PROFILE_CONFIG', 'profile saved', 'traceId=pg-v5',
+                  'pg-smoke', '2026-07-10T12:00:00Z', 'N', 'pg-smoke', 'pg-smoke', 0, 1)
+                """)) {
+            assertThat(audit.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    private static void assertProviderScanProfileRollbackIsAtomic(Connection connection) throws Exception {
+        boolean previous = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+        try (PreparedStatement update = connection.prepareStatement("""
+                UPDATE tm_user_config SET scan_base_profile = 'EMERGENCY' WHERE user_id = 'pg-v5-smoke'
+                """)) {
+            assertThat(update.executeUpdate()).isEqualTo(1);
+            connection.rollback();
+        } finally {
+            connection.setAutoCommit(previous);
+        }
+        try (PreparedStatement query = connection.prepareStatement("""
+                SELECT scan_base_profile FROM tm_user_config WHERE user_id = 'pg-v5-smoke'
+                """)) {
+            try (ResultSet rs = query.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo("AUTO");
             }
         }
     }

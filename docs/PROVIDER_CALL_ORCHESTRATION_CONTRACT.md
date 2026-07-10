@@ -22,7 +22,7 @@ Business Service
   -> Provider Adapter
 ```
 
-`MarketPriceSnapshotService` and `CoordinatedOhlcvSnapshotService` implement the new path. Existing business consumers are not all migrated in this package, so repository-wide single-entry adoption remains `PARTIAL`. The architecture guard prevents business services from importing concrete Binance/CoinGlass/News adapter implementations, and the next wiring package must replace remaining direct quote-reader calls with snapshot reads.
+`MarketPriceSnapshotService`, `BinanceDerivativesSnapshotService`, and `CoordinatedOhlcvSnapshotService` implement the provider boundary. Dashboard Home and Decision read models use the read-only snapshot peek; Position Monitor and Push Recheck may refresh through the coordinator. Decision Engine and plan assembly use authoritative persisted OHLCV. Repository-wide primary-business single-entry adoption is `PASS`; remaining direct clients are provider adapters or the legacy diagnostic market endpoint only.
 
 ## Request Identity
 
@@ -34,7 +34,7 @@ Business Service
 - timeframe;
 - time bucket.
 
-Its canonical form is `PROVIDER|DATASET|SYMBOL|TIMEFRAME|BUCKET`. Dataset types are intentionally separate: `PRICE`, `OHLCV`, `DERIVATIVES`, `EXTERNAL_CONTEXT`, and `AI_REVIEW`.
+Its canonical form is `PROVIDER|DATASET|SYMBOL|TIMEFRAME|BUCKET`. PRICE uses one stable `LATEST` key per symbol; cache lookup applies each consumer's freshness requirement, so a strict monitor cannot accept the looser age of a read model while all consumers still share one stored snapshot. Dataset types are intentionally separate: `PRICE`, `OHLCV`, `DERIVATIVES`, `EXTERNAL_CONTEXT`, and `AI_REVIEW`.
 
 ## Cache and Freshness
 
@@ -108,7 +108,7 @@ The package defines:
 
 Metadata includes provider, dataset, symbol/timeframe, provider data time, fetch/expiry times, source/freshness states, trace ID, canonical request key, cache/fallback flags, error code, and reason codes. Derivatives fields are nullable by design because no real CoinGlass source is connected.
 
-`AnalysisInputBundleAssembler` requires authoritative `5m`, `15m`, `1h`, and `4h` references and one trace ID across OHLCV, price, derivatives, and external context. It rejects mixed-trace inputs. Evidence, scores, decisions, and plans can therefore consume one locked snapshot set in the later business-wiring package.
+`AnalysisInputBundleAssembler` requires authoritative `5m`, `15m`, `1h`, and `4h` references and one trace ID across OHLCV, price, derivatives, and external context. It rejects mixed-trace inputs. `AuthoritativePersistedDecisionOhlcvSource` now supplies the four decision timeframes from the persisted readiness boundary; `1m` is no longer used as the formal decision or push-invalidation timeframe.
 
 ## Asset Priority and Bounded Universe
 
@@ -134,11 +134,13 @@ Authenticated `GET/PUT /api/config/scan-profile` reads and updates:
 
 The settings reuse `tm_user_config`; profile changes are audited through `tm_rule_version_log`. Position/pool subprofiles cannot be `AUTO`. The response exposes effective profile/reason, cadence, and provider budget state.
 
+Authenticated `GET /api/config/scan-profile/runtime?symbol=BTCUSDT` exposes the configured/effective profile, priority, reason, transition timing, price/derivatives cadence, last refresh statuses, and budget state without triggering a provider call.
+
 The matrix is configuration-bound. Position price intervals are 15s/10s/5s for LOW/STANDARD/HIGH and 3s for an affected EMERGENCY symbol. Derivatives retain their independent 120s/60s/60s cadence, with an emergency minimum refresh gap of 40s. Unaffected pool symbols are not elevated to EMERGENCY.
 
 ## Automatic Escalation and Hysteresis
 
-`ScanProfileTransitionService` reads every trigger and hysteresis value from versioned `tm_rule_config`. Inputs cover price/ATR/volume/spread, stop/target distance, open interest, liquidations, funding, events, confused score, Hot Reset, reversal, and data quality.
+`ScanProfileTransitionService` reads every trigger and hysteresis value from versioned `tm_rule_config`. The production universe source connects available persisted signals: active manual positions, monitor near-stop/near-target reasons, plan invalidation/high risk/reversal, Push Recheck drift/invalidation/blocking, external-context blocking, confused score, Hot Reset, and latest data quality. Runtime events are applied per symbol and are not promoted into a global profile. ATR/volume/spread and CoinGlass-only inputs remain null until authoritative producers exist; null is never interpreted as normal.
 
 Missing or malformed rule config keeps the current profile and returns `PROFILE_RULE_CONFIG_UNAVAILABLE`. It does not silently use a permissive Java threshold.
 
@@ -160,6 +162,8 @@ ProviderCallCoordinator
 
 `PersistedOhlcvIngestionService` remains the sole authoritative writer to `tm_persisted_ohlcv_bar`. No second mapper/writer was added. The existing controlled 1-2 symbol scheduler and its four-timeframe allowlist remain unchanged and semantically separate from the new provider-scan scheduler.
 
+The provider-scan refresh port checks the latest persisted closed-bar timestamp per timeframe and enters the coordinated writer path only when the next `5m`/`15m`/`1h`/`4h` close is due. A missing or failed persisted-read check permits a recovery refresh; it never marks missing bars healthy.
+
 ## Production Defaults
 
 The following production switches default to `false`:
@@ -175,7 +179,7 @@ The following production switches default to `false`:
 
 `V5__provider_scan_profile_orchestration.sql` adds only user scan-profile settings and provider scan rule defaults. It does not change trading data or add an executable action. Local H2 bootstrap and PostgreSQL migration SQL stay aligned.
 
-Historical controlled PostgreSQL evidence covers V1-V3, with static evidence for V4. V5 has not been rerun against a controlled PostgreSQL instance in this package. This is an explicit production-readiness blocker, not a PASS claim.
+`PostgreSqlFlywayMigrationSmokeTest` now validates clean V1-V5 migration, V5 columns/defaults, profile save/load, transition-audit-compatible insertion, timestamp persistence, transaction rollback atomicity, and mapper-compatible profile reads when Docker/Testcontainers is available. The 2026-07-10 local bounded run found no valid Docker socket, so migration/runtime evidence is `SKIPPED_DOCKER_UNAVAILABLE`, never PASS. Production readiness remains a separate blocked release gate.
 
 ## Test Evidence
 

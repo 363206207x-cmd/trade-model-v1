@@ -6,8 +6,11 @@ import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.enums.RecheckStatusEnum;
-import org.example.trademodel.market.client.MarketQuoteClient;
-import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
@@ -29,12 +32,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,7 +52,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final PushRecheckDispatchConfigService dispatchConfigService;
     private final UserPositionRiskAdapter userPositionRiskAdapter;
-    private final MarketQuoteClient marketQuoteClient;
+    private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final RuleConfigContractService ruleConfigContractService;
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
@@ -65,14 +70,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                                   PushRecheckLogMapper pushRecheckLogMapper,
                                   PushRecheckDispatchConfigService dispatchConfigService,
                                   UserPositionRiskAdapter userPositionRiskAdapter,
-                                  MarketQuoteClient marketQuoteClient,
+                                  MarketPriceSnapshotService marketPriceSnapshotService,
                                   RuleConfigContractService ruleConfigContractService) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.dispatchConfigService = dispatchConfigService;
         this.userPositionRiskAdapter = userPositionRiskAdapter;
-        this.marketQuoteClient = marketQuoteClient;
+        this.marketPriceSnapshotService = marketPriceSnapshotService;
         this.ruleConfigContractService = ruleConfigContractService;
     }
 
@@ -382,17 +387,17 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         if (symbol == null) {
             return PriceResolution.failed(failJson("PRICE_REQUIRED", "snapshot symbol missing"));
         }
-        if (marketQuoteClient == null) {
-            return PriceResolution.failed(failJson("QUOTE_UNAVAILABLE", "MarketQuoteClient unavailable"));
+        if (marketPriceSnapshotService == null) {
+            return PriceResolution.failed(failJson("QUOTE_UNAVAILABLE", "MarketPriceSnapshotService unavailable"));
         }
         try {
-            Optional<MarketQuoteSnapshot> snapshot = marketQuoteClient.fetch24hTicker(symbol);
-            if (snapshot.isEmpty()
-                    || snapshot.get().getLastPrice() == null
-                    || snapshot.get().getLastPrice().compareTo(BigDecimal.ZERO) <= 0) {
-                return PriceResolution.failed(failJson("QUOTE_UNAVAILABLE", "lastPrice unavailable for symbol=" + symbol));
+            ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.get(symbol,
+                    AssetPriority.P1_CORE, Duration.ofSeconds(15), "push-recheck-" + UUID.randomUUID());
+            if (!MarketPriceSnapshotPolicy.isFresh(result)) {
+                String code = MarketPriceSnapshotPolicy.failureCode(result);
+                return PriceResolution.failed(failJson(code, "snapshot unavailable for symbol=" + symbol));
             }
-            return PriceResolution.success(snapshot.get().getLastPrice());
+            return PriceResolution.success(result.payload().lastPrice());
         } catch (RuntimeException ex) {
             return PriceResolution.failed(failJson("QUOTE_UNAVAILABLE", ex.getMessage()));
         }

@@ -129,7 +129,6 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                     : emptyRoleResult(request);
         });
         when(aiDecisionOrchestratorService.providerReadiness()).thenReturn(List.of());
-        stubDecisionKlines(true);
     }
 
     @Test
@@ -198,7 +197,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Test
     void assemblerUsesFreshPersistedOhlcvToPersistBoundaryBackedPlanIntoDashboardHome() {
-        long latestCloseMs = persistBoundaryBars(SYMBOL, "5m", true);
+        long latestCloseMs = persistDecisionTimeframes(SYMBOL, true);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
@@ -234,8 +233,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     @Test
     void assemblerUsesFreshPersistedOhlcvForBearishBoundaryBackedPlan() {
         String symbol = "ETHUSDT";
-        stubDecisionKlines(false);
-        long latestCloseMs = persistBoundaryBars(symbol, "5m", false);
+        long latestCloseMs = persistDecisionTimeframes(symbol, false);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
@@ -266,19 +264,15 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         AnalysisRunResult result = analysisRunOrchestrator.run(
                 AnalysisRunCommand.manual("XRPUSDT", "5m", "req-boundary-no-ohlcv", analysisTime));
 
-        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        assertThat(result.isSuccessfulAnalysisAvailable()).isFalse();
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
-        assertThat(plan).isNotNull();
-        assertThat(plan.getEntryZone()).isEqualTo("暂无");
-        assertThat(plan.getStopLoss()).isEqualTo("暂无");
-        assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
-        assertThat(plan.getInvalidCondition()).isNull();
+        assertThat(plan).isNull();
         assertThat(count("tm_user_position")).isZero();
     }
 
     @Test
     void oneMinuteAnalysisDoesNotGenerateFormalExecutionPlanBoundary() {
-        long latestCloseMs = System.currentTimeMillis() - 1_000L;
+        long latestCloseMs = persistDecisionTimeframes("ADAUSDT", true);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
@@ -427,7 +421,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     private AnalysisRunResult runAiContractAnalysis(String symbol, String requestId) {
-        long latestCloseMs = persistBoundaryBars(symbol, "5m", true);
+        long latestCloseMs = persistDecisionTimeframes(symbol, true);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
         return analysisRunOrchestrator.run(
@@ -597,26 +591,13 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         executionPlanMapper.insert(plan);
     }
 
-    private void stubDecisionKlines(boolean bullish) {
-        List<String[]> klines = bullish
-                ? List.of(
-                kline("100", "105"),
-                kline("101", "106"),
-                kline("102", "107"))
-                : List.of(
-                kline("107", "102"),
-                kline("106", "101"),
-                kline("105", "100"));
-        when(realMarketDataFetcherService.fetchKlines(anyString(), eq("1m"), anyInt())).thenReturn(klines);
-        when(realMarketDataFetcherService.fetchKlines(anyString(), eq("5m"), anyInt())).thenReturn(klines);
-    }
-
-    private String[] kline(String open, String close) {
-        BigDecimal openValue = new BigDecimal(open);
-        BigDecimal closeValue = new BigDecimal(close);
-        BigDecimal high = openValue.max(closeValue).add(new BigDecimal("1.00"));
-        BigDecimal low = openValue.min(closeValue).subtract(new BigDecimal("1.00"));
-        return new String[]{"0", open, high.toPlainString(), low.toPlainString(), close};
+    private long persistDecisionTimeframes(String symbol, boolean bullish) {
+        long latest5m = 0L;
+        for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
+            long latest = persistBoundaryBars(symbol, timeframe, bullish);
+            if ("5m".equals(timeframe)) latest5m = latest;
+        }
+        return latest5m;
     }
 
     private long persistBoundaryBars(String symbol, String timeframe, boolean bullishStructure) {
@@ -627,10 +608,10 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         String batchId = "batch-" + symbol + "-" + latestOpenMs;
         List<OhlcvBarInput> bars = new java.util.ArrayList<>();
         for (int i = 0; i < 50; i++) {
-            BigDecimal open = new BigDecimal("101.00");
+            BigDecimal open = bullishStructure ? new BigDecimal("101.00") : new BigDecimal("102.00");
             BigDecimal high = new BigDecimal("103.00");
             BigDecimal low = new BigDecimal("99.00");
-            BigDecimal close = new BigDecimal("102.00");
+            BigDecimal close = bullishStructure ? new BigDecimal("102.00") : new BigDecimal("101.00");
             if (bullishStructure) {
                 if (i == 44) {
                     open = new BigDecimal("100.00");

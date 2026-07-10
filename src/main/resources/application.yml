@@ -53,6 +53,8 @@ trade-model:
     max-core-assets: 6
     max-candidate-assets: 20
     max-pool-assets: 20
+    core-assets: ${TRADE_MODEL_PROVIDER_CORE_ASSETS:BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT}
+    scan-user-id: ${TRADE_MODEL_PROVIDER_SCAN_USER_ID:admin}
     failure-threshold: 3
     circuit-open-seconds: 60
     provider-budgets:

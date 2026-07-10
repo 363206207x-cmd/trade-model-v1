@@ -3,6 +3,7 @@ package org.example.trademodel.providercall;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -46,13 +47,29 @@ public class ProviderCallCoordinator {
     }
 
     public <T> ProviderCallResult<T> execute(ProviderCallRequest<T> request) {
-        SnapshotCacheService.SnapshotLookup<T> existing = cache.lookup(request.key(), clock.instant());
+        SnapshotCacheService.SnapshotLookup<T> existing = cache.lookup(
+                request.key(), clock.instant(), request.freshTtl());
         if (existing.fresh()) return cached(request, existing, false);
         return singleFlight.execute(request.key(), () -> {
-            SnapshotCacheService.SnapshotLookup<T> afterJoin = cache.lookup(request.key(), clock.instant());
+            SnapshotCacheService.SnapshotLookup<T> afterJoin = cache.lookup(
+                    request.key(), clock.instant(), request.freshTtl());
             if (afterJoin.fresh()) return cached(request, afterJoin, false);
             return refresh(request, afterJoin.staleReadable() ? afterJoin : existing);
         });
+    }
+
+    public <T> ProviderCallResult<T> peek(
+            ProviderRequestKey key,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        ProviderCallRequest<T> request = new ProviderCallRequest<>(key, priority, freshTtl,
+                freshTtl.multipliedBy(4), Duration.ofSeconds(1), traceId,
+                () -> { throw new IllegalStateException("read-only snapshot peek must not call provider"); });
+        SnapshotCacheService.SnapshotLookup<T> lookup = cache.lookup(key, clock.instant(), freshTtl);
+        if (lookup.fresh()) return cached(request, lookup, false);
+        if (lookup.staleReadable()) return cached(request, lookup, true);
+        return failOrStale(request, lookup, UnifiedSourceStatus.WAITING_SYNC, "SNAPSHOT_NOT_CACHED");
     }
 
     private <T> ProviderCallResult<T> refresh(
@@ -149,7 +166,8 @@ public class ProviderCallCoordinator {
             SnapshotCacheService.SnapshotLookup<T> lookup,
             boolean fallback) {
         ProviderSnapshotMetadata metadata = lookup.metadata().asCacheHit(
-                fallback ? SnapshotFreshnessStatus.STALE : SnapshotFreshnessStatus.FRESH, fallback);
+                fallback ? SnapshotFreshnessStatus.STALE : SnapshotFreshnessStatus.FRESH, fallback,
+                lookup.metadata().fetchTime().plus(request.freshTtl()));
         return audited(request, new ProviderCallResult<>(lookup.payload(), metadata,
                 budget.state(request.key().provider(), circuitBreaker.state(request.key().provider()))));
     }

@@ -43,33 +43,59 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        Instant now = clock.instant();
-        long bucketSeconds = Math.max(1, freshTtl.toSeconds());
-        ProviderRequestKey key = new ProviderRequestKey("BINANCE_PUBLIC", ProviderDatasetType.PRICE,
-                symbol, "GLOBAL", String.valueOf(now.getEpochSecond() / bucketSeconds));
+        ProviderRequestKey key = key(symbol);
         ProviderCallResult<MarketPriceSnapshot> result = coordinator.execute(new ProviderCallRequest<>(key, priority, freshTtl,
-                freshTtl.multipliedBy(4), Duration.ofSeconds(3), traceId,
+                Duration.ofMinutes(2), Duration.ofSeconds(3), traceId,
                 () -> fetch(symbol, traceId, freshTtl)));
         if (result.payload() == null) return result;
         MarketPriceSnapshot enriched = new MarketPriceSnapshot(result.payload().symbol(), result.payload().lastPrice(),
-                result.payload().bidPrice(), result.payload().askPrice(), result.payload().spread(), result.metadata());
+                result.payload().bidPrice(), result.payload().askPrice(), result.payload().spread(),
+                result.payload().highPrice24h(), result.payload().lowPrice24h(),
+                result.payload().priceChangePercent24h(), result.payload().sourceProvider(),
+                result.payload().sourceFetchedAt(), result.metadata());
         return new ProviderCallResult<>(enriched, result.metadata(), result.budgetState());
+    }
+
+    public ProviderCallResult<MarketPriceSnapshot> peek(
+            String symbol,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        ProviderCallResult<MarketPriceSnapshot> result = coordinator.peek(key(symbol), priority, freshTtl, traceId);
+        if (result.payload() == null) return result;
+        MarketPriceSnapshot payload = result.payload();
+        return new ProviderCallResult<>(new MarketPriceSnapshot(payload.symbol(), payload.lastPrice(),
+                payload.bidPrice(), payload.askPrice(), payload.spread(), payload.highPrice24h(),
+                payload.lowPrice24h(), payload.priceChangePercent24h(), payload.sourceProvider(),
+                payload.sourceFetchedAt(), result.metadata()), result.metadata(), result.budgetState());
     }
 
     private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol, String traceId, Duration ttl) {
         Optional<MarketQuoteSnapshot> quote = marketQuoteClient.fetch24hTicker(symbol);
-        if (quote.isEmpty() || !positive(quote.get().getLastPrice())) {
+        if (quote.isEmpty()) {
             return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
+        }
+        if (quote.get().getLastPrice() == null) {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
+        }
+        if (!positive(quote.get().getLastPrice())) {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "INVALID_MARKET_PRICE", null);
         }
         MarketQuoteSnapshot raw = quote.get();
         Instant fetchedAt = raw.getFetchedAtEpochMillis() > 0
                 ? Instant.ofEpochMilli(raw.getFetchedAtEpochMillis()) : clock.instant();
         MarketPriceSnapshot snapshot = new MarketPriceSnapshot(raw.getSymbolNormalized(), raw.getLastPrice(),
-                null, null, null, null);
+                null, null, null, raw.getHighPrice(), raw.getLowPrice(), raw.getPriceChangePercent24h(),
+                raw.getProvider(), fetchedAt, null);
         return ProviderAdapterResponse.ready(snapshot, fetchedAt);
     }
 
     private static boolean positive(BigDecimal value) {
         return value != null && value.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private static ProviderRequestKey key(String symbol) {
+        return new ProviderRequestKey("BINANCE_PUBLIC", ProviderDatasetType.PRICE,
+                symbol, "GLOBAL", "LATEST");
     }
 }

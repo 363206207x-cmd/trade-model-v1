@@ -29,10 +29,10 @@ import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
 import org.example.trademodel.service.DecisionEngineService;
+import org.example.trademodel.service.DecisionOhlcvSnapshotSource;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.RecheckResult;
-import org.example.trademodel.service.RealMarketDataFetcherService;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.PushRecheckServiceImpl;
@@ -57,6 +57,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.matches;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -166,14 +167,16 @@ class V1HistoricalReplayValidationTest {
     }
 
     private ReplayResult runScenario(ReplayScenario scenario) {
-        RealMarketDataFetcherService localAdapter = mock(RealMarketDataFetcherService.class);
+        DecisionOhlcvSnapshotSource localAdapter = mock(DecisionOhlcvSnapshotSource.class);
         AiConflictResolverService conflictResolver = mock(AiConflictResolverService.class);
         ConfusedStateService confusedStateService = mock(ConfusedStateService.class);
         AssetStateService assetStateService = mock(AssetStateService.class);
         RuleConfigService ruleConfigService = mock(RuleConfigService.class);
         when(ruleConfigService.getRuleConfigMap()).thenReturn(Map.of());
-        when(localAdapter.fetchKlines(eq(scenario.symbol()), eq("1m"), anyInt())).thenReturn(klines(scenario.oneMinute()));
-        when(localAdapter.fetchKlines(eq(scenario.symbol()), eq("5m"), anyInt())).thenReturn(klines(scenario.fiveMinute()));
+        when(localAdapter.readClosedBars(eq(scenario.symbol()), eq("5m"), anyInt(), anyString()))
+                .thenReturn(klines(scenario.oneMinute()));
+        when(localAdapter.readClosedBars(eq(scenario.symbol()), matches("15m|1h|4h"), anyInt(), anyString()))
+                .thenReturn(klines(scenario.fiveMinute()));
         when(conflictResolver.resolve(any(DecisionContext.class))).thenReturn(scenario.conflict());
         when(confusedStateService.calculateConfused(eq(scenario.symbol()), any(DecisionContext.class)))
                 .thenReturn(scenario.confused());
@@ -191,8 +194,10 @@ class V1HistoricalReplayValidationTest {
         assertThat(decision.getIsWorthOpening()).isEqualTo(scenario.opportunityExpected());
         assertThat(decision.getAssetState()).isEqualTo(scenario.state());
         assertThat(decision.getAssetStateSnapshot()).contains(FIXTURE_SOURCE);
-        verify(localAdapter).fetchKlines(scenario.symbol(), "1m", 3);
-        verify(localAdapter).fetchKlines(scenario.symbol(), "5m", 3);
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("5m"), eq(3), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("15m"), eq(3), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("1h"), eq(3), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("4h"), eq(3), anyString());
         return new ReplayResult(scenario, decision, plan);
     }
 
@@ -209,7 +214,7 @@ class V1HistoricalReplayValidationTest {
                 new RuleConfigContractService.PushRecheckThresholds(new BigDecimal("0.02"), 70, 85, 60));
         PushRecheckServiceImpl service = new PushRecheckServiceImpl(snapshotMapper,
                 mock(AccountRiskSnapshotMapper.class), logMapper, mock(PushRecheckDispatchConfigService.class),
-                riskAdapter, quoteClient, config);
+                riskAdapter, org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient), config);
         RecheckResult result = service.recheck(snapshot.getPushId(), currentPrice);
         verifyNoInteractions(quoteClient);
         verify(logMapper).insert(any());
@@ -604,7 +609,9 @@ class V1HistoricalReplayValidationTest {
                 log.setLogId(logIds.incrementAndGet());
                 return log;
             });
-            service = new PositionMonitorServiceImpl(positionMapper, quoteClient, riskAdapter, planMapper, logService,
+            service = new PositionMonitorServiceImpl(positionMapper,
+                    org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient),
+                    riskAdapter, planMapper, logService,
                     mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class), mock(DecisionResultMapper.class),
                     new ObjectMapper(), null);
         }

@@ -2,13 +2,19 @@ package org.example.trademodel.market;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
-import org.example.trademodel.market.client.MarketQuoteClient;
-import org.example.trademodel.market.client.OpenInterestClient;
-import org.example.trademodel.market.client.PerpFundingRateClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
+import org.example.trademodel.providercall.snapshot.BinanceDerivativesSnapshotService;
+import org.example.trademodel.providercall.snapshot.MinimalDerivativesSnapshot;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,16 +36,13 @@ public class RealMarketEnvironmentService {
     static final String DERIVATIVES_CROWDING_STATE_CROWDED_LONG = "CROWDED_LONG";
     static final String DERIVATIVES_CROWDING_STATE_CROWDED_SHORT = "CROWDED_SHORT";
 
-    private final MarketQuoteClient marketQuoteClient;
-    private final PerpFundingRateClient perpFundingRateClient;
-    private final OpenInterestClient openInterestClient;
+    private final MarketPriceSnapshotService marketPriceSnapshotService;
+    private final BinanceDerivativesSnapshotService derivativesSnapshotService;
 
-    public RealMarketEnvironmentService(MarketQuoteClient marketQuoteClient,
-                                        PerpFundingRateClient perpFundingRateClient,
-                                        OpenInterestClient openInterestClient) {
-        this.marketQuoteClient = marketQuoteClient;
-        this.perpFundingRateClient = perpFundingRateClient;
-        this.openInterestClient = openInterestClient;
+    public RealMarketEnvironmentService(MarketPriceSnapshotService marketPriceSnapshotService,
+                                        BinanceDerivativesSnapshotService derivativesSnapshotService) {
+        this.marketPriceSnapshotService = marketPriceSnapshotService;
+        this.derivativesSnapshotService = derivativesSnapshotService;
     }
 
     /**
@@ -47,17 +50,18 @@ public class RealMarketEnvironmentService {
      */
     public Optional<MarketEnvironmentVO> tryBuildFromRealQuote(String assetSymbol, String timeframe) {
         try {
-            Optional<MarketQuoteSnapshot> snap = marketQuoteClient.fetch24hTicker(assetSymbol);
-            if (snap.isEmpty()) {
+            ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.get(assetSymbol,
+                    AssetPriority.P1_CORE, Duration.ofSeconds(30), "market-env-" + UUID.randomUUID());
+            if (!MarketPriceSnapshotPolicy.isFresh(result)) {
                 log.info("[market-env] real quote unavailable, will fallback asset={}", assetSymbol);
                 return Optional.empty();
             }
-            MarketEnvironmentVO env = mapSnapshot(snap.get(), timeframe);
-            mergePerpFundingIntoSummary(assetSymbol, env);
-            mergeOpenInterestIntoSummary(assetSymbol, env);
+            MarketPriceSnapshot snap = result.payload();
+            MarketEnvironmentVO env = mapSnapshot(snap, timeframe);
+            mergeDerivativesIntoSummary(assetSymbol, env);
             // derivativesCrowdingState：assemble 在 enrichOpenInterestDeltaFromPreviousSnapshot 之后计算（二刀 B）。
             log.info("[market-env] built from REAL quote provider={} symbol={} tf={}",
-                    snap.get().getProvider(), snap.get().getSymbolNormalized(), timeframe);
+                    snap.sourceProvider(), snap.symbol(), timeframe);
             return Optional.of(env);
         } catch (Exception e) {
             log.warn("[market-env] real mapping failed, fallback asset={} err={}", assetSymbol, e.getMessage());
@@ -65,19 +69,19 @@ public class RealMarketEnvironmentService {
         }
     }
 
-    private MarketEnvironmentVO mapSnapshot(MarketQuoteSnapshot q, String timeframe) {
-        BigDecimal pctBd = q.getPriceChangePercent24h() != null ? q.getPriceChangePercent24h() : BigDecimal.ZERO;
+    private MarketEnvironmentVO mapSnapshot(MarketPriceSnapshot q, String timeframe) {
+        BigDecimal pctBd = q.priceChangePercent24h() != null ? q.priceChangePercent24h() : BigDecimal.ZERO;
         double pct = pctBd.doubleValue();
         double abs = Math.abs(pct);
 
         MarketEnvironmentVO env = new MarketEnvironmentVO();
-        env.setPriceChangePercent24h(q.getPriceChangePercent24h());
+        env.setPriceChangePercent24h(q.priceChangePercent24h());
         env.setEnvironmentType(abs >= 2.0 ? "trend_market" : "range_market");
         env.setRiskMode(abs >= 8.0 ? "elevated" : "normal");
         int friendliness = (int) Math.round(Math.max(0, Math.min(100, 50 + pct * 2.5)));
         env.setTrendFriendliness((double) friendliness);
         env.setLeverageSuggestion(abs >= 6.0 ? "low_leverage" : "moderate_leverage");
-        Double rangePct = computeRangePercent24h(q);
+        Double rangePct = computeRangePercent24h(q.lastPrice(), q.highPrice24h(), q.lowPrice24h());
         if (rangePct != null) {
             env.setRangePct24h(rangePct);
             env.setVolatilityRegime(describeVolatilityRegime(rangePct));
@@ -86,12 +90,12 @@ public class RealMarketEnvironmentService {
         return env;
     }
 
-    private String buildSummary(MarketQuoteSnapshot q, String timeframe, Double rangePct) {
+    private String buildSummary(MarketPriceSnapshot q, String timeframe, Double rangePct) {
         String tf = timeframe != null && !timeframe.isBlank() ? timeframe.trim() : "n/a";
-        String price = q.getLastPrice() != null ? q.getLastPrice().toPlainString() : "?";
-        String pctf = q.getPriceChangePercent24h() != null ? q.getPriceChangePercent24h().toPlainString() : "?";
+        String price = q.lastPrice() != null ? q.lastPrice().toPlainString() : "?";
+        String pctf = q.priceChangePercent24h() != null ? q.priceChangePercent24h().toPlainString() : "?";
         StringBuilder sb = new StringBuilder();
-        sb.append("Real feed (Binance 24h): ").append(q.getSymbolNormalized())
+        sb.append("Real feed (Binance 24h): ").append(q.symbol())
                 .append(" last ").append(price).append(" USDT, 24h change ").append(pctf).append("%.");
         if (rangePct != null) {
             String regime = describeVolatilityRegime(rangePct);
@@ -110,17 +114,21 @@ public class RealMarketEnvironmentService {
         if (q == null) {
             return null;
         }
-        if (q.getLastPrice() == null || q.getHighPrice() == null || q.getLowPrice() == null) {
+        return computeRangePercent24h(q.getLastPrice(), q.getHighPrice(), q.getLowPrice());
+    }
+
+    private static Double computeRangePercent24h(BigDecimal lastPrice, BigDecimal highPrice, BigDecimal lowPrice) {
+        if (lastPrice == null || highPrice == null || lowPrice == null) {
             return null;
         }
-        if (q.getLastPrice().signum() <= 0) {
+        if (lastPrice.signum() <= 0) {
             return null;
         }
-        BigDecimal diff = q.getHighPrice().subtract(q.getLowPrice());
+        BigDecimal diff = highPrice.subtract(lowPrice);
         if (diff.signum() < 0) {
             return null;
         }
-        return diff.divide(q.getLastPrice(), 8, RoundingMode.HALF_UP)
+        return diff.divide(lastPrice, 8, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100))
                 .doubleValue();
     }
@@ -135,45 +143,32 @@ public class RealMarketEnvironmentService {
         return "中等波动";
     }
 
-    /** Best-effort：失败不拖垮现货 summary。 */
-    private void mergePerpFundingIntoSummary(String assetSymbol, MarketEnvironmentVO env) {
+    /** Best-effort：衍生品最小快照失败不拖垮现货 summary。 */
+    private void mergeDerivativesIntoSummary(String assetSymbol, MarketEnvironmentVO env) {
         env.setPerpFundingApplied(Boolean.FALSE);
-        if (perpFundingRateClient == null) {
-            return;
-        }
-        try {
-            Optional<BigDecimal> rateOpt = perpFundingRateClient.fetchLastFundingRate(assetSymbol);
-            if (rateOpt.isEmpty()) {
-                return;
-            }
-            BigDecimal rate = rateOpt.get();
-            env.setLastFundingRate(rate);
-            String base = env.getSummary() != null ? env.getSummary() : "";
-            env.setSummary(base + buildFundingAppendix(rate));
-            env.setPerpFundingApplied(Boolean.TRUE);
-        } catch (Exception e) {
-            log.info("[market-env] perp funding merge skipped asset={} err={}", assetSymbol, e.getMessage());
-        }
-    }
-
-    /** Best-effort：失败不拖垮现货 / Funding summary（见 {@code OI_MINIMAL_ACCESS_CONTRACT.md}）。 */
-    private void mergeOpenInterestIntoSummary(String assetSymbol, MarketEnvironmentVO env) {
         env.setOiApplied(Boolean.FALSE);
-        if (openInterestClient == null) {
+        if (derivativesSnapshotService == null) {
             return;
         }
         try {
-            Optional<BigDecimal> oiOpt = openInterestClient.fetchOpenInterest(assetSymbol);
-            if (oiOpt.isEmpty()) {
-                return;
+            ProviderCallResult<MinimalDerivativesSnapshot> result = derivativesSnapshotService.get(assetSymbol,
+                    AssetPriority.P1_CORE, Duration.ofSeconds(60), "market-env-derivatives-" + UUID.randomUUID());
+            MinimalDerivativesSnapshot snapshot = result == null ? null : result.payload();
+            if (snapshot == null) return;
+            if (snapshot.lastFundingRate() != null) {
+                env.setLastFundingRate(snapshot.lastFundingRate());
+                env.setSummary((env.getSummary() == null ? "" : env.getSummary())
+                        + buildFundingAppendix(snapshot.lastFundingRate()));
+                env.setPerpFundingApplied(Boolean.TRUE);
             }
-            BigDecimal oi = oiOpt.get();
-            env.setLastOpenInterest(oi);
-            String base = env.getSummary() != null ? env.getSummary() : "";
-            env.setSummary(base + buildOpenInterestAppendix(oi));
-            env.setOiApplied(Boolean.TRUE);
+            if (snapshot.openInterest() != null) {
+                env.setLastOpenInterest(snapshot.openInterest());
+                env.setSummary((env.getSummary() == null ? "" : env.getSummary())
+                        + buildOpenInterestAppendix(snapshot.openInterest()));
+                env.setOiApplied(Boolean.TRUE);
+            }
         } catch (Exception e) {
-            log.info("[market-env] open interest merge skipped asset={} err={}", assetSymbol, e.getMessage());
+            log.info("[market-env] derivatives snapshot merge skipped asset={} err={}", assetSymbol, e.getMessage());
         }
     }
 

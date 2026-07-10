@@ -1,21 +1,17 @@
 package org.example.trademodel.service;
 
 import org.example.trademodel.entity.TmPushSnapshotDO;
-import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
-import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -41,7 +37,6 @@ public class PushRecheckScheduler {
 
     private final PushSnapshotMapper pushSnapshotMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
-    private final MarketQuoteClient marketQuoteClient;
     private final PushRecheckService pushRecheckService;
     private final PushRecheckDispatchConfigService dispatchConfigService;
     private final boolean schedulersEnabled;
@@ -50,7 +45,6 @@ public class PushRecheckScheduler {
     public PushRecheckScheduler(
             PushSnapshotMapper pushSnapshotMapper,
             PushRecheckLogMapper pushRecheckLogMapper,
-            MarketQuoteClient marketQuoteClient,
             PushRecheckService pushRecheckService,
             PushRecheckDispatchConfigService dispatchConfigService,
             @Value("${trademodel.recheck.dispatch.limit:50}") int defaultLimit,
@@ -60,7 +54,6 @@ public class PushRecheckScheduler {
             @Value("${trade-model.schedulers.push-recheck.enabled:true}") boolean pushRecheckSchedulerEnabled) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
-        this.marketQuoteClient = marketQuoteClient;
         this.pushRecheckService = pushRecheckService;
         this.dispatchConfigService = dispatchConfigService;
         this.schedulersEnabled = schedulersEnabled;
@@ -122,23 +115,11 @@ public class PushRecheckScheduler {
         }
 
         try {
-            Optional<MarketQuoteSnapshot> opt = marketQuoteClient.fetch24hTicker(symbol);
-            if (opt.isEmpty()) {
-                log.debug("[push-recheck-scheduler] skip price not found: pushId={} symbol={}", pushId, symbol);
-                return;
-            }
-
-            BigDecimal price = opt.get().getLastPrice();
-            if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-                log.debug("[push-recheck-scheduler] skip invalid price: pushId={} lastPrice={}", pushId, price);
-                return;
-            }
-
             int attempt = resolveAttempt(pushId);
             String instructionId = batchId + "-PUSH-" + pushId;
             pushRecheckService.recheck(
                     pushId,
-                    price,
+                    null,
                     RecheckExecutionCommand.scheduled(batchId, instructionId, attempt, maxAttempts, minRetryMinutes));
         } catch (Exception e) {
             // 单条失败不要拖垮整轮

@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class ScanProfileTransitionServiceTest {
 
     @Test
-    void profileDowngradeRequiresRecoveryCycles() {
+    void downgradeRequiresRecoveryCycles() {
         Fixture fixture = fixture();
         ProfileTransitionResult emergency = fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
                 hotReset(), "trace-1");
@@ -44,7 +44,7 @@ class ScanProfileTransitionServiceTest {
     }
 
     @Test
-    void profileDowngradeMovesOneLevelAtATime() {
+    void downgradeMovesOneLevelAtATime() {
         Fixture fixture = fixture();
         fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, hotReset(), "trace-1");
         fixture.clock.advance(Duration.ofSeconds(301));
@@ -68,7 +68,7 @@ class ScanProfileTransitionServiceTest {
     }
 
     @Test
-    void effectiveProfileExplainsItsReason() {
+    void scanProfileRuntimeEndpointExplainsEffectiveReason() {
         Fixture fixture = fixture();
         ProfileTransitionResult result = fixture.service.evaluate("BTCUSDT", UserScanProfile.STANDARD,
                 hotReset(), "trace-1");
@@ -79,7 +79,7 @@ class ScanProfileTransitionServiceTest {
     }
 
     @Test
-    void manualHighProfileIsNotAutoDowngradedByTransitionService() {
+    void manualHighIsNotAutoDowngraded() {
         Fixture fixture = fixture();
         ProfileTransitionResult result = fixture.service.evaluate("BTCUSDT", UserScanProfile.HIGH,
                 ProfileTransitionSignal.recovery(), "trace-1");
@@ -96,6 +96,50 @@ class ScanProfileTransitionServiceTest {
         ProfileTransitionResult result = service.evaluate("BTCUSDT", UserScanProfile.LOW, hotReset(), "trace-1");
         assertThat(result.changed()).isFalse();
         assertThat(result.effectiveReason()).isEqualTo("PROFILE_RULE_CONFIG_UNAVAILABLE");
+    }
+
+    @Test
+    void nearStopRaisesOnlyAffectedPositionProfile() {
+        Fixture fixture = fixture();
+        ProfileTransitionSignal nearStop = new ProfileTransitionSignal(null, null, null, null,
+                BigDecimal.ZERO, null, null, null, null, false, null, false, false, null);
+        assertThat(fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, nearStop, "trace-stop")
+                .effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(fixture.service.currentProfile("ETHUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+    }
+
+    @Test
+    void nearTargetRaisesOnlyAffectedPositionProfile() {
+        Fixture fixture = fixture();
+        ProfileTransitionSignal nearTarget = new ProfileTransitionSignal(null, null, null, null,
+                null, BigDecimal.ZERO, null, null, null, false, null, false, false, null);
+        assertThat(fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, nearTarget, "trace-target")
+                .effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(fixture.service.currentProfile("ETHUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+    }
+
+    @Test
+    void hotResetRaisesAffectedAssetsToEmergency() {
+        Fixture fixture = fixture();
+        assertThat(fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, hotReset(), "trace-hot")
+                .effectiveProfile()).isEqualTo(RuntimeScanProfile.EMERGENCY);
+        assertThat(fixture.service.currentProfile("ETHUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+    }
+
+    @Test
+    void highRiskRaisesAffectedAssetProfile() {
+        Fixture fixture = fixture();
+        ProfileTransitionSignal highRisk = new ProfileTransitionSignal(null, null, null, null,
+                null, null, null, null, null, true, null, false, true, null);
+        assertThat(fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, highRisk, "trace-risk")
+                .effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+    }
+
+    @Test
+    void profileTransitionIsAudited() {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, hotReset(), "trace-audit");
+        verify(fixture.mapper).insert(any());
     }
 
     private static Fixture fixture() {
