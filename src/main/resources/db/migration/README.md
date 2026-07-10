@@ -8,6 +8,7 @@ Current migration files:
 - `V2__baseline_schema_indexes.sql`: PostgreSQL baseline index creation.
 - `V3__scheme_rule_config_defaults.sql`: PostgreSQL rule-config default upserts.
 - `V4__ohlcv_ingestion_provenance.sql`: additive OHLCV fetch/source/freshness/provenance/run audit columns and index.
+- `V5__provider_scan_profile_orchestration.sql`: additive user scan-profile settings and versioned provider-scan threshold defaults.
 
 `src/main/resources/schema.sql` remains the H2 local/test bootstrap path. It is intentionally separate from the PostgreSQL Flyway migration path.
 
@@ -24,4 +25,4 @@ PDR-PF4 status: current-state migration and rollback drill requirements are docu
 
 PDR-LIVE3 status: controlled external PostgreSQL Flyway smoke runner is available through `scripts/controlled-postgresql-flyway-smoke.sh` and `ControlledPostgreSqlFlywaySmokeTest`. It skips when controlled DB env is missing, requires explicit non-production and run confirmations, redacts connection values, and does not claim PASS until a disposable controlled PostgreSQL database is supplied.
 
-The historical controlled evidence through PDR-LIVE7 proves V1/V2/V3 only. V4 has bounded static PostgreSQL compatibility coverage and remains subject to a future controlled PostgreSQL migration run; production readiness remains `BLOCKED`.
+The historical controlled evidence through PDR-LIVE7 proves V1/V2/V3 only. V4 has bounded static PostgreSQL compatibility coverage. V5 is additive SQL reviewed by the package tests but has not been run in the controlled PostgreSQL evidence environment. V4/V5 remain subject to a future controlled PostgreSQL migration run; production readiness remains `BLOCKED`.

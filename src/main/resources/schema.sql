@@ -324,7 +324,14 @@ CREATE TABLE IF NOT EXISTS tm_user_config (
     risk_preference VARCHAR(50),
     ai_model_preference VARCHAR(50),
     notify_channels VARCHAR(100),
-    cooldown_minutes INT DEFAULT 15
+    cooldown_minutes INT DEFAULT 15,
+    scan_base_profile VARCHAR(16),
+    scan_position_profile VARCHAR(16),
+    scan_pool_profile VARCHAR(16),
+    scan_auto_escalation_enabled BOOLEAN,
+    scan_manual_override_until TIMESTAMP,
+    scan_update_reason VARCHAR(512),
+    scan_updated_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tm_real_position (
@@ -842,6 +849,24 @@ MERGE INTO tm_rule_config KEY(rule_key) VALUES
 ('cfg-hot-reset-oi-collapse', 'hot_reset_config', 'hot_reset_config.oi_collapse_change_ratio_threshold', '-0.30', 'Hot Reset open-interest collapse threshold', 'v1.0', TRUE),
 ('cfg-hot-reset-liquidity-drain', 'hot_reset_config', 'hot_reset_config.liquidity_drain_change_ratio_threshold', '-0.40', 'Hot Reset liquidity drain threshold', 'v1.0', TRUE),
 ('cfg-hot-reset-systemic-severity', 'hot_reset_config', 'hot_reset_config.systemic_shock_severity_threshold', '85', 'Hot Reset systemic shock severity threshold', 'v1.0', TRUE);
+
+MERGE INTO tm_rule_config KEY(rule_key) VALUES
+('cfg-provider-scan-emergency-price', 'provider_scan_profile_config', 'provider.scan.emergency_price_movement_1m', '0.05', 'Emergency 1m price movement threshold', 'v1.0', TRUE),
+('cfg-provider-scan-emergency-liquidation', 'provider_scan_profile_config', 'provider.scan.emergency_liquidation_spike', '90', 'Emergency liquidation spike score threshold', 'v1.0', TRUE),
+('cfg-provider-scan-emergency-confused', 'provider_scan_profile_config', 'provider.scan.emergency_confused_score', '85', 'Emergency confused score threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-price', 'provider_scan_profile_config', 'provider.scan.high_price_movement_1m', '0.02', 'High 1m price movement threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-atr', 'provider_scan_profile_config', 'provider.scan.high_atr_multiple_5m', '2.0', 'High 5m ATR multiple threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-volume', 'provider_scan_profile_config', 'provider.scan.high_volume_spike', '2.5', 'High volume spike threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-spread', 'provider_scan_profile_config', 'provider.scan.high_spread_spike', '2.0', 'High spread spike threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-oi', 'provider_scan_profile_config', 'provider.scan.high_open_interest_change', '0.10', 'High open interest change threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-funding', 'provider_scan_profile_config', 'provider.scan.high_funding_extremity', '80', 'High funding extremity threshold', 'v1.0', TRUE),
+('cfg-provider-scan-near-boundary', 'provider_scan_profile_config', 'provider.scan.near_boundary_distance', '0.01', 'Near stop or target distance threshold', 'v1.0', TRUE),
+('cfg-provider-scan-data-quality', 'provider_scan_profile_config', 'provider.scan.data_quality_deterioration_score', '60', 'Data quality deterioration threshold', 'v1.0', TRUE),
+('cfg-provider-scan-standard-confused', 'provider_scan_profile_config', 'provider.scan.standard_confused_score', '55', 'Standard profile confused score threshold', 'v1.0', TRUE),
+('cfg-provider-scan-high-hold', 'provider_scan_profile_config', 'provider.scan.high_min_hold_seconds', '300', 'High profile minimum hold seconds', 'v1.0', TRUE),
+('cfg-provider-scan-emergency-hold', 'provider_scan_profile_config', 'provider.scan.emergency_min_hold_seconds', '120', 'Emergency profile minimum hold seconds', 'v1.0', TRUE),
+('cfg-provider-scan-recovery-cycles', 'provider_scan_profile_config', 'provider.scan.recovery_confirm_cycles', '2', 'Recovery cycles before downgrade', 'v1.0', TRUE),
+('cfg-provider-scan-downgrade-cooldown', 'provider_scan_profile_config', 'provider.scan.downgrade_cooldown_seconds', '300', 'Profile downgrade cooldown seconds', 'v1.0', TRUE);
 
 -- hot_reset_* / pre_reset_state / post_reset_state 记录的是该行最近一次 Hot Reset 元数据，
 -- 不是按 analysis_id 归档的事件流水；review 仅做当前行解释展示。

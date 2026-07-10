@@ -40,6 +40,45 @@ management:
       show-components: never
 
 trade-model:
+  provider-call:
+    enabled: ${TRADE_MODEL_PROVIDER_CALL_ENABLED:false}
+    scheduler-enabled: ${TRADE_MODEL_PROVIDER_SCAN_SCHEDULER_ENABLED:false}
+    profile-escalation-enabled: ${TRADE_MODEL_PROFILE_ESCALATION_ENABLED:false}
+    external-calls-enabled: ${TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED:false}
+    base-profile: ${TRADE_MODEL_PROVIDER_BASE_PROFILE:AUTO}
+    auto-escalation-enabled: ${TRADE_MODEL_PROVIDER_AUTO_ESCALATION_ENABLED:true}
+    internal-budget-ratio: 0.80
+    emergency-reserve-ratio: 0.20
+    event-refresh-min-gap-seconds: 40
+    max-core-assets: 6
+    max-candidate-assets: 20
+    max-pool-assets: 20
+    failure-threshold: 3
+    circuit-open-seconds: 60
+    provider-budgets:
+      binance-public-advertised-rpm: 1200
+      coinglass-advertised-rpm: 300
+      ai-advertised-rpm: 60
+      external-context-advertised-rpm: 60
+    profiles:
+      low:
+        price: { position-seconds: 15, core-seconds: 60, candidate-seconds: 120, pool-seconds: 900 }
+        derivatives: { position-seconds: 120, core-seconds: 120, candidate-seconds: 300, pool-seconds: 900 }
+      standard:
+        price: { position-seconds: 10, core-seconds: 30, candidate-seconds: 60, pool-seconds: 600 }
+        derivatives: { position-seconds: 60, core-seconds: 60, candidate-seconds: 120, pool-seconds: 600 }
+      high:
+        price: { position-seconds: 5, core-seconds: 15, candidate-seconds: 30, pool-seconds: 300 }
+        derivatives: { position-seconds: 60, core-seconds: 60, candidate-seconds: 60, pool-seconds: 300 }
+      emergency:
+        price: { position-seconds: 3, core-seconds: 5, candidate-seconds: 10, pool-seconds: 900 }
+        derivatives: { position-seconds: 40, core-seconds: 40, candidate-seconds: 40, pool-seconds: 900 }
+        full-analysis-debounce-seconds: 20
+    profile-transition:
+      high-min-hold-seconds: 300
+      emergency-min-hold-seconds: 120
+      recovery-confirm-cycles: 2
+      downgrade-cooldown-seconds: 300
   auth:
     enabled: ${TRADE_MODEL_AUTH_ENABLED:true}
     admin-username: ${APP_ADMIN_USERNAME:admin}

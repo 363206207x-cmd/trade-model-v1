@@ -61,6 +61,27 @@ Done when:
 - omission/default tests cover browser payload and backend validation;
 - full manual lifecycle remains green.
 
+### Package B2: Unified Provider Call and Snapshot Adoption
+
+Priority: P0
+
+Depends on: Package B.
+
+Current status: coordination, cache, single-flight, budget, scan-profile, bounded-universe, snapshot contracts, and default-off scheduler foundation implemented; repository-wide business-reader migration remains open.
+
+Scope:
+
+- Route provider reads through snapshot services and `ProviderCallCoordinator`.
+- Reuse the authoritative OHLCV writer and prohibit a second writer.
+- Share price/derivatives/context snapshots across Dashboard, Decision, Position Monitor, and Push Recheck.
+- Retain explicit no-data/freshness states and production-default-off external calls.
+
+Done when:
+
+- all legacy business direct provider-reader calls are removed;
+- one request key produces one provider call within its freshness window;
+- controlled provider evidence is recorded separately without treating missing keys as PASS.
+
 ### Package D: External Context No-Data Contract
 
 Priority: P0
