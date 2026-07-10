@@ -2,6 +2,15 @@ package org.example.trademodel.integration;
 
 import org.example.trademodel.TradeModelApplication;
 import org.example.trademodel.ai.AiOrchestratorResult;
+import org.example.trademodel.ai.AiProviderCallStatus;
+import org.example.trademodel.ai.AiProviderName;
+import org.example.trademodel.ai.AiProviderRequest;
+import org.example.trademodel.ai.AiProviderReviewResult;
+import org.example.trademodel.ai.AiProviderRole;
+import org.example.trademodel.ai.AiReviewConflictLevel;
+import org.example.trademodel.ai.AiReviewStance;
+import org.example.trademodel.ai.AiRoleResultsCodec;
+import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.analysisrun.AnalysisRunCommand;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
@@ -48,6 +57,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @SpringBootTest(classes = TradeModelApplication.class)
 @Transactional
@@ -73,6 +84,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     private AnalysisRunOrchestrator analysisRunOrchestrator;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private AiRoleResultsCodec aiRoleResultsCodec;
 
     @MockBean
     private RealMarketDataFetcherService realMarketDataFetcherService;
@@ -102,9 +115,78 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         }
         when(realMarketEnvironmentService.tryBuildFromRealQuote(anyString(), anyString()))
                 .thenReturn(Optional.empty());
-        when(aiDecisionOrchestratorService.review(any())).thenReturn(new AiOrchestratorResult());
+        when(aiDecisionOrchestratorService.review(any())).thenAnswer(invocation -> {
+            AiProviderRequest request = invocation.getArgument(0);
+            return List.of("SOLUSDT", "BNBUSDT", "DOGEUSDT").contains(request.getSymbol())
+                    ? threeRoleResult(request)
+                    : emptyRoleResult(request);
+        });
         when(aiDecisionOrchestratorService.providerReadiness()).thenReturn(List.of());
         stubDecisionKlines(true);
+    }
+
+    @Test
+    void structuredAiRolePayloadPersistsAndLoadsWithoutLoss() {
+        AnalysisRunResult result = runAiContractAnalysis("SOLUSDT", "req-ai-persistence");
+
+        DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(persisted).isNotNull();
+        AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(persisted.getAiRoleResults());
+
+        assertThat(parsed.current()).isTrue();
+        assertThat(parsed.payload().schemaVersion()).isEqualTo("v1");
+        assertThat(parsed.payload().roles()).containsOnlyKeys("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+        assertThat(parsed.payload().roles().get("GPT_FINAL").summary()).isEqualTo("GPT persisted summary");
+        assertThat(parsed.payload().roles().get("GEMINI_REVIEW").reasonCodes())
+                .containsExactly("GEMINI_CONTRADICTION_ONLY");
+        assertThat(parsed.payload().roles().get("GROK_CHALLENGE").summary())
+                .isEqualTo("Grok persisted challenge");
+        assertThat(persisted.getAiRoleResults()).doesNotContain("providerRequestId", "Authorization", "apiKey");
+    }
+
+    @Test
+    void producerToDashboardHomeIntegrationRendersAllThreeRoles() {
+        String symbol = "BNBUSDT";
+        AnalysisRunResult result = runAiContractAnalysis(symbol, "req-ai-home");
+        DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+
+        clearInvocations(aiDecisionOrchestratorService);
+        DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
+        verifyNoInteractions(aiDecisionOrchestratorService);
+
+        assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v1");
+        DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
+        DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
+        DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
+        assertThat(gpt.getFinalMarketBias()).isEqualTo("BULLISH");
+        assertThat(gpt.getDecisionSummary()).isEqualTo("GPT persisted summary");
+        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("GPT_SUPPORT_ONLY");
+        assertThat(gemini.getReviewConclusion()).isEqualTo("Gemini persisted review");
+        assertThat(gemini.getDetectedContradictions()).containsExactly("GEMINI_CONTRADICTION_ONLY");
+        assertThat(grok.getChallengeThesis()).isEqualTo("Grok persisted challenge");
+        assertThat(grok.getCounterEvidence()).containsExactly("GROK_COUNTER_ONLY");
+        assertThat(gemini.getReviewConclusion()).doesNotContain("GPT", "Grok");
+        assertThat(grok.getChallengeThesis()).doesNotContain("GPT", "Gemini");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tm_user_position", Integer.class)).isZero();
+        assertThat(home.getSafety().getNotAutoTrading()).isTrue();
+        assertThat(home.getSafety().getNotOrderExecution()).isTrue();
+    }
+
+    @Test
+    void ruleLayerRemainsAuthoritative() {
+        AnalysisRunResult result = runAiContractAnalysis("DOGEUSDT", "req-ai-authority");
+        DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        AiRoleResultsPayload payload = aiRoleResultsCodec.parse(persisted.getAiRoleResults()).payload();
+
+        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(payload.synthesis().finalMarketBias()).isEqualTo("BULLISH");
+        assertThat(payload.safety().ruleDirectionPreserved()).isTrue();
+        assertThat(payload.safety().notStateMachineOverride()).isTrue();
+        assertThat(payload.safety().notUserPositionCreation()).isTrue();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tm_user_position", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForList("SELECT state FROM tm_asset_state", String.class))
+                .doesNotContain("TRIGGERED");
     }
 
     @Test
@@ -337,6 +419,66 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         );
     }
 
+    private AnalysisRunResult runAiContractAnalysis(String symbol, String requestId) {
+        long latestCloseMs = persistBoundaryBars(symbol, "5m", true);
+        String analysisTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
+        return analysisRunOrchestrator.run(
+                AnalysisRunCommand.manual(symbol, "5m", requestId, analysisTime));
+    }
+
+    private AiOrchestratorResult threeRoleResult(AiProviderRequest request) {
+        AiOrchestratorResult result = new AiOrchestratorResult();
+        result.setAnalysisId(request.getAnalysisId());
+        result.setTraceId(request.getTraceId());
+        result.setProviderResults(List.of(
+                role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "GPT_SUPPORT_ONLY", "GPT persisted summary"),
+                role(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                        AiReviewStance.CHALLENGE, "GEMINI_CONTRADICTION_ONLY", "Gemini persisted review"),
+                role(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE,
+                        AiReviewStance.CHALLENGE, "GROK_COUNTER_ONLY", "Grok persisted challenge")));
+        result.setGptConsistentWithRule(true);
+        result.setGeminiConsistentWithRule(false);
+        result.setGrokConsistentWithRule(false);
+        result.setAiObjectionCount(2);
+        result.setAiSupportCount(1);
+        result.setConflictContribution(20);
+        return result;
+    }
+
+    private AiOrchestratorResult emptyRoleResult(AiProviderRequest request) {
+        AiOrchestratorResult result = new AiOrchestratorResult();
+        result.setAnalysisId(request.getAnalysisId());
+        result.setTraceId(request.getTraceId());
+        return result;
+    }
+
+    private AiProviderReviewResult role(AiProviderName provider,
+                                        AiProviderRole providerRole,
+                                        AiReviewStance stance,
+                                        String reasonCode,
+                                        String summary) {
+        AiProviderReviewResult result = new AiProviderReviewResult();
+        result.setProvider(provider);
+        result.setRole(providerRole);
+        result.setCallStatus(AiProviderCallStatus.SUCCESS);
+        result.setStance(stance);
+        result.setConflictLevel(stance == AiReviewStance.CHALLENGE
+                ? AiReviewConflictLevel.MAJOR
+                : AiReviewConflictLevel.NONE);
+        result.setReasonCodes(List.of(reasonCode));
+        result.setSummary(summary);
+        return result;
+    }
+
+    private DashboardHomeVO.AiTabVO aiTab(DashboardHomeVO home, String role) {
+        return home.getAiDecision().getTabs().stream()
+                .filter(tab -> role.equals(tab.getRole()))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private void persistControlledAnalysisDecisionAndPlan() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 2, 9, 30);
         AnalysisRunDO run = new AnalysisRunDO();
@@ -400,7 +542,14 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         decision.setConclusionSummary("controlled decision result");
         decision.setIsWorthOpening(true);
         decision.setMultiTfConvergence("STRONG");
-        decision.setAiRoleResults("{\"GPT_FINAL\":{\"reviewConclusion\":\"controlled review\"}}");
+        AiOrchestratorResult aiResult = new AiOrchestratorResult();
+        aiResult.setAnalysisId(ANALYSIS_ID);
+        aiResult.setTraceId("trace-int-1");
+        decision.setAiRoleResults(aiRoleResultsCodec.serialize(aiResult, "v1.0",
+                new AiRoleResultsPayload.SynthesisPayload(
+                        "BULLISH", "HIGH", "LOW", true,
+                        "LEVEL_1_CONSISTENT", 12, "HIGH", "UNCHANGED",
+                        "CONFIRM", false, null)));
         decision.setIsAdopted(null);
         decision.setValidPeriod("12h");
         decision.setInvalidCondition("decision invalidation fallback");

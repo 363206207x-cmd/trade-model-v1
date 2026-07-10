@@ -762,9 +762,18 @@ public class DashboardHomeVO {
     }
 
     public static class AiDecisionVO {
+        private String schemaVersion;
         private String activeTab = "GPT_FINAL";
         private List<AiTabVO> tabs = new ArrayList<>();
         private ConsistencyVO consistency = new ConsistencyVO();
+
+        public String getSchemaVersion() {
+            return schemaVersion;
+        }
+
+        public void setSchemaVersion(String schemaVersion) {
+            this.schemaVersion = schemaVersion;
+        }
 
         public String getActiveTab() {
             return activeTab;

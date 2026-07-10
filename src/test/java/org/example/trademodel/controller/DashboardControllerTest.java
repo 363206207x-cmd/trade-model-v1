@@ -1528,7 +1528,7 @@ public class DashboardControllerTest {
         decision.setAnalysisId("ana-ready");
         decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
         decision.setConfidenceLevel("HIGH");
-        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setAiRoleResults("{\"schemaVersion\":\"v1\",\"roles\":{},\"synthesis\":{}}");
         decision.setReadModelTruthStatus("FULL");
         when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
 
@@ -1590,7 +1590,7 @@ public class DashboardControllerTest {
         decision.setAnalysisId("ana-partial");
         decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
         decision.setConfidenceLevel("MEDIUM");
-        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setAiRoleResults("{\"schemaVersion\":\"v1\",\"roles\":{},\"synthesis\":{}}");
         decision.setReadModelTruthStatus("PARTIAL");
         decision.setReadModelFallbackReason("LEGACY_MISSING:review_reasons");
         when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
@@ -1612,7 +1612,7 @@ public class DashboardControllerTest {
         decision.setAnalysisId("ana-source-partial");
         decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
         decision.setConfidenceLevel("HIGH");
-        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setAiRoleResults("{\"schemaVersion\":\"v1\",\"roles\":{},\"synthesis\":{}}");
         decision.setReadModelTruthStatus("FULL");
         when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
 
@@ -1653,7 +1653,7 @@ public class DashboardControllerTest {
         decision.setAnalysisId("ana-safe");
         decision.setCreateTime(LocalDateTime.of(2026, 5, 17, 12, 0));
         decision.setConfidenceLevel("HIGH");
-        decision.setAiRoleResults("{\"role\":\"present\"}");
+        decision.setAiRoleResults("{\"schemaVersion\":\"v1\",\"roles\":{},\"synthesis\":{}}");
         decision.setReadModelTruthStatus("FULL");
         when(decisionService.getLatestDecisionResultBySymbol("BTCUSDT")).thenReturn(decision);
 

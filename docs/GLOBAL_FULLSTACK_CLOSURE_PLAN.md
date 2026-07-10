@@ -10,6 +10,8 @@ Close V1 source, contract, persistence, API, and rendering gaps in dependency or
 
 Priority: P0
 
+Status: CLOSED by `AI_ROLE_STRUCTURED_CONTRACT_ALIGNMENT.md`.
+
 Scope:
 
 - Define one typed, versioned structure for GPT final, Gemini review, and Grok challenge outputs.

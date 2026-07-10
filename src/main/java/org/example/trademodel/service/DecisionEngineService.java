@@ -1,8 +1,13 @@
 package org.example.trademodel.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.example.trademodel.ai.AiOrchestrationMode;
 import org.example.trademodel.ai.AiOrchestratorResult;
 import org.example.trademodel.ai.AiProviderRequest;
+import org.example.trademodel.ai.AiProviderReviewResult;
+import org.example.trademodel.ai.AiRoleResultsCodec;
+import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
@@ -39,6 +44,7 @@ public class DecisionEngineService {
     private final AssetStateService assetStateService;
     private final RuleConfigService ruleConfigService;
     private final AiDecisionOrchestratorService aiDecisionOrchestratorService;
+    private final AiRoleResultsCodec aiRoleResultsCodec;
 
     // ========= 最小规则键集合（仅限本阶段允许 keys） =========
     private static final String KEY_WORTH_OPENING_MIN_SCORE = "decision.worth_opening_min_score";
@@ -67,7 +73,18 @@ public class DecisionEngineService {
                                  AssetStateService assetStateService,
                                  RuleConfigService ruleConfigService) {
         this(marketDataFetcher, aiConflictResolverService, confusedStateService,
-                assetStateService, ruleConfigService, null);
+                assetStateService, ruleConfigService, null, new AiRoleResultsCodec(new ObjectMapper()));
+    }
+
+    public DecisionEngineService(RealMarketDataFetcherService marketDataFetcher,
+                                 AiConflictResolverService aiConflictResolverService,
+                                 ConfusedStateService confusedStateService,
+                                 AssetStateService assetStateService,
+                                 RuleConfigService ruleConfigService,
+                                 AiDecisionOrchestratorService aiDecisionOrchestratorService) {
+        this(marketDataFetcher, aiConflictResolverService, confusedStateService, assetStateService,
+                ruleConfigService, aiDecisionOrchestratorService,
+                new AiRoleResultsCodec(new ObjectMapper()));
     }
 
     @Autowired
@@ -76,13 +93,17 @@ public class DecisionEngineService {
                                  ConfusedStateService confusedStateService,
                                  AssetStateService assetStateService,
                                  RuleConfigService ruleConfigService,
-                                 AiDecisionOrchestratorService aiDecisionOrchestratorService) {
+                                 AiDecisionOrchestratorService aiDecisionOrchestratorService,
+                                 AiRoleResultsCodec aiRoleResultsCodec) {
         this.marketDataFetcher = marketDataFetcher;
         this.aiConflictResolverService = aiConflictResolverService;
         this.confusedStateService = confusedStateService;
         this.assetStateService = assetStateService;
         this.ruleConfigService = ruleConfigService;
         this.aiDecisionOrchestratorService = aiDecisionOrchestratorService;
+        this.aiRoleResultsCodec = aiRoleResultsCodec != null
+                ? aiRoleResultsCodec
+                : new AiRoleResultsCodec(new ObjectMapper());
         logger.info("DecisionEngineService V3 (rule-layer direction + AI review-only orchestrator + real klines + multiTF) initialized successfully");
     }
 
@@ -109,6 +130,9 @@ public class DecisionEngineService {
             Map<String, RuleConfigDO> ruleMap = ruleConfigService != null
                     ? ruleConfigService.getRuleConfigMap()
                     : null;
+            String ruleVersion = ruleConfigService != null
+                    ? ruleConfigService.resolveActiveRuleVersion()
+                    : "v1.0";
 
             // 缺失/禁用/不可解析全部回退默认值，避免配置缺失导致行为崩掉
             int worthOpeningMinScore = getInt(ruleMap, KEY_WORTH_OPENING_MIN_SCORE, DEFAULT_WORTH_OPENING_MIN_SCORE);
@@ -277,10 +301,19 @@ public class DecisionEngineService {
             decision.setConclusionSummary(conclusion);
             decision.setIsWorthOpening(effectiveWorthOpening && !confused.isDirectionalPushBlocked());
             decision.setMultiTfConvergence(multiTfLabel);
-            decision.setAiRoleResults(
-                    aiReview.toSanitizedSummary()
-                            + " | rule-layer base direction preserved as "
-                            + ruleMarketBias + " (Score=" + finalScore + ")");
+            AiRoleResultsPayload.SynthesisPayload aiSynthesis = new AiRoleResultsPayload.SynthesisPayload(
+                    ruleMarketBias,
+                    conflict.getAdjustedConfidence() != null ? conflict.getAdjustedConfidence() : confidenceLevel,
+                    riskLevelLabel,
+                    effectiveWorthOpening && !confused.isDirectionalPushBlocked(),
+                    conflict.getLevel() != null ? conflict.getLevel().name() : null,
+                    conflict.getAiConflictScore(),
+                    conflict.getAdjustedConfidence(),
+                    conflict.getRiskAdjustment(),
+                    conflict.getPlanMode(),
+                    AssetStateEnum.CONFUSED.equals(finalAssetState) || confused.isDirectionalPushBlocked(),
+                    firstAiDowngradeReason(aiReview));
+            decision.setAiRoleResults(aiRoleResultsCodec.serialize(aiReview, ruleVersion, aiSynthesis));
             decision.setReviewReasons(reviewJson);
             decision.setAiConflictLevel(conflict.getLevel() != null ? conflict.getLevel().name() : null);
             decision.setAiConflictScore(conflict.getAiConflictScore());
@@ -418,6 +451,23 @@ public class DecisionEngineService {
         result.setReasonCodes(List.of(reasonCode));
         result.setCompletedAt(LocalDateTime.now());
         return result;
+    }
+
+    private static String firstAiDowngradeReason(AiOrchestratorResult result) {
+        if (result == null) {
+            return null;
+        }
+        for (AiProviderReviewResult providerResult : result.getProviderResults()) {
+            if (providerResult == null || !providerResult.challengesRule()) {
+                continue;
+            }
+            for (String reasonCode : providerResult.getReasonCodes()) {
+                if (reasonCode != null && !reasonCode.isBlank()) {
+                    return reasonCode;
+                }
+            }
+        }
+        return null;
     }
 
     private static String externalContextSummary(EventImpactInputVO input, boolean effectiveBlocked) {
