@@ -3,6 +3,8 @@ package org.example.trademodel.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
+import org.example.trademodel.ai.AiRoleResultsCodec;
+import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
@@ -78,6 +80,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     private final ProviderReadinessService providerReadinessService;
     private final ObjectMapper objectMapper;
+    private final AiRoleResultsCodec aiRoleResultsCodec;
     private final MarketQuoteClient marketQuoteClient;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -117,6 +120,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
         this.providerReadinessService = providerReadinessService;
         this.objectMapper = objectMapper;
+        this.aiRoleResultsCodec = new AiRoleResultsCodec(objectMapper);
         this.marketQuoteClient = marketQuoteClient;
     }
 
@@ -511,80 +515,65 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.AiDecisionVO buildAiDecision(DecisionResultVO decision) {
         DashboardHomeVO.AiDecisionVO ai = new DashboardHomeVO.AiDecisionVO();
         ai.setActiveTab("GPT_FINAL");
-        JsonNode root = parseAiRoleResults(decision != null ? decision.getAiRoleResults() : null);
+        AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(
+                decision != null ? decision.getAiRoleResults() : null);
+        AiRoleResultsPayload payload = parsed.current() ? parsed.payload() : null;
+        AiRoleResultsPayload.SynthesisPayload synthesis = payload != null ? payload.synthesis() : null;
+        ai.setSchemaVersion(payload != null ? payload.schemaVersion() : null);
         List<DashboardHomeVO.AiTabVO> tabs = new ArrayList<>();
         for (String role : AI_ROLES) {
-            tabs.add(buildAiTab(role, roleNode(root, role), decision));
+            AiRoleResultsPayload.RolePayload rolePayload = payload != null ? payload.roles().get(role) : null;
+            tabs.add(buildAiTab(role, rolePayload, synthesis));
         }
         ai.setTabs(tabs);
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
         consistency.setLevel(decision != null ? trimToNull(decision.getAiConflictLevel()) : null);
         consistency.setScore(decision != null ? decision.getAiConflictScore() : null);
         consistency.setConfused(decision != null && decision.getConfusedScore() != null && decision.getConfusedScore() > 0);
-        DashboardHomeVO.AiTabVO finalRole = tabs.stream()
-                .filter(tab -> "GPT_FINAL".equals(tab.getRole()))
-                .findFirst()
-                .orElse(null);
         consistency.setConsistencyScore(null);
         consistency.setConsistencyLevel(null);
         consistency.setConsistencySummary(null);
-        consistency.setDowngradeReason(finalRole != null ? trimToNull(finalRole.getDowngradeReason()) : null);
+        consistency.setDowngradeReason(synthesis != null ? trimToNull(synthesis.downgradeReason()) : null);
         ai.setConsistency(consistency);
         return ai;
     }
 
-    private DashboardHomeVO.AiTabVO buildAiTab(String role, JsonNode roleNode, DecisionResultVO decision) {
+    private DashboardHomeVO.AiTabVO buildAiTab(String role,
+                                               AiRoleResultsPayload.RolePayload rolePayload,
+                                               AiRoleResultsPayload.SynthesisPayload synthesis) {
         DashboardHomeVO.AiTabVO tab = new DashboardHomeVO.AiTabVO();
         tab.setRole(role);
         tab.setRoleLabel(roleLabel(role));
-        if (roleNode == null) {
+        if (rolePayload == null) {
             return tab;
         }
         switch (role) {
-            case "GPT_FINAL" -> populateFinalDecisionRole(tab, roleNode, decision);
-            case "GEMINI_REVIEW" -> populateConflictReviewRole(tab, roleNode);
-            case "GROK_CHALLENGE" -> populateChallengeRole(tab, roleNode);
+            case "GPT_FINAL" -> populateFinalDecisionRole(tab, rolePayload, synthesis);
+            case "GEMINI_REVIEW" -> populateConflictReviewRole(tab, rolePayload);
+            case "GROK_CHALLENGE" -> populateChallengeRole(tab, rolePayload);
             default -> {
             }
         }
         return tab;
     }
 
-    private void populateFinalDecisionRole(DashboardHomeVO.AiTabVO tab, JsonNode roleNode, DecisionResultVO decision) {
-        String finalMarketBias = firstNonBlank(
-                text(roleNode, "finalMarketBias", "final_market_bias", "finalBias", "marketBias", "bias",
-                        "direction", "finalDirection", "directionJudgement", "directionJudgment"),
-                decision != null ? decision.getMarketBiasHierarchy() : null
-        );
-        String finalConfidence = firstNonBlank(
-                text(roleNode, "finalConfidence", "confidenceLevel", "confidence", "confidence_level"),
-                decision != null ? decision.getConfidenceLevel() : null
-        );
-        String finalRiskLevel = firstNonBlank(
-                text(roleNode, "finalRiskLevel", "riskLevel", "risk_level"),
-                decision != null ? decision.getRiskLevel() : null
-        );
-        String finalPlanMode = firstNonBlank(
-                text(roleNode, "finalPlanMode", "planMode", "aiPlanMode", "ai_plan_mode"),
-                decision != null ? decision.getAiPlanMode() : null,
-                decision != null ? decision.getPlanMode() : null
-        );
-        String worthOpening = firstNonBlank(
-                text(roleNode, "worthOpening", "worth_opening", "openingWorth", "worthOpen", "isWorthOpening"),
-                worthOpeningLabel(decision != null ? decision.getIsWorthOpening() : null)
-        );
-        String finalConclusion = text(roleNode, "finalConclusion", "finalOpinion", "conclusion", "reviewConclusion");
-        List<String> coreSupportingEvidence = textList(roleNode,
-                "coreSupportingEvidence", "core_supporting_evidence", "coreSupportEvidence",
-                "finalSupportingEvidence", "supportEvidence", "supportingEvidence", "positiveEvidence",
-                "evidenceSupport", "supports", "support");
-        List<String> coreCounterEvidence = textList(roleNode,
-                "coreCounterEvidence", "core_counter_evidence", "finalCounterEvidence", "againstEvidence",
-                "opposingEvidence", "negativeEvidence", "counterEvidence", "contradictionEvidence",
-                "opposition", "against");
-        String decisionSummary = text(roleNode, "decisionSummary", "summary", "finalSummary");
-        String downgradeReason = text(roleNode, "downgradeReason", "blockReason", "downgradeOrBlockReason",
-                "downgrade_reason", "rejectReason");
+    private void populateFinalDecisionRole(DashboardHomeVO.AiTabVO tab,
+                                           AiRoleResultsPayload.RolePayload role,
+                                           AiRoleResultsPayload.SynthesisPayload synthesis) {
+        String finalMarketBias = synthesis != null ? trimToNull(synthesis.finalMarketBias()) : null;
+        String finalConfidence = synthesis != null ? trimToNull(synthesis.finalConfidence()) : null;
+        String finalRiskLevel = synthesis != null ? trimToNull(synthesis.finalRiskLevel()) : null;
+        String finalPlanMode = synthesis != null ? trimToNull(synthesis.planModeAdjustment()) : null;
+        String worthOpening = synthesis != null ? worthOpeningLabel(synthesis.worthOpening()) : null;
+        String finalConclusion = trimToNull(role.summary());
+        List<String> coreSupportingEvidence = "SUPPORT".equals(role.stance())
+                ? role.reasonCodes()
+                : List.of();
+        List<String> coreCounterEvidence = "CHALLENGE".equals(role.stance())
+                ? role.reasonCodes()
+                : List.of();
+        String decisionSummary = trimToNull(role.summary());
+        String downgradeReason = synthesis != null ? trimToNull(synthesis.downgradeReason()) : null;
 
         tab.setFinalMarketBias(finalMarketBias);
         tab.setFinalConfidence(finalConfidence);
@@ -604,42 +593,31 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         tab.setReviewConclusion(firstNonBlank(finalConclusion, decisionSummary));
     }
 
-    private void populateConflictReviewRole(DashboardHomeVO.AiTabVO tab, JsonNode roleNode) {
-        tab.setReviewVerdict(text(roleNode, "reviewVerdict", "verdict", "reviewOpinion", "decisionSummary", "summary"));
-        tab.setDetectedContradictions(textList(roleNode,
-                "detectedContradictions", "detected_contradictions", "contradictions", "contradictionEvidence",
-                "negativeEvidence", "againstEvidence", "opposingEvidence"));
-        tab.setWeakEvidence(textList(roleNode,
-                "weakEvidence", "weak_evidence", "weakEvidencePoints", "evidenceGaps", "evidenceWeakness",
-                "positiveEvidence", "supportEvidence"));
-        tab.setLogicGaps(textList(roleNode,
-                "logicGaps", "logic_gaps", "gaps", "risks", "riskWarnings", "risk_points"));
-        tab.setDowngradeRecommendation(text(roleNode,
-                "downgradeRecommendation", "downgrade_reason", "downgradeReason", "downgradeOrBlockReason",
-                "rejectReason", "blockReason"));
-        tab.setRiskAdjustmentSuggestion(text(roleNode,
-                "riskAdjustmentSuggestion", "risk_adjustment_suggestion", "riskAdjustment", "riskSuggestion"));
-        tab.setManualReviewRequired(text(roleNode,
-                "manualReviewRequired", "manual_review_required", "needManualReview", "manualReview"));
-        tab.setReviewConclusion(text(roleNode, "reviewConclusion", "conclusion", "decisionSummary", "summary"));
+    private void populateConflictReviewRole(DashboardHomeVO.AiTabVO tab,
+                                            AiRoleResultsPayload.RolePayload role) {
+        tab.setReviewVerdict(trimToNull(role.stance()));
+        tab.setDetectedContradictions("CHALLENGE".equals(role.stance())
+                ? role.reasonCodes()
+                : List.of());
+        tab.setWeakEvidence(List.of());
+        tab.setLogicGaps(List.of());
+        tab.setDowngradeRecommendation(null);
+        tab.setRiskAdjustmentSuggestion(null);
+        tab.setManualReviewRequired(Boolean.TRUE.equals(role.manualReviewRequired()) ? "是" : null);
+        tab.setReviewConclusion(trimToNull(role.summary()));
     }
 
-    private void populateChallengeRole(DashboardHomeVO.AiTabVO tab, JsonNode roleNode) {
-        tab.setChallengeThesis(text(roleNode,
-                "challengeThesis", "challenge_thesis", "thesis", "challenge", "adversarialThesis",
-                "finalOpinion", "summary"));
-        tab.setEventRisks(textList(roleNode,
-                "eventRisks", "event_risks", "eventRisk", "suddenEventRisk", "suddenNewsRisk", "newsRisk"));
-        tab.setSentimentReversalRisks(textList(roleNode,
-                "sentimentReversalRisks", "sentiment_reversal_risks", "sentimentReversalRisk", "sentimentRisk"));
-        tab.setMicrostructureTraps(textList(roleNode,
-                "microstructureTraps", "microstructure_traps", "microstructureTrap", "trap", "shortTermTrap"));
-        tab.setLiquidityRisks(textList(roleNode,
-                "liquidityRisks", "liquidity_risks", "liquidityRisk", "wickRisk", "squeezeRisk",
-                "liquidityWickSqueezeRisk", "riskPoints", "risk_points", "risks"));
-        tab.setCounterEvidence(textList(roleNode,
-                "counterEvidence", "counter_evidence", "againstEvidence", "opposingEvidence", "negativeEvidence"));
-        tab.setChallengeConclusion(text(roleNode, "challengeConclusion", "reviewConclusion", "conclusion", "decisionSummary", "summary"));
+    private void populateChallengeRole(DashboardHomeVO.AiTabVO tab,
+                                       AiRoleResultsPayload.RolePayload role) {
+        tab.setChallengeThesis(trimToNull(role.summary()));
+        tab.setEventRisks(List.of());
+        tab.setSentimentReversalRisks(List.of());
+        tab.setMicrostructureTraps(List.of());
+        tab.setLiquidityRisks(List.of());
+        tab.setCounterEvidence("CHALLENGE".equals(role.stance())
+                ? role.reasonCodes()
+                : List.of());
+        tab.setChallengeConclusion(trimToNull(role.summary()));
         tab.setReviewConclusion(tab.getChallengeConclusion());
     }
 
@@ -865,145 +843,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         } catch (RuntimeException ignored) {
             return null;
         }
-    }
-
-    private JsonNode parseAiRoleResults(String raw) {
-        if (!hasText(raw)) {
-            return null;
-        }
-        try {
-            return objectMapper.readTree(raw);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private JsonNode roleNode(JsonNode root, String role) {
-        if (root == null) {
-            return null;
-        }
-        if (root.isObject() && roleMatches(role, text(root, "role", "aiRole", "providerRole", "roleType"))) {
-            return root;
-        }
-        if (root.isObject()) {
-            for (String key : roleKeys(role)) {
-                JsonNode node = root.get(key);
-                if (node != null && node.isObject()) {
-                    return node;
-                }
-            }
-            for (var fields = root.fieldNames(); fields.hasNext(); ) {
-                JsonNode found = roleNode(root.get(fields.next()), role);
-                if (found != null) {
-                    return found;
-                }
-            }
-        } else if (root.isArray()) {
-            for (JsonNode child : root) {
-                JsonNode found = roleNode(child, role);
-                if (found != null) {
-                    return found;
-                }
-            }
-        }
-        return null;
-    }
-
-    private boolean roleMatches(String expectedRole, String rawRole) {
-        String expected = roleToken(expectedRole);
-        String actual = roleToken(rawRole);
-        if (actual.isEmpty()) {
-            return false;
-        }
-        if (expected.equals(actual)) {
-            return true;
-        }
-        return switch (expected) {
-            case "GPTFINAL" -> actual.equals("GPT") || actual.equals("FINAL") || actual.equals("GPTRULEREVIEW");
-            case "GEMINIREVIEW" -> actual.equals("GEMINI") || actual.equals("GEMINICONSISTENCYREVIEW");
-            case "GROKCHALLENGE" -> actual.equals("GROK") || actual.equals("GROKADVERSARIALCHALLENGE");
-            default -> false;
-        };
-    }
-
-    private String roleToken(String value) {
-        String trimmed = trimToNull(value);
-        if (trimmed == null) {
-            return "";
-        }
-        StringBuilder token = new StringBuilder();
-        for (char ch : trimmed.toUpperCase(Locale.ROOT).toCharArray()) {
-            if (Character.isLetterOrDigit(ch)) {
-                token.append(ch);
-            }
-        }
-        return token.toString();
-    }
-
-    private List<String> roleKeys(String role) {
-        if ("GPT_FINAL".equals(role)) {
-            return List.of("GPT_FINAL", "gptFinal", "gpt_final", "GPT", "gpt", "final", "GPT_RULE_REVIEW", "gptRuleReview");
-        }
-        if ("GEMINI_REVIEW".equals(role)) {
-            return List.of("GEMINI_REVIEW", "geminiReview", "gemini_review", "GEMINI", "gemini",
-                    "GEMINI_CONSISTENCY_REVIEW", "geminiConsistencyReview");
-        }
-        return List.of("GROK_CHALLENGE", "grokChallenge", "grok_challenge", "GROK", "grok",
-                "GROK_ADVERSARIAL_CHALLENGE", "grokAdversarialChallenge");
-    }
-
-    private List<String> textList(JsonNode node, String... keys) {
-        if (node == null || !node.isObject()) {
-            return List.of();
-        }
-        for (String key : keys) {
-            JsonNode child = node.get(key);
-            if (child == null || child.isNull()) {
-                continue;
-            }
-            List<String> values = new ArrayList<>();
-            if (child.isArray()) {
-                child.forEach(item -> {
-                    String value = scalarText(item);
-                    if (value != null) {
-                        values.add(value);
-                    }
-                });
-            } else {
-                String value = scalarText(child);
-                if (value != null) {
-                    values.add(value);
-                }
-            }
-            if (!values.isEmpty()) {
-                return values;
-            }
-        }
-        return List.of();
-    }
-
-    private String text(JsonNode node, String... keys) {
-        if (node == null || !node.isObject()) {
-            return null;
-        }
-        for (String key : keys) {
-            JsonNode child = node.get(key);
-            if (child == null || child.isNull()) {
-                continue;
-            }
-            String value = scalarText(child);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String scalarText(JsonNode node) {
-        if (node == null || !(node.isTextual() || node.isNumber() || node.isBoolean())) {
-            return null;
-        }
-        return trimToNull(node.asText());
     }
 
     private int normalizeLimit(Integer limit) {

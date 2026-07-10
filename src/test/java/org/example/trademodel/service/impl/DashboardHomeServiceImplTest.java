@@ -1,6 +1,15 @@
 package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.ai.AiOrchestratorResult;
+import org.example.trademodel.ai.AiProviderCallStatus;
+import org.example.trademodel.ai.AiProviderName;
+import org.example.trademodel.ai.AiProviderReviewResult;
+import org.example.trademodel.ai.AiProviderRole;
+import org.example.trademodel.ai.AiReviewConflictLevel;
+import org.example.trademodel.ai.AiReviewStance;
+import org.example.trademodel.ai.AiRoleResultsCodec;
+import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
@@ -73,6 +82,7 @@ class DashboardHomeServiceImplTest {
     private ProviderReadinessService providerReadinessService;
 
     private DashboardHomeServiceImpl service;
+    private final AiRoleResultsCodec aiRoleResultsCodec = new AiRoleResultsCodec(new ObjectMapper());
 
     @BeforeEach
     void setUp() {
@@ -108,18 +118,10 @@ class DashboardHomeServiceImplTest {
         btc.setPositionSuggestion("10%");
         btc.setValidPeriod("12h");
         btc.setInvalidCondition("跌破 61000");
-        btc.setAiRoleResults("""
-                {
-                  "GPT_FINAL": {
-                    "supportEvidence": ["规则方向一致"],
-                    "againstEvidence": ["事件窗口待复核"],
-                    "riskPoints": ["高波动"],
-                    "reviewConclusion": "保持人工复核"
-                  },
-                  "GEMINI_REVIEW": {},
-                  "GROK_CHALLENGE": {}
-                }
-                """);
+        btc.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "保持人工复核")),
+                synthesis("BULLISH", "HIGH", "HIGH", "REDUCED", true, "EVENT_WINDOW_REVIEW")));
 
         DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "EXTREME", 72, 80,
                 "LEVEL_4_EXTREME_DIVERGENCE", false, "{\"nextState\":\"HIGH_RISK\"}");
@@ -224,7 +226,9 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAiDecision().getActiveTab()).isEqualTo("GPT_FINAL");
         assertThat(home.getAiDecision().getTabs()).extracting(DashboardHomeVO.AiTabVO::getRole)
                 .containsExactly("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
-        assertThat(home.getAiDecision().getTabs().get(0).getSupportEvidence()).containsExactly("规则方向一致");
+        assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v1");
+        assertThat(home.getAiDecision().getTabs().get(0).getSupportEvidence())
+                .containsExactly("RULE_DIRECTION_ALIGNED");
         assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(7);
         assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
         assertThat(home.getPushInbox().getHasOpenPosition()).isTrue();
@@ -632,16 +636,16 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
         assertThat(gpt.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(gpt.getFinalConfidence()).isEqualTo("HIGH");
-        assertThat(gpt.getFinalRiskLevel()).isEqualTo("MEDIUM");
-        assertThat(gpt.getFinalPlanMode()).isEqualTo("REVIEW_ONLY");
-        assertThat(gpt.getWorthOpening()).isEqualTo("需要人工确认");
-        assertThat(gpt.getFinalConclusion()).isEqualTo("保持人工复核");
-        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("规则方向一致", "量能确认");
-        assertThat(gpt.getCoreCounterEvidence()).containsExactly("事件窗口待复核");
-        assertThat(gpt.getDecisionSummary()).isEqualTo("最终裁决只读摘要");
-        assertThat(gpt.getDowngradeReason()).isEqualTo("等待事件落地");
+        assertThat(gpt.getFinalRiskLevel()).isEqualTo("HIGH");
+        assertThat(gpt.getFinalPlanMode()).isEqualTo("PREPARE_ONLY");
+        assertThat(gpt.getWorthOpening()).isEqualTo("是");
+        assertThat(gpt.getFinalConclusion()).isEqualTo("GPT summary");
+        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("GPT_SUPPORT_ONLY");
+        assertThat(gpt.getCoreCounterEvidence()).isEmpty();
+        assertThat(gpt.getDecisionSummary()).isEqualTo("GPT summary");
+        assertThat(gpt.getDowngradeReason()).isEqualTo("GEMINI_CONTRADICTION_ONLY");
         assertThat(gpt.getDirection()).isEqualTo("BULLISH");
-        assertThat(gpt.getSupportEvidence()).containsExactly("规则方向一致", "量能确认");
+        assertThat(gpt.getSupportEvidence()).containsExactly("GPT_SUPPORT_ONLY");
         assertThat(gpt.getReviewVerdict()).isNull();
         assertThat(gpt.getChallengeThesis()).isNull();
     }
@@ -654,14 +658,14 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
-        assertThat(gemini.getReviewVerdict()).isEqualTo("存在分歧");
-        assertThat(gemini.getDetectedContradictions()).containsExactly("结构分歧");
-        assertThat(gemini.getWeakEvidence()).containsExactly("成交量不足");
-        assertThat(gemini.getLogicGaps()).containsExactly("缺少高周期确认");
-        assertThat(gemini.getDowngradeRecommendation()).isEqualTo("降级为人工复核");
-        assertThat(gemini.getRiskAdjustmentSuggestion()).isEqualTo("提高风险等级");
+        assertThat(gemini.getReviewVerdict()).isEqualTo("CHALLENGE");
+        assertThat(gemini.getDetectedContradictions()).containsExactly("GEMINI_CONTRADICTION_ONLY");
+        assertThat(gemini.getWeakEvidence()).isEmpty();
+        assertThat(gemini.getLogicGaps()).isEmpty();
+        assertThat(gemini.getDowngradeRecommendation()).isNull();
+        assertThat(gemini.getRiskAdjustmentSuggestion()).isNull();
         assertThat(gemini.getManualReviewRequired()).isEqualTo("是");
-        assertThat(gemini.getReviewConclusion()).isEqualTo("暂缓正式计划");
+        assertThat(gemini.getReviewConclusion()).isEqualTo("Gemini review summary");
         assertThat(gemini.getDirection()).isNull();
         assertThat(gemini.getFinalMarketBias()).isNull();
         assertThat(gemini.getChallengeThesis()).isNull();
@@ -676,13 +680,13 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
-        assertThat(grok.getChallengeThesis()).isEqualTo("反方认为假突破");
-        assertThat(grok.getEventRisks()).containsExactly("突发宏观窗口");
-        assertThat(grok.getSentimentReversalRisks()).containsExactly("情绪反转");
-        assertThat(grok.getMicrostructureTraps()).containsExactly("插针诱多");
-        assertThat(grok.getLiquidityRisks()).containsExactly("流动性不足");
-        assertThat(grok.getCounterEvidence()).containsExactly("趋势未确认");
-        assertThat(grok.getChallengeConclusion()).isEqualTo("挑战成立");
+        assertThat(grok.getChallengeThesis()).isEqualTo("Grok challenge summary");
+        assertThat(grok.getEventRisks()).isEmpty();
+        assertThat(grok.getSentimentReversalRisks()).isEmpty();
+        assertThat(grok.getMicrostructureTraps()).isEmpty();
+        assertThat(grok.getLiquidityRisks()).isEmpty();
+        assertThat(grok.getCounterEvidence()).containsExactly("GROK_COUNTER_ONLY");
+        assertThat(grok.getChallengeConclusion()).isEqualTo("Grok challenge summary");
         assertThat(grok.getDirection()).isNull();
         assertThat(grok.getFinalMarketBias()).isNull();
         assertThat(grok.getReviewVerdict()).isNull();
@@ -693,14 +697,17 @@ class DashboardHomeServiceImplTest {
     void missingRoleDataDoesNotCloneOtherRoleContent() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
-        decision.setAiRoleResults("{\"GPT_FINAL\":{\"finalMarketBias\":\"BULLISH\",\"coreSupportingEvidence\":[\"GPT only evidence\"],\"decisionSummary\":\"GPT only summary\"}}");
+        decision.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "GPT_ONLY_EVIDENCE", "GPT only summary")),
+                synthesis("BULLISH", "HIGH", "HIGH", "CONFIRM", true, null)));
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
-        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("GPT only evidence");
+        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("GPT_ONLY_EVIDENCE");
         assertThat(gpt.getDecisionSummary()).isEqualTo("GPT only summary");
 
         DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
@@ -720,7 +727,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void aiDecisionMalformedAndRawTextDoNotFabricateEvidence() {
+    void malformedPayloadFailsClosedAndLegacyPlainTextDoesNotBecomeThreeRoleEvidence() {
         DecisionResultVO malformed = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
         malformed.setInvalidCondition("跌破 61000");
@@ -745,7 +752,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
         decision.setInvalidCondition("跌破 61000");
-        decision.setAiRoleResults("{\"GPT_FINAL\":{\"summary\":\"只映射显式结论\"}}");
+        decision.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.ABSTAIN, "GPT_REVIEW", "只映射显式结论")),
+                synthesis("BULLISH", "HIGH", "HIGH", "REDUCED", true, null)));
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
@@ -762,19 +772,25 @@ class DashboardHomeServiceImplTest {
     void selectedSymbolDrivesAiDecisionEvidence() {
         DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
-        btc.setAiRoleResults("{\"GPT_FINAL\":{\"supportEvidence\":[\"BTC evidence\"]}}");
+        btc.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "BTC_EVIDENCE", "BTC summary")),
+                synthesis("BULLISH", "HIGH", "HIGH", "CONFIRM", true, null)));
 
         DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "MEDIUM", 70, 10,
                 "LEVEL_1", false, "{\"state\":\"OBSERVING\"}");
-        eth.setAiRoleResults("{\"GPT_FINAL\":{\"supportEvidence\":[\"ETH evidence\"]}}");
+        eth.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "ETH_EVIDENCE", "ETH summary")),
+                synthesis("BEARISH", "MEDIUM", "MEDIUM", "REDUCED", false, null)));
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth));
 
         DashboardHomeVO ethHome = service.getHome("ETHUSDT", 6);
         DashboardHomeVO defaultHome = service.getHome(null, 6);
 
-        assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).containsExactly("ETH evidence");
-        assertThat(aiTab(defaultHome, "GPT_FINAL").getSupportEvidence()).containsExactly("BTC evidence");
+        assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).containsExactly("ETH_EVIDENCE");
+        assertThat(aiTab(defaultHome, "GPT_FINAL").getSupportEvidence()).containsExactly("BTC_EVIDENCE");
     }
 
     @Test
@@ -790,14 +806,17 @@ class DashboardHomeServiceImplTest {
         assertThat(consistency.getConsistencyScore()).isNull();
         assertThat(consistency.getConsistencyLevel()).isNull();
         assertThat(consistency.getConsistencySummary()).isNull();
-        assertThat(consistency.getDowngradeReason()).isEqualTo("等待事件落地");
+        assertThat(consistency.getDowngradeReason()).isEqualTo("GEMINI_CONTRADICTION_ONLY");
     }
 
     @Test
     void adjudicationConsistencyDoesNotFakeScore() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 80,
                 "LEVEL_4_EXTREME_DIVERGENCE", true, "{\"state\":\"CANDIDATE\"}");
-        decision.setAiRoleResults("{\"GPT_FINAL\":{\"downgradeReason\":\"冲突过高\"}}");
+        decision.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.CHALLENGE, "CONFLICT_TOO_HIGH", "GPT challenge")),
+                synthesis("BULLISH", "LOW", "HIGH", "CONFUSED", false, "CONFLICT_TOO_HIGH")));
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
@@ -807,7 +826,7 @@ class DashboardHomeServiceImplTest {
         assertThat(consistency.getScore()).isEqualTo(80);
         assertThat(consistency.getConsistencyScore()).isNull();
         assertThat(consistency.getScore()).isNotEqualTo(20);
-        assertThat(consistency.getDowngradeReason()).isEqualTo("冲突过高");
+        assertThat(consistency.getDowngradeReason()).isEqualTo("CONFLICT_TOO_HIGH");
     }
 
     @Test
@@ -824,47 +843,56 @@ class DashboardHomeServiceImplTest {
     private DecisionResultVO decisionWithStructuredAiRoles() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
-        decision.setAiRoleResults("""
-                {
-                  "roles": [
-                    {
-                      "role": "GPT_FINAL",
-                      "finalMarketBias": "BULLISH",
-                      "finalConfidence": "HIGH",
-                      "finalRiskLevel": "MEDIUM",
-                      "finalPlanMode": "REVIEW_ONLY",
-                      "worthOpening": "需要人工确认",
-                      "finalConclusion": "保持人工复核",
-                      "coreSupportingEvidence": ["规则方向一致", "量能确认"],
-                      "coreCounterEvidence": ["事件窗口待复核"],
-                      "decisionSummary": "最终裁决只读摘要",
-                      "downgradeOrBlockReason": "等待事件落地"
-                    },
-                    {
-                      "providerRole": "GEMINI_CONSISTENCY_REVIEW",
-                      "reviewVerdict": "存在分歧",
-                      "detectedContradictions": ["结构分歧"],
-                      "weakEvidence": ["成交量不足"],
-                      "logicGaps": ["缺少高周期确认"],
-                      "downgradeRecommendation": "降级为人工复核",
-                      "riskAdjustmentSuggestion": "提高风险等级",
-                      "manualReviewRequired": "是",
-                      "reviewConclusion": "暂缓正式计划"
-                    },
-                    {
-                      "aiRole": "GROK_ADVERSARIAL_CHALLENGE",
-                      "challengeThesis": "反方认为假突破",
-                      "eventRisks": ["突发宏观窗口"],
-                      "sentimentReversalRisks": ["情绪反转"],
-                      "microstructureTraps": ["插针诱多"],
-                      "liquidityRisks": ["流动性不足"],
-                      "counterEvidence": ["趋势未确认"],
-                      "challengeConclusion": "挑战成立"
-                    }
-                  ]
-                }
-                """);
+        decision.setAiRoleResults(structuredAiRoleResults(List.of(
+                        role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                                AiReviewStance.SUPPORT, "GPT_SUPPORT_ONLY", "GPT summary"),
+                        role(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                                AiReviewStance.CHALLENGE, "GEMINI_CONTRADICTION_ONLY", "Gemini review summary"),
+                        role(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE,
+                                AiReviewStance.CHALLENGE, "GROK_COUNTER_ONLY", "Grok challenge summary")),
+                synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true,
+                        "GEMINI_CONTRADICTION_ONLY")));
         return decision;
+    }
+
+    private String structuredAiRoleResults(List<AiProviderReviewResult> roleResults,
+                                           AiRoleResultsPayload.SynthesisPayload synthesis) {
+        AiOrchestratorResult result = new AiOrchestratorResult();
+        result.setAnalysisId("analysis-dashboard-ai");
+        result.setTraceId("trace-dashboard-ai");
+        result.setProviderResults(roleResults);
+        return aiRoleResultsCodec.serialize(result, "v1.0", synthesis);
+    }
+
+    private AiProviderReviewResult role(AiProviderName provider,
+                                        AiProviderRole providerRole,
+                                        AiReviewStance stance,
+                                        String reasonCode,
+                                        String summary) {
+        AiProviderReviewResult role = new AiProviderReviewResult();
+        role.setProvider(provider);
+        role.setRole(providerRole);
+        role.setCallStatus(AiProviderCallStatus.SUCCESS);
+        role.setStance(stance);
+        role.setConflictLevel(stance == AiReviewStance.CHALLENGE
+                ? AiReviewConflictLevel.MAJOR
+                : AiReviewConflictLevel.NONE);
+        role.setReasonCodes(List.of(reasonCode));
+        role.setSummary(summary);
+        return role;
+    }
+
+    private AiRoleResultsPayload.SynthesisPayload synthesis(String direction,
+                                                            String confidence,
+                                                            String risk,
+                                                            String planMode,
+                                                            Boolean worthOpening,
+                                                            String downgradeReason) {
+        return new AiRoleResultsPayload.SynthesisPayload(
+                direction, confidence, risk, worthOpening,
+                "LEVEL_2_LIGHT_DIVERGENCE", 25,
+                confidence, "SLIGHTLY_RAISED", planMode, false,
+                downgradeReason);
     }
 
     private DecisionResultVO decision(String symbol,

@@ -159,7 +159,10 @@ class DecisionEngineServiceTest {
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-11", 85, 65);
 
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BEARISH");
-        assertThat(decision.getAiRoleResults()).contains("rule-layer base direction preserved as BEARISH");
+        assertThat(decision.getAiRoleResults())
+                .contains("\"schemaVersion\":\"v1\"")
+                .contains("\"finalMarketBias\":\"BEARISH\"")
+                .contains("\"ruleDirectionPreserved\":true");
         assertThat(decision.getAiRoleResults()).doesNotContain("最终裁决");
     }
 
@@ -316,7 +319,9 @@ class DecisionEngineServiceTest {
         assertThat(context.getAiProviderConflictContribution()).isEqualTo(18);
         assertThat(context.getAiOrchestrationMode()).isEqualTo("AI_ASSISTED");
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
-        assertThat(decision.getAiRoleResults()).contains("rule-layer base direction preserved as BULLISH");
+        assertThat(decision.getAiRoleResults())
+                .contains("\"finalMarketBias\":\"BULLISH\"")
+                .contains("\"ruleDirectionPreserved\":true");
         assertThat(decision.getAiRoleResults()).doesNotContain("Grok advisory");
         assertThat(decision.getAiRoleResults()).doesNotContain("Gemini advisory");
     }

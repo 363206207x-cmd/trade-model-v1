@@ -10,7 +10,7 @@
 
 | ID | Missing capability | Evidence | Classification | Closure criterion |
 |---|---|---|---|---|
-| GAP-P0-001 | Structured AI role-result persistence contract | producer writes compact text; Home consumes JSON | `WRONG_SOURCE_MAPPING` | One typed schema is written/read; real orchestrator-to-Home integration test covers all roles and empty fallback. |
+| GAP-P0-001 | Structured AI role-result persistence contract (`CLOSED`) | `schemaVersion=v1` producer -> `ai_role_results` -> mapper/VO -> strict Home consumer; real producer-to-Home integration covers separate roles and empty fallback | `IMPLEMENTED_AND_TRACED` | Closed by `AI_ROLE_STRUCTURED_CONTRACT_ALIGNMENT.md`; retain regression and sanitization guards. |
 | GAP-P0-002 | Production persisted-OHLCV ingestion | no runtime writer for `tm_persisted_ohlcv_bar` | `BLOCKED_NO_REAL_DATA` | Source-owned ingestion writes validated bars with freshness/provenance and drives a complete plan without test inserts. |
 | GAP-P0-003 | UserPosition source provenance | VO hardcodes every row to `MANUAL` | `WRONG_SOURCE_MAPPING` | Persisted source passes through mapper/service and Home excludes non-manual rows in a regression test. |
 | GAP-P0-004 | Fail-closed external-context no-data state | absent imports return `READY/OK/LOW` | `SEMANTIC_DRIFT` | No-config, waiting, empty-confirmed, stale, degraded, and error states are typed and decision/monitor behavior is conservative. |
