@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3 Historical Market Replay Business Validation
-Next Business Phase: Real local historical fixture ingestion or replay-gap remediation after explicit scope / production-readiness remediation
-Next Business Phase Allowed: YES for local replay validation and scoped remediation/business packages; NO for production deployment
+Current Work Package: P4 Versioned Real Local Historical Fixture + Direct Replay Adapter
+Next Business Phase: Supply a provenance-backed fixture in an allowed local path, then rerun P4 direct replay / explicitly scoped remediation
+Next Business Phase Allowed: YES for fixture provisioning and scoped local remediation; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -53,7 +53,7 @@ Next recommendation after P2: run P3 local historical/replay-style validation wh
 
 ## P3 Historical Market Replay Business Validation
 
-P3 is the current local-only replay package. It feeds clearly labeled in-memory OHLCV paths through the existing Decision Engine, review-only execution-plan boundary adapter, Push Recheck, and Position Monitor services.
+P3 is merged/effective on main by PR #1105. It feeds clearly labeled in-memory OHLCV paths through the existing Decision Engine, review-only execution-plan boundary adapter, Push Recheck, and Position Monitor services.
 
 Current P3 status:
 
@@ -65,6 +65,24 @@ Current P3 status:
 6. Production readiness remains BLOCKED and production deployment cannot proceed.
 
 Next recommendation after P3: add a versioned real local historical fixture and direct replay adapter in a separately scoped local-only package, or remediate the replay gaps recorded in `docs/V1_HISTORICAL_REPLAY_VALIDATION_EVIDENCE.md`.
+
+---
+
+## P4 Versioned Real Local Historical Fixture + Direct Replay Adapter
+
+P4 is the current local-only real-history evidence package. Its first mandatory discovery gate found no fixture in either repository allowlist directory and no `V1_REAL_HISTORICAL_FIXTURE_DIR` environment path.
+
+Current P4 status:
+
+1. `REAL_HISTORICAL_FIXTURE_STATUS: MISSING`.
+2. `REAL_HISTORICAL_REPLAY_RESULT: BLOCKED_MISSING_REAL_FIXTURE`.
+3. A versioned missing-state manifest and fixture contract are committed without raw candle data or invented provenance.
+4. Test-support CSV integrity, hash, gap reporting, monotonic replay clock, label isolation, and no-lookahead guards are prepared.
+5. The actual Evidence -> Score -> Decision -> Plan -> manual paper position monitor replay is not run and no final business output is constructed directly.
+6. No provider, production server/DB, order, external send, auto-open, auto-close, auto-reverse, or auto-trading surface is used.
+7. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Next recommendation after P4: provide a provenance-backed real fixture through one of the three allowed paths, review redistribution status, populate the manifest/hash, and then add the smallest time-bounded full-pipeline replay input seam.
 
 ---
 

@@ -1,0 +1,18 @@
+fixture_id: null
+fixture_version: "unassigned"
+source_type: MISSING_REAL_HISTORICAL_FIXTURE
+source_name: null
+source_reference: null
+export_or_download_date: null
+redistribution_status: "NOT_APPLICABLE_NO_FIXTURE"
+symbols: []
+timeframes: []
+start_time: null
+end_time: null
+row_count: 0
+sha256: null
+known_gaps: []
+timezone: "UTC"
+provenance_note: "No provenance-backed fixture was found in the two repository allowlist directories, and V1_REAL_HISTORICAL_FIXTURE_DIR was not supplied."
+not_live_provider_call: true
+not_profitability_evidence: true
