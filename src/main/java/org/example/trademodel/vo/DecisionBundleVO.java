@@ -3,7 +3,9 @@ package org.example.trademodel.vo;
 import org.example.trademodel.enums.AssetStateEnum;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class DecisionBundleVO {
@@ -61,6 +63,14 @@ public class DecisionBundleVO {
     private LocalDateTime externalEventWindowStart;
     private LocalDateTime externalEventWindowEnd;
     private String externalContextSourceHealth;
+    private String derivativesStatus;
+    private String derivativesFreshness;
+    private Boolean derivativesRequired;
+    private Boolean derivativesConfirmEligible;
+    private String derivativesPushMode;
+    private List<String> derivativesReasonCodes = new ArrayList<>();
+    private Instant derivativesProviderDataTime;
+    private String derivativesTraceId;
 
     // 空构造器 + 方便日志打印
     public DecisionBundleVO() {}
@@ -187,4 +197,22 @@ public class DecisionBundleVO {
     public void setExternalEventWindowEnd(LocalDateTime externalEventWindowEnd) { this.externalEventWindowEnd = externalEventWindowEnd; }
     public String getExternalContextSourceHealth() { return externalContextSourceHealth; }
     public void setExternalContextSourceHealth(String externalContextSourceHealth) { this.externalContextSourceHealth = externalContextSourceHealth; }
+    public String getDerivativesStatus() { return derivativesStatus; }
+    public void setDerivativesStatus(String derivativesStatus) { this.derivativesStatus = derivativesStatus; }
+    public String getDerivativesFreshness() { return derivativesFreshness; }
+    public void setDerivativesFreshness(String derivativesFreshness) { this.derivativesFreshness = derivativesFreshness; }
+    public Boolean getDerivativesRequired() { return derivativesRequired; }
+    public void setDerivativesRequired(Boolean derivativesRequired) { this.derivativesRequired = derivativesRequired; }
+    public Boolean getDerivativesConfirmEligible() { return derivativesConfirmEligible; }
+    public void setDerivativesConfirmEligible(Boolean derivativesConfirmEligible) { this.derivativesConfirmEligible = derivativesConfirmEligible; }
+    public String getDerivativesPushMode() { return derivativesPushMode; }
+    public void setDerivativesPushMode(String derivativesPushMode) { this.derivativesPushMode = derivativesPushMode; }
+    public List<String> getDerivativesReasonCodes() { return List.copyOf(derivativesReasonCodes); }
+    public void setDerivativesReasonCodes(List<String> derivativesReasonCodes) {
+        this.derivativesReasonCodes = derivativesReasonCodes == null ? new ArrayList<>() : new ArrayList<>(derivativesReasonCodes);
+    }
+    public Instant getDerivativesProviderDataTime() { return derivativesProviderDataTime; }
+    public void setDerivativesProviderDataTime(Instant derivativesProviderDataTime) { this.derivativesProviderDataTime = derivativesProviderDataTime; }
+    public String getDerivativesTraceId() { return derivativesTraceId; }
+    public void setDerivativesTraceId(String derivativesTraceId) { this.derivativesTraceId = derivativesTraceId; }
 }

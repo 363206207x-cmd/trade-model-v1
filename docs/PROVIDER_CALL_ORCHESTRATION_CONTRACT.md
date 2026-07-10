@@ -2,7 +2,7 @@
 
 ## Scope and Safety
 
-This contract began as the bounded coordination foundation for shared provider reads. CG-1 now adds a default-off CoinGlass v4 adapter below that foundation; it does not make a default live call or connect CoinGlass to score, decision, plan, monitor advice, Push, UserPosition, order, or trading behavior. Production readiness remains `BLOCKED`.
+This contract began as the bounded coordination foundation for shared provider reads. CG-1 adds the default-off CoinGlass v4 adapter below that foundation. BIZ-1 consumes only the coordinator-owned cached snapshot for downstream evidence/rule integration; it adds no default live call, UserPosition mutation, order, or trading behavior. Production readiness remains `BLOCKED`.
 
 ## Previous Call-Path Audit
 

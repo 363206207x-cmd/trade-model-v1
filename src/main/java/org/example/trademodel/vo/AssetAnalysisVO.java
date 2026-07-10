@@ -1,5 +1,7 @@
 package org.example.trademodel.vo;
 
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
+
 import java.util.List;
 
 public class AssetAnalysisVO {
@@ -13,6 +15,7 @@ public class AssetAnalysisVO {
     private DecisionBundleVO decisionBundle;
     private Integer dataQualityScore;
     private EventImpactInputVO eventImpactInput;
+    private DerivativesBusinessAssessment derivativesAssessment;
 
     public String getAnalysisId() { return analysisId; }
     public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
@@ -34,4 +37,6 @@ public class AssetAnalysisVO {
     public void setDataQualityScore(Integer dataQualityScore) { this.dataQualityScore = dataQualityScore; }
     public EventImpactInputVO getEventImpactInput() { return eventImpactInput; }
     public void setEventImpactInput(EventImpactInputVO eventImpactInput) { this.eventImpactInput = eventImpactInput; }
+    public DerivativesBusinessAssessment getDerivativesAssessment() { return derivativesAssessment; }
+    public void setDerivativesAssessment(DerivativesBusinessAssessment derivativesAssessment) { this.derivativesAssessment = derivativesAssessment; }
 }

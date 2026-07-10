@@ -868,5 +868,31 @@ MERGE INTO tm_rule_config KEY(rule_key) VALUES
 ('cfg-provider-scan-recovery-cycles', 'provider_scan_profile_config', 'provider.scan.recovery_confirm_cycles', '2', 'Recovery cycles before downgrade', 'v1.0', TRUE),
 ('cfg-provider-scan-downgrade-cooldown', 'provider_scan_profile_config', 'provider.scan.downgrade_cooldown_seconds', '300', 'Profile downgrade cooldown seconds', 'v1.0', TRUE);
 
+MERGE INTO tm_rule_config KEY(rule_key) VALUES
+('cfg-deriv-oi-5m-weak', 'derivatives_evidence_config', 'derivatives_evidence_config.oi_change_5m_weak', '0.02', '5m OI weak-change threshold', 'v1.0', TRUE),
+('cfg-deriv-oi-5m-strong', 'derivatives_evidence_config', 'derivatives_evidence_config.oi_change_5m_strong', '0.05', '5m OI strong-change threshold', 'v1.0', TRUE),
+('cfg-deriv-oi-15m-weak', 'derivatives_evidence_config', 'derivatives_evidence_config.oi_change_15m_weak', '0.04', '15m OI weak-change threshold', 'v1.0', TRUE),
+('cfg-deriv-oi-15m-strong', 'derivatives_evidence_config', 'derivatives_evidence_config.oi_change_15m_strong', '0.10', '15m OI strong-change threshold', 'v1.0', TRUE),
+('cfg-deriv-funding-positive', 'derivatives_evidence_config', 'derivatives_evidence_config.funding_positive_extreme', '0.0005', 'Positive funding extreme threshold', 'v1.0', TRUE),
+('cfg-deriv-funding-negative', 'derivatives_evidence_config', 'derivatives_evidence_config.funding_negative_extreme', '-0.0005', 'Negative funding extreme threshold', 'v1.0', TRUE),
+('cfg-deriv-long-crowding', 'derivatives_evidence_config', 'derivatives_evidence_config.long_short_long_crowding', '1.20', 'Long crowding ratio threshold', 'v1.0', TRUE),
+('cfg-deriv-short-crowding', 'derivatives_evidence_config', 'derivatives_evidence_config.long_short_short_crowding', '0.80', 'Short crowding ratio threshold', 'v1.0', TRUE),
+('cfg-deriv-liquidation-5m', 'derivatives_evidence_config', 'derivatives_evidence_config.liquidation_spike_5m', '1000000', '5m liquidation spike USD threshold', 'v1.0', TRUE),
+('cfg-deriv-liquidation-15m', 'derivatives_evidence_config', 'derivatives_evidence_config.liquidation_spike_15m', '3000000', '15m liquidation spike USD threshold', 'v1.0', TRUE),
+('cfg-deriv-liquidation-imbalance', 'derivatives_evidence_config', 'derivatives_evidence_config.liquidation_imbalance_ratio', '2.0', 'Liquidation imbalance ratio threshold', 'v1.0', TRUE),
+('cfg-deriv-exchange-concentration', 'derivatives_evidence_config', 'derivatives_evidence_config.exchange_concentration_high', '0.70', 'Exchange concentration high ratio threshold (0.70 = 70%)', 'v1.0', TRUE),
+('cfg-deriv-max-age', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_max_data_age_seconds', '120', 'Maximum derivatives data age in seconds', 'v1.0', TRUE),
+('cfg-deriv-required-confirm', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_required_for_confirm', 'true', 'Require OI and Funding for confirm paths', 'v1.0', TRUE),
+('cfg-deriv-min-datasets', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_minimum_dataset_count', '2', 'Minimum derivatives dataset count', 'v1.0', TRUE),
+('cfg-deriv-partial-penalty', 'derivatives_score_config', 'derivatives_score_config.derivatives_partial_confidence_penalty', '15', 'Partial derivatives confidence penalty', 'v1.0', TRUE),
+('cfg-deriv-stale-penalty', 'derivatives_score_config', 'derivatives_score_config.derivatives_stale_confidence_penalty', '30', 'Stale derivatives confidence penalty', 'v1.0', TRUE),
+('cfg-deriv-score-cap', 'derivatives_score_config', 'derivatives_score_config.derivatives_score_cap', '20', 'Maximum absolute derivatives contribution for non-trend scores', 'v1.0', TRUE),
+('cfg-deriv-trend-score-cap', 'derivatives_score_config', 'derivatives_score_config.derivatives_trend_score_cap', '5', 'Maximum absolute derivatives contribution for trend score', 'v1.0', TRUE),
+('cfg-deriv-min-data-quality', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_min_data_quality_score', '60', 'Minimum data quality for derivatives-confirmed opportunity', 'v1.0', TRUE),
+('cfg-deriv-eight-score-cap', 'derivatives_decision_config', 'derivatives_decision_config.eight_score_adjustment_cap', '10', 'Maximum absolute eight-score adjustment to rule decision score', 'v1.0', TRUE),
+('cfg-deriv-eight-score-factor', 'derivatives_decision_config', 'derivatives_decision_config.eight_score_adjustment_factor_percent', '20', 'Eight-score decision adjustment factor percent', 'v1.0', TRUE),
+('cfg-deriv-high-risk-downgrade', 'derivatives_decision_config', 'derivatives_decision_config.derivatives_high_risk_plan_downgrade', 'true', 'Downgrade plan mode under high derivatives risk', 'v1.0', TRUE),
+('cfg-deriv-monitor-refresh', 'derivatives_monitor_config', 'derivatives_monitor_config.refresh_seconds', '60', 'Cached derivatives monitor cadence', 'v1.0', TRUE);
+
 -- hot_reset_* / pre_reset_state / post_reset_state 记录的是该行最近一次 Hot Reset 元数据，
 -- 不是按 analysis_id 归档的事件流水；review 仅做当前行解释展示。

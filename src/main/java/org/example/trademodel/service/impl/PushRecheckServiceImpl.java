@@ -5,12 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
@@ -54,6 +58,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final UserPositionRiskAdapter userPositionRiskAdapter;
     private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final RuleConfigContractService ruleConfigContractService;
+    private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
                                   AccountRiskSnapshotMapper accountRiskSnapshotMapper,
@@ -79,6 +84,11 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         this.userPositionRiskAdapter = userPositionRiskAdapter;
         this.marketPriceSnapshotService = marketPriceSnapshotService;
         this.ruleConfigContractService = ruleConfigContractService;
+    }
+
+    @Autowired(required = false)
+    void setDerivativesSnapshotReadPort(DerivativesSnapshotReadPort derivativesSnapshotReadPort) {
+        this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
     }
 
     @Override
@@ -112,6 +122,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         TmAccountRiskSnapshotDO accountRiskSnapshot = null;
         UserPositionRiskResult userPositionRiskResult = null;
         RuleConfigContractService.PushRecheckThresholds thresholds = null;
+        DerivativesGuard derivativesGuard = null;
 
         if (snap == null) {
             status = RecheckStatusEnum.INVALIDATED;
@@ -125,6 +136,11 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.EXPIRED;
             message = "推送已过期，不得作为当前交易依据";
             failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
+        } else if ((derivativesGuard = validateDerivativesForRecheck(snap)) != null
+                && derivativesGuard.status() != null) {
+            status = derivativesGuard.status();
+            message = derivativesGuard.message();
+            failReasonJson = failJson(derivativesGuard.reasonCode(), derivativesGuard.detail());
         } else {
             if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 PriceResolution resolved = resolveCurrentPrice(snap);
@@ -408,6 +424,62 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             return ruleConfigContractService != null ? ruleConfigContractService.requirePushRecheckThresholds() : null;
         } catch (RuntimeException ex) {
             return null;
+        }
+    }
+
+    private DerivativesGuard validateDerivativesForRecheck(TmPushSnapshotDO snap) {
+        if (snap == null || !requiresDerivatives(snap.getInvalidationConditionJson())) return null;
+        if (derivativesSnapshotReadPort == null) {
+            return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "cached derivatives reader unavailable");
+        }
+        try {
+            ProviderCallResult<DerivativesRiskSnapshot> result = derivativesSnapshotReadPort.readCached(
+                    snap.getSymbol(), AssetPriority.P1_CORE, Duration.ofSeconds(60),
+                    snap.getTraceId() == null ? "push-recheck-derivatives" : snap.getTraceId());
+            DerivativesRiskSnapshot payload = result == null ? null : result.payload();
+            if (payload == null) {
+                return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "latest cached snapshot missing");
+            }
+            if (payload.sourceStatus() == UnifiedSourceStatus.STALE
+                    || payload.freshnessStatus() == SnapshotFreshnessStatus.STALE) {
+                return DerivativesGuard.blocked("DERIVATIVES_STALE", "latest cached snapshot stale");
+            }
+            boolean oiReady = payload.openInterestUsd() != null
+                    && (payload.openInterestChange5m() != null || payload.openInterestChange15m() != null);
+            boolean fundingReady = payload.weightedFundingRate() != null;
+            if (!oiReady || !fundingReady) {
+                return DerivativesGuard.blocked("DERIVATIVES_REQUIRED",
+                        "openInterestReady=" + oiReady + ",fundingReady=" + fundingReady);
+            }
+            if (payload.sourceStatus() != UnifiedSourceStatus.READY
+                    || !"COMPLETE".equalsIgnoreCase(payload.evidenceAvailability())) {
+                return DerivativesGuard.waiting("DERIVATIVES_PARTIAL", "latest cached snapshot partial");
+            }
+            return null;
+        } catch (RuntimeException failure) {
+            return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "cached derivatives read failed");
+        }
+    }
+
+    private static boolean requiresDerivatives(String invalidationJson) {
+        if (invalidationJson == null || invalidationJson.isBlank()) return false;
+        try {
+            JsonNode root = JSON.readTree(invalidationJson);
+            return root != null && root.path("derivativesRequired").asBoolean(false);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private record DerivativesGuard(RecheckStatusEnum status, String reasonCode, String message, String detail) {
+        private static DerivativesGuard blocked(String reasonCode, String detail) {
+            return new DerivativesGuard(RecheckStatusEnum.INVALIDATED, reasonCode,
+                    "衍生品确认数据不可用，仅供人工复核", detail);
+        }
+
+        private static DerivativesGuard waiting(String reasonCode, String detail) {
+            return new DerivativesGuard(RecheckStatusEnum.REVIEW_WAITING, reasonCode,
+                    "衍生品确认数据不完整，等待人工复核", detail);
         }
     }
 

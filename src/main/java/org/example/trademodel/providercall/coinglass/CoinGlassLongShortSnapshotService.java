@@ -24,4 +24,9 @@ public class CoinGlassLongShortSnapshotService
             String symbol, AssetPriority priority, Duration freshTtl, String traceId) {
         return get(symbol, priority, freshTtl, traceId, () -> adapter.fetchLongShortRatio(symbol));
     }
+
+    public ProviderCallResult<CoinGlassLongShortSnapshot> peek(
+            String symbol, AssetPriority priority, Duration freshTtl, String traceId) {
+        return super.peek(symbol, priority, freshTtl, traceId);
+    }
 }

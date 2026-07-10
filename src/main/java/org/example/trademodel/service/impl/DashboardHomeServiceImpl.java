@@ -5,6 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
+import org.example.trademodel.derivatives.DerivativesBusinessInput;
+import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
+import org.example.trademodel.derivatives.DerivativesEvidenceItem;
+import org.example.trademodel.derivatives.DerivativesEvidenceType;
+import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
@@ -13,6 +19,7 @@ import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.service.DashboardHomeService;
@@ -87,6 +94,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final ObjectMapper objectMapper;
     private final AiRoleResultsCodec aiRoleResultsCodec;
     private final MarketPriceSnapshotService marketPriceSnapshotService;
+    private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
+    private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -129,6 +138,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.marketPriceSnapshotService = marketPriceSnapshotService;
     }
 
+    @Autowired(required = false)
+    void setDerivativesBusinessIntegration(DerivativesSnapshotReadPort derivativesSnapshotReadPort,
+                                           DerivativesBusinessIntegrationService derivativesBusinessIntegrationService) {
+        this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
+        this.derivativesBusinessIntegrationService = derivativesBusinessIntegrationService;
+    }
+
     @Override
     public DashboardHomeVO getHome(String selectedSymbol, Integer limit) {
         int effectiveLimit = normalizeLimit(limit);
@@ -166,10 +182,74 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision));
         home.setAiDecision(buildAiDecision(selectedDecision));
         home.setPushInbox(pushInboxContext.pushInbox());
+        home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
                 pushInboxContext, providerReadiness));
         home.setSafety(new DashboardHomeVO.SafetyVO());
         return home;
+    }
+
+    private DashboardHomeVO.DerivativesSummaryVO buildDerivativesSummary(String symbol,
+                                                                         DecisionResultVO selectedDecision) {
+        DashboardHomeVO.DerivativesSummaryVO summary = new DashboardHomeVO.DerivativesSummaryVO();
+        if (derivativesSnapshotReadPort == null || derivativesBusinessIntegrationService == null) return summary;
+        try {
+            ProviderCallResult<DerivativesRiskSnapshot> result = derivativesSnapshotReadPort.readCached(
+                    symbol, AssetPriority.P1_CORE, Duration.ofSeconds(60), "dashboard-derivatives-" + UUID.randomUUID());
+            DerivativesRiskSnapshot snapshot = result == null ? null : result.payload();
+            if (snapshot == null) {
+                summary.setStatus("未配置");
+                return summary;
+            }
+            DerivativesBusinessAssessment assessment = derivativesBusinessIntegrationService.evaluate(
+                    new DerivativesBusinessInput(symbol,
+                            selectedDecision == null ? null : selectedDecision.getMarketBiasHierarchy(),
+                            null, null, false, Map.of(), false,
+                            selectedDecision == null ? null : selectedDecision.getDataQualityScore(),
+                            true, false, false, null, snapshot,
+                            snapshot.traceId(), selectedDecision == null ? null : selectedDecision.getAnalysisId(),
+                            "DASHBOARD_READONLY"));
+            summary.setStatus(derivativesStatusLabel(snapshot));
+            summary.setDataTime(snapshot.providerDataTime());
+            summary.setReasonCodes(assessment.reasonCodes());
+            for (DerivativesEvidenceItem evidence : assessment.evidence()) {
+                DerivativesEvidenceType type = evidence.evidenceType();
+                if (type == DerivativesEvidenceType.OPEN_INTEREST_EXPANSION) summary.setOpenInterestStructure("增加");
+                if (type == DerivativesEvidenceType.OPEN_INTEREST_CONTRACTION) summary.setOpenInterestStructure("减少");
+                if (type == DerivativesEvidenceType.OPEN_INTEREST_PRICE_DIVERGENCE) summary.setOpenInterestStructure("背离");
+                if (type == DerivativesEvidenceType.FUNDING_NORMAL) summary.setFundingRisk("正常");
+                if (type == DerivativesEvidenceType.FUNDING_POSITIVE_EXTREME
+                        || type == DerivativesEvidenceType.FUNDING_NEGATIVE_EXTREME) summary.setFundingRisk("极端");
+                if (type == DerivativesEvidenceType.LONG_CROWDING) summary.setCrowdingDirection("多头");
+                if (type == DerivativesEvidenceType.SHORT_CROWDING) summary.setCrowdingDirection("空头");
+                if (type == DerivativesEvidenceType.LONG_LIQUIDATION_SPIKE
+                        || type == DerivativesEvidenceType.SHORT_LIQUIDATION_SPIKE
+                        || type == DerivativesEvidenceType.LIQUIDATION_IMBALANCE) summary.setLiquidationRisk("异常");
+            }
+            if ("暂无".equals(summary.getLiquidationRisk())
+                    && (snapshot.longLiquidationUsd5m() != null || snapshot.longLiquidationUsd15m() != null
+                    || snapshot.shortLiquidationUsd5m() != null || snapshot.shortLiquidationUsd15m() != null)) {
+                summary.setLiquidationRisk("正常");
+            }
+            summary.setDecisionImpact(assessment.isHighRisk() ? "风险阻断"
+                    : "COMPLETE".equalsIgnoreCase(snapshot.evidenceAvailability()) ? "确认" : "降级");
+        } catch (RuntimeException failure) {
+            summary.setStatus("错误");
+            summary.setDecisionImpact("等待同步");
+        }
+        return summary;
+    }
+
+    private static String derivativesStatusLabel(DerivativesRiskSnapshot snapshot) {
+        if (snapshot == null || snapshot.sourceStatus() == null) return "等待同步";
+        return switch (snapshot.sourceStatus()) {
+            case READY -> "COMPLETE".equalsIgnoreCase(snapshot.evidenceAvailability()) ? "正常" : "部分";
+            case DEGRADED, EMPTY_CONFIRMED -> "部分";
+            case STALE -> "过期";
+            case NOT_CONFIGURED, DISABLED -> "未配置";
+            case ERROR -> "错误";
+            default -> "等待同步";
+        };
     }
 
     private DashboardHomeVO.HeaderVO buildHeader(LightSystemStatusVO systemStatus,

@@ -24,7 +24,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
     private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:16-alpine");
 
     @Test
-    void postgreSqlV5MigrationRuntimeTest() throws Exception {
+    void postgreSqlV6MigrationRuntimeTest() throws Exception {
         assumeTrue(dockerAvailable(), "Docker/Testcontainers is unavailable; PostgreSQL smoke skipped");
 
         try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(POSTGRES_IMAGE)) {
@@ -61,6 +61,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertOhlcvProvenanceColumnsExist(connection);
                 assertProviderScanProfileV5ColumnsExist(connection);
                 assertProviderScanRuleDefaultsExist(connection);
+                assertDerivativesBusinessRuleDefaultsExist(connection);
                 assertProviderScanProfileSaveLoadAndAudit(connection);
                 assertProviderScanProfileRollbackIsAtomic(connection);
                 assertFlywayHistorySucceeded(connection);
@@ -135,7 +136,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(5);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(6);
             }
         }
     }
@@ -164,6 +165,17 @@ class PostgreSqlFlywayMigrationSmokeTest {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(16);
+            }
+        }
+    }
+
+    private static void assertDerivativesBusinessRuleDefaultsExist(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*) FROM tm_rule_config WHERE rule_type LIKE 'derivatives_%_config'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(24);
             }
         }
     }

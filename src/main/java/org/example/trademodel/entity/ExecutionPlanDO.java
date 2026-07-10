@@ -25,7 +25,7 @@ public class ExecutionPlanDO {
     private Boolean notAutoTrading;
     private Boolean notOrderExecution;
     private Boolean notUserPositionCreation;
-    private Boolean needsRevalidation;
+    private Boolean needsRevalidation = false;
     private String revalidationReason;
     private String hotResetEventId;
     private LocalDateTime revalidationRequiredAt;

@@ -305,4 +305,25 @@ class AnalysisAssemblerServiceImplTest {
         List<ScoreItemVO> twoScores = List.of(new ScoreItemVO(), new ScoreItemVO());
         assertEquals(55, AnalysisAssemblerServiceImpl.estimateDataQualityScore(Collections.emptyList(), twoScores, FALLBACK));
     }
+
+    @Test
+    void eightScoresFeedDecisionComposite() {
+        List<ScoreItemVO> scores = java.util.stream.IntStream.range(0, 8)
+                .mapToObj(index -> {
+                    ScoreItemVO score = new ScoreItemVO();
+                    score.setScoreValue(40.0 + index * 5.0);
+                    return score;
+                })
+                .toList();
+
+        assertEquals(58, AnalysisAssemblerServiceImpl.calculateEightScoreComposite(scores));
+    }
+
+    @Test
+    void incompleteEightScoresDoNotBecomeSyntheticComposite() {
+        ScoreItemVO score = new ScoreItemVO();
+        score.setScoreValue(80.0);
+
+        assertEquals(null, AnalysisAssemblerServiceImpl.calculateEightScoreComposite(List.of(score)));
+    }
 }

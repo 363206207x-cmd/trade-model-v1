@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,7 @@ public class DashboardHomeVO {
     private ExecutionSuggestionVO executionSuggestion = new ExecutionSuggestionVO();
     private AiDecisionVO aiDecision = new AiDecisionVO();
     private PushInboxVO pushInbox = new PushInboxVO();
+    private DerivativesSummaryVO derivatives = new DerivativesSummaryVO();
     private DiagnosticsVO diagnostics = new DiagnosticsVO();
     private SafetyVO safety = new SafetyVO();
 
@@ -99,6 +101,9 @@ public class DashboardHomeVO {
     public void setPushInbox(PushInboxVO pushInbox) {
         this.pushInbox = pushInbox;
     }
+
+    public DerivativesSummaryVO getDerivatives() { return derivatives; }
+    public void setDerivatives(DerivativesSummaryVO derivatives) { this.derivatives = derivatives; }
 
     public DiagnosticsVO getDiagnostics() {
         return diagnostics;
@@ -1307,6 +1312,39 @@ public class DashboardHomeVO {
 
         public void setCreatedAt(LocalDateTime createdAt) {
             this.createdAt = createdAt;
+        }
+    }
+
+    public static class DerivativesSummaryVO {
+        private String status = "等待同步";
+        private String openInterestStructure = "暂无";
+        private String fundingRisk = "暂无";
+        private String liquidationRisk = "暂无";
+        private String crowdingDirection = "无明确";
+        private Instant dataTime;
+        private String source = "CoinGlass v4";
+        private String decisionImpact = "等待同步";
+        private List<String> reasonCodes = new ArrayList<>();
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+        public String getOpenInterestStructure() { return openInterestStructure; }
+        public void setOpenInterestStructure(String openInterestStructure) { this.openInterestStructure = openInterestStructure; }
+        public String getFundingRisk() { return fundingRisk; }
+        public void setFundingRisk(String fundingRisk) { this.fundingRisk = fundingRisk; }
+        public String getLiquidationRisk() { return liquidationRisk; }
+        public void setLiquidationRisk(String liquidationRisk) { this.liquidationRisk = liquidationRisk; }
+        public String getCrowdingDirection() { return crowdingDirection; }
+        public void setCrowdingDirection(String crowdingDirection) { this.crowdingDirection = crowdingDirection; }
+        public Instant getDataTime() { return dataTime; }
+        public void setDataTime(Instant dataTime) { this.dataTime = dataTime; }
+        public String getSource() { return source; }
+        public void setSource(String source) { this.source = source; }
+        public String getDecisionImpact() { return decisionImpact; }
+        public void setDecisionImpact(String decisionImpact) { this.decisionImpact = decisionImpact; }
+        public List<String> getReasonCodes() { return List.copyOf(reasonCodes); }
+        public void setReasonCodes(List<String> reasonCodes) {
+            this.reasonCodes = reasonCodes == null ? new ArrayList<>() : new ArrayList<>(reasonCodes);
         }
     }
 

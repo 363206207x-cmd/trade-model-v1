@@ -67,7 +67,7 @@ Priority: P0
 
 Depends on: Package B.
 
-Current status: coordination, cache, single-flight, budget, scan-profile, bounded-universe, snapshot contracts, and primary business-reader adoption are complete. CG-1 adds the default-off official CoinGlass v4 source/normalization layer; CoinGlass business-rule adoption remains a separate BIZ-1 package.
+Current status: coordination, cache, single-flight, budget, scan-profile, bounded-universe, snapshot contracts, and primary business-reader adoption are complete. CG-1 is merged/effective and BIZ-1 business-rule adoption is implemented pending merge/effective review.
 
 Scope:
 
@@ -82,7 +82,7 @@ Done when:
 - one request key produces one provider call within its freshness window;
 - controlled provider evidence is recorded separately without treating missing keys as PASS.
 
-CG-1 update: four isolated CoinGlass v4 datasets now assemble into a traceable `DerivativesRiskSnapshot` with partial/stale/fail-closed semantics. No CoinGlass field changes scoring, direction, plan, Position Monitor advice, or Push in this package. BIZ-1 remains `NOT_STARTED`.
+CG-1 update: four isolated CoinGlass v4 datasets assemble into a traceable `DerivativesRiskSnapshot` with partial/stale/fail-closed semantics. BIZ-1 owns downstream interpretation and now uses cache-only reads for evidence, bounded scores, decision/state downgrade, internal Push/Recheck, plan readiness, manual monitor, Confused/Hot Reset input, and Home summary. Direction remains 4h rule-owned and no trading action is added.
 
 ### Package D: External Context No-Data Contract
 
@@ -119,7 +119,7 @@ Done when:
 - every score has a tested owner/use;
 - threshold changes are versioned and reproducible.
 
-CALL-1B update: the four-timeframe provider/OHLCV adoption part is complete. Eight-score influence remains a separate P1 item and is not implied complete by this closure.
+CALL-1B update: the four-timeframe provider/OHLCV adoption part is complete. BIZ-1 implements the eight-score influence contract pending merge/effective review: all eight values are required for the composite, the adjustment is capped, and it cannot override the 4h rule direction.
 
 ### Package F: Plan and Asset-State Contract Cleanup
 

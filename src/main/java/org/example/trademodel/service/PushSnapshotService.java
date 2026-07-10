@@ -68,7 +68,9 @@ public class PushSnapshotService {
         row.setAnalysisId(analysis.getAnalysisId());
         row.setSymbol(analysis.getSymbol());
         row.setTimeframe(analysis.getTimeframe());
-        row.setPushType("ANALYSIS_RUN");
+        row.setPushType(decision.getDerivativesPushMode() != null
+                && !"NONE".equals(decision.getDerivativesPushMode())
+                ? decision.getDerivativesPushMode() : "ANALYSIS_RUN");
         row.setPushStatus("CAPTURED");
         row.setPushCreateTime(now);
         row.setRuleVersion(run.getRuleVersion());
@@ -212,7 +214,10 @@ public class PushSnapshotService {
         BigDecimal below = decision.getPushInvalidPriceBelow();
         BigDecimal above = decision.getPushInvalidPriceAbove();
         boolean hasStruct = below != null || above != null;
-        if (text == null && !hasStruct) {
+        boolean hasDerivatives = decision.getDerivativesRequired() != null
+                || decision.getDerivativesStatus() != null
+                || decision.getDerivativesFreshness() != null;
+        if (text == null && !hasStruct && !hasDerivatives) {
             return null;
         }
         try {
@@ -225,6 +230,24 @@ public class PushSnapshotService {
             }
             if (above != null) {
                 n.put("invalidPriceAbove", above);
+            }
+            if (decision.getDerivativesRequired() != null) {
+                n.put("derivativesRequired", decision.getDerivativesRequired());
+            }
+            if (decision.getDerivativesStatus() != null) {
+                n.put("derivativesStatus", decision.getDerivativesStatus());
+            }
+            if (decision.getDerivativesFreshness() != null) {
+                n.put("derivativesFreshness", decision.getDerivativesFreshness());
+            }
+            if (decision.getDerivativesProviderDataTime() != null) {
+                n.put("derivativesProviderDataTime", decision.getDerivativesProviderDataTime().toString());
+            }
+            if (decision.getDerivativesTraceId() != null) {
+                n.put("derivativesTraceId", decision.getDerivativesTraceId());
+            }
+            if (decision.getDerivativesReasonCodes() != null) {
+                n.putPOJO("derivativesReasonCodes", decision.getDerivativesReasonCodes());
             }
             return JSON.writeValueAsString(n);
         } catch (Exception e) {

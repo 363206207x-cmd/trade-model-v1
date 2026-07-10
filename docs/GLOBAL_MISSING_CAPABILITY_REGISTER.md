@@ -21,7 +21,7 @@
 
 | ID | Missing capability | Evidence | Classification | Closure criterion |
 |---|---|---|---|---|
-| GAP-P1-001 | Declared eight-score influence contract | only trend score enters decision | `BACKEND_FIELD_UNUSED` | Each category is explicitly consumed or explicitly diagnostic-only in code, docs, API, and tests. |
+| GAP-P1-001 | Declared eight-score influence contract (`IMPLEMENTED_PENDING_MERGE`) | all eight persisted score categories receive source-backed bounded contributions and the complete set feeds a capped composite decision adjustment; incomplete sets remain null | `IMPLEMENTED_PENDING_MERGE` | Close only after BIZ-1 merges/effective and retains deterministic all-eight/composite regression coverage. |
 | GAP-P1-002 | Stable score summary ordering | top three ordered by UUID-like ID | `SEMANTIC_DRIFT` | deterministic business priority/score ordering with test. |
 | GAP-P1-003 | Clean plan readiness contract | readiness sentence is stored in `validPeriod` | `WRONG_SOURCE_MAPPING` | dedicated readiness/status field; `validPeriod` contains period only. |
 | GAP-P1-004 | Source-backed fallback plan values | generic leverage and position text persists without boundary trace | `PLACEHOLDER_ONLY` | values remain null until authoritative calculation or are typed as non-plan policy hints outside the plan contract. |
@@ -33,7 +33,7 @@
 | GAP-P1-010 | Manual optional-field truth | browser silently sends quantity/leverage `1` | `RENDERED_NOT_BACKED` | omit unsupported values or visibly require/default them with an explicit backend contract. |
 | GAP-P1-011 | Opportunity real outcome automation | evaluation is explicit and OHLCV-blocked | `BLOCKED_NO_REAL_DATA` | bounded scheduler/operator policy evaluates due rows from authoritative bars without trading effects. |
 | GAP-P1-012 | Rule-config consumption completeness | confused/AI/missed groups exist but are not consumed | `BACKEND_FIELD_UNUSED` | policies load active version fail-closed and tests prove threshold changes. |
-| GAP-P1-013 | CoinGlass derivatives business adoption | CG-1 supplies normalized OI/Funding/liquidation/global-account-ratio snapshots, but scoring, Decision, Confused, plan, monitor advice, and Push do not consume them | `PROVIDER_READY_BUSINESS_NOT_WIRED` | BIZ-1 explicitly maps source-backed fields into configurable business rules with fail-closed tests; no adapter-level trading judgment. |
+| GAP-P1-013 | CoinGlass derivatives business adoption (`IMPLEMENTED_PENDING_MERGE`) | BIZ-1 maps the shared cached OI/Funding/liquidation/global-account-ratio snapshot into evidence, scores, Decision, state, internal Push/Recheck, plan readiness, manual monitor, Confused/Hot Reset inputs, and Home semantics with fail-closed tests | `IMPLEMENTED_PENDING_MERGE` | Close after merge/effective review; keep live-provider proof and production release evidence separate, and retain no adapter-level direction/trading judgment. |
 
 ## P2 Register
 

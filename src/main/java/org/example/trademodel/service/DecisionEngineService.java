@@ -8,6 +8,7 @@ import org.example.trademodel.ai.AiProviderRequest;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
@@ -66,6 +67,10 @@ public class DecisionEngineService {
     private static final int DEFAULT_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE = 85;
     private static final int MIN_DATA_QUALITY_SCORE_FOR_OPENING = 60;
     private static final int MIN_TREND_STRUCTURE_SCORE_FOR_OPENING = 50;
+    private static final String KEY_DERIVATIVES_EIGHT_SCORE_ADJUSTMENT_CAP =
+            "derivatives_decision_config.eight_score_adjustment_cap";
+    private static final String KEY_DERIVATIVES_EIGHT_SCORE_ADJUSTMENT_FACTOR_PERCENT =
+            "derivatives_decision_config.eight_score_adjustment_factor_percent";
 
     public DecisionEngineService(DecisionOhlcvSnapshotSource ohlcvSnapshotSource,
                                  AiConflictResolverService aiConflictResolverService,
@@ -123,6 +128,23 @@ public class DecisionEngineService {
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId,
                                          Integer dataQualityScore, Integer trendStructureScore,
                                          EventImpactInputVO externalContextInput) {
+        return makeDecision(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
+                externalContextInput, null);
+    }
+
+    public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId,
+                                         Integer dataQualityScore, Integer trendStructureScore,
+                                         EventImpactInputVO externalContextInput,
+                                         DerivativesBusinessAssessment derivativesAssessment) {
+        return makeDecision(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
+                externalContextInput, derivativesAssessment, null);
+    }
+
+    public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId,
+                                         Integer dataQualityScore, Integer trendStructureScore,
+                                         EventImpactInputVO externalContextInput,
+                                         DerivativesBusinessAssessment derivativesAssessment,
+                                         Integer eightScoreComposite) {
         String decisionId = "dec-" + Instant.now().toEpochMilli();
         logger.info("[AI决策] === 开始为 {} {} analysisId={} 生成决策 ===", symbol, timeframe, analysisId);
 
@@ -144,6 +166,10 @@ public class DecisionEngineService {
             int actionPriorityHighMinScoreExclusive = getInt(ruleMap,
                     KEY_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE,
                     DEFAULT_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE);
+            int eightScoreAdjustmentCap = getIntInRange(ruleMap,
+                    KEY_DERIVATIVES_EIGHT_SCORE_ADJUSTMENT_CAP, 10, 1, 25);
+            int eightScoreAdjustmentFactorPercent = getIntInRange(ruleMap,
+                    KEY_DERIVATIVES_EIGHT_SCORE_ADJUSTMENT_FACTOR_PERCENT, 20, 1, 100);
 
             // ==================== 1. 权威落库 K 线快照（同一 run trace） ====================
             String marketTraceId = analysisId == null || analysisId.isBlank() ? decisionId : analysisId;
@@ -160,18 +186,26 @@ public class DecisionEngineService {
             boolean isBullish1h = bullish(klines1h);
             boolean isBullish4h = bullish(klines4h);
 
-            boolean multiTfConvergence = isBullish5m == isBullish15m
-                    && isBullish5m == isBullish1h && isBullish5m == isBullish4h;
+            int alignedWith4h = (isBullish5m == isBullish4h ? 1 : 0)
+                    + (isBullish15m == isBullish4h ? 1 : 0)
+                    + (isBullish1h == isBullish4h ? 1 : 0)
+                    + 1;
+            boolean multiTfConvergence = isBullish4h == isBullish1h && alignedWith4h >= 3;
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
             // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================
-            int baseScore = isBullish5m ? 82 : 58;
-            int finalScore = baseScore + convergenceScore;
+            int baseScore = isBullish4h ? 82 : 58;
+            int eightScoreAdjustment = eightScoreComposite == null
+                    ? 0
+                    : Math.max(-eightScoreAdjustmentCap, Math.min(eightScoreAdjustmentCap,
+                    (int) Math.round((eightScoreComposite - 50)
+                            * eightScoreAdjustmentFactorPercent / 100.0)));
+            int finalScore = baseScore + convergenceScore + eightScoreAdjustment;
 
-            String ruleMarketBias = isBullish5m ? "BULLISH" : "BEARISH";
+            String ruleMarketBias = isBullish4h ? "BULLISH" : "BEARISH";
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
-            boolean worthOpening = finalScore >= worthOpeningMinScore;
+            boolean worthOpening = finalScore >= worthOpeningMinScore && multiTfConvergence;
             if (trendStructureScore != null && trendStructureScore < MIN_TREND_STRUCTURE_SCORE_FOR_OPENING) {
                 worthOpening = false;
             }
@@ -180,6 +214,13 @@ public class DecisionEngineService {
             }
             boolean externalContextBlocked = isEffectiveExternalBlocked(externalContextInput);
             boolean effectiveWorthOpening = worthOpening && !externalContextBlocked;
+            if (derivativesAssessment != null
+                    && (derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.STALE
+                    || derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.ERROR
+                    || derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.NOT_CONFIGURED
+                    || derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.DISABLED)) {
+                effectiveWorthOpening = false;
+            }
             String riskTier = finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM";
 
             // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
@@ -201,6 +242,16 @@ public class DecisionEngineService {
             ctx.setExecutionInstabilityScore(26);
             ctx.setMicrostructureTrapScore(multiTfConvergence ? 22 : 38);
             ctx.setCauseEffectDivergenceScore(multiTfConvergence ? 12 : 40);
+            if (derivativesAssessment != null) {
+                ctx.setDriverConflictScore(cap100(ctx.getDriverConflictScore()
+                        + derivativesAssessment.driverConflictDelta()));
+                ctx.setExecutionInstabilityScore(cap100(ctx.getExecutionInstabilityScore()
+                        + derivativesAssessment.executionInstabilityDelta()));
+                ctx.setMicrostructureTrapScore(cap100(ctx.getMicrostructureTrapScore()
+                        + derivativesAssessment.microstructureTrapDelta()));
+                ctx.setCauseEffectDivergenceScore(cap100(ctx.getCauseEffectDivergenceScore()
+                        + derivativesAssessment.causeEffectDivergenceDelta()));
+            }
             ctx.setConsecutiveLowConfusedCount(0);
 
             AiOrchestratorResult aiReview = runAiReview(symbol, timeframe, analysisId, decisionId,
@@ -223,6 +274,7 @@ public class DecisionEngineService {
             AssetStateEnum syntheticState = parseAssetState(confused.getNextState(),
                     effectiveWorthOpening ? AssetStateEnum.CANDIDATE : AssetStateEnum.OBSERVING);
             AssetStateEnum finalAssetState = failClosedExternalState(syntheticState, externalContextBlocked);
+            finalAssetState = mergeDerivativesState(finalAssetState, derivativesAssessment);
             String snapshot = assetStateService.buildSnapshotAtDecision(
                     symbol,
                     analysisId != null ? analysisId : "",
@@ -237,6 +289,7 @@ public class DecisionEngineService {
             if (confused.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD
                     || finalScore < highFinalScoreBelow
                     || externalContextBlocked
+                    || derivativesAssessment != null && derivativesAssessment.isHighRisk()
                     || "HIGH".equalsIgnoreCase(conflict.getRiskAdjustment())) {
                 riskLevelLabel = "HIGH";
             } else if (finalScore >= riskTierLowMinScore) {
@@ -286,10 +339,11 @@ public class DecisionEngineService {
 
             // ==================== 4. 输出最终决策 ====================
             String conclusion = String.format(
-                    "规则层基础方向：%s | AI编排模式：%s | 总分 %d | 多TF收敛：%s | 外部上下文阻塞：%s",
+                    "规则层基础方向：%s | AI编排模式：%s | 总分 %d | 八项评分修正 %+d | 多TF收敛：%s | 外部上下文阻塞：%s",
                     ruleMarketBias,
                     aiReview.getOrchestrationMode(),
                     finalScore,
+                    eightScoreAdjustment,
                     multiTfConvergence ? "STRONG" : "WEAK",
                     externalContextBlocked);
             DecisionBundleVO decision = new DecisionBundleVO();
@@ -335,6 +389,18 @@ public class DecisionEngineService {
             decision.setPushInvalidPriceBelow(pushInvalidPriceBelow);
             decision.setPushInvalidPriceAbove(pushInvalidPriceAbove);
             decision.setPushInvalidationSummary(pushInvalidationSummary);
+            if (derivativesAssessment != null) {
+                decision.setDerivativesStatus(derivativesAssessment.sourceStatus() == null
+                        ? null : derivativesAssessment.sourceStatus().name());
+                decision.setDerivativesFreshness(derivativesAssessment.freshnessStatus() == null
+                        ? null : derivativesAssessment.freshnessStatus().name());
+                decision.setDerivativesRequired(true);
+                decision.setDerivativesConfirmEligible(derivativesAssessment.confirmEligible());
+                decision.setDerivativesPushMode(derivativesAssessment.pushMode());
+                decision.setDerivativesReasonCodes(derivativesAssessment.reasonCodes());
+                decision.setDerivativesProviderDataTime(derivativesAssessment.providerDataTime());
+                decision.setDerivativesTraceId(derivativesAssessment.traceId());
+            }
             applyExternalContext(decision, externalContextInput);
 
             logger.info("[AI决策] 生成完成 → {} | ConfidenceLevel = {} | Score = {} | MultiTF = {} | Worth Open: {} | aiConflict={}/{} | confused={}",
@@ -366,6 +432,12 @@ public class DecisionEngineService {
         } catch (Exception ignored) {
             return defaultVal;
         }
+    }
+
+    private static int getIntInRange(Map<String, RuleConfigDO> cfgMap, String key, int defaultVal,
+                                     int minimum, int maximum) {
+        int value = getInt(cfgMap, key, defaultVal);
+        return value < minimum || value > maximum ? defaultVal : value;
     }
 
     private static boolean bullish(List<String[]> bars) {
@@ -402,6 +474,20 @@ public class DecisionEngineService {
             return syntheticState;
         }
         return AssetStateEnum.HIGH_RISK;
+    }
+
+    private static AssetStateEnum mergeDerivativesState(AssetStateEnum current,
+                                                        DerivativesBusinessAssessment assessment) {
+        if (assessment == null || assessment.opportunityState() == null) return current;
+        if (current == AssetStateEnum.CONFUSED || current == AssetStateEnum.COOLING
+                || current == AssetStateEnum.INVALIDATED) return current;
+        if (assessment.opportunityState() == AssetStateEnum.HIGH_RISK) return AssetStateEnum.HIGH_RISK;
+        if (current == AssetStateEnum.HIGH_RISK) return current;
+        return assessment.opportunityState();
+    }
+
+    private static int cap100(int value) {
+        return Math.max(0, Math.min(100, value));
     }
 
     private AiOrchestratorResult runAiReview(String symbol, String timeframe, String analysisId, String decisionId,

@@ -12,6 +12,13 @@ import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
+import org.example.trademodel.derivatives.DerivativesBusinessInput;
+import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
+import org.example.trademodel.derivatives.DerivativesEvidenceItem;
+import org.example.trademodel.derivatives.DerivativesEvidenceType;
+import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.dto.planboundary.MarketStructureBoundaryDTO;
 import org.example.trademodel.dto.planboundary.MarketStructureBoundaryRequest;
 import org.example.trademodel.dto.planboundary.RuntimeKlineContextDTO;
@@ -26,6 +33,11 @@ import org.example.trademodel.service.planboundary.MarketStructureBoundaryExtrac
 import org.example.trademodel.service.planboundary.SourceTraceBoundaryProducer;
 import org.example.trademodel.vo.*;
 import org.example.trademodel.entity.RuleConfigDO;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
+import org.example.trademodel.risk.UserPositionRiskAdapter;
+import org.example.trademodel.risk.UserPositionRiskResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +46,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
@@ -78,6 +91,9 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private final RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService;
     private final MarketStructureBoundaryExtractor marketStructureBoundaryExtractor;
     private final SourceTraceBoundaryProducer sourceTraceBoundaryProducer;
+    private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
+    private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
+    private UserPositionRiskAdapter userPositionRiskAdapter;
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -190,6 +206,15 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.sourceTraceBoundaryProducer = sourceTraceBoundaryProducer;
     }
 
+    @Autowired(required = false)
+    void setDerivativesBusinessIntegration(DerivativesSnapshotReadPort derivativesSnapshotReadPort,
+                                           DerivativesBusinessIntegrationService derivativesBusinessIntegrationService,
+                                           UserPositionRiskAdapter userPositionRiskAdapter) {
+        this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
+        this.derivativesBusinessIntegrationService = derivativesBusinessIntegrationService;
+        this.userPositionRiskAdapter = userPositionRiskAdapter;
+    }
+
 
     @Override
     @Transactional
@@ -242,8 +267,19 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             List<EvidenceItemVO> evidences = evidenceService.buildEvidence(scoreInput, marketEnv);
             scoreInput.setEvidenceList(evidences);
             List<ScoreItemVO> scores = scoreService.buildScoreList(scoreInput, marketEnv);
-            int dataQualityScore = estimateDataQualityScore(evidences, scores, marketEnvSourceType);
+            int baseDataQualityScore = estimateDataQualityScore(evidences, scores, marketEnvSourceType);
+            DerivativesBusinessInput derivativesInput = buildDerivativesBusinessInput(
+                    effectiveContext, baseDataQualityScore, false);
+            DerivativesBusinessAssessment derivativesAssessment = evaluateDerivatives(derivativesInput);
+            if (derivativesAssessment != null) {
+                evidences.addAll(derivativesBusinessIntegrationService.toEvidenceVos(derivativesAssessment));
+                derivativesBusinessIntegrationService.applyScoreAdjustments(scores, derivativesAssessment);
+            }
+            int dataQualityScore = derivativesAssessment == null
+                    ? baseDataQualityScore
+                    : Math.max(0, baseDataQualityScore - derivativesAssessment.dataQualityDiscount());
             Integer trendStructureScore = extractTrendStructureScore(scores);
+            Integer eightScoreComposite = calculateEightScoreComposite(scores);
 
             DecisionBundleVO decision = decisionEngineService.makeDecision(
                     symbol,
@@ -251,7 +287,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     analysisId,
                     dataQualityScore,
                     trendStructureScore,
-                    scoreInput.getEventImpactInput());
+                    scoreInput.getEventImpactInput(),
+                    derivativesAssessment,
+                    eightScoreComposite);
+            if (derivativesAssessment != null) {
+                derivativesBusinessIntegrationService.applyDecisionAdjustments(decision, derivativesAssessment);
+            }
 
             ExecutionPlanVO plan = generateExecutionPlanFailClosed(
                     decision,
@@ -259,6 +300,16 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     marketEnv,
                     scoreInput,
                     effectiveContext);
+            if (derivativesInput != null && derivativesAssessment != null) {
+                derivativesAssessment = evaluateDerivatives(withPlanBoundary(
+                        derivativesInput, hasCompletePlanBoundary(plan)));
+                derivativesBusinessIntegrationService.applyOpportunityState(decision, derivativesAssessment);
+                derivativesBusinessIntegrationService.applyPlanAdjustments(plan, derivativesAssessment);
+                decision.setAssetStateSnapshot(assetStateService.buildSnapshotAtDecision(
+                        symbol, analysisId, decision.getAssetState(),
+                        decision.getConfusedScore() == null ? 0 : decision.getConfusedScore(),
+                        decision.isMultiTimeframeAligned()));
+            }
 
             AssetAnalysisVO analysis = new AssetAnalysisVO();
             analysis.setAnalysisId(analysisId);
@@ -271,6 +322,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             analysis.setDecisionBundle(decision);
             analysis.setDataQualityScore(dataQualityScore);
             analysis.setEventImpactInput(scoreInput.getEventImpactInput());
+            analysis.setDerivativesAssessment(derivativesAssessment);
 
             System.out.println("=== 准备执行落库 saveToDatabase === analysisId=" + analysisId);
             saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan, marketEnvSourceType);
@@ -287,6 +339,91 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 System.out.println("[PERF] first_analysis_run=" + assembleCostMs + " ms");
             }
         }
+    }
+
+    private DerivativesBusinessAssessment evaluateDerivatives(DerivativesBusinessInput input) {
+        if (input == null || derivativesBusinessIntegrationService == null) return null;
+        return derivativesBusinessIntegrationService.evaluate(input);
+    }
+
+    private DerivativesBusinessInput buildDerivativesBusinessInput(
+            AnalysisExecutionContext context, int dataQualityScore, boolean planBoundaryComplete) {
+        if (context == null || derivativesSnapshotReadPort == null
+                || derivativesBusinessIntegrationService == null || persistedOhlcvQueryService == null) {
+            return null;
+        }
+        ProviderCallResult<DerivativesRiskSnapshot> snapshotResult;
+        try {
+            snapshotResult = derivativesSnapshotReadPort.readCached(context.getSymbol(), AssetPriority.P1_CORE,
+                    Duration.ofSeconds(60), context.getTraceId());
+        } catch (RuntimeException failure) {
+            snapshotResult = null;
+        }
+        Map<String, String> directions = new java.util.LinkedHashMap<>();
+        BigDecimal currentPrice = null;
+        BigDecimal comparisonPrice = null;
+        boolean volumeConfirmed = false;
+        boolean currentPriceFresh = false;
+        for (String tf : List.of("5m", "15m", "1h", "4h")) {
+            PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadiness(
+                    context.getSymbol(), tf, 3, maxBoundaryReadLagMs(tf));
+            if (readiness == null || readiness.getStatus() != PersistedOhlcvReadinessStatus.FRESH
+                    || readiness.getBars() == null || readiness.getBars().isEmpty()) {
+                continue;
+            }
+            PersistedOhlcvBarDO latest = readiness.getBars().get(0);
+            if (latest.getOpenPrice() != null && latest.getClosePrice() != null) {
+                directions.put(tf, latest.getClosePrice().compareTo(latest.getOpenPrice()) >= 0
+                        ? "BULLISH" : "BEARISH");
+            }
+            if ("5m".equals(tf) && latest.getClosePrice() != null) {
+                currentPrice = latest.getClosePrice();
+                currentPriceFresh = currentPrice.compareTo(BigDecimal.ZERO) > 0;
+                if (readiness.getBars().size() > 1) {
+                    comparisonPrice = readiness.getBars().get(1).getClosePrice();
+                    BigDecimal currentVolume = latest.getVolume();
+                    BigDecimal previousVolume = readiness.getBars().get(1).getVolume();
+                    volumeConfirmed = currentVolume != null && previousVolume != null
+                            && currentVolume.compareTo(previousVolume) >= 0;
+                }
+            }
+        }
+        String baseDirection = directions.getOrDefault("4h", directions.get("1h"));
+        return new DerivativesBusinessInput(context.getSymbol(), baseDirection, currentPrice, comparisonPrice,
+                volumeConfirmed, directions, currentPriceFresh, dataQualityScore, accountRiskAllowed(),
+                planBoundaryComplete, false,
+                null, snapshotResult == null ? null : snapshotResult.payload(), context.getTraceId(),
+                context.getAnalysisId(), context.getRuleVersion());
+    }
+
+    private boolean accountRiskAllowed() {
+        if (userPositionRiskAdapter == null) return false;
+        try {
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            return result != null && !result.isRiskBlocked();
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    private static DerivativesBusinessInput withPlanBoundary(DerivativesBusinessInput input,
+                                                             boolean planBoundaryComplete) {
+        return new DerivativesBusinessInput(input.symbol(), input.baseDirection(), input.currentPrice(),
+                input.comparisonPrice(), input.volumeConfirmed(), input.timeframeDirections(), input.currentPriceFresh(),
+                input.dataQualityScore(), input.accountRiskAllowed(), planBoundaryComplete, input.positionOpen(),
+                input.currentState(), input.snapshot(), input.traceId(), input.analysisId(), input.ruleVersion());
+    }
+
+    private static boolean hasCompletePlanBoundary(ExecutionPlanVO plan) {
+        return plan != null
+                && Boolean.TRUE.equals(plan.getSourceGateComplete())
+                && concretePlanValue(plan.getEntryZone())
+                && concretePlanValue(plan.getStopLoss())
+                && concretePlanValue(plan.getTakeProfitRules());
+    }
+
+    private static boolean concretePlanValue(String value) {
+        return value != null && !value.isBlank() && !"暂无".equals(value.trim());
     }
 
     private ExecutionPlanVO generateExecutionPlanFailClosed(
@@ -669,6 +806,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setNotAutoTrading(booleanOrTrue(plan.getNotAutoTrading()));
                 pdo.setNotOrderExecution(booleanOrTrue(plan.getNotOrderExecution()));
                 pdo.setNotUserPositionCreation(booleanOrTrue(plan.getNotUserPositionCreation()));
+                pdo.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
+                pdo.setRevalidationReason(plan.getRevalidationReason());
                 pdo.setCreateTime(LocalDateTime.now());
                 executionPlanMapper.insert(pdo);
                 persistedPlan = pdo;
@@ -716,6 +855,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         }
         MarketEnvironmentVO env = analysis.getMarketEnvironment();
         List<HotResetCommand> candidates = new ArrayList<>();
+        HotResetCommand derivatives = derivativesHotResetCommand(analysis, decision, traceId);
+        if (derivatives != null) {
+            candidates.add(derivatives);
+        }
         HotResetCommand systemic = systemicShockCommand(analysis, decision, env, traceId);
         if (systemic != null) {
             candidates.add(systemic);
@@ -741,6 +884,34 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             }
         }
         return candidates.get(0);
+    }
+
+    private HotResetCommand derivativesHotResetCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
+                                                        String traceId) {
+        DerivativesBusinessAssessment assessment = analysis.getDerivativesAssessment();
+        if (assessment == null || !assessment.hotResetCandidate()) return null;
+        DerivativesEvidenceItem oiCollapse = assessment.evidence().stream()
+                .filter(item -> item.evidenceType() == DerivativesEvidenceType.OPEN_INTEREST_CONTRACTION)
+                .filter(item -> "OI_COLLAPSE".equals(item.reasonCode()))
+                .findFirst().orElse(null);
+        if (oiCollapse != null && oiCollapse.currentValue() != null) {
+            HotResetCommand command = baseHotResetCommand(analysis, decision, traceId,
+                    HotResetEventTypeEnum.OI_COLLAPSE, 90);
+            command.setOpenInterestChangeRatio(oiCollapse.currentValue());
+            command.setSourceType("COINGLASS_V4");
+            command.setSourceReference(oiCollapse.sourceField());
+            command.setEventKey(hotResetEventKey(analysis, command.getEventType(),
+                    oiCollapse.currentValue().toPlainString()));
+            return command;
+        }
+        HotResetCommand command = baseHotResetCommand(analysis, decision, traceId,
+                HotResetEventTypeEnum.SYSTEMIC_SHOCK, 90);
+        command.setSystemicShock(true);
+        command.setSourceType("COINGLASS_V4");
+        command.setSourceReference("DerivativesBusinessAssessment.hotResetCandidate");
+        command.setEventKey(hotResetEventKey(analysis, command.getEventType(),
+                String.join(",", assessment.reasonCodes())));
+        return command;
     }
 
     private HotResetCommand priceMoveCommand(AssetAnalysisVO analysis, DecisionBundleVO decision,
@@ -947,6 +1118,20 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             }
         }
         return null;
+    }
+
+    static Integer calculateEightScoreComposite(List<ScoreItemVO> scores) {
+        if (scores == null || scores.size() != 8) {
+            return null;
+        }
+        double sum = 0.0;
+        for (ScoreItemVO score : scores) {
+            if (score == null || score.getScoreValue() == null) {
+                return null;
+            }
+            sum += score.getScoreValue();
+        }
+        return (int) Math.round(sum / 8.0);
     }
 
     /**
@@ -1322,6 +1507,20 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         }
         external.set("reasonCodes", externalReasons);
         root.set("externalContext", external);
+
+        ObjectNode derivatives = EXPLAIN_JSON.createObjectNode();
+        derivatives.put("status", decision.getDerivativesStatus() != null ? decision.getDerivativesStatus() : "WAITING_SYNC");
+        derivatives.put("freshness", decision.getDerivativesFreshness() != null ? decision.getDerivativesFreshness() : "UNAVAILABLE");
+        derivatives.put("required", Boolean.TRUE.equals(decision.getDerivativesRequired()));
+        derivatives.put("confirmEligible", Boolean.TRUE.equals(decision.getDerivativesConfirmEligible()));
+        derivatives.put("pushMode", decision.getDerivativesPushMode() != null ? decision.getDerivativesPushMode() : "NONE");
+        derivatives.put("providerDataTime", decision.getDerivativesProviderDataTime() == null
+                ? "" : decision.getDerivativesProviderDataTime().toString());
+        derivatives.put("traceId", decision.getDerivativesTraceId() != null ? decision.getDerivativesTraceId() : "");
+        ArrayNode derivativesReasons = EXPLAIN_JSON.createArrayNode();
+        decision.getDerivativesReasonCodes().forEach(derivativesReasons::add);
+        derivatives.set("reasonCodes", derivativesReasons);
+        root.set("derivatives", derivatives);
 
         try {
             return EXPLAIN_JSON.writeValueAsString(root);
