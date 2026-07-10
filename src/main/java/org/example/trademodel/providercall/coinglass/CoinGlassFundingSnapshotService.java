@@ -23,4 +23,9 @@ public class CoinGlassFundingSnapshotService
             String symbol, AssetPriority priority, Duration freshTtl, String traceId) {
         return get(symbol, priority, freshTtl, traceId, () -> adapter.fetchFunding(symbol));
     }
+
+    public ProviderCallResult<CoinGlassFundingSnapshot> peek(
+            String symbol, AssetPriority priority, Duration freshTtl, String traceId) {
+        return super.peek(symbol, priority, freshTtl, traceId);
+    }
 }

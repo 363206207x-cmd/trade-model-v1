@@ -81,8 +81,8 @@ class V1HistoricalReplayValidationTest {
         assertThat(results.stream().filter(ReplayResult::missedValidOpportunity).count()).isZero();
         assertResult(results, "HISTORICAL_STYLE_UPTREND_BREAKOUT", "BULLISH", true, AssetStateEnum.CANDIDATE);
         assertResult(results, "HISTORICAL_STYLE_DOWNTREND_BREAKDOWN", "BEARISH", true, AssetStateEnum.CANDIDATE);
-        assertResult(results, "CHOPPY_RANGE_NO_TRADE", "BULLISH", false, AssetStateEnum.OBSERVING);
-        assertResult(results, "WICK_STOP_SWEEP", "BEARISH", false, AssetStateEnum.OBSERVING);
+        assertResult(results, "CHOPPY_RANGE_NO_TRADE", "BEARISH", false, AssetStateEnum.OBSERVING);
+        assertResult(results, "WICK_STOP_SWEEP", "BULLISH", false, AssetStateEnum.OBSERVING);
         assertResult(results, "FAST_CRASH_REBOUND", "BULLISH", false, AssetStateEnum.CONFUSED);
         assertResult(results, "SLOW_TREND_PULLBACK", "BULLISH", true, AssetStateEnum.WAITING_TRIGGER);
         assertResult(results, "HIGH_RISK_EVENT_WINDOW", "BULLISH", false, AssetStateEnum.HIGH_RISK);
@@ -190,7 +190,9 @@ class V1HistoricalReplayValidationTest {
                 scenario.dataQualityScore(), scenario.trendScore(), scenario.externalContext());
         ExecutionPlanDO plan = planFromReplay(scenario, decision);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo(scenario.direction());
+        assertThat(decision.getMarketBiasHierarchy())
+                .as("formal 4h direction for %s", scenario.name())
+                .isEqualTo(scenario.direction());
         assertThat(decision.getIsWorthOpening()).isEqualTo(scenario.opportunityExpected());
         assertThat(decision.getAssetState()).isEqualTo(scenario.state());
         assertThat(decision.getAssetStateSnapshot()).contains(FIXTURE_SOURCE);
@@ -229,9 +231,9 @@ class V1HistoricalReplayValidationTest {
                         downtrend(), downtrend(), AssetStateEnum.CANDIDATE),
                 ReplayScenario.valid("FAKE_BREAKOUT_REVERSAL", "SOLUSDT", "BULLISH",
                         fakeBreakout(), fakeBreakout(), AssetStateEnum.CANDIDATE),
-                ReplayScenario.noTrade("CHOPPY_RANGE_NO_TRADE", "BNBUSDT", "BULLISH",
+                ReplayScenario.noTrade("CHOPPY_RANGE_NO_TRADE", "BNBUSDT", "BEARISH",
                         choppy1m(), choppy5m(), AssetStateEnum.OBSERVING, "RANGE_NO_TRADE"),
-                ReplayScenario.noTrade("WICK_STOP_SWEEP", "XRPUSDT", "BEARISH",
+                ReplayScenario.noTrade("WICK_STOP_SWEEP", "XRPUSDT", "BULLISH",
                         wick1m(), wick5m(), AssetStateEnum.OBSERVING, "WICK_RISK_REVIEW"),
                 ReplayScenario.confused("FAST_CRASH_REBOUND", "DOGEUSDT", crashRebound(), crashRebound()),
                 ReplayScenario.valid("SLOW_TREND_PULLBACK", "ADAUSDT", "BULLISH",

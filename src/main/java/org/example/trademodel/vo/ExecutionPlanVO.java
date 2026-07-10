@@ -1,5 +1,6 @@
 package org.example.trademodel.vo;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,6 +47,13 @@ public class ExecutionPlanVO {
     private String invalidCondition;
     private String leverageSuggestion;
     private String positionSuggestion;
+    private Boolean needsRevalidation;
+    private String revalidationReason;
+    private String derivativesStatus;
+    private String derivativesFreshness;
+    private List<String> derivativesReasonCodes = new ArrayList<>();
+    private Instant derivativesProviderDataTime;
+    private String derivativesTraceId;
 
     public String getPlanId() { return planId; }
     public void setPlanId(String planId) { this.planId = planId; }
@@ -113,4 +121,20 @@ public class ExecutionPlanVO {
     public void setLeverageSuggestion(String leverageSuggestion) { this.leverageSuggestion = leverageSuggestion; }
     public String getPositionSuggestion() { return positionSuggestion; }
     public void setPositionSuggestion(String positionSuggestion) { this.positionSuggestion = positionSuggestion; }
+    public Boolean getNeedsRevalidation() { return needsRevalidation; }
+    public void setNeedsRevalidation(Boolean needsRevalidation) { this.needsRevalidation = needsRevalidation; }
+    public String getRevalidationReason() { return revalidationReason; }
+    public void setRevalidationReason(String revalidationReason) { this.revalidationReason = revalidationReason; }
+    public String getDerivativesStatus() { return derivativesStatus; }
+    public void setDerivativesStatus(String derivativesStatus) { this.derivativesStatus = derivativesStatus; }
+    public String getDerivativesFreshness() { return derivativesFreshness; }
+    public void setDerivativesFreshness(String derivativesFreshness) { this.derivativesFreshness = derivativesFreshness; }
+    public List<String> getDerivativesReasonCodes() { return List.copyOf(derivativesReasonCodes); }
+    public void setDerivativesReasonCodes(List<String> derivativesReasonCodes) {
+        this.derivativesReasonCodes = derivativesReasonCodes == null ? new ArrayList<>() : new ArrayList<>(derivativesReasonCodes);
+    }
+    public Instant getDerivativesProviderDataTime() { return derivativesProviderDataTime; }
+    public void setDerivativesProviderDataTime(Instant derivativesProviderDataTime) { this.derivativesProviderDataTime = derivativesProviderDataTime; }
+    public String getDerivativesTraceId() { return derivativesTraceId; }
+    public void setDerivativesTraceId(String derivativesTraceId) { this.derivativesTraceId = derivativesTraceId; }
 }

@@ -4,6 +4,7 @@ import org.example.trademodel.ai.AiOrchestrationMode;
 import org.example.trademodel.ai.AiOrchestratorResult;
 import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -134,6 +136,37 @@ class DecisionEngineServiceTest {
         assertThat(dq55.getReviewReasons()).contains("DATA_QUALITY_INSUFFICIENT");
         assertThat(dq85.getIsWorthOpening()).isTrue();
         assertThat(dq85.getReviewReasons()).doesNotContain("DATA_QUALITY_INSUFFICIENT");
+    }
+
+    @Test
+    void makeDecision_fourHourAndOneHourConflictBlocksWorthOpening() {
+        when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
+                .thenAnswer(invocation -> "1h".equals(invocation.getArgument(1))
+                        ? bearishKlines()
+                        : bullishKlines());
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-mtf-conflict", 85, 65);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getMultiTfConvergence()).isEqualTo("WEAK");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+    }
+
+    @Test
+    void makeDecision_eightScoreAdjustmentUsesConfiguredCap() {
+        RuleConfigDO cap = new RuleConfigDO();
+        cap.setRuleValue("1");
+        RuleConfigDO factor = new RuleConfigDO();
+        factor.setRuleValue("100");
+        when(ruleConfigService.getRuleConfigMap()).thenReturn(Map.of(
+                "derivatives_decision_config.eight_score_adjustment_cap", cap,
+                "derivatives_decision_config.eight_score_adjustment_factor_percent", factor));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-score-cap",
+                85, 65, null, null, 100);
+
+        assertThat(decision.getConclusionSummary()).contains("八项评分修正 +1");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
     }
 
     @Test

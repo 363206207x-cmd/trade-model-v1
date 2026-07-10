@@ -20,7 +20,7 @@ The four independent request/cache identities are:
 - `COINGLASS_LIQUIDATION`
 - `COINGLASS_LONG_SHORT_RATIO`
 
-The package normalizes provider data into `DerivativesRiskSnapshot`. It does not change score weights, Decision Engine output, Confused score, ExecutionPlan, Position Monitor advice, Push text, UserPosition, or any trading behavior. BIZ-1 remains `NOT_STARTED`.
+CG-1 normalizes provider data into `DerivativesRiskSnapshot` and remains free of business judgment. The later, separately scoped BIZ-1 package is now implemented pending merge and owns all downstream score/decision/state/plan/monitor/push interpretation without changing CG-1 transport behavior.
 
 ## Authentication and Secret Safety
 
@@ -110,7 +110,7 @@ Fixtures under `src/test/resources/provider/coinglass/v4` are explicitly synthet
 - Liquidation spike score: not calculated in the adapter.
 - Funding next-settlement time: not exposed by the selected verified endpoint.
 - Alternate long/short ratio families: not mixed into the selected global account ratio.
-- Business scoring/decision/plan/monitor/push integration: `NOT_STARTED`, owned by BIZ-1.
+- Business scoring/decision/plan/monitor/push integration: `IMPLEMENTED_PENDING_MERGE`, owned by BIZ-1 and documented in `COINGLASS_DERIVATIVES_BUSINESS_INTEGRATION.md`.
 - Live account entitlement and authenticated provider evidence: `SKIPPED`, no key present.
 
 Production readiness remains `BLOCKED`.

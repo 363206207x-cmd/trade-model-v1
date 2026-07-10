@@ -87,7 +87,7 @@ class V1BusinessStressTest {
                 OpportunityScenario.valid("BULLISH_BREAKOUT_VALID", "BTCUSDT", "BULLISH", AssetStateEnum.CANDIDATE),
                 OpportunityScenario.valid("BULLISH_PULLBACK_VALID", "ETHUSDT", "BULLISH", AssetStateEnum.WAITING_TRIGGER),
                 OpportunityScenario.valid("BEARISH_BREAKDOWN_VALID", "SOLUSDT", "BEARISH", AssetStateEnum.CANDIDATE),
-                OpportunityScenario.noTrade("NOISY_RANGE_NO_TRADE", "BNBUSDT", "BULLISH", "TREND_STRUCTURE_SCORE_INSUFFICIENT"),
+                OpportunityScenario.noTrade("NOISY_RANGE_NO_TRADE", "BNBUSDT", "BEARISH", "TREND_STRUCTURE_SCORE_INSUFFICIENT"),
                 OpportunityScenario.highRisk("HIGH_RISK_BLOCKED", "XRPUSDT"),
                 OpportunityScenario.conflicted("CONFLICTED_AI_OR_RULES", "DOGEUSDT")
         );

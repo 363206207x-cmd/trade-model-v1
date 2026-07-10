@@ -4,6 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
+import org.example.trademodel.derivatives.DerivativesBusinessInput;
+import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
+import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -14,6 +18,7 @@ import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorPolicy;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
@@ -55,6 +60,8 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final DecisionResultMapper decisionResultMapper;
     private final ObjectMapper objectMapper;
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
+    private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
+    private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketPriceSnapshotService marketPriceSnapshotService,
@@ -90,6 +97,13 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         this.decisionResultMapper = decisionResultMapper;
         this.objectMapper = objectMapper;
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
+    }
+
+    @Autowired(required = false)
+    void setDerivativesBusinessIntegration(DerivativesSnapshotReadPort derivativesSnapshotReadPort,
+                                           DerivativesBusinessIntegrationService derivativesBusinessIntegrationService) {
+        this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
+        this.derivativesBusinessIntegrationService = derivativesBusinessIntegrationService;
     }
 
     @Override
@@ -142,8 +156,13 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         }
         String assetSymbol = requireText(position.getAssetSymbol(), "asset_symbol");
         BigDecimal currentPrice = readCurrentPrice(assetSymbol);
+        DerivativesBusinessAssessment derivativesAssessment = readDerivativesAssessment(
+                position, side, currentPrice);
         UserPositionRiskResult risk = currentRiskOrBlocked();
         Set<String> reasons = new LinkedHashSet<>();
+        if (derivativesAssessment != null) {
+            reasons.addAll(derivativesAssessment.reasonCodes());
+        }
         if (risk.getReasonCodes().contains("RISK_CONTEXT_UNAVAILABLE")) {
             reasons.add("RISK_CONTEXT_UNAVAILABLE");
         }
@@ -151,6 +170,10 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         PlanContext planContext = resolvePlanContext(position, reasons);
         boolean riskBlocked = risk.isRiskBlocked();
         String riskLevel = riskBlocked ? "HIGH" : PositionMonitorPolicy.normalizeRiskLevel(risk.getRiskLevel());
+        if (derivativesAssessment != null && derivativesAssessment.isHighRisk()) {
+            riskLevel = "HIGH";
+            reasons.add("DERIVATIVES_RISK_REVIEW_REQUIRED");
+        }
         ExternalContextSnapshot externalContext = resolveExternalContext(assetSymbol, planContext.analysisId);
         boolean externalSourceBlocked = ExternalContextPolicy.SOURCE_HEALTH_BLOCKED.equalsIgnoreCase(
                 externalContext.getSourceHealth());
@@ -210,6 +233,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                 || planContext.sourceGateBlockedOrIncomplete;
         boolean logicWeakened = planContext.missing
                 || riskIncreased
+                || derivativesAssessment != null && derivativesAssessment.needsRevalidation()
                 || nearStopLoss
                 || "INCOMPLETE".equals(planStatus)
                 || "REVIEW_ONLY".equals(planStatus)
@@ -219,7 +243,8 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
         String logicStatus;
         String suggestedAction;
-        if (riskBlocked || externalBlocked) {
+        if (riskBlocked || externalBlocked
+                || derivativesAssessment != null && derivativesAssessment.isHighRisk()) {
             logicStatus = "HIGH_RISK";
             suggestedAction = "RISK_REVIEW";
         } else if (planInvalidated) {
@@ -281,6 +306,26 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setMonitorLogId(log.getLogId());
         result.setMonitoredAt(LocalDateTime.now());
         return result;
+    }
+
+    private DerivativesBusinessAssessment readDerivativesAssessment(UserPositionDO position, String side,
+                                                                    BigDecimal currentPrice) {
+        if (position == null || derivativesSnapshotReadPort == null
+                || derivativesBusinessIntegrationService == null) return null;
+        try {
+            ProviderCallResult<DerivativesRiskSnapshot> result = derivativesSnapshotReadPort.readCached(
+                    position.getAssetSymbol(), AssetPriority.P0_POSITION,
+                    Duration.ofSeconds(derivativesBusinessIntegrationService.monitorRefreshSeconds()),
+                    "position-monitor-derivatives-" + position.getId());
+            if (result == null || result.payload() == null) return null;
+            DerivativesBusinessInput input = new DerivativesBusinessInput(position.getAssetSymbol(), side,
+                    currentPrice, position.getEntryPrice(), false, Map.of(), true, 100, true,
+                    false, true, null, result.payload(), "POSITION_MONITOR_" + position.getId(),
+                    optionalText(position.getSourceRefId()), "POSITION_MONITOR");
+            return derivativesBusinessIntegrationService.evaluate(input);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private void validateActivePosition(UserPositionDO position) {

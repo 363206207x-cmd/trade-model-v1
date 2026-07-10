@@ -76,6 +76,21 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
                 Math.max(0, properties.getMaxRetryTimeout()), call));
     }
 
+    ProviderCallResult<T> peek(String symbol, AssetPriority priority, Duration requestedFreshTtl,
+                              String traceId) {
+        ProviderRequestKey key;
+        try {
+            String normalized = symbolMapper.map(symbol).pairSymbol();
+            key = new ProviderRequestKey(PROVIDER, datasetType, normalized, timeframe, "LATEST");
+        } catch (IllegalArgumentException invalid) {
+            return unavailable(symbol, traceId, UnifiedSourceStatus.ERROR, "COINGLASS_SYMBOL_UNSUPPORTED");
+        }
+        Duration minimum = Duration.ofSeconds(Math.max(1, properties.getEmergencyMinRefreshGapSeconds()));
+        Duration freshTtl = requestedFreshTtl == null || requestedFreshTtl.compareTo(minimum) < 0
+                ? minimum : requestedFreshTtl;
+        return coordinator.peek(key, priority, freshTtl, traceId);
+    }
+
     private ProviderCallResult<T> unavailable(String symbol, String traceId,
                                                UnifiedSourceStatus status, String reason) {
         String normalized = symbol == null || symbol.isBlank() ? "INVALID" : symbol.trim().toUpperCase();

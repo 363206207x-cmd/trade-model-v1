@@ -44,4 +44,22 @@ public class CoinGlassDerivativesSnapshotService {
                 longShortService.get(symbol, priority, ttl, traceId);
         return assembler.assemble(symbol, traceId, oi, funding, liquidation, longShort);
     }
+
+    /**
+     * Reads only coordinator cache entries. This method never invokes a CoinGlass adapter.
+     */
+    public ProviderCallResult<DerivativesRiskSnapshot> peek(
+            String symbol, AssetPriority priority, Duration freshTtl, String traceId) {
+        Duration ttl = freshTtl == null
+                ? Duration.ofSeconds(Math.max(1, properties.getFreshTtlSeconds())) : freshTtl;
+        ProviderCallResult<CoinGlassOpenInterestSnapshot> oi =
+                openInterestService.peek(symbol, priority, ttl, traceId);
+        ProviderCallResult<CoinGlassFundingSnapshot> funding =
+                fundingService.peek(symbol, priority, ttl, traceId);
+        ProviderCallResult<CoinGlassLiquidationSnapshot> liquidation =
+                liquidationService.peek(symbol, priority, ttl, traceId);
+        ProviderCallResult<CoinGlassLongShortSnapshot> longShort =
+                longShortService.peek(symbol, priority, ttl, traceId);
+        return assembler.assemble(symbol, traceId, oi, funding, liquidation, longShort);
+    }
 }

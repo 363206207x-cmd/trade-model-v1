@@ -1,8 +1,14 @@
 package org.example.trademodel.service.impl;
 
+import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.enums.RecheckStatusEnum;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.ProviderDatasetType;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
@@ -26,8 +32,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +64,8 @@ class PushRecheckServiceImplTest {
     private MarketQuoteClient marketQuoteClient;
     @Mock
     private RuleConfigContractService ruleConfigContractService;
+    @Mock
+    private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
 
     private PushRecheckServiceImpl service;
 
@@ -69,6 +79,7 @@ class PushRecheckServiceImplTest {
                 userPositionRiskAdapter,
                 org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 ruleConfigContractService);
+        service.setDerivativesSnapshotReadPort(derivativesSnapshotReadPort);
         lenient().when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         lenient().when(ruleConfigContractService.requirePushRecheckThresholds())
                 .thenReturn(new RuleConfigContractService.PushRecheckThresholds(
@@ -269,6 +280,62 @@ class PushRecheckServiceImplTest {
         assertSafeReviewOnlyResult(r);
         verifyNoInteractions(marketQuoteClient);
         verify(pushSnapshotMapper).updatePushStatus(47L, "RECHECK_REVIEW_PASSED");
+    }
+
+    @Test
+    void pushRecheckUsesSharedDerivativesSnapshot() {
+        TmPushSnapshotDO snap = baseSnap();
+        snap.setSymbol("BTCUSDT");
+        snap.setInvalidationConditionJson("{\"derivativesRequired\":true}");
+        snap.setConfusedScoreSnapshot(10);
+        when(pushSnapshotMapper.selectByPushId(470L)).thenReturn(snap);
+        when(derivativesSnapshotReadPort.readCached(any(), any(), any(), any()))
+                .thenReturn(new ProviderCallResult<>(derivatives(UnifiedSourceStatus.READY,
+                        SnapshotFreshnessStatus.FRESH, "COMPLETE"), null, null));
+
+        RecheckResult result = service.recheck(470L, new BigDecimal("100"));
+
+        assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
+        verify(derivativesSnapshotReadPort).readCached(any(), any(), any(), any());
+    }
+
+    @Test
+    void pushRecheckStaleDerivativesFailsClosed() {
+        TmPushSnapshotDO snap = baseSnap();
+        snap.setSymbol("BTCUSDT");
+        snap.setInvalidationConditionJson("{\"derivativesRequired\":true}");
+        when(pushSnapshotMapper.selectByPushId(471L)).thenReturn(snap);
+        when(derivativesSnapshotReadPort.readCached(any(), any(), any(), any()))
+                .thenReturn(new ProviderCallResult<>(derivatives(UnifiedSourceStatus.STALE,
+                        SnapshotFreshnessStatus.STALE, "COMPLETE"), null, null));
+
+        RecheckResult result = service.recheck(471L, new BigDecimal("100"));
+
+        assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        assertThat(result.isReviewPassed()).isFalse();
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("DERIVATIVES_STALE");
+        assertThat(cap.getValue().getFailReasonJson()).contains("DERIVATIVES_STALE");
+    }
+
+    private static DerivativesRiskSnapshot derivatives(UnifiedSourceStatus status,
+                                                       SnapshotFreshnessStatus freshness,
+                                                       String availability) {
+        Instant now = Instant.now();
+        List<String> datasets = List.of(
+                ProviderDatasetType.COINGLASS_OPEN_INTEREST.name(),
+                ProviderDatasetType.COINGLASS_FUNDING.name(),
+                ProviderDatasetType.COINGLASS_LIQUIDATION.name(),
+                ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO.name());
+        return new DerivativesRiskSnapshot("BTCUSDT", "COINGLASS_V4", now, now, now.plusSeconds(60),
+                new BigDecimal("100000000"), null, new BigDecimal("0.05"), new BigDecimal("0.05"), null,
+                new BigDecimal("0.0001"), null, BigDecimal.ONE, "GLOBAL_ACCOUNT",
+                null, new BigDecimal("1000"), null, null,
+                null, new BigDecimal("1000"), null, null,
+                null, new BigDecimal("20"), datasets, List.of(), List.of(), status, freshness,
+                availability, List.of(), "trace-push-derivatives", Map.of(), null);
     }
 
     @Test

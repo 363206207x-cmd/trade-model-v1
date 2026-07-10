@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: CG-1 CoinGlass v4 Provider Adapter and Normalized Derivatives Snapshot
-Next Business Phase: BIZ-1 derivatives business-rule adoption after CG-1 is merged/effective and separately scoped
-Next Business Phase Allowed: NO on the unmerged CG-1 branch; NO for production deployment
+Current Work Package: BIZ-1 CoinGlass Derivatives Business Integration
+Next Business Phase: post-BIZ-1 alignment review after this implementation is merged/effective
+Next Business Phase Allowed: NO on the unmerged BIZ-1 branch; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -86,9 +86,30 @@ Next recommendation after P4: provide a provenance-backed real fixture through o
 
 ---
 
+## BIZ-1 CoinGlass Derivatives Business Integration
+
+BIZ-1 is implemented on the current branch and remains pending merge/effective review. It consumes only the shared cached CG-1 snapshot and makes zero live provider calls.
+
+Current BIZ-1 status:
+
+1. OI, Funding, liquidation, crowding, concentration, partial, stale, and unavailable states become source-traced evidence without converting missing values to zero.
+2. Derivatives inputs contribute bounded deltas to all eight scores; the complete eight-score set contributes a capped `-10..+10` decision-score adjustment.
+3. The formal direction remains 4h-owned; 5m/15m/1h/4h require at least three aligned timeframes and 4h/1h agreement.
+4. CoinGlass can confirm, downgrade, raise risk, block confirm, or request manual review. It cannot independently flip direction.
+5. Asset state, internal Push/Recheck, execution-plan readiness, manual-position monitor reasons, Confused inputs, Hot Reset candidate input, and Dashboard Home use the same cached assessment.
+6. Plan price boundaries remain OHLCV-owned. UserPosition creation/status mutation, external Push/Telegram send, order execution, and auto-trading are absent.
+7. Nineteen derivatives rule defaults are aligned between H2 bootstrap and PostgreSQL Flyway V6.
+8. Deterministic focused coverage exceeds forty BIZ-1 scenarios; full-suite and delivery validation remain required before draft PR handoff.
+9. Real CoinGlass live smoke is not run and live provider calls are zero.
+10. Production readiness remains BLOCKED and production deployment cannot proceed.
+
+Detailed contract: `docs/COINGLASS_DERIVATIVES_BUSINESS_INTEGRATION.md`.
+
+---
+
 ## CG-1 CoinGlass v4 Provider Adapter
 
-CG-1 is the current provider-adapter package. It implements only the source, normalization, cache, rate-budget, health, and trace boundary for CoinGlass v4.
+CG-1 is merged/effective on main by PR #1112. It implements the source, normalization, cache, rate-budget, health, and trace boundary for CoinGlass v4.
 
 Current CG-1 status:
 
@@ -97,8 +118,8 @@ Current CG-1 status:
 3. `DefaultProviderDatasetRefreshPort` routes aggregate derivatives refresh through `CoinGlassDerivativesSnapshotService` and `ProviderCallCoordinator`.
 4. Partial data is `DEGRADED`; missing values remain null; stale time remains `STALE`; disabled/missing-key states make no transport call.
 5. CoinGlass and external calls remain default-off. No key is present in the current environment, so live smoke is `SKIPPED` and live calls are zero.
-6. The normalized snapshot does not change score, decision, Confused state, ExecutionPlan, Position Monitor advice, Push text, or UserPosition.
-7. BIZ-1 remains `NOT_STARTED` until CG-1 is merged/effective and separately authorized.
+6. The normalized snapshot itself remains judgment-free; BIZ-1 owns downstream business interpretation.
+7. BIZ-1 is now separately implemented on its own branch and does not change CG-1 provider-call safety.
 8. Production readiness remains BLOCKED and production deployment cannot proceed.
 
 ---

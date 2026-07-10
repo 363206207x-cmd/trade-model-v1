@@ -10,12 +10,19 @@ import org.example.trademodel.ai.AiReviewConflictLevel;
 import org.example.trademodel.ai.AiReviewStance;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
+import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserConfigDO;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.ProviderDatasetType;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
@@ -39,11 +46,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -80,6 +90,8 @@ class DashboardHomeServiceImplTest {
     private ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     @Mock
     private ProviderReadinessService providerReadinessService;
+    @Mock
+    private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
 
     private DashboardHomeServiceImpl service;
     private final AiRoleResultsCodec aiRoleResultsCodec = new AiRoleResultsCodec(new ObjectMapper());
@@ -238,6 +250,24 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSafety().getNotTradeInstruction()).isTrue();
         assertThat(home.getSafety().getNotAutoTrading()).isTrue();
         assertThat(home.getSafety().getNotOrderExecution()).isTrue();
+    }
+
+    @Test
+    void homeUsesSharedCoinGlassSnapshotForBusinessSummaryWithoutRawDirectionSignal() {
+        service.setDerivativesBusinessIntegration(derivativesSnapshotReadPort,
+                new DerivativesBusinessIntegrationService(null));
+        when(derivativesSnapshotReadPort.readCached(any(), any(), any(), any()))
+                .thenReturn(new ProviderCallResult<>(dashboardDerivativesSnapshot(), null, null));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getDerivatives().getStatus()).isEqualTo("正常");
+        assertThat(home.getDerivatives().getOpenInterestStructure()).isEqualTo("增加");
+        assertThat(home.getDerivatives().getFundingRisk()).isEqualTo("正常");
+        assertThat(home.getDerivatives().getLiquidationRisk()).isEqualTo("正常");
+        assertThat(home.getDerivatives().getSource()).isEqualTo("CoinGlass v4");
+        assertThat(home.getDerivatives().getDecisionImpact()).isIn("确认", "降级", "风险阻断");
+        assertThat(home.getDerivatives().getDecisionImpact()).doesNotContain("做多", "做空");
     }
 
     @Test
@@ -996,6 +1026,23 @@ class DashboardHomeServiceImplTest {
             assertThat(tab.getCounterEvidence()).isEmpty();
             assertThat(tab.getChallengeConclusion()).isNull();
         });
+    }
+
+    private DerivativesRiskSnapshot dashboardDerivativesSnapshot() {
+        Instant now = Instant.now();
+        List<String> datasets = List.of(
+                ProviderDatasetType.COINGLASS_OPEN_INTEREST.name(),
+                ProviderDatasetType.COINGLASS_FUNDING.name(),
+                ProviderDatasetType.COINGLASS_LIQUIDATION.name(),
+                ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO.name());
+        return new DerivativesRiskSnapshot("BTCUSDT", "COINGLASS_V4", now, now, now.plusSeconds(60),
+                new BigDecimal("100000000"), null, new BigDecimal("0.05"), new BigDecimal("0.05"), null,
+                new BigDecimal("0.0001"), null, BigDecimal.ONE, "GLOBAL_ACCOUNT",
+                null, new BigDecimal("1000"), null, null,
+                null, new BigDecimal("1000"), null, null,
+                null, new BigDecimal("20"), datasets, List.of(), List.of(), UnifiedSourceStatus.READY,
+                SnapshotFreshnessStatus.FRESH, "COMPLETE", List.of(), "trace-dashboard-derivatives",
+                Map.of(), null);
     }
 
 }

@@ -89,7 +89,7 @@ Local bounded execution on 2026-07-10 completed with exit code 0 and Testcontain
 ## Remaining Boundaries
 
 - CoinGlass v4 source/normalization is implemented default-off in CG-1; live authenticated evidence is skipped because no key is present.
-- CoinGlass values are not wired into score, decision, Confused, plan, monitor advice, or Push; BIZ-1 remains not started.
+- BIZ-1 downstream adoption is implemented pending merge: shared cached CoinGlass values feed bounded evidence/score/decision/state/plan/monitor/internal-Push semantics without creating a second provider call path or trading action.
 - External context provider refresh remains not configured.
 - Live provider calls and production deployment evidence are outside this local test package.
 - Production readiness remains `BLOCKED`.
