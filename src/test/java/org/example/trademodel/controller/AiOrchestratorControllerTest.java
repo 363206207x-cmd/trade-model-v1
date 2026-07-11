@@ -40,7 +40,12 @@ class AiOrchestratorControllerTest {
         mvc.perform(get("/api/ai/orchestrator/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providers[0].provider").value("OPENAI"))
-                .andExpect(jsonPath("$.providers[0].ready").value(true))
+                .andExpect(jsonPath("$.providers[0].ready").value(false))
+                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_AVAILABLE_UNKNOWN"))
+                .andExpect(jsonPath("$.providers[0].configuredModel").value("gpt-status"))
+                .andExpect(jsonPath("$.providers[0].effectiveModel").value("gpt-status"))
+                .andExpect(jsonPath("$.providers[0].fallbackUsed").value(false))
+                .andExpect(jsonPath("$.modelStrategy.GPT_FINAL").value("QUALITY_FIRST"))
                 .andExpect(content().string(not(containsString("sk-status-secret"))))
                 .andExpect(content().string(not(containsString("https://secret-base.test"))));
     }
@@ -87,7 +92,10 @@ class AiOrchestratorControllerTest {
         @Override public AiProviderName provider() { return AiProviderName.OPENAI; }
         @Override public AiProviderRole role() { return AiProviderRole.GPT_RULE_REVIEW; }
         @Override public AiProviderReadiness readiness() {
-            return new AiProviderReadiness(provider(), role(), true, true, true, properties.getModel(), List.of());
+            return new AiProviderReadiness(provider(), role(), true, true, false,
+                    properties.getConfiguredModel(), properties.getEffectiveModel(), false, null,
+                    org.example.trademodel.ai.AiModelReadinessStatus.MODEL_AVAILABLE_UNKNOWN,
+                    List.of("MODEL_AVAILABILITY_UNVERIFIED"));
         }
         @Override public AiProviderReviewResult review(AiProviderRequest request) { return null; }
         @Override public AiProviderProperties providerProperties() { return properties; }

@@ -87,7 +87,7 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setTraceId(safe(request.getTraceId(), 64));
         log.setRequestId("ai-req-" + UUID.randomUUID());
         log.setProviderName(client.provider().name());
-        log.setModelName(safe(client.providerProperties().getModel(), 128));
+        log.setModelName(safe(client.providerProperties().getEffectiveModel(), 128));
         log.setAiRole(client.role().name());
         log.setStartedAt(now);
         log.setReservedCostUsd(reservedCostUsd == null ? BigDecimal.ZERO : reservedCostUsd);

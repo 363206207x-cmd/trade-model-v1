@@ -46,7 +46,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         )));
         body.put("generationConfig", Map.of("maxOutputTokens", maxOutputTokens(), "temperature", 0));
 
-        String model = URLEncoder.encode(providerProperties().getModel(), StandardCharsets.UTF_8);
+        String model = URLEncoder.encode(providerProperties().getEffectiveModel(), StandardCharsets.UTF_8);
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(),
                 "/v1beta/models/" + model + ":generateContent"), json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();

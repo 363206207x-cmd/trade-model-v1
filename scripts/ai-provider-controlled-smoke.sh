@@ -29,7 +29,7 @@ fi
 
 case "${target}" in
   OPENAI)
-    model="${TRADE_MODEL_AI_OPENAI_MODEL:-gpt-4.1-mini}"
+    model="${TRADE_MODEL_AI_OPENAI_MODEL:-gpt-5.6-sol}"
     provider_enabled="${TRADE_MODEL_AI_OPENAI_ENABLED:-false}"
     ;;
   GEMINI)

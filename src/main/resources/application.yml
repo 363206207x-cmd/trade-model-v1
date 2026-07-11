@@ -150,10 +150,20 @@ trade-model:
     max-output-tokens: ${TRADE_MODEL_AI_MAX_OUTPUT_TOKENS:500}
     daily-budget-usd: ${TRADE_MODEL_AI_DAILY_BUDGET_USD:0}
     per-analysis-budget-usd: ${TRADE_MODEL_AI_PER_ANALYSIS_BUDGET_USD:0}
+    model-strategy:
+      gpt-final:
+        priority: ${TRADE_MODEL_AI_GPT_FINAL_PRIORITY:QUALITY_FIRST}
+      gemini-review:
+        priority: ${TRADE_MODEL_AI_GEMINI_REVIEW_PRIORITY:BALANCED}
+      grok-challenge:
+        priority: ${TRADE_MODEL_AI_GROK_CHALLENGE_PRIORITY:CHALLENGE_FIRST}
     openai:
       enabled: ${TRADE_MODEL_AI_OPENAI_ENABLED:false}
       api-key: ${OPENAI_API_KEY:}
-      model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-4.1-mini}
+      model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-5.6-sol}
+      compatibility-fallback-active: ${TRADE_MODEL_AI_OPENAI_COMPATIBILITY_FALLBACK_ACTIVE:false}
+      compatibility-fallback-model: gpt-4.1-mini
+      fallback-reason: OPENAI_MODEL_FALLBACK_COMPATIBILITY
       base-url: ${TRADE_MODEL_AI_OPENAI_BASE_URL:https://api.openai.com}
       requests-per-minute: ${TRADE_MODEL_AI_OPENAI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_INPUT_COST_PER_MILLION_USD:0}

@@ -37,11 +37,16 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
     @Override
     protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", providerProperties().getModel());
+        String effectiveModel = providerProperties().getEffectiveModel();
+        body.put("model", effectiveModel);
         body.put("instructions", AiPromptBuilder.SYSTEM_INSTRUCTION);
         body.put("input", List.of(Map.of("role", "user", "content", promptJson)));
         body.put("max_output_tokens", maxOutputTokens());
-        body.put("temperature", 0);
+        if (effectiveModel.startsWith("gpt-5.")) {
+            body.put("reasoning", Map.of("effort", "high"));
+        } else {
+            body.put("temperature", 0);
+        }
 
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"),
                 json(body), timeoutOverrideMs);

@@ -16,7 +16,9 @@ This package aligns current model and HTTP contracts and adds a single-provider,
 
 Only first-party documentation was used:
 
-- OpenAI GPT-4.1 mini: <https://developers.openai.com/api/docs/models/gpt-4.1-mini>
+- OpenAI current model catalog: <https://developers.openai.com/api/docs/models>
+- OpenAI GPT-5.6 guide: <https://developers.openai.com/api/docs/guides/latest-model>
+- OpenAI GPT-4.1 mini compatibility fallback: <https://developers.openai.com/api/docs/models/gpt-4.1-mini>
 - OpenAI Responses create: <https://developers.openai.com/api/reference/resources/responses/methods/create>
 - OpenAI API errors: <https://developers.openai.com/api/docs/guides/error-codes>
 - OpenAI request IDs: <https://platform.openai.com/docs/api-reference/debugging-requests>
@@ -43,7 +45,7 @@ The parser accepts only the review-only schema. It rejects direction overrides, 
 
 | Provider | Official current contract | Assessment | Required change |
 |---|---|---|---|
-| OpenAI | gpt-4.1-mini remains listed and supports POST /v1/responses | Compatible | Keep model and endpoint; prefer x-request-id with response ID fallback |
+| OpenAI | gpt-5.6-sol is the current flagship for complex reasoning; GPT-4.1 mini remains a compatibility option | Quality gap | Change GPT_FINAL default to gpt-5.6-sol; retain explicit, visible compatibility fallback only |
 | Gemini | Gemini 1.5 Flash was shut down; gemini-3.5-flash is stable GA | Previous default unusable | Change default model; retain generateContent mapping |
 | xAI | grok-4.5 supports Responses and Chat; xAI recommends Responses and labels Chat deprecated | Endpoint deprecation risk | Change default model and migrate to POST /v1/responses |
 
@@ -51,19 +53,40 @@ The parser accepts only the review-only schema. It rejects direction overrides, 
 
 ### Current implementation
 
-The client uses gpt-4.1-mini, POST /v1/responses, Bearer authentication, model, instructions, input, max_output_tokens, and temperature.
+The previous default used gpt-4.1-mini with POST /v1/responses, Bearer authentication, model, instructions, input, max_output_tokens, and temperature.
 
 ### Official current contract
 
-GPT-4.1 mini is still official, not marked preview or deprecated, and supports Responses. Temperature zero is within the documented 0 through 2 range. Response text is read from output_text with output content fallback. Usage maps input_tokens, output_tokens, and total_tokens.
+The current OpenAI model catalog identifies gpt-5.6-sol, with alias gpt-5.6, as the flagship model for complex reasoning and coding. It supports Responses and configurable reasoning effort through max. GPT-4.1 mini remains available as a compatibility fallback, but it is no longer the quality-first default for final adjudication.
 
 ### Required change
 
-No model or endpoint change. Request-ID mapping now prefers the official x-request-id header, with response id as a presence fallback.
+GPT_FINAL defaults to gpt-5.6-sol through TRADE_MODEL_AI_OPENAI_MODEL. The client keeps POST /v1/responses and uses high reasoning effort for GPT-5 family models. Request-ID mapping prefers x-request-id, with response id as a presence fallback.
 
 ### No change reason
 
-The current model remains a stable bounded-cost review option. Environment override through TRADE_MODEL_AI_OPENAI_MODEL is preserved.
+An operator may activate the gpt-4.1-mini compatibility fallback only after primary-model unavailability is established by setting TRADE_MODEL_AI_OPENAI_COMPATIBILITY_FALLBACK_ACTIVE=true. The configured model remains visible, the effective model changes explicitly, fallbackUsed becomes true, and fallbackReason is OPENAI_MODEL_FALLBACK_COMPATIBILITY. No automatic retry or silent downgrade occurs.
+
+## AI Role Model Strategy
+
+AI is checkpoint-driven rather than a high-frequency chat surface. Model selection therefore follows role responsibility instead of applying one low-cost assumption to every provider.
+
+| Role | Provider default | Priority | Responsibility |
+|---|---|---|---|
+| GPT_FINAL | gpt-5.6-sol | QUALITY_FIRST | Final adjudication, instruction following, and conflict resolution |
+| GEMINI_REVIEW | gemini-3.5-flash | BALANCED | Low-latency consistency review and structured-output checking |
+| GROK_CHALLENGE | grok-4.5 | ADVERSARIAL_CHALLENGE | Contradiction detection and counter-challenge generation |
+
+The configuration keys are trade-model.ai.model-strategy.gpt-final.priority, gemini-review.priority, and grok-challenge.priority. Provider status exposes configuredModel, effectiveModel, fallbackUsed, and fallbackReason without exposing API keys.
+
+Model readiness is separate from credential presence:
+
+- MODEL_CONFIGURED: a model is selected while the provider remains disabled.
+- MODEL_AVAILABLE_UNKNOWN: provider and model configuration exist, but no live availability proof exists.
+- MODEL_FALLBACK_ACTIVE: the explicit OpenAI compatibility fallback is active.
+- MODEL_NOT_CONFIGURED: the primary model is blank or the fallback selection is invalid.
+
+The status endpoint does not report ready=true merely because an API key and model are configured. Missing or malformed model selection fails closed.
 
 ## Gemini Decision
 
@@ -215,7 +238,7 @@ It does not prove all providers work, sustained availability, cost safety, sched
 
 ## Test Evidence
 
-Fake transport tests cover all three contracts, one-request enforcement, no retry, gate skips, invalid targets, 401, 403, billing, 404, 429, timeout, IO, malformed JSON, missing text, missing usage, missing request ID, redaction, default script behavior, scheduler switches, default-disabled configuration, role safety flags, and Dashboard role labels.
+Fake transport tests cover all three contracts, the quality-first GPT default, explicit compatibility fallback and reason code, model-readiness states, missing-model fail-closed behavior, Gemini retirement avoidance, xAI Responses usage, one-request enforcement, no retry, gate skips, invalid targets, 401, 403, billing, 404, 429, timeout, IO, malformed JSON, missing text, missing usage, missing request ID, redaction, default script behavior, scheduler switches, default-disabled configuration, rule-direction preservation, record-creation boundaries, and Dashboard role labels.
 
 No fake transport test is live-provider evidence.
 

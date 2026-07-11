@@ -220,9 +220,12 @@ class AiProviderControlledSmokeTest {
                 "enabled: ${TRADE_MODEL_AI_XAI_ENABLED:false}",
                 "daily-budget-usd: ${TRADE_MODEL_AI_DAILY_BUDGET_USD:0}",
                 "per-analysis-budget-usd: ${TRADE_MODEL_AI_PER_ANALYSIS_BUDGET_USD:0}",
-                "model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-4.1-mini}",
+                "model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-5.6-sol}",
                 "model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}",
-                "model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}");
+                "model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}",
+                "priority: ${TRADE_MODEL_AI_GPT_FINAL_PRIORITY:QUALITY_FIRST}",
+                "priority: ${TRADE_MODEL_AI_GEMINI_REVIEW_PRIORITY:BALANCED}",
+                "priority: ${TRADE_MODEL_AI_GROK_CHALLENGE_PRIORITY:CHALLENGE_FIRST}");
 
         AiOrchestratorResult safety = new AiOrchestratorResult();
         assertThat(safety.isReviewOnly()).isTrue();

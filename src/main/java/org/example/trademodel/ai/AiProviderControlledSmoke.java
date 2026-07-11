@@ -172,7 +172,7 @@ public class AiProviderControlledSmoke {
             return configured;
         }
         return switch (provider) {
-            case OPENAI -> "gpt-4.1-mini";
+            case OPENAI -> "gpt-5.6-sol";
             case GEMINI -> "gemini-3.5-flash";
             case XAI -> "grok-4.5";
         };

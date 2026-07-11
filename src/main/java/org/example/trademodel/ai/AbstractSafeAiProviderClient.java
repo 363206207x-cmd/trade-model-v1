@@ -35,16 +35,45 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         AiProviderProperties providerProperties = providerProperties();
         boolean enabled = providerProperties.isEnabled();
         boolean configured = providerProperties.hasKeyAndModel() && !blank(providerProperties.getBaseUrl());
+        String configuredModel = providerProperties.getConfiguredModel();
+        String effectiveModel = providerProperties.getEffectiveModel();
+        boolean fallbackUsed = providerProperties.isFallbackUsed();
+        String fallbackReason = providerProperties.getFallbackReason();
+        AiModelReadinessStatus modelStatus;
+        if (!providerProperties.hasValidModelSelection()) {
+            modelStatus = AiModelReadinessStatus.MODEL_NOT_CONFIGURED;
+        } else if (fallbackUsed) {
+            modelStatus = AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE;
+        } else if (enabled && configured) {
+            modelStatus = AiModelReadinessStatus.MODEL_AVAILABLE_UNKNOWN;
+        } else {
+            modelStatus = AiModelReadinessStatus.MODEL_CONFIGURED;
+        }
         if (!enabled) {
-            return new AiProviderReadiness(provider(), role(), false, configured, false,
-                    providerProperties.getModel(), List.of("PROVIDER_DISABLED"));
+            return readiness(false, configured, configuredModel, effectiveModel, fallbackUsed,
+                    fallbackReason, modelStatus, List.of("PROVIDER_DISABLED"));
         }
         if (!configured) {
-            return new AiProviderReadiness(provider(), role(), true, false, false,
-                    providerProperties.getModel(), List.of("PROVIDER_NOT_CONFIGURED"));
+            String reason = providerProperties.hasValidModelSelection()
+                    ? "PROVIDER_NOT_CONFIGURED" : "MODEL_NOT_CONFIGURED";
+            return readiness(true, false, configuredModel, effectiveModel, fallbackUsed,
+                    fallbackReason, modelStatus, List.of(reason));
         }
-        return new AiProviderReadiness(provider(), role(), true, true, true,
-                providerProperties.getModel(), List.of());
+        List<String> reasons = fallbackUsed
+                ? List.of(AiProviderProperties.OPENAI_COMPATIBILITY_FALLBACK_REASON)
+                : List.of("MODEL_AVAILABILITY_UNVERIFIED");
+        return readiness(true, true, configuredModel, effectiveModel, fallbackUsed,
+                fallbackReason, modelStatus, reasons);
+    }
+
+    private AiProviderReadiness readiness(boolean enabled, boolean configured,
+                                          String configuredModel, String effectiveModel,
+                                          boolean fallbackUsed, String fallbackReason,
+                                          AiModelReadinessStatus modelStatus,
+                                          List<String> reasonCodes) {
+        return new AiProviderReadiness(provider(), role(), enabled, configured, false,
+                configuredModel, effectiveModel, fallbackUsed, fallbackReason,
+                modelStatus, reasonCodes);
     }
 
     @Override
