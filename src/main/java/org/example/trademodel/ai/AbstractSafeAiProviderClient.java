@@ -1,5 +1,6 @@
 package org.example.trademodel.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -59,13 +60,19 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
             AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs);
             AiHttpResponse response = transport.post(httpRequest);
             long latencyMs = elapsedMs(started);
-            if (response.getStatusCode() == 429) {
-                return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
-            }
             if (response.getStatusCode() == 401 || response.getStatusCode() == 403) {
                 return failure(AiProviderCallStatus.FAILED, "PROVIDER_AUTH_FAILURE", latencyMs);
             }
+            if (response.getStatusCode() == 404) {
+                return failure(AiProviderCallStatus.FAILED, "PROVIDER_MODEL_NOT_FOUND", latencyMs);
+            }
+            if (response.getStatusCode() == 429) {
+                return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
+            }
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+                if (isBillingOrCreditsFailure(response.getBody())) {
+                    return failure(AiProviderCallStatus.FAILED, "PROVIDER_BILLING_OR_CREDITS", latencyMs);
+                }
                 return failure(AiProviderCallStatus.FAILED, "PROVIDER_HTTP_" + response.getStatusCode(), latencyMs);
             }
 
@@ -82,6 +89,8 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                 result.setReasonCodes(appendReason(result.getReasonCodes(), "PROMPT_TRUNCATED"));
             }
             return result;
+        } catch (JsonProcessingException e) {
+            return failure(AiProviderCallStatus.INVALID_RESPONSE, "PROVIDER_RESPONSE_SCHEMA", elapsedMs(started));
         } catch (HttpTimeoutException e) {
             return timeout(started);
         } catch (InterruptedException e) {
@@ -193,6 +202,18 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         java.util.ArrayList<String> copy = new java.util.ArrayList<>(reasonCodes == null ? List.of() : reasonCodes);
         copy.add(code);
         return copy;
+    }
+
+    private static boolean isBillingOrCreditsFailure(String body) {
+        if (body == null || body.isBlank()) {
+            return false;
+        }
+        String normalized = body.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("insufficient_quota")
+                || normalized.contains("insufficient credit")
+                || normalized.contains("credit balance")
+                || normalized.contains("billing")
+                || normalized.contains("payment_required");
     }
 
     protected record ProviderPayload(String content, String providerRequestId,

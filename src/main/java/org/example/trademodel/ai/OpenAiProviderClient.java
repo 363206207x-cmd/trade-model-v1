@@ -75,7 +75,11 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
             }
         }
         JsonNode usage = root.path("usage");
-        return new ProviderPayload(content, text(root, "id"),
+        String requestId = response.firstHeader("x-request-id");
+        if (blank(requestId)) {
+            requestId = text(root, "id");
+        }
+        return new ProviderPayload(content, requestId,
                 longValue(usage, "input_tokens"),
                 longValue(usage, "output_tokens"),
                 longValue(usage, "total_tokens"));

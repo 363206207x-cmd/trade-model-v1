@@ -161,7 +161,7 @@ trade-model:
     gemini:
       enabled: ${TRADE_MODEL_AI_GEMINI_ENABLED:false}
       api-key: ${GEMINI_API_KEY:}
-      model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-1.5-flash}
+      model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}
       base-url: ${TRADE_MODEL_AI_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
       requests-per-minute: ${TRADE_MODEL_AI_GEMINI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_INPUT_COST_PER_MILLION_USD:0}
@@ -169,7 +169,7 @@ trade-model:
     xai:
       enabled: ${TRADE_MODEL_AI_XAI_ENABLED:false}
       api-key: ${XAI_API_KEY:}
-      model: ${TRADE_MODEL_AI_XAI_MODEL:grok-3-mini}
+      model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}
       base-url: ${TRADE_MODEL_AI_XAI_BASE_URL:https://api.x.ai}
       requests-per-minute: ${TRADE_MODEL_AI_XAI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_XAI_INPUT_COST_PER_MILLION_USD:0}
