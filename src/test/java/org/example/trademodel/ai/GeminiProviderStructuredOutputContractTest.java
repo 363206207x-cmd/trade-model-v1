@@ -51,6 +51,33 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
+    void nestedResultFragmentIsNormalizedBeforeStrictParser() throws Exception {
+        AiProviderReviewResult result = review(response("{\"result\":" + reviewJson() + "}"));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getReasonCodes()).containsExactly("SCHEMA_OK");
+    }
+
+    @Test
+    void nestedAnalysisFragmentIsNormalizedBeforeStrictParser() throws Exception {
+        AiProviderReviewResult result = review(response("{\"analysis\":" + reviewJson() + "}"));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getStance()).isEqualTo(AiReviewStance.ABSTAIN);
+    }
+
+    @Test
+    void deterministicSnakeCaseFieldNamesAreNormalized() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"analysis":{"stance":"ABSTAIN","conflict_level":"NONE",
+                 "reason_codes":["SCHEMA_OK"],"summary":"review only"}}
+                """));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getConflictLevel()).isEqualTo(AiReviewConflictLevel.NONE);
+    }
+
+    @Test
     void missingCandidatesFailsClosed() throws Exception {
         assertInvalid("{}", "INVALID_EMPTY_RESPONSE");
     }
@@ -79,7 +106,7 @@ class GeminiProviderStructuredOutputContractTest {
     @Test
     void naturalLanguagePlusJsonFailsClosed() throws Exception {
         assertInvalid(response("Here is the result: " + reviewJson()).getBody(),
-                "INVALID_RESPONSE_PARSE");
+                "INVALID_EMPTY_RESPONSE");
     }
 
     @Test
@@ -116,6 +143,29 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(result.getErrorCode()).isEqualTo("INVALID_FIELD_TYPE_REASONCODES");
         assertThat(result.getSchemaDiagnostic().typeMismatchFields())
                 .containsExactly("reasonCodes expected ARRAY got STRING");
+    }
+
+    @Test
+    void nestedTradingInstructionFieldFailsClosed() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"result":{"stance":"ABSTAIN","conflictLevel":"NONE",
+                 "reasonCodes":["SCHEMA_GAP"],"summary":"review only","orderAction":"BUY"}}
+                """));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_ORDERACTION");
+    }
+
+    @Test
+    void nestedUnknownUnsafeFieldFailsClosedWithoutSilentRemoval() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"analysis":{"stance":"ABSTAIN","conflictLevel":"NONE",
+                 "reasonCodes":["SCHEMA_GAP"],"summary":"review only",
+                 "providerPayload":{"private":"value"}}}
+                """));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_PROVIDERPAYLOAD");
     }
 
     @Test

@@ -226,6 +226,12 @@ When a Gemini 2xx response fails the strict role-result parser, the harness may 
 
 The diagnostic compares the candidate object with the exact V1 role fragment: required string fields `stance`, `conflictLevel`, and `summary`, plus required `reasonCodes` as an array of strings. Unknown fields, missing fields, wrong types, Markdown wrappers, and natural-language wrappers remain hard failures. The parser performs no extraction from prose and no automatic repair.
 
+### Gemini provider normalization layer
+
+Gemini candidate text passes through `GeminiRoleResultNormalizer` before the common V1 role-result parser. The normalizer accepts a direct role fragment or one deterministic single-object wrapper named `result` or `analysis`. It also maps only the explicit field aliases `conflict_level` to `conflictLevel` and `reason_codes` to `reasonCodes`; values are never inferred or filled.
+
+Successful normalization emits only `stance`, `conflictLevel`, `reasonCodes`, and `summary`, then the unchanged common parser validates required fields, types, enum values, forbidden fields, and forbidden instruction text. Missing fields, wrong types, duplicate aliases, extra fields, unsafe trading fields, Markdown, natural-language wrappers, multiple JSON values, and malformed JSON fail closed. Unknown fields are never silently discarded, and no response repair or intent guessing is performed. OpenAI and xAI response paths are unchanged.
+
 `AI_HTTP_STATUS_CLASS` reports `TIMEOUT` when no HTTP response arrives because the request timed out. Otherwise it reports `1XX` through `5XX` for an HTTP response, or `NOT_AVAILABLE` when no status exists for another reason. `AI_ERROR_CATEGORY` is blank for success/skip and otherwise is one of `TIMEOUT`, `AUTH`, `MODEL_NOT_FOUND`, `RATE_LIMIT`, `PROVIDER_ERROR`, or `RESPONSE_SCHEMA`.
 
 For Gemini non-2xx responses, the controlled smoke uses narrower categories: `INVALID_REQUEST`, `SCHEMA_UNSUPPORTED`, `MODEL_CAPABILITY_ERROR`, `AUTH`, `RATE_LIMIT`, `PROVIDER_INTERNAL_ERROR`, or `UNKNOWN_PROVIDER_ERROR`. `AI_PROVIDER_ERROR_REASON` is an allowlisted enum such as `GEMINI_HTTP_400_INVALID_REQUEST`, `GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED`, or `GEMINI_HTTP_5XX_INTERNAL`. The classifier may inspect the standard error status/message in memory for a 400 response, but it never retains or emits that text. Raw response bodies, prompts, headers, request IDs, and credentials remain excluded.

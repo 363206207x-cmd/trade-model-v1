@@ -105,7 +105,9 @@ public class AiProviderControlledSmoke {
                 return client.httpFailure(response, latencyMs);
             }
 
-            var payload = client.extractPayload(response);
+            var payload = mode == GeminiDiagnosticMode.C
+                    ? client.extractPayload(response)
+                    : client.extractDiagnosticPayload(response);
             AiProviderReviewResult result = switch (mode) {
                 case A -> plainTextDiagnostic(payload.content(), latencyMs);
                 case B -> jsonMimeDiagnostic(payload.content(), latencyMs);

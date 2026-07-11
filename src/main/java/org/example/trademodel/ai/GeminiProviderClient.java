@@ -22,6 +22,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
 
     private final AiOrchestratorProperties properties;
     private final ObjectMapper objectMapper;
+    private final GeminiRoleResultNormalizer roleResultNormalizer;
 
     public GeminiProviderClient(AiOrchestratorProperties properties,
                                 AiHttpTransport transport,
@@ -29,6 +30,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         super(properties, transport, objectMapper);
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.roleResultNormalizer = new GeminiRoleResultNormalizer(objectMapper);
     }
 
     @Override
@@ -73,6 +75,14 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
 
     @Override
     protected ProviderPayload extractPayload(AiHttpResponse response) throws Exception {
+        return extractPayload(response, true);
+    }
+
+    ProviderPayload extractDiagnosticPayload(AiHttpResponse response) throws Exception {
+        return extractPayload(response, false);
+    }
+
+    private ProviderPayload extractPayload(AiHttpResponse response, boolean normalizeRoleResult) throws Exception {
         JsonNode root = readTree(response.getBody());
         String content = null;
         JsonNode candidates = root.path("candidates");
@@ -84,6 +94,9 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         }
         if (!blank(content) && content.contains("```")) {
             content = null;
+        }
+        if (normalizeRoleResult && !blank(content)) {
+            content = roleResultNormalizer.normalize(content);
         }
         JsonNode usage = root.path("usageMetadata");
         String requestId = text(root, "responseId");
