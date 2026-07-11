@@ -37,7 +37,8 @@ public record AiProviderControlledSmokeResult(
                     "TEXT_NODE_PRESENT: " + yesNo(extractionDiagnostic.textNodePresent()),
                     "TEXT_LENGTH: " + Math.max(0, extractionDiagnostic.textLength()),
                     "EMPTY_TEXT: " + yesNo(extractionDiagnostic.emptyText()),
-                    "EXTRACTED_JSON_PARSE_STATUS: " + extractionDiagnostic.jsonParseStatus()));
+                    "EXTRACTED_JSON_PARSE_STATUS: " + extractionDiagnostic.jsonParseStatus(),
+                    "GEMINI_OUTPUT_CLASS: " + extractionDiagnostic.outputClass().name()));
             return List.copyOf(lines);
         }
         if (geminiResponseShapeDiagnostic != null) {

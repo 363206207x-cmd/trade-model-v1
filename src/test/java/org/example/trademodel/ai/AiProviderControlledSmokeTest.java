@@ -457,6 +457,19 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
+    void geminiRefusalClassificationExposesOnlyTheAllowedEnum() throws Exception {
+        String refusalText = "I cannot comply with PRIVATE_REFUSAL_DETAIL.";
+        FakeTransport transport = FakeTransport.responding(geminiResponseWithText(refusalText));
+
+        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+        String output = String.join("\n", result.sanitizedOutputLines());
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
+        assertThat(output).contains("GEMINI_OUTPUT_CLASS: REFUSAL_PATTERN");
+        assertThat(output).doesNotContain(refusalText, "PRIVATE_REFUSAL_DETAIL", "I cannot comply");
+    }
+
+    @Test
     void geminiExtractionDiagnosticExposesOnlyStructuralMetadata() throws Exception {
         String providerText = "{\"stance\":\"ABSTAIN\","
                 + "\"reasonCodes\":\"PRIVATE_REASON_VALUE\","
@@ -487,6 +500,7 @@ class AiProviderControlledSmokeTest {
                 "private-response-id",
                 "test-gemini-key",
                 "x-goog-api-key");
+        assertThat(output).contains("GEMINI_OUTPUT_CLASS: VALID_JSON_OBJECT");
     }
 
     @Test
@@ -602,6 +616,7 @@ class AiProviderControlledSmokeTest {
                 "TEXT_LENGTH",
                 "EMPTY_TEXT",
                 "EXTRACTED_JSON_PARSE_STATUS");
+        assertThat(script).contains("GEMINI_OUTPUT_CLASS");
     }
 
     @Test
@@ -712,7 +727,8 @@ class AiProviderControlledSmokeTest {
                 "TEXT_NODE_PRESENT: " + yesNo(textNodePresent),
                 "TEXT_LENGTH: " + textLength,
                 "EMPTY_TEXT: " + yesNo(emptyText),
-                "EXTRACTED_JSON_PARSE_STATUS: " + jsonParseStatus);
+                "EXTRACTED_JSON_PARSE_STATUS: " + jsonParseStatus,
+                "GEMINI_OUTPUT_CLASS: VALID_JSON_OBJECT");
     }
 
     private static String yesNo(boolean value) {

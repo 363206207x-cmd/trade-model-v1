@@ -128,6 +128,7 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(diagnostic.textLength()).isEqualTo(reviewJson().length());
         assertThat(diagnostic.emptyText()).isFalse();
         assertThat(diagnostic.extractedJsonParsePassed()).isTrue();
+        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.VALID_JSON_OBJECT);
     }
 
     @Test
@@ -142,6 +143,7 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(diagnostic.textNodePresent()).isFalse();
         assertThat(diagnostic.emptyText()).isTrue();
         assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
+        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.EMPTY_TEXT);
     }
 
     @Test
@@ -156,6 +158,7 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(diagnostic.textLength()).isEqualTo(2);
         assertThat(diagnostic.emptyText()).isTrue();
         assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
+        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.EMPTY_TEXT);
     }
 
     @Test
@@ -173,6 +176,31 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(diagnostic.textLength()).isZero();
         assertThat(diagnostic.emptyText()).isTrue();
         assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
+        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.EMPTY_TEXT);
+    }
+
+    @Test
+    void outputClassifierDistinguishesEmptyAndValidJsonContainers() throws Exception {
+        assertThat(extraction(response("{}")).outputClass())
+                .isEqualTo(GeminiOutputClass.EMPTY_JSON_OBJECT);
+        assertThat(extraction(response("[]")).outputClass())
+                .isEqualTo(GeminiOutputClass.EMPTY_JSON_ARRAY);
+        assertThat(extraction(response(reviewJson())).outputClass())
+                .isEqualTo(GeminiOutputClass.VALID_JSON_OBJECT);
+        assertThat(extraction(response("[\"review\"]")).outputClass())
+                .isEqualTo(GeminiOutputClass.VALID_JSON_ARRAY);
+    }
+
+    @Test
+    void outputClassifierDistinguishesShortMarkdownRefusalAndMalformedContent() throws Exception {
+        assertThat(extraction(response("brief review")).outputClass())
+                .isEqualTo(GeminiOutputClass.PLAIN_TEXT_SHORT);
+        assertThat(extraction(response("```json\n{}\n```")).outputClass())
+                .isEqualTo(GeminiOutputClass.MARKDOWN_WRAPPER);
+        assertThat(extraction(response("I cannot comply with this request.")).outputClass())
+                .isEqualTo(GeminiOutputClass.REFUSAL_PATTERN);
+        assertThat(extraction(response("{\"stance\":")).outputClass())
+                .isEqualTo(GeminiOutputClass.MALFORMED_JSON);
     }
 
     @Test
