@@ -119,24 +119,79 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
-    void testOnlyComparisonSeparatesNormalTextFromStructuredOutputWithoutNetwork() throws Exception {
-        CapturingTransport transport = new CapturingTransport(response(reviewJson()));
-        AiHttpRequest structuredRequest = client(transport).buildHttpRequest(
-                "{}", 30_000L, "gemini-3.5-flash");
-        JsonNode structuredBody = objectMapper.readTree(structuredRequest.getBody());
-        ObjectNode normalTextBody = structuredBody.deepCopy();
-        ObjectNode normalGeneration = (ObjectNode) normalTextBody.path("generationConfig");
-        normalGeneration.remove(List.of("responseMimeType", "responseJsonSchema"));
+    void testOnlyRequestVariantsIsolatePlainJsonMimeAndStrictSchemaWithoutNetwork() throws Exception {
+        CapturingTransport plainTransport = new CapturingTransport(response("plain capability fixture"));
+        CapturingTransport jsonMimeTransport = new CapturingTransport(response("{\"mode\":\"json-only\"}"));
+        CapturingTransport strictTransport = new CapturingTransport(response(reviewJson()));
 
-        assertThat(transport.request).isNull();
-        assertThat(structuredBody.path("generationConfig").path("responseMimeType").asText())
+        AiHttpResponse plainResponse = plainTransport.post(
+                diagnosticRequest(plainTransport, DiagnosticVariant.PLAIN_TEXT));
+        AiHttpResponse jsonMimeResponse = jsonMimeTransport.post(
+                diagnosticRequest(jsonMimeTransport, DiagnosticVariant.JSON_MIME_ONLY));
+        AiHttpResponse strictResponse = strictTransport.post(
+                diagnosticRequest(strictTransport, DiagnosticVariant.STRICT_SCHEMA));
+
+        JsonNode plainBody = objectMapper.readTree(plainTransport.request.getBody());
+        JsonNode jsonMimeBody = objectMapper.readTree(jsonMimeTransport.request.getBody());
+        JsonNode strictBody = objectMapper.readTree(strictTransport.request.getBody());
+
+        assertThat(plainResponse.getStatusCode()).isEqualTo(200);
+        assertThat(jsonMimeResponse.getStatusCode()).isEqualTo(200);
+        assertThat(strictResponse.getStatusCode()).isEqualTo(200);
+        assertThat(plainBody.path("generationConfig").has("responseMimeType")).isFalse();
+        assertThat(plainBody.path("generationConfig").has("responseJsonSchema")).isFalse();
+        assertThat(plainBody.path("systemInstruction").toString()).contains("plain-text capability response");
+        assertThat(jsonMimeBody.path("generationConfig").path("responseMimeType").asText())
                 .isEqualTo("application/json");
-        assertThat(structuredBody.path("generationConfig").path("responseJsonSchema").isObject()).isTrue();
-        assertThat(normalTextBody.path("generationConfig").has("responseMimeType")).isFalse();
-        assertThat(normalTextBody.path("generationConfig").has("responseJsonSchema")).isFalse();
-        assertThat(normalTextBody.path("contents")).isEqualTo(structuredBody.path("contents"));
-        assertThat(normalTextBody.path("systemInstruction"))
-                .isEqualTo(structuredBody.path("systemInstruction"));
+        assertThat(jsonMimeBody.path("generationConfig").has("responseJsonSchema")).isFalse();
+        assertThat(jsonMimeBody.path("systemInstruction").toString()).contains("JSON capability response");
+        assertThat(strictBody.path("generationConfig").path("responseMimeType").asText())
+                .isEqualTo("application/json");
+        assertThat(strictBody.path("generationConfig").path("responseJsonSchema").isObject()).isTrue();
+        assertThat(plainBody.path("contents")).isEqualTo(strictBody.path("contents"));
+        assertThat(jsonMimeBody.path("contents")).isEqualTo(strictBody.path("contents"));
+    }
+
+    @Test
+    void strictSchemaUsesOnlyOfficiallySupportedJsonSchemaFeatures() throws Exception {
+        CapturingTransport transport = new CapturingTransport(response(reviewJson()));
+        JsonNode body = objectMapper.readTree(
+                diagnosticRequest(transport, DiagnosticVariant.STRICT_SCHEMA).getBody());
+        JsonNode schema = body.path("generationConfig").path("responseJsonSchema");
+        JsonNode properties = schema.path("properties");
+
+        assertThat(schema.path("type").asText()).isEqualTo("object");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("required")).hasSize(4);
+        assertThat(properties.path("stance").path("type").asText()).isEqualTo("string");
+        assertThat(properties.path("stance").path("enum").isArray()).isTrue();
+        assertThat(properties.path("conflictLevel").path("type").asText()).isEqualTo("string");
+        assertThat(properties.path("conflictLevel").path("enum").isArray()).isTrue();
+        assertThat(properties.path("reasonCodes").path("type").asText()).isEqualTo("array");
+        assertThat(properties.path("reasonCodes").path("items").path("type").asText())
+                .isEqualTo("string");
+        assertThat(properties.path("summary").path("type").asText()).isEqualTo("string");
+    }
+
+    private AiHttpRequest diagnosticRequest(
+            CapturingTransport transport, DiagnosticVariant variant) throws Exception {
+        AiHttpRequest request = client(transport).buildHttpRequest(
+                "{}", 30_000L, "gemini-3.5-flash");
+        ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
+        ObjectNode generation = (ObjectNode) body.path("generationConfig");
+        if (variant == DiagnosticVariant.PLAIN_TEXT) {
+            generation.remove(List.of("responseMimeType", "responseJsonSchema"));
+            setDiagnosticInstruction(body, "Return one short plain-text capability response.");
+        } else if (variant == DiagnosticVariant.JSON_MIME_ONLY) {
+            generation.remove("responseJsonSchema");
+            setDiagnosticInstruction(body, "Return one JSON capability response without a schema contract.");
+        }
+        request.setBody(objectMapper.writeValueAsString(body));
+        return request;
+    }
+
+    private static void setDiagnosticInstruction(ObjectNode body, String instruction) {
+        ((ObjectNode) body.path("systemInstruction").path("parts").get(0)).put("text", instruction);
     }
 
     private void assertInvalid(String responseBody, String errorCode) {
@@ -190,6 +245,12 @@ class GeminiProviderStructuredOutputContractTest {
     private static String reviewJson() {
         return "{\"stance\":\"ABSTAIN\",\"conflictLevel\":\"NONE\","
                 + "\"reasonCodes\":[\"SCHEMA_OK\"],\"summary\":\"schema review only\"}";
+    }
+
+    private enum DiagnosticVariant {
+        PLAIN_TEXT,
+        JSON_MIME_ONLY,
+        STRICT_SCHEMA
     }
 
     private static final class CapturingTransport implements AiHttpTransport {

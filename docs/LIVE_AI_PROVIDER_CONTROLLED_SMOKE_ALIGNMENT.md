@@ -219,7 +219,13 @@ For Gemini non-2xx responses, the controlled smoke uses narrower categories: `IN
 
 The official Gemini generateContent reference confirms that `responseMimeType=application/json` can be paired with `responseJsonSchema`, and that the supported schema subset includes `type`, `enum`, `items`, `maxItems`, `properties`, `additionalProperties`, and `required`. The current V1 role fragment uses only those supported fields, so this package does not change or relax the structured request. Google's troubleshooting guide classifies HTTP 500 as `INTERNAL` and HTTP 503 as `UNAVAILABLE`; controlled-smoke 5xx responses are therefore reported as `PROVIDER_INTERNAL_ERROR`, without guessing that the schema is invalid.
 
-The offline `GeminiProviderStructuredOutputContractTest` also contains a test-only A/B diagnostic fixture. Variant A removes only `responseMimeType` and `responseJsonSchema`; variant B uses the production structured request. It performs no HTTP call and is not exposed as a runtime or shell switch.
+`GEMINI_SCHEMA_FEATURE_STATUS: PASS`. The strict role fragment uses only supported JSON Schema features: `object`, `properties`, `required`, `string`, `array`, `items`, string `enum`, `maxItems`, and `additionalProperties`. `additionalProperties` is explicitly documented as supported and remains `false`; it is not silently removed.
+
+The offline `GeminiProviderStructuredOutputContractTest` contains three fake-transport capability-isolation variants. Variant A is plain generateContent with neither `responseMimeType` nor `responseJsonSchema`. Variant B sets only `responseMimeType=application/json`. Variant C uses the unchanged production strict V1 role fragment with both JSON MIME and `responseJsonSchema`. Each variant uses a separate fake transport and makes no network call. The variants are test-only and are not exposed as runtime or shell switches.
+
+### Future live diagnostic plan
+
+No live capability-isolation request is run by this package. If a later operator explicitly authorizes live diagnosis, run exactly one variant at a time in this order: A plain text, B JSON MIME only, then C strict schema. For each single request, record only latency, HTTP status class, and parse status. Do not print response bodies, prompts, headers, request IDs, or keys; do not retry automatically. A/B/C results isolate provider/model access from JSON-mode support and strict-schema support, but no individual result proves production readiness.
 
 ## Failure Classification
 
