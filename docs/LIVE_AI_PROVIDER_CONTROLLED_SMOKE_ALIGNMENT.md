@@ -182,7 +182,7 @@ ALL, MULTI, THREE, wildcard, comma-separated, blank, and unknown targets fail cl
 - One provider target
 - At most one HTTP POST
 - No retry, loop, concurrency, fallback provider, or multi-role orchestration
-- Controlled-smoke request and overall timeout: 15 seconds
+- Controlled-smoke request and overall timeout: 30 seconds for Gemini structured-output validation; 15 seconds for OpenAI and xAI
 - Production AI request timeout remains unchanged at 5 seconds
 - Script watchdog: 60 seconds including Maven harness startup
 - Maximum output: 128 tokens
@@ -199,6 +199,7 @@ Allowed output fields are:
     AI_RESPONSE_PARSE_STATUS:
     AI_TOKEN_USAGE_PRESENT:
     AI_REQUEST_ID_PRESENT:
+    AI_TIMEOUT_LIMIT_MS:
     AI_LATENCY_MS:
     AI_PROVIDER_LIVE_SMOKE:
     LIVE_PROVIDER_CALLS:

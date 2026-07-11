@@ -145,8 +145,13 @@ class AiProviderControlledSmokeTest {
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_TIMEOUT);
         assertThat(result.httpStatusClass()).isEqualTo("TIMEOUT");
         assertThat(result.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.TIMEOUT);
+        assertThat(result.timeoutLimitMs()).isEqualTo(30_000L);
+        assertThat(transport.calls).isEqualTo(1);
         assertThat(String.join("\n", result.sanitizedOutputLines()))
-                .contains("AI_HTTP_STATUS_CLASS: TIMEOUT", "AI_ERROR_CATEGORY: TIMEOUT")
+                .contains(
+                        "AI_HTTP_STATUS_CLASS: TIMEOUT",
+                        "AI_ERROR_CATEGORY: TIMEOUT",
+                        "AI_TIMEOUT_LIMIT_MS: 30000")
                 .doesNotContain("private Gemini timeout");
     }
 
@@ -185,7 +190,9 @@ class AiProviderControlledSmokeTest {
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent");
         assertThat(transport.lastRequest.getHeaders())
                 .containsEntry("x-goog-api-key", "test-gemini-key");
-        assertThat(transport.lastRequest.getTimeout().toMillis()).isEqualTo(15_000L);
+        assertThat(result.timeoutLimitMs()).isEqualTo(30_000L);
+        assertThat(transport.lastRequest.getTimeout().toMillis()).isEqualTo(30_000L);
+        assertThat(transport.calls).isEqualTo(1);
 
         var body = objectMapper.readTree(transport.lastRequest.getBody());
         assertThat(body.path("systemInstruction").path("parts").isArray()).isTrue();
@@ -200,6 +207,14 @@ class AiProviderControlledSmokeTest {
 
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
         assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");
+    }
+
+    @Test
+    void productionRequestTimeoutRemainsFiveSeconds() throws Exception {
+        String application = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");
+        assertThat(application).doesNotContain("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:30000}");
     }
 
     @Test
@@ -323,7 +338,8 @@ class AiProviderControlledSmokeTest {
         assertThat(script).doesNotContain("source trade-model.local-secret");
         assertThat(script).contains(
                 "export TRADE_MODEL_AI_REQUEST_TIMEOUT_MS=15000",
-                "export TRADE_MODEL_AI_OVERALL_TIMEOUT_MS=15000");
+                "export TRADE_MODEL_AI_OVERALL_TIMEOUT_MS=15000",
+                "timeout_limit_ms=30000");
 
         ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
         processBuilder.redirectErrorStream(true);
@@ -383,7 +399,8 @@ class AiProviderControlledSmokeTest {
 
     private static AiProviderControlledSmokeResult skipped() {
         return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", null, "NOT_RUN",
-                false, false, 0L, AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null);
+                false, false, 0L, 0L,
+                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null);
     }
 
     private static Map<String, String> enabled(String target, boolean includeKey) {

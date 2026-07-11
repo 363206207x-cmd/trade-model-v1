@@ -8,6 +8,12 @@ emit_result() {
   local status="${4:-FAIL_UNEXPECTED}"
   local calls="${5:-0}"
   local key_reads="${6:-0}"
+  local timeout_limit_ms=15000
+  if [[ "${provider}" == "GEMINI" ]]; then
+    timeout_limit_ms=30000
+  elif [[ "${provider}" == "--" || -z "${provider}" ]]; then
+    timeout_limit_ms=0
+  fi
   printf '%s\n' \
     "AI_PROVIDER: ${provider}" \
     "AI_MODEL: ${model}" \
@@ -17,6 +23,7 @@ emit_result() {
     "AI_RESPONSE_PARSE_STATUS: NOT_RUN" \
     "AI_TOKEN_USAGE_PRESENT: NO" \
     "AI_REQUEST_ID_PRESENT: NO" \
+    "AI_TIMEOUT_LIMIT_MS: ${timeout_limit_ms}" \
     "AI_LATENCY_MS: 0" \
     "AI_PROVIDER_LIVE_SMOKE: ${status}" \
     "LIVE_PROVIDER_CALLS: ${calls}" \
@@ -103,7 +110,7 @@ fi
 kill "${watchdog_pid}" 2>/dev/null || true
 wait "${watchdog_pid}" 2>/dev/null || true
 
-allowed_output="$(awk '/^(AI_PROVIDER|AI_MODEL|AI_AUTH_STATUS|AI_HTTP_STATUS_CLASS|AI_ERROR_CATEGORY|AI_RESPONSE_PARSE_STATUS|AI_TOKEN_USAGE_PRESENT|AI_REQUEST_ID_PRESENT|AI_LATENCY_MS|AI_PROVIDER_LIVE_SMOKE|LIVE_PROVIDER_CALLS|REAL_KEYS_READ|PRODUCTION_READINESS|GEMINI_SCHEMA_DIAGNOSTIC|EXPECTED_FIELDS|ACTUAL_FIELDS|MISSING_FIELDS|UNEXPECTED_FIELDS|TYPE_MISMATCH_FIELDS): / { print }' "${output_file}")"
+allowed_output="$(awk '/^(AI_PROVIDER|AI_MODEL|AI_AUTH_STATUS|AI_HTTP_STATUS_CLASS|AI_ERROR_CATEGORY|AI_RESPONSE_PARSE_STATUS|AI_TOKEN_USAGE_PRESENT|AI_REQUEST_ID_PRESENT|AI_TIMEOUT_LIMIT_MS|AI_LATENCY_MS|AI_PROVIDER_LIVE_SMOKE|LIVE_PROVIDER_CALLS|REAL_KEYS_READ|PRODUCTION_READINESS|GEMINI_SCHEMA_DIAGNOSTIC|EXPECTED_FIELDS|ACTUAL_FIELDS|MISSING_FIELDS|UNEXPECTED_FIELDS|TYPE_MISMATCH_FIELDS): / { print }' "${output_file}")"
 if [[ "${smoke_exit}" -ne 0 || -z "${allowed_output}" ]]; then
   emit_result "${target}" "${model}" "KEY_PRESENT_NOT_EXPOSED" "FAIL_UNEXPECTED" "0" "1"
   exit 1

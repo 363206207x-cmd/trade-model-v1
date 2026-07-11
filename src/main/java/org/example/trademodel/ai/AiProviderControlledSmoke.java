@@ -12,7 +12,8 @@ public class AiProviderControlledSmoke {
     static final String EXTERNAL_CALL_GATE = "AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS";
     static final String TARGET = "AI_PROVIDER_SMOKE_TARGET";
     static final int MAX_OUTPUT_TOKENS = 128;
-    static final long REQUEST_TIMEOUT_MS = 15_000L;
+    static final long DEFAULT_SMOKE_TIMEOUT_MS = 15_000L;
+    static final long GEMINI_SMOKE_TIMEOUT_MS = 30_000L;
 
     private final ObjectMapper objectMapper;
 
@@ -26,6 +27,7 @@ public class AiProviderControlledSmoke {
         AiProviderName provider = provider(targetValue);
         String providerName = provider == null ? targetValue : provider.name();
         String model = provider == null ? null : model(env, provider);
+        long timeoutLimitMs = smokeTimeoutMs(provider);
 
         if (!enabled(env.get(EXTERNAL_CALL_GATE))) {
             return result(providerName, model, "NOT_CHECKED", "NOT_RUN", "NOT_RUN",
@@ -48,8 +50,8 @@ public class AiProviderControlledSmoke {
         }
 
         CountingTransport countingTransport = new CountingTransport(transport);
-        AiProviderReviewResult review = client(provider, model, apiKey, countingTransport)
-                .review(fixedSchemaOnlyRequest(), REQUEST_TIMEOUT_MS);
+        AiProviderReviewResult review = client(provider, model, apiKey, countingTransport, timeoutLimitMs)
+                .review(fixedSchemaOnlyRequest(), timeoutLimitMs);
         int statusCode = countingTransport.statusCode();
         AiProviderControlledSmokeStatus status = classify(review, statusCode);
         boolean parsed = review != null && review.successful();
@@ -65,11 +67,11 @@ public class AiProviderControlledSmoke {
     }
 
     private AiProviderClient client(AiProviderName provider, String model, String apiKey,
-                                    AiHttpTransport transport) {
+                                    AiHttpTransport transport, long timeoutLimitMs) {
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
         properties.setEnabled(true);
-        properties.setRequestTimeoutMs((int) REQUEST_TIMEOUT_MS);
-        properties.setOverallTimeoutMs((int) REQUEST_TIMEOUT_MS);
+        properties.setRequestTimeoutMs((int) timeoutLimitMs);
+        properties.setOverallTimeoutMs((int) timeoutLimitMs);
         properties.setMaxInputChars(4_000);
         properties.setMaxOutputTokens(MAX_OUTPUT_TOKENS);
         properties.setDailyBudgetUsd(BigDecimal.ZERO);
@@ -217,6 +219,15 @@ public class AiProviderControlledSmoke {
         return "true".equalsIgnoreCase(trim(value));
     }
 
+    private static long smokeTimeoutMs(AiProviderName provider) {
+        if (provider == null) {
+            return 0L;
+        }
+        return provider == AiProviderName.GEMINI
+                ? GEMINI_SMOKE_TIMEOUT_MS
+                : DEFAULT_SMOKE_TIMEOUT_MS;
+    }
+
     private static String trim(String value) {
         return value == null ? "" : value.trim();
     }
@@ -260,7 +271,8 @@ public class AiProviderControlledSmoke {
             AiProviderSchemaDiagnostic schemaDiagnostic) {
         return new AiProviderControlledSmokeResult(provider, model, authStatus, httpStatusClass,
                 errorCategory(status),
-                parseStatus, tokenUsage, requestId, latency, status, calls, schemaDiagnostic);
+                parseStatus, tokenUsage, requestId, smokeTimeoutMs(provider(provider)), latency,
+                status, calls, schemaDiagnostic);
     }
 
     private static final class CountingTransport implements AiHttpTransport {
