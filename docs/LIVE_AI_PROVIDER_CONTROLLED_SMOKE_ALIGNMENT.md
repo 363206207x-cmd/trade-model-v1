@@ -171,7 +171,8 @@ ALL, MULTI, THREE, wildcard, comma-separated, blank, and unknown targets fail cl
 - One provider target
 - At most one HTTP POST
 - No retry, loop, concurrency, fallback provider, or multi-role orchestration
-- Request timeout: 5 seconds
+- Controlled-smoke request and overall timeout: 15 seconds
+- Production AI request timeout remains unchanged at 5 seconds
 - Script watchdog: 60 seconds including Maven harness startup
 - Maximum output: 128 tokens
 
@@ -183,6 +184,7 @@ Allowed output fields are:
     AI_MODEL:
     AI_AUTH_STATUS:
     AI_HTTP_STATUS_CLASS:
+    AI_ERROR_CATEGORY:
     AI_RESPONSE_PARSE_STATUS:
     AI_TOKEN_USAGE_PRESENT:
     AI_REQUEST_ID_PRESENT:
@@ -193,6 +195,8 @@ Allowed output fields are:
     PRODUCTION_READINESS:
 
 The output never includes a key, key shape, authorization header, request body, prompt, raw response body, raw error body, raw headers, complete request ID, or provider summary.
+
+`AI_HTTP_STATUS_CLASS` reports `TIMEOUT` when no HTTP response arrives because the request timed out. Otherwise it reports `1XX` through `5XX` for an HTTP response, or `NOT_AVAILABLE` when no status exists for another reason. `AI_ERROR_CATEGORY` is blank for success/skip and otherwise is one of `TIMEOUT`, `AUTH`, `MODEL_NOT_FOUND`, `RATE_LIMIT`, `PROVIDER_ERROR`, or `RESPONSE_SCHEMA`.
 
 ## Failure Classification
 

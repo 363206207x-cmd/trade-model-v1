@@ -16,7 +16,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AiProviderControlledSmokeTest {
-    private final AiProviderControlledSmoke smoke = new AiProviderControlledSmoke(new ObjectMapper());
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AiProviderControlledSmoke smoke = new AiProviderControlledSmoke(objectMapper);
 
     @Test
     void controlledLiveSmokeEntryPoint() {
@@ -127,9 +128,74 @@ class AiProviderControlledSmokeTest {
         AiProviderControlledSmokeResult ioResult = smoke.run(enabled("OPENAI", true), io);
 
         assertThat(timeoutResult.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_TIMEOUT);
+        assertThat(timeoutResult.httpStatusClass()).isEqualTo("TIMEOUT");
+        assertThat(timeoutResult.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.TIMEOUT);
         assertThat(ioResult.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_PROVIDER_IO);
+        assertThat(ioResult.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.PROVIDER_ERROR);
         assertThat(timeout.calls).isEqualTo(1);
         assertThat(io.calls).isEqualTo(1);
+    }
+
+    @Test
+    void geminiTimeoutIsClassifiedWithoutResponseDetails() {
+        FakeTransport transport = FakeTransport.throwing(new HttpTimeoutException("private Gemini timeout"));
+
+        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_TIMEOUT);
+        assertThat(result.httpStatusClass()).isEqualTo("TIMEOUT");
+        assertThat(result.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.TIMEOUT);
+        assertThat(String.join("\n", result.sanitizedOutputLines()))
+                .contains("AI_HTTP_STATUS_CLASS: TIMEOUT", "AI_ERROR_CATEGORY: TIMEOUT")
+                .doesNotContain("private Gemini timeout");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "404,FAIL_MODEL_NOT_FOUND,MODEL_NOT_FOUND",
+            "403,FAIL_AUTH,AUTH",
+            "429,FAIL_RATE_LIMIT,RATE_LIMIT"
+    })
+    void geminiHttpFailuresExposeOnlyStatusClassAndCategory(
+            int statusCode, AiProviderControlledSmokeStatus expectedStatus,
+            AiProviderControlledSmokeErrorCategory expectedCategory) {
+        FakeTransport transport = FakeTransport.responding(
+                new AiHttpResponse(statusCode, "private Gemini body", Map.of()));
+
+        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+
+        assertThat(result.status()).isEqualTo(expectedStatus);
+        assertThat(result.httpStatusClass()).isEqualTo("4XX");
+        assertThat(result.errorCategory()).isEqualTo(expectedCategory);
+        assertThat(String.join("\n", result.sanitizedOutputLines()))
+                .doesNotContain("private Gemini body");
+    }
+
+    @Test
+    void geminiSuccessUsesGenerateContentContractAndSmokeOnlyTimeout() throws Exception {
+        FakeTransport transport = FakeTransport.responding(validGeminiResponse(true, true));
+
+        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.PASS);
+        assertThat(result.httpStatusClass()).isEqualTo("2XX");
+        assertThat(result.errorCategory()).isNull();
+        assertThat(result.responseParseStatus()).isEqualTo("PASS");
+        assertThat(transport.lastRequest.getUrl()).isEqualTo(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent");
+        assertThat(transport.lastRequest.getHeaders())
+                .containsEntry("x-goog-api-key", "test-gemini-key");
+        assertThat(transport.lastRequest.getTimeout().toMillis()).isEqualTo(15_000L);
+
+        var body = objectMapper.readTree(transport.lastRequest.getBody());
+        assertThat(body.path("systemInstruction").path("parts").isArray()).isTrue();
+        assertThat(body.path("contents").isArray()).isTrue();
+        assertThat(body.path("contents").get(0).path("role").asText()).isEqualTo("user");
+        assertThat(body.path("generationConfig").path("maxOutputTokens").asInt()).isEqualTo(128);
+        assertThat(body.path("generationConfig").has("temperature")).isTrue();
+
+        String application = Files.readString(Path.of("src/main/resources/application.yml"));
+        assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");
     }
 
     @Test
@@ -195,6 +261,9 @@ class AiProviderControlledSmokeTest {
             assertThat(script).contains("export " + scheduler + "=false");
         }
         assertThat(script).doesNotContain("source trade-model.local-secret");
+        assertThat(script).contains(
+                "export TRADE_MODEL_AI_REQUEST_TIMEOUT_MS=15000",
+                "export TRADE_MODEL_AI_OVERALL_TIMEOUT_MS=15000");
 
         ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
         processBuilder.redirectErrorStream(true);
@@ -253,7 +322,7 @@ class AiProviderControlledSmokeTest {
     }
 
     private static AiProviderControlledSmokeResult skipped() {
-        return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", "NOT_RUN",
+        return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", null, "NOT_RUN",
                 false, false, 0L, AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0);
     }
 
@@ -321,6 +390,7 @@ class AiProviderControlledSmokeTest {
         private final AiHttpResponse response;
         private final IOException exception;
         private int calls;
+        private AiHttpRequest lastRequest;
 
         private FakeTransport(AiHttpResponse response, IOException exception) {
             this.response = response;
@@ -338,6 +408,7 @@ class AiProviderControlledSmokeTest {
         @Override
         public AiHttpResponse post(AiHttpRequest request) throws IOException {
             calls++;
+            lastRequest = request;
             if (exception != null) {
                 throw exception;
             }

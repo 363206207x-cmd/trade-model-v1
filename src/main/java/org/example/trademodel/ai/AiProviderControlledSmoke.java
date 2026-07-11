@@ -12,7 +12,7 @@ public class AiProviderControlledSmoke {
     static final String EXTERNAL_CALL_GATE = "AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS";
     static final String TARGET = "AI_PROVIDER_SMOKE_TARGET";
     static final int MAX_OUTPUT_TOKENS = 128;
-    static final long REQUEST_TIMEOUT_MS = 5_000L;
+    static final long REQUEST_TIMEOUT_MS = 15_000L;
 
     private final ObjectMapper objectMapper;
 
@@ -59,7 +59,7 @@ public class AiProviderControlledSmoke {
                 && !review.getProviderRequestId().isBlank();
         long latency = review == null || review.getLatencyMs() == null ? 0L : review.getLatencyMs();
 
-        return result(provider.name(), model, "KEY_PRESENT_NOT_EXPOSED", httpStatusClass(statusCode),
+        return result(provider.name(), model, "KEY_PRESENT_NOT_EXPOSED", httpStatusClass(statusCode, status),
                 parsed ? "PASS" : "FAIL", tokenUsage, requestId, latency, status,
                 countingTransport.requestCount());
     }
@@ -221,11 +221,28 @@ public class AiProviderControlledSmoke {
         return value == null ? "" : value.trim();
     }
 
-    private static String httpStatusClass(int statusCode) {
-        if (statusCode < 100) {
+    private static String httpStatusClass(int statusCode, AiProviderControlledSmokeStatus status) {
+        if (status == AiProviderControlledSmokeStatus.FAIL_TIMEOUT) {
+            return "TIMEOUT";
+        }
+        if (statusCode < 100 || statusCode > 599) {
             return "NOT_AVAILABLE";
         }
         return statusCode / 100 + "XX";
+    }
+
+    private static AiProviderControlledSmokeErrorCategory errorCategory(
+            AiProviderControlledSmokeStatus status) {
+        return switch (status) {
+            case FAIL_TIMEOUT -> AiProviderControlledSmokeErrorCategory.TIMEOUT;
+            case FAIL_AUTH -> AiProviderControlledSmokeErrorCategory.AUTH;
+            case FAIL_MODEL_NOT_FOUND -> AiProviderControlledSmokeErrorCategory.MODEL_NOT_FOUND;
+            case FAIL_RATE_LIMIT -> AiProviderControlledSmokeErrorCategory.RATE_LIMIT;
+            case FAIL_RESPONSE_SCHEMA -> AiProviderControlledSmokeErrorCategory.RESPONSE_SCHEMA;
+            case FAIL_BILLING_OR_CREDITS, FAIL_PROVIDER_HTTP, FAIL_PROVIDER_IO, FAIL_UNEXPECTED ->
+                    AiProviderControlledSmokeErrorCategory.PROVIDER_ERROR;
+            default -> null;
+        };
     }
 
     private static AiProviderControlledSmokeResult result(
@@ -233,6 +250,7 @@ public class AiProviderControlledSmoke {
             String parseStatus, boolean tokenUsage, boolean requestId, long latency,
             AiProviderControlledSmokeStatus status, int calls) {
         return new AiProviderControlledSmokeResult(provider, model, authStatus, httpStatusClass,
+                errorCategory(status),
                 parseStatus, tokenUsage, requestId, latency, status, calls);
     }
 
