@@ -16,9 +16,16 @@ import java.util.Map;
 public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     private static final String JSON_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
 
-            For Gemini, return JSON only: no Markdown, no code fence, no prose, and no explanation.
-            Return exactly these AI_ROLE_RESULTS_SCHEMA_V1 role-fragment fields and no others:
+            You are GEMINI_REVIEW. Return ONLY one valid JSON object and nothing else.
+            Do not return Markdown, a code fence, an explanation, prose, a refusal, a prefix, or a suffix.
+            The JSON object must contain exactly these AI_ROLE_RESULTS_SCHEMA_V1 role-fragment fields and no others:
             stance, conflictLevel, reasonCodes, summary.
+            Use only these values for stance: SUPPORT, CHALLENGE, ABSTAIN.
+            Use only these values for conflictLevel: NONE, MINOR, MAJOR, EXTREME.
+            reasonCodes must be an array of strings and summary must be a string.
+            Even when evidence is insufficient or a review conclusion cannot be formed, return exactly this valid JSON object:
+            {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":["INSUFFICIENT_DATA"],"summary":"Insufficient evidence"}
+            Never replace that JSON fallback with plain text.
             """;
 
     private final AiOrchestratorProperties properties;

@@ -28,8 +28,13 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(requestBody.path("contents").isArray()).isTrue();
         String instruction = requestBody.path("systemInstruction").path("parts").get(0).path("text").asText();
         assertThat(instruction).contains(
-                "JSON only", "no Markdown", "no code fence", "no prose", "no explanation",
-                "stance, conflictLevel, reasonCodes, summary");
+                "GEMINI_REVIEW", "Return ONLY one valid JSON object", "Do not return Markdown",
+                "a code fence", "an explanation", "a refusal", "a prefix", "a suffix",
+                "stance, conflictLevel, reasonCodes, summary",
+                "SUPPORT, CHALLENGE, ABSTAIN", "NONE, MINOR, MAJOR, EXTREME",
+                "\"stance\":\"ABSTAIN\"", "\"reasonCodes\":[\"INSUFFICIENT_DATA\"]",
+                "\"summary\":\"Insufficient evidence\"", "Never replace that JSON fallback with plain text");
+        assertThat(instruction).doesNotContain("\"stance\":\"NEUTRAL\"");
 
         JsonNode generation = requestBody.path("generationConfig");
         assertThat(generation.path("responseMimeType").asText()).isEqualTo("application/json");
@@ -99,6 +104,12 @@ class GeminiProviderStructuredOutputContractTest {
     @Test
     void naturalLanguagePlusJsonFailsClosed() throws Exception {
         assertInvalid(response("Here is the result: " + reviewJson()).getBody(),
+                "INVALID_EMPTY_RESPONSE");
+    }
+
+    @Test
+    void plainTextRefusalFailsClosedWithoutAutomaticRepair() throws Exception {
+        assertInvalid(response("I cannot provide that review.").getBody(),
                 "INVALID_EMPTY_RESPONSE");
     }
 
