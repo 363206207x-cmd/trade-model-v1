@@ -155,25 +155,54 @@ class AiProviderControlledSmokeTest {
                 .doesNotContain("private Gemini timeout");
     }
 
-    @ParameterizedTest
-    @CsvSource({
-            "404,FAIL_MODEL_NOT_FOUND,MODEL_NOT_FOUND",
-            "403,FAIL_AUTH,AUTH",
-            "429,FAIL_RATE_LIMIT,RATE_LIMIT"
-    })
-    void geminiHttpFailuresExposeOnlyStatusClassAndCategory(
-            int statusCode, AiProviderControlledSmokeStatus expectedStatus,
-            AiProviderControlledSmokeErrorCategory expectedCategory) {
-        FakeTransport transport = FakeTransport.responding(
-                new AiHttpResponse(statusCode, "private Gemini body", Map.of()));
+    @Test
+    void geminiInvalidSchemaRequestIsSanitizedAsInvalidRequest() {
+        assertGeminiHttpFailure(400, "INVALID_ARGUMENT",
+                "responseJsonSchema is invalid PRIVATE_INVALID_SCHEMA_DETAIL",
+                AiProviderControlledSmokeStatus.FAIL_PROVIDER_HTTP,
+                AiProviderControlledSmokeErrorCategory.INVALID_REQUEST,
+                AiProviderErrorReason.GEMINI_HTTP_400_INVALID_REQUEST);
+    }
 
-        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+    @Test
+    void geminiUnsupportedStructuredOutputIsClassifiedWithoutBodyExposure() {
+        assertGeminiHttpFailure(400, "INVALID_ARGUMENT",
+                "structured output is unsupported PRIVATE_UNSUPPORTED_DETAIL",
+                AiProviderControlledSmokeStatus.FAIL_PROVIDER_HTTP,
+                AiProviderControlledSmokeErrorCategory.SCHEMA_UNSUPPORTED,
+                AiProviderErrorReason.GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED);
+    }
 
-        assertThat(result.status()).isEqualTo(expectedStatus);
-        assertThat(result.httpStatusClass()).isEqualTo("4XX");
-        assertThat(result.errorCategory()).isEqualTo(expectedCategory);
-        assertThat(String.join("\n", result.sanitizedOutputLines()))
-                .doesNotContain("private Gemini body");
+    @Test
+    void geminiModelCapabilityFailureIsClassifiedWithoutBodyExposure() {
+        assertGeminiHttpFailure(404, "NOT_FOUND", "PRIVATE_MODEL_CAPABILITY_DETAIL",
+                AiProviderControlledSmokeStatus.FAIL_MODEL_NOT_FOUND,
+                AiProviderControlledSmokeErrorCategory.MODEL_CAPABILITY_ERROR,
+                AiProviderErrorReason.GEMINI_MODEL_CAPABILITY_ERROR);
+    }
+
+    @Test
+    void geminiAuthFailureIsClassifiedWithoutBodyExposure() {
+        assertGeminiHttpFailure(403, "PERMISSION_DENIED", "PRIVATE_AUTH_DETAIL",
+                AiProviderControlledSmokeStatus.FAIL_AUTH,
+                AiProviderControlledSmokeErrorCategory.AUTH,
+                AiProviderErrorReason.GEMINI_AUTH_REJECTED);
+    }
+
+    @Test
+    void geminiRateLimitIsClassifiedWithoutBodyExposure() {
+        assertGeminiHttpFailure(429, "RESOURCE_EXHAUSTED", "PRIVATE_RATE_DETAIL",
+                AiProviderControlledSmokeStatus.FAIL_RATE_LIMIT,
+                AiProviderControlledSmokeErrorCategory.RATE_LIMIT,
+                AiProviderErrorReason.GEMINI_RATE_LIMITED);
+    }
+
+    @Test
+    void geminiServerFailureIsSanitizedAsProviderInternalError() {
+        assertGeminiHttpFailure(500, "INTERNAL", "PRIVATE_INTERNAL_DETAIL",
+                AiProviderControlledSmokeStatus.FAIL_PROVIDER_HTTP,
+                AiProviderControlledSmokeErrorCategory.PROVIDER_INTERNAL_ERROR,
+                AiProviderErrorReason.GEMINI_HTTP_5XX_INTERNAL);
     }
 
     @Test
@@ -398,9 +427,42 @@ class AiProviderControlledSmokeTest {
     }
 
     private static AiProviderControlledSmokeResult skipped() {
-        return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", null, "NOT_RUN",
+        return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", null, null, "NOT_RUN",
                 false, false, 0L, 0L,
                 AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null);
+    }
+
+    private void assertGeminiHttpFailure(
+            int statusCode, String providerStatus, String privateMessage,
+            AiProviderControlledSmokeStatus expectedStatus,
+            AiProviderControlledSmokeErrorCategory expectedCategory,
+            AiProviderErrorReason expectedReason) {
+        String body;
+        try {
+            body = objectMapper.writeValueAsString(Map.of(
+                    "error", Map.of(
+                            "code", statusCode,
+                            "status", providerStatus,
+                            "message", privateMessage)));
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+        FakeTransport transport = FakeTransport.responding(
+                new AiHttpResponse(statusCode, body, Map.of()));
+
+        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+        String output = String.join("\n", result.sanitizedOutputLines());
+
+        assertThat(result.status()).isEqualTo(expectedStatus);
+        assertThat(result.httpStatusClass()).isEqualTo(statusCode / 100 + "XX");
+        assertThat(result.errorCategory()).isEqualTo(expectedCategory);
+        assertThat(result.providerErrorReason()).isEqualTo(expectedReason);
+        assertThat(result.liveProviderCalls()).isEqualTo(1);
+        assertThat(transport.calls).isEqualTo(1);
+        assertThat(output).contains(
+                "AI_ERROR_CATEGORY: " + expectedCategory.name(),
+                "AI_PROVIDER_ERROR_REASON: " + expectedReason.name());
+        assertThat(output).doesNotContain(body, privateMessage, "x-goog-api-key");
     }
 
     private static Map<String, String> enabled(String target, boolean includeKey) {

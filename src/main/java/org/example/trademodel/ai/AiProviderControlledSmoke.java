@@ -63,7 +63,7 @@ public class AiProviderControlledSmoke {
 
         return result(provider.name(), model, "KEY_PRESENT_NOT_EXPOSED", httpStatusClass(statusCode, status),
                 parsed ? "PASS" : "FAIL", tokenUsage, requestId, latency, status,
-                countingTransport.requestCount(), review == null ? null : review.getSchemaDiagnostic());
+                countingTransport.requestCount(), review);
     }
 
     private AiProviderClient client(AiProviderName provider, String model, String apiKey,
@@ -139,13 +139,20 @@ public class AiProviderControlledSmoke {
         if ("PROVIDER_AUTH_FAILURE".equals(code)) {
             return AiProviderControlledSmokeStatus.FAIL_AUTH;
         }
+        if (AiProviderErrorReason.GEMINI_AUTH_REJECTED.name().equals(code)) {
+            return AiProviderControlledSmokeStatus.FAIL_AUTH;
+        }
         if ("PROVIDER_BILLING_OR_CREDITS".equals(code)) {
             return AiProviderControlledSmokeStatus.FAIL_BILLING_OR_CREDITS;
         }
         if ("PROVIDER_MODEL_NOT_FOUND".equals(code)) {
             return AiProviderControlledSmokeStatus.FAIL_MODEL_NOT_FOUND;
         }
+        if (AiProviderErrorReason.GEMINI_MODEL_CAPABILITY_ERROR.name().equals(code)) {
+            return AiProviderControlledSmokeStatus.FAIL_MODEL_NOT_FOUND;
+        }
         if ("PROVIDER_RATE_LIMITED".equals(code)
+                || AiProviderErrorReason.GEMINI_RATE_LIMITED.name().equals(code)
                 || review != null && review.getCallStatus() == AiProviderCallStatus.RATE_LIMITED) {
             return AiProviderControlledSmokeStatus.FAIL_RATE_LIMIT;
         }
@@ -243,7 +250,23 @@ public class AiProviderControlledSmoke {
     }
 
     private static AiProviderControlledSmokeErrorCategory errorCategory(
-            AiProviderControlledSmokeStatus status) {
+            String provider, AiProviderControlledSmokeStatus status, AiProviderReviewResult review) {
+        AiProviderErrorReason reason = providerErrorReason(provider, review);
+        if (reason != null) {
+            return switch (reason) {
+                case GEMINI_HTTP_400_INVALID_REQUEST -> AiProviderControlledSmokeErrorCategory.INVALID_REQUEST;
+                case GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED ->
+                        AiProviderControlledSmokeErrorCategory.SCHEMA_UNSUPPORTED;
+                case GEMINI_MODEL_CAPABILITY_ERROR ->
+                        AiProviderControlledSmokeErrorCategory.MODEL_CAPABILITY_ERROR;
+                case GEMINI_AUTH_REJECTED -> AiProviderControlledSmokeErrorCategory.AUTH;
+                case GEMINI_RATE_LIMITED -> AiProviderControlledSmokeErrorCategory.RATE_LIMIT;
+                case GEMINI_HTTP_5XX_INTERNAL ->
+                        AiProviderControlledSmokeErrorCategory.PROVIDER_INTERNAL_ERROR;
+                case GEMINI_UNKNOWN_PROVIDER_ERROR ->
+                        AiProviderControlledSmokeErrorCategory.UNKNOWN_PROVIDER_ERROR;
+            };
+        }
         return switch (status) {
             case FAIL_TIMEOUT -> AiProviderControlledSmokeErrorCategory.TIMEOUT;
             case FAIL_AUTH -> AiProviderControlledSmokeErrorCategory.AUTH;
@@ -254,6 +277,18 @@ public class AiProviderControlledSmoke {
                     AiProviderControlledSmokeErrorCategory.PROVIDER_ERROR;
             default -> null;
         };
+    }
+
+    private static AiProviderErrorReason providerErrorReason(
+            String provider, AiProviderReviewResult review) {
+        if (!AiProviderName.GEMINI.name().equalsIgnoreCase(trim(provider)) || review == null) {
+            return null;
+        }
+        try {
+            return AiProviderErrorReason.valueOf(trim(review.getErrorCode()));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private static AiProviderControlledSmokeResult result(
@@ -268,11 +303,11 @@ public class AiProviderControlledSmoke {
             String provider, String model, String authStatus, String httpStatusClass,
             String parseStatus, boolean tokenUsage, boolean requestId, long latency,
             AiProviderControlledSmokeStatus status, int calls,
-            AiProviderSchemaDiagnostic schemaDiagnostic) {
+            AiProviderReviewResult review) {
         return new AiProviderControlledSmokeResult(provider, model, authStatus, httpStatusClass,
-                errorCategory(status),
+                errorCategory(provider, status, review), providerErrorReason(provider, review),
                 parseStatus, tokenUsage, requestId, smokeTimeoutMs(provider(provider)), latency,
-                status, calls, schemaDiagnostic);
+                status, calls, review == null ? null : review.getSchemaDiagnostic());
     }
 
     private static final class CountingTransport implements AiHttpTransport {

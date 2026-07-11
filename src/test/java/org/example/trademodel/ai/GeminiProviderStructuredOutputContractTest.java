@@ -2,6 +2,7 @@ package org.example.trademodel.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -115,6 +116,27 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(result.getErrorCode()).isEqualTo("INVALID_FIELD_TYPE_REASONCODES");
         assertThat(result.getSchemaDiagnostic().typeMismatchFields())
                 .containsExactly("reasonCodes expected ARRAY got STRING");
+    }
+
+    @Test
+    void testOnlyComparisonSeparatesNormalTextFromStructuredOutputWithoutNetwork() throws Exception {
+        CapturingTransport transport = new CapturingTransport(response(reviewJson()));
+        AiHttpRequest structuredRequest = client(transport).buildHttpRequest(
+                "{}", 30_000L, "gemini-3.5-flash");
+        JsonNode structuredBody = objectMapper.readTree(structuredRequest.getBody());
+        ObjectNode normalTextBody = structuredBody.deepCopy();
+        ObjectNode normalGeneration = (ObjectNode) normalTextBody.path("generationConfig");
+        normalGeneration.remove(List.of("responseMimeType", "responseJsonSchema"));
+
+        assertThat(transport.request).isNull();
+        assertThat(structuredBody.path("generationConfig").path("responseMimeType").asText())
+                .isEqualTo("application/json");
+        assertThat(structuredBody.path("generationConfig").path("responseJsonSchema").isObject()).isTrue();
+        assertThat(normalTextBody.path("generationConfig").has("responseMimeType")).isFalse();
+        assertThat(normalTextBody.path("generationConfig").has("responseJsonSchema")).isFalse();
+        assertThat(normalTextBody.path("contents")).isEqualTo(structuredBody.path("contents"));
+        assertThat(normalTextBody.path("systemInstruction"))
+                .isEqualTo(structuredBody.path("systemInstruction"));
     }
 
     private void assertInvalid(String responseBody, String errorCode) {

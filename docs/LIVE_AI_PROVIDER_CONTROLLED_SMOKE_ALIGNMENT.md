@@ -196,6 +196,7 @@ Allowed output fields are:
     AI_AUTH_STATUS:
     AI_HTTP_STATUS_CLASS:
     AI_ERROR_CATEGORY:
+    AI_PROVIDER_ERROR_REASON:
     AI_RESPONSE_PARSE_STATUS:
     AI_TOKEN_USAGE_PRESENT:
     AI_REQUEST_ID_PRESENT:
@@ -213,6 +214,12 @@ When a Gemini 2xx response fails the strict role-result parser, the harness may 
 The diagnostic compares the candidate object with the exact V1 role fragment: required string fields `stance`, `conflictLevel`, and `summary`, plus required `reasonCodes` as an array of strings. Unknown fields, missing fields, wrong types, Markdown wrappers, and natural-language wrappers remain hard failures. The parser performs no extraction from prose and no automatic repair.
 
 `AI_HTTP_STATUS_CLASS` reports `TIMEOUT` when no HTTP response arrives because the request timed out. Otherwise it reports `1XX` through `5XX` for an HTTP response, or `NOT_AVAILABLE` when no status exists for another reason. `AI_ERROR_CATEGORY` is blank for success/skip and otherwise is one of `TIMEOUT`, `AUTH`, `MODEL_NOT_FOUND`, `RATE_LIMIT`, `PROVIDER_ERROR`, or `RESPONSE_SCHEMA`.
+
+For Gemini non-2xx responses, the controlled smoke uses narrower categories: `INVALID_REQUEST`, `SCHEMA_UNSUPPORTED`, `MODEL_CAPABILITY_ERROR`, `AUTH`, `RATE_LIMIT`, `PROVIDER_INTERNAL_ERROR`, or `UNKNOWN_PROVIDER_ERROR`. `AI_PROVIDER_ERROR_REASON` is an allowlisted enum such as `GEMINI_HTTP_400_INVALID_REQUEST`, `GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED`, or `GEMINI_HTTP_5XX_INTERNAL`. The classifier may inspect the standard error status/message in memory for a 400 response, but it never retains or emits that text. Raw response bodies, prompts, headers, request IDs, and credentials remain excluded.
+
+The official Gemini generateContent reference confirms that `responseMimeType=application/json` can be paired with `responseJsonSchema`, and that the supported schema subset includes `type`, `enum`, `items`, `maxItems`, `properties`, `additionalProperties`, and `required`. The current V1 role fragment uses only those supported fields, so this package does not change or relax the structured request. Google's troubleshooting guide classifies HTTP 500 as `INTERNAL` and HTTP 503 as `UNAVAILABLE`; controlled-smoke 5xx responses are therefore reported as `PROVIDER_INTERNAL_ERROR`, without guessing that the schema is invalid.
+
+The offline `GeminiProviderStructuredOutputContractTest` also contains a test-only A/B diagnostic fixture. Variant A removes only `responseMimeType` and `responseJsonSchema`; variant B uses the production structured request. It performs no HTTP call and is not exposed as a runtime or shell switch.
 
 ## Failure Classification
 

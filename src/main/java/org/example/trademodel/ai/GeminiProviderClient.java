@@ -8,6 +8,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -101,6 +102,71 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
             result.setSchemaDiagnostic(AiProviderSchemaDiagnostic.analyze(
                     objectMapper, providerPayload == null ? null : providerPayload.content()));
         }
+    }
+
+    @Override
+    protected AiProviderReviewResult httpFailure(AiHttpResponse response, long latencyMs) {
+        AiProviderErrorReason reason = classifyProviderError(response);
+        AiProviderCallStatus status = reason == AiProviderErrorReason.GEMINI_RATE_LIMITED
+                ? AiProviderCallStatus.RATE_LIMITED
+                : AiProviderCallStatus.FAILED;
+        return failure(status, reason.name(), latencyMs);
+    }
+
+    private AiProviderErrorReason classifyProviderError(AiHttpResponse response) {
+        int statusCode = response == null ? 0 : response.getStatusCode();
+        if (statusCode == 401 || statusCode == 403) {
+            return AiProviderErrorReason.GEMINI_AUTH_REJECTED;
+        }
+        if (statusCode == 429) {
+            return AiProviderErrorReason.GEMINI_RATE_LIMITED;
+        }
+        if (statusCode == 404) {
+            return AiProviderErrorReason.GEMINI_MODEL_CAPABILITY_ERROR;
+        }
+        if (statusCode >= 500 && statusCode <= 599) {
+            return AiProviderErrorReason.GEMINI_HTTP_5XX_INTERNAL;
+        }
+        if (statusCode == 400) {
+            String diagnosticText = sanitizedDiagnosticText(response.getBody());
+            if (isStructuredOutputUnsupported(diagnosticText)) {
+                return AiProviderErrorReason.GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED;
+            }
+            if (isModelCapabilityError(diagnosticText)) {
+                return AiProviderErrorReason.GEMINI_MODEL_CAPABILITY_ERROR;
+            }
+            return AiProviderErrorReason.GEMINI_HTTP_400_INVALID_REQUEST;
+        }
+        return AiProviderErrorReason.GEMINI_UNKNOWN_PROVIDER_ERROR;
+    }
+
+    private String sanitizedDiagnosticText(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        try {
+            JsonNode error = objectMapper.readTree(body).path("error");
+            return (error.path("status").asText("") + " " + error.path("message").asText(""))
+                    .toLowerCase(Locale.ROOT);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private static boolean isStructuredOutputUnsupported(String text) {
+        boolean structuredMarker = text.contains("structured output")
+                || text.contains("structured_output")
+                || text.contains("responsejsonschema")
+                || text.contains("response_json_schema")
+                || text.contains("responseschema")
+                || text.contains("response_schema");
+        return structuredMarker && (text.contains("unsupported") || text.contains("not supported"));
+    }
+
+    private static boolean isModelCapabilityError(String text) {
+        return text.contains("model")
+                && (text.contains("unsupported") || text.contains("not supported")
+                || text.contains("capability"));
     }
 
     private static Map<String, Object> responseJsonSchema() {

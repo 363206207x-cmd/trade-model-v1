@@ -87,20 +87,8 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
             AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs, selectedModel);
             AiHttpResponse response = transport.post(httpRequest);
             long latencyMs = elapsedMs(started);
-            if (response.getStatusCode() == 401 || response.getStatusCode() == 403) {
-                return failure(AiProviderCallStatus.FAILED, "PROVIDER_AUTH_FAILURE", latencyMs);
-            }
-            if (response.getStatusCode() == 404) {
-                return failure(AiProviderCallStatus.FAILED, "PROVIDER_MODEL_NOT_FOUND", latencyMs);
-            }
-            if (response.getStatusCode() == 429) {
-                return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
-            }
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                if (isBillingOrCreditsFailure(response.getBody())) {
-                    return failure(AiProviderCallStatus.FAILED, "PROVIDER_BILLING_OR_CREDITS", latencyMs);
-                }
-                return failure(AiProviderCallStatus.FAILED, "PROVIDER_HTTP_" + response.getStatusCode(), latencyMs);
+                return httpFailure(response, latencyMs);
             }
 
             ProviderPayload providerPayload = extractPayload(response);
@@ -138,6 +126,23 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
 
     protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
         // Provider-specific diagnostics may add sanitized metadata without retaining response values.
+    }
+
+    protected AiProviderReviewResult httpFailure(AiHttpResponse response, long latencyMs) {
+        if (response.getStatusCode() == 401 || response.getStatusCode() == 403) {
+            return failure(AiProviderCallStatus.FAILED, "PROVIDER_AUTH_FAILURE", latencyMs);
+        }
+        if (response.getStatusCode() == 404) {
+            return failure(AiProviderCallStatus.FAILED, "PROVIDER_MODEL_NOT_FOUND", latencyMs);
+        }
+        if (response.getStatusCode() == 429) {
+            return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
+        }
+        if (isBillingOrCreditsFailure(response.getBody())) {
+            return failure(AiProviderCallStatus.FAILED, "PROVIDER_BILLING_OR_CREDITS", latencyMs);
+        }
+        return failure(AiProviderCallStatus.FAILED,
+                "PROVIDER_HTTP_" + response.getStatusCode(), latencyMs);
     }
 
     protected String json(Object value) throws Exception {
@@ -193,7 +198,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return failure(AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT", elapsedMs(started));
     }
 
-    private AiProviderReviewResult failure(AiProviderCallStatus status, String code, long latencyMs) {
+    protected final AiProviderReviewResult failure(AiProviderCallStatus status, String code, long latencyMs) {
         AiProviderReviewResult result = AiProviderReviewResult.skipped(provider(), role(), status, code);
         result.setLatencyMs(latencyMs);
         result.setTimeout(status == AiProviderCallStatus.TIMEOUT);

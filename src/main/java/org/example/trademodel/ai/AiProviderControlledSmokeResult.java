@@ -9,6 +9,7 @@ public record AiProviderControlledSmokeResult(
         String authStatus,
         String httpStatusClass,
         AiProviderControlledSmokeErrorCategory errorCategory,
+        AiProviderErrorReason providerErrorReason,
         String responseParseStatus,
         boolean tokenUsagePresent,
         boolean requestIdPresent,
@@ -25,6 +26,8 @@ public record AiProviderControlledSmokeResult(
                 "AI_AUTH_STATUS: " + display(authStatus),
                 "AI_HTTP_STATUS_CLASS: " + display(httpStatusClass),
                 "AI_ERROR_CATEGORY: " + display(errorCategory == null ? null : errorCategory.name()),
+                "AI_PROVIDER_ERROR_REASON: "
+                        + display(providerErrorReason == null ? null : providerErrorReason.name()),
                 "AI_RESPONSE_PARSE_STATUS: " + display(responseParseStatus),
                 "AI_TOKEN_USAGE_PRESENT: " + yesNo(tokenUsagePresent),
                 "AI_REQUEST_ID_PRESENT: " + yesNo(requestIdPresent),
