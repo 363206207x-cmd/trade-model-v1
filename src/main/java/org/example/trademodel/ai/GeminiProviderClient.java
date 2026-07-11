@@ -12,6 +12,13 @@ import java.util.Map;
 
 @Component
 public class GeminiProviderClient extends AbstractSafeAiProviderClient {
+    private static final String STRUCTURED_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
+
+            For Gemini, return JSON only: no Markdown, no code fence, no prose, and no explanation.
+            Return exactly these AI_ROLE_RESULTS_SCHEMA_V1 role-fragment fields and no others:
+            stance, conflictLevel, reasonCodes, summary.
+            """;
+
     private final AiOrchestratorProperties properties;
 
     public GeminiProviderClient(AiOrchestratorProperties properties,
@@ -40,12 +47,17 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
                                              String selectedModel) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPromptBuilder.SYSTEM_INSTRUCTION))));
+        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", STRUCTURED_OUTPUT_INSTRUCTION))));
         body.put("contents", List.of(Map.of(
                 "role", "user",
                 "parts", List.of(Map.of("text", promptJson))
         )));
-        body.put("generationConfig", Map.of("maxOutputTokens", maxOutputTokens(), "temperature", 0));
+        Map<String, Object> generationConfig = new LinkedHashMap<>();
+        generationConfig.put("maxOutputTokens", maxOutputTokens());
+        generationConfig.put("temperature", 0);
+        generationConfig.put("responseMimeType", "application/json");
+        generationConfig.put("responseJsonSchema", responseJsonSchema());
+        body.put("generationConfig", generationConfig);
 
         String model = URLEncoder.encode(selectedModel, StandardCharsets.UTF_8);
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(),
@@ -67,6 +79,9 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 content = text(parts.get(0), "text");
             }
         }
+        if (!blank(content) && content.contains("```")) {
+            content = null;
+        }
         JsonNode usage = root.path("usageMetadata");
         String requestId = text(root, "responseId");
         if (blank(requestId)) {
@@ -76,5 +91,27 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 longValue(usage, "promptTokenCount"),
                 longValue(usage, "candidatesTokenCount"),
                 longValue(usage, "totalTokenCount"));
+    }
+
+    private static Map<String, Object> responseJsonSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("stance", Map.of(
+                "type", "string",
+                "enum", List.of("SUPPORT", "CHALLENGE", "ABSTAIN")));
+        properties.put("conflictLevel", Map.of(
+                "type", "string",
+                "enum", List.of("NONE", "MINOR", "MAJOR", "EXTREME")));
+        properties.put("reasonCodes", Map.of(
+                "type", "array",
+                "items", Map.of("type", "string"),
+                "maxItems", 8));
+        properties.put("summary", Map.of("type", "string"));
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        schema.put("properties", properties);
+        schema.put("required", List.of("stance", "conflictLevel", "reasonCodes", "summary"));
+        return schema;
     }
 }

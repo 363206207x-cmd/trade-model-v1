@@ -193,9 +193,31 @@ class AiProviderControlledSmokeTest {
         assertThat(body.path("contents").get(0).path("role").asText()).isEqualTo("user");
         assertThat(body.path("generationConfig").path("maxOutputTokens").asInt()).isEqualTo(128);
         assertThat(body.path("generationConfig").has("temperature")).isTrue();
+        assertThat(body.path("generationConfig").path("responseMimeType").asText())
+                .isEqualTo("application/json");
+        assertThat(body.path("generationConfig").path("responseJsonSchema").path("required"))
+                .hasSize(4);
 
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
         assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");
+    }
+
+    @Test
+    void invalidGeminiFixtureFailsSmokeResponseSchemaWithUsageAndRequestIdPreserved() {
+        String body = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":"
+                + "\"Natural language instead of the required JSON contract.\"}]}}],"
+                + "\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":8,"
+                + "\"totalTokenCount\":12},\"responseId\":\"test-response-id\"}";
+        FakeTransport transport = FakeTransport.responding(new AiHttpResponse(200, body, Map.of()));
+
+        AiProviderControlledSmokeResult result = smoke.run(enabled("GEMINI", true), transport);
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
+        assertThat(result.httpStatusClass()).isEqualTo("2XX");
+        assertThat(result.responseParseStatus()).isEqualTo("FAIL");
+        assertThat(result.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.RESPONSE_SCHEMA);
+        assertThat(result.tokenUsagePresent()).isTrue();
+        assertThat(result.requestIdPresent()).isTrue();
     }
 
     @Test

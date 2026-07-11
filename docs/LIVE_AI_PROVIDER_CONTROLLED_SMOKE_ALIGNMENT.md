@@ -28,6 +28,7 @@ Only first-party documentation was used:
 - Gemini lifecycle: <https://ai.google.dev/gemini-api/docs/deprecations>
 - Gemini 3.5 Flash: <https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash>
 - Gemini generateContent: <https://ai.google.dev/api/generate-content>
+- Gemini structured outputs: <https://ai.google.dev/gemini-api/docs/structured-output?lang=rest>
 - Gemini authentication: <https://ai.google.dev/gemini-api/docs/api-key>
 - xAI Grok 4.5: <https://docs.x.ai/developers/grok-4-5>
 - xAI Responses and Chat reference: <https://docs.x.ai/developers/rest-api-reference/inference/chat>
@@ -128,6 +129,16 @@ Gemini 1.5 Flash was shut down on 2025-09-29. Gemini 2.5 Flash remains stable bu
 ### Required change
 
 The default changes to gemini-3.5-flash. The endpoint and mapper remain aligned. TRADE_MODEL_AI_GEMINI_MODEL override remains supported.
+
+### Live smoke schema finding
+
+The controlled live smoke verified Gemini authentication, the generateContent endpoint, the `gemini-3.5-flash` model path, token usage, and request ID, but the returned candidate text did not satisfy the strict V1 role-result parser. HTTP success alone therefore remains insufficient.
+
+Google officially supports structured output for Gemini 3.5 Flash. The generateContent request now sets `generationConfig.responseMimeType` to `application/json` and supplies `generationConfig.responseJsonSchema` with exactly the provider role-fragment fields consumed by `AI_ROLE_RESULTS_SCHEMA_V1`: `stance`, `conflictLevel`, `reasonCodes`, and `summary`. Extra properties are disallowed. The system instruction also requires JSON only, without Markdown, code fences, prose, or explanations.
+
+The persisted `AI_ROLE_RESULTS_SCHEMA_V1` envelope is still assembled internally after provider parsing. Gemini does not own or emit rule direction, synthesis, safety state, execution plans, positions, or orders.
+
+Response extraction remains limited to `candidates[0].content.parts[0].text`. Missing nodes, blank text, Markdown fences, natural-language prefixes/suffixes, malformed JSON, unknown fields, and forbidden trading fields all fail closed. No regex extraction or output repair is used. A later operator-run smoke is required to establish a new live PASS; this package makes no provider call and does not claim production readiness.
 
 ## xAI Decision
 
