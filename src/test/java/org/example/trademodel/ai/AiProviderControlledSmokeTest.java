@@ -174,7 +174,7 @@ class AiProviderControlledSmokeTest {
     @Test
     void geminiDiagnosticModeBUsesJsonMimeWithoutSchemaSingleRequest() throws Exception {
         FakeTransport transport = FakeTransport.responding(
-                geminiResponseWithText("{\"mode\":\"json-mime-only\"}"));
+                geminiResponseWithText(reviewJsonText()));
 
         AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("B"), transport);
         var generation = objectMapper.readTree(transport.lastRequest.getBody()).path("generationConfig");
@@ -183,6 +183,31 @@ class AiProviderControlledSmokeTest {
         assertThat(generation.path("responseMimeType").asText()).isEqualTo("application/json");
         assertThat(generation.has("responseJsonSchema")).isFalse();
         assertDiagnosticOutput(result, "B");
+        assertThat(transport.calls).isEqualTo(1);
+    }
+
+    @Test
+    void geminiDiagnosticModeBJsonMismatchReachesFinalSanitizedOutput() throws Exception {
+        String providerText = "{\"stance\":\"ABSTAIN\","
+                + "\"reasonCodes\":\"PRIVATE_REASON_VALUE\","
+                + "\"summary\":\"PRIVATE_SUMMARY_VALUE\","
+                + "\"unexpected\":\"PRIVATE_EXTRA_VALUE\"}";
+        FakeTransport transport = FakeTransport.responding(geminiResponseWithText(providerText));
+
+        AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("B"), transport);
+        String output = String.join("\n", result.sanitizedOutputLines());
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
+        assertThat(result.sanitizedOutputLines()).containsExactly(
+                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
+                "GEMINI_EXPECTED_FIELDS: stance,conflictLevel,reasonCodes,summary",
+                "GEMINI_ACTUAL_FIELDS: stance,reasonCodes,summary,unexpected",
+                "GEMINI_MISSING_FIELDS: conflictLevel",
+                "GEMINI_UNEXPECTED_FIELDS: unexpected",
+                "GEMINI_TYPE_MISMATCH: reasonCodes:array->string");
+        assertThat(output).doesNotContain(
+                providerText, "PRIVATE_REASON_VALUE", "PRIVATE_SUMMARY_VALUE", "PRIVATE_EXTRA_VALUE",
+                "test-gemini-key", "x-goog-api-key", "systemInstruction", "contents");
         assertThat(transport.calls).isEqualTo(1);
     }
 
@@ -474,7 +499,10 @@ class AiProviderControlledSmokeTest {
                 "AI_DIAGNOSTIC_MODE",
                 "GEMINI_SCHEMA_DIAGNOSTIC_STATUS",
                 "GEMINI_EXPECTED_FIELDS",
-                "GEMINI_ACTUAL_FIELDS");
+                "GEMINI_ACTUAL_FIELDS",
+                "GEMINI_MISSING_FIELDS",
+                "GEMINI_UNEXPECTED_FIELDS",
+                "GEMINI_TYPE_MISMATCH");
     }
 
     @Test

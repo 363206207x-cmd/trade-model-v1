@@ -244,7 +244,7 @@ The official Gemini generateContent reference confirms that `responseMimeType=ap
 
 `GEMINI_PROVIDER_SCHEMA_STATUS: DIAGNOSTIC_ONLY_TIMEOUT`. The diagnostic C fragment still uses only supported JSON Schema features and remains available for explicitly authorized isolation tests. Production safety is enforced internally after JSON MIME output by deterministic normalization plus the unchanged strict V1 parser.
 
-The offline `GeminiProviderStructuredOutputContractTest` contains three fake-transport capability-isolation variants. Variant A is plain generateContent with neither `responseMimeType` nor `responseJsonSchema`. Variant B matches the production provider request with only `responseMimeType=application/json`; production then applies internal normalization and strict V1 validation. Variant C is diagnostic-only and adds the strict V1 role fragment as `responseJsonSchema`. Each offline test variant uses a separate fake transport and makes no network call.
+The offline `GeminiProviderStructuredOutputContractTest` contains three fake-transport capability-isolation variants. Variant A is plain generateContent with neither `responseMimeType` nor `responseJsonSchema`. Variant B matches the production provider request with only `responseMimeType=application/json`, then applies the same internal normalization and strict V1 validation so schema failures retain sanitized shape evidence. Variant C is diagnostic-only and adds the strict V1 role fragment as `responseJsonSchema` before applying the same internal validation. Each offline test variant uses a separate fake transport and makes no network call.
 
 ### Future live diagnostic plan
 

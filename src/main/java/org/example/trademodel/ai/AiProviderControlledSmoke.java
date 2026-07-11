@@ -1,7 +1,6 @@
 package org.example.trademodel.ai;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -105,13 +104,12 @@ public class AiProviderControlledSmoke {
                 return client.httpFailure(response, latencyMs);
             }
 
-            var payload = mode == GeminiDiagnosticMode.C
-                    ? client.extractPayload(response)
-                    : client.extractDiagnosticPayload(response);
+            var payload = mode == GeminiDiagnosticMode.A
+                    ? client.extractDiagnosticPayload(response)
+                    : client.extractPayload(response);
             AiProviderReviewResult result = switch (mode) {
                 case A -> plainTextDiagnostic(payload.content(), latencyMs);
-                case B -> jsonMimeDiagnostic(payload.content(), latencyMs);
-                case C -> strictSchemaDiagnostic(client, payload, latencyMs);
+                case B, C -> roleSchemaDiagnostic(client, payload, latencyMs);
             };
             result.setProviderRequestId(payload.providerRequestId());
             result.setInputTokens(payload.inputTokens());
@@ -161,16 +159,7 @@ public class AiProviderControlledSmoke {
         return diagnosticSuccess("GEMINI_DIAGNOSTIC_PLAIN_TEXT", latencyMs);
     }
 
-    private AiProviderReviewResult jsonMimeDiagnostic(String content, long latencyMs)
-            throws JsonProcessingException {
-        JsonNode root = objectMapper.readTree(content == null ? "" : content);
-        if (root == null) {
-            return diagnosticInvalid("GEMINI_DIAGNOSTIC_INVALID_JSON", latencyMs);
-        }
-        return diagnosticSuccess("GEMINI_DIAGNOSTIC_JSON_MIME", latencyMs);
-    }
-
-    private AiProviderReviewResult strictSchemaDiagnostic(
+    private AiProviderReviewResult roleSchemaDiagnostic(
             GeminiProviderClient client, AbstractSafeAiProviderClient.ProviderPayload payload,
             long latencyMs) {
         AiProviderReviewResult result = new AiProviderResponseParser(objectMapper).parse(
