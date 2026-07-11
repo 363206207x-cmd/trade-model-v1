@@ -21,7 +21,8 @@ public record GeminiResponseShapeDiagnostic(
         List<String> actualFields,
         List<String> missingFields,
         List<String> unexpectedFields,
-        List<String> typeMismatchFields) {
+        List<String> typeMismatchFields,
+        GeminiExtractionDiagnostic extractionDiagnostic) {
 
     private static final Map<String, String> EXPECTED_TYPES = expectedTypes();
     private static final Set<String> SUPPORTED_WRAPPERS = Set.of("result", "analysis");
@@ -40,12 +41,15 @@ public record GeminiResponseShapeDiagnostic(
         typeMismatchFields = immutable(typeMismatchFields);
     }
 
-    public static GeminiResponseShapeDiagnostic analyze(ObjectMapper objectMapper, String content) {
+    public static GeminiResponseShapeDiagnostic analyze(
+            ObjectMapper objectMapper, String content,
+            GeminiExtractionDiagnostic extractionDiagnostic) {
         List<String> expected = List.copyOf(EXPECTED_TYPES.keySet());
         JsonNode root = parseSingleJsonValue(objectMapper, content);
         if (root == null || !root.isObject()) {
             return new GeminiResponseShapeDiagnostic(
-                    List.of(), List.of(), List.of(), expected, List.of(), expected, List.of(), List.of());
+                    List.of(), List.of(), List.of(), expected, List.of(), expected,
+                    List.of(), List.of(), extractionDiagnostic);
         }
 
         List<String> topLevel = fieldNames(root);
@@ -80,7 +84,8 @@ public record GeminiResponseShapeDiagnostic(
             }
         }
         return new GeminiResponseShapeDiagnostic(
-                topLevel, nestedPaths, fieldTypes, expected, actual, missing, unexpected, mismatches);
+                topLevel, nestedPaths, fieldTypes, expected, actual, missing, unexpected,
+                mismatches, extractionDiagnostic);
     }
 
     private static JsonNode parseSingleJsonValue(ObjectMapper objectMapper, String content) {

@@ -198,13 +198,8 @@ class AiProviderControlledSmokeTest {
         String output = String.join("\n", result.sanitizedOutputLines());
 
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
-        assertThat(result.sanitizedOutputLines()).containsExactly(
-                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
-                "GEMINI_EXPECTED_FIELDS: stance,conflictLevel,reasonCodes,summary",
-                "GEMINI_ACTUAL_FIELDS: stance,reasonCodes,summary,unexpected",
-                "GEMINI_MISSING_FIELDS: conflictLevel",
-                "GEMINI_UNEXPECTED_FIELDS: unexpected",
-                "GEMINI_TYPE_MISMATCH: reasonCodes:array->string");
+        assertExtractionDiagnostic(result, "PASS", true, 1, true, true, true,
+                providerText.length(), false, "PASS");
         assertThat(output).doesNotContain(
                 providerText, "PRIVATE_REASON_VALUE", "PRIVATE_SUMMARY_VALUE", "PRIVATE_EXTRA_VALUE",
                 "test-gemini-key", "x-goog-api-key", "systemInstruction", "contents");
@@ -236,13 +231,8 @@ class AiProviderControlledSmokeTest {
         String output = String.join("\n", result.sanitizedOutputLines());
 
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
-        assertThat(result.sanitizedOutputLines()).containsExactly(
-                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
-                "GEMINI_EXPECTED_FIELDS: stance,conflictLevel,reasonCodes,summary",
-                "GEMINI_ACTUAL_FIELDS: stance,reasonCodes,summary",
-                "GEMINI_MISSING_FIELDS: conflictLevel",
-                "GEMINI_UNEXPECTED_FIELDS: none",
-                "GEMINI_TYPE_MISMATCH: reasonCodes:array->string");
+        assertExtractionDiagnostic(result, "PASS", true, 1, true, true, true,
+                providerText.length(), false, "PASS");
         assertThat(output).doesNotContain(
                 providerText, "PRIVATE_REASON_VALUE", "PRIVATE_SUMMARY_VALUE",
                 "test-gemini-key", "x-goog-api-key", "systemInstruction");
@@ -372,7 +362,7 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
-    void geminiResponseShapeDiagnosticExposesOnlyNamesPathsAndTypes() throws Exception {
+    void geminiExtractionDiagnosticExposesOnlyStructuralMetadata() throws Exception {
         String providerText = "{\"stance\":\"ABSTAIN\","
                 + "\"reasonCodes\":\"PRIVATE_REASON_VALUE\","
                 + "\"summary\":\"PRIVATE_SUMMARY_VALUE\","
@@ -392,13 +382,8 @@ class AiProviderControlledSmokeTest {
         String output = String.join("\n", result.sanitizedOutputLines());
 
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
-        assertThat(result.sanitizedOutputLines()).containsExactly(
-                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
-                "GEMINI_EXPECTED_FIELDS: stance,conflictLevel,reasonCodes,summary",
-                "GEMINI_ACTUAL_FIELDS: stance,reasonCodes,summary,unexpected",
-                "GEMINI_MISSING_FIELDS: conflictLevel",
-                "GEMINI_UNEXPECTED_FIELDS: unexpected",
-                "GEMINI_TYPE_MISMATCH: reasonCodes:array->string");
+        assertExtractionDiagnostic(result, "PASS", true, 1, true, true, true,
+                providerText.length(), false, "PASS");
         assertThat(output).doesNotContain(
                 providerText,
                 "PRIVATE_REASON_VALUE",
@@ -502,7 +487,16 @@ class AiProviderControlledSmokeTest {
                 "GEMINI_ACTUAL_FIELDS",
                 "GEMINI_MISSING_FIELDS",
                 "GEMINI_UNEXPECTED_FIELDS",
-                "GEMINI_TYPE_MISMATCH");
+                "GEMINI_TYPE_MISMATCH",
+                "GEMINI_EXTRACTION_DIAGNOSTIC_STATUS",
+                "CANDIDATES_PRESENT",
+                "CANDIDATE_COUNT",
+                "CONTENT_PRESENT",
+                "PARTS_PRESENT",
+                "TEXT_NODE_PRESENT",
+                "TEXT_LENGTH",
+                "EMPTY_TEXT",
+                "EXTRACTED_JSON_PARSE_STATUS");
     }
 
     @Test
@@ -588,6 +582,27 @@ class AiProviderControlledSmokeTest {
                 "AI_LATENCY_MS: " + result.latencyMs(),
                 "LIVE_PROVIDER_CALLS: 1",
                 "PRODUCTION_READINESS: BLOCKED");
+    }
+
+    private static void assertExtractionDiagnostic(
+            AiProviderControlledSmokeResult result, String status,
+            boolean candidatesPresent, int candidateCount,
+            boolean contentPresent, boolean partsPresent, boolean textNodePresent,
+            int textLength, boolean emptyText, String jsonParseStatus) {
+        assertThat(result.sanitizedOutputLines()).containsExactly(
+                "GEMINI_EXTRACTION_DIAGNOSTIC_STATUS: " + status,
+                "CANDIDATES_PRESENT: " + yesNo(candidatesPresent),
+                "CANDIDATE_COUNT: " + candidateCount,
+                "CONTENT_PRESENT: " + yesNo(contentPresent),
+                "PARTS_PRESENT: " + yesNo(partsPresent),
+                "TEXT_NODE_PRESENT: " + yesNo(textNodePresent),
+                "TEXT_LENGTH: " + textLength,
+                "EMPTY_TEXT: " + yesNo(emptyText),
+                "EXTRACTED_JSON_PARSE_STATUS: " + jsonParseStatus);
+    }
+
+    private static String yesNo(boolean value) {
+        return value ? "YES" : "NO";
     }
 
     private void assertGeminiHttpFailure(

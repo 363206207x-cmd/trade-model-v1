@@ -99,11 +99,14 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 content = text(parts.get(0), "text");
             }
         }
+        String extractedContent = content;
+        GeminiExtractionDiagnostic extractionDiagnostic =
+                GeminiExtractionDiagnostic.analyze(objectMapper, root, extractedContent);
+        GeminiResponseShapeDiagnostic responseShapeDiagnostic =
+                GeminiResponseShapeDiagnostic.analyze(objectMapper, extractedContent, extractionDiagnostic);
         if (!blank(content) && content.contains("```")) {
             content = null;
         }
-        GeminiResponseShapeDiagnostic responseShapeDiagnostic =
-                GeminiResponseShapeDiagnostic.analyze(objectMapper, content);
         if (normalizeRoleResult && !blank(content)) {
             content = roleResultNormalizer.normalize(content);
         }

@@ -22,6 +22,20 @@ public record AiProviderControlledSmokeResult(
         GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
+        GeminiExtractionDiagnostic extractionDiagnostic = geminiResponseShapeDiagnostic == null
+                ? null : geminiResponseShapeDiagnostic.extractionDiagnostic();
+        if (extractionDiagnostic != null) {
+            return List.of(
+                    "GEMINI_EXTRACTION_DIAGNOSTIC_STATUS: " + extractionDiagnostic.status(),
+                    "CANDIDATES_PRESENT: " + yesNo(extractionDiagnostic.candidatesPresent()),
+                    "CANDIDATE_COUNT: " + Math.max(0, extractionDiagnostic.candidateCount()),
+                    "CONTENT_PRESENT: " + yesNo(extractionDiagnostic.contentPresent()),
+                    "PARTS_PRESENT: " + yesNo(extractionDiagnostic.partsPresent()),
+                    "TEXT_NODE_PRESENT: " + yesNo(extractionDiagnostic.textNodePresent()),
+                    "TEXT_LENGTH: " + Math.max(0, extractionDiagnostic.textLength()),
+                    "EMPTY_TEXT: " + yesNo(extractionDiagnostic.emptyText()),
+                    "EXTRACTED_JSON_PARSE_STATUS: " + extractionDiagnostic.jsonParseStatus());
+        }
         if (geminiResponseShapeDiagnostic != null) {
             return List.of(
                     "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",

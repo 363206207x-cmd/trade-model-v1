@@ -103,6 +103,66 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
+    void extractionDiagnosticNormalStructurePasses() throws Exception {
+        GeminiExtractionDiagnostic diagnostic = extraction(response(reviewJson()));
+
+        assertThat(diagnostic.successful()).isTrue();
+        assertThat(diagnostic.candidatesPresent()).isTrue();
+        assertThat(diagnostic.candidateCount()).isEqualTo(1);
+        assertThat(diagnostic.contentPresent()).isTrue();
+        assertThat(diagnostic.partsPresent()).isTrue();
+        assertThat(diagnostic.textNodePresent()).isTrue();
+        assertThat(diagnostic.textLength()).isEqualTo(reviewJson().length());
+        assertThat(diagnostic.emptyText()).isFalse();
+        assertThat(diagnostic.extractedJsonParsePassed()).isTrue();
+    }
+
+    @Test
+    void extractionDiagnosticMissingCandidatesFails() throws Exception {
+        GeminiExtractionDiagnostic diagnostic = extraction(
+                new AiHttpResponse(200, "{}", Map.of()));
+
+        assertThat(diagnostic.successful()).isFalse();
+        assertThat(diagnostic.candidatesPresent()).isFalse();
+        assertThat(diagnostic.candidateCount()).isZero();
+        assertThat(diagnostic.contentPresent()).isFalse();
+        assertThat(diagnostic.textNodePresent()).isFalse();
+        assertThat(diagnostic.emptyText()).isTrue();
+        assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
+    }
+
+    @Test
+    void extractionDiagnosticEmptyTextFails() throws Exception {
+        GeminiExtractionDiagnostic diagnostic = extraction(response("  "));
+
+        assertThat(diagnostic.successful()).isFalse();
+        assertThat(diagnostic.candidatesPresent()).isTrue();
+        assertThat(diagnostic.contentPresent()).isTrue();
+        assertThat(diagnostic.partsPresent()).isTrue();
+        assertThat(diagnostic.textNodePresent()).isTrue();
+        assertThat(diagnostic.textLength()).isEqualTo(2);
+        assertThat(diagnostic.emptyText()).isTrue();
+        assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
+    }
+
+    @Test
+    void extractionDiagnosticUnexpectedContentStructureFails() throws Exception {
+        GeminiExtractionDiagnostic diagnostic = extraction(new AiHttpResponse(200, """
+                {"candidates":[{"content":{"parts":{"text":"{}"}}}]}
+                """, Map.of()));
+
+        assertThat(diagnostic.successful()).isFalse();
+        assertThat(diagnostic.candidatesPresent()).isTrue();
+        assertThat(diagnostic.candidateCount()).isEqualTo(1);
+        assertThat(diagnostic.contentPresent()).isTrue();
+        assertThat(diagnostic.partsPresent()).isTrue();
+        assertThat(diagnostic.textNodePresent()).isFalse();
+        assertThat(diagnostic.textLength()).isZero();
+        assertThat(diagnostic.emptyText()).isTrue();
+        assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
+    }
+
+    @Test
     void missingRequiredFieldFailsClosedWithSanitizedDiagnostic() throws Exception {
         AiProviderReviewResult result = review(response("""
                 {"stance":"ABSTAIN","reasonCodes":["SCHEMA_GAP"],"summary":"review only"}
@@ -268,6 +328,13 @@ class GeminiProviderStructuredOutputContractTest {
 
     private AiProviderReviewResult review(AiHttpResponse response) {
         return client(new CapturingTransport(response)).review(request(), 15_000L);
+    }
+
+    private GeminiExtractionDiagnostic extraction(AiHttpResponse response) throws Exception {
+        GeminiProviderClient client = client(new CapturingTransport(response));
+        return client.extractPayload(response)
+                .geminiResponseShapeDiagnostic()
+                .extractionDiagnostic();
     }
 
     private GeminiProviderClient client(CapturingTransport transport) {
