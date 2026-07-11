@@ -332,7 +332,7 @@ class AiProviderControlledSmokeTest {
         assertThat(body.path("systemInstruction").path("parts").isArray()).isTrue();
         assertThat(body.path("contents").isArray()).isTrue();
         assertThat(body.path("contents").get(0).path("role").asText()).isEqualTo("user");
-        assertThat(body.path("generationConfig").path("maxOutputTokens").asInt()).isEqualTo(128);
+        assertThat(body.path("generationConfig").path("maxOutputTokens").asInt()).isEqualTo(512);
         assertThat(body.path("generationConfig").has("temperature")).isTrue();
         assertThat(body.path("generationConfig").path("responseMimeType").asText())
                 .isEqualTo("application/json");
@@ -343,7 +343,7 @@ class AiProviderControlledSmokeTest {
         assertThat(diagnostic.model()).isEqualTo("gemini-3.5-flash");
         assertThat(diagnostic.responseMimeType()).isEqualTo("application/json");
         assertThat(diagnostic.responseSchemaPresent()).isFalse();
-        assertThat(diagnostic.maxOutputTokens()).isEqualTo(128);
+        assertThat(diagnostic.maxOutputTokens()).isEqualTo(512);
         assertThat(diagnostic.temperature()).isEqualTo("0");
         assertThat(diagnostic.systemInstructionLength()).isPositive();
         assertThat(diagnostic.userInputLength()).isPositive();
@@ -355,7 +355,7 @@ class AiProviderControlledSmokeTest {
                 "MODEL: gemini-3.5-flash",
                 "RESPONSE_MIME_TYPE: application/json",
                 "RESPONSE_SCHEMA_PRESENT: NO",
-                "MAX_OUTPUT_TOKENS: 128",
+                "MAX_OUTPUT_TOKENS: 512",
                 "TEMPERATURE: 0",
                 "STOP_SEQUENCES_PRESENT: NO",
                 "TOOLS_PRESENT: NO");
@@ -432,7 +432,10 @@ class AiProviderControlledSmokeTest {
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
 
         assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");
+        assertThat(application).contains("max-output-tokens: ${TRADE_MODEL_AI_MAX_OUTPUT_TOKENS:500}");
         assertThat(application).doesNotContain("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:30000}");
+        assertThat(AiProviderControlledSmoke.DEFAULT_SMOKE_MAX_OUTPUT_TOKENS).isEqualTo(128);
+        assertThat(AiProviderControlledSmoke.GEMINI_SMOKE_MAX_OUTPUT_TOKENS).isEqualTo(512);
     }
 
     @Test
@@ -550,6 +553,7 @@ class AiProviderControlledSmokeTest {
         }
         assertThat(script).doesNotContain("source trade-model.local-secret");
         assertThat(script).contains(
+                "export TRADE_MODEL_AI_MAX_OUTPUT_TOKENS=512",
                 "export TRADE_MODEL_AI_REQUEST_TIMEOUT_MS=15000",
                 "export TRADE_MODEL_AI_OVERALL_TIMEOUT_MS=15000",
                 "timeout_limit_ms=30000");
@@ -679,7 +683,7 @@ class AiProviderControlledSmokeTest {
                 "MODEL: gemini-3.5-flash",
                 "RESPONSE_MIME_TYPE: " + ("A".equals(mode) ? "--" : "application/json"),
                 "RESPONSE_SCHEMA_PRESENT: " + ("C".equals(mode) ? "YES" : "NO"),
-                "MAX_OUTPUT_TOKENS: 128",
+                "MAX_OUTPUT_TOKENS: 512",
                 "TEMPERATURE: 0",
                 "STOP_SEQUENCES_PRESENT: NO",
                 "TOOLS_PRESENT: NO",

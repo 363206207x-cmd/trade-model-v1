@@ -16,7 +16,8 @@ public class AiProviderControlledSmoke {
     static final String TARGET = "AI_PROVIDER_SMOKE_TARGET";
     static final String DIAGNOSTIC_GATE = "AI_PROVIDER_SMOKE_DIAGNOSTIC";
     static final String GEMINI_DIAGNOSTIC_MODE = "GEMINI_DIAGNOSTIC_MODE";
-    static final int MAX_OUTPUT_TOKENS = 128;
+    static final int DEFAULT_SMOKE_MAX_OUTPUT_TOKENS = 128;
+    static final int GEMINI_SMOKE_MAX_OUTPUT_TOKENS = 512;
     static final long DEFAULT_SMOKE_TIMEOUT_MS = 15_000L;
     static final long GEMINI_SMOKE_TIMEOUT_MS = 30_000L;
 
@@ -208,7 +209,8 @@ public class AiProviderControlledSmoke {
         properties.setRequestTimeoutMs((int) timeoutLimitMs);
         properties.setOverallTimeoutMs((int) timeoutLimitMs);
         properties.setMaxInputChars(4_000);
-        properties.setMaxOutputTokens(MAX_OUTPUT_TOKENS);
+        properties.setMaxOutputTokens(provider == AiProviderName.GEMINI
+                ? GEMINI_SMOKE_MAX_OUTPUT_TOKENS : DEFAULT_SMOKE_MAX_OUTPUT_TOKENS);
         properties.setDailyBudgetUsd(BigDecimal.ZERO);
         properties.setPerAnalysisBudgetUsd(BigDecimal.ZERO);
 

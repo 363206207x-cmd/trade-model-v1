@@ -32,6 +32,8 @@ class GeminiProviderStructuredOutputContractTest {
                 "a code fence", "an explanation", "a refusal", "a prefix", "a suffix",
                 "stance, conflictLevel, reasonCodes, summary",
                 "SUPPORT, CHALLENGE, ABSTAIN", "NONE, MINOR, MAJOR, EXTREME",
+                "summary must be a concise string no longer than 100 characters",
+                "Do not place any explanation outside the JSON object",
                 "\"stance\":\"ABSTAIN\"", "\"reasonCodes\":[\"INSUFFICIENT_DATA\"]",
                 "\"summary\":\"Insufficient evidence\"", "Never replace that JSON fallback with plain text");
         assertThat(instruction).doesNotContain("\"stance\":\"NEUTRAL\"");

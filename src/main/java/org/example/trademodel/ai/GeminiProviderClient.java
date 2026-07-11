@@ -22,7 +22,9 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
             stance, conflictLevel, reasonCodes, summary.
             Use only these values for stance: SUPPORT, CHALLENGE, ABSTAIN.
             Use only these values for conflictLevel: NONE, MINOR, MAJOR, EXTREME.
-            reasonCodes must be an array of strings and summary must be a string.
+            reasonCodes must be an array of strings.
+            summary must be a concise string no longer than 100 characters.
+            Do not place any explanation outside the JSON object.
             Even when evidence is insufficient or a review conclusion cannot be formed, return exactly this valid JSON object:
             {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":["INSUFFICIENT_DATA"],"summary":"Insufficient evidence"}
             Never replace that JSON fallback with plain text.
