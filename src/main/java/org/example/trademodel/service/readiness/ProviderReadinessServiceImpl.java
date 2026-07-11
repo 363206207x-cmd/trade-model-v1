@@ -103,8 +103,14 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
 
     private ProviderReadinessVO.ProviderStatusVO aiProviderStatus(String name, String prefix, boolean orchestratorEnabled) {
         boolean providerEnabled = orchestratorEnabled && isTrue(property(prefix + ".enabled"));
+        boolean modelConfigured = "OPENAI".equals(name)
+                ? hasText(property(prefix + ".gpt-final.fast-model"))
+                    && hasText(property(prefix + ".gpt-final.reasoning-model"))
+                    && hasText(property(prefix + ".gpt-final.fallback-models[0]"))
+                    && hasText(property(prefix + ".gpt-final.fallback-models[1]"))
+                : hasText(property(prefix + ".model"));
         boolean configured = hasText(property(prefix + ".api-key"))
-                && hasText(property(prefix + ".model"))
+                && modelConfigured
                 && hasText(property(prefix + ".base-url"));
         if (!orchestratorEnabled) {
             return item("AI", name, STATUS_WAITING_SYNC, false, configured, false, "AI_ORCHESTRATOR_DISABLED");

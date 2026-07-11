@@ -34,9 +34,10 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
-    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
+    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
+                                             String selectedModel) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", providerProperties().getEffectiveModel());
+        body.put("model", selectedModel);
         body.put("instructions", AiPromptBuilder.SYSTEM_INSTRUCTION);
         body.put("input", promptJson);
         body.put("max_output_tokens", maxOutputTokens());

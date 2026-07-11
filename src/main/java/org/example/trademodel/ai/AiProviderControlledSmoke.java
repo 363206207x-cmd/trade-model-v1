@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 
 public class AiProviderControlledSmoke {
@@ -81,7 +82,15 @@ public class AiProviderControlledSmoke {
         };
         providerProperties.setEnabled(true);
         providerProperties.setApiKey(apiKey);
-        providerProperties.setModel(model);
+        if (provider == AiProviderName.OPENAI) {
+            GptFinalModelRoutingProperties routing = providerProperties.getGptFinal();
+            routing.setFastModel(model);
+            routing.setReasoningModel(model);
+            routing.setFallbackModels(List.of("gpt-5.5", "gpt-5.4"));
+            routing.setFallbackEnabled(false);
+        } else {
+            providerProperties.setModel(model);
+        }
         providerProperties.setBaseUrl(baseUrl(provider));
         providerProperties.setRequestsPerMinute(1);
 
@@ -172,7 +181,7 @@ public class AiProviderControlledSmoke {
             return configured;
         }
         return switch (provider) {
-            case OPENAI -> "gpt-5.6-sol";
+            case OPENAI -> "gpt-5.6-luna";
             case GEMINI -> "gemini-3.5-flash";
             case XAI -> "grok-4.5";
         };
@@ -191,7 +200,9 @@ public class AiProviderControlledSmoke {
     }
 
     private static String modelVariable(AiProviderName provider) {
-        return "TRADE_MODEL_AI_" + provider.name() + "_MODEL";
+        return provider == AiProviderName.OPENAI
+                ? "TRADE_MODEL_AI_OPENAI_GPT_FINAL_FAST_MODEL"
+                : "TRADE_MODEL_AI_" + provider.name() + "_MODEL";
     }
 
     private static String apiKeyVariable(AiProviderName provider) {

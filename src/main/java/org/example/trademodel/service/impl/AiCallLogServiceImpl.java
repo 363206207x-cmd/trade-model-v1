@@ -102,6 +102,9 @@ public class AiCallLogServiceImpl implements AiCallLogService {
 
     private void fillCompletion(AiCallLogDO log, AiProviderReviewResult result) {
         LocalDateTime completedAt = LocalDateTime.now();
+        if (result.getSelectedModel() != null && !result.getSelectedModel().isBlank()) {
+            log.setModelName(safe(result.getSelectedModel(), 128));
+        }
         log.setCallStatus(result.getCallStatus() == null ? "FAILED" : result.getCallStatus().name());
         log.setProviderRequestId(safe(result.getProviderRequestId(), 128));
         log.setCompletedAt(completedAt);
@@ -144,6 +147,14 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         summary.put("reasonCodes", result.getReasonCodes());
         summary.put("summary", result.getSummary());
         summary.put("fallback", result.isFallback());
+        summary.put("originalModel", result.getOriginalModel());
+        summary.put("selectedModel", result.getSelectedModel());
+        summary.put("fallbackLevel", result.getFallbackLevel());
+        summary.put("fallbackReason", result.getFallbackReason());
+        summary.put("modelStrategy", result.getModelStrategy());
+        summary.put("modelRoutingTimestamp", result.getModelRoutingTimestamp() == null
+                ? null : result.getModelRoutingTimestamp().toString());
+        summary.put("modelRoutingTraceId", result.getModelRoutingTraceId());
         return json(summary, 1200);
     }
 

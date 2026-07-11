@@ -160,10 +160,13 @@ trade-model:
     openai:
       enabled: ${TRADE_MODEL_AI_OPENAI_ENABLED:false}
       api-key: ${OPENAI_API_KEY:}
-      model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-5.6-sol}
-      compatibility-fallback-active: ${TRADE_MODEL_AI_OPENAI_COMPATIBILITY_FALLBACK_ACTIVE:false}
-      compatibility-fallback-model: gpt-4.1-mini
-      fallback-reason: OPENAI_MODEL_FALLBACK_COMPATIBILITY
+      gpt-final:
+        fast-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FAST_MODEL:gpt-5.6-luna}
+        reasoning-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_REASONING_MODEL:gpt-5.6-sol}
+        fallback-enabled: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_ENABLED:true}
+        fallback-models:
+          - ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT55_MODEL:gpt-5.5}
+          - ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT54_MODEL:gpt-5.4}
       base-url: ${TRADE_MODEL_AI_OPENAI_BASE_URL:https://api.openai.com}
       requests-per-minute: ${TRADE_MODEL_AI_OPENAI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_INPUT_COST_PER_MILLION_USD:0}

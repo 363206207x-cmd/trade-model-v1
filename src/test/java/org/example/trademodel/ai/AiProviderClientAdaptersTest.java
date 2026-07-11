@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.http.HttpTimeoutException;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -167,6 +168,10 @@ class AiProviderClientAdaptersTest {
         properties.setEnabled(true);
         properties.setMaxInputChars(4000);
         properties.setMaxOutputTokens(200);
+        properties.getOpenai().getGptFinal().setFastModel("gpt-5.6-luna");
+        properties.getOpenai().getGptFinal().setReasoningModel("gpt-5.6-sol");
+        properties.getOpenai().getGptFinal().setFallbackModels(List.of("gpt-5.5", "gpt-5.4"));
+        properties.getOpenai().getGptFinal().setFallbackEnabled(false);
         return properties;
     }
 

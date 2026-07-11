@@ -41,10 +41,11 @@ class AiOrchestratorControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providers[0].provider").value("OPENAI"))
                 .andExpect(jsonPath("$.providers[0].ready").value(false))
-                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_AVAILABLE_UNKNOWN"))
-                .andExpect(jsonPath("$.providers[0].configuredModel").value("gpt-status"))
-                .andExpect(jsonPath("$.providers[0].effectiveModel").value("gpt-status"))
+                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_ACTIVE"))
+                .andExpect(jsonPath("$.providers[0].configuredModel").value("gpt-5.6-luna"))
+                .andExpect(jsonPath("$.providers[0].effectiveModel").value("gpt-5.6-luna"))
                 .andExpect(jsonPath("$.providers[0].fallbackUsed").value(false))
+                .andExpect(jsonPath("$.providers[0].modelStrategy").value("FAST_DECISION_MODEL"))
                 .andExpect(jsonPath("$.modelStrategy.GPT_FINAL").value("QUALITY_FIRST"))
                 .andExpect(content().string(not(containsString("sk-status-secret"))))
                 .andExpect(content().string(not(containsString("https://secret-base.test"))));
@@ -73,7 +74,9 @@ class AiOrchestratorControllerTest {
         properties.setEnabled(true);
         properties.getOpenai().setEnabled(true);
         properties.getOpenai().setApiKey("sk-status-secret");
-        properties.getOpenai().setModel("gpt-status");
+        properties.getOpenai().getGptFinal().setFastModel("gpt-5.6-luna");
+        properties.getOpenai().getGptFinal().setReasoningModel("gpt-5.6-sol");
+        properties.getOpenai().getGptFinal().setFallbackModels(List.of("gpt-5.5", "gpt-5.4"));
         properties.getOpenai().setBaseUrl("https://secret-base.test");
         properties.getOpenai().setRequestsPerMinute(1);
         properties.getOpenai().setInputCostPerMillionUsd(BigDecimal.ONE);
@@ -94,7 +97,8 @@ class AiOrchestratorControllerTest {
         @Override public AiProviderReadiness readiness() {
             return new AiProviderReadiness(provider(), role(), true, true, false,
                     properties.getConfiguredModel(), properties.getEffectiveModel(), false, null,
-                    org.example.trademodel.ai.AiModelReadinessStatus.MODEL_AVAILABLE_UNKNOWN,
+                    "FAST_DECISION_MODEL",
+                    org.example.trademodel.ai.AiModelReadinessStatus.MODEL_ACTIVE,
                     List.of("MODEL_AVAILABILITY_UNVERIFIED"));
         }
         @Override public AiProviderReviewResult review(AiProviderRequest request) { return null; }

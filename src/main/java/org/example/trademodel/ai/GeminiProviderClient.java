@@ -37,7 +37,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
-    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
+    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
+                                             String selectedModel) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPromptBuilder.SYSTEM_INSTRUCTION))));
         body.put("contents", List.of(Map.of(
@@ -46,7 +47,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         )));
         body.put("generationConfig", Map.of("maxOutputTokens", maxOutputTokens(), "temperature", 0));
 
-        String model = URLEncoder.encode(providerProperties().getEffectiveModel(), StandardCharsets.UTF_8);
+        String model = URLEncoder.encode(selectedModel, StandardCharsets.UTF_8);
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(),
                 "/v1beta/models/" + model + ":generateContent"), json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();

@@ -89,6 +89,7 @@ public class AiOrchestratorController {
         map.put("effectiveModel", readiness.getEffectiveModel());
         map.put("fallbackUsed", readiness.isFallbackUsed());
         map.put("fallbackReason", readiness.getFallbackReason());
+        map.put("modelStrategy", readiness.getModelStrategy());
         map.put("requestsPerMinuteConfigured", providerProperties.getRequestsPerMinute() > 0);
         map.put("costRateConfigured", providerProperties.getInputCostPerMillionUsd().signum() > 0
                 && providerProperties.getOutputCostPerMillionUsd().signum() > 0);

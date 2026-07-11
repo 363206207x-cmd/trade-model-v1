@@ -3,8 +3,13 @@ package org.example.trademodel.ai;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.net.http.HttpTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 
@@ -14,73 +19,101 @@ class AiProviderModelStrategyTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void gptFinalUsesConfiguredQualityFirstModelAndAvailabilityRemainsUnknown() throws Exception {
-        AiOrchestratorProperties properties = properties();
-        properties.getOpenai().setModel("gpt-5.6-sol");
-        CapturingTransport transport = new CapturingTransport(openAiResponse());
-        OpenAiProviderClient client = new OpenAiProviderClient(properties, transport, objectMapper);
+    void normalCheckpointSelectsApprovedGpt56FastModel() {
+        SequenceTransport transport = SequenceTransport.responding(openAiResponse());
+        OpenAiProviderClient client = client(transport);
 
-        AiProviderReadiness readiness = client.readiness();
-        client.review(request());
+        AiProviderReviewResult result = client.review(request(false), 5_000);
 
-        assertThat(readiness.getConfiguredModel()).isEqualTo("gpt-5.6-sol");
-        assertThat(readiness.getEffectiveModel()).isEqualTo("gpt-5.6-sol");
-        assertThat(readiness.getModelReadinessStatus())
-                .isEqualTo(AiModelReadinessStatus.MODEL_AVAILABLE_UNKNOWN);
-        assertThat(readiness.isReady()).isFalse();
-        assertThat(transport.request.getBody())
-                .contains("\"model\":\"gpt-5.6-sol\"")
-                .contains("\"reasoning\":{\"effort\":\"high\"}")
-                .doesNotContain("\"temperature\"");
-        assertThat(properties.getModelStrategy().getGptFinal().getPriority())
-                .isEqualTo(AiRoleModelPriority.QUALITY_FIRST);
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getModelStrategy()).isEqualTo("FAST_DECISION_MODEL");
+        assertThat(result.getOriginalModel()).isEqualTo("gpt-5.6-luna");
+        assertThat(result.getSelectedModel()).isEqualTo("gpt-5.6-luna");
+        assertThat(result.getFallbackLevel()).isZero();
+        assertThat(transport.models()).containsExactly("gpt-5.6-luna");
     }
 
     @Test
-    void gptCompatibilityFallbackMustBeExplicitAndEmitsReasonCode() {
-        AiProviderProperties provider = properties().getOpenai();
-        provider.setModel("gpt-5.6-sol");
-        provider.setCompatibilityFallbackModel("gpt-4.1-mini");
-        provider.setFallbackReason(AiProviderProperties.OPENAI_COMPATIBILITY_FALLBACK_REASON);
+    void conflictEscalationSelectsApprovedGpt56ReasoningModel() {
+        SequenceTransport transport = SequenceTransport.responding(openAiResponse());
+        OpenAiProviderClient client = client(transport);
 
-        assertThat(provider.getEffectiveModel()).isEqualTo("gpt-5.6-sol");
-        assertThat(provider.isFallbackUsed()).isFalse();
+        AiProviderReviewResult result = client.review(request(true), 5_000);
 
-        provider.setCompatibilityFallbackActive(true);
-        OpenAiProviderClient client = new OpenAiProviderClient(propertiesWith(provider),
-                new CapturingTransport(openAiResponse()), objectMapper);
-        AiProviderReadiness readiness = client.readiness();
-
-        assertThat(readiness.getConfiguredModel()).isEqualTo("gpt-5.6-sol");
-        assertThat(readiness.getEffectiveModel()).isEqualTo("gpt-4.1-mini");
-        assertThat(readiness.isFallbackUsed()).isTrue();
-        assertThat(readiness.getFallbackReason())
-                .isEqualTo("OPENAI_MODEL_FALLBACK_COMPATIBILITY");
-        assertThat(readiness.getModelReadinessStatus())
-                .isEqualTo(AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE);
-        assertThat(readiness.getReasonCodes())
-                .containsExactly("OPENAI_MODEL_FALLBACK_COMPATIBILITY");
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getModelStrategy()).isEqualTo("DEEP_REASONING_MODEL");
+        assertThat(result.getOriginalModel()).isEqualTo("gpt-5.6-sol");
+        assertThat(result.getSelectedModel()).isEqualTo("gpt-5.6-sol");
+        assertThat(transport.models()).containsExactly("gpt-5.6-sol");
     }
 
     @Test
-    void malformedOrMissingModelSelectionFailsClosed() {
-        AiOrchestratorProperties properties = properties();
-        properties.getOpenai().setModel(" ");
-        OpenAiProviderClient client = new OpenAiProviderClient(properties,
-                new CapturingTransport(openAiResponse()), objectMapper);
+    void fastTimeoutFallsToGpt55WithExplicitAuditMetadata() {
+        SequenceTransport transport = new SequenceTransport();
+        transport.addFailure(new HttpTimeoutException("test timeout"));
+        transport.addResponse(openAiResponse());
 
-        assertThat(client.readiness().isConfigured()).isFalse();
-        assertThat(client.readiness().isReady()).isFalse();
+        OpenAiProviderClient client = client(transport);
+        AiProviderReviewResult result = client.review(request(false), 5_000);
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getSelectedModel()).isEqualTo("gpt-5.5");
+        assertThat(result.getFallbackLevel()).isEqualTo(1);
+        assertThat(result.getFallbackReason()).isEqualTo("OPENAI_FALLBACK_GPT55");
+        assertThat(result.getReasonCodes())
+                .contains("OPENAI_FAST_MODEL_TIMEOUT", "OPENAI_FALLBACK_GPT55");
+        assertThat(result.getModelRoutingTimestamp()).isNotNull();
+        assertThat(result.getModelRoutingTraceId()).isEqualTo("trace-model-routing");
+        assertThat(transport.models()).containsExactly("gpt-5.6-luna", "gpt-5.5");
         assertThat(client.readiness().getModelReadinessStatus())
-                .isEqualTo(AiModelReadinessStatus.MODEL_NOT_CONFIGURED);
-        assertThat(client.readiness().getReasonCodes()).containsExactly("MODEL_NOT_CONFIGURED");
+                .isEqualTo(AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE);
+        assertThat(client.readiness().getEffectiveModel()).isEqualTo("gpt-5.5");
+    }
 
-        properties.getOpenai().setModel("gpt-5.6-sol");
-        properties.getOpenai().setCompatibilityFallbackActive(true);
-        properties.getOpenai().setCompatibilityFallbackModel("gpt-4.1-mini");
-        properties.getOpenai().setFallbackReason("UNDECLARED_DOWNGRADE");
+    @Test
+    void gpt55UnavailableFallsToGpt54() {
+        SequenceTransport transport = SequenceTransport.responding(
+                modelNotFound(), modelNotFound(), openAiResponse());
+
+        AiProviderReviewResult result = client(transport).review(request(false), 5_000);
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getSelectedModel()).isEqualTo("gpt-5.4");
+        assertThat(result.getFallbackLevel()).isEqualTo(2);
+        assertThat(result.getFallbackReason()).isEqualTo("OPENAI_FALLBACK_GPT54");
+        assertThat(result.getReasonCodes()).contains("OPENAI_FALLBACK_GPT55", "OPENAI_FALLBACK_GPT54");
+        assertThat(transport.models()).containsExactly("gpt-5.6-luna", "gpt-5.5", "gpt-5.4");
+    }
+
+    @Test
+    void noAcceptableModelReturnsModelUnavailable() {
+        SequenceTransport transport = SequenceTransport.responding(
+                modelNotFound(), modelNotFound(), modelNotFound());
+
+        AiProviderReviewResult result = client(transport).review(request(true), 5_000);
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getErrorCode()).isEqualTo("MODEL_UNAVAILABLE");
+        assertThat(result.getFallbackReason()).isEqualTo("OPENAI_NO_ACCEPTABLE_MODEL_AVAILABLE");
+        assertThat(result.getReasonCodes()).contains("OPENAI_REASONING_MODEL_UNAVAILABLE",
+                "OPENAI_NO_ACCEPTABLE_MODEL_AVAILABLE");
+        assertThat(client(SequenceTransport.responding(openAiResponse())).readiness().isReady()).isFalse();
+    }
+
+    @Test
+    void modelPolicyRejectsEveryGpt4PathAndMalformedConfiguration() {
+        assertThat(OpenAiModelRouter.isApprovedModel("gpt-4.1-mini")).isFalse();
+        assertThat(OpenAiModelRouter.isApprovedModel("gpt-4.1")).isFalse();
+        assertThat(OpenAiModelRouter.isApprovedModel("gpt-4o")).isFalse();
+        assertThat(OpenAiModelRouter.isApprovedModel("gpt-5.3")).isFalse();
+
+        AiOrchestratorProperties properties = properties();
+        properties.getOpenai().getGptFinal().setFallbackModels(List.of("gpt-5.5", "gpt-4.1-mini"));
+        OpenAiProviderClient client = new OpenAiProviderClient(properties,
+                SequenceTransport.responding(openAiResponse()), objectMapper);
         assertThat(client.readiness().isConfigured()).isFalse();
-        assertThat(client.readiness().getEffectiveModel()).isEmpty();
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_UNAVAILABLE);
     }
 
     @Test
@@ -91,25 +124,29 @@ class AiProviderModelStrategyTest {
         String dashboard = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
 
         assertThat(application)
-                .contains("model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-5.6-sol}")
+                .contains("fast-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FAST_MODEL:gpt-5.6-luna}")
+                .contains("reasoning-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_REASONING_MODEL:gpt-5.6-sol}")
+                .contains("${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT55_MODEL:gpt-5.5}")
+                .contains("${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT54_MODEL:gpt-5.4}")
                 .contains("model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}")
                 .contains("model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}")
-                .contains("priority: ${TRADE_MODEL_AI_GPT_FINAL_PRIORITY:QUALITY_FIRST}")
-                .contains("priority: ${TRADE_MODEL_AI_GEMINI_REVIEW_PRIORITY:BALANCED}")
-                .contains("priority: ${TRADE_MODEL_AI_GROK_CHALLENGE_PRIORITY:CHALLENGE_FIRST}")
-                .doesNotContain("gemini-1.5-flash");
+                .doesNotContain("gpt-4.1-mini", "gpt-4o", "gemini-1.5-flash");
         assertThat(xaiClient).contains("/v1/responses").doesNotContain("/v1/chat/completions");
         assertThat(dashboard).contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
     }
 
     @Test
-    void aiModelSelectionRemainsReviewOnlyAndCannotCreateTradingRecords() throws Exception {
+    void aiModelRoutingRemainsReviewOnlyAndCannotCreateTradingRecords() throws Exception {
         AiOrchestratorResult result = new AiOrchestratorResult();
         assertThat(result.isReviewOnly()).isTrue();
+        assertThat(result.isManualReviewOnly()).isTrue();
+        assertThat(result.isNotTradeInstruction()).isTrue();
         assertThat(result.isNotExecutable()).isTrue();
+        assertThat(result.isNotAutoTrading()).isTrue();
         assertThat(result.isNotOrderExecution()).isTrue();
         assertThat(result.isNotUserPositionCreation()).isTrue();
         assertThat(result.isNotPositionMutation()).isTrue();
+        assertThat(result.isNotStateMachineOverride()).isTrue();
         assertThat(result.isRuleDirectionPreserved()).isTrue();
 
         String orchestrator = Files.readString(Path.of(
@@ -119,42 +156,46 @@ class AiProviderModelStrategyTest {
                 .doesNotContain("manualOpen(", "manualClose(", "placeOrder(");
     }
 
+    private OpenAiProviderClient client(SequenceTransport transport) {
+        return new OpenAiProviderClient(properties(), transport, objectMapper);
+    }
+
     private static AiOrchestratorProperties properties() {
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
         properties.setEnabled(true);
-        configure(properties.getOpenai());
-        return properties;
-    }
-
-    private static AiOrchestratorProperties propertiesWith(AiProviderProperties openai) {
-        AiOrchestratorProperties properties = new AiOrchestratorProperties();
-        properties.setEnabled(true);
-        properties.setOpenai(openai);
-        return properties;
-    }
-
-    private static void configure(AiProviderProperties provider) {
+        AiProviderProperties provider = properties.getOpenai();
         provider.setEnabled(true);
         provider.setApiKey("test-key-not-a-secret");
-        provider.setModel("gpt-5.6-sol");
         provider.setBaseUrl("https://provider.test");
         provider.setRequestsPerMinute(1);
+        GptFinalModelRoutingProperties routing = provider.getGptFinal();
+        routing.setFastModel("gpt-5.6-luna");
+        routing.setReasoningModel("gpt-5.6-sol");
+        routing.setFallbackModels(List.of("gpt-5.5", "gpt-5.4"));
+        routing.setFallbackEnabled(true);
+        return properties;
     }
 
-    private static AiProviderRequest request() {
+    private static AiProviderRequest request(boolean deep) {
         AiProviderRequest request = new AiProviderRequest();
-        request.setAnalysisId("analysis-model-strategy");
-        request.setTraceId("trace-model-strategy");
+        request.setAnalysisId("analysis-model-routing");
+        request.setTraceId("trace-model-routing");
         request.setSymbol("NON_MARKET_TEST");
         request.setTimeframe("NOT_APPLICABLE");
         request.setRuleMarketBias("NEUTRAL");
-        request.setDecisionFacts(Map.of("ruleDirectionPreserved", true));
+        request.setRuleRiskLevel(deep ? "HIGH" : "MEDIUM");
+        request.setMultiTimeframeState(deep ? "CONTRADICTION" : "ALIGNED");
+        request.setDecisionFacts(Map.of("confused", deep, "ruleDirectionPreserved", true));
         return request;
+    }
+
+    private static AiHttpResponse modelNotFound() {
+        return new AiHttpResponse(404, "model unavailable", Map.of());
     }
 
     private static AiHttpResponse openAiResponse() {
         String payload = "{\"stance\":\"ABSTAIN\",\"conflictLevel\":\"NONE\","
-                + "\"reasonCodes\":[\"MODEL_STRATEGY_TEST\"],\"summary\":\"review only\"}";
+                + "\"reasonCodes\":[\"MODEL_ROUTING_TEST\"],\"summary\":\"review only\"}";
         return new AiHttpResponse(200, "{\"output_text\":" + quote(payload) + "}", Map.of());
     }
 
@@ -162,18 +203,34 @@ class AiProviderModelStrategyTest {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
-    private static final class CapturingTransport implements AiHttpTransport {
-        private final AiHttpResponse response;
-        private AiHttpRequest request;
+    private static final class SequenceTransport implements AiHttpTransport {
+        private final Deque<Object> outcomes = new ArrayDeque<>();
+        private final List<String> models = new ArrayList<>();
 
-        private CapturingTransport(AiHttpResponse response) {
-            this.response = response;
+        static SequenceTransport responding(AiHttpResponse... responses) {
+            SequenceTransport transport = new SequenceTransport();
+            for (AiHttpResponse response : responses) {
+                transport.addResponse(response);
+            }
+            return transport;
         }
 
+        void addResponse(AiHttpResponse response) { outcomes.add(response); }
+        void addFailure(IOException failure) { outcomes.add(failure); }
+        List<String> models() { return List.copyOf(models); }
+
         @Override
-        public AiHttpResponse post(AiHttpRequest request) {
-            this.request = request;
-            return response;
+        public AiHttpResponse post(AiHttpRequest request) throws IOException {
+            try {
+                models.add(new ObjectMapper().readTree(request.getBody()).path("model").asText());
+            } catch (Exception e) {
+                throw new IOException("invalid test request", e);
+            }
+            Object outcome = outcomes.removeFirst();
+            if (outcome instanceof IOException failure) {
+                throw failure;
+            }
+            return (AiHttpResponse) outcome;
         }
     }
 }

@@ -37,33 +37,26 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         boolean configured = providerProperties.hasKeyAndModel() && !blank(providerProperties.getBaseUrl());
         String configuredModel = providerProperties.getConfiguredModel();
         String effectiveModel = providerProperties.getEffectiveModel();
-        boolean fallbackUsed = providerProperties.isFallbackUsed();
-        String fallbackReason = providerProperties.getFallbackReason();
         AiModelReadinessStatus modelStatus;
         if (!providerProperties.hasValidModelSelection()) {
-            modelStatus = AiModelReadinessStatus.MODEL_NOT_CONFIGURED;
-        } else if (fallbackUsed) {
-            modelStatus = AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE;
+            modelStatus = AiModelReadinessStatus.MODEL_UNAVAILABLE;
         } else if (enabled && configured) {
-            modelStatus = AiModelReadinessStatus.MODEL_AVAILABLE_UNKNOWN;
+            modelStatus = AiModelReadinessStatus.MODEL_ACTIVE;
         } else {
             modelStatus = AiModelReadinessStatus.MODEL_CONFIGURED;
         }
         if (!enabled) {
-            return readiness(false, configured, configuredModel, effectiveModel, fallbackUsed,
-                    fallbackReason, modelStatus, List.of("PROVIDER_DISABLED"));
+            return readiness(false, configured, configuredModel, effectiveModel, false,
+                    null, modelStatus, List.of("PROVIDER_DISABLED"));
         }
         if (!configured) {
             String reason = providerProperties.hasValidModelSelection()
                     ? "PROVIDER_NOT_CONFIGURED" : "MODEL_NOT_CONFIGURED";
-            return readiness(true, false, configuredModel, effectiveModel, fallbackUsed,
-                    fallbackReason, modelStatus, List.of(reason));
+            return readiness(true, false, configuredModel, effectiveModel, false,
+                    null, modelStatus, List.of(reason));
         }
-        List<String> reasons = fallbackUsed
-                ? List.of(AiProviderProperties.OPENAI_COMPATIBILITY_FALLBACK_REASON)
-                : List.of("MODEL_AVAILABILITY_UNVERIFIED");
-        return readiness(true, true, configuredModel, effectiveModel, fallbackUsed,
-                fallbackReason, modelStatus, reasons);
+        return readiness(true, true, configuredModel, effectiveModel, false,
+                null, modelStatus, List.of("MODEL_AVAILABILITY_UNVERIFIED"));
     }
 
     private AiProviderReadiness readiness(boolean enabled, boolean configured,
@@ -83,10 +76,15 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
 
     @Override
     public AiProviderReviewResult review(AiProviderRequest request, long timeoutOverrideMs) {
+        return reviewWithModel(request, timeoutOverrideMs, providerProperties().getEffectiveModel());
+    }
+
+    protected AiProviderReviewResult reviewWithModel(AiProviderRequest request, long timeoutOverrideMs,
+                                                     String selectedModel) {
         long started = System.nanoTime();
         AiPromptBuilder.PromptPayload prompt = promptBuilder.build(request, role());
         try {
-            AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs);
+            AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs, selectedModel);
             AiHttpResponse response = transport.post(httpRequest);
             long latencyMs = elapsedMs(started);
             if (response.getStatusCode() == 401 || response.getStatusCode() == 403) {
@@ -132,7 +130,8 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         }
     }
 
-    protected abstract AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception;
+    protected abstract AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
+                                                      String selectedModel) throws Exception;
 
     protected abstract ProviderPayload extractPayload(AiHttpResponse response) throws Exception;
 
@@ -227,7 +226,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return Math.max(0, (System.nanoTime() - started) / 1_000_000L);
     }
 
-    private static List<String> appendReason(List<String> reasonCodes, String code) {
+    protected static List<String> appendReason(List<String> reasonCodes, String code) {
         java.util.ArrayList<String> copy = new java.util.ArrayList<>(reasonCodes == null ? List.of() : reasonCodes);
         copy.add(code);
         return copy;

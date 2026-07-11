@@ -35,7 +35,10 @@ class ProviderReadinessServiceImplTest {
                 .withProperty("trade-model.ai.enabled", "true")
                 .withProperty("trade-model.ai.openai.enabled", "true")
                 .withProperty("trade-model.ai.openai.api-key", "configured-openai-key")
-                .withProperty("trade-model.ai.openai.model", "gpt-test")
+                .withProperty("trade-model.ai.openai.gpt-final.fast-model", "gpt-5.6-luna")
+                .withProperty("trade-model.ai.openai.gpt-final.reasoning-model", "gpt-5.6-sol")
+                .withProperty("trade-model.ai.openai.gpt-final.fallback-models[0]", "gpt-5.5")
+                .withProperty("trade-model.ai.openai.gpt-final.fallback-models[1]", "gpt-5.4")
                 .withProperty("trade-model.ai.openai.base-url", "https://api.openai.test")
                 .withProperty("trade-model.external-context.news.api-key", "configured-news-key");
 

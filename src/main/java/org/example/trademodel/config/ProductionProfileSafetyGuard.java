@@ -104,7 +104,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             }
         }
 
-        validateExplicitAiProvider(environment, errors, "OpenAI", "trade-model.ai.openai");
+        validateExplicitOpenAiProvider(environment, errors);
         validateExplicitAiProvider(environment, errors, "Gemini", "trade-model.ai.gemini");
         validateExplicitAiProvider(environment, errors, "xAI", "trade-model.ai.xai");
 
@@ -362,6 +362,29 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
         if (isBlank(property(environment, propertyPrefix + ".base-url"))) {
             errors.add(displayName + " base URL missing for explicitly enabled production AI provider");
+        }
+    }
+
+    private static void validateExplicitOpenAiProvider(Environment environment, List<String> errors) {
+        String prefix = "trade-model.ai.openai";
+        if (!isTrue(property(environment, prefix + ".enabled"))) {
+            return;
+        }
+        if (isBlank(property(environment, prefix + ".api-key"))) {
+            errors.add("OpenAI API key missing for explicitly enabled production AI provider");
+        }
+        String fast = property(environment, prefix + ".gpt-final.fast-model");
+        String reasoning = property(environment, prefix + ".gpt-final.reasoning-model");
+        String gpt55 = property(environment, prefix + ".gpt-final.fallback-models[0]");
+        String gpt54 = property(environment, prefix + ".gpt-final.fallback-models[1]");
+        if (!org.example.trademodel.ai.OpenAiModelRouter.isApprovedPrimary(fast)
+                || !org.example.trademodel.ai.OpenAiModelRouter.isApprovedPrimary(reasoning)
+                || !org.example.trademodel.ai.OpenAiModelRouter.isApprovedGpt55(gpt55)
+                || !org.example.trademodel.ai.OpenAiModelRouter.isApprovedGpt54(gpt54)) {
+            errors.add("OpenAI GPT_FINAL model routing must stay within approved GPT-5.6/5.5/5.4 models");
+        }
+        if (isBlank(property(environment, prefix + ".base-url"))) {
+            errors.add("OpenAI base URL missing for explicitly enabled production AI provider");
         }
     }
 
