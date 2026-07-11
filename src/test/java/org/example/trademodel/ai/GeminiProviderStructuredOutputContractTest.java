@@ -23,7 +23,7 @@ class GeminiProviderStructuredOutputContractTest {
         assertThat(result.successful()).isTrue();
         JsonNode requestBody = objectMapper.readTree(transport.request.getBody());
         assertThat(transport.request.getUrl()).isEqualTo(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent");
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent");
         assertThat(transport.request.getHeaders()).containsEntry("x-goog-api-key", "test-gemini-key");
         assertThat(requestBody.path("contents").isArray()).isTrue();
         String instruction = requestBody.path("systemInstruction").path("parts").get(0).path("text").asText();
@@ -106,6 +106,12 @@ class GeminiProviderStructuredOutputContractTest {
     @Test
     void naturalLanguagePlusJsonFailsClosed() throws Exception {
         assertInvalid(response("Here is the result: " + reviewJson()).getBody(),
+                "INVALID_EMPTY_RESPONSE");
+    }
+
+    @Test
+    void malformedJsonStillFailsClosedWithoutAutomaticRepair() throws Exception {
+        assertInvalid(response("{\"stance\":\"ABSTAIN\"").getBody(),
                 "INVALID_EMPTY_RESPONSE");
     }
 
@@ -339,7 +345,7 @@ class GeminiProviderStructuredOutputContractTest {
     private AiHttpRequest diagnosticRequest(
             CapturingTransport transport, DiagnosticVariant variant) throws Exception {
         GeminiProviderClient client = client(transport);
-        AiHttpRequest request = client.buildHttpRequest("{}", 30_000L, "gemini-3.5-flash");
+        AiHttpRequest request = client.buildHttpRequest("{}", 30_000L, "gemini-2.5-pro");
         ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
         ObjectNode generation = (ObjectNode) body.path("generationConfig");
         if (variant == DiagnosticVariant.PLAIN_TEXT) {
@@ -386,7 +392,7 @@ class GeminiProviderStructuredOutputContractTest {
         AiProviderProperties gemini = properties.getGemini();
         gemini.setEnabled(true);
         gemini.setApiKey("test-gemini-key");
-        gemini.setModel("gemini-3.5-flash");
+        gemini.setModel("gemini-2.5-pro");
         gemini.setBaseUrl("https://generativelanguage.googleapis.com");
         return new GeminiProviderClient(properties, transport, objectMapper);
     }

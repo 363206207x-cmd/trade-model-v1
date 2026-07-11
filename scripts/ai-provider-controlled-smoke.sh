@@ -81,7 +81,7 @@ case "${target}" in
     provider_enabled="${TRADE_MODEL_AI_OPENAI_ENABLED:-false}"
     ;;
   GEMINI)
-    model="${TRADE_MODEL_AI_GEMINI_MODEL:-gemini-3.5-flash}"
+    model="${TRADE_MODEL_AI_GEMINI_MODEL:-gemini-2.5-pro}"
     provider_enabled="${TRADE_MODEL_AI_GEMINI_ENABLED:-false}"
     ;;
   XAI)

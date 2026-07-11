@@ -321,7 +321,7 @@ class AiProviderControlledSmokeTest {
         assertThat(result.errorCategory()).isNull();
         assertThat(result.responseParseStatus()).isEqualTo("PASS");
         assertThat(transport.lastRequest.getUrl()).isEqualTo(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent");
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent");
         assertThat(transport.lastRequest.getHeaders())
                 .containsEntry("x-goog-api-key", "test-gemini-key");
         assertThat(result.timeoutLimitMs()).isEqualTo(30_000L);
@@ -340,7 +340,7 @@ class AiProviderControlledSmokeTest {
 
         GeminiRequestDiagnostic diagnostic = result.geminiRequestDiagnostic();
         assertThat(diagnostic).isNotNull();
-        assertThat(diagnostic.model()).isEqualTo("gemini-3.5-flash");
+        assertThat(diagnostic.model()).isEqualTo("gemini-2.5-pro");
         assertThat(diagnostic.responseMimeType()).isEqualTo("application/json");
         assertThat(diagnostic.responseSchemaPresent()).isFalse();
         assertThat(diagnostic.maxOutputTokens()).isEqualTo(512);
@@ -352,7 +352,7 @@ class AiProviderControlledSmokeTest {
         String diagnosticOutput = String.join("\n", result.sanitizedOutputLines());
         assertThat(diagnosticOutput).contains(
                 "GEMINI_REQUEST_DIAGNOSTIC: SANITIZED",
-                "MODEL: gemini-3.5-flash",
+                "MODEL: gemini-2.5-pro",
                 "RESPONSE_MIME_TYPE: application/json",
                 "RESPONSE_SCHEMA_PRESENT: NO",
                 "MAX_OUTPUT_TOKENS: 512",
@@ -657,7 +657,7 @@ class AiProviderControlledSmokeTest {
                 "reasoning-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_REASONING_MODEL:gpt-5.6-sol}",
                 "${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT55_MODEL:gpt-5.5}",
                 "${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT54_MODEL:gpt-5.4}",
-                "model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}",
+                "model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-2.5-pro}",
                 "model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}",
                 "priority: ${TRADE_MODEL_AI_GPT_FINAL_PRIORITY:QUALITY_FIRST}",
                 "priority: ${TRADE_MODEL_AI_GEMINI_REVIEW_PRIORITY:BALANCED}",
@@ -695,7 +695,7 @@ class AiProviderControlledSmokeTest {
         assertThat(result.liveProviderCalls()).isEqualTo(1);
         assertThat(result.sanitizedOutputLines()).contains(
                 "GEMINI_REQUEST_DIAGNOSTIC: SANITIZED",
-                "MODEL: gemini-3.5-flash",
+                "MODEL: gemini-2.5-pro",
                 "RESPONSE_MIME_TYPE: " + ("A".equals(mode) ? "--" : "application/json"),
                 "RESPONSE_SCHEMA_PRESENT: " + ("C".equals(mode) ? "YES" : "NO"),
                 "MAX_OUTPUT_TOKENS: 512",

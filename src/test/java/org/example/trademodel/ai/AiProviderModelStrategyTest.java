@@ -158,9 +158,9 @@ class AiProviderModelStrategyTest {
                 .contains("reasoning-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_REASONING_MODEL:gpt-5.6-sol}")
                 .contains("${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT55_MODEL:gpt-5.5}")
                 .contains("${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT54_MODEL:gpt-5.4}")
-                .contains("model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}")
+                .contains("model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-2.5-pro}")
                 .contains("model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}")
-                .doesNotContain("gpt-4.1-mini", "gpt-4o", "gemini-1.5-flash");
+                .doesNotContain("gpt-4.1-mini", "gpt-4o", "gemini-1.5-flash", "gemini-3.5-flash");
         assertThat(xaiClient).contains("/v1/responses").doesNotContain("/v1/chat/completions");
         assertThat(dashboard).contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
     }

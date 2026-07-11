@@ -27,6 +27,7 @@ Only first-party documentation was used:
 - OpenAI request IDs: <https://developers.openai.com/api/reference/overview#debugging-requests>
 - Gemini lifecycle: <https://ai.google.dev/gemini-api/docs/deprecations>
 - Gemini 3.5 Flash: <https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash>
+- Gemini 2.5 Pro: <https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro>
 - Gemini generateContent: <https://ai.google.dev/api/generate-content>
 - Gemini structured outputs: <https://ai.google.dev/gemini-api/docs/structured-output?lang=rest>
 - Gemini authentication: <https://ai.google.dev/gemini-api/docs/api-key>
@@ -50,7 +51,7 @@ The parser accepts only the review-only schema. It rejects direction overrides, 
 | Provider | Official current contract | Assessment | Required change |
 |---|---|---|---|
 | OpenAI | GPT-5.6 Luna targets speed-sensitive workloads, GPT-5.6 Sol is the family frontier model, and GPT-5.5/GPT-5.4 support Responses and reasoning | Single-model gap | Route normal checkpoints to Luna, complex conflicts to Sol, then fall back only to GPT-5.5 and GPT-5.4 |
-| Gemini | Gemini 1.5 Flash was shut down; gemini-3.5-flash is stable GA | Previous default unusable | Change default model; retain generateContent mapping |
+| Gemini | `gemini-2.5-pro` is a stable Pro API model with structured-output and thinking support | Flash JSON reliability gap | Select stable Pro for consistency review; retain generateContent mapping |
 | xAI | grok-4.5 supports Responses and Chat; xAI recommends Responses and labels Chat deprecated | Endpoint deprecation risk | Change default model and migrate to POST /v1/responses |
 
 ## OpenAI Decision
@@ -78,7 +79,7 @@ AI is checkpoint-driven rather than a high-frequency chat surface. Model selecti
 | Role | Provider default | Priority | Responsibility |
 |---|---|---|---|
 | GPT_FINAL | routed GPT-5.6/5.5/5.4 | QUALITY_FIRST | Final adjudication, instruction following, and conflict resolution |
-| GEMINI_REVIEW | gemini-3.5-flash | BALANCED | Low-latency consistency review and structured-output checking |
+| GEMINI_REVIEW | gemini-2.5-pro | BALANCED | High-reliability consistency review and structured-output checking |
 | GROK_CHALLENGE | grok-4.5 | ADVERSARIAL_CHALLENGE | Contradiction detection and counter-challenge generation |
 
 The configuration keys are trade-model.ai.model-strategy.gpt-final.priority, gemini-review.priority, and grok-challenge.priority. Provider status exposes configuredModel, effectiveModel, fallbackUsed, and fallbackReason without exposing API keys.
@@ -124,15 +125,15 @@ The client uses generateContent with x-goog-api-key, systemInstruction, contents
 
 ### Official current contract
 
-Gemini 1.5 Flash was shut down on 2025-09-29. Gemini 2.5 Flash remains stable but has a documented 2026-10-16 shutdown date and Google recommends Gemini 3.5 Flash. Gemini 3.5 Flash is stable, GA, and non-preview.
+Google's current Gemini API model page identifies the exact API model code `gemini-2.5-pro` as Stable and describes it as an advanced model for complex tasks. Its capability table explicitly marks structured outputs and thinking as supported. The newer `gemini-3.1-pro-preview` is still Preview, so it is not selected for this stable release configuration.
 
 ### Required change
 
-The default changes to gemini-3.5-flash. The endpoint and mapper remain aligned. TRADE_MODEL_AI_GEMINI_MODEL override remains supported.
+The `GEMINI_REVIEW` default changes to `gemini-2.5-pro`. The generateContent endpoint, JSON MIME request, response mapper, deterministic normalizer, and strict V1 parser remain aligned. `TRADE_MODEL_AI_GEMINI_MODEL` override support remains unchanged.
 
 ### Live smoke schema finding
 
-The controlled A/B/C diagnosis verified that Gemini authentication, the generateContent endpoint, and the `gemini-3.5-flash` model work. Mode A plain text passed. Mode B JSON MIME returned JSON that did not satisfy the V1 role fragment. Mode C provider strict schema exceeded the 30-second controlled-smoke limit. HTTP success alone therefore remains insufficient, and provider-side strict schema is not acceptable for the production latency budget.
+The controlled A/B/C diagnosis verified that Gemini authentication, the generateContent endpoint, and the evaluated `gemini-3.5-flash` model were reachable. Plain text and JSON MIME transport worked, but repeated review responses were empty, short non-JSON, or classified `MALFORMED_JSON`; provider strict schema also exceeded the 30-second controlled-smoke limit. Flash therefore remains API-available but JSON-generation-unstable for this review contract in the current environment. `gemini-2.5-pro` is selected for structured review reliability, but a later operator-run controlled smoke is still required to prove a contract-valid live response.
 
 The production Gemini request sets `generationConfig.responseMimeType` to `application/json` and does not send `responseJsonSchema`. Candidate JSON then passes through deterministic Gemini normalization and the unchanged internal `AI_ROLE_RESULTS_SCHEMA_V1` parser. JSON MIME requests do not by themselves guarantee schema-shaped content, so the Gemini system instruction explicitly requires one JSON object with only `stance`, `conflictLevel`, `reasonCodes`, and `summary`, without Markdown, code fences, explanations, refusals, prefixes, or suffixes. When evidence is insufficient, Gemini must return the canonical V1 abstention fragment (`ABSTAIN`, `NONE`, `INSUFFICIENT_DATA`, `Insufficient evidence`) rather than short plain text. `ABSTAIN` is used because it is the V1 review stance for a neutral/no-conclusion outcome; `NEUTRAL` is not an accepted `AiReviewStance` value.
 
