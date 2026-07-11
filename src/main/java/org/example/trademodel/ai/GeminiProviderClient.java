@@ -2,6 +2,7 @@ package org.example.trademodel.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
@@ -13,7 +14,7 @@ import java.util.Map;
 
 @Component
 public class GeminiProviderClient extends AbstractSafeAiProviderClient {
-    private static final String STRUCTURED_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
+    private static final String JSON_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
 
             For Gemini, return JSON only: no Markdown, no code fence, no prose, and no explanation.
             Return exactly these AI_ROLE_RESULTS_SCHEMA_V1 role-fragment fields and no others:
@@ -52,7 +53,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
                                              String selectedModel) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", STRUCTURED_OUTPUT_INSTRUCTION))));
+        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", JSON_OUTPUT_INSTRUCTION))));
         body.put("contents", List.of(Map.of(
                 "role", "user",
                 "parts", List.of(Map.of("text", promptJson))
@@ -61,7 +62,6 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         generationConfig.put("maxOutputTokens", maxOutputTokens());
         generationConfig.put("temperature", 0);
         generationConfig.put("responseMimeType", "application/json");
-        generationConfig.put("responseJsonSchema", responseJsonSchema());
         body.put("generationConfig", generationConfig);
 
         String model = URLEncoder.encode(selectedModel, StandardCharsets.UTF_8);
@@ -71,6 +71,13 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         headers.put("x-goog-api-key", providerProperties().getApiKey());
         request.setHeaders(headers);
         return request;
+    }
+
+    void applyStrictSchemaForDiagnostic(AiHttpRequest request) throws Exception {
+        ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
+        ObjectNode generationConfig = (ObjectNode) body.path("generationConfig");
+        generationConfig.set("responseJsonSchema", objectMapper.valueToTree(responseJsonSchema()));
+        request.setBody(objectMapper.writeValueAsString(body));
     }
 
     @Override

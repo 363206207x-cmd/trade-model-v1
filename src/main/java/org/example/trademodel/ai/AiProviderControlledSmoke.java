@@ -98,7 +98,7 @@ public class AiProviderControlledSmoke {
         long started = System.nanoTime();
         try {
             AiHttpRequest request = client.buildHttpRequest("{}", timeoutLimitMs, model);
-            applyDiagnosticMode(request, mode);
+            applyDiagnosticMode(client, request, mode);
             AiHttpResponse response = transport.post(request);
             long latencyMs = elapsedMs(started);
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
@@ -133,7 +133,8 @@ public class AiProviderControlledSmoke {
         }
     }
 
-    private void applyDiagnosticMode(AiHttpRequest request, GeminiDiagnosticMode mode) throws Exception {
+    private void applyDiagnosticMode(
+            GeminiProviderClient client, AiHttpRequest request, GeminiDiagnosticMode mode) throws Exception {
         ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
         ObjectNode generation = (ObjectNode) body.path("generationConfig");
         if (mode == GeminiDiagnosticMode.A) {
@@ -144,6 +145,9 @@ public class AiProviderControlledSmoke {
             setDiagnosticInstruction(body, "Return one JSON capability response without a schema contract.");
         }
         request.setBody(objectMapper.writeValueAsString(body));
+        if (mode == GeminiDiagnosticMode.C) {
+            client.applyStrictSchemaForDiagnostic(request);
+        }
     }
 
     private static void setDiagnosticInstruction(ObjectNode body, String instruction) {

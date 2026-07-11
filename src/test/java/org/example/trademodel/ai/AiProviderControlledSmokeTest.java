@@ -288,8 +288,7 @@ class AiProviderControlledSmokeTest {
         assertThat(body.path("generationConfig").has("temperature")).isTrue();
         assertThat(body.path("generationConfig").path("responseMimeType").asText())
                 .isEqualTo("application/json");
-        assertThat(body.path("generationConfig").path("responseJsonSchema").path("required"))
-                .hasSize(4);
+        assertThat(body.path("generationConfig").has("responseJsonSchema")).isFalse();
 
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
         assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");

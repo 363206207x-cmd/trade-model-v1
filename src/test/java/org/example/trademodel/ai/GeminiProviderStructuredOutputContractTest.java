@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -16,7 +15,7 @@ class GeminiProviderStructuredOutputContractTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void normalGeminiJsonTextPassesStrictParserAndRequestUsesOfficialSchemaFields() throws Exception {
+    void normalGeminiJsonMimePassesNormalizerAndStrictInternalParser() throws Exception {
         CapturingTransport transport = new CapturingTransport(response(reviewJson()));
 
         AiProviderReviewResult result = client(transport).review(request(), 15_000L);
@@ -34,13 +33,7 @@ class GeminiProviderStructuredOutputContractTest {
 
         JsonNode generation = requestBody.path("generationConfig");
         assertThat(generation.path("responseMimeType").asText()).isEqualTo("application/json");
-        JsonNode schema = generation.path("responseJsonSchema");
-        assertThat(schema.path("type").asText()).isEqualTo("object");
-        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
-        assertThat(schema.path("required")).hasSize(4);
-        List<String> fields = new ArrayList<>();
-        schema.path("properties").fieldNames().forEachRemaining(fields::add);
-        assertThat(fields).containsExactly("stance", "conflictLevel", "reasonCodes", "summary");
+        assertThat(generation.has("responseJsonSchema")).isFalse();
     }
 
     @Test
@@ -225,8 +218,8 @@ class GeminiProviderStructuredOutputContractTest {
 
     private AiHttpRequest diagnosticRequest(
             CapturingTransport transport, DiagnosticVariant variant) throws Exception {
-        AiHttpRequest request = client(transport).buildHttpRequest(
-                "{}", 30_000L, "gemini-3.5-flash");
+        GeminiProviderClient client = client(transport);
+        AiHttpRequest request = client.buildHttpRequest("{}", 30_000L, "gemini-3.5-flash");
         ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
         ObjectNode generation = (ObjectNode) body.path("generationConfig");
         if (variant == DiagnosticVariant.PLAIN_TEXT) {
@@ -237,6 +230,9 @@ class GeminiProviderStructuredOutputContractTest {
             setDiagnosticInstruction(body, "Return one JSON capability response without a schema contract.");
         }
         request.setBody(objectMapper.writeValueAsString(body));
+        if (variant == DiagnosticVariant.STRICT_SCHEMA) {
+            client.applyStrictSchemaForDiagnostic(request);
+        }
         return request;
     }
 
