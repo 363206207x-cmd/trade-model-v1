@@ -201,6 +201,30 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
+    void geminiDiagnosticModeCSchemaFailurePropagatesSanitizedShape() throws Exception {
+        String providerText = "{\"stance\":\"ABSTAIN\","
+                + "\"reasonCodes\":\"PRIVATE_REASON_VALUE\","
+                + "\"summary\":\"PRIVATE_SUMMARY_VALUE\"}";
+        FakeTransport transport = FakeTransport.responding(geminiResponseWithText(providerText));
+
+        AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("C"), transport);
+        String output = String.join("\n", result.sanitizedOutputLines());
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
+        assertThat(result.sanitizedOutputLines()).containsExactly(
+                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
+                "GEMINI_EXPECTED_FIELDS: stance,conflictLevel,reasonCodes,summary",
+                "GEMINI_ACTUAL_FIELDS: stance,reasonCodes,summary",
+                "GEMINI_MISSING_FIELDS: conflictLevel",
+                "GEMINI_UNEXPECTED_FIELDS: none",
+                "GEMINI_TYPE_MISMATCH: reasonCodes:array->string");
+        assertThat(output).doesNotContain(
+                providerText, "PRIVATE_REASON_VALUE", "PRIVATE_SUMMARY_VALUE",
+                "test-gemini-key", "x-goog-api-key", "systemInstruction");
+        assertThat(transport.calls).isEqualTo(1);
+    }
+
+    @Test
     void geminiDiagnosticModeIsDisabledAndFailClosedWithoutExplicitMode() {
         Map<String, String> environment = diagnosticEnabled(null);
         FakeTransport transport = FakeTransport.responding(validGeminiResponse(true, true));
@@ -447,7 +471,10 @@ class AiProviderControlledSmokeTest {
                 "AI_PROVIDER_SMOKE_DIAGNOSTIC",
                 "GEMINI_DIAGNOSTIC_MODE",
                 "A|B|C",
-                "AI_DIAGNOSTIC_MODE");
+                "AI_DIAGNOSTIC_MODE",
+                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS",
+                "GEMINI_EXPECTED_FIELDS",
+                "GEMINI_ACTUAL_FIELDS");
     }
 
     @Test

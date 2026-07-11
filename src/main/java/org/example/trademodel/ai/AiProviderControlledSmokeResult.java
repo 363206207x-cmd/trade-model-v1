@@ -22,6 +22,15 @@ public record AiProviderControlledSmokeResult(
         GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
+        if (geminiResponseShapeDiagnostic != null) {
+            return List.of(
+                    "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
+                    "GEMINI_EXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.expectedFields()),
+                    "GEMINI_ACTUAL_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.actualFields()),
+                    "GEMINI_MISSING_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.missingFields()),
+                    "GEMINI_UNEXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.unexpectedFields()),
+                    "GEMINI_TYPE_MISMATCH: " + joinCompact(geminiResponseShapeDiagnostic.typeMismatchFields()));
+        }
         if (diagnosticMode != null) {
             return List.of(
                     "AI_PROVIDER: GEMINI",
@@ -32,15 +41,6 @@ public record AiProviderControlledSmokeResult(
                     "AI_LATENCY_MS: " + Math.max(0, latencyMs),
                     "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
                     "PRODUCTION_READINESS: BLOCKED");
-        }
-        if (geminiResponseShapeDiagnostic != null) {
-            return List.of(
-                    "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
-                    "GEMINI_EXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.expectedFields()),
-                    "GEMINI_ACTUAL_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.actualFields()),
-                    "GEMINI_MISSING_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.missingFields()),
-                    "GEMINI_UNEXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.unexpectedFields()),
-                    "GEMINI_TYPE_MISMATCH: " + joinCompact(geminiResponseShapeDiagnostic.typeMismatchFields()));
         }
         List<String> lines = new ArrayList<>(List.of(
                 "AI_PROVIDER: " + display(provider),
