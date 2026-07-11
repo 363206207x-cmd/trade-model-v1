@@ -54,7 +54,7 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
             status = AiModelReadinessStatus.MODEL_UNAVAILABLE;
         } else if (fallbackUsed) {
             status = AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE;
-        } else if (enabled && configured) {
+        } else if (last != null && last.available()) {
             status = AiModelReadinessStatus.MODEL_ACTIVE;
         } else {
             status = AiModelReadinessStatus.MODEL_CONFIGURED;
@@ -62,8 +62,9 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
         List<String> reasons = switch (status) {
             case MODEL_UNAVAILABLE -> List.of("OPENAI_NO_ACCEPTABLE_MODEL_AVAILABLE");
             case MODEL_FALLBACK_ACTIVE -> List.of(fallbackReason);
-            case MODEL_ACTIVE -> List.of("MODEL_AVAILABILITY_UNVERIFIED");
-            case MODEL_CONFIGURED -> List.of("PROVIDER_DISABLED");
+            case MODEL_ACTIVE -> List.of("MODEL_CALL_VERIFIED");
+            case MODEL_CONFIGURED -> List.of(enabled && configured
+                    ? "MODEL_AVAILABILITY_UNVERIFIED" : "PROVIDER_DISABLED");
         };
         return new AiProviderReadiness(provider(), role(), enabled, configured && validModels, false,
                 configuredModel, effectiveModel, fallbackUsed, fallbackReason,
@@ -187,7 +188,9 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
         }
         OpenAiModelRoutingDecision decision = modelRouter.decision(
                 plan, level, level > 0 || !available ? fallbackReason : null, request, available);
-        lastRoutingDecision = decision;
+        if (result.successful() || !available) {
+            lastRoutingDecision = decision;
+        }
         result.setOriginalModel(decision.originalModel());
         result.setSelectedModel(decision.selectedModel());
         result.setFallbackLevel(decision.fallbackLevel());

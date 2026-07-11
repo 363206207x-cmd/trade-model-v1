@@ -24,7 +24,7 @@ Only first-party documentation was used:
 - OpenAI GPT-5.4: <https://developers.openai.com/api/docs/models/gpt-5.4>
 - OpenAI Responses create: <https://developers.openai.com/api/reference/resources/responses/methods/create>
 - OpenAI API errors: <https://developers.openai.com/api/docs/guides/error-codes>
-- OpenAI request IDs: <https://platform.openai.com/docs/api-reference/debugging-requests>
+- OpenAI request IDs: <https://developers.openai.com/api/reference/overview#debugging-requests>
 - Gemini lifecycle: <https://ai.google.dev/gemini-api/docs/deprecations>
 - Gemini 3.5 Flash: <https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash>
 - Gemini generateContent: <https://ai.google.dev/api/generate-content>
@@ -60,7 +60,7 @@ The implementation uses POST /v1/responses, Bearer authentication, model, instru
 
 ### Official current contract
 
-The official catalog identifies gpt-5.6-sol as the GPT-5.6 frontier model and recommends gpt-5.6-luna for speed- and cost-sensitive workloads. Both support reasoning and Responses. GPT-5.5 and GPT-5.4 are stable reasoning-capable Responses models and form the only approved fallback tiers.
+The official catalog identifies gpt-5.6-sol as the GPT-5.6 frontier model and recommends gpt-5.6-luna for speed- and cost-sensitive workloads. Both support reasoning and Responses, while the catalog currently limits GPT-5.6 preview availability to select trusted partners. GPT-5.5 and GPT-5.4 are reasoning-capable Responses models whose model pages are not marked preview or deprecated, and they form the only approved fallback tiers.
 
 ### Required change
 
@@ -84,12 +84,14 @@ The configuration keys are trade-model.ai.model-strategy.gpt-final.priority, gem
 
 Model readiness is separate from credential presence:
 
-- MODEL_CONFIGURED: a model is selected while the provider remains disabled.
-- MODEL_ACTIVE: an approved model route is configured and active; this is not a live availability claim.
+- MODEL_CONFIGURED: an approved model route is selected, but no successful provider response has verified it in this process.
+- MODEL_ACTIVE: the configured primary model has returned a successful contract-valid response in this process.
 - MODEL_FALLBACK_ACTIVE: an approved GPT-5.5 or GPT-5.4 fallback was selected.
 - MODEL_UNAVAILABLE: configuration is invalid or no approved model remains available.
 
-The status endpoint does not report ready=true merely because an API key and model are configured. Missing or malformed model selection fails closed.
+The status endpoint does not report ready=true or MODEL_ACTIVE merely because an API key and model are configured. Missing or malformed model selection fails closed.
+
+The detailed OpenAI model/API contract verification is recorded in `docs/OPENAI_GPT5_MODEL_ROUTING_CONTRACT.md`.
 
 ## GPT_FINAL Model Routing Strategy
 
@@ -187,6 +189,7 @@ Allowed output fields are:
     AI_LATENCY_MS:
     AI_PROVIDER_LIVE_SMOKE:
     LIVE_PROVIDER_CALLS:
+    REAL_KEYS_READ:
     PRODUCTION_READINESS:
 
 The output never includes a key, key shape, authorization header, request body, prompt, raw response body, raw error body, raw headers, complete request ID, or provider summary.
@@ -249,7 +252,7 @@ The default validation is:
 
     bash scripts/ai-provider-controlled-smoke.sh
 
-It must return SKIPPED_EXTERNAL_CALLS_DISABLED and LIVE_PROVIDER_CALLS: 0.
+It must return SKIPPED_EXTERNAL_CALLS_DISABLED, LIVE_PROVIDER_CALLS: 0, and REAL_KEYS_READ: 0.
 
 For a later operator-authorized single-provider run, the selected key must already be present in the operator shell. Do not enter a key in a command, document, Codex, or shell history. Set only the non-secret gates for exactly one target, then run the same script. The harness never sources a secret file.
 

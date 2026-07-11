@@ -207,6 +207,7 @@ class AiProviderControlledSmokeTest {
         assertThat(output).contains(
                 "AI_PROVIDER_LIVE_SMOKE: SKIPPED_EXTERNAL_CALLS_DISABLED",
                 "LIVE_PROVIDER_CALLS: 0",
+                "REAL_KEYS_READ: 0",
                 "PRODUCTION_READINESS: BLOCKED");
     }
 

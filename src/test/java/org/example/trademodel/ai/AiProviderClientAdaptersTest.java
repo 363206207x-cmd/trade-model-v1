@@ -26,11 +26,36 @@ class AiProviderClientAdaptersTest {
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.SUCCESS);
         assertThat(result.getProviderRequestId()).isEqualTo("resp-openai");
+        assertThat(result.getInputTokens()).isEqualTo(11);
+        assertThat(result.getOutputTokens()).isEqualTo(7);
         assertThat(result.getTotalTokens()).isEqualTo(18);
         assertThat(transport.lastRequest.getUrl()).isEqualTo("https://api.openai.test/v1/responses");
         assertThat(transport.lastRequest.getHeaders()).containsEntry("Authorization", "Bearer openai-key");
+        assertThat(transport.lastRequest.getBody())
+                .contains("\"model\":\"gpt-5.6-luna\"")
+                .contains("\"instructions\"")
+                .contains("\"input\"")
+                .contains("\"max_output_tokens\":200")
+                .contains("\"reasoning\":{\"effort\":\"high\"}");
         assertThat(transport.lastRequest.getBody()).doesNotContain("\"tools\"");
         assertThat(transport.lastRequest.getBody()).doesNotContain("openai-key");
+    }
+
+    @Test
+    void openAiAdapter_mapsResponsesOutputContentFallback() {
+        AiOrchestratorProperties properties = properties();
+        configure(properties.getOpenai(), "openai-key", "gpt-test", "https://api.openai.test");
+        OpenAiProviderClient client = new OpenAiProviderClient(properties,
+                FakeTransport.responding(new AiHttpResponse(200, """
+                        {"output":[{"type":"message","content":[{"type":"output_text","text":"{\\"stance\\":\\"ABSTAIN\\",\\"conflictLevel\\":\\"NONE\\",\\"reasonCodes\\":[\\"OUTPUT_FALLBACK\\"],\\"summary\\":\\"review only\\"}"}]}],"usage":{"input_tokens":3,"output_tokens":2,"total_tokens":5}}
+                        """, Map.of("x-request-id", List.of("request-output-fallback")))), objectMapper);
+
+        AiProviderReviewResult result = client.review(request());
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.SUCCESS);
+        assertThat(result.getProviderRequestId()).isEqualTo("request-output-fallback");
+        assertThat(result.getReasonCodes()).contains("OUTPUT_FALLBACK");
+        assertThat(result.getTotalTokens()).isEqualTo(5);
     }
 
     @Test

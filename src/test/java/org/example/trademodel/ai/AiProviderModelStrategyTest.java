@@ -23,6 +23,10 @@ class AiProviderModelStrategyTest {
         SequenceTransport transport = SequenceTransport.responding(openAiResponse());
         OpenAiProviderClient client = client(transport);
 
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_CONFIGURED);
+        assertThat(client.readiness().getReasonCodes()).containsExactly("MODEL_AVAILABILITY_UNVERIFIED");
+
         AiProviderReviewResult result = client.review(request(false), 5_000);
 
         assertThat(result.successful()).isTrue();
@@ -31,6 +35,9 @@ class AiProviderModelStrategyTest {
         assertThat(result.getSelectedModel()).isEqualTo("gpt-5.6-luna");
         assertThat(result.getFallbackLevel()).isZero();
         assertThat(transport.models()).containsExactly("gpt-5.6-luna");
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_ACTIVE);
+        assertThat(client.readiness().getReasonCodes()).containsExactly("MODEL_CALL_VERIFIED");
     }
 
     @Test
@@ -79,8 +86,11 @@ class AiProviderModelStrategyTest {
 
         assertThat(result.successful()).isTrue();
         assertThat(result.getSelectedModel()).isEqualTo("gpt-5.4");
+        assertThat(result.getOriginalModel()).isEqualTo("gpt-5.6-luna");
         assertThat(result.getFallbackLevel()).isEqualTo(2);
         assertThat(result.getFallbackReason()).isEqualTo("OPENAI_FALLBACK_GPT54");
+        assertThat(result.getModelRoutingTimestamp()).isNotNull();
+        assertThat(result.getModelRoutingTraceId()).isEqualTo("trace-model-routing");
         assertThat(result.getReasonCodes()).contains("OPENAI_FALLBACK_GPT55", "OPENAI_FALLBACK_GPT54");
         assertThat(transport.models()).containsExactly("gpt-5.6-luna", "gpt-5.5", "gpt-5.4");
     }
@@ -89,19 +99,39 @@ class AiProviderModelStrategyTest {
     void noAcceptableModelReturnsModelUnavailable() {
         SequenceTransport transport = SequenceTransport.responding(
                 modelNotFound(), modelNotFound(), modelNotFound());
+        OpenAiProviderClient client = client(transport);
 
-        AiProviderReviewResult result = client(transport).review(request(true), 5_000);
+        AiProviderReviewResult result = client.review(request(true), 5_000);
 
         assertThat(result.successful()).isFalse();
         assertThat(result.getErrorCode()).isEqualTo("MODEL_UNAVAILABLE");
         assertThat(result.getFallbackReason()).isEqualTo("OPENAI_NO_ACCEPTABLE_MODEL_AVAILABLE");
         assertThat(result.getReasonCodes()).contains("OPENAI_REASONING_MODEL_UNAVAILABLE",
                 "OPENAI_NO_ACCEPTABLE_MODEL_AVAILABLE");
-        assertThat(client(SequenceTransport.responding(openAiResponse())).readiness().isReady()).isFalse();
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_UNAVAILABLE);
+        assertThat(client.readiness().isReady()).isFalse();
+    }
+
+    @Test
+    void failedContractResponseDoesNotActivateConfiguredModel() {
+        SequenceTransport transport = SequenceTransport.responding(new AiHttpResponse(401, "{}", Map.of()));
+        OpenAiProviderClient client = client(transport);
+
+        AiProviderReviewResult result = client.review(request(false), 5_000);
+
+        assertThat(result.successful()).isFalse();
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_CONFIGURED);
+        assertThat(client.readiness().getReasonCodes()).containsExactly("MODEL_AVAILABILITY_UNVERIFIED");
     }
 
     @Test
     void modelPolicyRejectsEveryGpt4PathAndMalformedConfiguration() {
+        assertThat(OpenAiModelRouter.isApprovedPrimary("gpt-5.6-luna")).isTrue();
+        assertThat(OpenAiModelRouter.isApprovedPrimary("gpt-5.6-sol")).isTrue();
+        assertThat(OpenAiModelRouter.isApprovedGpt55("gpt-5.5")).isTrue();
+        assertThat(OpenAiModelRouter.isApprovedGpt54("gpt-5.4")).isTrue();
         assertThat(OpenAiModelRouter.isApprovedModel("gpt-4.1-mini")).isFalse();
         assertThat(OpenAiModelRouter.isApprovedModel("gpt-4.1")).isFalse();
         assertThat(OpenAiModelRouter.isApprovedModel("gpt-4o")).isFalse();

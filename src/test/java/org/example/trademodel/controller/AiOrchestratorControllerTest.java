@@ -41,7 +41,7 @@ class AiOrchestratorControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providers[0].provider").value("OPENAI"))
                 .andExpect(jsonPath("$.providers[0].ready").value(false))
-                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_ACTIVE"))
+                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_CONFIGURED"))
                 .andExpect(jsonPath("$.providers[0].configuredModel").value("gpt-5.6-luna"))
                 .andExpect(jsonPath("$.providers[0].effectiveModel").value("gpt-5.6-luna"))
                 .andExpect(jsonPath("$.providers[0].fallbackUsed").value(false))
@@ -98,7 +98,7 @@ class AiOrchestratorControllerTest {
             return new AiProviderReadiness(provider(), role(), true, true, false,
                     properties.getConfiguredModel(), properties.getEffectiveModel(), false, null,
                     "FAST_DECISION_MODEL",
-                    org.example.trademodel.ai.AiModelReadinessStatus.MODEL_ACTIVE,
+                    org.example.trademodel.ai.AiModelReadinessStatus.MODEL_CONFIGURED,
                     List.of("MODEL_AVAILABILITY_UNVERIFIED"));
         }
         @Override public AiProviderReviewResult review(AiProviderRequest request) { return null; }

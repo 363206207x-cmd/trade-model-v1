@@ -22,7 +22,9 @@ public class AiProviderResponseParser {
     );
     private static final List<String> FORBIDDEN_TEXT = List.of(
             "ignore previous instructions", "place order", "orderaction", "finaldirection",
-            "override direction", "stop loss", "take profit", "risk reward"
+            "override direction", "stop loss", "take profit", "risk reward",
+            "submit order", "create order", "open a position", "create position record",
+            "create user position", "create userposition"
     );
 
     private final ObjectMapper objectMapper;
