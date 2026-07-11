@@ -81,6 +81,42 @@ class GeminiProviderStructuredOutputContractTest {
                 "INVALID_RESPONSE_PARSE");
     }
 
+    @Test
+    void missingRequiredFieldFailsClosedWithSanitizedDiagnostic() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"stance":"ABSTAIN","reasonCodes":["SCHEMA_GAP"],"summary":"review only"}
+                """));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_MISSING_FIELD_CONFLICTLEVEL");
+        assertThat(result.getSchemaDiagnostic().missingFields()).containsExactly("conflictLevel");
+    }
+
+    @Test
+    void extraFieldFailsClosedWithSanitizedDiagnostic() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":["SCHEMA_GAP"],
+                 "summary":"review only","extraProviderField":"private value"}
+                """));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_EXTRAPROVIDERFIELD");
+        assertThat(result.getSchemaDiagnostic().unexpectedFields()).containsExactly("extraProviderField");
+    }
+
+    @Test
+    void wrongFieldTypeFailsClosedWithSanitizedDiagnostic() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":"SCHEMA_GAP",
+                 "summary":"review only"}
+                """));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_FIELD_TYPE_REASONCODES");
+        assertThat(result.getSchemaDiagnostic().typeMismatchFields())
+                .containsExactly("reasonCodes expected ARRAY got STRING");
+    }
+
     private void assertInvalid(String responseBody, String errorCode) {
         AiProviderReviewResult result = review(new AiHttpResponse(200, responseBody, Map.of()));
 

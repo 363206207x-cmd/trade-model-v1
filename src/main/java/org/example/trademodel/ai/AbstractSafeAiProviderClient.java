@@ -105,6 +105,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
 
             ProviderPayload providerPayload = extractPayload(response);
             AiProviderReviewResult result = responseParser.parse(provider(), role(), providerPayload.content());
+            enrichParsedResult(result, providerPayload);
             result.setProviderRequestId(providerPayload.providerRequestId());
             result.setLatencyMs(latencyMs);
             result.setInputTokens(providerPayload.inputTokens());
@@ -134,6 +135,10 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                                                       String selectedModel) throws Exception;
 
     protected abstract ProviderPayload extractPayload(AiHttpResponse response) throws Exception;
+
+    protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
+        // Provider-specific diagnostics may add sanitized metadata without retaining response values.
+    }
 
     protected String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);

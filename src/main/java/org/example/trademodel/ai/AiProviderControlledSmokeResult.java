@@ -1,5 +1,6 @@
 package org.example.trademodel.ai;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public record AiProviderControlledSmokeResult(
@@ -13,10 +14,11 @@ public record AiProviderControlledSmokeResult(
         boolean requestIdPresent,
         long latencyMs,
         AiProviderControlledSmokeStatus status,
-        int liveProviderCalls
+        int liveProviderCalls,
+        AiProviderSchemaDiagnostic schemaDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
-        return List.of(
+        List<String> lines = new ArrayList<>(List.of(
                 "AI_PROVIDER: " + display(provider),
                 "AI_MODEL: " + display(model),
                 "AI_AUTH_STATUS: " + display(authStatus),
@@ -28,7 +30,16 @@ public record AiProviderControlledSmokeResult(
                 "AI_LATENCY_MS: " + Math.max(0, latencyMs),
                 "AI_PROVIDER_LIVE_SMOKE: " + status.name(),
                 "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
-                "PRODUCTION_READINESS: BLOCKED");
+                "PRODUCTION_READINESS: BLOCKED"));
+        if (schemaDiagnostic != null) {
+            lines.add("GEMINI_SCHEMA_DIAGNOSTIC: FIELD_NAMES_AND_TYPES_ONLY");
+            lines.add("EXPECTED_FIELDS: " + join(schemaDiagnostic.expectedFields()));
+            lines.add("ACTUAL_FIELDS: " + join(schemaDiagnostic.actualFields()));
+            lines.add("MISSING_FIELDS: " + join(schemaDiagnostic.missingFields()));
+            lines.add("UNEXPECTED_FIELDS: " + join(schemaDiagnostic.unexpectedFields()));
+            lines.add("TYPE_MISMATCH_FIELDS: " + join(schemaDiagnostic.typeMismatchFields()));
+        }
+        return List.copyOf(lines);
     }
 
     private static String display(String value) {
@@ -37,5 +48,9 @@ public record AiProviderControlledSmokeResult(
 
     private static String yesNo(boolean value) {
         return value ? "YES" : "NO";
+    }
+
+    private static String join(List<String> values) {
+        return values == null || values.isEmpty() ? "none" : String.join(", ", values);
     }
 }

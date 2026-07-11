@@ -207,6 +207,10 @@ Allowed output fields are:
 
 The output never includes a key, key shape, authorization header, request body, prompt, raw response body, raw error body, raw headers, complete request ID, or provider summary.
 
+When a Gemini 2xx response fails the strict role-result parser, the harness may additionally emit `GEMINI_SCHEMA_DIAGNOSTIC`, `EXPECTED_FIELDS`, `ACTUAL_FIELDS`, `MISSING_FIELDS`, `UNEXPECTED_FIELDS`, and `TYPE_MISMATCH_FIELDS`. These lines contain only allowlisted or sanitized field names and JSON type names. They never retain or print field values, candidate text, the raw response, the prompt, headers, or credentials.
+
+The diagnostic compares the candidate object with the exact V1 role fragment: required string fields `stance`, `conflictLevel`, and `summary`, plus required `reasonCodes` as an array of strings. Unknown fields, missing fields, wrong types, Markdown wrappers, and natural-language wrappers remain hard failures. The parser performs no extraction from prose and no automatic repair.
+
 `AI_HTTP_STATUS_CLASS` reports `TIMEOUT` when no HTTP response arrives because the request timed out. Otherwise it reports `1XX` through `5XX` for an HTTP response, or `NOT_AVAILABLE` when no status exists for another reason. `AI_ERROR_CATEGORY` is blank for success/skip and otherwise is one of `TIMEOUT`, `AUTH`, `MODEL_NOT_FOUND`, `RATE_LIMIT`, `PROVIDER_ERROR`, or `RESPONSE_SCHEMA`.
 
 ## Failure Classification

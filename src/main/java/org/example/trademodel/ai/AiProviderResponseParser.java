@@ -20,6 +20,9 @@ public class AiProviderResponseParser {
     private static final Set<String> ALLOWED_TOP_LEVEL_FIELDS = Set.of(
             "stance", "conflictLevel", "reasonCodes", "summary"
     );
+    private static final List<String> REQUIRED_FIELDS = List.of(
+            "stance", "conflictLevel", "reasonCodes", "summary"
+    );
     private static final List<String> FORBIDDEN_TEXT = List.of(
             "ignore previous instructions", "place order", "orderaction", "finaldirection",
             "override direction", "stop loss", "take profit", "risk reward",
@@ -60,7 +63,28 @@ public class AiProviderResponseParser {
             if (textViolation != null) {
                 return invalid(result, "INVALID_FORBIDDEN_TEXT");
             }
-
+            for (String requiredField : REQUIRED_FIELDS) {
+                if (!root.has(requiredField)) {
+                    return invalid(result, "INVALID_MISSING_FIELD_" + safeCode(requiredField));
+                }
+            }
+            if (!root.path("stance").isTextual()) {
+                return invalid(result, "INVALID_FIELD_TYPE_STANCE");
+            }
+            if (!root.path("conflictLevel").isTextual()) {
+                return invalid(result, "INVALID_FIELD_TYPE_CONFLICTLEVEL");
+            }
+            if (!root.path("reasonCodes").isArray()) {
+                return invalid(result, "INVALID_FIELD_TYPE_REASONCODES");
+            }
+            for (JsonNode reasonCode : root.path("reasonCodes")) {
+                if (!reasonCode.isTextual()) {
+                    return invalid(result, "INVALID_REASON_CODE_TYPE");
+                }
+            }
+            if (!root.path("summary").isTextual()) {
+                return invalid(result, "INVALID_FIELD_TYPE_SUMMARY");
+            }
             AiReviewStance stance = enumValue(AiReviewStance.class, root.path("stance").asText(null));
             AiReviewConflictLevel conflictLevel = enumValue(AiReviewConflictLevel.class,
                     root.path("conflictLevel").asText(null));

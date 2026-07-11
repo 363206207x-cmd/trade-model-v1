@@ -221,6 +221,44 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
+    void geminiSchemaDiagnosticExposesOnlyFieldNamesAndTypes() throws Exception {
+        String providerText = "{\"stance\":\"ABSTAIN\","
+                + "\"reasonCodes\":\"PRIVATE_REASON_VALUE\","
+                + "\"summary\":\"PRIVATE_SUMMARY_VALUE\","
+                + "\"unexpected\":\"PRIVATE_EXTRA_VALUE\"}";
+        String body = objectMapper.writeValueAsString(Map.of(
+                "candidates", List.of(Map.of(
+                        "content", Map.of("parts", List.of(Map.of("text", providerText))))),
+                "usageMetadata", Map.of(
+                        "promptTokenCount", 4,
+                        "candidatesTokenCount", 8,
+                        "totalTokenCount", 12),
+                "responseId", "private-response-id"));
+
+        AiProviderControlledSmokeResult result = smoke.run(
+                enabled("GEMINI", true),
+                FakeTransport.responding(new AiHttpResponse(200, body, Map.of())));
+        String output = String.join("\n", result.sanitizedOutputLines());
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
+        assertThat(output).contains(
+                "GEMINI_SCHEMA_DIAGNOSTIC: FIELD_NAMES_AND_TYPES_ONLY",
+                "EXPECTED_FIELDS: stance, conflictLevel, reasonCodes, summary",
+                "ACTUAL_FIELDS: stance, reasonCodes, summary, unexpected",
+                "MISSING_FIELDS: conflictLevel",
+                "UNEXPECTED_FIELDS: unexpected",
+                "TYPE_MISMATCH_FIELDS: reasonCodes expected ARRAY got STRING");
+        assertThat(output).doesNotContain(
+                providerText,
+                "PRIVATE_REASON_VALUE",
+                "PRIVATE_SUMMARY_VALUE",
+                "PRIVATE_EXTRA_VALUE",
+                "private-response-id",
+                "test-gemini-key",
+                "x-goog-api-key");
+    }
+
+    @Test
     void malformedOrMissingTextFailsResponseSchema() {
         FakeTransport malformed = FakeTransport.responding(new AiHttpResponse(200, "{", Map.of()));
         FakeTransport missingText = FakeTransport.responding(new AiHttpResponse(200,
@@ -345,7 +383,7 @@ class AiProviderControlledSmokeTest {
 
     private static AiProviderControlledSmokeResult skipped() {
         return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", null, "NOT_RUN",
-                false, false, 0L, AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0);
+                false, false, 0L, AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null);
     }
 
     private static Map<String, String> enabled(String target, boolean includeKey) {

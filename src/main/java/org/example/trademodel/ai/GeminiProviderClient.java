@@ -20,12 +20,14 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
             """;
 
     private final AiOrchestratorProperties properties;
+    private final ObjectMapper objectMapper;
 
     public GeminiProviderClient(AiOrchestratorProperties properties,
                                 AiHttpTransport transport,
                                 ObjectMapper objectMapper) {
         super(properties, transport, objectMapper);
         this.properties = properties;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -91,6 +93,14 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 longValue(usage, "promptTokenCount"),
                 longValue(usage, "candidatesTokenCount"),
                 longValue(usage, "totalTokenCount"));
+    }
+
+    @Override
+    protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
+        if (result != null && result.getCallStatus() == AiProviderCallStatus.INVALID_RESPONSE) {
+            result.setSchemaDiagnostic(AiProviderSchemaDiagnostic.analyze(
+                    objectMapper, providerPayload == null ? null : providerPayload.content()));
+        }
     }
 
     private static Map<String, Object> responseJsonSchema() {

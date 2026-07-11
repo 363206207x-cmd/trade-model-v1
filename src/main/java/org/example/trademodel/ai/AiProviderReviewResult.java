@@ -33,6 +33,7 @@ public class AiProviderReviewResult {
     private String modelStrategy;
     private LocalDateTime modelRoutingTimestamp;
     private String modelRoutingTraceId;
+    private AiProviderSchemaDiagnostic schemaDiagnostic;
 
     public static AiProviderReviewResult skipped(AiProviderName provider, AiProviderRole role,
                                                  AiProviderCallStatus status, String reason) {
@@ -121,4 +122,8 @@ public class AiProviderReviewResult {
     }
     public String getModelRoutingTraceId() { return modelRoutingTraceId; }
     public void setModelRoutingTraceId(String modelRoutingTraceId) { this.modelRoutingTraceId = modelRoutingTraceId; }
+    public AiProviderSchemaDiagnostic getSchemaDiagnostic() { return schemaDiagnostic; }
+    public void setSchemaDiagnostic(AiProviderSchemaDiagnostic schemaDiagnostic) {
+        this.schemaDiagnostic = schemaDiagnostic;
+    }
 }

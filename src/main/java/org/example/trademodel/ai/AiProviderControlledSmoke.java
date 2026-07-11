@@ -61,7 +61,7 @@ public class AiProviderControlledSmoke {
 
         return result(provider.name(), model, "KEY_PRESENT_NOT_EXPOSED", httpStatusClass(statusCode, status),
                 parsed ? "PASS" : "FAIL", tokenUsage, requestId, latency, status,
-                countingTransport.requestCount());
+                countingTransport.requestCount(), review == null ? null : review.getSchemaDiagnostic());
     }
 
     private AiProviderClient client(AiProviderName provider, String model, String apiKey,
@@ -249,9 +249,18 @@ public class AiProviderControlledSmoke {
             String provider, String model, String authStatus, String httpStatusClass,
             String parseStatus, boolean tokenUsage, boolean requestId, long latency,
             AiProviderControlledSmokeStatus status, int calls) {
+        return result(provider, model, authStatus, httpStatusClass, parseStatus, tokenUsage,
+                requestId, latency, status, calls, null);
+    }
+
+    private static AiProviderControlledSmokeResult result(
+            String provider, String model, String authStatus, String httpStatusClass,
+            String parseStatus, boolean tokenUsage, boolean requestId, long latency,
+            AiProviderControlledSmokeStatus status, int calls,
+            AiProviderSchemaDiagnostic schemaDiagnostic) {
         return new AiProviderControlledSmokeResult(provider, model, authStatus, httpStatusClass,
                 errorCategory(status),
-                parseStatus, tokenUsage, requestId, latency, status, calls);
+                parseStatus, tokenUsage, requestId, latency, status, calls, schemaDiagnostic);
     }
 
     private static final class CountingTransport implements AiHttpTransport {
