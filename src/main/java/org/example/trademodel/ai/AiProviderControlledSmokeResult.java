@@ -5,6 +5,7 @@ import java.util.List;
 
 public record AiProviderControlledSmokeResult(
         String provider,
+        String diagnosticMode,
         String model,
         String authStatus,
         String httpStatusClass,
@@ -20,6 +21,17 @@ public record AiProviderControlledSmokeResult(
         AiProviderSchemaDiagnostic schemaDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
+        if (diagnosticMode != null) {
+            return List.of(
+                    "AI_PROVIDER: GEMINI",
+                    "AI_DIAGNOSTIC_MODE: " + display(diagnosticMode),
+                    "AI_HTTP_STATUS_CLASS: " + display(httpStatusClass),
+                    "AI_ERROR_CATEGORY: " + display(errorCategory == null ? null : errorCategory.name()),
+                    "AI_RESPONSE_PARSE_STATUS: " + display(responseParseStatus),
+                    "AI_LATENCY_MS: " + Math.max(0, latencyMs),
+                    "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
+                    "PRODUCTION_READINESS: BLOCKED");
+        }
         List<String> lines = new ArrayList<>(List.of(
                 "AI_PROVIDER: " + display(provider),
                 "AI_MODEL: " + display(model),

@@ -32,9 +32,46 @@ emit_result() {
     "PRODUCTION_READINESS: BLOCKED"
 }
 
+emit_diagnostic_result() {
+  local mode="${1:---}"
+  local category="${2:---}"
+  local parse_status="${3:-NOT_RUN}"
+  local calls="${4:-0}"
+  printf '%s\n' \
+    "AI_PROVIDER: GEMINI" \
+    "AI_DIAGNOSTIC_MODE: ${mode}" \
+    "AI_HTTP_STATUS_CLASS: NOT_RUN" \
+    "AI_ERROR_CATEGORY: ${category}" \
+    "AI_RESPONSE_PARSE_STATUS: ${parse_status}" \
+    "AI_LATENCY_MS: 0" \
+    "LIVE_PROVIDER_CALLS: ${calls}" \
+    "PRODUCTION_READINESS: BLOCKED"
+}
+
 target="${AI_PROVIDER_SMOKE_TARGET:-}"
+diagnostic_enabled="${AI_PROVIDER_SMOKE_DIAGNOSTIC:-false}"
+diagnostic_mode="${GEMINI_DIAGNOSTIC_MODE:-}"
+if [[ "${diagnostic_enabled}" == "true" ]]; then
+  case "${diagnostic_mode}" in
+    A|B|C) ;;
+    *)
+      emit_diagnostic_result "--" "UNKNOWN_PROVIDER_ERROR" "NOT_RUN" "0"
+      exit 2
+      ;;
+  esac
+  if [[ -n "${target}" && "${target}" != "GEMINI" ]]; then
+    emit_diagnostic_result "${diagnostic_mode}" "UNKNOWN_PROVIDER_ERROR" "NOT_RUN" "0"
+    exit 2
+  fi
+  target="GEMINI"
+  export AI_PROVIDER_SMOKE_TARGET=GEMINI
+fi
 if [[ "${AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS:-false}" != "true" ]]; then
-  emit_result "${target:---}" "--" "NOT_CHECKED" "SKIPPED_EXTERNAL_CALLS_DISABLED" "0"
+  if [[ "${diagnostic_enabled}" == "true" ]]; then
+    emit_diagnostic_result "${diagnostic_mode}" "--" "NOT_RUN" "0"
+  else
+    emit_result "${target:---}" "--" "NOT_CHECKED" "SKIPPED_EXTERNAL_CALLS_DISABLED" "0"
+  fi
   exit 0
 fi
 
@@ -62,7 +99,11 @@ case "${target}" in
 esac
 
 if [[ "${TRADE_MODEL_AI_ENABLED:-false}" != "true" || "${provider_enabled}" != "true" ]]; then
-  emit_result "${target}" "${model}" "PROVIDER_DISABLED" "SKIPPED_PROVIDER_DISABLED" "0"
+  if [[ "${diagnostic_enabled}" == "true" ]]; then
+    emit_diagnostic_result "${diagnostic_mode}" "UNKNOWN_PROVIDER_ERROR" "NOT_RUN" "0"
+  else
+    emit_result "${target}" "${model}" "PROVIDER_DISABLED" "SKIPPED_PROVIDER_DISABLED" "0"
+  fi
   exit 0
 fi
 
@@ -72,7 +113,11 @@ case "${target}" in
   XAI) key_present="${XAI_API_KEY:+yes}" ;;
 esac
 if [[ "${key_present:-}" != "yes" ]]; then
-  emit_result "${target}" "${model}" "MISSING" "SKIPPED_MISSING_API_KEY" "0"
+  if [[ "${diagnostic_enabled}" == "true" ]]; then
+    emit_diagnostic_result "${diagnostic_mode}" "UNKNOWN_PROVIDER_ERROR" "NOT_RUN" "0"
+  else
+    emit_result "${target}" "${model}" "MISSING" "SKIPPED_MISSING_API_KEY" "0"
+  fi
   exit 0
 fi
 
@@ -111,9 +156,17 @@ fi
 kill "${watchdog_pid}" 2>/dev/null || true
 wait "${watchdog_pid}" 2>/dev/null || true
 
-allowed_output="$(awk '/^(AI_PROVIDER|AI_MODEL|AI_AUTH_STATUS|AI_HTTP_STATUS_CLASS|AI_ERROR_CATEGORY|AI_PROVIDER_ERROR_REASON|AI_RESPONSE_PARSE_STATUS|AI_TOKEN_USAGE_PRESENT|AI_REQUEST_ID_PRESENT|AI_TIMEOUT_LIMIT_MS|AI_LATENCY_MS|AI_PROVIDER_LIVE_SMOKE|LIVE_PROVIDER_CALLS|REAL_KEYS_READ|PRODUCTION_READINESS|GEMINI_SCHEMA_DIAGNOSTIC|EXPECTED_FIELDS|ACTUAL_FIELDS|MISSING_FIELDS|UNEXPECTED_FIELDS|TYPE_MISMATCH_FIELDS): / { print }' "${output_file}")"
+if [[ "${diagnostic_enabled}" == "true" ]]; then
+  allowed_output="$(awk '/^(AI_PROVIDER|AI_DIAGNOSTIC_MODE|AI_HTTP_STATUS_CLASS|AI_ERROR_CATEGORY|AI_RESPONSE_PARSE_STATUS|AI_LATENCY_MS|LIVE_PROVIDER_CALLS|PRODUCTION_READINESS): / { print }' "${output_file}")"
+else
+  allowed_output="$(awk '/^(AI_PROVIDER|AI_MODEL|AI_AUTH_STATUS|AI_HTTP_STATUS_CLASS|AI_ERROR_CATEGORY|AI_PROVIDER_ERROR_REASON|AI_RESPONSE_PARSE_STATUS|AI_TOKEN_USAGE_PRESENT|AI_REQUEST_ID_PRESENT|AI_TIMEOUT_LIMIT_MS|AI_LATENCY_MS|AI_PROVIDER_LIVE_SMOKE|LIVE_PROVIDER_CALLS|REAL_KEYS_READ|PRODUCTION_READINESS|GEMINI_SCHEMA_DIAGNOSTIC|EXPECTED_FIELDS|ACTUAL_FIELDS|MISSING_FIELDS|UNEXPECTED_FIELDS|TYPE_MISMATCH_FIELDS): / { print }' "${output_file}")"
+fi
 if [[ "${smoke_exit}" -ne 0 || -z "${allowed_output}" ]]; then
-  emit_result "${target}" "${model}" "KEY_PRESENT_NOT_EXPOSED" "FAIL_UNEXPECTED" "0" "1"
+  if [[ "${diagnostic_enabled}" == "true" ]]; then
+    emit_diagnostic_result "${diagnostic_mode}" "UNKNOWN_PROVIDER_ERROR" "FAIL" "0"
+  else
+    emit_result "${target}" "${model}" "KEY_PRESENT_NOT_EXPOSED" "FAIL_UNEXPECTED" "0" "1"
+  fi
   exit 1
 fi
 

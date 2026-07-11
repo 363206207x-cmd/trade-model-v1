@@ -156,6 +156,63 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
+    void geminiDiagnosticModeAUsesPlainTextSingleRequest() throws Exception {
+        FakeTransport transport = FakeTransport.responding(geminiResponseWithText("plain capability response"));
+
+        AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("A"), transport);
+        var generation = objectMapper.readTree(transport.lastRequest.getBody()).path("generationConfig");
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.PASS);
+        assertThat(generation.has("responseMimeType")).isFalse();
+        assertThat(generation.has("responseJsonSchema")).isFalse();
+        assertDiagnosticOutput(result, "A");
+        assertThat(transport.calls).isEqualTo(1);
+    }
+
+    @Test
+    void geminiDiagnosticModeBUsesJsonMimeWithoutSchemaSingleRequest() throws Exception {
+        FakeTransport transport = FakeTransport.responding(
+                geminiResponseWithText("{\"mode\":\"json-mime-only\"}"));
+
+        AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("B"), transport);
+        var generation = objectMapper.readTree(transport.lastRequest.getBody()).path("generationConfig");
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.PASS);
+        assertThat(generation.path("responseMimeType").asText()).isEqualTo("application/json");
+        assertThat(generation.has("responseJsonSchema")).isFalse();
+        assertDiagnosticOutput(result, "B");
+        assertThat(transport.calls).isEqualTo(1);
+    }
+
+    @Test
+    void geminiDiagnosticModeCUsesStrictSchemaAndParserSingleRequest() throws Exception {
+        FakeTransport transport = FakeTransport.responding(geminiResponseWithText(reviewJsonText()));
+
+        AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("C"), transport);
+        var generation = objectMapper.readTree(transport.lastRequest.getBody()).path("generationConfig");
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.PASS);
+        assertThat(generation.path("responseMimeType").asText()).isEqualTo("application/json");
+        assertThat(generation.path("responseJsonSchema").isObject()).isTrue();
+        assertDiagnosticOutput(result, "C");
+        assertThat(transport.calls).isEqualTo(1);
+    }
+
+    @Test
+    void geminiDiagnosticModeIsDisabledAndFailClosedWithoutExplicitMode() {
+        Map<String, String> environment = diagnosticEnabled(null);
+        FakeTransport transport = FakeTransport.responding(validGeminiResponse(true, true));
+
+        AiProviderControlledSmokeResult result = smoke.run(environment, transport);
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_INVALID_TARGET);
+        assertThat(result.diagnosticMode()).isEqualTo("--");
+        assertThat(result.liveProviderCalls()).isZero();
+        assertThat(transport.calls).isZero();
+        assertThat(result.sanitizedOutputLines()).hasSize(8);
+    }
+
+    @Test
     void geminiInvalidSchemaRequestIsSanitizedAsInvalidRequest() {
         assertGeminiHttpFailure(400, "INVALID_ARGUMENT",
                 "responseJsonSchema is invalid PRIVATE_INVALID_SCHEMA_DETAIL",
@@ -374,6 +431,8 @@ class AiProviderControlledSmokeTest {
         processBuilder.redirectErrorStream(true);
         processBuilder.environment().remove("AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS");
         processBuilder.environment().remove("AI_PROVIDER_SMOKE_HARNESS_ENTRY");
+        processBuilder.environment().remove("AI_PROVIDER_SMOKE_DIAGNOSTIC");
+        processBuilder.environment().remove("GEMINI_DIAGNOSTIC_MODE");
         Process process = processBuilder.start();
         String output = new String(process.getInputStream().readAllBytes());
 
@@ -382,6 +441,35 @@ class AiProviderControlledSmokeTest {
                 "AI_PROVIDER_LIVE_SMOKE: SKIPPED_EXTERNAL_CALLS_DISABLED",
                 "LIVE_PROVIDER_CALLS: 0",
                 "REAL_KEYS_READ: 0",
+                "PRODUCTION_READINESS: BLOCKED");
+        assertThat(script).contains(
+                "AI_PROVIDER_SMOKE_DIAGNOSTIC",
+                "GEMINI_DIAGNOSTIC_MODE",
+                "A|B|C",
+                "AI_DIAGNOSTIC_MODE");
+    }
+
+    @Test
+    void shellDiagnosticModeStillRequiresExternalCallAuthorization() throws Exception {
+        ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
+        processBuilder.redirectErrorStream(true);
+        processBuilder.environment().put("AI_PROVIDER_SMOKE_DIAGNOSTIC", "true");
+        processBuilder.environment().put("GEMINI_DIAGNOSTIC_MODE", "A");
+        processBuilder.environment().remove("AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS");
+        processBuilder.environment().remove("GEMINI_API_KEY");
+
+        Process process = processBuilder.start();
+        String output = new String(process.getInputStream().readAllBytes());
+
+        assertThat(process.waitFor()).isZero();
+        assertThat(output.lines().toList()).containsExactly(
+                "AI_PROVIDER: GEMINI",
+                "AI_DIAGNOSTIC_MODE: A",
+                "AI_HTTP_STATUS_CLASS: NOT_RUN",
+                "AI_ERROR_CATEGORY: --",
+                "AI_RESPONSE_PARSE_STATUS: NOT_RUN",
+                "AI_LATENCY_MS: 0",
+                "LIVE_PROVIDER_CALLS: 0",
                 "PRODUCTION_READINESS: BLOCKED");
     }
 
@@ -427,9 +515,23 @@ class AiProviderControlledSmokeTest {
     }
 
     private static AiProviderControlledSmokeResult skipped() {
-        return new AiProviderControlledSmokeResult("--", "--", "NOT_CHECKED", "NOT_RUN", null, null, "NOT_RUN",
+        return new AiProviderControlledSmokeResult("--", null, "--", "NOT_CHECKED", "NOT_RUN",
+                null, null, "NOT_RUN",
                 false, false, 0L, 0L,
                 AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null);
+    }
+
+    private static void assertDiagnosticOutput(AiProviderControlledSmokeResult result, String mode) {
+        assertThat(result.liveProviderCalls()).isEqualTo(1);
+        assertThat(result.sanitizedOutputLines()).containsExactly(
+                "AI_PROVIDER: GEMINI",
+                "AI_DIAGNOSTIC_MODE: " + mode,
+                "AI_HTTP_STATUS_CLASS: 2XX",
+                "AI_ERROR_CATEGORY: --",
+                "AI_RESPONSE_PARSE_STATUS: PASS",
+                "AI_LATENCY_MS: " + result.latencyMs(),
+                "LIVE_PROVIDER_CALLS: 1",
+                "PRODUCTION_READINESS: BLOCKED");
     }
 
     private void assertGeminiHttpFailure(
@@ -483,6 +585,15 @@ class AiProviderControlledSmokeTest {
         return environment;
     }
 
+    private static Map<String, String> diagnosticEnabled(String mode) {
+        Map<String, String> environment = enabled("GEMINI", true);
+        environment.put("AI_PROVIDER_SMOKE_DIAGNOSTIC", "true");
+        if (mode != null) {
+            environment.put("GEMINI_DIAGNOSTIC_MODE", mode);
+        }
+        return environment;
+    }
+
     private static AiHttpResponse validResponse(String target, boolean usage, boolean requestId) {
         return switch (target) {
             case "GEMINI" -> validGeminiResponse(usage, requestId);
@@ -510,6 +621,18 @@ class AiProviderControlledSmokeTest {
         return new AiHttpResponse(200, body, Map.of());
     }
 
+    private AiHttpResponse geminiResponseWithText(String text) throws Exception {
+        Map<String, Object> body = Map.of(
+                "candidates", List.of(Map.of(
+                        "content", Map.of("parts", List.of(Map.of("text", text))))),
+                "usageMetadata", Map.of(
+                        "promptTokenCount", 4,
+                        "candidatesTokenCount", 8,
+                        "totalTokenCount", 12),
+                "responseId", "test-diagnostic-response-id");
+        return new AiHttpResponse(200, objectMapper.writeValueAsString(body), Map.of());
+    }
+
     private static AiHttpResponse validXaiResponse(boolean usage, boolean requestId) {
         String body = "{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\","
                 + "\"text\":\"" + reviewPayload() + "\"}]}]"
@@ -523,6 +646,11 @@ class AiProviderControlledSmokeTest {
     private static String reviewPayload() {
         return "{\\\"stance\\\":\\\"ABSTAIN\\\",\\\"conflictLevel\\\":\\\"NONE\\\","
                 + "\\\"reasonCodes\\\":[\\\"SCHEMA_OK\\\"],\\\"summary\\\":\\\"schema review only\\\"}";
+    }
+
+    private static String reviewJsonText() {
+        return "{\"stance\":\"ABSTAIN\",\"conflictLevel\":\"NONE\","
+                + "\"reasonCodes\":[\"SCHEMA_OK\"],\"summary\":\"schema review only\"}";
     }
 
     private static final class FakeTransport implements AiHttpTransport {

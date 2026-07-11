@@ -177,6 +177,8 @@ All conditions must be true before one request is possible:
 
 ALL, MULTI, THREE, wildcard, comma-separated, blank, and unknown targets fail closed. There is no fallback to another provider.
 
+Gemini A/B/C live diagnosis adds two mandatory non-secret gates: `AI_PROVIDER_SMOKE_DIAGNOSTIC=true` and `GEMINI_DIAGNOSTIC_MODE=A|B|C`. The script forces the target to Gemini and rejects a conflicting provider target. The existing external-call, global AI, Gemini-enabled, existing-key, scheduler-off, one-request, timeout, and harness-entry gates still apply. Diagnostic mode is disabled by default.
+
 ## One-Provider-One-Request Rule
 
 - One provider target
@@ -209,6 +211,17 @@ Allowed output fields are:
 
 The output never includes a key, key shape, authorization header, request body, prompt, raw response body, raw error body, raw headers, complete request ID, or provider summary.
 
+Authorized Gemini diagnostic mode emits only:
+
+    AI_PROVIDER:
+    AI_DIAGNOSTIC_MODE:
+    AI_HTTP_STATUS_CLASS:
+    AI_ERROR_CATEGORY:
+    AI_RESPONSE_PARSE_STATUS:
+    AI_LATENCY_MS:
+    LIVE_PROVIDER_CALLS:
+    PRODUCTION_READINESS:
+
 When a Gemini 2xx response fails the strict role-result parser, the harness may additionally emit `GEMINI_SCHEMA_DIAGNOSTIC`, `EXPECTED_FIELDS`, `ACTUAL_FIELDS`, `MISSING_FIELDS`, `UNEXPECTED_FIELDS`, and `TYPE_MISMATCH_FIELDS`. These lines contain only allowlisted or sanitized field names and JSON type names. They never retain or print field values, candidate text, the raw response, the prompt, headers, or credentials.
 
 The diagnostic compares the candidate object with the exact V1 role fragment: required string fields `stance`, `conflictLevel`, and `summary`, plus required `reasonCodes` as an array of strings. Unknown fields, missing fields, wrong types, Markdown wrappers, and natural-language wrappers remain hard failures. The parser performs no extraction from prose and no automatic repair.
@@ -221,7 +234,7 @@ The official Gemini generateContent reference confirms that `responseMimeType=ap
 
 `GEMINI_SCHEMA_FEATURE_STATUS: PASS`. The strict role fragment uses only supported JSON Schema features: `object`, `properties`, `required`, `string`, `array`, `items`, string `enum`, `maxItems`, and `additionalProperties`. `additionalProperties` is explicitly documented as supported and remains `false`; it is not silently removed.
 
-The offline `GeminiProviderStructuredOutputContractTest` contains three fake-transport capability-isolation variants. Variant A is plain generateContent with neither `responseMimeType` nor `responseJsonSchema`. Variant B sets only `responseMimeType=application/json`. Variant C uses the unchanged production strict V1 role fragment with both JSON MIME and `responseJsonSchema`. Each variant uses a separate fake transport and makes no network call. The variants are test-only and are not exposed as runtime or shell switches.
+The offline `GeminiProviderStructuredOutputContractTest` contains three fake-transport capability-isolation variants. Variant A is plain generateContent with neither `responseMimeType` nor `responseJsonSchema`. Variant B sets only `responseMimeType=application/json`. Variant C uses the unchanged production strict V1 role fragment with both JSON MIME and `responseJsonSchema`. Each offline test variant uses a separate fake transport and makes no network call. The controlled smoke harness reuses the same transformations only after every explicit diagnostic gate passes; no production Gemini client default is changed.
 
 ### Future live diagnostic plan
 
@@ -288,6 +301,17 @@ The default validation is:
 It must return SKIPPED_EXTERNAL_CALLS_DISABLED, LIVE_PROVIDER_CALLS: 0, and REAL_KEYS_READ: 0.
 
 For a later operator-authorized single-provider run, the selected key must already be present in the operator shell. Do not enter a key in a command, document, Codex, or shell history. Set only the non-secret gates for exactly one target, then run the same script. The harness never sources a secret file.
+
+For a later operator-authorized Gemini capability diagnosis, keep the existing key in the shell without displaying it, enable the existing global/Gemini switches and external-call gate, then select exactly one mode:
+
+    export AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true
+    export TRADE_MODEL_AI_ENABLED=true
+    export TRADE_MODEL_AI_GEMINI_ENABLED=true
+    export AI_PROVIDER_SMOKE_DIAGNOSTIC=true
+    export GEMINI_DIAGNOSTIC_MODE=A
+    bash scripts/ai-provider-controlled-smoke.sh
+
+Repeat only after reviewing the prior single result, changing the mode to `B` or `C`. Do not run modes in a loop or parallel. The script accepts only one mode per process, performs at most one HTTP request, has no retry and no provider fallback, and prints only the diagnostic allowlist above. It does not source or display the Gemini key.
 
 ## What PASS Proves
 
