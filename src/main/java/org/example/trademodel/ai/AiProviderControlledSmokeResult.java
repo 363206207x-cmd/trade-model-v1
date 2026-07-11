@@ -35,15 +35,12 @@ public record AiProviderControlledSmokeResult(
         }
         if (geminiResponseShapeDiagnostic != null) {
             return List.of(
-                    "GEMINI_RESPONSE_SHAPE_DIAGNOSTIC: FIELD_NAMES_PATHS_AND_TYPES_ONLY",
-                    "HTTP_STATUS: " + display(httpStatusClass),
-                    "TOP_LEVEL_FIELDS: " + join(geminiResponseShapeDiagnostic.topLevelFields()),
-                    "NESTED_OBJECT_PATHS: " + join(geminiResponseShapeDiagnostic.nestedObjectPaths()),
-                    "FIELD_TYPES: " + join(geminiResponseShapeDiagnostic.fieldTypes()),
-                    "EXPECTED_FIELDS: " + join(geminiResponseShapeDiagnostic.expectedFields()),
-                    "MISSING_FIELDS: " + join(geminiResponseShapeDiagnostic.missingFields()),
-                    "UNEXPECTED_FIELDS: " + join(geminiResponseShapeDiagnostic.unexpectedFields()),
-                    "TYPE_MISMATCH: " + join(geminiResponseShapeDiagnostic.typeMismatchFields()));
+                    "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
+                    "GEMINI_EXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.expectedFields()),
+                    "GEMINI_ACTUAL_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.actualFields()),
+                    "GEMINI_MISSING_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.missingFields()),
+                    "GEMINI_UNEXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.unexpectedFields()),
+                    "GEMINI_TYPE_MISMATCH: " + joinCompact(geminiResponseShapeDiagnostic.typeMismatchFields()));
         }
         List<String> lines = new ArrayList<>(List.of(
                 "AI_PROVIDER: " + display(provider),
@@ -82,5 +79,9 @@ public record AiProviderControlledSmokeResult(
 
     private static String join(List<String> values) {
         return values == null || values.isEmpty() ? "none" : String.join(", ", values);
+    }
+
+    private static String joinCompact(List<String> values) {
+        return values == null || values.isEmpty() ? "none" : String.join(",", values);
     }
 }

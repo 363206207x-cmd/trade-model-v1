@@ -18,6 +18,7 @@ public record GeminiResponseShapeDiagnostic(
         List<String> nestedObjectPaths,
         List<String> fieldTypes,
         List<String> expectedFields,
+        List<String> actualFields,
         List<String> missingFields,
         List<String> unexpectedFields,
         List<String> typeMismatchFields) {
@@ -33,6 +34,7 @@ public record GeminiResponseShapeDiagnostic(
         nestedObjectPaths = immutable(nestedObjectPaths);
         fieldTypes = immutable(fieldTypes);
         expectedFields = immutable(expectedFields);
+        actualFields = immutable(actualFields);
         missingFields = immutable(missingFields);
         unexpectedFields = immutable(unexpectedFields);
         typeMismatchFields = immutable(typeMismatchFields);
@@ -43,7 +45,7 @@ public record GeminiResponseShapeDiagnostic(
         JsonNode root = parseSingleJsonValue(objectMapper, content);
         if (root == null || !root.isObject()) {
             return new GeminiResponseShapeDiagnostic(
-                    List.of(), List.of(), List.of(), expected, expected, List.of(), List.of());
+                    List.of(), List.of(), List.of(), expected, List.of(), expected, List.of(), List.of());
         }
 
         List<String> topLevel = fieldNames(root);
@@ -52,6 +54,8 @@ public record GeminiResponseShapeDiagnostic(
         collectShape(root, "", 0, nestedPaths, fieldTypes);
 
         JsonNode candidate = supportedCandidate(root);
+        List<String> actual = candidate != null && candidate.isObject()
+                ? fieldNames(candidate) : List.of();
         List<String> missing = new ArrayList<>();
         List<String> unexpected = new ArrayList<>();
         List<String> mismatches = new ArrayList<>();
@@ -76,7 +80,7 @@ public record GeminiResponseShapeDiagnostic(
             }
         }
         return new GeminiResponseShapeDiagnostic(
-                topLevel, nestedPaths, fieldTypes, expected, missing, unexpected, mismatches);
+                topLevel, nestedPaths, fieldTypes, expected, actual, missing, unexpected, mismatches);
     }
 
     private static JsonNode parseSingleJsonValue(ObjectMapper objectMapper, String content) {

@@ -95,6 +95,8 @@ class AiProviderControlledSmokeTest {
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.PASS);
         assertThat(result.liveProviderCalls()).isEqualTo(1);
         assertThat(transport.calls).isEqualTo(1);
+        assertThat(result.geminiResponseShapeDiagnostic()).isNull();
+        assertThat(result.sanitizedOutputLines()).noneMatch(line -> line.startsWith("GEMINI_"));
         assertThat(result.tokenUsagePresent()).isTrue();
         assertThat(result.requestIdPresent()).isTrue();
     }
@@ -342,15 +344,12 @@ class AiProviderControlledSmokeTest {
 
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
         assertThat(result.sanitizedOutputLines()).containsExactly(
-                "GEMINI_RESPONSE_SHAPE_DIAGNOSTIC: FIELD_NAMES_PATHS_AND_TYPES_ONLY",
-                "HTTP_STATUS: 2XX",
-                "TOP_LEVEL_FIELDS: stance, reasonCodes, summary, unexpected",
-                "NESTED_OBJECT_PATHS: none",
-                "FIELD_TYPES: stance:string, reasonCodes:string, summary:string, unexpected:string",
-                "EXPECTED_FIELDS: stance, conflictLevel, reasonCodes, summary",
-                "MISSING_FIELDS: conflictLevel",
-                "UNEXPECTED_FIELDS: unexpected",
-                "TYPE_MISMATCH: reasonCodes:array->string");
+                "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
+                "GEMINI_EXPECTED_FIELDS: stance,conflictLevel,reasonCodes,summary",
+                "GEMINI_ACTUAL_FIELDS: stance,reasonCodes,summary,unexpected",
+                "GEMINI_MISSING_FIELDS: conflictLevel",
+                "GEMINI_UNEXPECTED_FIELDS: unexpected",
+                "GEMINI_TYPE_MISMATCH: reasonCodes:array->string");
         assertThat(output).doesNotContain(
                 providerText,
                 "PRIVATE_REASON_VALUE",
