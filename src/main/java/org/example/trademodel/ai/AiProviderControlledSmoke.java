@@ -92,10 +92,12 @@ public class AiProviderControlledSmoke {
         boolean requestId = review != null && review.getProviderRequestId() != null
                 && !review.getProviderRequestId().isBlank();
         long latency = review == null || review.getLatencyMs() == null ? 0L : review.getLatencyMs();
+        GeminiRequestDiagnostic requestDiagnostic = provider == AiProviderName.GEMINI
+                ? GeminiRequestDiagnostic.analyze(objectMapper, model, countingTransport.request()) : null;
 
         return result(provider.name(), model, "KEY_PRESENT_NOT_EXPOSED", httpStatusClass(statusCode, status),
                 parsed ? "PASS" : "FAIL", tokenUsage, requestId, latency, status,
-                countingTransport.requestCount(), review, diagnosticLabel);
+                countingTransport.requestCount(), review, diagnosticLabel, requestDiagnostic);
     }
 
     private AiProviderReviewResult runGeminiDiagnostic(
@@ -524,12 +526,23 @@ public class AiProviderControlledSmoke {
             String parseStatus, boolean tokenUsage, boolean requestId, long latency,
             AiProviderControlledSmokeStatus status, int calls,
             AiProviderReviewResult review, String diagnosticMode) {
+        return result(provider, model, authStatus, httpStatusClass, parseStatus, tokenUsage,
+                requestId, latency, status, calls, review, diagnosticMode, null);
+    }
+
+    private static AiProviderControlledSmokeResult result(
+            String provider, String model, String authStatus, String httpStatusClass,
+            String parseStatus, boolean tokenUsage, boolean requestId, long latency,
+            AiProviderControlledSmokeStatus status, int calls,
+            AiProviderReviewResult review, String diagnosticMode,
+            GeminiRequestDiagnostic requestDiagnostic) {
         return new AiProviderControlledSmokeResult(provider, diagnosticMode, model, authStatus, httpStatusClass,
                 errorCategory(provider, status, review), providerErrorReason(provider, review),
                 parseStatus, tokenUsage, requestId, smokeTimeoutMs(provider(provider)), latency,
                 status, calls,
                 review == null ? null : review.getSchemaDiagnostic(),
-                review == null ? null : review.getGeminiResponseShapeDiagnostic());
+                review == null ? null : review.getGeminiResponseShapeDiagnostic(),
+                requestDiagnostic);
     }
 
     private enum GeminiDiagnosticMode {
@@ -550,6 +563,7 @@ public class AiProviderControlledSmoke {
         private final AiHttpTransport delegate;
         private int requestCount;
         private int statusCode;
+        private AiHttpRequest request;
 
         private CountingTransport(AiHttpTransport delegate) {
             this.delegate = delegate;
@@ -561,6 +575,7 @@ public class AiProviderControlledSmoke {
                 throw new IOException("CONTROLLED_SMOKE_REQUEST_LIMIT");
             }
             requestCount++;
+            this.request = request;
             AiHttpResponse response = delegate.post(request);
             statusCode = response == null ? 0 : response.getStatusCode();
             return response;
@@ -572,6 +587,10 @@ public class AiProviderControlledSmoke {
 
         private int statusCode() {
             return statusCode;
+        }
+
+        private AiHttpRequest request() {
+            return request;
         }
     }
 }

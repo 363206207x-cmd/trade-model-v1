@@ -19,13 +19,16 @@ public record AiProviderControlledSmokeResult(
         AiProviderControlledSmokeStatus status,
         int liveProviderCalls,
         AiProviderSchemaDiagnostic schemaDiagnostic,
-        GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic
+        GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic,
+        GeminiRequestDiagnostic geminiRequestDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
+        List<String> requestLines = requestDiagnosticLines();
         GeminiExtractionDiagnostic extractionDiagnostic = geminiResponseShapeDiagnostic == null
                 ? null : geminiResponseShapeDiagnostic.extractionDiagnostic();
         if (extractionDiagnostic != null) {
-            return List.of(
+            List<String> lines = new ArrayList<>(requestLines);
+            lines.addAll(List.of(
                     "GEMINI_EXTRACTION_DIAGNOSTIC_STATUS: " + extractionDiagnostic.status(),
                     "CANDIDATES_PRESENT: " + yesNo(extractionDiagnostic.candidatesPresent()),
                     "CANDIDATE_COUNT: " + Math.max(0, extractionDiagnostic.candidateCount()),
@@ -34,19 +37,23 @@ public record AiProviderControlledSmokeResult(
                     "TEXT_NODE_PRESENT: " + yesNo(extractionDiagnostic.textNodePresent()),
                     "TEXT_LENGTH: " + Math.max(0, extractionDiagnostic.textLength()),
                     "EMPTY_TEXT: " + yesNo(extractionDiagnostic.emptyText()),
-                    "EXTRACTED_JSON_PARSE_STATUS: " + extractionDiagnostic.jsonParseStatus());
+                    "EXTRACTED_JSON_PARSE_STATUS: " + extractionDiagnostic.jsonParseStatus()));
+            return List.copyOf(lines);
         }
         if (geminiResponseShapeDiagnostic != null) {
-            return List.of(
+            List<String> lines = new ArrayList<>(requestLines);
+            lines.addAll(List.of(
                     "GEMINI_SCHEMA_DIAGNOSTIC_STATUS: FAILED",
                     "GEMINI_EXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.expectedFields()),
                     "GEMINI_ACTUAL_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.actualFields()),
                     "GEMINI_MISSING_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.missingFields()),
                     "GEMINI_UNEXPECTED_FIELDS: " + joinCompact(geminiResponseShapeDiagnostic.unexpectedFields()),
-                    "GEMINI_TYPE_MISMATCH: " + joinCompact(geminiResponseShapeDiagnostic.typeMismatchFields()));
+                    "GEMINI_TYPE_MISMATCH: " + joinCompact(geminiResponseShapeDiagnostic.typeMismatchFields())));
+            return List.copyOf(lines);
         }
         if (diagnosticMode != null) {
-            return List.of(
+            List<String> lines = new ArrayList<>(requestLines);
+            lines.addAll(List.of(
                     "AI_PROVIDER: GEMINI",
                     "AI_DIAGNOSTIC_MODE: " + display(diagnosticMode),
                     "AI_HTTP_STATUS_CLASS: " + display(httpStatusClass),
@@ -54,9 +61,11 @@ public record AiProviderControlledSmokeResult(
                     "AI_RESPONSE_PARSE_STATUS: " + display(responseParseStatus),
                     "AI_LATENCY_MS: " + Math.max(0, latencyMs),
                     "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
-                    "PRODUCTION_READINESS: BLOCKED");
+                    "PRODUCTION_READINESS: BLOCKED"));
+            return List.copyOf(lines);
         }
-        List<String> lines = new ArrayList<>(List.of(
+        List<String> lines = new ArrayList<>(requestLines);
+        lines.addAll(List.of(
                 "AI_PROVIDER: " + display(provider),
                 "AI_MODEL: " + display(model),
                 "AI_AUTH_STATUS: " + display(authStatus),
@@ -81,6 +90,24 @@ public record AiProviderControlledSmokeResult(
             lines.add("TYPE_MISMATCH_FIELDS: " + join(schemaDiagnostic.typeMismatchFields()));
         }
         return List.copyOf(lines);
+    }
+
+    private List<String> requestDiagnosticLines() {
+        if (geminiRequestDiagnostic == null) {
+            return List.of();
+        }
+        return List.of(
+                "GEMINI_REQUEST_DIAGNOSTIC: SANITIZED",
+                "MODEL: " + display(geminiRequestDiagnostic.model()),
+                "RESPONSE_MIME_TYPE: " + display(geminiRequestDiagnostic.responseMimeType()),
+                "RESPONSE_SCHEMA_PRESENT: " + yesNo(geminiRequestDiagnostic.responseSchemaPresent()),
+                "MAX_OUTPUT_TOKENS: " + Math.max(0, geminiRequestDiagnostic.maxOutputTokens()),
+                "TEMPERATURE: " + display(geminiRequestDiagnostic.temperature()),
+                "SYSTEM_INSTRUCTION_LENGTH: "
+                        + Math.max(0, geminiRequestDiagnostic.systemInstructionLength()),
+                "USER_INPUT_LENGTH: " + Math.max(0, geminiRequestDiagnostic.userInputLength()),
+                "STOP_SEQUENCES_PRESENT: " + yesNo(geminiRequestDiagnostic.stopSequencesPresent()),
+                "TOOLS_PRESENT: " + yesNo(geminiRequestDiagnostic.toolsPresent()));
     }
 
     private static String display(String value) {

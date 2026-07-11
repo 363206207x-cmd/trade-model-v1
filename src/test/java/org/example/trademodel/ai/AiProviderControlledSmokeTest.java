@@ -96,7 +96,14 @@ class AiProviderControlledSmokeTest {
         assertThat(result.liveProviderCalls()).isEqualTo(1);
         assertThat(transport.calls).isEqualTo(1);
         assertThat(result.geminiResponseShapeDiagnostic()).isNull();
-        assertThat(result.sanitizedOutputLines()).noneMatch(line -> line.startsWith("GEMINI_"));
+        if ("GEMINI".equals(target)) {
+            assertThat(result.geminiRequestDiagnostic()).isNotNull();
+            assertThat(result.sanitizedOutputLines())
+                    .contains("GEMINI_REQUEST_DIAGNOSTIC: SANITIZED");
+        } else {
+            assertThat(result.geminiRequestDiagnostic()).isNull();
+            assertThat(result.sanitizedOutputLines()).noneMatch(line -> line.startsWith("GEMINI_"));
+        }
         assertThat(result.tokenUsagePresent()).isTrue();
         assertThat(result.requestIdPresent()).isTrue();
     }
@@ -331,6 +338,31 @@ class AiProviderControlledSmokeTest {
                 .isEqualTo("application/json");
         assertThat(body.path("generationConfig").has("responseJsonSchema")).isFalse();
 
+        GeminiRequestDiagnostic diagnostic = result.geminiRequestDiagnostic();
+        assertThat(diagnostic).isNotNull();
+        assertThat(diagnostic.model()).isEqualTo("gemini-3.5-flash");
+        assertThat(diagnostic.responseMimeType()).isEqualTo("application/json");
+        assertThat(diagnostic.responseSchemaPresent()).isFalse();
+        assertThat(diagnostic.maxOutputTokens()).isEqualTo(128);
+        assertThat(diagnostic.temperature()).isEqualTo("0");
+        assertThat(diagnostic.systemInstructionLength()).isPositive();
+        assertThat(diagnostic.userInputLength()).isPositive();
+        assertThat(diagnostic.stopSequencesPresent()).isFalse();
+        assertThat(diagnostic.toolsPresent()).isFalse();
+        String diagnosticOutput = String.join("\n", result.sanitizedOutputLines());
+        assertThat(diagnosticOutput).contains(
+                "GEMINI_REQUEST_DIAGNOSTIC: SANITIZED",
+                "MODEL: gemini-3.5-flash",
+                "RESPONSE_MIME_TYPE: application/json",
+                "RESPONSE_SCHEMA_PRESENT: NO",
+                "MAX_OUTPUT_TOKENS: 128",
+                "TEMPERATURE: 0",
+                "STOP_SEQUENCES_PRESENT: NO",
+                "TOOLS_PRESENT: NO");
+        assertThat(diagnosticOutput).doesNotContain(
+                "BTCUSDT", "Multi-timeframe summary", "test-gemini-key",
+                "x-goog-api-key", "systemInstruction", "contents");
+
         var prompt = objectMapper.readTree(
                 body.path("contents").get(0).path("parts").get(0).path("text").asText());
         assertThat(prompt.path("ruleLayerFacts").path("symbol").asText()).isEqualTo("BTCUSDT");
@@ -548,6 +580,15 @@ class AiProviderControlledSmokeTest {
                 "GEMINI_MISSING_FIELDS",
                 "GEMINI_UNEXPECTED_FIELDS",
                 "GEMINI_TYPE_MISMATCH",
+                "GEMINI_REQUEST_DIAGNOSTIC",
+                "RESPONSE_MIME_TYPE",
+                "RESPONSE_SCHEMA_PRESENT",
+                "MAX_OUTPUT_TOKENS",
+                "TEMPERATURE",
+                "SYSTEM_INSTRUCTION_LENGTH",
+                "USER_INPUT_LENGTH",
+                "STOP_SEQUENCES_PRESENT",
+                "TOOLS_PRESENT",
                 "GEMINI_EXTRACTION_DIAGNOSTIC_STATUS",
                 "CANDIDATES_PRESENT",
                 "CANDIDATE_COUNT",
@@ -628,12 +669,20 @@ class AiProviderControlledSmokeTest {
         return new AiProviderControlledSmokeResult("--", null, "--", "NOT_CHECKED", "NOT_RUN",
                 null, null, "NOT_RUN",
                 false, false, 0L, 0L,
-                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null, null);
+                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null, null, null);
     }
 
     private static void assertDiagnosticOutput(AiProviderControlledSmokeResult result, String mode) {
         assertThat(result.liveProviderCalls()).isEqualTo(1);
-        assertThat(result.sanitizedOutputLines()).containsExactly(
+        assertThat(result.sanitizedOutputLines()).contains(
+                "GEMINI_REQUEST_DIAGNOSTIC: SANITIZED",
+                "MODEL: gemini-3.5-flash",
+                "RESPONSE_MIME_TYPE: " + ("A".equals(mode) ? "--" : "application/json"),
+                "RESPONSE_SCHEMA_PRESENT: " + ("C".equals(mode) ? "YES" : "NO"),
+                "MAX_OUTPUT_TOKENS: 128",
+                "TEMPERATURE: 0",
+                "STOP_SEQUENCES_PRESENT: NO",
+                "TOOLS_PRESENT: NO",
                 "AI_PROVIDER: GEMINI",
                 "AI_DIAGNOSTIC_MODE: " + mode,
                 "AI_HTTP_STATUS_CLASS: 2XX",
@@ -649,7 +698,8 @@ class AiProviderControlledSmokeTest {
             boolean candidatesPresent, int candidateCount,
             boolean contentPresent, boolean partsPresent, boolean textNodePresent,
             int textLength, boolean emptyText, String jsonParseStatus) {
-        assertThat(result.sanitizedOutputLines()).containsExactly(
+        assertThat(result.sanitizedOutputLines()).contains(
+                "GEMINI_REQUEST_DIAGNOSTIC: SANITIZED",
                 "GEMINI_EXTRACTION_DIAGNOSTIC_STATUS: " + status,
                 "CANDIDATES_PRESENT: " + yesNo(candidatesPresent),
                 "CANDIDATE_COUNT: " + candidateCount,
