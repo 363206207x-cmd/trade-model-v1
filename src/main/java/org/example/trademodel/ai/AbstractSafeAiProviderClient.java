@@ -255,6 +255,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     }
 
     protected record ProviderPayload(String content, String providerRequestId,
-                                     Long inputTokens, Long outputTokens, Long totalTokens) {
+                                     Long inputTokens, Long outputTokens, Long totalTokens,
+                                     GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic) {
     }
 }

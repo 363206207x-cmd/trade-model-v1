@@ -456,7 +456,9 @@ public class AiProviderControlledSmoke {
         return new AiProviderControlledSmokeResult(provider, diagnosticMode, model, authStatus, httpStatusClass,
                 errorCategory(provider, status, review), providerErrorReason(provider, review),
                 parseStatus, tokenUsage, requestId, smokeTimeoutMs(provider(provider)), latency,
-                status, calls, review == null ? null : review.getSchemaDiagnostic());
+                status, calls,
+                review == null ? null : review.getSchemaDiagnostic(),
+                review == null ? null : review.getGeminiResponseShapeDiagnostic());
     }
 
     private enum GeminiDiagnosticMode {

@@ -162,6 +162,25 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
+    void nestedUnknownObjectFailsAndExposesOnlySanitizedShape() throws Exception {
+        AiProviderReviewResult result = review(response("""
+                {"review":{"stance":"ABSTAIN","conflictLevel":"NONE",
+                 "reasonCodes":["PRIVATE_REASON"],"summary":"PRIVATE_SUMMARY"}}
+                """));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_REVIEW");
+        assertThat(result.getGeminiResponseShapeDiagnostic().topLevelFields()).containsExactly("review");
+        assertThat(result.getGeminiResponseShapeDiagnostic().nestedObjectPaths()).containsExactly(
+                "review.stance", "review.conflictLevel", "review.reasonCodes", "review.summary");
+        assertThat(result.getGeminiResponseShapeDiagnostic().fieldTypes()).containsExactly(
+                "review:object", "review.stance:string", "review.conflictLevel:string",
+                "review.reasonCodes:array", "review.summary:string");
+        assertThat(result.getGeminiResponseShapeDiagnostic().toString()).doesNotContain(
+                "PRIVATE_REASON", "PRIVATE_SUMMARY", "ABSTAIN", "NONE");
+    }
+
+    @Test
     void testOnlyRequestVariantsIsolatePlainJsonMimeAndStrictSchemaWithoutNetwork() throws Exception {
         CapturingTransport plainTransport = new CapturingTransport(response("plain capability fixture"));
         CapturingTransport jsonMimeTransport = new CapturingTransport(response("{\"mode\":\"json-only\"}"));

@@ -102,6 +102,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         if (!blank(content) && content.contains("```")) {
             content = null;
         }
+        GeminiResponseShapeDiagnostic responseShapeDiagnostic =
+                GeminiResponseShapeDiagnostic.analyze(objectMapper, content);
         if (normalizeRoleResult && !blank(content)) {
             content = roleResultNormalizer.normalize(content);
         }
@@ -113,7 +115,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         return new ProviderPayload(content, requestId,
                 longValue(usage, "promptTokenCount"),
                 longValue(usage, "candidatesTokenCount"),
-                longValue(usage, "totalTokenCount"));
+                longValue(usage, "totalTokenCount"),
+                responseShapeDiagnostic);
     }
 
     @Override
@@ -121,6 +124,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         if (result != null && result.getCallStatus() == AiProviderCallStatus.INVALID_RESPONSE) {
             result.setSchemaDiagnostic(AiProviderSchemaDiagnostic.analyze(
                     objectMapper, providerPayload == null ? null : providerPayload.content()));
+            result.setGeminiResponseShapeDiagnostic(providerPayload == null
+                    ? null : providerPayload.geminiResponseShapeDiagnostic());
         }
     }
 

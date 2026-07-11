@@ -164,7 +164,8 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
         return new ProviderPayload(content, requestId,
                 longValue(usage, "input_tokens"),
                 longValue(usage, "output_tokens"),
-                longValue(usage, "total_tokens"));
+                longValue(usage, "total_tokens"),
+                null);
     }
 
     private AiProviderReviewResult unavailable(OpenAiModelRouter.RoutePlan plan,

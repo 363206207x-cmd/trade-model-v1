@@ -321,7 +321,7 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
-    void geminiSchemaDiagnosticExposesOnlyFieldNamesAndTypes() throws Exception {
+    void geminiResponseShapeDiagnosticExposesOnlyNamesPathsAndTypes() throws Exception {
         String providerText = "{\"stance\":\"ABSTAIN\","
                 + "\"reasonCodes\":\"PRIVATE_REASON_VALUE\","
                 + "\"summary\":\"PRIVATE_SUMMARY_VALUE\","
@@ -341,13 +341,16 @@ class AiProviderControlledSmokeTest {
         String output = String.join("\n", result.sanitizedOutputLines());
 
         assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA);
-        assertThat(output).contains(
-                "GEMINI_SCHEMA_DIAGNOSTIC: FIELD_NAMES_AND_TYPES_ONLY",
+        assertThat(result.sanitizedOutputLines()).containsExactly(
+                "GEMINI_RESPONSE_SHAPE_DIAGNOSTIC: FIELD_NAMES_PATHS_AND_TYPES_ONLY",
+                "HTTP_STATUS: 2XX",
+                "TOP_LEVEL_FIELDS: stance, reasonCodes, summary, unexpected",
+                "NESTED_OBJECT_PATHS: none",
+                "FIELD_TYPES: stance:string, reasonCodes:string, summary:string, unexpected:string",
                 "EXPECTED_FIELDS: stance, conflictLevel, reasonCodes, summary",
-                "ACTUAL_FIELDS: stance, reasonCodes, summary, unexpected",
                 "MISSING_FIELDS: conflictLevel",
                 "UNEXPECTED_FIELDS: unexpected",
-                "TYPE_MISMATCH_FIELDS: reasonCodes expected ARRAY got STRING");
+                "TYPE_MISMATCH: reasonCodes:array->string");
         assertThat(output).doesNotContain(
                 providerText,
                 "PRIVATE_REASON_VALUE",
@@ -517,7 +520,7 @@ class AiProviderControlledSmokeTest {
         return new AiProviderControlledSmokeResult("--", null, "--", "NOT_CHECKED", "NOT_RUN",
                 null, null, "NOT_RUN",
                 false, false, 0L, 0L,
-                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null);
+                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null, null);
     }
 
     private static void assertDiagnosticOutput(AiProviderControlledSmokeResult result, String mode) {

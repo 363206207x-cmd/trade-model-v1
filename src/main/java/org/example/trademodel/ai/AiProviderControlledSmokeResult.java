@@ -18,7 +18,8 @@ public record AiProviderControlledSmokeResult(
         long latencyMs,
         AiProviderControlledSmokeStatus status,
         int liveProviderCalls,
-        AiProviderSchemaDiagnostic schemaDiagnostic
+        AiProviderSchemaDiagnostic schemaDiagnostic,
+        GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
         if (diagnosticMode != null) {
@@ -31,6 +32,18 @@ public record AiProviderControlledSmokeResult(
                     "AI_LATENCY_MS: " + Math.max(0, latencyMs),
                     "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
                     "PRODUCTION_READINESS: BLOCKED");
+        }
+        if (geminiResponseShapeDiagnostic != null) {
+            return List.of(
+                    "GEMINI_RESPONSE_SHAPE_DIAGNOSTIC: FIELD_NAMES_PATHS_AND_TYPES_ONLY",
+                    "HTTP_STATUS: " + display(httpStatusClass),
+                    "TOP_LEVEL_FIELDS: " + join(geminiResponseShapeDiagnostic.topLevelFields()),
+                    "NESTED_OBJECT_PATHS: " + join(geminiResponseShapeDiagnostic.nestedObjectPaths()),
+                    "FIELD_TYPES: " + join(geminiResponseShapeDiagnostic.fieldTypes()),
+                    "EXPECTED_FIELDS: " + join(geminiResponseShapeDiagnostic.expectedFields()),
+                    "MISSING_FIELDS: " + join(geminiResponseShapeDiagnostic.missingFields()),
+                    "UNEXPECTED_FIELDS: " + join(geminiResponseShapeDiagnostic.unexpectedFields()),
+                    "TYPE_MISMATCH: " + join(geminiResponseShapeDiagnostic.typeMismatchFields()));
         }
         List<String> lines = new ArrayList<>(List.of(
                 "AI_PROVIDER: " + display(provider),

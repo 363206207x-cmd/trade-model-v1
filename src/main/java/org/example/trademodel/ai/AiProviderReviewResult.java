@@ -34,6 +34,7 @@ public class AiProviderReviewResult {
     private LocalDateTime modelRoutingTimestamp;
     private String modelRoutingTraceId;
     private AiProviderSchemaDiagnostic schemaDiagnostic;
+    private GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic;
 
     public static AiProviderReviewResult skipped(AiProviderName provider, AiProviderRole role,
                                                  AiProviderCallStatus status, String reason) {
@@ -125,5 +126,12 @@ public class AiProviderReviewResult {
     public AiProviderSchemaDiagnostic getSchemaDiagnostic() { return schemaDiagnostic; }
     public void setSchemaDiagnostic(AiProviderSchemaDiagnostic schemaDiagnostic) {
         this.schemaDiagnostic = schemaDiagnostic;
+    }
+    public GeminiResponseShapeDiagnostic getGeminiResponseShapeDiagnostic() {
+        return geminiResponseShapeDiagnostic;
+    }
+    public void setGeminiResponseShapeDiagnostic(
+            GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic) {
+        this.geminiResponseShapeDiagnostic = geminiResponseShapeDiagnostic;
     }
 }
