@@ -73,10 +73,17 @@ public class AiProviderControlledSmoke {
 
         CountingTransport countingTransport = new CountingTransport(transport);
         AiProviderClient providerClient = client(provider, model, apiKey, countingTransport, timeoutLimitMs);
+        AiProviderRequest smokeRequest = provider == AiProviderName.GEMINI
+                ? fixedGeminiReviewRequest() : fixedSchemaOnlyRequest();
+        if (provider == AiProviderName.GEMINI && !validGeminiReviewFixture(smokeRequest)) {
+            return result(provider.name(), model, "KEY_PRESENT_NOT_EXPOSED", "NOT_RUN", "FAIL",
+                    false, false, 0, AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA, 0,
+                    null, diagnosticLabel);
+        }
         AiProviderReviewResult review = diagnosticMode == null
-                ? providerClient.review(fixedSchemaOnlyRequest(), timeoutLimitMs)
+                ? providerClient.review(smokeRequest, timeoutLimitMs)
                 : runGeminiDiagnostic((GeminiProviderClient) providerClient, countingTransport,
-                        diagnosticMode, model, timeoutLimitMs);
+                        diagnosticMode, model, timeoutLimitMs, smokeRequest);
         int statusCode = countingTransport.statusCode();
         AiProviderControlledSmokeStatus status = classify(review, statusCode);
         boolean parsed = review != null && review.successful();
@@ -93,10 +100,12 @@ public class AiProviderControlledSmoke {
 
     private AiProviderReviewResult runGeminiDiagnostic(
             GeminiProviderClient client, CountingTransport transport,
-            GeminiDiagnosticMode mode, String model, long timeoutLimitMs) {
+            GeminiDiagnosticMode mode, String model, long timeoutLimitMs,
+            AiProviderRequest smokeRequest) {
         long started = System.nanoTime();
         try {
-            AiHttpRequest request = client.buildHttpRequest("{}", timeoutLimitMs, model);
+            AiHttpRequest request = client.buildControlledSmokeHttpRequest(
+                    smokeRequest, timeoutLimitMs, model);
             applyDiagnosticMode(client, request, mode);
             AiHttpResponse response = transport.post(request);
             long latencyMs = elapsedMs(started);
@@ -140,7 +149,6 @@ public class AiProviderControlledSmoke {
             setDiagnosticInstruction(body, "Return one short plain-text capability response.");
         } else if (mode == GeminiDiagnosticMode.B) {
             generation.remove("responseJsonSchema");
-            setDiagnosticInstruction(body, "Return one JSON capability response without a schema contract.");
         }
         request.setBody(objectMapper.writeValueAsString(body));
         if (mode == GeminiDiagnosticMode.C) {
@@ -254,6 +262,80 @@ public class AiProviderControlledSmoke {
                 "notStateMachineOverride", true,
                 "ruleDirectionPreserved", true));
         return request;
+    }
+
+    static AiProviderRequest fixedGeminiReviewRequest() {
+        AiProviderRequest request = new AiProviderRequest();
+        request.setAnalysisId("controlled-gemini-review-smoke");
+        request.setTraceId("controlled-gemini-review-smoke");
+        request.setSymbol("BTCUSDT");
+        request.setTimeframe("15m");
+        request.setRuleMarketBias("BULLISH");
+        request.setRuleConfidence("MEDIUM");
+        request.setRuleRiskLevel("MEDIUM");
+        request.setRuleWorthOpening(Boolean.FALSE);
+        request.setDataQualityScore(82);
+        request.setTrendStructureScore(68);
+        request.setMultiTimeframeState("5m BULLISH; 15m BULLISH; 1h NEUTRAL");
+        request.setExternalContextState("ABSENT");
+        request.setEvidenceSummary(
+                "Multi-timeframe summary: 5m and 15m support bullish structure; 1h remains neutral.");
+        request.setScoreSummary(
+                "Rule decision summary: BULLISH with MEDIUM confidence and MEDIUM risk; worthOpening=false.");
+        request.setDecisionFacts(Map.ofEntries(
+                Map.entry("roleContext", "GEMINI_REVIEW"),
+                Map.entry("multiTimeframeSummary",
+                        "5m and 15m support bullish structure; 1h remains neutral."),
+                Map.entry("ruleDecisionSummary",
+                        "BULLISH, MEDIUM confidence, MEDIUM risk, worthOpening=false."),
+                Map.entry("conflictReviewRequest",
+                        "Review consistency between the multi-timeframe evidence and rule decision."),
+                Map.entry("outputInstruction", "Return ONLY JSON."),
+                Map.entry("requiredOutputFields",
+                        List.of("stance", "conflictLevel", "reasonCodes", "summary")),
+                Map.entry("insufficientEvidenceFallback", Map.of(
+                        "stance", "ABSTAIN",
+                        "conflictLevel", "NONE",
+                        "reasonCodes", List.of("INSUFFICIENT_DATA"),
+                        "summary", "Insufficient evidence")),
+                Map.entry("reviewOnly", true),
+                Map.entry("manualReviewOnly", true),
+                Map.entry("notTradeInstruction", true),
+                Map.entry("notExecutable", true),
+                Map.entry("notAutoTrading", true),
+                Map.entry("notOrderExecution", true),
+                Map.entry("notUserPositionCreation", true),
+                Map.entry("notPositionMutation", true),
+                Map.entry("notStateMachineOverride", true),
+                Map.entry("ruleDirectionPreserved", true)));
+        return request;
+    }
+
+    static boolean validGeminiReviewFixture(AiProviderRequest request) {
+        if (request == null || trim(request.getSymbol()).isBlank()
+                || trim(request.getEvidenceSummary()).isBlank()
+                || trim(request.getScoreSummary()).isBlank()) {
+            return false;
+        }
+        Map<String, Object> facts = request.getDecisionFacts();
+        return "GEMINI_REVIEW".equals(facts.get("roleContext"))
+                && nonBlankFact(facts, "multiTimeframeSummary")
+                && nonBlankFact(facts, "ruleDecisionSummary")
+                && nonBlankFact(facts, "conflictReviewRequest")
+                && "Return ONLY JSON.".equals(facts.get("outputInstruction"))
+                && List.of("stance", "conflictLevel", "reasonCodes", "summary")
+                .equals(facts.get("requiredOutputFields"))
+                && Map.of(
+                        "stance", "ABSTAIN",
+                        "conflictLevel", "NONE",
+                        "reasonCodes", List.of("INSUFFICIENT_DATA"),
+                        "summary", "Insufficient evidence")
+                .equals(facts.get("insufficientEvidenceFallback"));
+    }
+
+    private static boolean nonBlankFact(Map<String, Object> facts, String key) {
+        Object value = facts.get(key);
+        return value instanceof String text && !text.isBlank();
     }
 
     private static AiProviderControlledSmokeStatus classify(AiProviderReviewResult review, int statusCode) {

@@ -331,8 +331,68 @@ class AiProviderControlledSmokeTest {
                 .isEqualTo("application/json");
         assertThat(body.path("generationConfig").has("responseJsonSchema")).isFalse();
 
+        var prompt = objectMapper.readTree(
+                body.path("contents").get(0).path("parts").get(0).path("text").asText());
+        assertThat(prompt.path("ruleLayerFacts").path("symbol").asText()).isEqualTo("BTCUSDT");
+        assertThat(prompt.path("ruleLayerFacts").path("timeframe").asText()).isEqualTo("15m");
+        assertThat(prompt.path("scores").path("multiTimeframeState").asText())
+                .contains("5m BULLISH", "15m BULLISH", "1h NEUTRAL");
+        var facts = prompt.path("untrustedData").path("decisionFacts");
+        assertThat(facts.path("roleContext").asText()).isEqualTo("GEMINI_REVIEW");
+        assertThat(facts.path("multiTimeframeSummary").asText()).isNotBlank();
+        assertThat(facts.path("ruleDecisionSummary").asText()).isNotBlank();
+        assertThat(facts.path("conflictReviewRequest").asText()).isNotBlank();
+        assertThat(facts.path("outputInstruction").asText()).isEqualTo("Return ONLY JSON.");
+        assertThat(facts.path("requiredOutputFields")).hasSize(4);
+        assertThat(facts.path("insufficientEvidenceFallback").path("stance").asText())
+                .isEqualTo("ABSTAIN");
+        assertThat(AiProviderControlledSmoke.validGeminiReviewFixture(
+                AiProviderControlledSmoke.fixedGeminiReviewRequest())).isTrue();
+
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
         assertThat(application).contains("request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}");
+    }
+
+    @Test
+    void emptyGeminiReviewInputFailsFixtureValidationClosed() {
+        assertThat(AiProviderControlledSmoke.validGeminiReviewFixture(null)).isFalse();
+        assertThat(AiProviderControlledSmoke.validGeminiReviewFixture(new AiProviderRequest())).isFalse();
+    }
+
+    @Test
+    void missingGeminiReviewEvidenceFailsFixtureValidationClosed() {
+        AiProviderRequest request = AiProviderControlledSmoke.fixedGeminiReviewRequest();
+        request.setEvidenceSummary("");
+
+        assertThat(AiProviderControlledSmoke.validGeminiReviewFixture(request)).isFalse();
+    }
+
+    @Test
+    void missingGeminiRoleContextFailsFixtureValidationClosed() {
+        AiProviderRequest request = AiProviderControlledSmoke.fixedGeminiReviewRequest();
+        Map<String, Object> facts = new HashMap<>(request.getDecisionFacts());
+        facts.remove("roleContext");
+        request.setDecisionFacts(facts);
+
+        assertThat(AiProviderControlledSmoke.validGeminiReviewFixture(request)).isFalse();
+    }
+
+    @Test
+    void geminiDiagnosticJsonModeUsesDeterministicReviewFixture() throws Exception {
+        FakeTransport transport = FakeTransport.responding(geminiResponseWithText(reviewJsonText()));
+
+        AiProviderControlledSmokeResult result = smoke.run(diagnosticEnabled("B"), transport);
+        var body = objectMapper.readTree(transport.lastRequest.getBody());
+        var prompt = objectMapper.readTree(
+                body.path("contents").get(0).path("parts").get(0).path("text").asText());
+
+        assertThat(result.status()).isEqualTo(AiProviderControlledSmokeStatus.PASS);
+        assertThat(prompt.path("ruleLayerFacts").path("symbol").asText()).isEqualTo("BTCUSDT");
+        assertThat(prompt.path("untrustedData").path("decisionFacts").path("roleContext").asText())
+                .isEqualTo("GEMINI_REVIEW");
+        assertThat(body.path("systemInstruction").path("parts").get(0).path("text").asText())
+                .contains("GEMINI_REVIEW", "Return ONLY one valid JSON object", "INSUFFICIENT_DATA");
+        assertThat(transport.calls).isEqualTo(1);
     }
 
     @Test

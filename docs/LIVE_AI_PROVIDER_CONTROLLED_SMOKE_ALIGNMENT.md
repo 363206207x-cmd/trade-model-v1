@@ -140,6 +140,8 @@ The persisted `AI_ROLE_RESULTS_SCHEMA_V1` envelope is still assembled internally
 
 Response extraction remains limited to `candidates[0].content.parts[0].text`. Missing nodes, blank text, plain-text refusals, Markdown fences, natural-language prefixes/suffixes, malformed JSON, missing or wrong-typed fields, unknown fields, and forbidden trading fields all fail closed. No text fallback, regex extraction, missing-field filling, intent guessing, or output repair is used. A later operator-run smoke is required to establish a new live PASS; this package makes no provider call and does not claim production readiness.
 
+The controlled Gemini smoke now uses a deterministic `GEMINI_REVIEW` fixture instead of the former schema-only/no-market prompt or an empty diagnostic payload. The fixture supplies a BTCUSDT context, a multi-timeframe summary, the rule decision summary, and a conflict-review request. It also repeats the JSON-only output fields and the canonical insufficient-evidence fallback. Normal Gemini smoke and JSON diagnostic modes share this fixture. Missing input, missing evidence, or missing role context fails fixture validation before any request; no empty JSON is accepted or repaired.
+
 ## xAI Decision
 
 ### Current implementation

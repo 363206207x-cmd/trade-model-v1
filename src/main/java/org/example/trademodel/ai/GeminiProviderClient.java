@@ -80,6 +80,13 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         return request;
     }
 
+    AiHttpRequest buildControlledSmokeHttpRequest(AiProviderRequest request, long timeoutOverrideMs,
+                                                   String selectedModel) throws Exception {
+        AiPromptBuilder.PromptPayload prompt = new AiPromptBuilder(objectMapper, properties)
+                .build(request, role());
+        return buildHttpRequest(prompt.dataJson(), timeoutOverrideMs, selectedModel);
+    }
+
     void applyStrictSchemaForDiagnostic(AiHttpRequest request) throws Exception {
         ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
         ObjectNode generationConfig = (ObjectNode) body.path("generationConfig");
