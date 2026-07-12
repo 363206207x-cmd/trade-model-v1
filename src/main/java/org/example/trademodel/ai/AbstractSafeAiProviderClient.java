@@ -135,11 +135,11 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         if (response.getStatusCode() == 404) {
             return failure(AiProviderCallStatus.FAILED, "PROVIDER_MODEL_NOT_FOUND", latencyMs);
         }
-        if (response.getStatusCode() == 429) {
-            return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
-        }
         if (isBillingOrCreditsFailure(response.getBody())) {
             return failure(AiProviderCallStatus.FAILED, "PROVIDER_BILLING_OR_CREDITS", latencyMs);
+        }
+        if (response.getStatusCode() == 429) {
+            return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
         }
         return failure(AiProviderCallStatus.FAILED,
                 "PROVIDER_HTTP_" + response.getStatusCode(), latencyMs);
@@ -248,6 +248,9 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         }
         String normalized = body.toLowerCase(java.util.Locale.ROOT);
         return normalized.contains("insufficient_quota")
+                || normalized.contains("exceeded your current quota")
+                || normalized.contains("quota exhausted")
+                || normalized.contains("run out of credits")
                 || normalized.contains("insufficient credit")
                 || normalized.contains("credit balance")
                 || normalized.contains("billing")

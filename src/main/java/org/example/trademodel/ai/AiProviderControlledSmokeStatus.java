@@ -3,6 +3,7 @@ package org.example.trademodel.ai;
 public enum AiProviderControlledSmokeStatus {
     PASS,
     SKIPPED_EXTERNAL_CALLS_DISABLED,
+    SKIPPED_HARNESS_ENTRY_MISSING,
     SKIPPED_MISSING_API_KEY,
     SKIPPED_PROVIDER_DISABLED,
     FAIL_INVALID_TARGET,

@@ -7,12 +7,20 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.http.HttpTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 
 public class AiProviderControlledSmoke {
     static final String EXTERNAL_CALL_GATE = "AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS";
+    static final String HARNESS_ENTRY_GATE = "AI_PROVIDER_SMOKE_HARNESS_ENTRY";
+    static final String HARNESS_ENTRY_CONFIRMATION = "I_CONFIRM_SINGLE_PROVIDER_SMOKE";
+    static final String CALL_COUNT_FILE = "AI_PROVIDER_SMOKE_CALL_COUNT_FILE";
     static final String TARGET = "AI_PROVIDER_SMOKE_TARGET";
     static final String DIAGNOSTIC_GATE = "AI_PROVIDER_SMOKE_DIAGNOSTIC";
     static final String GEMINI_DIAGNOSTIC_MODE = "GEMINI_DIAGNOSTIC_MODE";
@@ -53,6 +61,11 @@ public class AiProviderControlledSmoke {
                     false, false, 0, AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0,
                     null, diagnosticLabel);
         }
+        if (!HARNESS_ENTRY_CONFIRMATION.equals(env.get(HARNESS_ENTRY_GATE))) {
+            return result(providerName, model, "NOT_CHECKED", "NOT_RUN", "NOT_RUN",
+                    false, false, 0, AiProviderControlledSmokeStatus.SKIPPED_HARNESS_ENTRY_MISSING, 0,
+                    null, diagnosticLabel);
+        }
         if (provider == null) {
             return result(providerName, model, "NOT_CHECKED", "NOT_RUN", "NOT_RUN",
                     false, false, 0, AiProviderControlledSmokeStatus.FAIL_INVALID_TARGET, 0,
@@ -72,7 +85,7 @@ public class AiProviderControlledSmoke {
                     null, diagnosticLabel);
         }
 
-        CountingTransport countingTransport = new CountingTransport(transport);
+        CountingTransport countingTransport = new CountingTransport(transport, env.get(CALL_COUNT_FILE));
         AiProviderClient providerClient = client(provider, model, apiKey, countingTransport, timeoutLimitMs);
         AiProviderRequest smokeRequest = provider == AiProviderName.GEMINI
                 ? fixedGeminiReviewRequest() : fixedSchemaOnlyRequest();
@@ -563,12 +576,14 @@ public class AiProviderControlledSmoke {
 
     private static final class CountingTransport implements AiHttpTransport {
         private final AiHttpTransport delegate;
+        private final Path callCountFile;
         private int requestCount;
         private int statusCode;
         private AiHttpRequest request;
 
-        private CountingTransport(AiHttpTransport delegate) {
+        private CountingTransport(AiHttpTransport delegate, String callCountFile) {
             this.delegate = delegate;
+            this.callCountFile = trim(callCountFile).isBlank() ? null : Path.of(callCountFile);
         }
 
         @Override
@@ -576,11 +591,23 @@ public class AiProviderControlledSmoke {
             if (requestCount >= 1) {
                 throw new IOException("CONTROLLED_SMOKE_REQUEST_LIMIT");
             }
-            requestCount++;
             this.request = request;
+            writeExternalCallMarker();
+            requestCount++;
             AiHttpResponse response = delegate.post(request);
             statusCode = response == null ? 0 : response.getStatusCode();
             return response;
+        }
+
+        private void writeExternalCallMarker() throws IOException {
+            if (callCountFile == null) {
+                return;
+            }
+            if (!Files.isRegularFile(callCountFile, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("CONTROLLED_SMOKE_CALL_COUNT_FILE_INVALID");
+            }
+            Files.writeString(callCountFile, "1\n", StandardCharsets.UTF_8,
+                    StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
         }
 
         private int requestCount() {

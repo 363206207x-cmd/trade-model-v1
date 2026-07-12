@@ -61,6 +61,7 @@ public record AiProviderControlledSmokeResult(
                     "AI_ERROR_CATEGORY: " + display(errorCategory == null ? null : errorCategory.name()),
                     "AI_RESPONSE_PARSE_STATUS: " + display(responseParseStatus),
                     "AI_LATENCY_MS: " + Math.max(0, latencyMs),
+                    "AI_PROVIDER_LIVE_SMOKE: " + status.name(),
                     "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
                     "PRODUCTION_READINESS: BLOCKED"));
             return List.copyOf(lines);

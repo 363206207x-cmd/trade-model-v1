@@ -160,6 +160,28 @@ class AiProviderClientAdaptersTest {
     }
 
     @Test
+    void adapter_distinguishesRateLimitFromBillingOnHttp429WithoutRawBody() {
+        AiOrchestratorProperties properties = properties();
+        configure(properties.getOpenai(), "openai-key", "gpt-test", "https://api.openai.test");
+
+        AiProviderReviewResult rateLimit = reviewStatus(properties, 429, "too many requests private detail");
+        AiProviderReviewResult insufficientQuota = reviewStatus(
+                properties, 429, "insufficient_quota private detail");
+        AiProviderReviewResult exceededQuota = reviewStatus(
+                properties, 429, "You exceeded your current quota private detail");
+        AiProviderReviewResult billing = reviewStatus(
+                properties, 402, "credit balance billing private detail");
+
+        assertThat(rateLimit.getErrorCode()).isEqualTo("PROVIDER_RATE_LIMITED");
+        assertThat(rateLimit.getCallStatus()).isEqualTo(AiProviderCallStatus.RATE_LIMITED);
+        assertThat(insufficientQuota.getErrorCode()).isEqualTo("PROVIDER_BILLING_OR_CREDITS");
+        assertThat(exceededQuota.getErrorCode()).isEqualTo("PROVIDER_BILLING_OR_CREDITS");
+        assertThat(billing.getErrorCode()).isEqualTo("PROVIDER_BILLING_OR_CREDITS");
+        assertThat(List.of(rateLimit, insufficientQuota, exceededQuota, billing))
+                .allSatisfy(result -> assertThat(result.getSummary()).doesNotContain("private detail"));
+    }
+
+    @Test
     void adapter_mapsTimeoutToTimeoutFallback() {
         AiOrchestratorProperties properties = properties();
         configure(properties.getOpenai(), "openai-key", "gpt-test", "https://api.openai.test");

@@ -188,6 +188,7 @@ Gemini A/B/C live diagnosis adds two mandatory non-secret gates: `AI_PROVIDER_SM
 
 - One provider target
 - At most one HTTP POST
+- Core runtime requires `AI_PROVIDER_SMOKE_HARNESS_ENTRY=I_CONFIRM_SINGLE_PROVIDER_SMOKE` before reading the selected key, constructing the provider client, or invoking transport
 - No retry, loop, concurrency, fallback provider, or multi-role orchestration
 - Controlled-smoke request and overall timeout: 30 seconds for Gemini structured-output validation; 15 seconds for OpenAI and xAI
 - Production AI request timeout remains unchanged at 5 seconds
@@ -214,7 +215,7 @@ Allowed output fields are:
     REAL_KEYS_READ:
     PRODUCTION_READINESS:
 
-The output never includes a key, key shape, authorization header, request body, prompt, raw response body, raw error body, raw headers, complete request ID, or provider summary.
+The output never includes a key, key shape, authorization header, request body, prompt, raw response body, raw error body, raw headers, complete request ID, or provider summary. The shell maintains a mode-`600` temporary counter containing only `0` or `1`; it is deleted on exit. Process failures report the marker value, or `UNKNOWN_MAX_1` when the marker cannot be trusted, rather than silently claiming zero calls.
 
 Authorized Gemini diagnostic mode emits only:
 
@@ -224,6 +225,7 @@ Authorized Gemini diagnostic mode emits only:
     AI_ERROR_CATEGORY:
     AI_RESPONSE_PARSE_STATUS:
     AI_LATENCY_MS:
+    AI_PROVIDER_LIVE_SMOKE:
     LIVE_PROVIDER_CALLS:
     PRODUCTION_READINESS:
 
@@ -264,13 +266,14 @@ No live capability-isolation request is run by this package. If a later operator
 | Condition | Result |
 |---|---|
 | external gate closed | SKIPPED_EXTERNAL_CALLS_DISABLED |
+| core harness confirmation absent or invalid | SKIPPED_HARNESS_ENTRY_MISSING |
 | key absent | SKIPPED_MISSING_API_KEY |
 | global or provider switch disabled | SKIPPED_PROVIDER_DISABLED |
 | target not exactly allowlisted | FAIL_INVALID_TARGET |
 | HTTP 401/403 | FAIL_AUTH |
-| explicit billing/credits error | FAIL_BILLING_OR_CREDITS |
+| explicit billing/credits error, including an HTTP 429 quota/credit body | FAIL_BILLING_OR_CREDITS |
 | HTTP 404/model missing | FAIL_MODEL_NOT_FOUND |
-| HTTP 429 | FAIL_RATE_LIMIT |
+| remaining HTTP 429 without billing/quota/credit semantics | FAIL_RATE_LIMIT |
 | timeout | FAIL_TIMEOUT |
 | 2xx malformed or missing review text | FAIL_RESPONSE_SCHEMA |
 | other non-2xx | FAIL_PROVIDER_HTTP |
@@ -284,6 +287,7 @@ Every result includes PRODUCTION_READINESS: BLOCKED.
 - *.local-secret remains ignored.
 - No local secret file is read, sourced, copied, modified, or tracked.
 - Key presence is checked only after all non-secret gates pass.
+- The exact core harness-entry confirmation is checked before selected-key lookup and before transport construction.
 - Tests use test-openai-key, test-gemini-key, and test-xai-key.
 - No command example puts a key in shell history.
 - Raw provider error content is never returned or logged.
@@ -319,7 +323,7 @@ The default validation is:
 
 It must return SKIPPED_EXTERNAL_CALLS_DISABLED, LIVE_PROVIDER_CALLS: 0, and REAL_KEYS_READ: 0.
 
-For a later operator-authorized single-provider run, the selected key must already be present in the operator shell. Do not enter a key in a command, document, Codex, or shell history. Set only the non-secret gates for exactly one target, then run the same script. The harness never sources a secret file.
+For a later operator-authorized single-provider run, the selected key must already be present in the operator shell. Do not enter a key in a command, document, Codex, or shell history. Set only the non-secret gates for exactly one target, including `AI_PROVIDER_SMOKE_HARNESS_ENTRY=I_CONFIRM_SINGLE_PROVIDER_SMOKE`, then run the same script. The harness never sources a secret file.
 
 For a later operator-authorized Gemini capability diagnosis, keep the existing key in the shell without displaying it, enable the existing global/Gemini switches and external-call gate, then select exactly one mode:
 

@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.net.http.HttpTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,15 +21,12 @@ class AiProviderControlledSmokeTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final AiProviderControlledSmoke smoke = new AiProviderControlledSmoke(objectMapper);
 
+    @TempDir
+    Path tempDir;
+
     @Test
     void controlledLiveSmokeEntryPoint() {
         Map<String, String> environment = System.getenv();
-        if (!"I_CONFIRM_SINGLE_PROVIDER_SMOKE".equals(
-                environment.get("AI_PROVIDER_SMOKE_HARNESS_ENTRY"))) {
-            skipped().sanitizedOutputLines().forEach(System.out::println);
-            return;
-        }
-
         AiProviderControlledSmokeResult result = smoke.run(environment, new JdkAiHttpTransport());
         result.sanitizedOutputLines().forEach(System.out::println);
         assertThat(result.liveProviderCalls()).isLessThanOrEqualTo(1);
@@ -54,6 +53,28 @@ class AiProviderControlledSmokeTest {
 
         assertThat(result.status()).isEqualTo(
                 AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED);
+        assertThat(transport.calls).isZero();
+    }
+
+    @Test
+    void coreHarnessEntryGateCannotBeBypassedByDirectRun() {
+        FakeTransport transport = FakeTransport.responding(validOpenAiResponse(true, true));
+        Map<String, String> missing = enabled("OPENAI", true);
+        missing.remove("AI_PROVIDER_SMOKE_HARNESS_ENTRY");
+        Map<String, String> invalid = enabled("OPENAI", true);
+        invalid.put("AI_PROVIDER_SMOKE_HARNESS_ENTRY", "invalid");
+
+        AiProviderControlledSmokeResult missingResult = smoke.run(missing, transport);
+        AiProviderControlledSmokeResult invalidResult = smoke.run(invalid, transport);
+
+        assertThat(missingResult.status()).isEqualTo(
+                AiProviderControlledSmokeStatus.SKIPPED_HARNESS_ENTRY_MISSING);
+        assertThat(invalidResult.status()).isEqualTo(
+                AiProviderControlledSmokeStatus.SKIPPED_HARNESS_ENTRY_MISSING);
+        assertThat(missingResult.liveProviderCalls()).isZero();
+        assertThat(invalidResult.liveProviderCalls()).isZero();
+        assertThat(missingResult.sanitizedOutputLines())
+                .contains("AI_PROVIDER_LIVE_SMOKE: SKIPPED_HARNESS_ENTRY_MISSING");
         assertThat(transport.calls).isZero();
     }
 
@@ -115,6 +136,8 @@ class AiProviderControlledSmokeTest {
             "402,insufficient credits private detail,FAIL_BILLING_OR_CREDITS",
             "404,model missing private detail,FAIL_MODEL_NOT_FOUND",
             "429,rate limit private detail,FAIL_RATE_LIMIT",
+            "429,insufficient_quota private detail,FAIL_BILLING_OR_CREDITS",
+            "429,exceeded your current quota private detail,FAIL_BILLING_OR_CREDITS",
             "500,provider private detail,FAIL_PROVIDER_HTTP"
     })
     void providerHttpFailuresMapDeterministically(int status, String body,
@@ -143,6 +166,32 @@ class AiProviderControlledSmokeTest {
         assertThat(ioResult.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.PROVIDER_ERROR);
         assertThat(timeout.calls).isEqualTo(1);
         assertThat(io.calls).isEqualTo(1);
+    }
+
+    @Test
+    void callCountMarkerStaysZeroWithoutTransportAndBecomesOneBeforeFailure() throws Exception {
+        Path noCallMarker = marker("no-call");
+        Map<String, String> missingKey = enabled("OPENAI", false);
+        missingKey.put("AI_PROVIDER_SMOKE_CALL_COUNT_FILE", noCallMarker.toString());
+
+        AiProviderControlledSmokeResult noCall = smoke.run(
+                missingKey, FakeTransport.responding(validOpenAiResponse(true, true)));
+
+        assertThat(noCall.liveProviderCalls()).isZero();
+        assertThat(Files.readString(noCallMarker).trim()).isEqualTo("0");
+
+        for (IOException failure : List.of(
+                new IOException("private IO detail"),
+                new HttpTimeoutException("private timeout detail"))) {
+            Path invokedMarker = marker("invoked-" + failure.getClass().getSimpleName());
+            Map<String, String> environment = enabled("OPENAI", true);
+            environment.put("AI_PROVIDER_SMOKE_CALL_COUNT_FILE", invokedMarker.toString());
+
+            AiProviderControlledSmokeResult result = smoke.run(environment, FakeTransport.throwing(failure));
+
+            assertThat(result.liveProviderCalls()).isEqualTo(1);
+            assertThat(Files.readString(invokedMarker).trim()).isEqualTo("1");
+        }
     }
 
     @Test
@@ -257,7 +306,9 @@ class AiProviderControlledSmokeTest {
         assertThat(result.diagnosticMode()).isEqualTo("--");
         assertThat(result.liveProviderCalls()).isZero();
         assertThat(transport.calls).isZero();
-        assertThat(result.sanitizedOutputLines()).hasSize(8);
+        assertThat(result.sanitizedOutputLines())
+                .hasSize(9)
+                .contains("AI_PROVIDER_LIVE_SMOKE: FAIL_INVALID_TARGET");
     }
 
     @Test
@@ -571,6 +622,12 @@ class AiProviderControlledSmokeTest {
                 "export TRADE_MODEL_AI_REQUEST_TIMEOUT_MS=15000",
                 "export TRADE_MODEL_AI_OVERALL_TIMEOUT_MS=15000",
                 "timeout_limit_ms=30000");
+        assertThat(script).contains(
+                "AI_PROVIDER_SMOKE_HARNESS_ENTRY",
+                "I_CONFIRM_SINGLE_PROVIDER_SMOKE",
+                "AI_PROVIDER_SMOKE_CALL_COUNT_FILE",
+                "chmod 600",
+                "UNKNOWN_MAX_1");
 
         ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
         processBuilder.redirectErrorStream(true);
@@ -620,6 +677,13 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
+    void shellReportsMarkerValueWhenHarnessProcessFails() throws Exception {
+        assertThat(runShellWithFailingMaven("1")).contains("LIVE_PROVIDER_CALLS: 1");
+        assertThat(runShellWithFailingMaven("0")).contains("LIVE_PROVIDER_CALLS: 0");
+        assertThat(runShellWithFailingMaven("invalid")).contains("LIVE_PROVIDER_CALLS: UNKNOWN_MAX_1");
+    }
+
+    @Test
     void shellDiagnosticModeStillRequiresExternalCallAuthorization() throws Exception {
         ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
         processBuilder.redirectErrorStream(true);
@@ -639,8 +703,28 @@ class AiProviderControlledSmokeTest {
                 "AI_ERROR_CATEGORY: --",
                 "AI_RESPONSE_PARSE_STATUS: NOT_RUN",
                 "AI_LATENCY_MS: 0",
+                "AI_PROVIDER_LIVE_SMOKE: SKIPPED_EXTERNAL_CALLS_DISABLED",
                 "LIVE_PROVIDER_CALLS: 0",
                 "PRODUCTION_READINESS: BLOCKED");
+    }
+
+    @Test
+    void shellExternalModeRequiresHarnessEntryBeforeKeyLookup() throws Exception {
+        ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
+        processBuilder.redirectErrorStream(true);
+        processBuilder.environment().put("AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS", "true");
+        processBuilder.environment().put("AI_PROVIDER_SMOKE_TARGET", "OPENAI");
+        processBuilder.environment().remove("AI_PROVIDER_SMOKE_HARNESS_ENTRY");
+        processBuilder.environment().remove("OPENAI_API_KEY");
+
+        Process process = processBuilder.start();
+        String output = new String(process.getInputStream().readAllBytes());
+
+        assertThat(process.waitFor()).isZero();
+        assertThat(output).contains(
+                "AI_PROVIDER_LIVE_SMOKE: SKIPPED_HARNESS_ENTRY_MISSING",
+                "LIVE_PROVIDER_CALLS: 0",
+                "REAL_KEYS_READ: 0");
     }
 
     @Test
@@ -708,6 +792,7 @@ class AiProviderControlledSmokeTest {
                 "AI_ERROR_CATEGORY: --",
                 "AI_RESPONSE_PARSE_STATUS: PASS",
                 "AI_LATENCY_MS: " + result.latencyMs(),
+                "AI_PROVIDER_LIVE_SMOKE: PASS",
                 "LIVE_PROVIDER_CALLS: 1",
                 "PRODUCTION_READINESS: BLOCKED");
     }
@@ -771,6 +856,7 @@ class AiProviderControlledSmokeTest {
     private static Map<String, String> enabled(String target, boolean includeKey) {
         Map<String, String> environment = new HashMap<>();
         environment.put("AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS", "true");
+        environment.put("AI_PROVIDER_SMOKE_HARNESS_ENTRY", "I_CONFIRM_SINGLE_PROVIDER_SMOKE");
         environment.put("AI_PROVIDER_SMOKE_TARGET", target);
         environment.put("TRADE_MODEL_AI_ENABLED", "true");
         if ("OPENAI".equals(target)) {
@@ -784,6 +870,41 @@ class AiProviderControlledSmokeTest {
             if (includeKey) environment.put("XAI_API_KEY", "test-xai-key");
         }
         return environment;
+    }
+
+    private Path marker(String name) throws IOException {
+        Path marker = tempDir.resolve(name + ".count");
+        Files.writeString(marker, "0\n");
+        return marker;
+    }
+
+    private String runShellWithFailingMaven(String markerValue) throws Exception {
+        Path scripts = Files.createDirectories(tempDir.resolve("shell-" + markerValue).resolve("scripts"));
+        Files.copy(Path.of("scripts/ai-provider-controlled-smoke.sh"),
+                scripts.resolve("ai-provider-controlled-smoke.sh"));
+        Path wrapper = scripts.getParent().resolve("mvnw");
+        Files.writeString(wrapper, "#!/usr/bin/env bash\n"
+                + "printf '%s\\n' \"${FAKE_MARKER_VALUE}\" > \"${AI_PROVIDER_SMOKE_CALL_COUNT_FILE}\"\n"
+                + "exit 1\n");
+        Files.setPosixFilePermissions(wrapper, PosixFilePermissions.fromString("rwx------"));
+
+        ProcessBuilder processBuilder = new ProcessBuilder("bash", "scripts/ai-provider-controlled-smoke.sh");
+        processBuilder.directory(scripts.getParent().toFile());
+        processBuilder.redirectErrorStream(true);
+        Map<String, String> environment = processBuilder.environment();
+        environment.put("AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS", "true");
+        environment.put("AI_PROVIDER_SMOKE_HARNESS_ENTRY", "I_CONFIRM_SINGLE_PROVIDER_SMOKE");
+        environment.put("AI_PROVIDER_SMOKE_TARGET", "OPENAI");
+        environment.put("TRADE_MODEL_AI_ENABLED", "true");
+        environment.put("TRADE_MODEL_AI_OPENAI_ENABLED", "true");
+        environment.put("OPENAI_API_KEY", "test-openai-key");
+        environment.put("FAKE_MARKER_VALUE", markerValue);
+        environment.put("AI_PROVIDER_SMOKE_WATCHDOG_SECONDS", "1");
+
+        Process process = processBuilder.start();
+        String output = new String(process.getInputStream().readAllBytes());
+        assertThat(process.waitFor()).isEqualTo(1);
+        return output;
     }
 
     private static Map<String, String> diagnosticEnabled(String mode) {
