@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
+import org.example.trademodel.market.client.impl.RoutedPublicOhlcvProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -19,6 +20,7 @@ class LocalRealDataStatusServiceTest {
     @Mock PersistedOhlcvBarMapper ohlcvMapper;
     @Mock AnalysisRunMapper analysisRunMapper;
     @Mock DecisionResultMapper decisionResultMapper;
+    @Mock RoutedPublicOhlcvProvider routedProvider;
 
     @Test
     void localRealStatusDoesNotExposeSecretsAndShowsAiDisabled() throws Exception {
@@ -26,8 +28,10 @@ class LocalRealDataStatusServiceTest {
         readiness.transition(LocalRealReadinessState.DEGRADED, "MARKET_WINDOW_INCOMPLETE");
         when(ohlcvMapper.countAllClosedBars()).thenReturn(0L);
         when(analysisRunMapper.countLocalRealSuccessfulSymbols()).thenReturn(0);
+        when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
+        when(routedProvider.health()).thenReturn(Map.of());
         LocalRealDataStatusService service = new LocalRealDataStatusService(
-                readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper);
+                readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider);
 
         Map<String, Object> status = service.status();
         String json = new ObjectMapper().findAndRegisterModules().writeValueAsString(status).toLowerCase();
@@ -35,5 +39,13 @@ class LocalRealDataStatusServiceTest {
         assertThat(status.get("ai")).isEqualTo(Map.of("enabled", false, "status", "DISABLED"));
         assertThat(json).doesNotContain("api_key", "apikey", "password", "authorization", "prompt");
         assertThat(status).containsEntry("notAutoTrading", true).containsEntry("notOrderExecution", true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> market = (Map<String, Object>) status.get("marketData");
+        assertThat(market).containsEntry("provider", "KRAKEN").containsEntry("readyAssetCount", 0L);
+        assertThat((java.util.List<?>) market.get("assets")).hasSize(6);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> providers = (Map<String, Object>) status.get("providers");
+        assertThat(providers).containsEntry("primary", "KRAKEN");
+        assertThat((java.util.List<?>) status.get("assets")).hasSize(6);
     }
 }

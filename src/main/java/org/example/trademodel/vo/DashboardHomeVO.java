@@ -405,6 +405,9 @@ public class DashboardHomeVO {
         private Boolean worthOpening;
         private BigDecimal latestPrice;
         private String dataFreshness;
+        private Map<String, String> timeframeFreshness;
+        private String sourceProvider;
+        private String unavailableReason;
         private Integer evidenceCount;
         private LocalDateTime latestAnalysisTime;
 
@@ -524,6 +527,12 @@ public class DashboardHomeVO {
         public void setLatestPrice(BigDecimal latestPrice) { this.latestPrice = latestPrice; }
         public String getDataFreshness() { return dataFreshness; }
         public void setDataFreshness(String dataFreshness) { this.dataFreshness = dataFreshness; }
+        public Map<String, String> getTimeframeFreshness() { return timeframeFreshness; }
+        public void setTimeframeFreshness(Map<String, String> timeframeFreshness) { this.timeframeFreshness = timeframeFreshness; }
+        public String getSourceProvider() { return sourceProvider; }
+        public void setSourceProvider(String sourceProvider) { this.sourceProvider = sourceProvider; }
+        public String getUnavailableReason() { return unavailableReason; }
+        public void setUnavailableReason(String unavailableReason) { this.unavailableReason = unavailableReason; }
         public Integer getEvidenceCount() { return evidenceCount; }
         public void setEvidenceCount(Integer evidenceCount) { this.evidenceCount = evidenceCount; }
         public LocalDateTime getLatestAnalysisTime() { return latestAnalysisTime; }

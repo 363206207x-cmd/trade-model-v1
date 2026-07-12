@@ -20,6 +20,7 @@ class LocalRealProfileContractTest {
                 .contains("jdbc:h2:file:./data/trade-model-v1-local-real;MODE=MySQL;AUTO_SERVER=TRUE")
                 .contains("address: 127.0.0.1")
                 .contains("require-real-market-environment: true")
+                .contains("primary: kraken", "fallback: binance", "base-url: https://api.kraken.com")
                 .doesNotContain("jdbc:h2:mem:", "create-drop");
     }
 

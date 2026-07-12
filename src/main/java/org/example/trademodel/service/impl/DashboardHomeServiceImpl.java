@@ -24,6 +24,9 @@ import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
+import org.example.trademodel.localreal.LocalRealAssetReadiness;
+import org.example.trademodel.localreal.LocalRealAssetReadinessState;
+import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.DecisionService;
@@ -101,6 +104,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private AnalysisRunMapper analysisRunMapper;
+    private LocalRealReadinessService localRealReadinessService;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -155,6 +159,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                       AnalysisRunMapper analysisRunMapper) {
         this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
         this.analysisRunMapper = analysisRunMapper;
+    }
+
+    @Autowired(required = false)
+    void setLocalRealReadinessService(LocalRealReadinessService localRealReadinessService) {
+        this.localRealReadinessService = localRealReadinessService;
     }
 
     @Override
@@ -274,6 +283,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         header.setAiStatus(firstNonBlank(providerReadiness != null ? providerReadiness.getAiProviderStatus() : null,
                 "WAITING_SYNC"));
         header.setDataSourceText(dataSourceText(positionSyncStatus, externalContext, providerReadiness));
+        if (localRealReadinessService != null) {
+            header.setDataSourceText(localRealDataSourceText());
+        }
         header.setUpdatedAt(LocalDateTime.now());
         return header;
     }
@@ -453,14 +465,32 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (asset == null || persistedOhlcvBarMapper == null || !hasText(symbol)) {
             return;
         }
-        List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper.selectLatestClosedWindow(symbol, "5m", 1);
-        PersistedOhlcvBarDO latest = rows == null || rows.isEmpty() ? null : rows.get(0);
+        Map<String, String> timeframeFreshness = new LinkedHashMap<>();
+        PersistedOhlcvBarDO latest = null;
+        for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
+            List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper.selectLatestClosedWindow(symbol, timeframe, 1);
+            PersistedOhlcvBarDO timeframeLatest = rows == null || rows.isEmpty() ? null : rows.get(0);
+            timeframeFreshness.put(timeframe, timeframeLatest == null
+                    ? "NO_DATA" : firstNonBlank(timeframeLatest.getFreshnessStatus(), "UNKNOWN"));
+            if ("5m".equals(timeframe)) latest = timeframeLatest;
+        }
+        asset.setTimeframeFreshness(Map.copyOf(timeframeFreshness));
         if (latest == null) {
-            asset.setDataFreshness("NO_DATA");
+            LocalRealAssetReadiness readiness = localRealReadinessService == null
+                    ? null : localRealReadinessService.asset(symbol);
+            if (readiness != null && readiness.state() == LocalRealAssetReadinessState.UNAVAILABLE) {
+                asset.setDataFreshness("UNAVAILABLE");
+                asset.setUnavailableReason(readiness.reasonCode());
+            } else {
+                asset.setDataFreshness("NO_DATA");
+            }
             return;
         }
         asset.setLatestPrice(latest.getClosePrice());
-        asset.setDataFreshness(trimToNull(latest.getFreshnessStatus()));
+        boolean allFresh = timeframeFreshness.values().stream().allMatch("FRESH"::equalsIgnoreCase);
+        boolean anyData = timeframeFreshness.values().stream().anyMatch(value -> !"NO_DATA".equals(value));
+        asset.setDataFreshness(allFresh ? "FRESH" : anyData ? "PARTIAL" : "NO_DATA");
+        asset.setSourceProvider(providerLabel(latest.getProvider()));
     }
 
     private DashboardHomeVO.AssetVO assetBase(int slot, String normalizedSymbol) {
@@ -1086,6 +1116,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 sourceHealth,
                 "WAITING_SYNC"
         );
+    }
+
+    private String localRealDataSourceText() {
+        long ready = localRealReadinessService.readyAssetCount();
+        List<String> degraded = localRealReadinessService.assets().values().stream()
+                .filter(item -> item.state() != LocalRealAssetReadinessState.READY)
+                .map(item -> item.symbol().replace("USDT", ""))
+                .toList();
+        String suffix = degraded.isEmpty() ? "" : " · degraded " + String.join(",", degraded);
+        return "真实行情资产 " + ready + "/" + DEFAULT_SYMBOLS.size() + " · Kraken" + suffix;
+    }
+
+    private String providerLabel(String provider) {
+        String normalized = upper(provider);
+        if (normalized.startsWith("KRAKEN")) return "Kraken";
+        if (normalized.startsWith("BINANCE")) return "Binance";
+        return trimToNull(provider);
     }
 
     private String diagnosticFromFreshness(PositionSyncStatusVO positionSyncStatus) {

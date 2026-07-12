@@ -5991,6 +5991,9 @@
             isWorthOpening: asset.worthOpening,
             latestPrice: asset.latestPrice,
             dataFreshness: asset.dataFreshness,
+            timeframeFreshness: asset.timeframeFreshness,
+            sourceProvider: asset.sourceProvider,
+            unavailableReason: asset.unavailableReason,
             evidenceCount: asset.evidenceCount,
             latestAnalysisTime: asset.latestAnalysisTime
         };
@@ -6045,6 +6048,15 @@
             var stateOpinion = stateText && worthText ? (stateText + " / " + worthText) : (stateText || worthText || "");
             var priceText = formatPrice(asset.latestPrice);
             var freshnessText = cleanBlankValue(localizeVisibleStatus(asset.dataFreshness)) || "NO_DATA";
+            var providerText = cleanBlankValue(asset.sourceProvider) || "暂无";
+            var unavailableReason = cleanBlankValue(asset.unavailableReason);
+            var timeframeFreshness = asset.timeframeFreshness || {};
+            var timeframeFreshnessText = ["5m", "15m", "1h", "4h"].map(function (timeframe) {
+                return timeframe + ":" + (cleanBlankValue(localizeVisibleStatus(timeframeFreshness[timeframe])) || "NO_DATA");
+            }).join(" · ");
+            var dataStatusText = String(asset.dataFreshness || "").toUpperCase() === "UNAVAILABLE"
+                ? ("数据源不可用" + (unavailableReason ? (" · " + unavailableReason) : ""))
+                : freshnessText;
             var evidenceText = asset.evidenceCount == null ? "暂无" : String(asset.evidenceCount);
             var analysisTimeText = formatDateTime(asset.latestAnalysisTime);
             var coinCls = coinAvatarClass(rawSymbol);
@@ -6059,7 +6071,9 @@
                 '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value">' + escapeHtml(stateOpinion) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">最新价</span><span class="value">' + escapeHtml(priceText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">数据状态</span><span class="value">' + escapeHtml(freshnessText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">数据来源</span><span class="value">' + escapeHtml(providerText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">数据状态</span><span class="value">' + escapeHtml(dataStatusText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">四周期新鲜度</span><span class="value">' + escapeHtml(timeframeFreshnessText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">证据数</span><span class="value">' + escapeHtml(evidenceText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">分析时间</span><span class="value">' + escapeHtml(analysisTimeText) + '</span></div>' +
                 '</div></div></div>';

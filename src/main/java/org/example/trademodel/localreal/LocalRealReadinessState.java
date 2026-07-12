@@ -6,6 +6,7 @@ public enum LocalRealReadinessState {
     MARKET_READY,
     ANALYSIS_RUNNING,
     DASHBOARD_READY,
+    DASHBOARD_PARTIAL,
     DEGRADED,
     FAILED
 }

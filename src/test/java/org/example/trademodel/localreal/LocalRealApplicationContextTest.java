@@ -18,6 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.flyway.enabled=false",
         "trade-model.schedulers.enabled=false",
         "trade-model.ohlcv.public-provider.external-calls-enabled=false",
+        "trade-model.ohlcv.kraken.external-calls-enabled=false",
+        "trade-model.ohlcv.binance.external-calls-enabled=false",
         "trade-model.provider-call.external-calls-enabled=false"
 })
 @ActiveProfiles("local-real")

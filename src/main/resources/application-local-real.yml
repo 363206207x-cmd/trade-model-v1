@@ -59,6 +59,17 @@ trade-model:
       required-market-timeframes: 5m,15m,1h,4h
       required-closed-bars: 100
   ohlcv:
+    provider:
+      primary: kraken
+      fallback: binance
+      fallback-enabled: true
+    kraken:
+      enabled: true
+      external-calls-enabled: true
+      base-url: https://api.kraken.com
+    binance:
+      enabled: true
+      external-calls-enabled: true
     public-provider:
       enabled: true
       external-calls-enabled: true
