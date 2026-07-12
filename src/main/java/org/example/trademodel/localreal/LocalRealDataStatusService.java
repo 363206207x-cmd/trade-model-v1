@@ -94,7 +94,8 @@ public class LocalRealDataStatusService {
             LocalRealAssetReadiness item = readiness.asset(symbol);
             Map<String, Object> asset = new LinkedHashMap<>();
             asset.put("symbol", symbol);
-            asset.put("provider", latest == null ? null : latest.getProvider());
+            asset.put("provider", latest == null ? routedProvider.primaryProvider() : latest.getProvider());
+            asset.put("requestPair", routedProvider.requestPair(symbol));
             asset.put("status", item == null ? LocalRealAssetReadinessState.NO_DATA.name() : item.state().name());
             asset.put("reasonCode", item == null ? "NO_DATA" : item.reasonCode());
             asset.put("closedBarCount", ohlcvMapper.countClosedBarsBySymbol(symbol));
@@ -107,6 +108,7 @@ public class LocalRealDataStatusService {
     private Map<String, Object> providerStatuses() {
         Map<String, Object> providers = new LinkedHashMap<>();
         providers.put("primary", routedProvider.primaryProvider());
+        providers.put("krakenPairCacheState", routedProvider.krakenPairCacheState().name());
         providers.putAll(routedProvider.health());
         return providers;
     }
