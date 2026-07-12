@@ -56,7 +56,7 @@ class AnalysisSchedulerLocalRealReadinessGateTest {
     }
 
     @Test
-    void analysisRunsAfterMinimumBarsAvailable() {
+    void schedulerUsesPersistedKrakenBarsAndAnalysisRunSucceedsAfterRealBarsReady() {
         when(queryService.evaluateReadiness(eq("BTCUSDT"), any(), eq(100), anyLong()))
                 .thenReturn(readiness(PersistedOhlcvReadinessStatus.FRESH));
         AnalysisRunResult result = org.mockito.Mockito.mock(AnalysisRunResult.class);

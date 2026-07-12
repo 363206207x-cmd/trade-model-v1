@@ -1,6 +1,9 @@
 package org.example.trademodel.localreal;
 
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
@@ -20,17 +23,20 @@ public class LocalRealDataStatusService {
     private final AnalysisRunMapper analysisRunMapper;
     private final DecisionResultMapper decisionResultMapper;
     private final RoutedPublicOhlcvProvider routedProvider;
+    private final PersistedRealMarketEnvironmentService realMarketEnvironmentService;
 
     public LocalRealDataStatusService(LocalRealReadinessService readiness,
                                       PersistedOhlcvBarMapper ohlcvMapper,
                                       AnalysisRunMapper analysisRunMapper,
                                       DecisionResultMapper decisionResultMapper,
-                                      RoutedPublicOhlcvProvider routedProvider) {
+                                      RoutedPublicOhlcvProvider routedProvider,
+                                      PersistedRealMarketEnvironmentService realMarketEnvironmentService) {
         this.readiness = readiness;
         this.ohlcvMapper = ohlcvMapper;
         this.analysisRunMapper = analysisRunMapper;
         this.decisionResultMapper = decisionResultMapper;
         this.routedProvider = routedProvider;
+        this.realMarketEnvironmentService = realMarketEnvironmentService;
     }
 
     public Map<String, Object> status() {
@@ -92,12 +98,19 @@ public class LocalRealDataStatusService {
         return LocalRealDataCoordinator.SYMBOLS.stream().map(symbol -> {
             PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBarBySymbol(symbol);
             LocalRealAssetReadiness item = readiness.asset(symbol);
+            PersistedRealMarketEnvironmentAssessment marketAssessment =
+                    realMarketEnvironmentService == null ? null : realMarketEnvironmentService.assess(symbol, "5m");
+            AnalysisRunDO latestAnalysis = analysisRunMapper.selectLatestBySymbol(symbol);
             Map<String, Object> asset = new LinkedHashMap<>();
             asset.put("symbol", symbol);
             asset.put("provider", latest == null ? routedProvider.primaryProvider() : latest.getProvider());
             asset.put("requestPair", routedProvider.requestPair(symbol));
             asset.put("status", item == null ? LocalRealAssetReadinessState.NO_DATA.name() : item.state().name());
             asset.put("reasonCode", item == null ? "NO_DATA" : item.reasonCode());
+            asset.put("marketDataStatus", marketDataStatus(latest, marketAssessment));
+            asset.put("realMarketEnvironment", marketAssessment != null && marketAssessment.ready());
+            asset.put("analysisStatus", analysisStatus(latestAnalysis));
+            asset.put("latestAnalysisFailureCode", latestAnalysisFailureCode(latestAnalysis));
             asset.put("closedBarCount", ohlcvMapper.countClosedBarsBySymbol(symbol));
             asset.put("latestClosedBarAt", latest == null || latest.getCloseTimeMs() == null
                     ? null : java.time.Instant.ofEpochMilli(latest.getCloseTimeMs()));
@@ -115,5 +128,29 @@ public class LocalRealDataStatusService {
 
     private static int value(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private static String marketDataStatus(PersistedOhlcvBarDO latest,
+                                           PersistedRealMarketEnvironmentAssessment assessment) {
+        if (latest == null) return "MARKET_DATA_NOT_READY";
+        if (assessment != null && assessment.ready()) return "READY";
+        if ("STALE".equals(latest.getFreshnessStatus())) return "STALE";
+        return assessment != null && assessment.reasonCode() != null
+                ? assessment.reasonCode() : "REAL_MARKET_PROVENANCE_INCOMPLETE";
+    }
+
+    private static String analysisStatus(AnalysisRunDO latest) {
+        if (latest == null || latest.getStatus() == null) return "WAITING";
+        return "SUCCESS".equals(latest.getStatus()) ? "READY" : latest.getStatus();
+    }
+
+    private static String latestAnalysisFailureCode(AnalysisRunDO latest) {
+        if (latest == null || !"FAILED".equals(latest.getStatus())) return null;
+        if (latest.getErrorMessage() != null
+                && latest.getErrorMessage().contains("REAL_MARKET_ENVIRONMENT_REQUIRED")) {
+            return "REAL_MARKET_ENVIRONMENT_REQUIRED";
+        }
+        return latest.getErrorCode() == null || latest.getErrorCode().isBlank()
+                ? "LATEST_ANALYSIS_FAILED" : latest.getErrorCode();
     }
 }

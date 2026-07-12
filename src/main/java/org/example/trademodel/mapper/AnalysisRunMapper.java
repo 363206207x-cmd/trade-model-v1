@@ -35,6 +35,10 @@ public interface AnalysisRunMapper {
     @Select("SELECT * FROM tm_analysis_run WHERE request_id = #{requestId} ORDER BY created_at DESC, analysis_id DESC LIMIT 1")
     AnalysisRunDO selectByRequestId(String requestId);
 
+    @Select("SELECT * FROM tm_analysis_run WHERE symbol = #{symbol} "
+            + "ORDER BY COALESCE(completed_at, started_at, created_at) DESC, analysis_id DESC LIMIT 1")
+    AnalysisRunDO selectLatestBySymbol(String symbol);
+
     @Select("SELECT * FROM tm_analysis_run WHERE idempotency_key = #{idempotencyKey}")
     AnalysisRunDO selectByIdempotencyKey(String idempotencyKey);
 
@@ -130,8 +134,11 @@ public interface AnalysisRunMapper {
     @Select("SELECT COUNT(DISTINCT symbol) FROM tm_analysis_run")
     Integer countDistinctSymbols();
 
-    @Select("SELECT COUNT(DISTINCT symbol) FROM tm_analysis_run WHERE status = 'SUCCESS' "
-            + "AND symbol IN ('BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT')")
+    @Select("SELECT COUNT(*) FROM (SELECT symbol, status, ROW_NUMBER() OVER (PARTITION BY symbol "
+            + "ORDER BY COALESCE(completed_at, started_at, created_at) DESC, analysis_id DESC) AS rn "
+            + "FROM tm_analysis_run WHERE symbol IN "
+            + "('BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT')) latest "
+            + "WHERE latest.rn = 1 AND latest.status = 'SUCCESS'")
     Integer countLocalRealSuccessfulSymbols();
 
     @Select("SELECT MAX(completed_at) FROM tm_analysis_run WHERE status = 'SUCCESS'")

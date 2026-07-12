@@ -36,6 +36,13 @@ public class RuntimeKlineContextDTO implements SourceCompletenessContract {
     private String persistedOhlcvStaleReasonCode;
     private String persistedOhlcvStaleReasonText;
     private List<String> persistedOhlcvMissingFields = new ArrayList<>();
+    private String sourceMode;
+    private String sourceProvider;
+    private String sourceMarketType;
+    private boolean realMarketEnvironment;
+    private Integer closedBarCount;
+    private Long latestClosedBarTimeMs;
+    private List<String> sourceTraceRefs = new ArrayList<>();
     private SourceTraceFallbackStatusEnum fallbackStatus;
     private List<String> missingFields = new ArrayList<>();
     private boolean manualReviewRequired = true;
@@ -281,6 +288,62 @@ public class RuntimeKlineContextDTO implements SourceCompletenessContract {
         this.persistedOhlcvMissingFields = persistedOhlcvMissingFields == null
                 ? new ArrayList<>()
                 : new ArrayList<>(persistedOhlcvMissingFields);
+    }
+
+    public String getSourceMode() {
+        return sourceMode;
+    }
+
+    public void setSourceMode(String sourceMode) {
+        this.sourceMode = sourceMode;
+    }
+
+    public String getSourceProvider() {
+        return sourceProvider;
+    }
+
+    public void setSourceProvider(String sourceProvider) {
+        this.sourceProvider = sourceProvider;
+    }
+
+    public String getSourceMarketType() {
+        return sourceMarketType;
+    }
+
+    public void setSourceMarketType(String sourceMarketType) {
+        this.sourceMarketType = sourceMarketType;
+    }
+
+    public boolean isRealMarketEnvironment() {
+        return realMarketEnvironment;
+    }
+
+    public void setRealMarketEnvironment(boolean realMarketEnvironment) {
+        this.realMarketEnvironment = realMarketEnvironment;
+    }
+
+    public Integer getClosedBarCount() {
+        return closedBarCount;
+    }
+
+    public void setClosedBarCount(Integer closedBarCount) {
+        this.closedBarCount = closedBarCount;
+    }
+
+    public Long getLatestClosedBarTimeMs() {
+        return latestClosedBarTimeMs;
+    }
+
+    public void setLatestClosedBarTimeMs(Long latestClosedBarTimeMs) {
+        this.latestClosedBarTimeMs = latestClosedBarTimeMs;
+    }
+
+    public List<String> getSourceTraceRefs() {
+        return new ArrayList<>(sourceTraceRefs);
+    }
+
+    public void setSourceTraceRefs(List<String> sourceTraceRefs) {
+        this.sourceTraceRefs = sourceTraceRefs == null ? new ArrayList<>() : new ArrayList<>(sourceTraceRefs);
     }
 
     @Override

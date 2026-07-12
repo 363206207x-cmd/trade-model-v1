@@ -57,6 +57,29 @@ class PersistedOhlcvIngestionServiceImplTest {
     }
 
     @Test
+    void persistedKrakenBarsCarryRealProviderProvenanceAndPersistedBarsRetainSourceTrace() {
+        OhlcvBarInput bar = freshBar("BTCUSDT", "5m");
+        OhlcvIngestionBatch batch = new OhlcvIngestionBatch(
+                "KRAKEN", "SPOT", "/0/public/OHLC", OhlcvSourceState.READY,
+                Instant.now(), "kraken-public-ohlc-v1", 1,
+                "trace-kraken-real", "run-kraken-real", List.of(bar));
+
+        OhlcvIngestionResult result = ingestionService.ingest(batch);
+        PersistedOhlcvBarDO stored = mapper.selectBySourceKey(
+                "BTCUSDT", "5m", bar.openTimeMs(), "KRAKEN", "SPOT");
+
+        assertThat(result.ready()).isTrue();
+        assertThat(stored).isNotNull();
+        assertThat(stored.getProvider()).isEqualTo("KRAKEN");
+        assertThat(stored.getProviderMarketType()).isEqualTo("SPOT");
+        assertThat(stored.getSourceEndpoint()).isEqualTo("/0/public/OHLC");
+        assertThat(stored.getSourceTraceId()).isEqualTo("trace-kraken-real");
+        assertThat(stored.getFetchTime()).isNotNull();
+        assertThat(stored.getClosed()).isTrue();
+        assertThat(stored.getQualityStatus()).isEqualTo("OK");
+    }
+
+    @Test
     void identicalBarIngestionIsIdempotent() {
         OhlcvIngestionBatch batch = batch("ETHUSDT", "15m", freshBar("ETHUSDT", "15m"));
 

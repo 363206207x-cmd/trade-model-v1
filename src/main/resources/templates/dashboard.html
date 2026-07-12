@@ -2571,6 +2571,22 @@
             border-radius: 50%;
             background: var(--status-ok);
         }
+        .local-real-pipeline-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 18px;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+        .local-real-pipeline-banner strong { color: var(--text-primary); }
+        .local-real-pipeline-banner .pipeline-reason { margin-left: auto; }
+        @media (max-width: 720px) {
+            .local-real-pipeline-banner { align-items: flex-start; flex-direction: column; gap: 4px; }
+            .local-real-pipeline-banner .pipeline-reason { margin-left: 0; }
+        }
     </style>
 </head>
 <body data-monitor-mode="system">
@@ -2588,6 +2604,12 @@
             </span>
         </div>
     </header>
+
+    <div class="local-real-pipeline-banner" id="localRealPipelineBanner" hidden>
+        <strong id="localRealMarketStatus">真实行情等待同步</strong>
+        <span id="localRealAnalysisStatus">分析链等待同步</span>
+        <span class="pipeline-reason" id="localRealFailureReason"></span>
+    </div>
 
     <div class="wrap">
         <div class="dashboard-shell">
@@ -6242,6 +6264,38 @@
             });
     }
 
+    function renderLocalRealPipelineStatus(status) {
+        var banner = document.getElementById("localRealPipelineBanner");
+        if (!banner || !status || status.mode !== "LOCAL_REAL_DATA") return;
+        banner.hidden = false;
+        var market = status.marketData || {};
+        var analysis = status.analysis || {};
+        var assets = Array.isArray(status.assets) ? status.assets : [];
+        var closedBars = Number(market.closedBarCount || 0);
+        var completed = Number(analysis.completedAssetCount || 0);
+        var marketReady = closedBars > 0 && assets.some(function (asset) {
+            return asset && asset.marketDataStatus === "READY" && asset.realMarketEnvironment === true;
+        });
+        var latestFailure = assets.map(function (asset) {
+            return asset && asset.latestAnalysisFailureCode;
+        }).filter(Boolean)[0] || status.failureReasonCode || "";
+        setText("localRealMarketStatus", marketReady ? "真实行情已就绪" : "真实行情等待同步");
+        setText("localRealAnalysisStatus", completed > 0
+                ? (completed + " 个资产分析已完成")
+                : (closedBars > 0 ? "分析链未完成" : "分析链等待同步"));
+        setText("localRealFailureReason", completed > 0 || !latestFailure ? "" : ("原因：" + latestFailure));
+    }
+
+    function fetchLocalRealPipelineStatus() {
+        return fetch("/api/local-real/status")
+            .then(function (response) { return response.ok ? response.json() : Promise.reject(response); })
+            .then(renderLocalRealPipelineStatus)
+            .catch(function () {
+                var banner = document.getElementById("localRealPipelineBanner");
+                if (banner) banner.hidden = true;
+            });
+    }
+
     function renderSidebarPanel(systemStatus, alerts, openPositionCount) {
         var sysBox = document.getElementById("sidebarSystemStatus");
         var alertBox = document.getElementById("sidebarAlertList");
@@ -9106,6 +9160,7 @@
 
     function refreshDashboard() {
         markPositionValidationStarted();
+        fetchLocalRealPipelineStatus();
         fetchDashboardHome()
             .then(function (home) {
                 markPositionValidationFinished();

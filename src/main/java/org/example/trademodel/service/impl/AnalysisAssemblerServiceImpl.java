@@ -10,6 +10,8 @@ import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.market.RealMarketEnvironmentService;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
@@ -95,6 +97,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private UserPositionRiskAdapter userPositionRiskAdapter;
+    private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private boolean requireRealMarketEnvironment;
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
@@ -217,6 +220,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.userPositionRiskAdapter = userPositionRiskAdapter;
     }
 
+    @Autowired(required = false)
+    void setPersistedRealMarketEnvironmentService(
+            PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService) {
+        this.persistedRealMarketEnvironmentService = persistedRealMarketEnvironmentService;
+    }
+
     @Value("${trade-model.analysis.require-real-market-environment:false}")
     void setRequireRealMarketEnvironment(boolean requireRealMarketEnvironment) {
         this.requireRealMarketEnvironment = requireRealMarketEnvironment;
@@ -249,22 +258,33 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
             marketEnv.setSummary("Real K-line data from Binance");
             String marketEnvSourceType = MARKET_ENV_SOURCE_FALLBACK;
-            if (realMarketEnvironmentService != null) {
-                MarketEnvironmentVO quoteEnv = realMarketEnvironmentService
-                        .tryBuildFromRealQuote(symbol, timeframe)
-                        .orElse(null);
-                if (quoteEnv != null) {
-                    marketEnv = quoteEnv;
-                    enrichOpenInterestDeltaFromPreviousSnapshot(marketEnv, symbol, timeframe);
-                    marketEnv.setDerivativesCrowdingState(
-                            RealMarketEnvironmentService.computeDerivativesCrowdingState(marketEnv));
-                    marketEnvSourceType = marketEnvSourceTypeForSuccessfulQuote(quoteEnv);
-                    log.info("[market-env] assemble uses Binance market-env heuristic symbol={} tf={} sourceType={}",
-                            symbol, timeframe, marketEnvSourceType);
+            MarketEnvironmentVO quoteEnv = realMarketEnvironmentService == null ? null
+                    : realMarketEnvironmentService.tryBuildFromRealQuote(symbol, timeframe).orElse(null);
+            if (quoteEnv != null) {
+                marketEnv = quoteEnv;
+                enrichOpenInterestDeltaFromPreviousSnapshot(marketEnv, symbol, timeframe);
+                marketEnv.setDerivativesCrowdingState(
+                        RealMarketEnvironmentService.computeDerivativesCrowdingState(marketEnv));
+                marketEnvSourceType = marketEnvSourceTypeForSuccessfulQuote(quoteEnv);
+                log.info("[market-env] assemble uses Binance market-env heuristic symbol={} tf={} sourceType={}",
+                        symbol, timeframe, marketEnvSourceType);
+            } else {
+                PersistedRealMarketEnvironmentAssessment persistedEnvironment =
+                        persistedRealMarketEnvironmentService == null ? null
+                                : persistedRealMarketEnvironmentService.assess(symbol, timeframe);
+                if (persistedEnvironment != null && persistedEnvironment.ready()) {
+                    marketEnv = persistedEnvironment.environment();
+                    marketEnvSourceType = persistedEnvironment.sourceType();
+                    log.info("[market-env] assemble uses persisted real OHLCV symbol={} tf={} provider={} sourceType={} closedBars={}",
+                            symbol, timeframe, persistedEnvironment.provider(), marketEnvSourceType,
+                            persistedEnvironment.closedBarCount());
+                } else if (requireRealMarketEnvironment) {
+                    String reason = persistedEnvironment == null
+                            ? "REAL_MARKET_PROVENANCE_INCOMPLETE" : persistedEnvironment.reasonCode();
+                    log.warn("[market-env] real environment unavailable symbol={} tf={} reason={}",
+                            symbol, timeframe, reason);
+                    throw new IllegalStateException("REAL_MARKET_ENVIRONMENT_REQUIRED");
                 } else {
-                    if (requireRealMarketEnvironment) {
-                        throw new IllegalStateException("REAL_MARKET_ENVIRONMENT_REQUIRED");
-                    }
                     log.info("[market-env] assemble fallback placeholder symbol={} tf={}", symbol, timeframe);
                 }
             }

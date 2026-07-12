@@ -57,6 +57,10 @@ public class LocalRealDataCoordinator {
         for (String symbol : SYMBOLS) {
             readiness.updateAsset(symbol, LocalRealAssetReadinessState.BOOTSTRAPPING, null,
                     "PUBLIC_OHLCV_BOOTSTRAP_RUNNING");
+            if (analysisSchedulerService.marketDataReady(symbol)) {
+                log.info("local-real reuses persisted market window symbol={}", symbol);
+                continue;
+            }
             for (String timeframe : TIMEFRAMES) {
                 OhlcvIngestionResult result = ingestionScheduler.ingestOne(symbol, timeframe);
                 if (result == null || (!result.ready() && result.insertedCount() == 0 && result.idempotentCount() == 0)) {
