@@ -104,3 +104,73 @@ take-profit, leverage, order, or position instruction.
 - output contains status classes, parse status, counts, and timing only
 - no key, prompt, header, raw response, model answer, or interaction identifier is printed
 - production readiness remains `BLOCKED`
+
+## Controlled Live Evidence - PASS_3_OF_3
+
+Operator-controlled evidence was collected on clean `main` at commit
+`eacc224f23f8a63a1294bed4813a0aec5c5614bf`. All runs used the formal
+`AiDecisionOrchestratorService`, the bounded three-thread executor, the fixed review-only fixture,
+an isolated in-memory H2 database, disabled business schedulers, and disabled OpenAI internal model
+fallback. No retry was permitted.
+
+Final result order was deterministic in every run:
+
+```text
+GPT_RULE_REVIEW,GEMINI_CONSISTENCY_REVIEW,GROK_ADVERSARIAL_CHALLENGE
+```
+
+### Orchestration Runs
+
+| Run | Result | Mode | Latency ms | Submitted | Completed | Success | Timeout | Failed | Partial fallback | Global deadline exceeded |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| 1 | PASS | AI_ASSISTED | 9,716 | 3 | 3 | 3 | 0 | 0 | false | false |
+| 2 | PASS | AI_ASSISTED | 10,550 | 3 | 3 | 3 | 0 | 0 | false | false |
+| 3 | PASS | AI_ASSISTED | 7,239 | 3 | 3 | 3 | 0 | 0 | false | false |
+
+### Provider Runs
+
+| Run | OpenAI HTTP / parse / latency / calls | Gemini HTTP / parse / latency / calls | xAI HTTP / parse / latency / calls |
+| --- | --- | --- | --- |
+| 1 | 2XX / PASS / 4,677 ms / 1 | 2XX / PASS / 9,681 ms / 1 | 2XX / PASS / 4,497 ms / 1 |
+| 2 | 2XX / PASS / 5,236 ms / 1 | 2XX / PASS / 10,523 ms / 1 | 2XX / PASS / 6,939 ms / 1 |
+| 3 | 2XX / PASS / 4,180 ms / 1 | 2XX / PASS / 7,206 ms / 1 | 2XX / PASS / 4,216 ms / 1 |
+
+Each run recorded `LIVE_PROVIDER_CALLS: 3` and `REAL_KEYS_READ: 3`. Across all three runs:
+
+- repeatability: `PASS_3_OF_3`
+- total external calls: `9`
+- OpenAI calls: `3`
+- Gemini calls: `3`
+- xAI calls: `3`
+- failures: `0`
+- timeouts: `0`
+- partial fallbacks: `0`
+- global deadline exceeded: `0`
+
+### Aggregate Latency
+
+| Measurement | Average | Observed range |
+| --- | ---: | ---: |
+| Orchestration | approximately 9,168 ms | 7,239-10,550 ms |
+| OpenAI | approximately 4,698 ms | 4,180-5,236 ms |
+| Gemini | approximately 9,137 ms | 7,206-10,523 ms |
+| xAI | approximately 5,217 ms | 4,216-6,939 ms |
+
+### Evidence Boundary
+
+This evidence proves that all three configured credentials worked during the controlled runs, all
+three endpoints were reachable, all responses passed their strict adapters/parsers, bounded
+parallel submission worked, deterministic ordering was preserved, the global deadline was not
+exceeded, and every provider was invoked exactly once per run. End-to-end orchestration completed
+in approximately 7.2-10.6 seconds without failure, timeout, retry, or partial fallback.
+
+The runs used no trading, order, position mutation, `ExecutionPlan` creation, Push, or Telegram
+behavior. The evidence-closure package itself performs no live call and reads no secret.
+
+This evidence does not prove long-term availability, production scheduling stability, concurrency
+under real system load, monthly API cost, sustained rate-limit/quota behavior, AI decision
+correctness, directional accuracy, profitability, or production deployment readiness.
+
+Production readiness remains `BLOCKED`. Remaining gates include sustained soak testing,
+cost-budget validation, rate-limit and quota validation, a real business-chain E2E beyond the fixed
+review fixture, and an approved production rollout and rollback plan.
