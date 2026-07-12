@@ -49,13 +49,25 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
-    void interactionsRequestUsesLowThinkingAndNoSummary() throws Exception {
+    void geminiInteractionsUses512OutputTokenBound() throws Exception {
         JsonNode generation = requestBody().path("generation_config");
 
-        assertThat(generation.path("max_output_tokens").asInt()).isEqualTo(256);
+        assertThat(generation.path("max_output_tokens").asInt()).isEqualTo(512);
+    }
+
+    @Test
+    void geminiInteractionsUsesMinimalThinking() throws Exception {
+        JsonNode generation = requestBody().path("generation_config");
+
         assertThat(generation.path("temperature").asInt()).isZero();
         assertThat(generation.path("seed").asInt()).isEqualTo(42);
-        assertThat(generation.path("thinking_level").asText()).isEqualTo("low");
+        assertThat(generation.path("thinking_level").asText()).isEqualTo("minimal");
+    }
+
+    @Test
+    void geminiInteractionsStillUsesNoThinkingSummary() throws Exception {
+        JsonNode generation = requestBody().path("generation_config");
+
         assertThat(generation.path("thinking_summaries").asText()).isEqualTo("none");
     }
 
@@ -158,6 +170,26 @@ class GeminiProviderStructuredOutputContractTest {
 
         assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_STATUS_MISSING");
         assertThat(result.getGeminiInteractionDiagnostic().interactionStatus()).isEqualTo("MISSING");
+    }
+
+    @Test
+    void geminiIncompleteDoesNotAttemptJsonOrV1ParsingAndDoesNotRetry() {
+        CapturingTransport transport = transport(interaction(
+                "incomplete", "interaction-id", List.of(modelOutput("not-inspected")), true));
+
+        AiProviderReviewResult result = client(transport).review(request(), 15_000L);
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_STATUS_INCOMPLETE");
+        assertThat(result.getGeminiInteractionDiagnostic().finalJsonParseStatus())
+                .isEqualTo("NOT_CHECKED");
+        assertThat(result.getGeminiInteractionDiagnostic().v1ContractStatus())
+                .isEqualTo("NOT_CHECKED");
+        assertThat(result.getGeminiInteractionDiagnostic().finalTextBlockCount()).isZero();
+        assertThat(result.getGeminiInteractionDiagnostic().finalTextLength()).isZero();
+        assertThat(transport.calls).isEqualTo(1);
+        assertThat(transport.request.getUrl()).endsWith("/v1/interactions");
+        assertThat(transport.request.getUrl()).doesNotContain("generateContent", "v1beta");
     }
 
     @Test

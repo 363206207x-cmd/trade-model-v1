@@ -12,7 +12,7 @@ import java.util.Map;
 
 @Component
 public class GeminiProviderClient extends AbstractSafeAiProviderClient {
-    static final int INTERACTIONS_MAX_OUTPUT_TOKENS = 256;
+    static final int INTERACTIONS_MAX_OUTPUT_TOKENS = 512;
     private static final String COMPLETED_STATUS = "completed";
     private static final String JSON_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
 
@@ -84,7 +84,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         generationConfig.put("max_output_tokens", INTERACTIONS_MAX_OUTPUT_TOKENS);
         generationConfig.put("temperature", 0);
         generationConfig.put("seed", 42);
-        generationConfig.put("thinking_level", "low");
+        generationConfig.put("thinking_level", "minimal");
         generationConfig.put("thinking_summaries", "none");
 
         Map<String, Object> responseFormat = new LinkedHashMap<>();

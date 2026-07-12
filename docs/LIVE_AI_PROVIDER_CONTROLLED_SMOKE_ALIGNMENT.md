@@ -122,7 +122,7 @@ Environment overrides are `TRADE_MODEL_AI_OPENAI_GPT_FINAL_FAST_MODEL`, `TRADE_M
 
 ### Canonical implementation
 
-`GEMINI_REVIEW` now uses `gemini-3.5-flash`, canonicalized in the outgoing request as `models/gemini-3.5-flash`, and sends exactly one `POST /v1/interactions` request. The request sets `store=false`, `stream=false`, a bounded 256-token output, temperature 0, seed 42, low thinking, no thinking summary, no tools, and a JSON Schema response format for the four V1 role fields. There is no automatic generateContent fallback.
+`GEMINI_REVIEW` now uses `gemini-3.5-flash`, canonicalized in the outgoing request as `models/gemini-3.5-flash`, and sends exactly one `POST /v1/interactions` request. The request sets `store=false`, `stream=false`, a bounded 512-token output, temperature 0, seed 42, minimal thinking, no thinking summary, no tools, and a JSON Schema response format for the four V1 role fields. There is no automatic generateContent fallback.
 
 The production adapter parses only terminal `status=completed` Interaction resources. It selects the last `model_output` step, concatenates only nonblank `type=text` items inside that final step, and ignores earlier model-output text. Failed, cancelled, incomplete, missing-step, missing-text, malformed-JSON, and schema-invalid results fail closed. It never reads thought text, concatenates earlier outputs, strips prose, extracts JSON with regex, repairs output, or invents fields.
 
@@ -132,7 +132,11 @@ The deterministic Gemini normalizer remains a final security boundary before the
 
 ### Real evidence and remaining limitation
 
-The operator evidence showed that `gemini-2.5-pro` was visible in model listing and declared generateContent support, but the minimal real generateContent request returned HTTP 404; it is therefore not the selected default. `gemini-3.5-flash` Interactions returned real HTTP 200 with text and usage. One external probe passed the V1 JSON contract and one did not, so repeatability remains unproven. This package implements the canonical request/extraction discrepancy offline and makes no live provider call. Gemini is not production-ready and overall production readiness remains BLOCKED.
+The operator evidence showed that `gemini-2.5-pro` was visible in model listing and declared generateContent support, but the minimal real generateContent request returned HTTP 404; it is therefore not the selected default. `gemini-3.5-flash` Interactions returned real HTTP 200 with text and usage. One external probe passed the V1 JSON contract and one did not, so repeatability remains unproven.
+
+The latest operator-run Interactions evidence returned HTTP 2xx with `status=INCOMPLETE`. The usage object and thought-token field were present, one `model_output` step existed, and the terminal output contained zero text blocks and zero text characters. JSON parsing and V1 validation were therefore not reached and remain `NOT_CHECKED`; this is not evidence of invalid JSON, a schema mismatch, normalizer failure, authentication failure, or model unavailability. In response, the bounded request changes from low to minimal thinking and from 256 to 512 maximum output tokens while retaining no thinking summary and the 100-character summary constraint. These Gemini-specific values remain fixed safe constants in this package; environment-configurable tuning is deferred to a separately scoped change.
+
+Codex made no live provider call and performed no live retest for this change. Repeatability remains unproven, Gemini is not production-ready, and overall production readiness remains BLOCKED.
 
 The controlled Gemini smoke uses the exact production Interactions client, canonical model mapping, request builder, final-step extractor, normalizer, and strict parser. It has no second one-off response parser. The sanitized request diagnostic exposes only model, MIME type, schema presence, token limit, temperature, instruction/input lengths, stop-sequence presence, and tools presence.
 
@@ -184,7 +188,7 @@ Legacy Gemini diagnostic labels do not create alternate request or parser paths;
 - Controlled-smoke request and overall timeout: 30 seconds for Gemini structured-output validation; 15 seconds for OpenAI and xAI
 - Production AI request timeout remains unchanged at 5 seconds
 - Script watchdog: 60 seconds including Maven harness startup
-- Maximum output: 128 tokens for OpenAI/xAI controlled smoke and 256 tokens for Gemini Interactions
+- Maximum output: 128 tokens for OpenAI/xAI controlled smoke and 512 tokens for Gemini Interactions
 
 ## Sanitized Output Contract
 

@@ -22,7 +22,7 @@ public class AiProviderControlledSmoke {
     static final String DIAGNOSTIC_GATE = "AI_PROVIDER_SMOKE_DIAGNOSTIC";
     static final String GEMINI_DIAGNOSTIC_MODE = "GEMINI_DIAGNOSTIC_MODE";
     static final int DEFAULT_SMOKE_MAX_OUTPUT_TOKENS = 128;
-    static final int GEMINI_SMOKE_MAX_OUTPUT_TOKENS = 256;
+    static final int GEMINI_SMOKE_MAX_OUTPUT_TOKENS = 512;
     static final long DEFAULT_SMOKE_TIMEOUT_MS = 15_000L;
     static final long GEMINI_SMOKE_TIMEOUT_MS = 30_000L;
 
