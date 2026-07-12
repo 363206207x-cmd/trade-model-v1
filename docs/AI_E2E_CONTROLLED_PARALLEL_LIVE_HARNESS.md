@@ -42,6 +42,16 @@ settings with an isolated in-memory H2 database, disables the OpenAI internal mo
 call-count clarity, and preserves the merged timeout contract:
 OpenAI 10 seconds, Gemini 25 seconds, xAI 10 seconds, and an overall 30-second deadline.
 
+The isolated datasource uses the same H2 MySQL compatibility mode as the authoritative local
+schema contract:
+
+```text
+jdbc:h2:mem:ai_parallel_controlled_smoke;DB_CLOSE_DELAY=-1;MODE=MySQL
+```
+
+SQL initialization remains `always`; the harness does not bypass `schema.sql` or connect to the
+normal application database.
+
 ## Call Audit
 
 The script creates a mode-600 temporary marker. A test-only transport decorator records each
@@ -64,6 +74,20 @@ actually terminated Maven. Failure output includes only:
 Classification reads the captured Maven output locally for fixed framework class names. It never
 prints that file, exception messages, stack traces, SQL, datasource details, prompts, provider
 responses, headers, or credentials.
+
+## Startup Failure Closure
+
+The first controlled parallel run stopped at `SPRING_STARTING` with
+`DATABASE_INITIALIZATION_FAILURE`. Its recovered provider attempt counts were `0/0/0`, so no live
+provider retry was needed or performed during this repair.
+
+Offline regression reproduces authoritative `schema.sql` failure under the former H2 PostgreSQL
+compatibility mode and proves that the isolated MySQL compatibility mode reaches `SPRING_READY`,
+creates `tm_ai_call_log`, makes zero transport calls, and shuts down the bounded executor cleanly.
+
+The cleanup lifecycle now uses script-level path and child-process variables plus a named EXIT
+handler. It is safe under `set -u`, preserves the original exit status, handles partial temporary
+file initialization, and removes only known nonblank temporary paths.
 
 ## Fixed Fixture
 
