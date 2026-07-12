@@ -14,6 +14,8 @@ class LocalRealScriptsContractTest {
         assertThat(script)
                 .contains("DASHBOARD_READY", "SECONDS + 180", "TRADE_MODEL_AI_ENABLED=false")
                 .contains("TRADE_MODEL_COINGLASS_ENABLED=false", "TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED=true")
+                .contains("MARKET_PROVIDER_PRIMARY", "READY_ASSETS", "DEGRADED_ASSETS")
+                .contains("TRADE_MODEL_OHLCV_PROVIDER_PRIMARY=kraken")
                 .doesNotContain("trade-model.local-secret", "killall");
     }
 

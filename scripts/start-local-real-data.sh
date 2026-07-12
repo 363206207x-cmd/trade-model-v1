@@ -45,6 +45,13 @@ export TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED=false
 export TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED=false
 export TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED=true
 export TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED=true
+export TRADE_MODEL_OHLCV_PROVIDER_PRIMARY=kraken
+export TRADE_MODEL_OHLCV_PROVIDER_FALLBACK=binance
+export TRADE_MODEL_OHLCV_PROVIDER_FALLBACK_ENABLED=true
+export TRADE_MODEL_OHLCV_KRAKEN_ENABLED=true
+export TRADE_MODEL_OHLCV_KRAKEN_EXTERNAL_CALLS_ENABLED=true
+export TRADE_MODEL_OHLCV_BINANCE_ENABLED=true
+export TRADE_MODEL_OHLCV_BINANCE_EXTERNAL_CALLS_ENABLED=true
 export TRADE_MODEL_OHLCV_INGESTION_SCHEDULER_ENABLED=true
 export TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED=true
 export TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED=true
@@ -60,6 +67,9 @@ deadline=$((SECONDS + 180))
 last_state="STARTING"
 last_bars="0"
 last_assets="0"
+last_ready_assets="0"
+last_degraded_assets="none"
+last_primary_provider="KRAKEN"
 last_reason="LOCAL_REAL_STARTING"
 while (( SECONDS < deadline )); do
   if ! kill -0 "${APP_PID}" 2>/dev/null; then
@@ -68,16 +78,21 @@ while (( SECONDS < deadline )); do
     exit 1
   fi
   if payload="$(curl -fsS --max-time 3 "${STATUS_URL}" 2>/dev/null)"; then
-    read -r last_state last_bars last_assets last_reason < <(printf '%s' "${payload}" | python3 -c '
+    read -r last_state last_bars last_assets last_reason last_primary_provider last_ready_assets last_degraded_assets < <(printf '%s' "${payload}" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
-print(d.get("state","STARTING"), d.get("marketData",{}).get("closedBarCount",0), d.get("analysis",{}).get("completedAssetCount",0), d.get("failureReasonCode","UNKNOWN"))
+m=d.get("marketData",{})
+degraded=",".join(m.get("degradedAssets",[])) or "none"
+print(d.get("state","STARTING"), m.get("closedBarCount",0), d.get("analysis",{}).get("completedAssetCount",0), d.get("failureReasonCode","UNKNOWN"), m.get("provider","KRAKEN"), m.get("readyAssetCount",0), degraded)
 ')
     if [[ "${last_state}" == "DASHBOARD_READY" ]]; then
       echo "LOCAL_REAL_DATA_START: PASS"
       echo "HEALTH_STATUS: UP"
       echo "DATABASE_MODE: LOCAL_PERSISTENT_H2"
-      echo "MARKET_PROVIDER: ENABLED"
+      echo "MARKET_PROVIDER_PRIMARY: ${last_primary_provider}"
+      echo "READY_ASSETS: ${last_ready_assets}/6"
+      echo "DEGRADED_ASSETS: ${last_degraded_assets}"
+      echo "DASHBOARD_READY: TRUE"
       echo "AI_PROVIDERS: DISABLED"
       echo "DASHBOARD_URL: ${DASHBOARD_URL}"
       echo "LOG_FILE: .runtime/trade-model-v1-local-real.log"
@@ -92,6 +107,8 @@ echo "LOCAL_REAL_DATA_START: FAIL_DASHBOARD_READY_TIMEOUT"
 echo "CURRENT_STAGE: ${last_state}"
 echo "CLOSED_BAR_COUNT: ${last_bars}"
 echo "COMPLETED_ASSET_COUNT: ${last_assets}"
+echo "READY_ASSETS: ${last_ready_assets}/6"
+echo "DEGRADED_ASSETS: ${last_degraded_assets}"
 echo "FAILURE_REASON_CODE: ${last_reason}"
 echo "LOG_FILE: .runtime/trade-model-v1-local-real.log"
 exit 1

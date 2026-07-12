@@ -24,6 +24,18 @@ class DashboardLocalRealBindingContractTest {
     }
 
     @Test
+    void dashboardDisplaysProviderName() throws Exception {
+        String template = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
+        assertThat(template).contains("sourceProvider", "数据来源", "timeframeFreshness", "四周期新鲜度");
+    }
+
+    @Test
+    void dashboardDisplaysUnavailableAssetReason() throws Exception {
+        String template = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
+        assertThat(template).contains("unavailableReason", "数据源不可用");
+    }
+
+    @Test
     void localRealCoordinatorCannotCreatePositionsOrdersOrExternalPush() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/org/example/trademodel/localreal/LocalRealDataCoordinator.java"));

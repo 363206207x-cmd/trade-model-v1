@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Public Binance spot K-line adapter. No credential, account, position, or order surface is used. */
 @Service
@@ -25,11 +26,12 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
     private final RealMarketDataFetcherService fetcher;
     private final boolean providerEnabled;
     private final boolean externalCallsEnabled;
+    private final AtomicBoolean geoRestrictedCircuitOpen = new AtomicBoolean(false);
 
     public BinancePublicOhlcvProvider(
             RealMarketDataFetcherService fetcher,
-            @Value("${trade-model.ohlcv.public-provider.enabled:false}") boolean providerEnabled,
-            @Value("${trade-model.ohlcv.public-provider.external-calls-enabled:false}") boolean externalCallsEnabled
+            @Value("${trade-model.ohlcv.binance.enabled:${trade-model.ohlcv.public-provider.enabled:false}}") boolean providerEnabled,
+            @Value("${trade-model.ohlcv.binance.external-calls-enabled:${trade-model.ohlcv.public-provider.external-calls-enabled:false}}") boolean externalCallsEnabled
     ) {
         this.fetcher = fetcher;
         this.providerEnabled = providerEnabled;
@@ -43,6 +45,9 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             int limit,
             String ingestionRunId
     ) {
+        if (geoRestrictedCircuitOpen.get()) {
+            return result(OhlcvSourceState.ERROR, "PROVIDER_UNAVAILABLE_FOR_LOCATION", null);
+        }
         if (!providerEnabled) {
             return result(OhlcvSourceState.DISABLED, "PUBLIC_OHLCV_PROVIDER_DISABLED", null);
         }
@@ -61,6 +66,11 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             return result(OhlcvSourceState.ERROR, "PUBLIC_OHLCV_PROVIDER_RESULT_MISSING", null);
         }
         if (fetched.sourceState() != OhlcvSourceState.READY) {
+            if (fetched.httpStatus() == 451 || "GEO_RESTRICTED".equals(fetched.reasonCode())
+                    || "ELIGIBILITY_RESTRICTED".equals(fetched.reasonCode())) {
+                geoRestrictedCircuitOpen.set(true);
+                return result(OhlcvSourceState.ERROR, "GEO_RESTRICTED", null);
+            }
             return result(fetched.sourceState(), fetched.reasonCode(), null);
         }
 
@@ -109,6 +119,10 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
                 ingestionRunId,
                 bars);
         return result(OhlcvSourceState.READY, null, batch);
+    }
+
+    public boolean isGeoRestrictedCircuitOpen() {
+        return geoRestrictedCircuitOpen.get();
     }
 
     private static BigDecimal decimal(String value) {

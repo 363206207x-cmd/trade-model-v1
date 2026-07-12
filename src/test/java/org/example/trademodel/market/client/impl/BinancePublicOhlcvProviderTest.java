@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class BinancePublicOhlcvProviderTest {
@@ -61,6 +62,23 @@ class BinancePublicOhlcvProviderTest {
         PublicOhlcvProviderResult result = provider.fetchClosedBars("BTCUSDT", "5m", 100, "run-1");
 
         assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.DISABLED);
+        verify(fetcher, never()).fetchKlinesDetailed("BTCUSDT", "5m", 100);
+    }
+
+    @Test
+    void http451OpensProcessCircuitAndPreventsRepeatedCalls() {
+        when(fetcher.fetchKlinesDetailed("BNBUSDT", "5m", 100))
+                .thenReturn(new PublicKlineFetchResult(OhlcvSourceState.ERROR, "GEO_RESTRICTED",
+                        Instant.now(), List.of(), 451));
+        BinancePublicOhlcvProvider provider = new BinancePublicOhlcvProvider(fetcher, true, true);
+
+        PublicOhlcvProviderResult first = provider.fetchClosedBars("BNBUSDT", "5m", 100, "run-1");
+        PublicOhlcvProviderResult second = provider.fetchClosedBars("BTCUSDT", "5m", 100, "run-2");
+
+        assertThat(first.reasonCode()).isEqualTo("GEO_RESTRICTED");
+        assertThat(second.reasonCode()).isEqualTo("PROVIDER_UNAVAILABLE_FOR_LOCATION");
+        assertThat(provider.isGeoRestrictedCircuitOpen()).isTrue();
+        verify(fetcher, times(1)).fetchKlinesDetailed("BNBUSDT", "5m", 100);
         verify(fetcher, never()).fetchKlinesDetailed("BTCUSDT", "5m", 100);
     }
 

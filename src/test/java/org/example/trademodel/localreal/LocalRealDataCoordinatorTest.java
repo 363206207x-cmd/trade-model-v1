@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class LocalRealDataCoordinatorTest {
@@ -49,16 +50,40 @@ class LocalRealDataCoordinatorTest {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
         when(ingestionScheduler.ingestOne(anyString(), anyString())).thenReturn(readyIngestion());
         when(analysisSchedulerService.marketDataReady(anyString())).thenReturn(true);
-        AnalysisRunResult successful = org.mockito.Mockito.mock(AnalysisRunResult.class);
-        when(successful.isSuccessfulAnalysisAvailable()).thenReturn(true);
-        when(analysisSchedulerService.runScheduledCycle())
-                .thenReturn(List.of(successful, successful, successful, successful, successful, successful));
+        List<AnalysisRunResult> results = successfulResults(
+                "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
+        when(analysisSchedulerService.runScheduledCycle()).thenReturn(results);
         LocalRealDataCoordinator coordinator = coordinator(readiness);
 
         coordinator.bootstrap();
 
         assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DASHBOARD_READY);
         verify(analysisSchedulerService).runScheduledCycle();
+        coordinator.shutdown();
+    }
+
+    @Test
+    void fiveReadyAssetsMakeDashboardReadyWhileUnsupportedBnbStaysUnavailable() {
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        when(ingestionScheduler.ingestOne(anyString(), anyString())).thenAnswer(invocation ->
+                "BNBUSDT".equals(invocation.getArgument(0))
+                        ? new OhlcvIngestionResult(OhlcvSourceState.ERROR, null, 0, 0, 0,
+                        List.of("PAIR_NOT_SUPPORTED_OR_GEO_RESTRICTED"))
+                        : readyIngestion());
+        when(analysisSchedulerService.marketDataReady(anyString())).thenAnswer(invocation ->
+                !"BNBUSDT".equals(invocation.getArgument(0)));
+        List<AnalysisRunResult> results = successfulResults(
+                "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT");
+        when(analysisSchedulerService.runScheduledCycle()).thenReturn(results);
+        LocalRealDataCoordinator coordinator = coordinator(readiness);
+
+        coordinator.bootstrap();
+
+        assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DASHBOARD_READY);
+        assertThat(readiness.readyAssetCount()).isEqualTo(5);
+        assertThat(readiness.asset("BNBUSDT").state()).isEqualTo(LocalRealAssetReadinessState.UNAVAILABLE);
+        assertThat(readiness.asset("BNBUSDT").reasonCode())
+                .isEqualTo("PAIR_NOT_SUPPORTED_OR_GEO_RESTRICTED");
         coordinator.shutdown();
     }
 
@@ -84,5 +109,14 @@ class LocalRealDataCoordinatorTest {
     private static OhlcvIngestionResult readyIngestion() {
         return new OhlcvIngestionResult(OhlcvSourceState.READY, OhlcvFreshnessStatus.FRESH,
                 100, 0, 0, List.of());
+    }
+
+    private static List<AnalysisRunResult> successfulResults(String... symbols) {
+        return java.util.Arrays.stream(symbols).map(symbol -> {
+            AnalysisRunResult result = mock(AnalysisRunResult.class);
+            when(result.isSuccessfulAnalysisAvailable()).thenReturn(true);
+            when(result.getSymbol()).thenReturn(symbol);
+            return result;
+        }).toList();
     }
 }
