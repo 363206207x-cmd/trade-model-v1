@@ -21,6 +21,16 @@ public class AiOrchestratorResult {
     private int conflictContribution;
     private List<String> reasonCodes = new ArrayList<>();
     private LocalDateTime completedAt;
+    private LocalDateTime orchestrationStartedAt;
+    private LocalDateTime orchestrationCompletedAt;
+    private long orchestrationLatencyMs;
+    private int providerSubmittedCount;
+    private int providerCompletedCount;
+    private int providerTimeoutCount;
+    private int providerFailedCount;
+    private int providerSuccessCount;
+    private boolean globalDeadlineExceeded;
+    private boolean partialFallbackUsed;
 
     private final boolean reviewOnly = true;
     private final boolean manualReviewOnly = true;
@@ -39,6 +49,14 @@ public class AiOrchestratorResult {
         sb.append("orchestrationMode=").append(orchestrationMode);
         sb.append("; ruleDirectionPreserved=true");
         sb.append("; reviewOnly=true");
+        sb.append("; orchestrationLatencyMs=").append(orchestrationLatencyMs);
+        sb.append("; providerSubmittedCount=").append(providerSubmittedCount);
+        sb.append("; providerCompletedCount=").append(providerCompletedCount);
+        sb.append("; providerTimeoutCount=").append(providerTimeoutCount);
+        sb.append("; providerFailedCount=").append(providerFailedCount);
+        sb.append("; providerSuccessCount=").append(providerSuccessCount);
+        sb.append("; globalDeadlineExceeded=").append(globalDeadlineExceeded);
+        sb.append("; partialFallbackUsed=").append(partialFallbackUsed);
         sb.append("; providers=");
         for (int i = 0; i < providerResults.size(); i++) {
             AiProviderReviewResult result = providerResults.get(i);
@@ -105,6 +123,46 @@ public class AiOrchestratorResult {
     }
     public LocalDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+    public LocalDateTime getOrchestrationStartedAt() { return orchestrationStartedAt; }
+    public void setOrchestrationStartedAt(LocalDateTime orchestrationStartedAt) {
+        this.orchestrationStartedAt = orchestrationStartedAt;
+    }
+    public LocalDateTime getOrchestrationCompletedAt() { return orchestrationCompletedAt; }
+    public void setOrchestrationCompletedAt(LocalDateTime orchestrationCompletedAt) {
+        this.orchestrationCompletedAt = orchestrationCompletedAt;
+    }
+    public long getOrchestrationLatencyMs() { return orchestrationLatencyMs; }
+    public void setOrchestrationLatencyMs(long orchestrationLatencyMs) {
+        this.orchestrationLatencyMs = Math.max(0L, orchestrationLatencyMs);
+    }
+    public int getProviderSubmittedCount() { return providerSubmittedCount; }
+    public void setProviderSubmittedCount(int providerSubmittedCount) {
+        this.providerSubmittedCount = Math.max(0, providerSubmittedCount);
+    }
+    public int getProviderCompletedCount() { return providerCompletedCount; }
+    public void setProviderCompletedCount(int providerCompletedCount) {
+        this.providerCompletedCount = Math.max(0, providerCompletedCount);
+    }
+    public int getProviderTimeoutCount() { return providerTimeoutCount; }
+    public void setProviderTimeoutCount(int providerTimeoutCount) {
+        this.providerTimeoutCount = Math.max(0, providerTimeoutCount);
+    }
+    public int getProviderFailedCount() { return providerFailedCount; }
+    public void setProviderFailedCount(int providerFailedCount) {
+        this.providerFailedCount = Math.max(0, providerFailedCount);
+    }
+    public int getProviderSuccessCount() { return providerSuccessCount; }
+    public void setProviderSuccessCount(int providerSuccessCount) {
+        this.providerSuccessCount = Math.max(0, providerSuccessCount);
+    }
+    public boolean isGlobalDeadlineExceeded() { return globalDeadlineExceeded; }
+    public void setGlobalDeadlineExceeded(boolean globalDeadlineExceeded) {
+        this.globalDeadlineExceeded = globalDeadlineExceeded;
+    }
+    public boolean isPartialFallbackUsed() { return partialFallbackUsed; }
+    public void setPartialFallbackUsed(boolean partialFallbackUsed) {
+        this.partialFallbackUsed = partialFallbackUsed;
+    }
     public boolean isReviewOnly() { return reviewOnly; }
     public boolean isManualReviewOnly() { return manualReviewOnly; }
     public boolean isNotTradeInstruction() { return notTradeInstruction; }

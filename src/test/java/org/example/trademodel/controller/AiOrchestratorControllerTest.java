@@ -49,6 +49,11 @@ class AiOrchestratorControllerTest {
                 .andExpect(jsonPath("$.providers[0].reasonCodes[0]")
                         .value("MODEL_AVAILABILITY_UNVERIFIED"))
                 .andExpect(jsonPath("$.modelStrategy.GPT_FINAL").value("QUALITY_FIRST"))
+                .andExpect(jsonPath("$.providerTimeouts.openaiMs").value(10000))
+                .andExpect(jsonPath("$.providerTimeouts.geminiMs").value(25000))
+                .andExpect(jsonPath("$.providerTimeouts.xaiMs").value(10000))
+                .andExpect(jsonPath("$.providerTimeouts.overallMs").value(30000))
+                .andExpect(jsonPath("$.providerTimeouts.configurationValid").value(true))
                 .andExpect(content().string(not(containsString("sk-status-secret"))))
                 .andExpect(content().string(not(containsString("https://secret-base.test"))));
     }

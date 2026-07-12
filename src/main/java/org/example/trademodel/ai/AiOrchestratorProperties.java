@@ -15,6 +15,7 @@ public class AiOrchestratorProperties {
     private int maxOutputTokens = 500;
     private BigDecimal dailyBudgetUsd = BigDecimal.ZERO;
     private BigDecimal perAnalysisBudgetUsd = BigDecimal.ZERO;
+    private ProviderTimeouts providerTimeouts = new ProviderTimeouts();
     private ModelStrategy modelStrategy = new ModelStrategy();
     private AiProviderProperties openai = new AiProviderProperties();
     private AiProviderProperties gemini = new AiProviderProperties();
@@ -37,6 +38,10 @@ public class AiOrchestratorProperties {
     public BigDecimal getPerAnalysisBudgetUsd() { return perAnalysisBudgetUsd; }
     public void setPerAnalysisBudgetUsd(BigDecimal perAnalysisBudgetUsd) {
         this.perAnalysisBudgetUsd = perAnalysisBudgetUsd == null ? BigDecimal.ZERO : perAnalysisBudgetUsd;
+    }
+    public ProviderTimeouts getProviderTimeouts() { return providerTimeouts; }
+    public void setProviderTimeouts(ProviderTimeouts providerTimeouts) {
+        this.providerTimeouts = providerTimeouts == null ? new ProviderTimeouts() : providerTimeouts;
     }
     public ModelStrategy getModelStrategy() { return modelStrategy; }
     public void setModelStrategy(ModelStrategy modelStrategy) {
@@ -85,6 +90,49 @@ public class AiOrchestratorProperties {
         public AiRoleModelPriority getPriority() { return priority; }
         public void setPriority(AiRoleModelPriority priority) {
             this.priority = priority == null ? AiRoleModelPriority.BALANCED : priority;
+        }
+    }
+
+    public static class ProviderTimeouts {
+        public static final int MIN_PROVIDER_MS = 1_000;
+        public static final int MAX_PROVIDER_MS = 30_000;
+        public static final int MIN_OVERALL_MS = 5_000;
+        public static final int MAX_OVERALL_MS = 60_000;
+
+        private int openaiMs = 10_000;
+        private int geminiMs = 25_000;
+        private int xaiMs = 10_000;
+        private int overallMs = 30_000;
+
+        public int getOpenaiMs() { return openaiMs; }
+        public void setOpenaiMs(int openaiMs) { this.openaiMs = openaiMs; }
+        public int getGeminiMs() { return geminiMs; }
+        public void setGeminiMs(int geminiMs) { this.geminiMs = geminiMs; }
+        public int getXaiMs() { return xaiMs; }
+        public void setXaiMs(int xaiMs) { this.xaiMs = xaiMs; }
+        public int getOverallMs() { return overallMs; }
+        public void setOverallMs(int overallMs) { this.overallMs = overallMs; }
+
+        public int timeoutMs(AiProviderName provider) {
+            if (provider == AiProviderName.OPENAI) {
+                return openaiMs;
+            }
+            if (provider == AiProviderName.GEMINI) {
+                return geminiMs;
+            }
+            return xaiMs;
+        }
+
+        public boolean validOverall() {
+            return overallMs >= MIN_OVERALL_MS && overallMs <= MAX_OVERALL_MS;
+        }
+
+        public boolean validProvider(AiProviderName provider) {
+            int timeoutMs = timeoutMs(provider);
+            return validOverall()
+                    && timeoutMs >= MIN_PROVIDER_MS
+                    && timeoutMs <= MAX_PROVIDER_MS
+                    && timeoutMs <= overallMs;
         }
     }
 }
