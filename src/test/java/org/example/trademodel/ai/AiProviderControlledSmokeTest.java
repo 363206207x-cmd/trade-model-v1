@@ -556,6 +556,51 @@ class AiProviderControlledSmokeTest {
     }
 
     @Test
+    void shellInteractionAllowlistPreservesApprovedLinesAndBlocksSensitiveLines() throws Exception {
+        String script = Files.readString(Path.of("scripts/ai-provider-controlled-smoke.sh"));
+        List<String> allowlistLines = shellAllowlistLines(script);
+        List<String> approved = approvedInteractionFilterLines();
+        List<String> forbidden = List.of(
+                "RAW_RESPONSE_BODY: secret-provider-content",
+                "GENERATED_TEXT: private-output",
+                "INTERACTION_ID_VALUE: private-interaction-id",
+                "TOKEN_COUNT_VALUE: 12345",
+                "AUTHORIZATION: secret-key",
+                "PROMPT_VALUE: private-prompt");
+        Path syntheticOutput = tempDir.resolve("gemini-interaction-filter.txt");
+        Files.writeString(syntheticOutput, String.join("\n", approved) + "\n"
+                + String.join("\n", forbidden) + "\n");
+
+        assertThat(allowlistLines).hasSize(2);
+        for (String allowlistLine : allowlistLines) {
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    "awk", awkProgram(allowlistLine), syntheticOutput.toString());
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+            String output = new String(process.getInputStream().readAllBytes());
+
+            assertThat(process.waitFor()).isZero();
+            assertThat(output.lines().toList()).containsExactlyElementsOf(approved);
+            assertThat(output).doesNotContain(forbidden.toArray(String[]::new));
+        }
+        assertThat(script).doesNotContain("GEMINI_.*", ".*INTERACTION.*");
+    }
+
+    @Test
+    void javaInteractionDiagnosticFieldsStaySynchronizedWithBothShellAllowlists() throws Exception {
+        String script = Files.readString(Path.of("scripts/ai-provider-controlled-smoke.sh"));
+        List<String> emittedFields = interactionFailureResult().sanitizedOutputLines().stream()
+                .map(line -> line.substring(0, line.indexOf(':')))
+                .filter(field -> field.startsWith("GEMINI_INTERACTION_"))
+                .toList();
+
+        assertThat(emittedFields).isNotEmpty();
+        for (String allowlistLine : shellAllowlistLines(script)) {
+            assertThat(allowlistFields(allowlistLine)).containsAll(emittedFields);
+        }
+    }
+
+    @Test
     void shellReportsMarkerValueWhenHarnessProcessFails() throws Exception {
         assertThat(runShellWithFailingMaven("1")).contains("LIVE_PROVIDER_CALLS: 1");
         assertThat(runShellWithFailingMaven("0")).contains("LIVE_PROVIDER_CALLS: 0");
@@ -653,6 +698,67 @@ class AiProviderControlledSmokeTest {
                 false, false, 0L, 0L,
                 AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0,
                 null, null, null, null);
+    }
+
+    private static List<String> approvedInteractionFilterLines() {
+        return List.of(
+                "AI_PROVIDER: GEMINI",
+                "AI_PROVIDER_LIVE_SMOKE: FAIL_RESPONSE_SCHEMA",
+                "LIVE_PROVIDER_CALLS: 1",
+                "GEMINI_INTERACTION_DIAGNOSTIC_STATUS: FAILED",
+                "GEMINI_INTERACTION_STATUS: incomplete",
+                "GEMINI_INTERACTION_ID_PRESENT: YES",
+                "GEMINI_INTERACTION_USAGE_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_INPUT_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_OUTPUT_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_THOUGHT_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_STEP_COUNT: 2",
+                "GEMINI_INTERACTION_MODEL_OUTPUT_STEP_COUNT: 1",
+                "GEMINI_INTERACTION_FINAL_OUTPUT_PRESENT: YES",
+                "GEMINI_INTERACTION_FINAL_TEXT_BLOCK_COUNT: 1",
+                "GEMINI_INTERACTION_FINAL_TEXT_LENGTH: 97",
+                "GEMINI_INTERACTION_FINAL_JSON_PARSE_STATUS: FAIL",
+                "GEMINI_INTERACTION_V1_CONTRACT_STATUS: NOT_CHECKED",
+                "GEMINI_INTERACTION_FAILURE_REASON: GEMINI_INTERACTION_STATUS_INCOMPLETE");
+    }
+
+    private static List<String> shellAllowlistLines(String script) {
+        return script.lines()
+                .filter(line -> line.contains("allowed_output=\"$(awk '"))
+                .toList();
+    }
+
+    private static String awkProgram(String allowlistLine) {
+        int start = allowlistLine.indexOf("awk '") + "awk '".length();
+        int end = allowlistLine.indexOf("' \"${output_file}\"", start);
+        if (start < "awk '".length() || end < start) {
+            throw new IllegalArgumentException("SHELL_ALLOWLIST_AWK_PROGRAM_MISSING");
+        }
+        return allowlistLine.substring(start, end);
+    }
+
+    private static List<String> allowlistFields(String allowlistLine) {
+        String program = awkProgram(allowlistLine);
+        int start = program.indexOf("/^(") + 3;
+        int end = program.indexOf("): /", start);
+        if (start < "/^(".length() || end < start) {
+            throw new IllegalArgumentException("SHELL_ALLOWLIST_FIELDS_MISSING");
+        }
+        return List.of(program.substring(start, end).split("\\|"));
+    }
+
+    private static AiProviderControlledSmokeResult interactionFailureResult() {
+        GeminiInteractionDiagnostic diagnostic = new GeminiInteractionDiagnostic(
+                "INCOMPLETE", true, true, true, true, true, true,
+                2, 1, true, 1, 97, "FAIL", "NOT_CHECKED",
+                GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_INCOMPLETE);
+        return new AiProviderControlledSmokeResult(
+                "GEMINI", null, "gemini-3.5-flash", "KEY_PRESENT_NOT_EXPOSED", "2XX",
+                AiProviderControlledSmokeErrorCategory.RESPONSE_SCHEMA, null, "FAIL",
+                true, true, 30_000L, 1L,
+                AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA, 1,
+                null, null, null, diagnostic);
     }
 
     private void assertGeminiHttpFailure(
