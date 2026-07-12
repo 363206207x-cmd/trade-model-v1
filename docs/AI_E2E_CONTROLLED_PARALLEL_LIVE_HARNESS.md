@@ -47,7 +47,23 @@ OpenAI 10 seconds, Gemini 25 seconds, xAI 10 seconds, and an overall 30-second d
 The script creates a mode-600 temporary marker. A test-only transport decorator records each
 provider immediately before its formal transport call and rejects a second attempt. A normal run
 reports `0` or `1` per provider. A failed or watchdog-terminated process reports
-`UNKNOWN_MAX_1`; it never converts an uncertain run into a false zero-call result.
+the exact readable values from that marker. Only a missing, malformed, or unreadable provider value
+becomes `UNKNOWN_MAX_1`; any aggregate containing an unknown value becomes `UNKNOWN_MAX_3`.
+
+## Failure Diagnostics
+
+Two additional mode-600 markers record the last allowlisted harness stage and whether the watchdog
+actually terminated Maven. Failure output includes only:
+
+- a fixed failure category such as `SPRING_CONTEXT_FAILURE`, `DATABASE_INITIALIZATION_FAILURE`,
+  `CALL_COUNT_AUDIT_FAILURE`, or `WATCHDOG_TIMEOUT`
+- process state `SUCCESS`, `FAILURE`, or `WATCHDOG`
+- an allowlisted stage from `PRECHECK` through `OUTPUT_EMITTED`
+- recovered per-provider counts and their safe aggregate
+
+Classification reads the captured Maven output locally for fixed framework class names. It never
+prints that file, exception messages, stack traces, SQL, datasource details, prompts, provider
+responses, headers, or credentials.
 
 ## Fixed Fixture
 
