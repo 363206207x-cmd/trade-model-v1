@@ -46,6 +46,16 @@ public class AiOrchestratorController {
         map.put("globalEnabled", properties.isEnabled());
         map.put("requestTimeoutMs", properties.getRequestTimeoutMs());
         map.put("overallTimeoutMs", properties.getOverallTimeoutMs());
+        AiOrchestratorProperties.ProviderTimeouts providerTimeouts = properties.getProviderTimeouts();
+        map.put("providerTimeouts", Map.of(
+                "openaiMs", providerTimeouts.getOpenaiMs(),
+                "geminiMs", providerTimeouts.getGeminiMs(),
+                "xaiMs", providerTimeouts.getXaiMs(),
+                "overallMs", providerTimeouts.getOverallMs(),
+                "configurationValid", providerTimeouts.validOverall()
+                        && providerTimeouts.validProvider(org.example.trademodel.ai.AiProviderName.OPENAI)
+                        && providerTimeouts.validProvider(org.example.trademodel.ai.AiProviderName.GEMINI)
+                        && providerTimeouts.validProvider(org.example.trademodel.ai.AiProviderName.XAI)));
         map.put("maxInputChars", properties.getMaxInputChars());
         map.put("maxOutputTokens", properties.getMaxOutputTokens());
         map.put("dailyBudgetConfigured", properties.getDailyBudgetUsd().signum() > 0);

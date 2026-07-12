@@ -148,6 +148,11 @@ trade-model:
     overall-timeout-ms: ${TRADE_MODEL_AI_OVERALL_TIMEOUT_MS:8000}
     max-input-chars: ${TRADE_MODEL_AI_MAX_INPUT_CHARS:24000}
     max-output-tokens: ${TRADE_MODEL_AI_MAX_OUTPUT_TOKENS:500}
+    provider-timeouts:
+      openai-ms: ${TRADE_MODEL_AI_OPENAI_TIMEOUT_MS:10000}
+      gemini-ms: ${TRADE_MODEL_AI_GEMINI_TIMEOUT_MS:25000}
+      xai-ms: ${TRADE_MODEL_AI_XAI_TIMEOUT_MS:10000}
+      overall-ms: ${TRADE_MODEL_AI_OVERALL_TIMEOUT_MS:30000}
     daily-budget-usd: ${TRADE_MODEL_AI_DAILY_BUDGET_USD:0}
     per-analysis-budget-usd: ${TRADE_MODEL_AI_PER_ANALYSIS_BUDGET_USD:0}
     model-strategy:
