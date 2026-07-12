@@ -73,11 +73,11 @@ class AiProviderClientAdaptersTest {
     }
 
     @Test
-    void geminiAdapter_mapsGenerateContentWithHeaderKeyAndNoTools() throws Exception {
+    void geminiAdapter_mapsInteractionsWithHeaderKeyAndNoTools() throws Exception {
         AiOrchestratorProperties properties = properties();
         configure(properties.getGemini(), "gemini-key", "gemini-test", "https://gemini.test");
         FakeTransport transport = FakeTransport.responding(new AiHttpResponse(200, """
-                {"responseId":"gemini-resp","candidates":[{"content":{"parts":[{"text":"{\\"stance\\":\\"ABSTAIN\\",\\"conflictLevel\\":\\"NONE\\",\\"reasonCodes\\":[\\"NO_EDGE\\"],\\"summary\\":\\"no clear issue\\"}"}]}}],"usageMetadata":{"promptTokenCount":13,"candidatesTokenCount":5,"totalTokenCount":18}}
+                {"id":"gemini-resp","status":"completed","steps":[{"type":"model_output","content":[{"type":"text","text":"{\\"stance\\":\\"ABSTAIN\\",\\"conflictLevel\\":\\"NONE\\",\\"reasonCodes\\":[\\"NO_EDGE\\"],\\"summary\\":\\"no clear issue\\"}"}]}],"usage":{"total_input_tokens":13,"total_output_tokens":5,"total_tokens":18}}
                 """, Map.of()));
         GeminiProviderClient client = new GeminiProviderClient(properties, transport, objectMapper);
 
@@ -86,8 +86,11 @@ class AiProviderClientAdaptersTest {
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.SUCCESS);
         assertThat(result.getProviderRequestId()).isEqualTo("gemini-resp");
         assertThat(result.getInputTokens()).isEqualTo(13);
-        assertThat(transport.lastRequest.getUrl()).isEqualTo("https://gemini.test/v1beta/models/gemini-test:generateContent");
+        assertThat(result.getOutputTokens()).isEqualTo(5);
+        assertThat(result.getTotalTokens()).isEqualTo(18);
+        assertThat(transport.lastRequest.getUrl()).isEqualTo("https://gemini.test/v1/interactions");
         assertThat(transport.lastRequest.getHeaders()).containsEntry("x-goog-api-key", "gemini-key");
+        assertThat(transport.lastRequest.getBody()).contains("\"model\":\"models/gemini-test\"");
         assertThat(transport.lastRequest.getBody()).doesNotContain("\"tools\"");
     }
 

@@ -16,7 +16,7 @@ public record GeminiRequestDiagnostic(
         boolean stopSequencesPresent,
         boolean toolsPresent
 ) {
-    private static final Pattern SAFE_MODEL = Pattern.compile("[A-Za-z0-9._:-]{1,120}");
+    private static final Pattern SAFE_MODEL = Pattern.compile("[A-Za-z0-9._:/-]{1,120}");
 
     public static GeminiRequestDiagnostic analyze(
             ObjectMapper objectMapper, String model, AiHttpRequest request) {
@@ -26,17 +26,19 @@ public record GeminiRequestDiagnostic(
         }
         try {
             JsonNode root = objectMapper.readTree(request.getBody());
-            JsonNode generation = root.path("generationConfig");
+            JsonNode generation = root.path("generation_config");
+            JsonNode responseFormat = root.path("response_format");
+            String requestModel = textOrDefault(root.path("model"), safeModel);
             return new GeminiRequestDiagnostic(
-                    safeModel,
-                    textOrDefault(generation.path("responseMimeType"), "--"),
-                    generation.hasNonNull("responseJsonSchema"),
-                    Math.max(0, generation.path("maxOutputTokens").asInt(0)),
+                    safeModel(requestModel),
+                    textOrDefault(responseFormat.path("mime_type"), "--"),
+                    responseFormat.path("schema").isObject(),
+                    Math.max(0, generation.path("max_output_tokens").asInt(0)),
                     generation.path("temperature").isNumber()
                             ? generation.path("temperature").asText() : "NONE",
-                    textLength(root.path("systemInstruction").path("parts")),
-                    contentTextLength(root.path("contents")),
-                    generation.has("stopSequences"),
+                    textLength(root.path("system_instruction")),
+                    textLength(root.path("input")),
+                    generation.has("stop_sequences"),
                     root.has("tools"));
         } catch (Exception ignored) {
             return unavailable(safeModel);
@@ -56,28 +58,7 @@ public record GeminiRequestDiagnostic(
         return node != null && node.isTextual() && !node.asText().isBlank() ? node.asText() : fallback;
     }
 
-    private static int contentTextLength(JsonNode contents) {
-        if (contents == null || !contents.isArray()) {
-            return 0;
-        }
-        int length = 0;
-        for (JsonNode content : contents) {
-            length += textLength(content.path("parts"));
-        }
-        return length;
-    }
-
-    private static int textLength(JsonNode parts) {
-        if (parts == null || !parts.isArray()) {
-            return 0;
-        }
-        int length = 0;
-        for (JsonNode part : parts) {
-            JsonNode text = part.path("text");
-            if (text.isTextual()) {
-                length += text.asText().length();
-            }
-        }
-        return length;
+    private static int textLength(JsonNode text) {
+        return text != null && text.isTextual() ? text.asText().length() : 0;
     }
 }

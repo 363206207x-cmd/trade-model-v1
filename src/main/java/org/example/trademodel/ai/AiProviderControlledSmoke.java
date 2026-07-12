@@ -1,12 +1,9 @@
 package org.example.trademodel.ai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -25,7 +22,7 @@ public class AiProviderControlledSmoke {
     static final String DIAGNOSTIC_GATE = "AI_PROVIDER_SMOKE_DIAGNOSTIC";
     static final String GEMINI_DIAGNOSTIC_MODE = "GEMINI_DIAGNOSTIC_MODE";
     static final int DEFAULT_SMOKE_MAX_OUTPUT_TOKENS = 128;
-    static final int GEMINI_SMOKE_MAX_OUTPUT_TOKENS = 512;
+    static final int GEMINI_SMOKE_MAX_OUTPUT_TOKENS = 256;
     static final long DEFAULT_SMOKE_TIMEOUT_MS = 15_000L;
     static final long GEMINI_SMOKE_TIMEOUT_MS = 30_000L;
 
@@ -94,10 +91,7 @@ public class AiProviderControlledSmoke {
                     false, false, 0, AiProviderControlledSmokeStatus.FAIL_RESPONSE_SCHEMA, 0,
                     null, diagnosticLabel);
         }
-        AiProviderReviewResult review = diagnosticMode == null
-                ? providerClient.review(smokeRequest, timeoutLimitMs)
-                : runGeminiDiagnostic((GeminiProviderClient) providerClient, countingTransport,
-                        diagnosticMode, model, timeoutLimitMs, smokeRequest);
+        AiProviderReviewResult review = providerClient.review(smokeRequest, timeoutLimitMs);
         int statusCode = countingTransport.statusCode();
         AiProviderControlledSmokeStatus status = classify(review, statusCode);
         boolean parsed = review != null && review.successful();
@@ -114,106 +108,6 @@ public class AiProviderControlledSmoke {
                 countingTransport.requestCount(), review, diagnosticLabel, requestDiagnostic);
     }
 
-    private AiProviderReviewResult runGeminiDiagnostic(
-            GeminiProviderClient client, CountingTransport transport,
-            GeminiDiagnosticMode mode, String model, long timeoutLimitMs,
-            AiProviderRequest smokeRequest) {
-        long started = System.nanoTime();
-        try {
-            AiHttpRequest request = client.buildControlledSmokeHttpRequest(
-                    smokeRequest, timeoutLimitMs, model);
-            applyDiagnosticMode(client, request, mode);
-            AiHttpResponse response = transport.post(request);
-            long latencyMs = elapsedMs(started);
-            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                return client.httpFailure(response, latencyMs);
-            }
-
-            var payload = mode == GeminiDiagnosticMode.A
-                    ? client.extractDiagnosticPayload(response)
-                    : client.extractPayload(response);
-            AiProviderReviewResult result = switch (mode) {
-                case A -> plainTextDiagnostic(payload.content(), latencyMs);
-                case B, C -> roleSchemaDiagnostic(client, payload, latencyMs);
-            };
-            result.setProviderRequestId(payload.providerRequestId());
-            result.setInputTokens(payload.inputTokens());
-            result.setOutputTokens(payload.outputTokens());
-            result.setTotalTokens(payload.totalTokens());
-            return result;
-        } catch (HttpTimeoutException exception) {
-            return client.failure(AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT", elapsedMs(started));
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            return client.failure(AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT", elapsedMs(started));
-        } catch (JsonProcessingException exception) {
-            return client.failure(AiProviderCallStatus.INVALID_RESPONSE,
-                    "PROVIDER_RESPONSE_SCHEMA", elapsedMs(started));
-        } catch (IOException exception) {
-            return client.failure(AiProviderCallStatus.FAILED, "PROVIDER_IO_FAILURE", elapsedMs(started));
-        } catch (Exception exception) {
-            return client.failure(AiProviderCallStatus.FAILED, "PROVIDER_FAILURE", elapsedMs(started));
-        }
-    }
-
-    private void applyDiagnosticMode(
-            GeminiProviderClient client, AiHttpRequest request, GeminiDiagnosticMode mode) throws Exception {
-        ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
-        ObjectNode generation = (ObjectNode) body.path("generationConfig");
-        if (mode == GeminiDiagnosticMode.A) {
-            generation.remove(List.of("responseMimeType", "responseJsonSchema"));
-            setDiagnosticInstruction(body, "Return one short plain-text capability response.");
-        } else if (mode == GeminiDiagnosticMode.B) {
-            generation.remove("responseJsonSchema");
-        }
-        request.setBody(objectMapper.writeValueAsString(body));
-        if (mode == GeminiDiagnosticMode.C) {
-            client.applyStrictSchemaForDiagnostic(request);
-        }
-    }
-
-    private static void setDiagnosticInstruction(ObjectNode body, String instruction) {
-        ((ObjectNode) body.path("systemInstruction").path("parts").get(0)).put("text", instruction);
-    }
-
-    private static AiProviderReviewResult plainTextDiagnostic(String content, long latencyMs) {
-        if (content == null || content.isBlank()) {
-            return diagnosticInvalid("GEMINI_DIAGNOSTIC_EMPTY_TEXT", latencyMs);
-        }
-        return diagnosticSuccess("GEMINI_DIAGNOSTIC_PLAIN_TEXT", latencyMs);
-    }
-
-    private AiProviderReviewResult roleSchemaDiagnostic(
-            GeminiProviderClient client, AbstractSafeAiProviderClient.ProviderPayload payload,
-            long latencyMs) {
-        AiProviderReviewResult result = new AiProviderResponseParser(objectMapper).parse(
-                AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW, payload.content());
-        client.enrichParsedResult(result, payload);
-        result.setLatencyMs(latencyMs);
-        return result;
-    }
-
-    private static AiProviderReviewResult diagnosticSuccess(String reasonCode, long latencyMs) {
-        AiProviderReviewResult result = new AiProviderReviewResult();
-        result.setProvider(AiProviderName.GEMINI);
-        result.setRole(AiProviderRole.GEMINI_CONSISTENCY_REVIEW);
-        result.setCallStatus(AiProviderCallStatus.SUCCESS);
-        result.setStance(AiReviewStance.ABSTAIN);
-        result.setConflictLevel(AiReviewConflictLevel.NONE);
-        result.setReasonCodes(List.of(reasonCode));
-        result.setSummary(reasonCode);
-        result.setLatencyMs(latencyMs);
-        return result;
-    }
-
-    private static AiProviderReviewResult diagnosticInvalid(String reasonCode, long latencyMs) {
-        AiProviderReviewResult result = AiProviderReviewResult.skipped(
-                AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
-                AiProviderCallStatus.INVALID_RESPONSE, reasonCode);
-        result.setErrorCode(reasonCode);
-        result.setLatencyMs(latencyMs);
-        return result;
-    }
 
     private AiProviderClient client(AiProviderName provider, String model, String apiKey,
                                     AiHttpTransport transport, long timeoutLimitMs) {
@@ -415,7 +309,7 @@ public class AiProviderControlledSmoke {
         }
         return switch (provider) {
             case OPENAI -> "gpt-5.6-luna";
-            case GEMINI -> "gemini-2.5-pro";
+            case GEMINI -> "gemini-3.5-flash";
             case XAI -> "grok-4.5";
         };
     }

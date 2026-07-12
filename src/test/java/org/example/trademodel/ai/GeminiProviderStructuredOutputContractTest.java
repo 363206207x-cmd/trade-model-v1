@@ -2,10 +2,13 @@ package org.example.trademodel.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,392 +18,260 @@ class GeminiProviderStructuredOutputContractTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void normalGeminiJsonMimePassesNormalizerAndStrictInternalParser() throws Exception {
-        CapturingTransport transport = new CapturingTransport(response(reviewJson()));
+    void stableV1InteractionsUsesCanonicalModelName() throws Exception {
+        CapturingTransport transport = transport(completed(reviewJson("canonical")));
 
-        AiProviderReviewResult result = client(transport).review(request(), 15_000L);
+        client(transport).review(request(), 15_000L);
 
-        assertThat(result.successful()).isTrue();
-        JsonNode requestBody = objectMapper.readTree(transport.request.getBody());
-        assertThat(transport.request.getUrl()).isEqualTo(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent");
-        assertThat(transport.request.getHeaders()).containsEntry("x-goog-api-key", "test-gemini-key");
-        assertThat(requestBody.path("contents").isArray()).isTrue();
-        String instruction = requestBody.path("systemInstruction").path("parts").get(0).path("text").asText();
-        assertThat(instruction).contains(
-                "GEMINI_REVIEW", "Return ONLY one valid JSON object", "Do not return Markdown",
-                "a code fence", "an explanation", "a refusal", "a prefix", "a suffix",
-                "stance, conflictLevel, reasonCodes, summary",
-                "SUPPORT, CHALLENGE, ABSTAIN", "NONE, MINOR, MAJOR, EXTREME",
-                "summary must be a concise string no longer than 100 characters",
-                "Do not place any explanation outside the JSON object",
-                "\"stance\":\"ABSTAIN\"", "\"reasonCodes\":[\"INSUFFICIENT_DATA\"]",
-                "\"summary\":\"Insufficient evidence\"", "Never replace that JSON fallback with plain text");
-        assertThat(instruction).doesNotContain("\"stance\":\"NEUTRAL\"");
-
-        JsonNode generation = requestBody.path("generationConfig");
-        assertThat(generation.path("responseMimeType").asText()).isEqualTo("application/json");
-        assertThat(generation.has("responseJsonSchema")).isFalse();
+        JsonNode body = objectMapper.readTree(transport.request.getBody());
+        assertThat(transport.request.getUrl())
+                .isEqualTo("https://generativelanguage.googleapis.com/v1/interactions");
+        assertThat(body.path("model").asText()).isEqualTo("models/gemini-3.5-flash");
+        assertThat(GeminiProviderClient.canonicalModelName("models/gemini-3.5-flash"))
+                .isEqualTo("models/gemini-3.5-flash");
     }
 
     @Test
-    void geminiJsonWithWhitespacePassesStrictParser() throws Exception {
-        AiProviderReviewResult result = review(response("  \n" + reviewJson() + "\n  "));
+    void interactionsRequestUsesResponseFormatSchema() throws Exception {
+        JsonNode body = requestBody();
+        JsonNode format = body.path("response_format");
+        JsonNode schema = format.path("schema");
 
-        assertThat(result.successful()).isTrue();
+        assertThat(format.path("type").asText()).isEqualTo("text");
+        assertThat(format.path("mime_type").asText()).isEqualTo("application/json");
+        assertThat(schema.path("type").asText()).isEqualTo("object");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("required")).hasSize(4);
+        assertThat(schema.path("properties").path("reasonCodes").path("maxItems").asInt())
+                .isEqualTo(8);
     }
 
     @Test
-    void nestedResultFragmentIsNormalizedBeforeStrictParser() throws Exception {
-        AiProviderReviewResult result = review(response("{\"result\":" + reviewJson() + "}"));
+    void interactionsRequestUsesLowThinkingAndNoSummary() throws Exception {
+        JsonNode generation = requestBody().path("generation_config");
 
-        assertThat(result.successful()).isTrue();
-        assertThat(result.getReasonCodes()).containsExactly("SCHEMA_OK");
+        assertThat(generation.path("max_output_tokens").asInt()).isEqualTo(256);
+        assertThat(generation.path("temperature").asInt()).isZero();
+        assertThat(generation.path("seed").asInt()).isEqualTo(42);
+        assertThat(generation.path("thinking_level").asText()).isEqualTo("low");
+        assertThat(generation.path("thinking_summaries").asText()).isEqualTo("none");
     }
 
     @Test
-    void nestedAnalysisFragmentIsNormalizedBeforeStrictParser() throws Exception {
-        AiProviderReviewResult result = review(response("{\"analysis\":" + reviewJson() + "}"));
+    void interactionsRequestUsesStoreFalseAndNoTools() throws Exception {
+        JsonNode body = requestBody();
+
+        assertThat(body.path("store").asBoolean()).isFalse();
+        assertThat(body.path("stream").asBoolean()).isFalse();
+        assertThat(body.path("system_instruction").isTextual()).isTrue();
+        assertThat(body.path("input").isTextual()).isTrue();
+        assertThat(body.has("tools")).isFalse();
+        assertThat(body.has("orderAction")).isFalse();
+        assertThat(body.has("positionAction")).isFalse();
+        assertThat(body.has("pushAction")).isFalse();
+    }
+
+    @Test
+    void finalModelOutputStepIsSelected() {
+        AiProviderReviewResult result = review(completed(List.of(
+                modelOutput(reviewJson("first")),
+                modelOutput(reviewJson("last")))));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getSummary()).isEqualTo("last");
+    }
+
+    @Test
+    void earlierModelOutputStepsAreNotConcatenated() {
+        AiProviderReviewResult result = review(completed(List.of(
+                modelOutput("non-json explanatory text"),
+                modelOutput(reviewJson("final valid")))));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getSummary()).isEqualTo("final valid");
+    }
+
+    @Test
+    void multipleTextBlocksInsideFinalStepAreConcatenated() {
+        String json = reviewJson("split blocks");
+        int midpoint = json.length() / 2;
+        AiProviderReviewResult result = review(completed(List.of(
+                modelOutput(json.substring(0, midpoint), json.substring(midpoint)))));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getSummary()).isEqualTo("split blocks");
+    }
+
+    @Test
+    void multipleIncompatibleFinalOutputsFailClosed() {
+        AiProviderReviewResult result = review(completed(List.of(
+                modelOutput(reviewJson("output A"), reviewJson("output B")))));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_EMPTY_RESPONSE");
+    }
+
+    @Test
+    void validFinalStructuredOutputPasses() {
+        AiProviderReviewResult result = review(completed(reviewJson("valid")));
 
         assertThat(result.successful()).isTrue();
         assertThat(result.getStance()).isEqualTo(AiReviewStance.ABSTAIN);
-    }
-
-    @Test
-    void deterministicSnakeCaseFieldNamesAreNormalized() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"analysis":{"stance":"ABSTAIN","conflict_level":"NONE",
-                 "reason_codes":["SCHEMA_OK"],"summary":"review only"}}
-                """));
-
-        assertThat(result.successful()).isTrue();
         assertThat(result.getConflictLevel()).isEqualTo(AiReviewConflictLevel.NONE);
     }
 
     @Test
-    void missingCandidatesFailsClosed() throws Exception {
-        assertInvalid("{}", "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void missingContentFailsClosed() throws Exception {
-        assertInvalid("{\"candidates\":[{}]}", "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void missingPartsFailsClosed() throws Exception {
-        assertInvalid("{\"candidates\":[{\"content\":{}}]}", "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void emptyTextFailsClosed() throws Exception {
-        assertInvalid(response("  ").getBody(), "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void markdownFencedJsonFailsClosed() throws Exception {
-        assertInvalid(response("```json\n" + reviewJson() + "\n```").getBody(),
-                "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void naturalLanguagePlusJsonFailsClosed() throws Exception {
-        assertInvalid(response("Here is the result: " + reviewJson()).getBody(),
-                "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void malformedJsonStillFailsClosedWithoutAutomaticRepair() throws Exception {
-        assertInvalid(response("{\"stance\":\"ABSTAIN\"").getBody(),
-                "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void plainTextRefusalFailsClosedWithoutAutomaticRepair() throws Exception {
-        assertInvalid(response("I cannot provide that review.").getBody(),
-                "INVALID_EMPTY_RESPONSE");
-    }
-
-    @Test
-    void extractionDiagnosticNormalStructurePasses() throws Exception {
-        GeminiExtractionDiagnostic diagnostic = extraction(response(reviewJson()));
-
-        assertThat(diagnostic.successful()).isTrue();
-        assertThat(diagnostic.candidatesPresent()).isTrue();
-        assertThat(diagnostic.candidateCount()).isEqualTo(1);
-        assertThat(diagnostic.contentPresent()).isTrue();
-        assertThat(diagnostic.partsPresent()).isTrue();
-        assertThat(diagnostic.textNodePresent()).isTrue();
-        assertThat(diagnostic.textLength()).isEqualTo(reviewJson().length());
-        assertThat(diagnostic.emptyText()).isFalse();
-        assertThat(diagnostic.extractedJsonParsePassed()).isTrue();
-        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.VALID_JSON_OBJECT);
-    }
-
-    @Test
-    void extractionDiagnosticMissingCandidatesFails() throws Exception {
-        GeminiExtractionDiagnostic diagnostic = extraction(
-                new AiHttpResponse(200, "{}", Map.of()));
-
-        assertThat(diagnostic.successful()).isFalse();
-        assertThat(diagnostic.candidatesPresent()).isFalse();
-        assertThat(diagnostic.candidateCount()).isZero();
-        assertThat(diagnostic.contentPresent()).isFalse();
-        assertThat(diagnostic.textNodePresent()).isFalse();
-        assertThat(diagnostic.emptyText()).isTrue();
-        assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
-        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.EMPTY_TEXT);
-    }
-
-    @Test
-    void extractionDiagnosticEmptyTextFails() throws Exception {
-        GeminiExtractionDiagnostic diagnostic = extraction(response("  "));
-
-        assertThat(diagnostic.successful()).isFalse();
-        assertThat(diagnostic.candidatesPresent()).isTrue();
-        assertThat(diagnostic.contentPresent()).isTrue();
-        assertThat(diagnostic.partsPresent()).isTrue();
-        assertThat(diagnostic.textNodePresent()).isTrue();
-        assertThat(diagnostic.textLength()).isEqualTo(2);
-        assertThat(diagnostic.emptyText()).isTrue();
-        assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
-        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.EMPTY_TEXT);
-    }
-
-    @Test
-    void extractionDiagnosticUnexpectedContentStructureFails() throws Exception {
-        GeminiExtractionDiagnostic diagnostic = extraction(new AiHttpResponse(200, """
-                {"candidates":[{"content":{"parts":{"text":"{}"}}}]}
-                """, Map.of()));
-
-        assertThat(diagnostic.successful()).isFalse();
-        assertThat(diagnostic.candidatesPresent()).isTrue();
-        assertThat(diagnostic.candidateCount()).isEqualTo(1);
-        assertThat(diagnostic.contentPresent()).isTrue();
-        assertThat(diagnostic.partsPresent()).isTrue();
-        assertThat(diagnostic.textNodePresent()).isFalse();
-        assertThat(diagnostic.textLength()).isZero();
-        assertThat(diagnostic.emptyText()).isTrue();
-        assertThat(diagnostic.extractedJsonParsePassed()).isFalse();
-        assertThat(diagnostic.outputClass()).isEqualTo(GeminiOutputClass.EMPTY_TEXT);
-    }
-
-    @Test
-    void outputClassifierDistinguishesEmptyAndValidJsonContainers() throws Exception {
-        assertThat(extraction(response("{}")).outputClass())
-                .isEqualTo(GeminiOutputClass.EMPTY_JSON_OBJECT);
-        assertThat(extraction(response("[]")).outputClass())
-                .isEqualTo(GeminiOutputClass.EMPTY_JSON_ARRAY);
-        assertThat(extraction(response(reviewJson())).outputClass())
-                .isEqualTo(GeminiOutputClass.VALID_JSON_OBJECT);
-        assertThat(extraction(response("[\"review\"]")).outputClass())
-                .isEqualTo(GeminiOutputClass.VALID_JSON_ARRAY);
-    }
-
-    @Test
-    void outputClassifierDistinguishesShortMarkdownRefusalAndMalformedContent() throws Exception {
-        assertThat(extraction(response("brief review")).outputClass())
-                .isEqualTo(GeminiOutputClass.PLAIN_TEXT_SHORT);
-        assertThat(extraction(response("```json\n{}\n```")).outputClass())
-                .isEqualTo(GeminiOutputClass.MARKDOWN_WRAPPER);
-        assertThat(extraction(response("I cannot comply with this request.")).outputClass())
-                .isEqualTo(GeminiOutputClass.REFUSAL_PATTERN);
-        assertThat(extraction(response("{\"stance\":")).outputClass())
-                .isEqualTo(GeminiOutputClass.MALFORMED_JSON);
-    }
-
-    @Test
-    void missingRequiredFieldFailsClosedWithSanitizedDiagnostic() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"stance":"ABSTAIN","reasonCodes":["SCHEMA_GAP"],"summary":"review only"}
-                """));
+    void malformedFinalOutputFailsClosed() {
+        AiProviderReviewResult result = review(completed("{\"stance\":\"ABSTAIN\""));
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_MISSING_FIELD_CONFLICTLEVEL");
-        assertThat(result.getSchemaDiagnostic().missingFields()).containsExactly("conflictLevel");
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_EMPTY_RESPONSE");
     }
 
     @Test
-    void extraFieldFailsClosedWithSanitizedDiagnostic() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":["SCHEMA_GAP"],
-                 "summary":"review only","extraProviderField":"private value"}
-                """));
+    void incompleteInteractionFailsClosed() {
+        assertInteractionStatusFailsClosed("incomplete");
+    }
+
+    @Test
+    void failedInteractionFailsClosed() {
+        assertInteractionStatusFailsClosed("failed");
+    }
+
+    @Test
+    void cancelledInteractionFailsClosed() {
+        assertInteractionStatusFailsClosed("cancelled");
+    }
+
+    @Test
+    void missingFinalTextFailsClosed() {
+        Map<String, Object> step = Map.of(
+                "type", "model_output",
+                "content", List.of(Map.of("type", "thought", "text", "private thought")));
+        AiProviderReviewResult result = review(interaction("completed", "interaction-id", List.of(step), true));
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_EXTRAPROVIDERFIELD");
-        assertThat(result.getSchemaDiagnostic().unexpectedFields()).containsExactly("extraProviderField");
+        assertThat(result.getErrorCode()).isEqualTo("PROVIDER_RESPONSE_SCHEMA");
     }
 
     @Test
-    void wrongFieldTypeFailsClosedWithSanitizedDiagnostic() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":"SCHEMA_GAP",
-                 "summary":"review only"}
-                """));
+    void interactionIdMapsToProviderRequestId() {
+        AiProviderReviewResult result = review(completed(reviewJson("id")));
+
+        assertThat(result.getProviderRequestId()).isEqualTo("interaction-id");
+        assertThat(result.getReasonCodes()).doesNotContain("GEMINI_INTERACTION_ID_MISSING");
+    }
+
+    @Test
+    void absentInteractionIdIsNotInventedAndAddsReason() {
+        AiProviderReviewResult result = review(
+                interaction("completed", null, List.of(modelOutput(reviewJson("no id"))), true));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getProviderRequestId()).isNull();
+        assertThat(result.getReasonCodes()).contains("GEMINI_INTERACTION_ID_MISSING");
+    }
+
+    @Test
+    void interactionUsageMapsCorrectly() {
+        AiProviderReviewResult result = review(completed(reviewJson("usage")));
+
+        assertThat(result.getInputTokens()).isEqualTo(13L);
+        assertThat(result.getOutputTokens()).isEqualTo(5L);
+        assertThat(result.getTotalTokens()).isEqualTo(18L);
+    }
+
+    @Test
+    void geminiNormalizerDoesNotRepairInvalidJson() {
+        GeminiRoleResultNormalizer normalizer = new GeminiRoleResultNormalizer(objectMapper);
+
+        assertThat(normalizer.normalize("```json\n" + reviewJson("markdown") + "\n```")).isNull();
+        assertThat(normalizer.normalize("prefix " + reviewJson("prose"))).isNull();
+        assertThat(normalizer.normalize("{\"stance\":")).isNull();
+    }
+
+    @Test
+    void noGenerateContentAutomaticFallback() {
+        CapturingTransport transport = transport(new AiHttpResponse(404, "{}", Map.of()));
+
+        AiProviderReviewResult result = client(transport).review(request(), 15_000L);
+
+        assertThat(result.successful()).isFalse();
+        assertThat(transport.calls).isEqualTo(1);
+        assertThat(transport.request.getUrl()).endsWith("/v1/interactions");
+        assertThat(transport.request.getUrl()).doesNotContain("generateContent", "v1beta");
+    }
+
+    @Test
+    void readinessRemainsModelConfiguredBeforeSuccess() {
+        GeminiProviderClient client = client(transport(completed(reviewJson("unused"))));
+
+        AiProviderReadiness readiness = client.readiness();
+
+        assertThat(readiness.getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_CONFIGURED);
+        assertThat(readiness.getConfiguredModel()).isEqualTo("gemini-3.5-flash");
+        assertThat(readiness.getEffectiveModel()).isEqualTo("models/gemini-3.5-flash");
+        assertThat(readiness.isReady()).isFalse();
+    }
+
+    @Test
+    void readinessBecomesModelActiveOnlyAfterContractSuccess() {
+        GeminiProviderClient client = client(transport(completed(reviewJson("verified"))));
+
+        assertThat(client.review(request()).successful()).isTrue();
+
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_ACTIVE);
+    }
+
+    @Test
+    void dashboardRoleSemanticsAndNoTradingBoundariesRemainUnchanged() throws Exception {
+        String dashboard = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
+        String source = Files.readString(Path.of(
+                "src/main/java/org/example/trademodel/ai/GeminiProviderClient.java"));
+
+        assertThat(dashboard).contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+        assertThat(source).doesNotContain(
+                "UserPosition", "ExecutionPlan", "OrderService", "PushService", "Telegram",
+                "generateContent", "v1beta");
+    }
+
+    private JsonNode requestBody() throws Exception {
+        CapturingTransport transport = transport(completed(reviewJson("request")));
+        client(transport).review(request(), 15_000L);
+        return objectMapper.readTree(transport.request.getBody());
+    }
+
+    private void assertInteractionStatusFailsClosed(String status) {
+        AiProviderReviewResult result = review(
+                interaction(status, "interaction-id", List.of(modelOutput(reviewJson(status))), true));
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_FIELD_TYPE_REASONCODES");
-        assertThat(result.getSchemaDiagnostic().typeMismatchFields())
-                .containsExactly("reasonCodes expected ARRAY got STRING");
-    }
-
-    @Test
-    void nestedTradingInstructionFieldFailsClosed() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"result":{"stance":"ABSTAIN","conflictLevel":"NONE",
-                 "reasonCodes":["SCHEMA_GAP"],"summary":"review only","orderAction":"BUY"}}
-                """));
-
-        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_ORDERACTION");
-    }
-
-    @Test
-    void nestedUnknownUnsafeFieldFailsClosedWithoutSilentRemoval() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"analysis":{"stance":"ABSTAIN","conflictLevel":"NONE",
-                 "reasonCodes":["SCHEMA_GAP"],"summary":"review only",
-                 "providerPayload":{"private":"value"}}}
-                """));
-
-        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_PROVIDERPAYLOAD");
-    }
-
-    @Test
-    void nestedUnknownObjectFailsAndExposesOnlySanitizedShape() throws Exception {
-        AiProviderReviewResult result = review(response("""
-                {"review":{"stance":"ABSTAIN","conflictLevel":"NONE",
-                 "reasonCodes":["PRIVATE_REASON"],"summary":"PRIVATE_SUMMARY"}}
-                """));
-
-        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_UNKNOWN_FIELD_REVIEW");
-        assertThat(result.getGeminiResponseShapeDiagnostic().topLevelFields()).containsExactly("review");
-        assertThat(result.getGeminiResponseShapeDiagnostic().nestedObjectPaths()).containsExactly(
-                "review.stance", "review.conflictLevel", "review.reasonCodes", "review.summary");
-        assertThat(result.getGeminiResponseShapeDiagnostic().fieldTypes()).containsExactly(
-                "review:object", "review.stance:string", "review.conflictLevel:string",
-                "review.reasonCodes:array", "review.summary:string");
-        assertThat(result.getGeminiResponseShapeDiagnostic().toString()).doesNotContain(
-                "PRIVATE_REASON", "PRIVATE_SUMMARY", "ABSTAIN", "NONE");
-    }
-
-    @Test
-    void testOnlyRequestVariantsIsolatePlainJsonMimeAndStrictSchemaWithoutNetwork() throws Exception {
-        CapturingTransport plainTransport = new CapturingTransport(response("plain capability fixture"));
-        CapturingTransport jsonMimeTransport = new CapturingTransport(response("{\"mode\":\"json-only\"}"));
-        CapturingTransport strictTransport = new CapturingTransport(response(reviewJson()));
-
-        AiHttpResponse plainResponse = plainTransport.post(
-                diagnosticRequest(plainTransport, DiagnosticVariant.PLAIN_TEXT));
-        AiHttpResponse jsonMimeResponse = jsonMimeTransport.post(
-                diagnosticRequest(jsonMimeTransport, DiagnosticVariant.JSON_MIME_ONLY));
-        AiHttpResponse strictResponse = strictTransport.post(
-                diagnosticRequest(strictTransport, DiagnosticVariant.STRICT_SCHEMA));
-
-        JsonNode plainBody = objectMapper.readTree(plainTransport.request.getBody());
-        JsonNode jsonMimeBody = objectMapper.readTree(jsonMimeTransport.request.getBody());
-        JsonNode strictBody = objectMapper.readTree(strictTransport.request.getBody());
-
-        assertThat(plainResponse.getStatusCode()).isEqualTo(200);
-        assertThat(jsonMimeResponse.getStatusCode()).isEqualTo(200);
-        assertThat(strictResponse.getStatusCode()).isEqualTo(200);
-        assertThat(plainBody.path("generationConfig").has("responseMimeType")).isFalse();
-        assertThat(plainBody.path("generationConfig").has("responseJsonSchema")).isFalse();
-        assertThat(plainBody.path("systemInstruction").toString()).contains("plain-text capability response");
-        assertThat(jsonMimeBody.path("generationConfig").path("responseMimeType").asText())
-                .isEqualTo("application/json");
-        assertThat(jsonMimeBody.path("generationConfig").has("responseJsonSchema")).isFalse();
-        assertThat(jsonMimeBody.path("systemInstruction").toString()).contains("JSON capability response");
-        assertThat(strictBody.path("generationConfig").path("responseMimeType").asText())
-                .isEqualTo("application/json");
-        assertThat(strictBody.path("generationConfig").path("responseJsonSchema").isObject()).isTrue();
-        assertThat(plainBody.path("contents")).isEqualTo(strictBody.path("contents"));
-        assertThat(jsonMimeBody.path("contents")).isEqualTo(strictBody.path("contents"));
-    }
-
-    @Test
-    void strictSchemaUsesOnlyOfficiallySupportedJsonSchemaFeatures() throws Exception {
-        CapturingTransport transport = new CapturingTransport(response(reviewJson()));
-        JsonNode body = objectMapper.readTree(
-                diagnosticRequest(transport, DiagnosticVariant.STRICT_SCHEMA).getBody());
-        JsonNode schema = body.path("generationConfig").path("responseJsonSchema");
-        JsonNode properties = schema.path("properties");
-
-        assertThat(schema.path("type").asText()).isEqualTo("object");
-        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
-        assertThat(schema.path("required")).hasSize(4);
-        assertThat(properties.path("stance").path("type").asText()).isEqualTo("string");
-        assertThat(properties.path("stance").path("enum").isArray()).isTrue();
-        assertThat(properties.path("conflictLevel").path("type").asText()).isEqualTo("string");
-        assertThat(properties.path("conflictLevel").path("enum").isArray()).isTrue();
-        assertThat(properties.path("reasonCodes").path("type").asText()).isEqualTo("array");
-        assertThat(properties.path("reasonCodes").path("items").path("type").asText())
-                .isEqualTo("string");
-        assertThat(properties.path("summary").path("type").asText()).isEqualTo("string");
-    }
-
-    private AiHttpRequest diagnosticRequest(
-            CapturingTransport transport, DiagnosticVariant variant) throws Exception {
-        GeminiProviderClient client = client(transport);
-        AiHttpRequest request = client.buildHttpRequest("{}", 30_000L, "gemini-2.5-pro");
-        ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
-        ObjectNode generation = (ObjectNode) body.path("generationConfig");
-        if (variant == DiagnosticVariant.PLAIN_TEXT) {
-            generation.remove(List.of("responseMimeType", "responseJsonSchema"));
-            setDiagnosticInstruction(body, "Return one short plain-text capability response.");
-        } else if (variant == DiagnosticVariant.JSON_MIME_ONLY) {
-            generation.remove("responseJsonSchema");
-            setDiagnosticInstruction(body, "Return one JSON capability response without a schema contract.");
-        }
-        request.setBody(objectMapper.writeValueAsString(body));
-        if (variant == DiagnosticVariant.STRICT_SCHEMA) {
-            client.applyStrictSchemaForDiagnostic(request);
-        }
-        return request;
-    }
-
-    private static void setDiagnosticInstruction(ObjectNode body, String instruction) {
-        ((ObjectNode) body.path("systemInstruction").path("parts").get(0)).put("text", instruction);
-    }
-
-    private void assertInvalid(String responseBody, String errorCode) {
-        AiProviderReviewResult result = review(new AiHttpResponse(200, responseBody, Map.of()));
-
-        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo(errorCode);
+        assertThat(result.getErrorCode()).isEqualTo("PROVIDER_RESPONSE_SCHEMA");
     }
 
     private AiProviderReviewResult review(AiHttpResponse response) {
-        return client(new CapturingTransport(response)).review(request(), 15_000L);
-    }
-
-    private GeminiExtractionDiagnostic extraction(AiHttpResponse response) throws Exception {
-        GeminiProviderClient client = client(new CapturingTransport(response));
-        return client.extractPayload(response)
-                .geminiResponseShapeDiagnostic()
-                .extractionDiagnostic();
+        return client(transport(response)).review(request(), 15_000L);
     }
 
     private GeminiProviderClient client(CapturingTransport transport) {
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
         properties.setEnabled(true);
         properties.setMaxInputChars(4_000);
-        properties.setMaxOutputTokens(128);
+        properties.setMaxOutputTokens(500);
         AiProviderProperties gemini = properties.getGemini();
         gemini.setEnabled(true);
         gemini.setApiKey("test-gemini-key");
-        gemini.setModel("gemini-2.5-pro");
+        gemini.setModel("gemini-3.5-flash");
         gemini.setBaseUrl("https://generativelanguage.googleapis.com");
         return new GeminiProviderClient(properties, transport, objectMapper);
     }
 
     private static AiProviderRequest request() {
         AiProviderRequest request = new AiProviderRequest();
-        request.setAnalysisId("gemini-structured-contract");
-        request.setTraceId("trace-gemini-structured-contract");
+        request.setAnalysisId("gemini-interactions-contract");
+        request.setTraceId("trace-gemini-interactions-contract");
         request.setSymbol("NON_MARKET_TEST");
         request.setTimeframe("NOT_APPLICABLE");
         request.setRuleMarketBias("NEUTRAL");
@@ -409,31 +280,56 @@ class GeminiProviderStructuredOutputContractTest {
         return request;
     }
 
-    private AiHttpResponse response(String text) throws Exception {
-        Map<String, Object> body = Map.of(
-                "candidates", List.of(Map.of(
-                        "content", Map.of("parts", List.of(Map.of("text", text))))),
-                "usageMetadata", Map.of(
-                        "promptTokenCount", 4,
-                        "candidatesTokenCount", 8,
-                        "totalTokenCount", 12),
-                "responseId", "test-gemini-response-id");
-        return new AiHttpResponse(200, objectMapper.writeValueAsString(body), Map.of());
+    private AiHttpResponse completed(String text) {
+        return completed(List.of(modelOutput(text)));
     }
 
-    private static String reviewJson() {
+    private AiHttpResponse completed(List<Map<String, Object>> steps) {
+        return interaction("completed", "interaction-id", steps, true);
+    }
+
+    private AiHttpResponse interaction(
+            String status, String id, List<Map<String, Object>> steps, boolean includeUsage) {
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            if (id != null) {
+                body.put("id", id);
+            }
+            body.put("status", status);
+            body.put("steps", steps);
+            if (includeUsage) {
+                body.put("usage", Map.of(
+                        "total_input_tokens", 13,
+                        "total_output_tokens", 5,
+                        "total_tokens", 18,
+                        "total_thought_tokens", 2));
+            }
+            return new AiHttpResponse(200, objectMapper.writeValueAsString(body), Map.of());
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private static Map<String, Object> modelOutput(String... texts) {
+        List<Map<String, Object>> content = new ArrayList<>();
+        for (String text : texts) {
+            content.add(Map.of("type", "text", "text", text));
+        }
+        return Map.of("type", "model_output", "content", content);
+    }
+
+    private static String reviewJson(String summary) {
         return "{\"stance\":\"ABSTAIN\",\"conflictLevel\":\"NONE\","
-                + "\"reasonCodes\":[\"SCHEMA_OK\"],\"summary\":\"schema review only\"}";
+                + "\"reasonCodes\":[\"SCHEMA_OK\"],\"summary\":\"" + summary + "\"}";
     }
 
-    private enum DiagnosticVariant {
-        PLAIN_TEXT,
-        JSON_MIME_ONLY,
-        STRICT_SCHEMA
+    private static CapturingTransport transport(AiHttpResponse response) {
+        return new CapturingTransport(response);
     }
 
     private static final class CapturingTransport implements AiHttpTransport {
         private final AiHttpResponse response;
+        private int calls;
         private AiHttpRequest request;
 
         private CapturingTransport(AiHttpResponse response) {
@@ -442,6 +338,7 @@ class GeminiProviderStructuredOutputContractTest {
 
         @Override
         public AiHttpResponse post(AiHttpRequest request) throws IOException {
+            calls++;
             this.request = request;
             return response;
         }

@@ -174,7 +174,7 @@ trade-model:
     gemini:
       enabled: ${TRADE_MODEL_AI_GEMINI_ENABLED:false}
       api-key: ${GEMINI_API_KEY:}
-      model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-2.5-pro}
+      model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}
       base-url: ${TRADE_MODEL_AI_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
       requests-per-minute: ${TRADE_MODEL_AI_GEMINI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_INPUT_COST_PER_MILLION_USD:0}

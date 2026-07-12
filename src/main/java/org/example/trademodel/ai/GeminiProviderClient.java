@@ -1,12 +1,11 @@
 package org.example.trademodel.ai;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -14,6 +13,8 @@ import java.util.Map;
 
 @Component
 public class GeminiProviderClient extends AbstractSafeAiProviderClient {
+    static final int INTERACTIONS_MAX_OUTPUT_TOKENS = 256;
+    private static final String COMPLETED_STATUS = "completed";
     private static final String JSON_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
 
             You are GEMINI_REVIEW. Return ONLY one valid JSON object and nothing else.
@@ -22,7 +23,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
             stance, conflictLevel, reasonCodes, summary.
             Use only these values for stance: SUPPORT, CHALLENGE, ABSTAIN.
             Use only these values for conflictLevel: NONE, MINOR, MAJOR, EXTREME.
-            reasonCodes must be an array of strings.
+            reasonCodes must be an array of at most 8 strings.
             summary must be a concise string no longer than 100 characters.
             Do not place any explanation outside the JSON object.
             Even when evidence is insufficient or a review conclusion cannot be formed, return exactly this valid JSON object:
@@ -59,23 +60,50 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
+    protected boolean validModelSelection(AiProviderProperties providerProperties) {
+        try {
+            canonicalModelName(providerProperties == null ? null : providerProperties.getEffectiveModel());
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    @Override
+    protected String effectiveModelForReadiness(AiProviderProperties providerProperties) {
+        try {
+            return canonicalModelName(providerProperties == null ? null : providerProperties.getEffectiveModel());
+        } catch (IllegalArgumentException exception) {
+            return providerProperties == null ? null : providerProperties.getEffectiveModel();
+        }
+    }
+
+    @Override
     protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
                                              String selectedModel) throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", JSON_OUTPUT_INSTRUCTION))));
-        body.put("contents", List.of(Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", promptJson))
-        )));
         Map<String, Object> generationConfig = new LinkedHashMap<>();
-        generationConfig.put("maxOutputTokens", maxOutputTokens());
+        generationConfig.put("max_output_tokens", INTERACTIONS_MAX_OUTPUT_TOKENS);
         generationConfig.put("temperature", 0);
-        generationConfig.put("responseMimeType", "application/json");
-        body.put("generationConfig", generationConfig);
+        generationConfig.put("seed", 42);
+        generationConfig.put("thinking_level", "low");
+        generationConfig.put("thinking_summaries", "none");
 
-        String model = URLEncoder.encode(selectedModel, StandardCharsets.UTF_8);
+        Map<String, Object> responseFormat = new LinkedHashMap<>();
+        responseFormat.put("type", "text");
+        responseFormat.put("mime_type", "application/json");
+        responseFormat.put("schema", responseJsonSchema());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", canonicalModelName(selectedModel));
+        body.put("store", false);
+        body.put("stream", false);
+        body.put("system_instruction", JSON_OUTPUT_INSTRUCTION);
+        body.put("input", promptJson);
+        body.put("generation_config", generationConfig);
+        body.put("response_format", responseFormat);
+
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(),
-                "/v1beta/models/" + model + ":generateContent"), json(body), timeoutOverrideMs);
+                "/v1/interactions"), json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();
         headers.put("x-goog-api-key", providerProperties().getApiKey());
         request.setHeaders(headers);
@@ -89,62 +117,66 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         return buildHttpRequest(prompt.dataJson(), timeoutOverrideMs, selectedModel);
     }
 
-    void applyStrictSchemaForDiagnostic(AiHttpRequest request) throws Exception {
-        ObjectNode body = (ObjectNode) objectMapper.readTree(request.getBody());
-        ObjectNode generationConfig = (ObjectNode) body.path("generationConfig");
-        generationConfig.set("responseJsonSchema", objectMapper.valueToTree(responseJsonSchema()));
-        request.setBody(objectMapper.writeValueAsString(body));
-    }
-
     @Override
     protected ProviderPayload extractPayload(AiHttpResponse response) throws Exception {
-        return extractPayload(response, true);
-    }
-
-    ProviderPayload extractDiagnosticPayload(AiHttpResponse response) throws Exception {
-        return extractPayload(response, false);
-    }
-
-    private ProviderPayload extractPayload(AiHttpResponse response, boolean normalizeRoleResult) throws Exception {
         JsonNode root = readTree(response.getBody());
-        String content = null;
-        JsonNode candidates = root.path("candidates");
-        if (candidates.isArray() && !candidates.isEmpty()) {
-            JsonNode parts = candidates.get(0).path("content").path("parts");
-            if (parts.isArray() && !parts.isEmpty()) {
-                content = text(parts.get(0), "text");
+        String status = text(root, "status");
+        if (!COMPLETED_STATUS.equalsIgnoreCase(status)) {
+            throw contractFailure("GEMINI_INTERACTION_NOT_COMPLETED");
+        }
+
+        JsonNode finalModelOutput = null;
+        JsonNode steps = root.path("steps");
+        if (steps.isArray()) {
+            for (JsonNode step : steps) {
+                if (step.isObject() && "model_output".equals(text(step, "type"))) {
+                    finalModelOutput = step;
+                }
             }
         }
-        String extractedContent = content;
-        GeminiExtractionDiagnostic extractionDiagnostic =
-                GeminiExtractionDiagnostic.analyze(objectMapper, root, extractedContent);
+        if (finalModelOutput == null) {
+            throw contractFailure("GEMINI_INTERACTION_MODEL_OUTPUT_MISSING");
+        }
+
+        StringBuilder finalText = new StringBuilder();
+        JsonNode contentItems = finalModelOutput.path("content");
+        if (contentItems.isArray()) {
+            for (JsonNode item : contentItems) {
+                String itemText = text(item, "text");
+                if (item.isObject() && "text".equals(text(item, "type")) && !blank(itemText)) {
+                    finalText.append(itemText);
+                }
+            }
+        }
+        String extractedContent = finalText.toString().trim();
+        if (blank(extractedContent)) {
+            throw contractFailure("GEMINI_INTERACTION_FINAL_TEXT_MISSING");
+        }
+
         GeminiResponseShapeDiagnostic responseShapeDiagnostic =
-                GeminiResponseShapeDiagnostic.analyze(objectMapper, extractedContent, extractionDiagnostic);
-        if (!blank(content) && content.contains("```")) {
-            content = null;
-        }
-        if (normalizeRoleResult && !blank(content)) {
-            content = roleResultNormalizer.normalize(content);
-        }
-        JsonNode usage = root.path("usageMetadata");
-        String requestId = text(root, "responseId");
-        if (blank(requestId)) {
-            requestId = response.firstHeader("x-request-id");
-        }
-        return new ProviderPayload(content, requestId,
-                longValue(usage, "promptTokenCount"),
-                longValue(usage, "candidatesTokenCount"),
-                longValue(usage, "totalTokenCount"),
+                GeminiResponseShapeDiagnostic.analyze(objectMapper, extractedContent, null);
+        String normalizedContent = roleResultNormalizer.normalize(extractedContent);
+        JsonNode usage = root.path("usage");
+        return new ProviderPayload(normalizedContent, text(root, "id"),
+                longValue(usage, "total_input_tokens"),
+                longValue(usage, "total_output_tokens"),
+                longValue(usage, "total_tokens"),
                 responseShapeDiagnostic);
     }
 
     @Override
     protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
-        if (result != null && result.getCallStatus() == AiProviderCallStatus.INVALID_RESPONSE) {
+        if (result == null) {
+            return;
+        }
+        if (result.getCallStatus() == AiProviderCallStatus.INVALID_RESPONSE) {
             result.setSchemaDiagnostic(AiProviderSchemaDiagnostic.analyze(
                     objectMapper, providerPayload == null ? null : providerPayload.content()));
             result.setGeminiResponseShapeDiagnostic(providerPayload == null
                     ? null : providerPayload.geminiResponseShapeDiagnostic());
+        }
+        if (result.successful() && (providerPayload == null || blank(providerPayload.providerRequestId()))) {
+            result.setReasonCodes(appendReason(result.getReasonCodes(), "GEMINI_INTERACTION_ID_MISSING"));
         }
     }
 
@@ -155,6 +187,39 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 ? AiProviderCallStatus.RATE_LIMITED
                 : AiProviderCallStatus.FAILED;
         return failure(status, reason.name(), latencyMs);
+    }
+
+    static String canonicalModelName(String selectedModel) {
+        String model = selectedModel == null ? "" : selectedModel.trim();
+        if (model.startsWith("models/") && model.length() > "models/".length()) {
+            return model;
+        }
+        if (!model.isBlank() && !model.contains("/")) {
+            return "models/" + model;
+        }
+        throw new IllegalArgumentException("GEMINI_MODEL_NAME_INVALID");
+    }
+
+    static Map<String, Object> responseJsonSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("stance", Map.of(
+                "type", "string",
+                "enum", List.of("SUPPORT", "CHALLENGE", "ABSTAIN")));
+        properties.put("conflictLevel", Map.of(
+                "type", "string",
+                "enum", List.of("NONE", "MINOR", "MAJOR", "EXTREME")));
+        properties.put("reasonCodes", Map.of(
+                "type", "array",
+                "items", Map.of("type", "string"),
+                "maxItems", 8));
+        properties.put("summary", Map.of("type", "string"));
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        schema.put("properties", properties);
+        schema.put("required", List.of("stance", "conflictLevel", "reasonCodes", "summary"));
+        return schema;
     }
 
     private AiProviderErrorReason classifyProviderError(AiHttpResponse response) {
@@ -200,10 +265,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     private static boolean isStructuredOutputUnsupported(String text) {
         boolean structuredMarker = text.contains("structured output")
                 || text.contains("structured_output")
-                || text.contains("responsejsonschema")
-                || text.contains("response_json_schema")
-                || text.contains("responseschema")
-                || text.contains("response_schema");
+                || text.contains("response format")
+                || text.contains("response_format");
         return structuredMarker && (text.contains("unsupported") || text.contains("not supported"));
     }
 
@@ -213,25 +276,7 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 || text.contains("capability"));
     }
 
-    private static Map<String, Object> responseJsonSchema() {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("stance", Map.of(
-                "type", "string",
-                "enum", List.of("SUPPORT", "CHALLENGE", "ABSTAIN")));
-        properties.put("conflictLevel", Map.of(
-                "type", "string",
-                "enum", List.of("NONE", "MINOR", "MAJOR", "EXTREME")));
-        properties.put("reasonCodes", Map.of(
-                "type", "array",
-                "items", Map.of("type", "string"),
-                "maxItems", 8));
-        properties.put("summary", Map.of("type", "string"));
-
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("type", "object");
-        schema.put("additionalProperties", false);
-        schema.put("properties", properties);
-        schema.put("required", List.of("stance", "conflictLevel", "reasonCodes", "summary"));
-        return schema;
+    private static JsonProcessingException contractFailure(String code) {
+        return new JsonParseException(null, code);
     }
 }

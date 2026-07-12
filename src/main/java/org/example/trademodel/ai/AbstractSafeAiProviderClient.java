@@ -19,6 +19,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     private final ObjectMapper objectMapper;
     private final AiPromptBuilder promptBuilder;
     private final AiProviderResponseParser responseParser;
+    private volatile boolean contractVerified;
 
     protected AbstractSafeAiProviderClient(AiOrchestratorProperties properties,
                                            AiHttpTransport transport,
@@ -34,13 +35,15 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     public AiProviderReadiness readiness() {
         AiProviderProperties providerProperties = providerProperties();
         boolean enabled = providerProperties.isEnabled();
-        boolean configured = providerProperties.hasKeyAndModel() && !blank(providerProperties.getBaseUrl());
+        boolean validModelSelection = validModelSelection(providerProperties);
+        boolean configured = providerProperties.hasKeyAndModel() && validModelSelection
+                && !blank(providerProperties.getBaseUrl());
         String configuredModel = providerProperties.getConfiguredModel();
-        String effectiveModel = providerProperties.getEffectiveModel();
+        String effectiveModel = effectiveModelForReadiness(providerProperties);
         AiModelReadinessStatus modelStatus;
-        if (!providerProperties.hasValidModelSelection()) {
+        if (!validModelSelection) {
             modelStatus = AiModelReadinessStatus.MODEL_UNAVAILABLE;
-        } else if (enabled && configured) {
+        } else if (enabled && configured && contractVerified) {
             modelStatus = AiModelReadinessStatus.MODEL_ACTIVE;
         } else {
             modelStatus = AiModelReadinessStatus.MODEL_CONFIGURED;
@@ -50,7 +53,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                     null, modelStatus, List.of("PROVIDER_DISABLED"));
         }
         if (!configured) {
-            String reason = providerProperties.hasValidModelSelection()
+            String reason = validModelSelection
                     ? "PROVIDER_NOT_CONFIGURED" : "MODEL_NOT_CONFIGURED";
             return readiness(true, false, configuredModel, effectiveModel, false,
                     null, modelStatus, List.of(reason));
@@ -104,6 +107,9 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
             if (prompt.truncated() && result.successful()) {
                 result.setReasonCodes(appendReason(result.getReasonCodes(), "PROMPT_TRUNCATED"));
             }
+            if (result.successful()) {
+                contractVerified = true;
+            }
             return result;
         } catch (JsonProcessingException e) {
             return failure(AiProviderCallStatus.INVALID_RESPONSE, "PROVIDER_RESPONSE_SCHEMA", elapsedMs(started));
@@ -123,6 +129,14 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                                                       String selectedModel) throws Exception;
 
     protected abstract ProviderPayload extractPayload(AiHttpResponse response) throws Exception;
+
+    protected boolean validModelSelection(AiProviderProperties providerProperties) {
+        return providerProperties != null && providerProperties.hasValidModelSelection();
+    }
+
+    protected String effectiveModelForReadiness(AiProviderProperties providerProperties) {
+        return providerProperties == null ? null : providerProperties.getEffectiveModel();
+    }
 
     protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
         // Provider-specific diagnostics may add sanitized metadata without retaining response values.

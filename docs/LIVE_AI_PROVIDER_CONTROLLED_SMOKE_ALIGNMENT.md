@@ -27,8 +27,7 @@ Only first-party documentation was used:
 - OpenAI request IDs: <https://developers.openai.com/api/reference/overview#debugging-requests>
 - Gemini lifecycle: <https://ai.google.dev/gemini-api/docs/deprecations>
 - Gemini 3.5 Flash: <https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash>
-- Gemini 2.5 Pro: <https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro>
-- Gemini generateContent: <https://ai.google.dev/api/generate-content>
+- Gemini Interactions API: `POST https://generativelanguage.googleapis.com/v1/interactions`
 - Gemini structured outputs: <https://ai.google.dev/gemini-api/docs/structured-output?lang=rest>
 - Gemini authentication: <https://ai.google.dev/gemini-api/docs/api-key>
 - xAI Grok 4.5: <https://docs.x.ai/developers/grok-4-5>
@@ -51,7 +50,7 @@ The parser accepts only the review-only schema. It rejects direction overrides, 
 | Provider | Official current contract | Assessment | Required change |
 |---|---|---|---|
 | OpenAI | GPT-5.6 Luna targets speed-sensitive workloads, GPT-5.6 Sol is the family frontier model, and GPT-5.5/GPT-5.4 support Responses and reasoning | Single-model gap | Route normal checkpoints to Luna, complex conflicts to Sol, then fall back only to GPT-5.5 and GPT-5.4 |
-| Gemini | `gemini-2.5-pro` is a stable Pro API model with structured-output and thinking support | Flash JSON reliability gap | Select stable Pro for consistency review; retain generateContent mapping |
+| Gemini | `gemini-3.5-flash` Interactions accepts canonical `models/...` names and JSON Schema response format | generateContent availability and extraction mismatch | Use one stable-v1 Interactions adapter with final-step extraction and strict V1 validation |
 | xAI | grok-4.5 supports Responses and Chat; xAI recommends Responses and labels Chat deprecated | Endpoint deprecation risk | Change default model and migrate to POST /v1/responses |
 
 ## OpenAI Decision
@@ -79,7 +78,7 @@ AI is checkpoint-driven rather than a high-frequency chat surface. Model selecti
 | Role | Provider default | Priority | Responsibility |
 |---|---|---|---|
 | GPT_FINAL | routed GPT-5.6/5.5/5.4 | QUALITY_FIRST | Final adjudication, instruction following, and conflict resolution |
-| GEMINI_REVIEW | gemini-2.5-pro | BALANCED | High-reliability consistency review and structured-output checking |
+| GEMINI_REVIEW | gemini-3.5-flash | BALANCED | Consistency review through the stable Interactions structured-output contract |
 | GROK_CHALLENGE | grok-4.5 | ADVERSARIAL_CHALLENGE | Contradiction detection and counter-challenge generation |
 
 The configuration keys are trade-model.ai.model-strategy.gpt-final.priority, gemini-review.priority, and grok-challenge.priority. Provider status exposes configuredModel, effectiveModel, fallbackUsed, and fallbackReason without exposing API keys.
@@ -119,31 +118,21 @@ Environment overrides are `TRADE_MODEL_AI_OPENAI_GPT_FINAL_FAST_MODEL`, `TRADE_M
 
 ## Gemini Decision
 
-### Current implementation
+### Canonical implementation
 
-The client uses generateContent with x-goog-api-key, systemInstruction, contents, generationConfig.maxOutputTokens, generationConfig.temperature, candidate text, usageMetadata, and responseId/header trace mapping.
+`GEMINI_REVIEW` now uses `gemini-3.5-flash`, canonicalized in the outgoing request as `models/gemini-3.5-flash`, and sends exactly one `POST /v1/interactions` request. The request sets `store=false`, `stream=false`, a bounded 256-token output, temperature 0, seed 42, low thinking, no thinking summary, no tools, and a JSON Schema response format for the four V1 role fields. There is no automatic generateContent fallback.
 
-### Official current contract
+The production adapter parses only terminal `status=completed` Interaction resources. It selects the last `model_output` step, concatenates only nonblank `type=text` items inside that final step, and ignores earlier model-output text. Failed, cancelled, incomplete, missing-step, missing-text, malformed-JSON, and schema-invalid results fail closed. It never reads thought text, concatenates earlier outputs, strips prose, extracts JSON with regex, repairs output, or invents fields.
 
-Google's current Gemini API model page identifies the exact API model code `gemini-2.5-pro` as Stable and describes it as an advanced model for complex tasks. Its capability table explicitly marks structured outputs and thinking as supported. The newer `gemini-3.1-pro-preview` is still Preview, so it is not selected for this stable release configuration.
+Interaction `id` maps directly to `providerRequestId`; missing IDs remain absent and add `GEMINI_INTERACTION_ID_MISSING`. Usage maps from `total_input_tokens`, `total_output_tokens`, and `total_tokens`. Raw payloads, output text, prompts, headers, and keys are never exposed.
 
-### Required change
+The deterministic Gemini normalizer remains a final security boundary before the strict common V1 parser. Its expected normal path is identity normalization. It does not accept Markdown or natural language, repair malformed JSON, infer stance, fill missing values, or silently remove unknown/trading fields.
 
-The `GEMINI_REVIEW` default changes to `gemini-2.5-pro`. The generateContent endpoint, JSON MIME request, response mapper, deterministic normalizer, and strict V1 parser remain aligned. `TRADE_MODEL_AI_GEMINI_MODEL` override support remains unchanged.
+### Real evidence and remaining limitation
 
-### Live smoke schema finding
+The operator evidence showed that `gemini-2.5-pro` was visible in model listing and declared generateContent support, but the minimal real generateContent request returned HTTP 404; it is therefore not the selected default. `gemini-3.5-flash` Interactions returned real HTTP 200 with text and usage. One external probe passed the V1 JSON contract and one did not, so repeatability remains unproven. This package implements the canonical request/extraction discrepancy offline and makes no live provider call. Gemini is not production-ready and overall production readiness remains BLOCKED.
 
-The controlled A/B/C diagnosis verified that Gemini authentication, the generateContent endpoint, and the evaluated `gemini-3.5-flash` model were reachable. Plain text and JSON MIME transport worked, but repeated review responses were empty, short non-JSON, or classified `MALFORMED_JSON`; provider strict schema also exceeded the 30-second controlled-smoke limit. Flash therefore remains API-available but JSON-generation-unstable for this review contract in the current environment. `gemini-2.5-pro` is selected for structured review reliability, but a later operator-run controlled smoke is still required to prove a contract-valid live response.
-
-The production Gemini request sets `generationConfig.responseMimeType` to `application/json` and does not send `responseJsonSchema`. Candidate JSON then passes through deterministic Gemini normalization and the unchanged internal `AI_ROLE_RESULTS_SCHEMA_V1` parser. JSON MIME requests do not by themselves guarantee schema-shaped content, so the Gemini system instruction explicitly requires one JSON object with only `stance`, `conflictLevel`, `reasonCodes`, and `summary`, without Markdown, code fences, explanations, refusals, prefixes, or suffixes. When evidence is insufficient, Gemini must return the canonical V1 abstention fragment (`ABSTAIN`, `NONE`, `INSUFFICIENT_DATA`, `Insufficient evidence`) rather than short plain text. `ABSTAIN` is used because it is the V1 review stance for a neutral/no-conclusion outcome; `NEUTRAL` is not an accepted `AiReviewStance` value.
-
-The persisted `AI_ROLE_RESULTS_SCHEMA_V1` envelope is still assembled internally after provider parsing. Gemini does not own or emit rule direction, synthesis, safety state, execution plans, positions, or orders.
-
-Response extraction remains limited to `candidates[0].content.parts[0].text`. Missing nodes, blank text, plain-text refusals, Markdown fences, natural-language prefixes/suffixes, malformed JSON, missing or wrong-typed fields, unknown fields, and forbidden trading fields all fail closed. No text fallback, regex extraction, missing-field filling, intent guessing, or output repair is used. A later operator-run smoke is required to establish a new live PASS; this package makes no provider call and does not claim production readiness.
-
-The controlled Gemini smoke now uses a deterministic `GEMINI_REVIEW` fixture instead of the former schema-only/no-market prompt or an empty diagnostic payload. The fixture supplies a BTCUSDT context, a multi-timeframe summary, the rule decision summary, and a conflict-review request. It also repeats the JSON-only output fields and the canonical insufficient-evidence fallback. Normal Gemini smoke and JSON diagnostic modes share this fixture. Missing input, missing evidence, or missing role context fails fixture validation before any request; no empty JSON is accepted or repaired.
-
-The controlled smoke also derives a sanitized request-contract diagnostic from the actual outgoing Gemini request. It exposes only the model name, response MIME type, schema presence, output-token limit, temperature, system-instruction length, user-input length, stop-sequence presence, and tools presence. The diagnostic does not retain or emit system/user text, request bodies, headers, API keys, or response content. It verifies that the normal review request uses JSON MIME without a conflicting provider schema, has a non-empty prompt, uses a Gemini-only 512-token controlled-smoke limit, and has neither stop sequences nor tools. Other controlled providers retain the 128-token limit. The Gemini instruction requires `summary` to be concise and no longer than 100 characters, with no explanation outside the JSON object. Production configuration and timeouts are unchanged.
+The controlled Gemini smoke uses the exact production Interactions client, canonical model mapping, request builder, final-step extractor, normalizer, and strict parser. It has no second one-off response parser. The sanitized request diagnostic exposes only model, MIME type, schema presence, token limit, temperature, instruction/input lengths, stop-sequence presence, and tools presence.
 
 ## xAI Decision
 
@@ -182,7 +171,7 @@ All conditions must be true before one request is possible:
 
 ALL, MULTI, THREE, wildcard, comma-separated, blank, and unknown targets fail closed. There is no fallback to another provider.
 
-Gemini A/B/C live diagnosis adds two mandatory non-secret gates: `AI_PROVIDER_SMOKE_DIAGNOSTIC=true` and `GEMINI_DIAGNOSTIC_MODE=A|B|C`. The script forces the target to Gemini and rejects a conflicting provider target. The existing external-call, global AI, Gemini-enabled, existing-key, scheduler-off, one-request, timeout, and harness-entry gates still apply. Diagnostic mode is disabled by default.
+Legacy Gemini diagnostic labels do not create alternate request or parser paths; any explicitly enabled Gemini smoke still uses the canonical production Interactions adapter and all existing external-call gates.
 
 ## One-Provider-One-Request Rule
 
@@ -193,7 +182,7 @@ Gemini A/B/C live diagnosis adds two mandatory non-secret gates: `AI_PROVIDER_SM
 - Controlled-smoke request and overall timeout: 30 seconds for Gemini structured-output validation; 15 seconds for OpenAI and xAI
 - Production AI request timeout remains unchanged at 5 seconds
 - Script watchdog: 60 seconds including Maven harness startup
-- Maximum output: 128 tokens
+- Maximum output: 128 tokens for OpenAI/xAI controlled smoke and 256 tokens for Gemini Interactions
 
 ## Sanitized Output Contract
 
@@ -241,25 +230,17 @@ Successful normalization emits only `stance`, `conflictLevel`, `reasonCodes`, an
 
 When JSON MIME output fails normalization or strict V1 validation, the controlled smoke emits only `GEMINI_SCHEMA_DIAGNOSTIC_STATUS`, `GEMINI_EXPECTED_FIELDS`, `GEMINI_ACTUAL_FIELDS`, `GEMINI_MISSING_FIELDS`, `GEMINI_UNEXPECTED_FIELDS`, and `GEMINI_TYPE_MISMATCH`. Lists contain sanitized field names or type relationships only. The raw candidate, field values, summary, reasoning, prompt, request body, headers, request ID, and API key are never retained in the diagnostic or printed. Successful Gemini responses emit none of these fields. The evidence distinguishes a deterministic alias gap from an unsupported wrapper or unsafe semantic mismatch, but it never changes mappings or repairs output automatically.
 
-Schema evidence takes precedence over the generic A/B/C diagnostic summary when a Gemini diagnostic request reaches the strict parser and fails. Both diagnostic and normal smoke script allowlists include the six schema fields, so sanitized evidence survives from `GeminiProviderClient` through `AiProviderReviewResult`, `AiProviderControlledSmokeResult`, and the final shell output.
-
-Extraction evidence is captured before normalization and, on a failed Gemini result, takes precedence while the extraction path is under diagnosis. The output is limited to candidate/content/parts/text-node presence, candidate count, text length, empty-text status, and strict single-JSON-value parse status. It never stores or prints candidate text, generated values, prompts, headers, request bodies, request IDs, or credentials. A successful Gemini result emits no extraction diagnostic.
-
-Failed Gemini extraction evidence also includes one allowlisted `GEMINI_OUTPUT_CLASS` value: `EMPTY_TEXT`, `EMPTY_JSON_OBJECT`, `EMPTY_JSON_ARRAY`, `VALID_JSON_OBJECT`, `VALID_JSON_ARRAY`, `PLAIN_TEXT_SHORT`, `MARKDOWN_WRAPPER`, `REFUSAL_PATTERN`, or `MALFORMED_JSON`. Classification occurs in memory before normalization and stores only the enum. It never emits the response text, matched phrase, JSON values, prompt, headers, or credentials, and it does not make the parser more permissive.
+Schema evidence remains sanitized when the final Interactions output reaches the strict parser and fails. Only field names and type relationships may pass from `GeminiProviderClient` through `AiProviderReviewResult`, `AiProviderControlledSmokeResult`, and the shell allowlist. Interaction steps and text values are never emitted.
 
 `AI_HTTP_STATUS_CLASS` reports `TIMEOUT` when no HTTP response arrives because the request timed out. Otherwise it reports `1XX` through `5XX` for an HTTP response, or `NOT_AVAILABLE` when no status exists for another reason. `AI_ERROR_CATEGORY` is blank for success/skip and otherwise is one of `TIMEOUT`, `AUTH`, `MODEL_NOT_FOUND`, `RATE_LIMIT`, `PROVIDER_ERROR`, or `RESPONSE_SCHEMA`.
 
 For Gemini non-2xx responses, the controlled smoke uses narrower categories: `INVALID_REQUEST`, `SCHEMA_UNSUPPORTED`, `MODEL_CAPABILITY_ERROR`, `AUTH`, `RATE_LIMIT`, `PROVIDER_INTERNAL_ERROR`, or `UNKNOWN_PROVIDER_ERROR`. `AI_PROVIDER_ERROR_REASON` is an allowlisted enum such as `GEMINI_HTTP_400_INVALID_REQUEST`, `GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED`, or `GEMINI_HTTP_5XX_INTERNAL`. The classifier may inspect the standard error status/message in memory for a 400 response, but it never retains or emits that text. Raw response bodies, prompts, headers, request IDs, and credentials remain excluded.
 
-The official Gemini generateContent reference confirms that `responseMimeType=application/json` may be used without a provider schema. Although Gemini also supports `responseJsonSchema`, the controlled C result exceeded 30 seconds, so strict provider schema remains diagnostic-only. Google's troubleshooting guide classifies HTTP 500 as `INTERNAL` and HTTP 503 as `UNAVAILABLE`; controlled-smoke 5xx responses are therefore reported as `PROVIDER_INTERNAL_ERROR`, without guessing that the schema is invalid.
+The offline `GeminiProviderStructuredOutputContractTest` verifies the canonical model name, Interactions request schema, final-step-only extraction, multi-block final text, terminal status handling, ID/usage mapping, strict normalization, readiness transition, and absence of generateContent fallback. It uses fake transport only and makes no network call.
 
-`GEMINI_PROVIDER_SCHEMA_STATUS: DIAGNOSTIC_ONLY_TIMEOUT`. The diagnostic C fragment still uses only supported JSON Schema features and remains available for explicitly authorized isolation tests. Production safety is enforced internally after JSON MIME output by deterministic normalization plus the unchanged strict V1 parser.
+### Future repeatability evidence
 
-The offline `GeminiProviderStructuredOutputContractTest` contains three fake-transport capability-isolation variants. Variant A is plain generateContent with neither `responseMimeType` nor `responseJsonSchema`. Variant B matches the production provider request with only `responseMimeType=application/json`, then applies the same internal normalization and strict V1 validation so schema failures retain sanitized shape evidence. Variant C is diagnostic-only and adds the strict V1 role fragment as `responseJsonSchema` before applying the same internal validation. Each offline test variant uses a separate fake transport and makes no network call.
-
-### Future live diagnostic plan
-
-No live capability-isolation request is run by this package. If a later operator explicitly authorizes live diagnosis, run exactly one variant at a time in this order: A plain text, B JSON MIME only, then C strict schema. For each single request, record only latency, HTTP status class, and parse status. Do not print response bodies, prompts, headers, request IDs, or keys; do not retry automatically. A/B/C results isolate provider/model access from JSON-mode support and strict-schema support, but no individual result proves production readiness.
+No live Gemini request is run by this package. Any later operator-authorized repeatability check must use the same production Interactions adapter, one request per execution, no retry, and the sanitized smoke output. A single PASS does not prove repeatability or production readiness.
 
 ## Failure Classification
 
@@ -325,16 +306,7 @@ It must return SKIPPED_EXTERNAL_CALLS_DISABLED, LIVE_PROVIDER_CALLS: 0, and REAL
 
 For a later operator-authorized single-provider run, the selected key must already be present in the operator shell. Do not enter a key in a command, document, Codex, or shell history. Set only the non-secret gates for exactly one target, including `AI_PROVIDER_SMOKE_HARNESS_ENTRY=I_CONFIRM_SINGLE_PROVIDER_SMOKE`, then run the same script. The harness never sources a secret file.
 
-For a later operator-authorized Gemini capability diagnosis, keep the existing key in the shell without displaying it, enable the existing global/Gemini switches and external-call gate, then select exactly one mode:
-
-    export AI_PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=true
-    export TRADE_MODEL_AI_ENABLED=true
-    export TRADE_MODEL_AI_GEMINI_ENABLED=true
-    export AI_PROVIDER_SMOKE_DIAGNOSTIC=true
-    export GEMINI_DIAGNOSTIC_MODE=A
-    bash scripts/ai-provider-controlled-smoke.sh
-
-Repeat only after reviewing the prior single result, changing the mode to `B` or `C`. Do not run modes in a loop or parallel. The script accepts only one mode per process, performs at most one HTTP request, has no retry and no provider fallback, and prints only the diagnostic allowlist above. It does not source or display the Gemini key.
+For a later operator-authorized Gemini repeatability check, keep the existing key in the shell without displaying it and enable the existing global/Gemini/external-call gates for exactly one run. The script uses the production Interactions adapter, performs at most one request, has no retry or legacy fallback, and does not source or display the key.
 
 ## What PASS Proves
 

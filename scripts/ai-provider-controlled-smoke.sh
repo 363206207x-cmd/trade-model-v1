@@ -113,7 +113,7 @@ case "${target}" in
     provider_enabled="${TRADE_MODEL_AI_OPENAI_ENABLED:-false}"
     ;;
   GEMINI)
-    model="${TRADE_MODEL_AI_GEMINI_MODEL:-gemini-2.5-pro}"
+    model="${TRADE_MODEL_AI_GEMINI_MODEL:-gemini-3.5-flash}"
     provider_enabled="${TRADE_MODEL_AI_GEMINI_ENABLED:-false}"
     ;;
   XAI)
@@ -163,7 +163,7 @@ export TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED=false
 export TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED=false
 export TRADE_MODEL_PROVIDER_SCAN_SCHEDULER_ENABLED=false
 if [[ "${target}" == "GEMINI" ]]; then
-  export TRADE_MODEL_AI_MAX_OUTPUT_TOKENS=512
+  export TRADE_MODEL_AI_MAX_OUTPUT_TOKENS=256
 else
   export TRADE_MODEL_AI_MAX_OUTPUT_TOKENS=128
 fi
