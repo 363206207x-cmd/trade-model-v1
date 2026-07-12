@@ -40,9 +40,63 @@ class AiOrchestratorControllerTest {
         mvc.perform(get("/api/ai/orchestrator/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providers[0].provider").value("OPENAI"))
-                .andExpect(jsonPath("$.providers[0].ready").value(true))
+                .andExpect(jsonPath("$.providers[0].ready").value(false))
+                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_CONFIGURED"))
+                .andExpect(jsonPath("$.providers[0].configuredModel").value("gpt-5.6-luna"))
+                .andExpect(jsonPath("$.providers[0].effectiveModel").value("gpt-5.6-luna"))
+                .andExpect(jsonPath("$.providers[0].fallbackUsed").value(false))
+                .andExpect(jsonPath("$.providers[0].modelStrategy").value("FAST_DECISION_MODEL"))
+                .andExpect(jsonPath("$.providers[0].reasonCodes[0]")
+                        .value("MODEL_AVAILABILITY_UNVERIFIED"))
+                .andExpect(jsonPath("$.modelStrategy.GPT_FINAL").value("QUALITY_FIRST"))
                 .andExpect(content().string(not(containsString("sk-status-secret"))))
                 .andExpect(content().string(not(containsString("https://secret-base.test"))));
+    }
+
+    @Test
+    void controllerStatusAfterSuccessIsConsistent() throws Exception {
+        AiOrchestratorProperties properties = properties();
+        AiProviderReadiness readiness = new AiProviderReadiness(
+                AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                true, true, true, "gemini-3.5-flash", "models/gemini-3.5-flash",
+                false, null, "BALANCED",
+                org.example.trademodel.ai.AiModelReadinessStatus.MODEL_ACTIVE,
+                List.of("MODEL_CALL_VERIFIED"));
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new AiOrchestratorController(
+                new FakeOrchestrator(), new FakeLogService(), properties,
+                List.of(new FakeClient(properties.getGemini(), readiness)))).build();
+
+        mvc.perform(get("/api/ai/orchestrator/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers[0].ready").value(true))
+                .andExpect(jsonPath("$.providers[0].modelReadiness").value("MODEL_ACTIVE"))
+                .andExpect(jsonPath("$.providers[0].reasonCodes[0]").value("MODEL_CALL_VERIFIED"))
+                .andExpect(content().string(not(containsString("MODEL_AVAILABILITY_UNVERIFIED"))));
+    }
+
+    @Test
+    void controllerStatusForSuccessfulFallbackIsConsistent() throws Exception {
+        AiOrchestratorProperties properties = properties();
+        AiProviderReadiness readiness = new AiProviderReadiness(
+                AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                true, true, true, "gpt-5.6-luna", "gpt-5.5",
+                true, "OPENAI_FALLBACK_GPT55", "FAST_DECISION_MODEL",
+                org.example.trademodel.ai.AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE,
+                List.of("OPENAI_FALLBACK_GPT55"));
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new AiOrchestratorController(
+                new FakeOrchestrator(), new FakeLogService(), properties,
+                List.of(new FakeClient(properties.getOpenai(), readiness)))).build();
+
+        mvc.perform(get("/api/ai/orchestrator/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers[0].ready").value(true))
+                .andExpect(jsonPath("$.providers[0].modelReadiness")
+                        .value("MODEL_FALLBACK_ACTIVE"))
+                .andExpect(jsonPath("$.providers[0].fallbackUsed").value(true))
+                .andExpect(jsonPath("$.providers[0].fallbackReason")
+                        .value("OPENAI_FALLBACK_GPT55"))
+                .andExpect(jsonPath("$.providers[0].reasonCodes[0]")
+                        .value("OPENAI_FALLBACK_GPT55"));
     }
 
     @Test
@@ -68,7 +122,9 @@ class AiOrchestratorControllerTest {
         properties.setEnabled(true);
         properties.getOpenai().setEnabled(true);
         properties.getOpenai().setApiKey("sk-status-secret");
-        properties.getOpenai().setModel("gpt-status");
+        properties.getOpenai().getGptFinal().setFastModel("gpt-5.6-luna");
+        properties.getOpenai().getGptFinal().setReasoningModel("gpt-5.6-sol");
+        properties.getOpenai().getGptFinal().setFallbackModels(List.of("gpt-5.5", "gpt-5.4"));
         properties.getOpenai().setBaseUrl("https://secret-base.test");
         properties.getOpenai().setRequestsPerMinute(1);
         properties.getOpenai().setInputCostPerMillionUsd(BigDecimal.ONE);
@@ -83,11 +139,24 @@ class AiOrchestratorControllerTest {
 
     private static final class FakeClient implements AiProviderClient {
         private final AiProviderProperties properties;
-        private FakeClient(AiProviderProperties properties) { this.properties = properties; }
-        @Override public AiProviderName provider() { return AiProviderName.OPENAI; }
-        @Override public AiProviderRole role() { return AiProviderRole.GPT_RULE_REVIEW; }
+        private final AiProviderReadiness readiness;
+        private FakeClient(AiProviderProperties properties) {
+            this(properties, new AiProviderReadiness(
+                    AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                    true, true, false,
+                    properties.getConfiguredModel(), properties.getEffectiveModel(), false, null,
+                    "FAST_DECISION_MODEL",
+                    org.example.trademodel.ai.AiModelReadinessStatus.MODEL_CONFIGURED,
+                    List.of("MODEL_AVAILABILITY_UNVERIFIED")));
+        }
+        private FakeClient(AiProviderProperties properties, AiProviderReadiness readiness) {
+            this.properties = properties;
+            this.readiness = readiness;
+        }
+        @Override public AiProviderName provider() { return readiness.getProvider(); }
+        @Override public AiProviderRole role() { return readiness.getRole(); }
         @Override public AiProviderReadiness readiness() {
-            return new AiProviderReadiness(provider(), role(), true, true, true, properties.getModel(), List.of());
+            return readiness;
         }
         @Override public AiProviderReviewResult review(AiProviderRequest request) { return null; }
         @Override public AiProviderProperties providerProperties() { return properties; }

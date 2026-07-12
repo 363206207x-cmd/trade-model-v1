@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.time.LocalDateTime;
 
 public class AiProviderReviewResult {
     private AiProviderName provider;
@@ -26,6 +27,15 @@ public class AiProviderReviewResult {
     private boolean timeout;
     private boolean budgetBlocked;
     private boolean rateLimited;
+    private String originalModel;
+    private String selectedModel;
+    private Integer fallbackLevel;
+    private String modelStrategy;
+    private LocalDateTime modelRoutingTimestamp;
+    private String modelRoutingTraceId;
+    private AiProviderSchemaDiagnostic schemaDiagnostic;
+    private GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic;
+    private GeminiInteractionDiagnostic geminiInteractionDiagnostic;
 
     public static AiProviderReviewResult skipped(AiProviderName provider, AiProviderRole role,
                                                  AiProviderCallStatus status, String reason) {
@@ -100,4 +110,36 @@ public class AiProviderReviewResult {
     public void setBudgetBlocked(boolean budgetBlocked) { this.budgetBlocked = budgetBlocked; }
     public boolean isRateLimited() { return rateLimited; }
     public void setRateLimited(boolean rateLimited) { this.rateLimited = rateLimited; }
+    public String getOriginalModel() { return originalModel; }
+    public void setOriginalModel(String originalModel) { this.originalModel = originalModel; }
+    public String getSelectedModel() { return selectedModel; }
+    public void setSelectedModel(String selectedModel) { this.selectedModel = selectedModel; }
+    public Integer getFallbackLevel() { return fallbackLevel; }
+    public void setFallbackLevel(Integer fallbackLevel) { this.fallbackLevel = fallbackLevel; }
+    public String getModelStrategy() { return modelStrategy; }
+    public void setModelStrategy(String modelStrategy) { this.modelStrategy = modelStrategy; }
+    public LocalDateTime getModelRoutingTimestamp() { return modelRoutingTimestamp; }
+    public void setModelRoutingTimestamp(LocalDateTime modelRoutingTimestamp) {
+        this.modelRoutingTimestamp = modelRoutingTimestamp;
+    }
+    public String getModelRoutingTraceId() { return modelRoutingTraceId; }
+    public void setModelRoutingTraceId(String modelRoutingTraceId) { this.modelRoutingTraceId = modelRoutingTraceId; }
+    public AiProviderSchemaDiagnostic getSchemaDiagnostic() { return schemaDiagnostic; }
+    public void setSchemaDiagnostic(AiProviderSchemaDiagnostic schemaDiagnostic) {
+        this.schemaDiagnostic = schemaDiagnostic;
+    }
+    public GeminiResponseShapeDiagnostic getGeminiResponseShapeDiagnostic() {
+        return geminiResponseShapeDiagnostic;
+    }
+    public void setGeminiResponseShapeDiagnostic(
+            GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic) {
+        this.geminiResponseShapeDiagnostic = geminiResponseShapeDiagnostic;
+    }
+    public GeminiInteractionDiagnostic getGeminiInteractionDiagnostic() {
+        return geminiInteractionDiagnostic;
+    }
+    public void setGeminiInteractionDiagnostic(
+            GeminiInteractionDiagnostic geminiInteractionDiagnostic) {
+        this.geminiInteractionDiagnostic = geminiInteractionDiagnostic;
+    }
 }

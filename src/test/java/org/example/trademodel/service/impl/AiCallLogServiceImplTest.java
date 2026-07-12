@@ -65,6 +65,14 @@ class AiCallLogServiceImplTest {
         result.setOutputTokens(5L);
         result.setTotalTokens(15L);
         result.setCalculatedCostUsd(new BigDecimal("0.00001234"));
+        result.setFallback(true);
+        result.setFallbackReason("OPENAI_FALLBACK_GPT55");
+        result.setOriginalModel("gpt-5.6-luna");
+        result.setSelectedModel("gpt-5.5");
+        result.setFallbackLevel(1);
+        result.setModelStrategy("FAST_DECISION_MODEL");
+        result.setModelRoutingTimestamp(LocalDateTime.of(2026, 7, 11, 12, 0));
+        result.setModelRoutingTraceId("trace-1");
 
         service.completeCall(log, result);
 
@@ -72,6 +80,13 @@ class AiCallLogServiceImplTest {
         verify(mapper).updateCompletion(captor.capture());
         assertThat(captor.getValue().getCallStatus()).isEqualTo("SUCCESS");
         assertThat(captor.getValue().getTotalTokens()).isEqualTo(15L);
+        assertThat(captor.getValue().getModelName()).isEqualTo("gpt-5.5");
+        assertThat(captor.getValue().getFallbackReason()).isEqualTo("OPENAI_FALLBACK_GPT55");
+        assertThat(captor.getValue().getResponseSummary()).contains(
+                "\"originalModel\":\"gpt-5.6-luna\"",
+                "\"selectedModel\":\"gpt-5.5\"",
+                "\"fallbackLevel\":1",
+                "\"modelRoutingTraceId\":\"trace-1\"");
         assertThat(captor.getValue().getResponseSummary()).contains("sk-***");
         assertThat(captor.getValue().getResponseSummary()).doesNotContain("should-redact");
     }

@@ -1,5 +1,6 @@
 package org.example.trademodel.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -18,6 +19,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     private final ObjectMapper objectMapper;
     private final AiPromptBuilder promptBuilder;
     private final AiProviderResponseParser responseParser;
+    private volatile boolean contractVerified;
 
     protected AbstractSafeAiProviderClient(AiOrchestratorProperties properties,
                                            AiHttpTransport transport,
@@ -33,17 +35,45 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     public AiProviderReadiness readiness() {
         AiProviderProperties providerProperties = providerProperties();
         boolean enabled = providerProperties.isEnabled();
-        boolean configured = providerProperties.hasKeyAndModel() && !blank(providerProperties.getBaseUrl());
+        boolean validModelSelection = validModelSelection(providerProperties);
+        boolean configured = providerProperties.hasKeyAndModel() && validModelSelection
+                && !blank(providerProperties.getBaseUrl());
+        String configuredModel = providerProperties.getConfiguredModel();
+        String effectiveModel = effectiveModelForReadiness(providerProperties);
+        AiModelReadinessStatus modelStatus;
+        if (!validModelSelection) {
+            modelStatus = AiModelReadinessStatus.MODEL_UNAVAILABLE;
+        } else if (enabled && configured && contractVerified) {
+            modelStatus = AiModelReadinessStatus.MODEL_ACTIVE;
+        } else {
+            modelStatus = AiModelReadinessStatus.MODEL_CONFIGURED;
+        }
         if (!enabled) {
-            return new AiProviderReadiness(provider(), role(), false, configured, false,
-                    providerProperties.getModel(), List.of("PROVIDER_DISABLED"));
+            return readiness(false, configured, configuredModel, effectiveModel, false,
+                    null, modelStatus, List.of("PROVIDER_DISABLED"));
         }
         if (!configured) {
-            return new AiProviderReadiness(provider(), role(), true, false, false,
-                    providerProperties.getModel(), List.of("PROVIDER_NOT_CONFIGURED"));
+            String reason = validModelSelection
+                    ? "PROVIDER_NOT_CONFIGURED" : "MODEL_NOT_CONFIGURED";
+            return readiness(true, false, configuredModel, effectiveModel, false,
+                    null, modelStatus, List.of(reason));
         }
-        return new AiProviderReadiness(provider(), role(), true, true, true,
-                providerProperties.getModel(), List.of());
+        List<String> reasons = modelStatus == AiModelReadinessStatus.MODEL_ACTIVE
+                ? List.of("MODEL_CALL_VERIFIED")
+                : List.of("MODEL_AVAILABILITY_UNVERIFIED");
+        return readiness(true, true, configuredModel, effectiveModel, false,
+                null, modelStatus, reasons);
+    }
+
+    private AiProviderReadiness readiness(boolean enabled, boolean configured,
+                                          String configuredModel, String effectiveModel,
+                                          boolean fallbackUsed, String fallbackReason,
+                                          AiModelReadinessStatus modelStatus,
+                                          List<String> reasonCodes) {
+        boolean ready = enabled && configured && modelStatus == AiModelReadinessStatus.MODEL_ACTIVE;
+        return new AiProviderReadiness(provider(), role(), enabled, configured, ready,
+                configuredModel, effectiveModel, fallbackUsed, fallbackReason,
+                modelStatus, reasonCodes);
     }
 
     @Override
@@ -53,24 +83,24 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
 
     @Override
     public AiProviderReviewResult review(AiProviderRequest request, long timeoutOverrideMs) {
+        return reviewWithModel(request, timeoutOverrideMs, providerProperties().getEffectiveModel());
+    }
+
+    protected AiProviderReviewResult reviewWithModel(AiProviderRequest request, long timeoutOverrideMs,
+                                                     String selectedModel) {
         long started = System.nanoTime();
         AiPromptBuilder.PromptPayload prompt = promptBuilder.build(request, role());
         try {
-            AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs);
+            AiHttpRequest httpRequest = buildHttpRequest(prompt.dataJson(), timeoutOverrideMs, selectedModel);
             AiHttpResponse response = transport.post(httpRequest);
             long latencyMs = elapsedMs(started);
-            if (response.getStatusCode() == 429) {
-                return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
-            }
-            if (response.getStatusCode() == 401 || response.getStatusCode() == 403) {
-                return failure(AiProviderCallStatus.FAILED, "PROVIDER_AUTH_FAILURE", latencyMs);
-            }
             if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
-                return failure(AiProviderCallStatus.FAILED, "PROVIDER_HTTP_" + response.getStatusCode(), latencyMs);
+                return httpFailure(response, latencyMs);
             }
 
             ProviderPayload providerPayload = extractPayload(response);
             AiProviderReviewResult result = responseParser.parse(provider(), role(), providerPayload.content());
+            enrichParsedResult(result, providerPayload);
             result.setProviderRequestId(providerPayload.providerRequestId());
             result.setLatencyMs(latencyMs);
             result.setInputTokens(providerPayload.inputTokens());
@@ -81,7 +111,17 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
             if (prompt.truncated() && result.successful()) {
                 result.setReasonCodes(appendReason(result.getReasonCodes(), "PROMPT_TRUNCATED"));
             }
+            if (result.successful()) {
+                contractVerified = true;
+            }
             return result;
+        } catch (GeminiInteractionContractException e) {
+            AiProviderReviewResult result = failure(
+                    AiProviderCallStatus.INVALID_RESPONSE, e.reason().name(), elapsedMs(started));
+            result.setGeminiInteractionDiagnostic(e.diagnostic());
+            return result;
+        } catch (JsonProcessingException e) {
+            return failure(AiProviderCallStatus.INVALID_RESPONSE, "PROVIDER_RESPONSE_SCHEMA", elapsedMs(started));
         } catch (HttpTimeoutException e) {
             return timeout(started);
         } catch (InterruptedException e) {
@@ -94,9 +134,39 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         }
     }
 
-    protected abstract AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception;
+    protected abstract AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
+                                                      String selectedModel) throws Exception;
 
     protected abstract ProviderPayload extractPayload(AiHttpResponse response) throws Exception;
+
+    protected boolean validModelSelection(AiProviderProperties providerProperties) {
+        return providerProperties != null && providerProperties.hasValidModelSelection();
+    }
+
+    protected String effectiveModelForReadiness(AiProviderProperties providerProperties) {
+        return providerProperties == null ? null : providerProperties.getEffectiveModel();
+    }
+
+    protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
+        // Provider-specific diagnostics may add sanitized metadata without retaining response values.
+    }
+
+    protected AiProviderReviewResult httpFailure(AiHttpResponse response, long latencyMs) {
+        if (response.getStatusCode() == 401 || response.getStatusCode() == 403) {
+            return failure(AiProviderCallStatus.FAILED, "PROVIDER_AUTH_FAILURE", latencyMs);
+        }
+        if (response.getStatusCode() == 404) {
+            return failure(AiProviderCallStatus.FAILED, "PROVIDER_MODEL_NOT_FOUND", latencyMs);
+        }
+        if (isBillingOrCreditsFailure(response.getBody())) {
+            return failure(AiProviderCallStatus.FAILED, "PROVIDER_BILLING_OR_CREDITS", latencyMs);
+        }
+        if (response.getStatusCode() == 429) {
+            return failure(AiProviderCallStatus.RATE_LIMITED, "PROVIDER_RATE_LIMITED", latencyMs);
+        }
+        return failure(AiProviderCallStatus.FAILED,
+                "PROVIDER_HTTP_" + response.getStatusCode(), latencyMs);
+    }
 
     protected String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);
@@ -151,7 +221,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return failure(AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT", elapsedMs(started));
     }
 
-    private AiProviderReviewResult failure(AiProviderCallStatus status, String code, long latencyMs) {
+    protected final AiProviderReviewResult failure(AiProviderCallStatus status, String code, long latencyMs) {
         AiProviderReviewResult result = AiProviderReviewResult.skipped(provider(), role(), status, code);
         result.setLatencyMs(latencyMs);
         result.setTimeout(status == AiProviderCallStatus.TIMEOUT);
@@ -189,13 +259,30 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return Math.max(0, (System.nanoTime() - started) / 1_000_000L);
     }
 
-    private static List<String> appendReason(List<String> reasonCodes, String code) {
+    protected static List<String> appendReason(List<String> reasonCodes, String code) {
         java.util.ArrayList<String> copy = new java.util.ArrayList<>(reasonCodes == null ? List.of() : reasonCodes);
         copy.add(code);
         return copy;
     }
 
+    private static boolean isBillingOrCreditsFailure(String body) {
+        if (body == null || body.isBlank()) {
+            return false;
+        }
+        String normalized = body.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("insufficient_quota")
+                || normalized.contains("exceeded your current quota")
+                || normalized.contains("quota exhausted")
+                || normalized.contains("run out of credits")
+                || normalized.contains("insufficient credit")
+                || normalized.contains("credit balance")
+                || normalized.contains("billing")
+                || normalized.contains("payment_required");
+    }
+
     protected record ProviderPayload(String content, String providerRequestId,
-                                     Long inputTokens, Long outputTokens, Long totalTokens) {
+                                     Long inputTokens, Long outputTokens, Long totalTokens,
+                                     GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic,
+                                     GeminiInteractionDiagnostic geminiInteractionDiagnostic) {
     }
 }

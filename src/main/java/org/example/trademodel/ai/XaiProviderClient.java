@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @Component
@@ -35,17 +34,17 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
-    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
+    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
+                                             String selectedModel) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", providerProperties().getModel());
-        body.put("messages", List.of(
-                Map.of("role", "system", "content", AiPromptBuilder.SYSTEM_INSTRUCTION),
-                Map.of("role", "user", "content", promptJson)
-        ));
-        body.put("max_tokens", maxOutputTokens());
-        body.put("temperature", 0);
+        body.put("model", selectedModel);
+        body.put("instructions", AiPromptBuilder.SYSTEM_INSTRUCTION);
+        body.put("input", promptJson);
+        body.put("max_output_tokens", maxOutputTokens());
+        body.put("reasoning", Map.of("effort", "low"));
+        body.put("store", false);
 
-        AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/chat/completions"),
+        AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"),
                 json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();
         headers.put("Authorization", "Bearer " + providerProperties().getApiKey());
@@ -56,15 +55,37 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
     @Override
     protected ProviderPayload extractPayload(AiHttpResponse response) throws Exception {
         JsonNode root = readTree(response.getBody());
-        String content = null;
-        JsonNode choices = root.path("choices");
-        if (choices.isArray() && !choices.isEmpty()) {
-            content = text(choices.get(0).path("message"), "content");
+        String content = text(root, "output_text");
+        if (blank(content)) {
+            JsonNode output = root.path("output");
+            if (output.isArray()) {
+                for (JsonNode item : output) {
+                    JsonNode contentNodes = item.path("content");
+                    if (!contentNodes.isArray()) {
+                        continue;
+                    }
+                    for (JsonNode contentNode : contentNodes) {
+                        content = text(contentNode, "text");
+                        if (!blank(content)) {
+                            break;
+                        }
+                    }
+                    if (!blank(content)) {
+                        break;
+                    }
+                }
+            }
         }
         JsonNode usage = root.path("usage");
-        return new ProviderPayload(content, text(root, "id"),
-                longValue(usage, "prompt_tokens"),
-                longValue(usage, "completion_tokens"),
-                longValue(usage, "total_tokens"));
+        String requestId = response.firstHeader("x-request-id");
+        if (blank(requestId)) {
+            requestId = text(root, "id");
+        }
+        return new ProviderPayload(content, requestId,
+                longValue(usage, "input_tokens"),
+                longValue(usage, "output_tokens"),
+                longValue(usage, "total_tokens"),
+                null,
+                null);
     }
 }

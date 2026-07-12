@@ -1,24 +1,46 @@
 package org.example.trademodel.ai;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component
 public class GeminiProviderClient extends AbstractSafeAiProviderClient {
+    static final int INTERACTIONS_MAX_OUTPUT_TOKENS = 512;
+    private static final String COMPLETED_STATUS = "completed";
+    private static final String JSON_OUTPUT_INSTRUCTION = AiPromptBuilder.SYSTEM_INSTRUCTION + """
+
+            You are GEMINI_REVIEW. Return ONLY one valid JSON object and nothing else.
+            Do not return Markdown, a code fence, an explanation, prose, a refusal, a prefix, or a suffix.
+            The JSON object must contain exactly these AI_ROLE_RESULTS_SCHEMA_V1 role-fragment fields and no others:
+            stance, conflictLevel, reasonCodes, summary.
+            Use only these values for stance: SUPPORT, CHALLENGE, ABSTAIN.
+            Use only these values for conflictLevel: NONE, MINOR, MAJOR, EXTREME.
+            reasonCodes must be an array of at most 8 strings.
+            summary must be a concise string no longer than 100 characters.
+            Do not place any explanation outside the JSON object.
+            Even when evidence is insufficient or a review conclusion cannot be formed, return exactly this valid JSON object:
+            {"stance":"ABSTAIN","conflictLevel":"NONE","reasonCodes":["INSUFFICIENT_DATA"],"summary":"Insufficient evidence"}
+            Never replace that JSON fallback with plain text.
+            """;
+
     private final AiOrchestratorProperties properties;
+    private final ObjectMapper objectMapper;
+    private final GeminiRoleResultNormalizer roleResultNormalizer;
 
     public GeminiProviderClient(AiOrchestratorProperties properties,
                                 AiHttpTransport transport,
                                 ObjectMapper objectMapper) {
         super(properties, transport, objectMapper);
         this.properties = properties;
+        this.objectMapper = objectMapper;
+        this.roleResultNormalizer = new GeminiRoleResultNormalizer(objectMapper);
     }
 
     @Override
@@ -37,43 +59,341 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
-    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs) throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", AiPromptBuilder.SYSTEM_INSTRUCTION))));
-        body.put("contents", List.of(Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", promptJson))
-        )));
-        body.put("generationConfig", Map.of("maxOutputTokens", maxOutputTokens(), "temperature", 0));
+    protected boolean validModelSelection(AiProviderProperties providerProperties) {
+        try {
+            canonicalModelName(providerProperties == null ? null : providerProperties.getEffectiveModel());
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
 
-        String model = URLEncoder.encode(providerProperties().getModel(), StandardCharsets.UTF_8);
+    @Override
+    protected String effectiveModelForReadiness(AiProviderProperties providerProperties) {
+        try {
+            return canonicalModelName(providerProperties == null ? null : providerProperties.getEffectiveModel());
+        } catch (IllegalArgumentException exception) {
+            return providerProperties == null ? null : providerProperties.getEffectiveModel();
+        }
+    }
+
+    @Override
+    protected AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
+                                             String selectedModel) throws Exception {
+        Map<String, Object> generationConfig = new LinkedHashMap<>();
+        generationConfig.put("max_output_tokens", INTERACTIONS_MAX_OUTPUT_TOKENS);
+        generationConfig.put("temperature", 0);
+        generationConfig.put("seed", 42);
+        generationConfig.put("thinking_level", "minimal");
+        generationConfig.put("thinking_summaries", "none");
+
+        Map<String, Object> responseFormat = new LinkedHashMap<>();
+        responseFormat.put("type", "text");
+        responseFormat.put("mime_type", "application/json");
+        responseFormat.put("schema", responseJsonSchema());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", canonicalModelName(selectedModel));
+        body.put("store", false);
+        body.put("stream", false);
+        body.put("system_instruction", JSON_OUTPUT_INSTRUCTION);
+        body.put("input", promptJson);
+        body.put("generation_config", generationConfig);
+        body.put("response_format", responseFormat);
+
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(),
-                "/v1beta/models/" + model + ":generateContent"), json(body), timeoutOverrideMs);
+                "/v1/interactions"), json(body), timeoutOverrideMs);
         Map<String, String> headers = jsonHeaders();
         headers.put("x-goog-api-key", providerProperties().getApiKey());
         request.setHeaders(headers);
         return request;
     }
 
+    AiHttpRequest buildControlledSmokeHttpRequest(AiProviderRequest request, long timeoutOverrideMs,
+                                                   String selectedModel) throws Exception {
+        AiPromptBuilder.PromptPayload prompt = new AiPromptBuilder(objectMapper, properties)
+                .build(request, role());
+        return buildHttpRequest(prompt.dataJson(), timeoutOverrideMs, selectedModel);
+    }
+
     @Override
     protected ProviderPayload extractPayload(AiHttpResponse response) throws Exception {
         JsonNode root = readTree(response.getBody());
-        String content = null;
-        JsonNode candidates = root.path("candidates");
-        if (candidates.isArray() && !candidates.isEmpty()) {
-            JsonNode parts = candidates.get(0).path("content").path("parts");
-            if (parts.isArray() && !parts.isEmpty()) {
-                content = text(parts.get(0), "text");
+        GeminiInteractionDiagnostic diagnostic = interactionDiagnostic(root);
+        if (root == null || !root.isObject()) {
+            throw contractFailure(GeminiInteractionFailureReason.GEMINI_INTERACTION_RESPONSE_ENVELOPE_INVALID,
+                    diagnostic);
+        }
+        String status = text(root, "status");
+        GeminiInteractionFailureReason statusFailure = statusFailure(status);
+        if (statusFailure != null) {
+            throw contractFailure(statusFailure, diagnostic);
+        }
+
+        JsonNode finalModelOutput = null;
+        JsonNode steps = root.path("steps");
+        if (!steps.isArray()) {
+            throw contractFailure(GeminiInteractionFailureReason.GEMINI_INTERACTION_RESPONSE_ENVELOPE_INVALID,
+                    diagnostic);
+        }
+        if (steps.isArray()) {
+            for (JsonNode step : steps) {
+                if (step.isObject() && "model_output".equals(text(step, "type"))) {
+                    finalModelOutput = step;
+                }
             }
         }
-        JsonNode usage = root.path("usageMetadata");
-        String requestId = text(root, "responseId");
-        if (blank(requestId)) {
-            requestId = response.firstHeader("x-request-id");
+        if (finalModelOutput == null) {
+            throw contractFailure(GeminiInteractionFailureReason.GEMINI_INTERACTION_MODEL_OUTPUT_MISSING,
+                    diagnostic);
         }
-        return new ProviderPayload(content, requestId,
-                longValue(usage, "promptTokenCount"),
-                longValue(usage, "candidatesTokenCount"),
-                longValue(usage, "totalTokenCount"));
+
+        StringBuilder finalText = new StringBuilder();
+        int finalTextBlockCount = 0;
+        JsonNode contentItems = finalModelOutput.path("content");
+        if (contentItems.isArray()) {
+            for (JsonNode item : contentItems) {
+                String itemText = text(item, "text");
+                if (item.isObject() && "text".equals(text(item, "type"))) {
+                    finalTextBlockCount++;
+                    if (!blank(itemText)) {
+                        finalText.append(itemText);
+                    }
+                }
+            }
+        }
+        String extractedContent = finalText.toString().trim();
+        diagnostic = diagnostic.withFinalOutput(
+                true, finalTextBlockCount, extractedContent.length(), "NOT_CHECKED");
+        if (blank(extractedContent)) {
+            throw contractFailure(GeminiInteractionFailureReason.GEMINI_INTERACTION_FINAL_TEXT_MISSING,
+                    diagnostic);
+        }
+        if (!singleJsonValue(extractedContent)) {
+            throw contractFailure(GeminiInteractionFailureReason.GEMINI_INTERACTION_FINAL_JSON_INVALID,
+                    diagnostic.withFinalOutput(true, finalTextBlockCount,
+                            extractedContent.length(), "FAIL"));
+        }
+        diagnostic = diagnostic.withFinalOutput(
+                true, finalTextBlockCount, extractedContent.length(), "PASS");
+
+        GeminiResponseShapeDiagnostic responseShapeDiagnostic =
+                GeminiResponseShapeDiagnostic.analyze(objectMapper, extractedContent, null);
+        String normalizedContent = roleResultNormalizer.normalize(extractedContent);
+        if (normalizedContent == null) {
+            throw contractFailure(GeminiInteractionFailureReason.GEMINI_INTERACTION_FINAL_JSON_INVALID,
+                    diagnostic.withFinalOutput(true, finalTextBlockCount,
+                            extractedContent.length(), "FAIL"));
+        }
+        JsonNode usage = root.path("usage");
+        return new ProviderPayload(normalizedContent, text(root, "id"),
+                longValue(usage, "total_input_tokens"),
+                longValue(usage, "total_output_tokens"),
+                longValue(usage, "total_tokens"),
+                responseShapeDiagnostic,
+                diagnostic);
+    }
+
+    @Override
+    protected void enrichParsedResult(AiProviderReviewResult result, ProviderPayload providerPayload) {
+        if (result == null) {
+            return;
+        }
+        if (result.getCallStatus() == AiProviderCallStatus.INVALID_RESPONSE) {
+            result.setSchemaDiagnostic(AiProviderSchemaDiagnostic.analyze(
+                    objectMapper, providerPayload == null ? null : providerPayload.content()));
+            result.setGeminiResponseShapeDiagnostic(providerPayload == null
+                    ? null : providerPayload.geminiResponseShapeDiagnostic());
+            GeminiInteractionFailureReason reason =
+                    GeminiInteractionFailureReason.GEMINI_INTERACTION_V1_CONTRACT_INVALID;
+            result.setErrorCode(reason.name());
+            result.setFallbackReason(reason.name());
+            result.setReasonCodes(List.of(reason.name()));
+            result.setSummary(reason.name());
+            result.setGeminiInteractionDiagnostic(providerPayload == null
+                    ? null : providerPayload.geminiInteractionDiagnostic()
+                    .withV1ContractStatus("FAIL", reason));
+        } else if (result.successful() && providerPayload != null) {
+            result.setGeminiInteractionDiagnostic(providerPayload.geminiInteractionDiagnostic()
+                    .withV1ContractStatus("PASS", null));
+        }
+        if (result.successful() && (providerPayload == null || blank(providerPayload.providerRequestId()))) {
+            result.setReasonCodes(appendReason(result.getReasonCodes(), "GEMINI_INTERACTION_ID_MISSING"));
+        }
+    }
+
+    @Override
+    protected AiProviderReviewResult httpFailure(AiHttpResponse response, long latencyMs) {
+        AiProviderErrorReason reason = classifyProviderError(response);
+        AiProviderCallStatus status = reason == AiProviderErrorReason.GEMINI_RATE_LIMITED
+                ? AiProviderCallStatus.RATE_LIMITED
+                : AiProviderCallStatus.FAILED;
+        return failure(status, reason.name(), latencyMs);
+    }
+
+    static String canonicalModelName(String selectedModel) {
+        String model = selectedModel == null ? "" : selectedModel.trim();
+        if (model.startsWith("models/") && model.length() > "models/".length()) {
+            return model;
+        }
+        if (!model.isBlank() && !model.contains("/")) {
+            return "models/" + model;
+        }
+        throw new IllegalArgumentException("GEMINI_MODEL_NAME_INVALID");
+    }
+
+    static Map<String, Object> responseJsonSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("stance", Map.of(
+                "type", "string",
+                "enum", List.of("SUPPORT", "CHALLENGE", "ABSTAIN")));
+        properties.put("conflictLevel", Map.of(
+                "type", "string",
+                "enum", List.of("NONE", "MINOR", "MAJOR", "EXTREME")));
+        properties.put("reasonCodes", Map.of(
+                "type", "array",
+                "items", Map.of("type", "string"),
+                "maxItems", 8));
+        properties.put("summary", Map.of("type", "string"));
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        schema.put("properties", properties);
+        schema.put("required", List.of("stance", "conflictLevel", "reasonCodes", "summary"));
+        return schema;
+    }
+
+    private AiProviderErrorReason classifyProviderError(AiHttpResponse response) {
+        int statusCode = response == null ? 0 : response.getStatusCode();
+        if (statusCode == 401 || statusCode == 403) {
+            return AiProviderErrorReason.GEMINI_AUTH_REJECTED;
+        }
+        if (statusCode == 429) {
+            return AiProviderErrorReason.GEMINI_RATE_LIMITED;
+        }
+        if (statusCode == 404) {
+            return AiProviderErrorReason.GEMINI_MODEL_CAPABILITY_ERROR;
+        }
+        if (statusCode >= 500 && statusCode <= 599) {
+            return AiProviderErrorReason.GEMINI_HTTP_5XX_INTERNAL;
+        }
+        if (statusCode == 400) {
+            String diagnosticText = sanitizedDiagnosticText(response.getBody());
+            if (isStructuredOutputUnsupported(diagnosticText)) {
+                return AiProviderErrorReason.GEMINI_STRUCTURED_OUTPUT_UNSUPPORTED;
+            }
+            if (isModelCapabilityError(diagnosticText)) {
+                return AiProviderErrorReason.GEMINI_MODEL_CAPABILITY_ERROR;
+            }
+            return AiProviderErrorReason.GEMINI_HTTP_400_INVALID_REQUEST;
+        }
+        return AiProviderErrorReason.GEMINI_UNKNOWN_PROVIDER_ERROR;
+    }
+
+    private String sanitizedDiagnosticText(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        try {
+            JsonNode error = objectMapper.readTree(body).path("error");
+            return (error.path("status").asText("") + " " + error.path("message").asText(""))
+                    .toLowerCase(Locale.ROOT);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private static boolean isStructuredOutputUnsupported(String text) {
+        boolean structuredMarker = text.contains("structured output")
+                || text.contains("structured_output")
+                || text.contains("response format")
+                || text.contains("response_format");
+        return structuredMarker && (text.contains("unsupported") || text.contains("not supported"));
+    }
+
+    private static boolean isModelCapabilityError(String text) {
+        return text.contains("model")
+                && (text.contains("unsupported") || text.contains("not supported")
+                || text.contains("capability"));
+    }
+
+    private GeminiInteractionDiagnostic interactionDiagnostic(JsonNode root) {
+        JsonNode usage = root == null ? null : root.get("usage");
+        JsonNode steps = root == null ? null : root.get("steps");
+        int stepCount = steps != null && steps.isArray() ? steps.size() : 0;
+        int modelOutputStepCount = 0;
+        if (steps != null && steps.isArray()) {
+            for (JsonNode step : steps) {
+                if (step.isObject() && "model_output".equals(text(step, "type"))) {
+                    modelOutputStepCount++;
+                }
+            }
+        }
+        return new GeminiInteractionDiagnostic(
+                sanitizedInteractionStatus(text(root, "status")),
+                root != null && root.hasNonNull("id"),
+                usage != null && usage.isObject(),
+                hasValue(usage, "total_input_tokens"),
+                hasValue(usage, "total_output_tokens"),
+                hasValue(usage, "total_thought_tokens"),
+                hasValue(usage, "total_tokens"),
+                stepCount,
+                modelOutputStepCount,
+                modelOutputStepCount > 0,
+                0,
+                0,
+                "NOT_CHECKED",
+                "NOT_CHECKED",
+                null);
+    }
+
+    private static GeminiInteractionFailureReason statusFailure(String status) {
+        if (status == null || status.isBlank()) {
+            return GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_MISSING;
+        }
+        return switch (status.trim().toLowerCase(Locale.ROOT)) {
+            case COMPLETED_STATUS -> null;
+            case "in_progress" -> GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_IN_PROGRESS;
+            case "requires_action" ->
+                    GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_REQUIRES_ACTION;
+            case "failed" -> GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_FAILED;
+            case "cancelled" -> GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_CANCELLED;
+            case "incomplete" -> GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_INCOMPLETE;
+            default -> GeminiInteractionFailureReason.GEMINI_INTERACTION_STATUS_MISSING;
+        };
+    }
+
+    private static String sanitizedInteractionStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "MISSING";
+        }
+        return switch (status.trim().toLowerCase(Locale.ROOT)) {
+            case "completed" -> "COMPLETED";
+            case "in_progress" -> "IN_PROGRESS";
+            case "requires_action" -> "REQUIRES_ACTION";
+            case "failed" -> "FAILED";
+            case "cancelled" -> "CANCELLED";
+            case "incomplete" -> "INCOMPLETE";
+            default -> "UNKNOWN";
+        };
+    }
+
+    private static boolean hasValue(JsonNode node, String field) {
+        return node != null && node.isObject() && node.hasNonNull(field);
+    }
+
+    private boolean singleJsonValue(String content) {
+        try (JsonParser parser = objectMapper.getFactory().createParser(content.trim())) {
+            JsonNode root = objectMapper.readTree(parser);
+            return root != null && parser.nextToken() == null;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static GeminiInteractionContractException contractFailure(
+            GeminiInteractionFailureReason reason, GeminiInteractionDiagnostic diagnostic) {
+        return new GeminiInteractionContractException(reason, diagnostic);
     }
 }

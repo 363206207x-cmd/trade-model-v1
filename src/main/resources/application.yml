@@ -150,10 +150,23 @@ trade-model:
     max-output-tokens: ${TRADE_MODEL_AI_MAX_OUTPUT_TOKENS:500}
     daily-budget-usd: ${TRADE_MODEL_AI_DAILY_BUDGET_USD:0}
     per-analysis-budget-usd: ${TRADE_MODEL_AI_PER_ANALYSIS_BUDGET_USD:0}
+    model-strategy:
+      gpt-final:
+        priority: ${TRADE_MODEL_AI_GPT_FINAL_PRIORITY:QUALITY_FIRST}
+      gemini-review:
+        priority: ${TRADE_MODEL_AI_GEMINI_REVIEW_PRIORITY:BALANCED}
+      grok-challenge:
+        priority: ${TRADE_MODEL_AI_GROK_CHALLENGE_PRIORITY:CHALLENGE_FIRST}
     openai:
       enabled: ${TRADE_MODEL_AI_OPENAI_ENABLED:false}
       api-key: ${OPENAI_API_KEY:}
-      model: ${TRADE_MODEL_AI_OPENAI_MODEL:gpt-4.1-mini}
+      gpt-final:
+        fast-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FAST_MODEL:gpt-5.6-luna}
+        reasoning-model: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_REASONING_MODEL:gpt-5.6-sol}
+        fallback-enabled: ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_ENABLED:true}
+        fallback-models:
+          - ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT55_MODEL:gpt-5.5}
+          - ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT54_MODEL:gpt-5.4}
       base-url: ${TRADE_MODEL_AI_OPENAI_BASE_URL:https://api.openai.com}
       requests-per-minute: ${TRADE_MODEL_AI_OPENAI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_INPUT_COST_PER_MILLION_USD:0}
@@ -161,7 +174,7 @@ trade-model:
     gemini:
       enabled: ${TRADE_MODEL_AI_GEMINI_ENABLED:false}
       api-key: ${GEMINI_API_KEY:}
-      model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-1.5-flash}
+      model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}
       base-url: ${TRADE_MODEL_AI_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
       requests-per-minute: ${TRADE_MODEL_AI_GEMINI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_INPUT_COST_PER_MILLION_USD:0}
@@ -169,7 +182,7 @@ trade-model:
     xai:
       enabled: ${TRADE_MODEL_AI_XAI_ENABLED:false}
       api-key: ${XAI_API_KEY:}
-      model: ${TRADE_MODEL_AI_XAI_MODEL:grok-3-mini}
+      model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}
       base-url: ${TRADE_MODEL_AI_XAI_BASE_URL:https://api.x.ai}
       requests-per-minute: ${TRADE_MODEL_AI_XAI_RPM:0}
       input-cost-per-million-usd: ${TRADE_MODEL_AI_XAI_INPUT_COST_PER_MILLION_USD:0}

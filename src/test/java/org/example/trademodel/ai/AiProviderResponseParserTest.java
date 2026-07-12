@@ -58,4 +58,25 @@ class AiProviderResponseParserTest {
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
         assertThat(result.isFallback()).isTrue();
     }
+
+    @Test
+    void parse_rejectsMissingText() {
+        AiProviderReviewResult result = parser.parse(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW, " ");
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("INVALID_EMPTY_RESPONSE");
+    }
+
+    @Test
+    void parse_rejectsPositionCreationAndOrderRequests() {
+        AiProviderReviewResult position = parser.parse(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW, """
+                {"stance":"SUPPORT","conflictLevel":"NONE","reasonCodes":["X"],"summary":"Create user position now."}
+                """);
+        AiProviderReviewResult order = parser.parse(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW, """
+                {"stance":"SUPPORT","conflictLevel":"NONE","reasonCodes":["X"],"summary":"Submit order now."}
+                """);
+
+        assertThat(position.getErrorCode()).isEqualTo("INVALID_FORBIDDEN_TEXT");
+        assertThat(order.getErrorCode()).isEqualTo("INVALID_FORBIDDEN_TEXT");
+    }
 }

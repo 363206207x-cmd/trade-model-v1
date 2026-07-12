@@ -65,14 +65,33 @@ class ProductionProfileSafetyGuardTest {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.ai.openai.enabled", "true");
         environment.setProperty("trade-model.ai.openai.api-key", " ");
-        environment.setProperty("trade-model.ai.openai.model", "");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fast-model", "");
+        environment.setProperty("trade-model.ai.openai.gpt-final.reasoning-model", "");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fallback-models[0]", "");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fallback-models[1]", "");
         environment.setProperty("trade-model.ai.openai.base-url", " ");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("OpenAI API key missing for explicitly enabled production AI provider")
-                .hasMessageContaining("OpenAI model missing for explicitly enabled production AI provider")
+                .hasMessageContaining("OpenAI GPT_FINAL model routing must stay within approved GPT-5.6/5.5/5.4 models")
                 .hasMessageContaining("OpenAI base URL missing for explicitly enabled production AI provider");
+    }
+
+    @Test
+    void rejectsOpenAiRoutingBelowGpt54() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.ai.openai.enabled", "true");
+        environment.setProperty("trade-model.ai.openai.api-key", "configured-test-key");
+        environment.setProperty("trade-model.ai.openai.base-url", "https://api.openai.test");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fast-model", "gpt-5.6-luna");
+        environment.setProperty("trade-model.ai.openai.gpt-final.reasoning-model", "gpt-5.6-sol");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fallback-models[0]", "gpt-5.5");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fallback-models[1]", "gpt-4.1-mini");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("OpenAI GPT_FINAL model routing must stay within approved GPT-5.6/5.5/5.4 models");
     }
 
     @Test

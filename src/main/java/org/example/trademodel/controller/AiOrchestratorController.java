@@ -51,6 +51,10 @@ public class AiOrchestratorController {
         map.put("dailyBudgetConfigured", properties.getDailyBudgetUsd().signum() > 0);
         map.put("perAnalysisBudgetConfigured", properties.getPerAnalysisBudgetUsd().signum() > 0);
         map.put("fallbackMode", AiOrchestrationMode.RULE_ONLY_FALLBACK.name());
+        map.put("modelStrategy", Map.of(
+                "GPT_FINAL", properties.getModelStrategy().getGptFinal().getPriority().name(),
+                "GEMINI_REVIEW", properties.getModelStrategy().getGeminiReview().getPriority().name(),
+                "GROK_CHALLENGE", properties.getModelStrategy().getGrokChallenge().getPriority().name()));
         map.put("providers", providerClients.stream().map(this::providerStatus).toList());
         return map;
     }
@@ -80,7 +84,12 @@ public class AiOrchestratorController {
         map.put("enabled", readiness.isEnabled());
         map.put("configured", readiness.isConfigured());
         map.put("ready", readiness.isReady());
-        map.put("model", readiness.getModel());
+        map.put("modelReadiness", readiness.getModelReadinessStatus().name());
+        map.put("configuredModel", readiness.getConfiguredModel());
+        map.put("effectiveModel", readiness.getEffectiveModel());
+        map.put("fallbackUsed", readiness.isFallbackUsed());
+        map.put("fallbackReason", readiness.getFallbackReason());
+        map.put("modelStrategy", readiness.getModelStrategy());
         map.put("requestsPerMinuteConfigured", providerProperties.getRequestsPerMinute() > 0);
         map.put("costRateConfigured", providerProperties.getInputCostPerMillionUsd().signum() > 0
                 && providerProperties.getOutputCostPerMillionUsd().signum() > 0);

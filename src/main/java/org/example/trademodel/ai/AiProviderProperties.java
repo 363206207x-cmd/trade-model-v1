@@ -6,6 +6,7 @@ public class AiProviderProperties {
     private boolean enabled;
     private String apiKey = "";
     private String model = "";
+    private GptFinalModelRoutingProperties gptFinal = new GptFinalModelRoutingProperties();
     private String baseUrl = "";
     private int requestsPerMinute;
     private BigDecimal inputCostPerMillionUsd = BigDecimal.ZERO;
@@ -17,6 +18,15 @@ public class AiProviderProperties {
     public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     public String getModel() { return model; }
     public void setModel(String model) { this.model = model; }
+    public GptFinalModelRoutingProperties getGptFinal() { return gptFinal; }
+    public void setGptFinal(GptFinalModelRoutingProperties gptFinal) {
+        this.gptFinal = gptFinal == null ? new GptFinalModelRoutingProperties() : gptFinal;
+    }
+    public String getConfiguredModel() {
+        String configured = normalize(model);
+        return configured.isBlank() ? normalize(gptFinal.getFastModel()) : configured;
+    }
+    public String getEffectiveModel() { return getConfiguredModel(); }
     public String getBaseUrl() { return baseUrl; }
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
     public int getRequestsPerMinute() { return requestsPerMinute; }
@@ -31,6 +41,14 @@ public class AiProviderProperties {
     }
 
     public boolean hasKeyAndModel() {
-        return apiKey != null && !apiKey.isBlank() && model != null && !model.isBlank();
+        return apiKey != null && !apiKey.isBlank() && hasValidModelSelection();
+    }
+
+    public boolean hasValidModelSelection() {
+        return !normalize(model).isBlank() || gptFinal.isConfigured();
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 }

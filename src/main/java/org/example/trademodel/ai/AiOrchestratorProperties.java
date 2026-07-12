@@ -15,6 +15,7 @@ public class AiOrchestratorProperties {
     private int maxOutputTokens = 500;
     private BigDecimal dailyBudgetUsd = BigDecimal.ZERO;
     private BigDecimal perAnalysisBudgetUsd = BigDecimal.ZERO;
+    private ModelStrategy modelStrategy = new ModelStrategy();
     private AiProviderProperties openai = new AiProviderProperties();
     private AiProviderProperties gemini = new AiProviderProperties();
     private AiProviderProperties xai = new AiProviderProperties();
@@ -37,10 +38,53 @@ public class AiOrchestratorProperties {
     public void setPerAnalysisBudgetUsd(BigDecimal perAnalysisBudgetUsd) {
         this.perAnalysisBudgetUsd = perAnalysisBudgetUsd == null ? BigDecimal.ZERO : perAnalysisBudgetUsd;
     }
+    public ModelStrategy getModelStrategy() { return modelStrategy; }
+    public void setModelStrategy(ModelStrategy modelStrategy) {
+        this.modelStrategy = modelStrategy == null ? new ModelStrategy() : modelStrategy;
+    }
     public AiProviderProperties getOpenai() { return openai; }
     public void setOpenai(AiProviderProperties openai) { this.openai = openai == null ? new AiProviderProperties() : openai; }
     public AiProviderProperties getGemini() { return gemini; }
     public void setGemini(AiProviderProperties gemini) { this.gemini = gemini == null ? new AiProviderProperties() : gemini; }
     public AiProviderProperties getXai() { return xai; }
     public void setXai(AiProviderProperties xai) { this.xai = xai == null ? new AiProviderProperties() : xai; }
+
+    public static class ModelStrategy {
+        private RoleStrategy gptFinal = new RoleStrategy(AiRoleModelPriority.QUALITY_FIRST);
+        private RoleStrategy geminiReview = new RoleStrategy(AiRoleModelPriority.BALANCED);
+        private RoleStrategy grokChallenge = new RoleStrategy(AiRoleModelPriority.CHALLENGE_FIRST);
+
+        public RoleStrategy getGptFinal() { return gptFinal; }
+        public void setGptFinal(RoleStrategy gptFinal) {
+            this.gptFinal = gptFinal == null
+                    ? new RoleStrategy(AiRoleModelPriority.QUALITY_FIRST) : gptFinal;
+        }
+        public RoleStrategy getGeminiReview() { return geminiReview; }
+        public void setGeminiReview(RoleStrategy geminiReview) {
+            this.geminiReview = geminiReview == null
+                    ? new RoleStrategy(AiRoleModelPriority.BALANCED) : geminiReview;
+        }
+        public RoleStrategy getGrokChallenge() { return grokChallenge; }
+        public void setGrokChallenge(RoleStrategy grokChallenge) {
+            this.grokChallenge = grokChallenge == null
+                    ? new RoleStrategy(AiRoleModelPriority.CHALLENGE_FIRST) : grokChallenge;
+        }
+    }
+
+    public static class RoleStrategy {
+        private AiRoleModelPriority priority;
+
+        public RoleStrategy() {
+            this(AiRoleModelPriority.BALANCED);
+        }
+
+        public RoleStrategy(AiRoleModelPriority priority) {
+            this.priority = priority;
+        }
+
+        public AiRoleModelPriority getPriority() { return priority; }
+        public void setPriority(AiRoleModelPriority priority) {
+            this.priority = priority == null ? AiRoleModelPriority.BALANCED : priority;
+        }
+    }
 }
