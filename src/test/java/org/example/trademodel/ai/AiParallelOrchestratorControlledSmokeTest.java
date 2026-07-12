@@ -9,6 +9,10 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,11 +22,18 @@ import java.nio.file.StandardOpenOption;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.sql.DataSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AiParallelOrchestratorControlledSmokeTest {
+    private static final String ISOLATED_H2_URL =
+            "jdbc:h2:mem:ai_parallel_controlled_smoke_test;DB_CLOSE_DELAY=-1;MODE=MySQL";
+    private static volatile OfflineContextEvidence offlineContextEvidence;
     private final AiParallelOrchestratorControlledSmoke smoke =
             new AiParallelOrchestratorControlledSmoke();
 
@@ -294,6 +305,285 @@ class AiParallelOrchestratorControlledSmokeTest {
         assertThat(output).contains("AI_PARALLEL_HARNESS_STAGE: ORCHESTRATOR_STARTING");
     }
 
+    @Test
+    void isolatedH2MySqlContextStartsSuccessfully() throws Exception {
+        OfflineContextEvidence evidence = offlineContextEvidence();
+
+        assertThat(evidence.springReady()).isTrue();
+        assertThat(evidence.orchestratorBeanAvailable()).isTrue();
+        assertThat(evidence.executorBeanAvailable()).isTrue();
+        assertThat(evidence.datasourceUrl())
+                .isEqualTo("jdbc:h2:mem:ai_parallel_controlled_smoke_test")
+                .doesNotContain("trade_model_v1", "postgresql", "production");
+        assertThat(evidence.contextClosed()).isTrue();
+        assertThat(evidence.executorShutdown()).isTrue();
+    }
+
+    @Test
+    void authoritativeSchemaInitializesInSmokeDatabase() throws Exception {
+        assertThat(offlineContextEvidence().publicTableCount()).isGreaterThanOrEqualTo(20);
+    }
+
+    @Test
+    void aiCallLogTableExistsAfterInitialization() throws Exception {
+        OfflineContextEvidence evidence = offlineContextEvidence();
+
+        assertThat(evidence.aiCallLogTableCount()).isOne();
+        assertThat(evidence.aiCallLogRows()).isZero();
+    }
+
+    @Test
+    void offlineContextStartupMakesZeroProviderCalls() throws Exception {
+        OfflineContextEvidence evidence = offlineContextEvidence();
+
+        assertThat(evidence.providerPostCount()).isZero();
+        assertThat(evidence.userPositionRows()).isZero();
+        assertThat(evidence.executionPlanRows()).isZero();
+        assertThat(evidence.orderTableCount()).isZero();
+    }
+
+    @Test
+    void postgresCompatibilityModeIsNotUsedBySmoke() throws Exception {
+        String script = Files.readString(
+                Path.of("scripts/ai-parallel-orchestrator-controlled-smoke.sh"));
+        assertThat(script)
+                .contains("jdbc:h2:mem:ai_parallel_controlled_smoke;DB_CLOSE_DELAY=-1;MODE=MySQL")
+                .doesNotContain("ai_parallel_controlled_smoke;MODE=PostgreSQL");
+
+        DriverManagerDataSource incompatible = new DriverManagerDataSource(
+                "jdbc:h2:mem:ai_parallel_postgres_incompatible_" + UUID.randomUUID()
+                        + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+                "sa", "");
+        ResourceDatabasePopulator schema = new ResourceDatabasePopulator(
+                new ClassPathResource("schema.sql"));
+
+        assertThatThrownBy(() -> schema.execute(incompatible))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void sqlInitializationRemainsEnabled() throws Exception {
+        String script = Files.readString(
+                Path.of("scripts/ai-parallel-orchestrator-controlled-smoke.sh"));
+
+        assertThat(script).contains("SPRING_SQL_INIT_MODE=always")
+                .doesNotContain("SPRING_SQL_INIT_MODE=never");
+        assertThat(offlineContextEvidence().schemaInitialized()).isTrue();
+    }
+
+    @Test
+    void cleanupSuccessPathHasNoUnboundVariable() throws Exception {
+        CleanupResult result = cleanupRun(0, true, false);
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.output()).doesNotContain("unbound variable");
+    }
+
+    @Test
+    void cleanupFailurePathHasNoUnboundVariable() throws Exception {
+        CleanupResult result = cleanupRun(17, true, false);
+
+        assertThat(result.exitCode()).isEqualTo(17);
+        assertThat(result.output()).doesNotContain("unbound variable");
+    }
+
+    @Test
+    void cleanupWatchdogPathHasNoUnboundVariable() throws Exception {
+        CleanupResult result = cleanupRun(19, true, true);
+
+        assertThat(result.exitCode()).isEqualTo(19);
+        assertThat(result.output()).doesNotContain("unbound variable");
+    }
+
+    @Test
+    void cleanupWithMissingTempPathsIsSafe() throws Exception {
+        CleanupResult result = cleanupRun(0, false, false);
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.output()).isBlank();
+    }
+
+    @Test
+    void cleanupPreservesOriginalExitCode() throws Exception {
+        assertThat(cleanupRun(23, true, false).exitCode()).isEqualTo(23);
+    }
+
+    @Test
+    void cleanupRemovesAllCreatedTempFiles() throws Exception {
+        CleanupResult result = cleanupRun(0, true, false);
+
+        assertThat(result.remainingTempFiles()).isZero();
+    }
+
+    @Test
+    void cleanupDoesNotPrintSecretOrRawOutput() throws Exception {
+        CleanupResult result = cleanupRun(29, true, false);
+
+        assertThat(result.output()).doesNotContain("secret", "Prompt", "Authorization",
+                "response", "stack trace");
+    }
+
+    @Test
+    void deliberateDatabaseFailureStillProducesSanitizedCategory() throws Exception {
+        String raw = "JdbcSQLSyntaxErrorException: confidential SQL and datasource details";
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", raw,
+                "SPRING_STARTING", "0", 1, false);
+
+        assertThat(output).contains(
+                        "AI_PARALLEL_HARNESS_FAILURE_CATEGORY: DATABASE_INITIALIZATION_FAILURE",
+                        "AI_PARALLEL_HARNESS_STAGE: SPRING_STARTING")
+                .doesNotContain("confidential SQL", "datasource details");
+    }
+
+    @Test
+    void stageMovesToSpringReadyOnSuccessfulContextStartup() throws Exception {
+        assertThat(offlineContextEvidence().stage()).isEqualTo("SPRING_READY");
+    }
+
+    private static OfflineContextEvidence offlineContextEvidence() throws Exception {
+        if (offlineContextEvidence != null) {
+            return offlineContextEvidence;
+        }
+        synchronized (AiParallelOrchestratorControlledSmokeTest.class) {
+            if (offlineContextEvidence != null) {
+                return offlineContextEvidence;
+            }
+            Path stageFile = Files.createTempFile("ai-parallel-offline-stage", ".txt");
+            StageAudit stageAudit = new StageAudit(stageFile);
+            stageAudit.write("SPRING_STARTING");
+            ConfigurableApplicationContext context = null;
+            AiProviderExecutor executor = null;
+            boolean springReady = false;
+            boolean orchestratorAvailable = false;
+            boolean executorAvailable = false;
+            int publicTables = 0;
+            int aiCallLogTableCount = 0;
+            int aiCallLogRows = -1;
+            int userPositionRows = -1;
+            int executionPlanRows = -1;
+            int orderTableCount = -1;
+            int providerPostCount = -1;
+            String datasourceUrl = "";
+            try {
+                context = new SpringApplicationBuilder(
+                        TradeModelApplication.class, OfflineContextConfiguration.class)
+                        .web(WebApplicationType.NONE)
+                        .run(offlineContextArguments());
+                stageAudit.write("SPRING_READY");
+                springReady = true;
+                orchestratorAvailable = context.getBean(AiDecisionOrchestratorService.class) != null;
+                executor = context.getBean(AiProviderExecutor.class);
+                executorAvailable = executor != null;
+                JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
+                publicTables = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'PUBLIC'",
+                        Integer.class);
+                aiCallLogTableCount = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                                + "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'TM_AI_CALL_LOG'",
+                        Integer.class);
+                aiCallLogRows = jdbc.queryForObject("SELECT COUNT(*) FROM tm_ai_call_log", Integer.class);
+                userPositionRows = jdbc.queryForObject("SELECT COUNT(*) FROM tm_user_position", Integer.class);
+                executionPlanRows = jdbc.queryForObject("SELECT COUNT(*) FROM tm_execution_plan", Integer.class);
+                orderTableCount = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                                + "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'TM_ORDER'",
+                        Integer.class);
+                providerPostCount = context.getBean("offlineProviderPostCount", AtomicInteger.class).get();
+                DataSource dataSource = context.getBean(DataSource.class);
+                try (var connection = dataSource.getConnection()) {
+                    datasourceUrl = connection.getMetaData().getURL();
+                }
+            } finally {
+                if (context != null) {
+                    context.close();
+                }
+            }
+            boolean executorShutdown = executor != null && executor.isShutdown();
+            String stage = Files.readString(stageFile).trim();
+            Files.deleteIfExists(stageFile);
+            offlineContextEvidence = new OfflineContextEvidence(
+                    springReady, orchestratorAvailable, executorAvailable,
+                    publicTables > 0, publicTables, aiCallLogTableCount, aiCallLogRows,
+                    userPositionRows, executionPlanRows, orderTableCount, providerPostCount, datasourceUrl,
+                    stage, true, executorShutdown);
+            return offlineContextEvidence;
+        }
+    }
+
+    private static String[] offlineContextArguments() {
+        return new String[]{
+                "--spring.profiles.active=default",
+                "--spring.main.banner-mode=off",
+                "--spring.datasource.url=" + ISOLATED_H2_URL,
+                "--spring.datasource.driver-class-name=org.h2.Driver",
+                "--spring.datasource.username=sa",
+                "--spring.datasource.password=",
+                "--spring.sql.init.mode=always",
+                "--trade-model.schedulers.enabled=false",
+                "--trade-model.schedulers.push-recheck.enabled=false",
+                "--trade-model.schedulers.position-sync.enabled=false",
+                "--trade-model.schedulers.position-monitor.enabled=false",
+                "--trade-model.schedulers.market-data.enabled=false",
+                "--trade-model.schedulers.ohlcv-ingestion.enabled=false",
+                "--trade-model.schedulers.watchlist.enabled=false",
+                "--trade-model.analysis.scheduler.enabled=false",
+                "--trade-model.provider-call.scheduler-enabled=false",
+                "--trade-model.ai.enabled=false",
+                "--trade-model.ai.openai.enabled=false",
+                "--trade-model.ai.gemini.enabled=false",
+                "--trade-model.ai.xai.enabled=false",
+                "--trade-model.ai.openai.api-key=",
+                "--trade-model.ai.gemini.api-key=",
+                "--trade-model.ai.xai.api-key="
+        };
+    }
+
+    private static CleanupResult cleanupRun(int expectedExitCode, boolean createFiles,
+                                            boolean startWatchdog) throws Exception {
+        Path directory = Files.createTempDirectory("ai-parallel-cleanup-test");
+        Path output = createFiles ? directory.resolve("output") : Path.of("");
+        Path calls = createFiles ? directory.resolve("calls") : Path.of("");
+        Path stage = createFiles ? directory.resolve("stage") : Path.of("");
+        Path watchdog = createFiles ? directory.resolve("watchdog") : Path.of("");
+        if (createFiles) {
+            Files.writeString(output, "private raw output");
+            Files.writeString(calls, "OPENAI=0\nGEMINI=0\nXAI=0\n");
+            Files.writeString(stage, "PRECHECK\n");
+            Files.writeString(watchdog, "0\n");
+        }
+        Path script = Path.of("scripts/ai-parallel-orchestrator-controlled-smoke.sh").toAbsolutePath();
+        String shell = "source \"$1\"; "
+                + "SMOKE_OUTPUT_FILE=\"$2\"; SMOKE_CALL_COUNT_FILE=\"$3\"; "
+                + "SMOKE_STAGE_FILE=\"$4\"; SMOKE_WATCHDOG_FILE=\"$5\"; "
+                + "if [[ \"$7\" == true ]]; then sleep 30 & WATCHDOG_PID=$!; fi; "
+                + "trap smoke_cleanup EXIT; exit \"$6\"";
+        Process process = new ProcessBuilder("bash", "-c", shell, "_", script.toString(),
+                createFiles ? output.toString() : "",
+                createFiles ? calls.toString() : "",
+                createFiles ? stage.toString() : "",
+                createFiles ? watchdog.toString() : "",
+                Integer.toString(expectedExitCode), Boolean.toString(startWatchdog))
+                .redirectErrorStream(true)
+                .start();
+        String processOutput = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int actualExitCode = process.waitFor();
+        long remaining;
+        try (var paths = Files.list(directory)) {
+            remaining = paths.count();
+        }
+        try (var paths = Files.walk(directory)) {
+            paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException exception) {
+                    throw new IllegalStateException(exception);
+                }
+            });
+        }
+        return new CleanupResult(actualExitCode, processOutput, remaining);
+    }
+
     private static Map<String, String> enabledEnvironment() {
         Map<String, String> environment = new java.util.HashMap<>();
         environment.put(AiParallelOrchestratorControlledSmoke.ENABLE_EXTERNAL_CALLS, "true");
@@ -406,6 +696,23 @@ class AiParallelOrchestratorControlledSmokeTest {
         @Override
         public List<AiProviderReadiness> providerReadiness() {
             return List.of();
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class OfflineContextConfiguration {
+        @Bean
+        AtomicInteger offlineProviderPostCount() {
+            return new AtomicInteger();
+        }
+
+        @Bean
+        @Primary
+        AiHttpTransport offlineRejectingAiHttpTransport(AtomicInteger offlineProviderPostCount) {
+            return request -> {
+                offlineProviderPostCount.incrementAndGet();
+                throw new IOException("OFFLINE_CONTEXT_TRANSPORT_MUST_NOT_BE_CALLED");
+            };
         }
     }
 
@@ -528,5 +835,25 @@ class AiParallelOrchestratorControlledSmokeTest {
                 throw new IllegalStateException("CONTROLLED_SMOKE_STAGE_AUDIT_UNAVAILABLE", exception);
             }
         }
+    }
+
+    private record OfflineContextEvidence(boolean springReady,
+                                          boolean orchestratorBeanAvailable,
+                                          boolean executorBeanAvailable,
+                                          boolean schemaInitialized,
+                                          int publicTableCount,
+                                          int aiCallLogTableCount,
+                                          int aiCallLogRows,
+                                          int userPositionRows,
+                                          int executionPlanRows,
+                                          int orderTableCount,
+                                          int providerPostCount,
+                                          String datasourceUrl,
+                                          String stage,
+                                          boolean contextClosed,
+                                          boolean executorShutdown) {
+    }
+
+    private record CleanupResult(int exitCode, String output, long remainingTempFiles) {
     }
 }

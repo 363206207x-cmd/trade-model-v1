@@ -1,6 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SMOKE_OUTPUT_FILE=""
+SMOKE_CALL_COUNT_FILE=""
+SMOKE_STAGE_FILE=""
+SMOKE_WATCHDOG_FILE=""
+SMOKE_PID=""
+WATCHDOG_PID=""
+
+smoke_cleanup() {
+  local original_exit_code=$?
+  trap - EXIT INT TERM
+  if [[ -n "${SMOKE_PID:-}" ]] && kill -0 "${SMOKE_PID}" 2>/dev/null; then
+    kill -TERM "${SMOKE_PID}" 2>/dev/null || true
+    wait "${SMOKE_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${WATCHDOG_PID:-}" ]] && kill -0 "${WATCHDOG_PID}" 2>/dev/null; then
+    kill -TERM "${WATCHDOG_PID}" 2>/dev/null || true
+    wait "${WATCHDOG_PID}" 2>/dev/null || true
+  fi
+  local path
+  for path in "${SMOKE_OUTPUT_FILE:-}" "${SMOKE_CALL_COUNT_FILE:-}" \
+      "${SMOKE_STAGE_FILE:-}" "${SMOKE_WATCHDOG_FILE:-}"; do
+    if [[ -n "${path}" ]]; then
+      rm -f -- "${path}"
+    fi
+  done
+  exit "${original_exit_code}"
+}
+
+smoke_signal_exit() {
+  local signal_exit_code="${1:-1}"
+  trap - INT TERM
+  exit "${signal_exit_code}"
+}
+
 read_provider_count() {
   local marker_file="${1:-}"
   local provider="${2:-}"
@@ -208,7 +242,7 @@ main() {
   export TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED=false
   export TRADE_MODEL_PROVIDER_SCAN_SCHEDULER_ENABLED=false
   export SPRING_PROFILES_ACTIVE=default
-  export SPRING_DATASOURCE_URL='jdbc:h2:mem:ai_parallel_controlled_smoke;MODE=PostgreSQL;DB_CLOSE_DELAY=-1'
+  export SPRING_DATASOURCE_URL='jdbc:h2:mem:ai_parallel_controlled_smoke;DB_CLOSE_DELAY=-1;MODE=MySQL'
   export SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver
   export SPRING_DATASOURCE_USERNAME=sa
   export SPRING_DATASOURCE_PASSWORD=
@@ -230,54 +264,56 @@ main() {
   export TRADE_MODEL_AI_XAI_INPUT_COST_PER_MILLION_USD=0.01
   export TRADE_MODEL_AI_XAI_OUTPUT_COST_PER_MILLION_USD=0.01
 
-  local output_file call_count_file stage_file watchdog_file
-  output_file="$(mktemp)"
-  call_count_file="$(mktemp)"
-  stage_file="$(mktemp)"
-  watchdog_file="$(mktemp)"
-  chmod 600 "${output_file}" "${call_count_file}" "${stage_file}" "${watchdog_file}"
-  printf '%s\n' "OPENAI=0" "GEMINI=0" "XAI=0" >"${call_count_file}"
-  printf '%s\n' "PRECHECK" >"${stage_file}"
-  printf '%s\n' "0" >"${watchdog_file}"
-  export AI_PARALLEL_SMOKE_CALL_COUNT_FILE="${call_count_file}"
-  export AI_PARALLEL_SMOKE_STAGE_FILE="${stage_file}"
-  trap 'rm -f "${output_file}" "${call_count_file}" "${stage_file}" "${watchdog_file}"' EXIT
+  trap smoke_cleanup EXIT
+  trap 'smoke_signal_exit 130' INT
+  trap 'smoke_signal_exit 143' TERM
+  SMOKE_OUTPUT_FILE="$(mktemp)"
+  SMOKE_CALL_COUNT_FILE="$(mktemp)"
+  SMOKE_STAGE_FILE="$(mktemp)"
+  SMOKE_WATCHDOG_FILE="$(mktemp)"
+  chmod 600 "${SMOKE_OUTPUT_FILE}" "${SMOKE_CALL_COUNT_FILE}" \
+    "${SMOKE_STAGE_FILE}" "${SMOKE_WATCHDOG_FILE}"
+  printf '%s\n' "OPENAI=0" "GEMINI=0" "XAI=0" >"${SMOKE_CALL_COUNT_FILE}"
+  printf '%s\n' "PRECHECK" >"${SMOKE_STAGE_FILE}"
+  printf '%s\n' "0" >"${SMOKE_WATCHDOG_FILE}"
+  export AI_PARALLEL_SMOKE_CALL_COUNT_FILE="${SMOKE_CALL_COUNT_FILE}"
+  export AI_PARALLEL_SMOKE_STAGE_FILE="${SMOKE_STAGE_FILE}"
 
   ./mvnw -q \
     -Dtest=AiParallelOrchestratorControlledSmokeTest#controlledLiveSmokeEntryPoint \
-    test >"${output_file}" 2>&1 &
-  local smoke_pid=$!
+    test >"${SMOKE_OUTPUT_FILE}" 2>&1 &
+  SMOKE_PID=$!
   local watchdog_seconds="${AI_PARALLEL_SMOKE_WATCHDOG_SECONDS:-60}"
   if [[ ! "${watchdog_seconds}" =~ ^[1-9][0-9]*$ || "${watchdog_seconds}" -gt 60 ]]; then
     watchdog_seconds=60
   fi
   (
     sleep "${watchdog_seconds}"
-    if kill -0 "${smoke_pid}" 2>/dev/null; then
-      printf '%s\n' "1" >"${watchdog_file}"
-      kill -TERM "${smoke_pid}" 2>/dev/null || true
+    if kill -0 "${SMOKE_PID}" 2>/dev/null; then
+      printf '%s\n' "1" >"${SMOKE_WATCHDOG_FILE}"
+      kill -TERM "${SMOKE_PID}" 2>/dev/null || true
     fi
   ) &
-  local watchdog_pid=$!
+  WATCHDOG_PID=$!
 
   local smoke_exit
-  if wait "${smoke_pid}"; then
+  if wait "${SMOKE_PID}"; then
     smoke_exit=0
   else
     smoke_exit=$?
   fi
-  kill "${watchdog_pid}" 2>/dev/null || true
-  wait "${watchdog_pid}" 2>/dev/null || true
+  kill "${WATCHDOG_PID}" 2>/dev/null || true
+  wait "${WATCHDOG_PID}" 2>/dev/null || true
 
   local allowed_output output_contract_present=false
-  allowed_output="$(awk '/^(AI_PARALLEL_LIVE_SMOKE|AI_PARALLEL_SMOKE_STATUS|ORCHESTRATION_MODE|ORCHESTRATION_LATENCY_MS|GLOBAL_DEADLINE_EXCEEDED|PROVIDER_SUBMITTED_COUNT|PROVIDER_COMPLETED_COUNT|PROVIDER_SUCCESS_COUNT|PROVIDER_TIMEOUT_COUNT|PROVIDER_FAILED_COUNT|PARTIAL_FALLBACK_USED|OPENAI_STATUS|OPENAI_HTTP_STATUS_CLASS|OPENAI_PARSE_STATUS|OPENAI_LATENCY_MS|OPENAI_CALL_COUNT|GEMINI_STATUS|GEMINI_HTTP_STATUS_CLASS|GEMINI_PARSE_STATUS|GEMINI_LATENCY_MS|GEMINI_CALL_COUNT|XAI_STATUS|XAI_HTTP_STATUS_CLASS|XAI_PARSE_STATUS|XAI_LATENCY_MS|XAI_CALL_COUNT|FINAL_RESULT_ORDER|LIVE_PROVIDER_CALLS|REAL_KEYS_READ|PRODUCTION_READINESS): / { print }' "${output_file}")"
+  allowed_output="$(awk '/^(AI_PARALLEL_LIVE_SMOKE|AI_PARALLEL_SMOKE_STATUS|ORCHESTRATION_MODE|ORCHESTRATION_LATENCY_MS|GLOBAL_DEADLINE_EXCEEDED|PROVIDER_SUBMITTED_COUNT|PROVIDER_COMPLETED_COUNT|PROVIDER_SUCCESS_COUNT|PROVIDER_TIMEOUT_COUNT|PROVIDER_FAILED_COUNT|PARTIAL_FALLBACK_USED|OPENAI_STATUS|OPENAI_HTTP_STATUS_CLASS|OPENAI_PARSE_STATUS|OPENAI_LATENCY_MS|OPENAI_CALL_COUNT|GEMINI_STATUS|GEMINI_HTTP_STATUS_CLASS|GEMINI_PARSE_STATUS|GEMINI_LATENCY_MS|GEMINI_CALL_COUNT|XAI_STATUS|XAI_HTTP_STATUS_CLASS|XAI_PARSE_STATUS|XAI_LATENCY_MS|XAI_CALL_COUNT|FINAL_RESULT_ORDER|LIVE_PROVIDER_CALLS|REAL_KEYS_READ|PRODUCTION_READINESS): / { print }' "${SMOKE_OUTPUT_FILE}")"
   if [[ "${allowed_output}" == *"AI_PARALLEL_LIVE_SMOKE: "*
         && "${allowed_output}" == *"LIVE_PROVIDER_CALLS: "* ]]; then
     output_contract_present=true
   fi
   if [[ "${smoke_exit}" -ne 0 || "${output_contract_present}" != "true" ]]; then
-    emit_failure "${output_file}" "${call_count_file}" "${stage_file}" \
-      "${watchdog_file}" "${smoke_exit}" "${output_contract_present}"
+    emit_failure "${SMOKE_OUTPUT_FILE}" "${SMOKE_CALL_COUNT_FILE}" "${SMOKE_STAGE_FILE}" \
+      "${SMOKE_WATCHDOG_FILE}" "${smoke_exit}" "${output_contract_present}"
     return 1
   fi
   printf '%s\n' "${allowed_output}"
