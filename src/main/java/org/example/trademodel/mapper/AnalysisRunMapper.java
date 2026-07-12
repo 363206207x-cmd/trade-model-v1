@@ -130,6 +130,22 @@ public interface AnalysisRunMapper {
     @Select("SELECT COUNT(DISTINCT symbol) FROM tm_analysis_run")
     Integer countDistinctSymbols();
 
+    @Select("SELECT COUNT(DISTINCT symbol) FROM tm_analysis_run WHERE status = 'SUCCESS' "
+            + "AND symbol IN ('BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT')")
+    Integer countLocalRealSuccessfulSymbols();
+
+    @Select("SELECT MAX(completed_at) FROM tm_analysis_run WHERE status = 'SUCCESS'")
+    LocalDateTime selectLatestSuccessfulCompletedAt();
+
+    @Select("SELECT COUNT(*) FROM tm_evidence_item WHERE analysis_id = #{analysisId}")
+    Integer countEvidenceByAnalysisId(@Param("analysisId") String analysisId);
+
+    @Select("SELECT COUNT(*) FROM tm_score_item WHERE analysis_id = #{analysisId}")
+    Integer countScoresByAnalysisId(@Param("analysisId") String analysisId);
+
+    @Select("SELECT AVG(score_value) FROM tm_score_item WHERE analysis_id = #{analysisId}")
+    Double selectAverageScoreByAnalysisId(@Param("analysisId") String analysisId);
+
     @Select("SELECT COUNT(*) FROM tm_analysis_run "
             + "WHERE analysis_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
     @Select(value = "SELECT COUNT(*) FROM tm_analysis_run "

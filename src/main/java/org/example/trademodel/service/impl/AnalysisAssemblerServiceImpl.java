@@ -41,6 +41,7 @@ import org.example.trademodel.risk.UserPositionRiskResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,6 +95,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private UserPositionRiskAdapter userPositionRiskAdapter;
+    private boolean requireRealMarketEnvironment;
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -215,6 +217,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.userPositionRiskAdapter = userPositionRiskAdapter;
     }
 
+    @Value("${trade-model.analysis.require-real-market-environment:false}")
+    void setRequireRealMarketEnvironment(boolean requireRealMarketEnvironment) {
+        this.requireRealMarketEnvironment = requireRealMarketEnvironment;
+    }
+
 
     @Override
     @Transactional
@@ -255,6 +262,9 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     log.info("[market-env] assemble uses Binance market-env heuristic symbol={} tf={} sourceType={}",
                             symbol, timeframe, marketEnvSourceType);
                 } else {
+                    if (requireRealMarketEnvironment) {
+                        throw new IllegalStateException("REAL_MARKET_ENVIRONMENT_REQUIRED");
+                    }
                     log.info("[market-env] assemble fallback placeholder symbol={} tf={}", symbol, timeframe);
                 }
             }

@@ -27,6 +27,7 @@ public class AnalysisSchedulerService {
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final AnalysisRunProperties properties;
     private final Clock clock;
+    private PersistedOhlcvQueryService persistedOhlcvQueryService;
 
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties) {
@@ -40,6 +41,11 @@ public class AnalysisSchedulerService {
         this.analysisRunOrchestrator = analysisRunOrchestrator;
         this.properties = properties;
         this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
+    }
+
+    @Autowired(required = false)
+    void setPersistedOhlcvQueryService(PersistedOhlcvQueryService persistedOhlcvQueryService) {
+        this.persistedOhlcvQueryService = persistedOhlcvQueryService;
     }
 
     public ApiResponse<AssetAnalysisVO> executeAnalysis(String symbol, String timeframe, String triggerType) {
@@ -87,12 +93,34 @@ public class AnalysisSchedulerService {
         String reference = "SCHEDULED:" + LocalDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
         List<AnalysisRunResult> results = new ArrayList<>();
         for (String symbol : properties.getScheduler().getSymbols()) {
+            if (!marketDataReady(symbol)) {
+                continue;
+            }
             for (String timeframe : properties.getScheduler().getTimeframes()) {
                 results.add(analysisRunOrchestrator.run(AnalysisRunCommand.scheduled(
                         symbol, timeframe, RequestIdSupport.generate(), reference)));
             }
         }
         return results;
+    }
+
+    public boolean marketDataReady(String symbol) {
+        int requiredBars = properties.getScheduler().getRequiredClosedBars();
+        List<String> requiredTimeframes = properties.getScheduler().getRequiredMarketTimeframes();
+        if (requiredBars <= 0 && (requiredTimeframes == null || requiredTimeframes.isEmpty())) {
+            return true;
+        }
+        if (requiredBars <= 0 || requiredTimeframes == null || requiredTimeframes.isEmpty()
+                || persistedOhlcvQueryService == null) {
+            return false;
+        }
+        for (String timeframe : requiredTimeframes) {
+            long maxReadLagMs = maxReadLagMs(timeframe);
+            if (!persistedOhlcvQueryService.evaluateReadiness(symbol, timeframe, requiredBars, maxReadLagMs).isFresh()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public Map<String, Object> status() {
@@ -111,8 +139,20 @@ public class AnalysisSchedulerService {
         status.put("notUserPositionCreation", true);
         status.put("notUserPositionMutation", true);
         status.put("supportedTimeframes", AnalysisTimePolicy.supportedTimeframes());
+        status.put("requiredMarketTimeframes", properties.getScheduler().getRequiredMarketTimeframes());
+        status.put("requiredClosedBars", properties.getScheduler().getRequiredClosedBars());
         status.put("configValid", schedulerConfigValid());
         return status;
+    }
+
+    private static long maxReadLagMs(String timeframe) {
+        return switch (timeframe) {
+            case "5m" -> 11L * 60_000L;
+            case "15m" -> 31L * 60_000L;
+            case "1h" -> 121L * 60_000L;
+            case "4h" -> 481L * 60_000L;
+            default -> 0L;
+        };
     }
 
     private boolean schedulerConfigValid() {
