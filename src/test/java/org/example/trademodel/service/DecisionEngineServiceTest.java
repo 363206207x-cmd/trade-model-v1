@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -95,6 +97,16 @@ class DecisionEngineServiceTest {
         DecisionBundleVO withGateBoundaryScore = service.makeDecision("BTCUSDT", "1m", "analysis-3", 60, 65);
 
         assertThat(withGateBoundaryScore.getIsWorthOpening()).isEqualTo(baseline.getIsWorthOpening());
+    }
+
+    @Test
+    void sixAssetsReceiveDistinctDecisionIdsEvenInOneTightCycle() {
+        Set<String> decisionIds = List.of("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT")
+                .stream()
+                .map(symbol -> service.makeDecision(symbol, "5m", "ana-" + symbol, 80, 65).getDecisionId())
+                .collect(Collectors.toSet());
+
+        assertThat(decisionIds).hasSize(6).allMatch(id -> id.startsWith("dec-") && id.length() <= 64);
     }
 
     @Test

@@ -6,6 +6,10 @@ import org.example.trademodel.service.AnalysisAssemblerService;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -17,6 +21,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AnalysisRunOrchestratorImplTest {
     private static final Clock FIXED = Clock.fixed(Instant.parse("2026-06-23T10:04:59Z"), ZoneOffset.UTC);
 
@@ -50,6 +55,26 @@ class AnalysisRunOrchestratorImplTest {
                 .isNotEqualTo(base);
         assertThat(AnalysisRunOrchestratorImpl.idempotencyKeyForTest("BTCUSDT", "5m", bucket, "rules-b"))
                 .isNotEqualTo(base);
+    }
+
+    @Test
+    void schedulerCycleMayBeSharedButSixAnalysisIdsAndSnapshotsAreAssetScoped() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.IN_PROGRESS);
+        AnalysisRunOrchestratorImpl orchestrator = orchestrator(
+                guard, new CapturingAssembler(false), "rules-2026-06");
+        List<String> symbols = List.of("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
+
+        symbols.forEach(symbol -> orchestrator.run(AnalysisRunCommand.scheduled(
+                symbol, "5m", "req-" + symbol, "scheduler-cycle-shared")));
+
+        assertThat(guard.requests).hasSize(6);
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getAnalysisId).doesNotHaveDuplicates();
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getTraceId).doesNotHaveDuplicates();
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getIdempotencyKey).doesNotHaveDuplicates();
+        assertThat(guard.requests).extracting(AnalysisRunClaimRequest::getTriggerReference)
+                .containsOnly("scheduler-cycle-shared");
+        assertThat(guard.requests).allSatisfy(request ->
+                assertThat(request.getInputSnapshotJson()).contains("\"symbol\":\"" + request.getSymbol() + "\""));
     }
 
     @Test
@@ -115,6 +140,31 @@ class AnalysisRunOrchestratorImplTest {
         assertThat(guard.failedMessage).isEqualTo(result.getMessage());
     }
 
+    @Test
+    void evidencePrimaryKeyCollisionUsesPreciseFailureCodeAndSanitizedDiagnostics(CapturedOutput output) {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
+        DuplicateKeyException collision = new DuplicateKeyException(
+                "Unique index or primary key violation: \"PUBLIC.PRIMARY_KEY_4 ON "
+                        + "PUBLIC.TM_EVIDENCE_ITEM(EVIDENCE_ID) VALUES ('secret-value')\"");
+
+        AnalysisRunResult result = orchestrator(guard, new CapturingAssembler(collision), "rules-2026-06")
+                .run(AnalysisRunCommand.manual("ETHUSDT", "5m", "req-collision", "2026-06-23T10:04:59Z"));
+
+        assertThat(result.getStatus()).isEqualTo("FAILED");
+        assertThat(guard.failedCode).isEqualTo("EVIDENCE_ID_COLLISION");
+        assertThat(output).contains("symbol=ETHUSDT")
+                .contains("entity=tm_evidence_item")
+                .contains("constraint=PRIMARY_KEY_4")
+                .contains("failureCode=EVIDENCE_ID_COLLISION")
+                .doesNotContain("secret-value");
+    }
+
+    @Test
+    void nonDuplicateFailureKeepsExistingFailureClassification() {
+        assertThat(AnalysisRunOrchestratorImpl.classifyPersistenceFailure(
+                new IllegalStateException("REAL_MARKET_ENVIRONMENT_REQUIRED"))).isNull();
+    }
+
     private static AnalysisRunOrchestratorImpl orchestrator(CapturingGuard guard, CapturingAssembler assembler, String ruleVersion) {
         AnalysisRunProperties properties = new AnalysisRunProperties();
         return new AnalysisRunOrchestratorImpl(guard, assembler, ruleConfig(ruleVersion), properties, FIXED);
@@ -161,6 +211,7 @@ class AnalysisRunOrchestratorImplTest {
     private static final class CapturingGuard implements AnalysisIdempotencyGuard {
         private final AnalysisIdempotencyClaimStatus status;
         private final List<AnalysisRunClaimRequest> requests = new ArrayList<>();
+        private String failedCode;
         private String failedMessage;
 
         private CapturingGuard(AnalysisIdempotencyClaimStatus status) {
@@ -175,16 +226,23 @@ class AnalysisRunOrchestratorImplTest {
 
         @Override
         public void markFailed(AnalysisExecutionContext context, String errorCode, String errorMessage) {
+            failedCode = errorCode;
             failedMessage = errorMessage;
         }
     }
 
     private static final class CapturingAssembler implements AnalysisAssemblerService {
-        private final boolean fail;
+        private final RuntimeException failure;
         private AnalysisExecutionContext context;
 
         private CapturingAssembler(boolean fail) {
-            this.fail = fail;
+            this.failure = fail
+                    ? new IllegalStateException("Authorization: Bearer SECRET https://api.example.test/path?api_key=SECRET&x=1")
+                    : null;
+        }
+
+        private CapturingAssembler(RuntimeException failure) {
+            this.failure = failure;
         }
 
         @Override
@@ -195,8 +253,8 @@ class AnalysisRunOrchestratorImplTest {
         @Override
         public AssetAnalysisVO assemble(AnalysisExecutionContext context) {
             this.context = context;
-            if (fail) {
-                throw new IllegalStateException("Authorization: Bearer SECRET https://api.example.test/path?api_key=SECRET&x=1");
+            if (failure != null) {
+                throw failure;
             }
             AssetAnalysisVO analysis = new AssetAnalysisVO();
             analysis.setAnalysisId(context.getAnalysisId());

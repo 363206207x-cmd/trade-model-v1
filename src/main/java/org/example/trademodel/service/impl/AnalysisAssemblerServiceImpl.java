@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.trademodel.analysisrun.AnalysisExecutionContext;
+import org.example.trademodel.analysisrun.AnalysisPersistenceIds;
 import org.example.trademodel.analysisrun.AnalysisRunIds;
 import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
@@ -58,7 +59,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -702,7 +702,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             if (evidences != null) {
                 for (EvidenceItemVO e : evidences) {
                     EvidenceItemDO edo = new EvidenceItemDO();
-                    edo.setEvidenceId(e.getEvidenceId() != null ? e.getEvidenceId() : "ev-" + System.currentTimeMillis());
+                    edo.setEvidenceId(e.getEvidenceId() != null ? e.getEvidenceId() : AnalysisPersistenceIds.evidenceId());
                     edo.setAnalysisId(analysis.getAnalysisId());
                     edo.setEvidenceType(EvidenceTypeConstants.normalizeEvidenceType(e.getEvidenceType()));
                     edo.setDescription(e.getDescription());
@@ -1450,7 +1450,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         // 仅处理 score_id 主键冲突，快速重试以恢复样本生成链路。
         final int maxAttempts = 3;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            scoreItemDO.setScoreId("sc-" + UUID.randomUUID().toString().replace("-", ""));
+            scoreItemDO.setScoreId(AnalysisPersistenceIds.scoreId());
             try {
                 scoreItemMapper.insert(scoreItemDO);
                 return;
