@@ -115,6 +115,11 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                 contractVerified = true;
             }
             return result;
+        } catch (GeminiInteractionContractException e) {
+            AiProviderReviewResult result = failure(
+                    AiProviderCallStatus.INVALID_RESPONSE, e.reason().name(), elapsedMs(started));
+            result.setGeminiInteractionDiagnostic(e.diagnostic());
+            return result;
         } catch (JsonProcessingException e) {
             return failure(AiProviderCallStatus.INVALID_RESPONSE, "PROVIDER_RESPONSE_SCHEMA", elapsedMs(started));
         } catch (HttpTimeoutException e) {
@@ -277,6 +282,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
 
     protected record ProviderPayload(String content, String providerRequestId,
                                      Long inputTokens, Long outputTokens, Long totalTokens,
-                                     GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic) {
+                                     GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic,
+                                     GeminiInteractionDiagnostic geminiInteractionDiagnostic) {
     }
 }

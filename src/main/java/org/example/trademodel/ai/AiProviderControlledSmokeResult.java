@@ -20,10 +20,48 @@ public record AiProviderControlledSmokeResult(
         int liveProviderCalls,
         AiProviderSchemaDiagnostic schemaDiagnostic,
         GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic,
-        GeminiRequestDiagnostic geminiRequestDiagnostic
+        GeminiRequestDiagnostic geminiRequestDiagnostic,
+        GeminiInteractionDiagnostic geminiInteractionDiagnostic
 ) {
     public List<String> sanitizedOutputLines() {
         List<String> requestLines = requestDiagnosticLines();
+        if (geminiInteractionDiagnostic != null
+                && geminiInteractionDiagnostic.failureReason() != null) {
+            List<String> lines = new ArrayList<>(requestLines);
+            lines.addAll(standardSmokeLines());
+            lines.addAll(List.of(
+                    "GEMINI_INTERACTION_DIAGNOSTIC_STATUS: FAILED",
+                    "GEMINI_INTERACTION_STATUS: " + display(geminiInteractionDiagnostic.interactionStatus()),
+                    "GEMINI_INTERACTION_ID_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.interactionIdPresent()),
+                    "GEMINI_INTERACTION_USAGE_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.usagePresent()),
+                    "GEMINI_INTERACTION_TOTAL_INPUT_TOKENS_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.totalInputTokensPresent()),
+                    "GEMINI_INTERACTION_TOTAL_OUTPUT_TOKENS_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.totalOutputTokensPresent()),
+                    "GEMINI_INTERACTION_TOTAL_THOUGHT_TOKENS_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.totalThoughtTokensPresent()),
+                    "GEMINI_INTERACTION_TOTAL_TOKENS_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.totalTokensPresent()),
+                    "GEMINI_INTERACTION_STEP_COUNT: "
+                            + Math.max(0, geminiInteractionDiagnostic.stepCount()),
+                    "GEMINI_INTERACTION_MODEL_OUTPUT_STEP_COUNT: "
+                            + Math.max(0, geminiInteractionDiagnostic.modelOutputStepCount()),
+                    "GEMINI_INTERACTION_FINAL_OUTPUT_PRESENT: "
+                            + yesNo(geminiInteractionDiagnostic.finalModelOutputPresent()),
+                    "GEMINI_INTERACTION_FINAL_TEXT_BLOCK_COUNT: "
+                            + Math.max(0, geminiInteractionDiagnostic.finalTextBlockCount()),
+                    "GEMINI_INTERACTION_FINAL_TEXT_LENGTH: "
+                            + Math.max(0, geminiInteractionDiagnostic.finalTextLength()),
+                    "GEMINI_INTERACTION_FINAL_JSON_PARSE_STATUS: "
+                            + display(geminiInteractionDiagnostic.finalJsonParseStatus()),
+                    "GEMINI_INTERACTION_V1_CONTRACT_STATUS: "
+                            + display(geminiInteractionDiagnostic.v1ContractStatus()),
+                    "GEMINI_INTERACTION_FAILURE_REASON: "
+                            + geminiInteractionDiagnostic.failureReason().name()));
+            return List.copyOf(lines);
+        }
         GeminiExtractionDiagnostic extractionDiagnostic = geminiResponseShapeDiagnostic == null
                 ? null : geminiResponseShapeDiagnostic.extractionDiagnostic();
         if (extractionDiagnostic != null) {
@@ -67,7 +105,20 @@ public record AiProviderControlledSmokeResult(
             return List.copyOf(lines);
         }
         List<String> lines = new ArrayList<>(requestLines);
-        lines.addAll(List.of(
+        lines.addAll(standardSmokeLines());
+        if (schemaDiagnostic != null) {
+            lines.add("GEMINI_SCHEMA_DIAGNOSTIC: FIELD_NAMES_AND_TYPES_ONLY");
+            lines.add("EXPECTED_FIELDS: " + join(schemaDiagnostic.expectedFields()));
+            lines.add("ACTUAL_FIELDS: " + join(schemaDiagnostic.actualFields()));
+            lines.add("MISSING_FIELDS: " + join(schemaDiagnostic.missingFields()));
+            lines.add("UNEXPECTED_FIELDS: " + join(schemaDiagnostic.unexpectedFields()));
+            lines.add("TYPE_MISMATCH_FIELDS: " + join(schemaDiagnostic.typeMismatchFields()));
+        }
+        return List.copyOf(lines);
+    }
+
+    private List<String> standardSmokeLines() {
+        return List.of(
                 "AI_PROVIDER: " + display(provider),
                 "AI_MODEL: " + display(model),
                 "AI_AUTH_STATUS: " + display(authStatus),
@@ -82,16 +133,7 @@ public record AiProviderControlledSmokeResult(
                 "AI_LATENCY_MS: " + Math.max(0, latencyMs),
                 "AI_PROVIDER_LIVE_SMOKE: " + status.name(),
                 "LIVE_PROVIDER_CALLS: " + Math.max(0, liveProviderCalls),
-                "PRODUCTION_READINESS: BLOCKED"));
-        if (schemaDiagnostic != null) {
-            lines.add("GEMINI_SCHEMA_DIAGNOSTIC: FIELD_NAMES_AND_TYPES_ONLY");
-            lines.add("EXPECTED_FIELDS: " + join(schemaDiagnostic.expectedFields()));
-            lines.add("ACTUAL_FIELDS: " + join(schemaDiagnostic.actualFields()));
-            lines.add("MISSING_FIELDS: " + join(schemaDiagnostic.missingFields()));
-            lines.add("UNEXPECTED_FIELDS: " + join(schemaDiagnostic.unexpectedFields()));
-            lines.add("TYPE_MISMATCH_FIELDS: " + join(schemaDiagnostic.typeMismatchFields()));
-        }
-        return List.copyOf(lines);
+                "PRODUCTION_READINESS: BLOCKED");
     }
 
     private List<String> requestDiagnosticLines() {

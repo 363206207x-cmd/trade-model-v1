@@ -3,6 +3,8 @@ package org.example.trademodel.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -108,7 +110,7 @@ class GeminiProviderStructuredOutputContractTest {
                 modelOutput(reviewJson("output A"), reviewJson("output B")))));
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_EMPTY_RESPONSE");
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_FINAL_JSON_INVALID");
     }
 
     @Test
@@ -125,22 +127,37 @@ class GeminiProviderStructuredOutputContractTest {
         AiProviderReviewResult result = review(completed("{\"stance\":\"ABSTAIN\""));
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("INVALID_EMPTY_RESPONSE");
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_FINAL_JSON_INVALID");
+        assertThat(result.getGeminiInteractionDiagnostic().finalJsonParseStatus()).isEqualTo("FAIL");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "in_progress,GEMINI_INTERACTION_STATUS_IN_PROGRESS",
+            "requires_action,GEMINI_INTERACTION_STATUS_REQUIRES_ACTION",
+            "failed,GEMINI_INTERACTION_STATUS_FAILED",
+            "cancelled,GEMINI_INTERACTION_STATUS_CANCELLED",
+            "incomplete,GEMINI_INTERACTION_STATUS_INCOMPLETE"
+    })
+    void nonCompletedInteractionStatusPreservesExactReason(String status, String expectedReason) {
+        AiProviderReviewResult result = review(
+                interaction(status, "interaction-id", List.of(modelOutput(reviewJson(status))), true));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo(expectedReason);
+        assertThat(result.getGeminiInteractionDiagnostic().failureReason().name())
+                .isEqualTo(expectedReason);
+        assertThat(result.getGeminiInteractionDiagnostic().interactionStatus())
+                .isEqualTo(status.toUpperCase());
     }
 
     @Test
-    void incompleteInteractionFailsClosed() {
-        assertInteractionStatusFailsClosed("incomplete");
-    }
+    void missingInteractionStatusPreservesExactReason() {
+        AiProviderReviewResult result = review(
+                interaction(null, "interaction-id", List.of(modelOutput(reviewJson("missing"))), true));
 
-    @Test
-    void failedInteractionFailsClosed() {
-        assertInteractionStatusFailsClosed("failed");
-    }
-
-    @Test
-    void cancelledInteractionFailsClosed() {
-        assertInteractionStatusFailsClosed("cancelled");
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_STATUS_MISSING");
+        assertThat(result.getGeminiInteractionDiagnostic().interactionStatus()).isEqualTo("MISSING");
     }
 
     @Test
@@ -151,7 +168,56 @@ class GeminiProviderStructuredOutputContractTest {
         AiProviderReviewResult result = review(interaction("completed", "interaction-id", List.of(step), true));
 
         assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_FINAL_TEXT_MISSING");
+        assertThat(result.getGeminiInteractionDiagnostic().finalTextBlockCount()).isZero();
+    }
+
+    @Test
+    void missingModelOutputPreservesExactReason() {
+        AiProviderReviewResult result = review(interaction(
+                "completed", "interaction-id", List.of(Map.of("type", "tool_output")), true));
+
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_MODEL_OUTPUT_MISSING");
+        assertThat(result.getGeminiInteractionDiagnostic().modelOutputStepCount()).isZero();
+        assertThat(result.getGeminiInteractionDiagnostic().finalModelOutputPresent()).isFalse();
+    }
+
+    @Test
+    void jsonValidButV1InvalidPreservesExactReason() {
+        AiProviderReviewResult result = review(completed("{\"stance\":\"ABSTAIN\"}"));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
+        assertThat(result.getErrorCode()).isEqualTo("GEMINI_INTERACTION_V1_CONTRACT_INVALID");
+        assertThat(result.getGeminiInteractionDiagnostic().finalJsonParseStatus()).isEqualTo("PASS");
+        assertThat(result.getGeminiInteractionDiagnostic().v1ContractStatus()).isEqualTo("FAIL");
+    }
+
+    @Test
+    void interactionDiagnosticStoresPresenceAndCountsWithoutValues() {
+        AiProviderReviewResult result = review(completed("not-json-private-provider-output"));
+        GeminiInteractionDiagnostic diagnostic = result.getGeminiInteractionDiagnostic();
+
+        assertThat(diagnostic.interactionIdPresent()).isTrue();
+        assertThat(diagnostic.usagePresent()).isTrue();
+        assertThat(diagnostic.totalInputTokensPresent()).isTrue();
+        assertThat(diagnostic.totalOutputTokensPresent()).isTrue();
+        assertThat(diagnostic.totalThoughtTokensPresent()).isTrue();
+        assertThat(diagnostic.totalTokensPresent()).isTrue();
+        assertThat(diagnostic.stepCount()).isEqualTo(1);
+        assertThat(diagnostic.modelOutputStepCount()).isEqualTo(1);
+        assertThat(diagnostic.finalTextBlockCount()).isEqualTo(1);
+        assertThat(diagnostic.finalTextLength()).isPositive();
+        assertThat(diagnostic.toString()).doesNotContain(
+                "interaction-id", "not-json-private-provider-output", "private thought");
+    }
+
+    @Test
+    void malformedResponseEnvelopeUsesGenericSchemaFallback() {
+        AiProviderReviewResult result = review(new AiHttpResponse(200, "{", Map.of()));
+
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
         assertThat(result.getErrorCode()).isEqualTo("PROVIDER_RESPONSE_SCHEMA");
+        assertThat(result.getGeminiInteractionDiagnostic()).isNull();
     }
 
     @Test
@@ -259,14 +325,6 @@ class GeminiProviderStructuredOutputContractTest {
         CapturingTransport transport = transport(completed(reviewJson("request")));
         client(transport).review(request(), 15_000L);
         return objectMapper.readTree(transport.request.getBody());
-    }
-
-    private void assertInteractionStatusFailsClosed(String status) {
-        AiProviderReviewResult result = review(
-                interaction(status, "interaction-id", List.of(modelOutput(reviewJson(status))), true));
-
-        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.INVALID_RESPONSE);
-        assertThat(result.getErrorCode()).isEqualTo("PROVIDER_RESPONSE_SCHEMA");
     }
 
     private AiProviderReviewResult review(AiHttpResponse response) {

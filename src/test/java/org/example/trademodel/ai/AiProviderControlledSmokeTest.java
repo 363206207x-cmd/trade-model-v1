@@ -119,8 +119,11 @@ class AiProviderControlledSmokeTest {
         assertThat(result.geminiResponseShapeDiagnostic()).isNull();
         if ("GEMINI".equals(target)) {
             assertThat(result.geminiRequestDiagnostic()).isNotNull();
+            assertThat(result.geminiInteractionDiagnostic()).isNotNull();
             assertThat(result.sanitizedOutputLines())
                     .contains("GEMINI_REQUEST_DIAGNOSTIC: SANITIZED");
+            assertThat(result.sanitizedOutputLines())
+                    .noneMatch(line -> line.startsWith("GEMINI_INTERACTION_DIAGNOSTIC_STATUS:"));
         } else {
             assertThat(result.geminiRequestDiagnostic()).isNull();
             assertThat(result.sanitizedOutputLines()).noneMatch(line -> line.startsWith("GEMINI_"));
@@ -390,9 +393,10 @@ class AiProviderControlledSmokeTest {
 
     @Test
     void invalidGeminiFixtureFailsSmokeResponseSchemaWithUsageAndRequestIdPreserved() {
+        String privateOutput = "Natural language instead of the required JSON contract.";
         String body = "{\"status\":\"completed\",\"steps\":[{\"type\":\"model_output\","
                 + "\"content\":[{\"type\":\"text\",\"text\":"
-                + "\"Natural language instead of the required JSON contract.\"}]}],"
+                + "\"" + privateOutput + "\"}]}],"
                 + "\"usage\":{\"total_input_tokens\":4,\"total_output_tokens\":8,"
                 + "\"total_tokens\":12},\"id\":\"test-response-id\"}";
         FakeTransport transport = FakeTransport.responding(new AiHttpResponse(200, body, Map.of()));
@@ -405,6 +409,28 @@ class AiProviderControlledSmokeTest {
         assertThat(result.errorCategory()).isEqualTo(AiProviderControlledSmokeErrorCategory.RESPONSE_SCHEMA);
         assertThat(result.tokenUsagePresent()).isTrue();
         assertThat(result.requestIdPresent()).isTrue();
+        assertThat(result.geminiInteractionDiagnostic().failureReason())
+                .isEqualTo(GeminiInteractionFailureReason.GEMINI_INTERACTION_FINAL_JSON_INVALID);
+        String output = String.join("\n", result.sanitizedOutputLines());
+        assertThat(output).contains(
+                "GEMINI_INTERACTION_DIAGNOSTIC_STATUS: FAILED",
+                "GEMINI_INTERACTION_STATUS: COMPLETED",
+                "GEMINI_INTERACTION_ID_PRESENT: YES",
+                "GEMINI_INTERACTION_USAGE_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_INPUT_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_OUTPUT_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_TOTAL_THOUGHT_TOKENS_PRESENT: NO",
+                "GEMINI_INTERACTION_TOTAL_TOKENS_PRESENT: YES",
+                "GEMINI_INTERACTION_STEP_COUNT: 1",
+                "GEMINI_INTERACTION_MODEL_OUTPUT_STEP_COUNT: 1",
+                "GEMINI_INTERACTION_FINAL_OUTPUT_PRESENT: YES",
+                "GEMINI_INTERACTION_FINAL_TEXT_BLOCK_COUNT: 1",
+                "GEMINI_INTERACTION_FINAL_JSON_PARSE_STATUS: FAIL",
+                "GEMINI_INTERACTION_V1_CONTRACT_STATUS: NOT_CHECKED",
+                "GEMINI_INTERACTION_FAILURE_REASON: GEMINI_INTERACTION_FINAL_JSON_INVALID");
+        assertThat(output).doesNotContain(
+                privateOutput, body, "test-response-id", "test-gemini-key",
+                "x-goog-api-key", "system_instruction", "input");
     }
 
     @Test
@@ -625,7 +651,8 @@ class AiProviderControlledSmokeTest {
         return new AiProviderControlledSmokeResult("--", null, "--", "NOT_CHECKED", "NOT_RUN",
                 null, null, "NOT_RUN",
                 false, false, 0L, 0L,
-                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0, null, null, null);
+                AiProviderControlledSmokeStatus.SKIPPED_EXTERNAL_CALLS_DISABLED, 0,
+                null, null, null, null);
     }
 
     private void assertGeminiHttpFailure(

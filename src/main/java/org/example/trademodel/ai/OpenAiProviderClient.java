@@ -168,6 +168,7 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
                 longValue(usage, "input_tokens"),
                 longValue(usage, "output_tokens"),
                 longValue(usage, "total_tokens"),
+                null,
                 null);
     }
 

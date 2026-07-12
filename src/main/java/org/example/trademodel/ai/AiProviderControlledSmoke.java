@@ -99,6 +99,14 @@ public class AiProviderControlledSmoke {
                 || review.getOutputTokens() != null || review.getTotalTokens() != null);
         boolean requestId = review != null && review.getProviderRequestId() != null
                 && !review.getProviderRequestId().isBlank();
+        GeminiInteractionDiagnostic interactionDiagnostic = review == null
+                ? null : review.getGeminiInteractionDiagnostic();
+        if (interactionDiagnostic != null) {
+            tokenUsage = tokenUsage || interactionDiagnostic.totalInputTokensPresent()
+                    || interactionDiagnostic.totalOutputTokensPresent()
+                    || interactionDiagnostic.totalTokensPresent();
+            requestId = requestId || interactionDiagnostic.interactionIdPresent();
+        }
         long latency = review == null || review.getLatencyMs() == null ? 0L : review.getLatencyMs();
         GeminiRequestDiagnostic requestDiagnostic = provider == AiProviderName.GEMINI
                 ? GeminiRequestDiagnostic.analyze(objectMapper, model, countingTransport.request()) : null;
@@ -451,7 +459,8 @@ public class AiProviderControlledSmoke {
                 status, calls,
                 review == null ? null : review.getSchemaDiagnostic(),
                 review == null ? null : review.getGeminiResponseShapeDiagnostic(),
-                requestDiagnostic);
+                requestDiagnostic,
+                review == null ? null : review.getGeminiInteractionDiagnostic());
     }
 
     private enum GeminiDiagnosticMode {
