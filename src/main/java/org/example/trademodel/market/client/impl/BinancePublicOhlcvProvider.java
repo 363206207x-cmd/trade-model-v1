@@ -7,6 +7,8 @@ import org.example.trademodel.dto.ohlcv.PublicKlineFetchResult;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.example.trademodel.service.RealMarketDataFetcherService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Public Binance spot K-line adapter. No credential, account, position, or order surface is used. */
 @Service
 public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
+    private static final Logger log = LoggerFactory.getLogger(BinancePublicOhlcvProvider.class);
     static final String SOURCE_ENDPOINT = "/api/v3/klines";
     private static final Set<String> SUPPORTED_TIMEFRAMES = Set.of("5m", "15m", "1h", "4h");
 
@@ -69,6 +72,7 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             if (fetched.httpStatus() == 451 || "GEO_RESTRICTED".equals(fetched.reasonCode())
                     || "ELIGIBILITY_RESTRICTED".equals(fetched.reasonCode())) {
                 geoRestrictedCircuitOpen.set(true);
+                log.warn("BINANCE_GEO_RESTRICTED symbol={} reasonCode={}", symbol, fetched.reasonCode());
                 return result(OhlcvSourceState.ERROR, "GEO_RESTRICTED", null);
             }
             return result(fetched.sourceState(), fetched.reasonCode(), null);

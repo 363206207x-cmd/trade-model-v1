@@ -5,6 +5,7 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.market.client.impl.RoutedPublicOhlcvProvider;
+import org.example.trademodel.market.client.impl.KrakenPairCacheState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -30,6 +31,8 @@ class LocalRealDataStatusServiceTest {
         when(analysisRunMapper.countLocalRealSuccessfulSymbols()).thenReturn(0);
         when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
         when(routedProvider.health()).thenReturn(Map.of());
+        when(routedProvider.krakenPairCacheState()).thenReturn(KrakenPairCacheState.READY);
+        when(routedProvider.requestPair("BTCUSDT")).thenReturn("XBTUSD");
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider);
 
@@ -45,7 +48,13 @@ class LocalRealDataStatusServiceTest {
         assertThat((java.util.List<?>) market.get("assets")).hasSize(6);
         @SuppressWarnings("unchecked")
         Map<String, Object> providers = (Map<String, Object>) status.get("providers");
-        assertThat(providers).containsEntry("primary", "KRAKEN");
+        assertThat(providers).containsEntry("primary", "KRAKEN")
+                .containsEntry("krakenPairCacheState", "READY");
         assertThat((java.util.List<?>) status.get("assets")).hasSize(6);
+        @SuppressWarnings("unchecked")
+        java.util.List<Map<String, Object>> assets = (java.util.List<Map<String, Object>>) status.get("assets");
+        assertThat(assets.get(0)).containsEntry("symbol", "BTCUSDT")
+                .containsEntry("provider", "KRAKEN")
+                .containsEntry("requestPair", "XBTUSD");
     }
 }

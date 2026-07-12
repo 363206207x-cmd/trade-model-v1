@@ -2,7 +2,9 @@
 
 这套本地模式以 Kraken Public OHLC 为主数据源读取真实、已闭合的 K 线，Binance Public Kline 仅作为可选回退，数据写入本机持久化数据库后再运行项目现有的证据、评分与决策链。首页展示的是实际写入的数据，不是 mock 数据。
 
-内部 `BTCUSDT`、`ETHUSDT`、`SOLUSDT`、`XRPUSDT`、`DOGEUSDT` 显式映射到 Kraken 的 USD 现货交易对。`BNBUSDT` 会先通过 Kraken `AssetPairs` 检查；若 Kraken 不支持且 Binance 因 HTTP 451 地域限制不可用，只有 BNB 标记为数据源不可用，其余资产继续启动和分析。
+内部六个资产会通过一次进程内缓存的 Kraken `AssetPairs` 响应解析 REST 标识：以 `wsname` 匹配展示身份，但 OHLC 请求使用 `altname`（缺失时才使用 result object key）。BTC 同时兼容 BTC/XBT，DOGE 同时兼容 DOGE/XDG。若 Kraken 明确不支持 BNB/USD 且 Binance 因 HTTP 451 地域限制不可用，只有 BNB 标记为数据源不可用，其余资产继续启动和分析。
+
+只有 timeout、DNS、5xx、rate limit、provider unavailable，以及 AssetPairs 明确确认的 pair 不存在允许尝试 Binance。Kraken 本地映射或响应结构错误会直接 fail closed，不会通过 Binance 回退掩盖缺陷。
 
 ## 启动
 

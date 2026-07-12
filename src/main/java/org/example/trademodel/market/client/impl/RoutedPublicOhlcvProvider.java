@@ -12,11 +12,15 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Primary
 public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
+    private static final Set<String> KRAKEN_FALLBACK_REASONS = Set.of(
+            "TIMEOUT", "DNS_FAILURE", "HTTP_5XX", "PROVIDER_UNAVAILABLE", "RATE_LIMITED",
+            "PAIR_NOT_SUPPORTED");
     private final KrakenPublicOhlcvProvider kraken;
     private final BinancePublicOhlcvProvider binance;
     private final String primary;
@@ -43,7 +47,8 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
                                                      String ingestionRunId) {
         PublicOhlcvProviderResult primaryResult = call(primary, symbol, timeframe, limit, ingestionRunId);
         record(primary, primaryResult);
-        if (ready(primaryResult) || !fallbackEnabled || primary.equals(fallback)) return primaryResult;
+        if (ready(primaryResult) || !fallbackEnabled || primary.equals(fallback)
+                || !fallbackAllowed(primary, primaryResult)) return primaryResult;
 
         PublicOhlcvProviderResult fallbackResult = call(fallback, symbol, timeframe, limit, ingestionRunId);
         record(fallback, fallbackResult);
@@ -67,6 +72,14 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         return snapshots;
     }
 
+    public String requestPair(String symbol) {
+        return kraken.cachedRequestPair(symbol);
+    }
+
+    public KrakenPairCacheState krakenPairCacheState() {
+        return kraken.pairCacheState();
+    }
+
     private PublicOhlcvProviderResult call(String provider, String symbol, String timeframe, int limit, String runId) {
         return switch (provider) {
             case "KRAKEN" -> kraken.fetchClosedBars(symbol, timeframe, limit, runId);
@@ -83,6 +96,12 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
 
     private static boolean ready(PublicOhlcvProviderResult result) {
         return result != null && result.sourceState() == OhlcvSourceState.READY && result.batch() != null;
+    }
+
+    private static boolean fallbackAllowed(String provider, PublicOhlcvProviderResult result) {
+        if (!"KRAKEN".equals(provider)) return true;
+        String reason = result == null ? "PROVIDER_UNAVAILABLE" : result.reasonCode();
+        return KRAKEN_FALLBACK_REASONS.contains(reason);
     }
 
     private static String normalizeProvider(String value) {

@@ -9,6 +9,9 @@ import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.dto.ohlcv.PublicProviderErrorCode;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.example.trademodel.service.RealMarketDataFetcherService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +20,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,13 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
     static final String SOURCE_ENDPOINT = "/0/public/OHLC";
-    private static final String ASSET_PAIRS_ENDPOINT = "/0/public/AssetPairs";
-    private static final Map<String, String> DISPLAY_PAIRS = Map.of(
-            "BTCUSDT", "BTC/USD",
-            "ETHUSDT", "ETH/USD",
-            "SOLUSDT", "SOL/USD",
-            "XRPUSDT", "XRP/USD",
-            "DOGEUSDT", "DOGE/USD");
+    private static final Logger log = LoggerFactory.getLogger(KrakenPublicOhlcvProvider.class);
     private static final Map<String, Integer> INTERVALS = Map.of(
             "5m", 5, "15m", 15, "1h", 60, "4h", 240);
 
@@ -40,19 +36,26 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
     private final boolean enabled;
     private final boolean externalCallsEnabled;
     private final String baseUrl;
-    private volatile boolean bnbPairChecked;
-    private volatile String bnbDisplayPair;
+    private final KrakenPairResolver pairResolver;
     private final AtomicLong rateLimitedUntilMs = new AtomicLong(0L);
 
+    @Autowired
     public KrakenPublicOhlcvProvider(
             RealMarketDataFetcherService fetcher,
             @Value("${trade-model.ohlcv.kraken.enabled:false}") boolean enabled,
             @Value("${trade-model.ohlcv.kraken.external-calls-enabled:false}") boolean externalCallsEnabled,
             @Value("${trade-model.ohlcv.kraken.base-url:https://api.kraken.com}") String baseUrl) {
+        this(fetcher, enabled, externalCallsEnabled, baseUrl, new KrakenPairResolver(fetcher, baseUrl));
+    }
+
+    KrakenPublicOhlcvProvider(RealMarketDataFetcherService fetcher, boolean enabled,
+                              boolean externalCallsEnabled, String baseUrl,
+                              KrakenPairResolver pairResolver) {
         this.fetcher = fetcher;
         this.enabled = enabled;
         this.externalCallsEnabled = externalCallsEnabled;
         this.baseUrl = stripTrailingSlash(baseUrl);
+        this.pairResolver = pairResolver;
     }
 
     @Override
@@ -71,28 +74,33 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
             return result(OhlcvSourceState.DEGRADED, "PUBLIC_OHLCV_REQUEST_INVALID", null);
         }
 
-        PairResolution pair = resolvePair(normalized);
-        if (!pair.ready()) return result(pair.state(), pair.reasonCode(), null);
-        String url = buildOhlcUrl(baseUrl, pair.displayPair(), timeframe, limit, Instant.now());
+        KrakenPairResolution pair = pairResolver.resolve(normalized);
+        if (!pair.ready()) return result(pair.sourceState(), pair.reasonCode(), null);
+        String url = buildOhlcUrl(baseUrl, pair.metadata().requestPair(), timeframe, limit, Instant.now());
         PublicMarketHttpResult fetched = fetchWithBoundedRetry(url);
+        if (fetched == null) {
+            return result(OhlcvSourceState.ERROR, PublicProviderErrorCode.PROVIDER_UNAVAILABLE.name(), null);
+        }
         if (!fetched.ready()) return result(fetched.sourceState(), normalizeReason(fetched.reasonCode()), null);
-        return mapResponse(normalized, timeframe, limit, ingestionRunId, fetched);
+        return mapResponse(normalized, timeframe, limit, ingestionRunId, fetched, pair.metadata());
     }
 
     PublicOhlcvProviderResult mapResponse(String symbol, String timeframe, int limit, String ingestionRunId,
-                                          PublicMarketHttpResult fetched) {
+                                          PublicMarketHttpResult fetched, KrakenPairMetadata pair) {
         JsonNode root = fetched.payload();
         if (root == null || !root.isObject() || !validErrorArray(root.path("error"))) {
             return result(OhlcvSourceState.ERROR, PublicProviderErrorCode.INVALID_RESPONSE.name(), null);
         }
         if (containsUnknownPair(root.path("error"))) {
-            return result(OhlcvSourceState.ERROR, PublicProviderErrorCode.PAIR_NOT_SUPPORTED.name(), null);
+            log.warn("KRAKEN_OHLC_UNKNOWN_PAIR internalSymbol={} requestPair={}",
+                    symbol, pair == null ? null : pair.requestPair());
+            return result(OhlcvSourceState.ERROR, "KRAKEN_OHLC_UNKNOWN_PAIR", null);
         }
         if (!root.path("error").isEmpty()) {
             return result(OhlcvSourceState.ERROR, PublicProviderErrorCode.INVALID_RESPONSE.name(), null);
         }
         JsonNode resultNode = root.path("result");
-        JsonNode candles = firstCandleArray(resultNode);
+        JsonNode candles = firstCandleArray(resultNode, pair);
         if (candles == null || !candles.isArray() || candles.size() < 2) {
             return result(OhlcvSourceState.ERROR, PublicProviderErrorCode.INVALID_RESPONSE.name(), null);
         }
@@ -121,39 +129,10 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
         return result(OhlcvSourceState.READY, null, batch);
     }
 
-    private PairResolution resolvePair(String symbol) {
-        String direct = DISPLAY_PAIRS.get(symbol);
-        if (direct != null) return PairResolution.ready(direct);
-        if (!"BNBUSDT".equals(symbol)) {
-            return PairResolution.failed(PublicProviderErrorCode.PAIR_NOT_SUPPORTED.name());
-        }
-        if (bnbPairChecked) {
-            return bnbDisplayPair == null
-                    ? PairResolution.failed(PublicProviderErrorCode.PAIR_NOT_SUPPORTED.name())
-                    : PairResolution.ready(bnbDisplayPair);
-        }
-        synchronized (this) {
-            if (bnbPairChecked) {
-                return bnbDisplayPair == null
-                        ? PairResolution.failed(PublicProviderErrorCode.PAIR_NOT_SUPPORTED.name())
-                        : PairResolution.ready(bnbDisplayPair);
-            }
-            String url = baseUrl + ASSET_PAIRS_ENDPOINT + "?pair=BNBUSD&assetVersion=1";
-            PublicMarketHttpResult result = fetcher.fetchPublicJson("KRAKEN", url);
-            if (!result.ready()) {
-                return new PairResolution(false, null, result.sourceState(), normalizeReason(result.reasonCode()));
-            }
-            bnbDisplayPair = parseAssetVersionDisplayPair(result.payload(), "BNB/USD");
-            bnbPairChecked = true;
-            return bnbDisplayPair == null
-                    ? PairResolution.failed(PublicProviderErrorCode.PAIR_NOT_SUPPORTED.name())
-                    : PairResolution.ready(bnbDisplayPair);
-        }
-    }
-
     private PublicMarketHttpResult fetchWithBoundedRetry(String url) {
         PublicMarketHttpResult result = fetcher.fetchPublicJson("KRAKEN", url);
-        if (result != null && result.httpStatus() == 429) {
+        if (result == null) return null;
+        if (result.httpStatus() == 429) {
             rateLimitedUntilMs.set(System.currentTimeMillis() + 60_000L);
             return result;
         }
@@ -163,11 +142,11 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
         return fetcher.fetchPublicJson("KRAKEN", url);
     }
 
-    static String buildOhlcUrl(String baseUrl, String displayPair, String timeframe, int limit, Instant now) {
+    static String buildOhlcUrl(String baseUrl, String requestPair, String timeframe, int limit, Instant now) {
         int interval = intervalMinutes(timeframe);
         long since = Math.max(0L, now.getEpochSecond() - (long) interval * 60L * (limit + 2L));
         return stripTrailingSlash(baseUrl) + SOURCE_ENDPOINT
-                + "?pair=" + URLEncoder.encode(displayPair, StandardCharsets.UTF_8)
+                + "?pair=" + URLEncoder.encode(requestPair, StandardCharsets.UTF_8)
                 + "&interval=" + interval + "&since=" + since + "&assetVersion=1";
     }
 
@@ -177,27 +156,32 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
         return interval;
     }
 
-    static String parseAssetVersionDisplayPair(JsonNode payload, String expectedDisplayPair) {
-        if (payload == null || !payload.path("error").isArray() || payload.path("error").size() > 0) return null;
-        JsonNode result = payload.path("result");
-        if (!result.isObject()) return null;
-        var fields = result.fields();
-        while (fields.hasNext()) {
-            JsonNode pair = fields.next().getValue();
-            String wsname = pair.path("wsname").asText(null);
-            if (expectedDisplayPair.equalsIgnoreCase(wsname)) return wsname;
-        }
-        return null;
+    public String cachedRequestPair(String symbol) {
+        KrakenPairMetadata metadata = pairResolver.cached(symbol);
+        return metadata == null ? null : metadata.requestPair();
     }
 
-    private static JsonNode firstCandleArray(JsonNode result) {
+    public KrakenPairCacheState pairCacheState() {
+        return pairResolver.state();
+    }
+
+    static JsonNode firstCandleArray(JsonNode result, KrakenPairMetadata pair) {
         if (result == null || !result.isObject()) return null;
+        if (pair != null) {
+            for (String key : List.of(pair.resultKey(), pair.requestPair(), pair.displayPair())) {
+                JsonNode exact = result.get(key);
+                if (exact != null && exact.isArray()) return exact;
+            }
+        }
+        JsonNode only = null;
         var fields = result.fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next();
-            if (!"last".equals(field.getKey()) && field.getValue().isArray()) return field.getValue();
+            if ("last".equals(field.getKey()) || !field.getValue().isArray()) continue;
+            if (only != null) return null;
+            only = field.getValue();
         }
-        return null;
+        return only;
     }
 
     private static OhlcvBarInput parseRow(String symbol, String timeframe, int intervalMinutes, JsonNode row) {
@@ -264,13 +248,4 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
         return new PublicOhlcvProviderResult(state, reason, batch);
     }
 
-    private record PairResolution(boolean ready, String displayPair, OhlcvSourceState state, String reasonCode) {
-        static PairResolution ready(String pair) {
-            return new PairResolution(true, pair, OhlcvSourceState.READY, null);
-        }
-
-        static PairResolution failed(String reason) {
-            return new PairResolution(false, null, OhlcvSourceState.ERROR, reason);
-        }
-    }
 }
