@@ -66,7 +66,10 @@ public class OpenAiProviderClient extends AbstractSafeAiProviderClient {
             case MODEL_CONFIGURED -> List.of(enabled && configured
                     ? "MODEL_AVAILABILITY_UNVERIFIED" : "PROVIDER_DISABLED");
         };
-        return new AiProviderReadiness(provider(), role(), enabled, configured && validModels, false,
+        boolean ready = enabled && configured && validModels
+                && (status == AiModelReadinessStatus.MODEL_ACTIVE
+                || status == AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE);
+        return new AiProviderReadiness(provider(), role(), enabled, configured && validModels, ready,
                 configuredModel, effectiveModel, fallbackUsed, fallbackReason,
                 last == null ? GptFinalModelStrategy.FAST_DECISION_MODEL.name()
                         : last.modelStrategy().name(),

@@ -203,7 +203,7 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
-    void readinessRemainsModelConfiguredBeforeSuccess() {
+    void geminiReadinessBeforeCallIsConfiguredAndNotReady() {
         GeminiProviderClient client = client(transport(completed(reviewJson("unused"))));
 
         AiProviderReadiness readiness = client.readiness();
@@ -216,13 +216,31 @@ class GeminiProviderStructuredOutputContractTest {
     }
 
     @Test
-    void readinessBecomesModelActiveOnlyAfterContractSuccess() {
+    void geminiReadinessAfterContractValidInteractionIsActiveAndReady() {
         GeminiProviderClient client = client(transport(completed(reviewJson("verified"))));
 
         assertThat(client.review(request()).successful()).isTrue();
 
-        assertThat(client.readiness().getModelReadinessStatus())
+        AiProviderReadiness readiness = client.readiness();
+        assertThat(readiness.getModelReadinessStatus())
                 .isEqualTo(AiModelReadinessStatus.MODEL_ACTIVE);
+        assertThat(readiness.isReady()).isTrue();
+        assertThat(readiness.getReasonCodes()).containsExactly("MODEL_CALL_VERIFIED");
+        assertThat(readiness.getReasonCodes()).doesNotContain("MODEL_AVAILABILITY_UNVERIFIED");
+    }
+
+    @Test
+    void failedInteractionRemainsConfiguredAndNotReady() {
+        GeminiProviderClient client = client(transport(
+                interaction("failed", "interaction-id", List.of(modelOutput(reviewJson("failed"))), true)));
+
+        assertThat(client.review(request()).successful()).isFalse();
+
+        AiProviderReadiness readiness = client.readiness();
+        assertThat(readiness.getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_CONFIGURED);
+        assertThat(readiness.isReady()).isFalse();
+        assertThat(readiness.getReasonCodes()).containsExactly("MODEL_AVAILABILITY_UNVERIFIED");
     }
 
     @Test

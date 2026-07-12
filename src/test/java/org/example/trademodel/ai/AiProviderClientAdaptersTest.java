@@ -111,6 +111,12 @@ class AiProviderClientAdaptersTest {
         assertThat(result.getInputTokens()).isEqualTo(21);
         assertThat(result.getOutputTokens()).isEqualTo(9);
         assertThat(result.getTotalTokens()).isEqualTo(30);
+        assertThat(client.readiness().getModelReadinessStatus())
+                .isEqualTo(AiModelReadinessStatus.MODEL_ACTIVE);
+        assertThat(client.readiness().isReady()).isTrue();
+        assertThat(client.readiness().getReasonCodes()).containsExactly("MODEL_CALL_VERIFIED");
+        assertThat(client.readiness().getReasonCodes())
+                .doesNotContain("MODEL_AVAILABILITY_UNVERIFIED");
         assertThat(transport.lastRequest.getUrl()).isEqualTo("https://xai.test/v1/responses");
         assertThat(transport.lastRequest.getBody()).contains("\"max_output_tokens\":200");
         assertThat(transport.lastRequest.getBody()).contains("\"effort\":\"low\"");

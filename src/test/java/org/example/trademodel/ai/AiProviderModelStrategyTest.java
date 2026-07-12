@@ -35,9 +35,12 @@ class AiProviderModelStrategyTest {
         assertThat(result.getSelectedModel()).isEqualTo("gpt-5.6-luna");
         assertThat(result.getFallbackLevel()).isZero();
         assertThat(transport.models()).containsExactly("gpt-5.6-luna");
-        assertThat(client.readiness().getModelReadinessStatus())
+        AiProviderReadiness readiness = client.readiness();
+        assertThat(readiness.getModelReadinessStatus())
                 .isEqualTo(AiModelReadinessStatus.MODEL_ACTIVE);
-        assertThat(client.readiness().getReasonCodes()).containsExactly("MODEL_CALL_VERIFIED");
+        assertThat(readiness.isReady()).isTrue();
+        assertThat(readiness.getReasonCodes()).containsExactly("MODEL_CALL_VERIFIED");
+        assertThat(readiness.getReasonCodes()).doesNotContain("MODEL_AVAILABILITY_UNVERIFIED");
     }
 
     @Test
@@ -72,9 +75,14 @@ class AiProviderModelStrategyTest {
         assertThat(result.getModelRoutingTimestamp()).isNotNull();
         assertThat(result.getModelRoutingTraceId()).isEqualTo("trace-model-routing");
         assertThat(transport.models()).containsExactly("gpt-5.6-luna", "gpt-5.5");
-        assertThat(client.readiness().getModelReadinessStatus())
+        AiProviderReadiness readiness = client.readiness();
+        assertThat(readiness.getModelReadinessStatus())
                 .isEqualTo(AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE);
-        assertThat(client.readiness().getEffectiveModel()).isEqualTo("gpt-5.5");
+        assertThat(readiness.isReady()).isTrue();
+        assertThat(readiness.isFallbackUsed()).isTrue();
+        assertThat(readiness.getFallbackReason()).isEqualTo("OPENAI_FALLBACK_GPT55");
+        assertThat(readiness.getReasonCodes()).containsExactly("OPENAI_FALLBACK_GPT55");
+        assertThat(readiness.getEffectiveModel()).isEqualTo("gpt-5.5");
     }
 
     @Test

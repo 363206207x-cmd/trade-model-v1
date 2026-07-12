@@ -85,12 +85,14 @@ The configuration keys are trade-model.ai.model-strategy.gpt-final.priority, gem
 
 Model readiness is separate from credential presence:
 
-- MODEL_CONFIGURED: an approved model route is selected, but no successful provider response has verified it in this process.
-- MODEL_ACTIVE: the configured primary model has returned a successful contract-valid response in this process.
-- MODEL_FALLBACK_ACTIVE: an approved GPT-5.5 or GPT-5.4 fallback was selected.
-- MODEL_UNAVAILABLE: configuration is invalid or no approved model remains available.
+- MODEL_CONFIGURED: an approved model route is selected, but no successful provider response has verified it in this process; `ready=false` and the reason is `MODEL_AVAILABILITY_UNVERIFIED`.
+- MODEL_ACTIVE: the configured primary model has returned a successful contract-valid response in this process; `ready=true`, the reason is `MODEL_CALL_VERIFIED`, and `MODEL_AVAILABILITY_UNVERIFIED` is absent.
+- MODEL_FALLBACK_ACTIVE: an approved GPT-5.5 or GPT-5.4 fallback was selected and its full response contract passed; `ready=true`, `fallbackUsed=true`, and the explicit fallback reason is retained.
+- MODEL_UNAVAILABLE: configuration is invalid or no approved model remains available; `ready=false`.
 
 The status endpoint does not report ready=true or MODEL_ACTIVE merely because an API key and model are configured. Missing or malformed model selection fails closed.
+
+Readiness verification is deliberately process-local and is not persisted. After application restart, a configured provider starts again at `MODEL_CONFIGURED`; it can become `MODEL_ACTIVE` only after a new HTTP, extraction, JSON, and strict V1 role-contract success. No key, raw output, prompt, response body, or readiness secret is persisted.
 
 The detailed OpenAI model/API contract verification is recorded in `docs/OPENAI_GPT5_MODEL_ROUTING_CONTRACT.md`.
 

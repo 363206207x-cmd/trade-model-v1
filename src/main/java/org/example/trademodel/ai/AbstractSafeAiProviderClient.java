@@ -58,8 +58,11 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
             return readiness(true, false, configuredModel, effectiveModel, false,
                     null, modelStatus, List.of(reason));
         }
+        List<String> reasons = modelStatus == AiModelReadinessStatus.MODEL_ACTIVE
+                ? List.of("MODEL_CALL_VERIFIED")
+                : List.of("MODEL_AVAILABILITY_UNVERIFIED");
         return readiness(true, true, configuredModel, effectiveModel, false,
-                null, modelStatus, List.of("MODEL_AVAILABILITY_UNVERIFIED"));
+                null, modelStatus, reasons);
     }
 
     private AiProviderReadiness readiness(boolean enabled, boolean configured,
@@ -67,7 +70,8 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                                           boolean fallbackUsed, String fallbackReason,
                                           AiModelReadinessStatus modelStatus,
                                           List<String> reasonCodes) {
-        return new AiProviderReadiness(provider(), role(), enabled, configured, false,
+        boolean ready = enabled && configured && modelStatus == AiModelReadinessStatus.MODEL_ACTIVE;
+        return new AiProviderReadiness(provider(), role(), enabled, configured, ready,
                 configuredModel, effectiveModel, fallbackUsed, fallbackReason,
                 modelStatus, reasonCodes);
     }
