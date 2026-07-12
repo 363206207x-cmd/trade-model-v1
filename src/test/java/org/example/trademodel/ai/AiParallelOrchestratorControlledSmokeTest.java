@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -33,18 +34,24 @@ class AiParallelOrchestratorControlledSmokeTest {
             return;
         }
 
+        StageAudit stageAudit = StageAudit.fromEnvironment(environment);
+        stageAudit.write("SPRING_STARTING");
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(
                 TradeModelApplication.class, ControlledTransportConfiguration.class)
                 .web(WebApplicationType.NONE)
                 .properties("spring.main.banner-mode=off")
                 .run()) {
+            stageAudit.write("SPRING_READY");
             AiDecisionOrchestratorService orchestrator =
                     context.getBean(AiDecisionOrchestratorService.class);
             ControlledCountingAiHttpTransport transport =
                     context.getBean(ControlledCountingAiHttpTransport.class);
+            stageAudit.write("ORCHESTRATOR_STARTING");
             AiParallelOrchestratorControlledSmoke.SmokeResult result =
                     smoke.run(environment, orchestrator, transport::snapshot);
+            stageAudit.write("ORCHESTRATOR_COMPLETED");
             result.sanitizedOutputLines().forEach(System.out::println);
+            stageAudit.write("OUTPUT_EMITTED");
             assertThat(result.liveProviderCalls()).isIn("0", "1", "2", "3", "UNKNOWN_MAX_3");
             assertThat(result.finalResultOrder()).isEqualTo(
                     AiParallelOrchestratorControlledSmoke.FINAL_RESULT_ORDER);
@@ -182,6 +189,111 @@ class AiParallelOrchestratorControlledSmokeTest {
         }
     }
 
+    @Test
+    void allZeroMarkerReportsZero() throws Exception {
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", "", "PRECHECK", "0", 1, false);
+
+        assertThat(output).contains("OPENAI_CALL_COUNT: 0", "GEMINI_CALL_COUNT: 0",
+                "XAI_CALL_COUNT: 0", "LIVE_PROVIDER_CALLS: 0");
+    }
+
+    @Test
+    void mixedMarkerReportsExactTotal() throws Exception {
+        String output = failureOutput("OPENAI=1\nGEMINI=0\nXAI=1\n", "", "PROVIDERS_SUBMITTED", "0", 1, false);
+
+        assertThat(output).contains("OPENAI_CALL_COUNT: 1", "GEMINI_CALL_COUNT: 0",
+                "XAI_CALL_COUNT: 1", "LIVE_PROVIDER_CALLS: 2");
+    }
+
+    @Test
+    void malformedSingleProviderReportsPartialUnknown() throws Exception {
+        String output = failureOutput("OPENAI=1\nGEMINI=invalid\nXAI=0\n", "", "PRECHECK", "0", 1, false);
+
+        assertThat(output).contains("OPENAI_CALL_COUNT: 1", "GEMINI_CALL_COUNT: UNKNOWN_MAX_1",
+                "XAI_CALL_COUNT: 0", "LIVE_PROVIDER_CALLS: UNKNOWN_MAX_3");
+    }
+
+    @Test
+    void missingMarkerReportsUnknownMax3() throws Exception {
+        String output = failureOutput(null, "", "PRECHECK", "0", 1, false);
+
+        assertThat(output).contains("OPENAI_CALL_COUNT: UNKNOWN_MAX_1",
+                "GEMINI_CALL_COUNT: UNKNOWN_MAX_1", "XAI_CALL_COUNT: UNKNOWN_MAX_1",
+                "LIVE_PROVIDER_CALLS: UNKNOWN_MAX_3");
+    }
+
+    @Test
+    void springContextFailureClassifiedSafely() throws Exception {
+        assertFailureCategory("Failed to load ApplicationContext", "SPRING_CONTEXT_FAILURE");
+    }
+
+    @Test
+    void databaseFailureClassifiedSafely() throws Exception {
+        assertFailureCategory("org.h2.jdbc.JdbcSQLSyntaxErrorException", "DATABASE_INITIALIZATION_FAILURE");
+    }
+
+    @Test
+    void beanFailureClassifiedSafely() throws Exception {
+        assertFailureCategory("UnsatisfiedDependencyException", "BEAN_CONFIGURATION_FAILURE");
+    }
+
+    @Test
+    void safetyGuardFailureClassifiedSafely() throws Exception {
+        assertFailureCategory("ProductionProfileSafetyGuard", "PRODUCTION_SAFETY_GUARD_FAILURE");
+    }
+
+    @Test
+    void assertionFailureClassifiedSafely() throws Exception {
+        assertFailureCategory("org.opentest4j.AssertionFailedError", "TEST_ASSERTION_FAILURE");
+    }
+
+    @Test
+    void watchdogFailureClassifiedSafely() throws Exception {
+        String output = failureOutput("OPENAI=1\nGEMINI=0\nXAI=0\n", "", "PROVIDERS_SUBMITTED", "1", 143, false);
+
+        assertThat(output).contains("AI_PARALLEL_HARNESS_FAILURE_CATEGORY: WATCHDOG_TIMEOUT",
+                "AI_PARALLEL_HARNESS_PROCESS_EXIT: WATCHDOG", "OPENAI_CALL_COUNT: 1");
+    }
+
+    @Test
+    void outputContractMissingClassifiedSafely() throws Exception {
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", "", "OUTPUT_EMITTED", "0", 0, false);
+
+        assertThat(output).contains("AI_PARALLEL_HARNESS_FAILURE_CATEGORY: OUTPUT_CONTRACT_MISSING",
+                "AI_PARALLEL_HARNESS_PROCESS_EXIT: SUCCESS");
+    }
+
+    @Test
+    void rawStackTraceIsNotPrinted() throws Exception {
+        String raw = "BeanCreationException\n\tat private.Secret.method(Secret.java:42)";
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", raw, "SPRING_STARTING", "0", 1, false);
+
+        assertThat(output).doesNotContain("private.Secret", "Secret.java", "\tat ");
+    }
+
+    @Test
+    void exceptionMessageIsNotPrinted() throws Exception {
+        String message = "BeanCreationException: confidential failure detail";
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", message, "SPRING_STARTING", "0", 1, false);
+
+        assertThat(output).doesNotContain("confidential failure detail");
+    }
+
+    @Test
+    void keyPromptHeaderAndResponseAreNotPrinted() throws Exception {
+        String sensitive = "BeanCreationException OPENAI_API_KEY=secret Prompt=hidden Authorization=Bearer-token response=private";
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", sensitive, "SPRING_STARTING", "0", 1, false);
+
+        assertThat(output).doesNotContain("secret", "Prompt=hidden", "Authorization", "response=private");
+    }
+
+    @Test
+    void stageMarkerIsReported() throws Exception {
+        String output = failureOutput("OPENAI=1\nGEMINI=0\nXAI=0\n", "", "ORCHESTRATOR_STARTING", "0", 1, false);
+
+        assertThat(output).contains("AI_PARALLEL_HARNESS_STAGE: ORCHESTRATOR_STARTING");
+    }
+
     private static Map<String, String> enabledEnvironment() {
         Map<String, String> environment = new java.util.HashMap<>();
         environment.put(AiParallelOrchestratorControlledSmoke.ENABLE_EXTERNAL_CALLS, "true");
@@ -195,6 +307,51 @@ class AiParallelOrchestratorControlledSmokeTest {
         environment.put("GEMINI_API_KEY", "test-gemini-key");
         environment.put("XAI_API_KEY", "test-xai-key");
         return environment;
+    }
+
+    private static void assertFailureCategory(String frameworkMarker, String expected) throws Exception {
+        String output = failureOutput("OPENAI=0\nGEMINI=0\nXAI=0\n", frameworkMarker,
+                "SPRING_STARTING", "0", 1, false);
+        assertThat(output).contains("AI_PARALLEL_HARNESS_FAILURE_CATEGORY: " + expected);
+    }
+
+    private static String failureOutput(String callMarker, String capturedOutput, String stage,
+                                        String watchdog, int processExit,
+                                        boolean outputContractPresent) throws Exception {
+        Path directory = Files.createTempDirectory("ai-parallel-diagnostic-test");
+        try {
+            Path calls = directory.resolve("calls");
+            Path output = directory.resolve("output");
+            Path stageFile = directory.resolve("stage");
+            Path watchdogFile = directory.resolve("watchdog");
+            if (callMarker != null) {
+                Files.writeString(calls, callMarker);
+            }
+            Files.writeString(output, capturedOutput == null ? "" : capturedOutput);
+            Files.writeString(stageFile, stage);
+            Files.writeString(watchdogFile, watchdog);
+            Path script = Path.of("scripts/ai-parallel-orchestrator-controlled-smoke.sh").toAbsolutePath();
+            Process process = new ProcessBuilder("bash", "-c",
+                    "source \"$1\"; emit_failure \"$2\" \"$3\" \"$4\" \"$5\" \"$6\" \"$7\"",
+                    "_", script.toString(), output.toString(), calls.toString(), stageFile.toString(),
+                    watchdogFile.toString(), Integer.toString(processExit),
+                    Boolean.toString(outputContractPresent))
+                    .redirectErrorStream(true)
+                    .start();
+            String result = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertThat(process.waitFor()).isZero();
+            return result;
+        } finally {
+            try (var paths = Files.walk(directory)) {
+                paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException exception) {
+                        throw new IllegalStateException(exception);
+                    }
+                });
+            }
+        }
     }
 
     private static AiParallelOrchestratorControlledSmoke.CallCountAudit zeroAudit() {
@@ -255,24 +412,35 @@ class AiParallelOrchestratorControlledSmokeTest {
     @Configuration(proxyBeanMethods = false)
     static class ControlledTransportConfiguration {
         @Bean
+        StageAudit stageAudit() {
+            return StageAudit.fromEnvironment(System.getenv());
+        }
+
+        @Bean
         @Primary
-        ControlledCountingAiHttpTransport controlledCountingAiHttpTransport() {
+        ControlledCountingAiHttpTransport controlledCountingAiHttpTransport(StageAudit stageAudit) {
             String marker = System.getenv("AI_PARALLEL_SMOKE_CALL_COUNT_FILE");
             if (marker == null || marker.isBlank()) {
                 throw new IllegalStateException("AI_PARALLEL_SMOKE_CALL_COUNT_FILE_REQUIRED");
             }
-            return new ControlledCountingAiHttpTransport(new JdkAiHttpTransport(), Path.of(marker));
+            return new ControlledCountingAiHttpTransport(new JdkAiHttpTransport(), Path.of(marker), stageAudit);
         }
     }
 
     static final class ControlledCountingAiHttpTransport implements AiHttpTransport {
         private final AiHttpTransport delegate;
         private final Path marker;
+        private final StageAudit stageAudit;
         private final Map<AiProviderName, Integer> counts = new EnumMap<>(AiProviderName.class);
 
         ControlledCountingAiHttpTransport(AiHttpTransport delegate, Path marker) {
+            this(delegate, marker, null);
+        }
+
+        ControlledCountingAiHttpTransport(AiHttpTransport delegate, Path marker, StageAudit stageAudit) {
             this.delegate = delegate;
             this.marker = marker;
+            this.stageAudit = stageAudit;
             counts.put(AiProviderName.OPENAI, 0);
             counts.put(AiProviderName.GEMINI, 0);
             counts.put(AiProviderName.XAI, 0);
@@ -283,6 +451,9 @@ class AiParallelOrchestratorControlledSmokeTest {
         public AiHttpResponse post(AiHttpRequest request) throws IOException, InterruptedException {
             AiProviderName provider = providerFor(request == null ? null : request.getUrl());
             markAttempt(provider);
+            if (stageAudit != null) {
+                stageAudit.write("PROVIDERS_SUBMITTED");
+            }
             return delegate.post(request);
         }
 
@@ -325,6 +496,37 @@ class AiParallelOrchestratorControlledSmokeTest {
                 return AiProviderName.XAI;
             }
             throw new IOException("CONTROLLED_SMOKE_UNKNOWN_PROVIDER_ENDPOINT");
+        }
+    }
+
+    static final class StageAudit {
+        private static final List<String> ALLOWED = List.of(
+                "PRECHECK", "SPRING_STARTING", "SPRING_READY", "ORCHESTRATOR_STARTING",
+                "PROVIDERS_SUBMITTED", "ORCHESTRATOR_COMPLETED", "OUTPUT_EMITTED");
+        private final Path marker;
+
+        StageAudit(Path marker) {
+            this.marker = marker;
+        }
+
+        static StageAudit fromEnvironment(Map<String, String> environment) {
+            String marker = environment.get("AI_PARALLEL_SMOKE_STAGE_FILE");
+            if (marker == null || marker.isBlank()) {
+                throw new IllegalStateException("CONTROLLED_SMOKE_STAGE_AUDIT_UNAVAILABLE");
+            }
+            return new StageAudit(Path.of(marker));
+        }
+
+        synchronized void write(String stage) {
+            if (!ALLOWED.contains(stage)) {
+                throw new IllegalArgumentException("CONTROLLED_SMOKE_STAGE_INVALID");
+            }
+            try {
+                Files.writeString(marker, stage + "\n", StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+            } catch (IOException exception) {
+                throw new IllegalStateException("CONTROLLED_SMOKE_STAGE_AUDIT_UNAVAILABLE", exception);
+            }
         }
     }
 }
