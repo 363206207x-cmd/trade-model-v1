@@ -5988,7 +5988,11 @@
             riskLevel: asset.riskLevel,
             assetState: asset.assetState,
             assetStateSnapshot: asset.assetStateLabel || asset.assetState,
-            isWorthOpening: asset.worthOpening
+            isWorthOpening: asset.worthOpening,
+            latestPrice: asset.latestPrice,
+            dataFreshness: asset.dataFreshness,
+            evidenceCount: asset.evidenceCount,
+            latestAnalysisTime: asset.latestAnalysisTime
         };
     }
 
@@ -6039,6 +6043,10 @@
             var stateText = cleanBlankValue(localizeVisibleStatus(asset.assetStateLabel || ""));
             var worthText = asset.worthOpening === true ? "待复核候选" : (asset.worthOpening === false ? "暂不建议" : "");
             var stateOpinion = stateText && worthText ? (stateText + " / " + worthText) : (stateText || worthText || "");
+            var priceText = formatPrice(asset.latestPrice);
+            var freshnessText = cleanBlankValue(localizeVisibleStatus(asset.dataFreshness)) || "NO_DATA";
+            var evidenceText = asset.evidenceCount == null ? "暂无" : String(asset.evidenceCount);
+            var analysisTimeText = formatDateTime(asset.latestAnalysisTime);
             var coinCls = coinAvatarClass(rawSymbol);
             return '<div class="coin-tile bias-' + bcls + selected + (placeholder ? ' placeholder' : '') + '" data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '">' +
                 '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
@@ -6050,6 +6058,10 @@
                 '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value">' + escapeHtml(stateOpinion) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">最新价</span><span class="value">' + escapeHtml(priceText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">数据状态</span><span class="value">' + escapeHtml(freshnessText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">证据数</span><span class="value">' + escapeHtml(evidenceText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">分析时间</span><span class="value">' + escapeHtml(analysisTimeText) + '</span></div>' +
                 '</div></div></div>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {

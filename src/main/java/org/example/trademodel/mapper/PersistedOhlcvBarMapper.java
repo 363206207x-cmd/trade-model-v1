@@ -100,4 +100,14 @@ public interface PersistedOhlcvBarMapper {
             @Param("endTimeMs") long endTimeMs,
             @Param("limit") int limit
     );
+
+    @Select("SELECT COUNT(*) FROM tm_persisted_ohlcv_bar WHERE is_closed = TRUE AND is_deleted = 0")
+    long countAllClosedBars();
+
+    @Select("SELECT COUNT(*) FROM tm_persisted_ohlcv_bar WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
+            + "AND is_closed = TRUE AND is_deleted = 0")
+    long countClosedBars(@Param("symbol") String symbol, @Param("timeframe") String timeframe);
+
+    @Select(BASE_SELECT + "WHERE is_closed = TRUE AND is_deleted = 0 ORDER BY close_time_ms DESC, id DESC LIMIT 1")
+    PersistedOhlcvBarDO selectLatestClosedBar();
 }

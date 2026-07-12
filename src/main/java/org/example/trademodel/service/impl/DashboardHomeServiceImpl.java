@@ -22,6 +22,9 @@ import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
@@ -96,6 +99,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final MarketPriceSnapshotService marketPriceSnapshotService;
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
+    private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
+    private AnalysisRunMapper analysisRunMapper;
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -143,6 +148,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                            DerivativesBusinessIntegrationService derivativesBusinessIntegrationService) {
         this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
         this.derivativesBusinessIntegrationService = derivativesBusinessIntegrationService;
+    }
+
+    @Autowired(required = false)
+    void setLocalRealDashboardSources(PersistedOhlcvBarMapper persistedOhlcvBarMapper,
+                                      AnalysisRunMapper analysisRunMapper) {
+        this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
+        this.analysisRunMapper = analysisRunMapper;
     }
 
     @Override
@@ -412,7 +424,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setSlotType("DECISION");
         asset.setMarketBias(trimToNull(decision.getMarketBiasHierarchy()));
         asset.setMarketBiasLabel(biasLabel(decision.getMarketBiasHierarchy()));
-        asset.setCompositeScore(null);
+        applyPersistedMarketData(asset, normalizeSymbol(decision.getSymbol()));
+        if (analysisRunMapper != null && hasText(decision.getAnalysisId())) {
+            Double average = analysisRunMapper.selectAverageScoreByAnalysisId(decision.getAnalysisId());
+            asset.setCompositeScore(average == null ? null : (int) Math.round(average));
+            asset.setEvidenceCount(analysisRunMapper.countEvidenceByAnalysisId(decision.getAnalysisId()));
+        }
+        asset.setLatestAnalysisTime(decision.getCreateTime());
         asset.setConfidenceLevel(trimToNull(decision.getConfidenceLevel()));
         asset.setConfidenceLabel(confidenceLabel(decision.getConfidenceLevel()));
         asset.setRiskLevel(trimToNull(decision.getRiskLevel()));
@@ -426,8 +444,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private DashboardHomeVO.AssetVO assetPlaceholder(int slot, String symbol) {
         DashboardHomeVO.AssetVO asset = assetBase(slot, symbol);
-        asset.setSlotType("DEFAULT_SLOT");
+        applyPersistedMarketData(asset, symbol);
+        asset.setSlotType(asset.getLatestPrice() == null ? "DEFAULT_SLOT" : "MARKET_DATA");
         return asset;
+    }
+
+    private void applyPersistedMarketData(DashboardHomeVO.AssetVO asset, String symbol) {
+        if (asset == null || persistedOhlcvBarMapper == null || !hasText(symbol)) {
+            return;
+        }
+        List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper.selectLatestClosedWindow(symbol, "5m", 1);
+        PersistedOhlcvBarDO latest = rows == null || rows.isEmpty() ? null : rows.get(0);
+        if (latest == null) {
+            asset.setDataFreshness("NO_DATA");
+            return;
+        }
+        asset.setLatestPrice(latest.getClosePrice());
+        asset.setDataFreshness(trimToNull(latest.getFreshnessStatus()));
     }
 
     private DashboardHomeVO.AssetVO assetBase(int slot, String normalizedSymbol) {

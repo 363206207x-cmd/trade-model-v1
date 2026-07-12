@@ -17,6 +17,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +39,28 @@ public class RealMarketDataFetcherService {
     public RealMarketDataFetcherService(@Lazy AnalysisSchedulerService analysisSchedulerService) {
         this.analysisSchedulerService = analysisSchedulerService;
         logger.info("RealMarketDataFetcherService initialized successfully with baseUrl: {}", baseUrl);
+    }
+
+    @Value("${market.api.connect-timeout-ms:5000}")
+    void configureConnectTimeout(int connectTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = requestFactory();
+        factory.setConnectTimeout(Math.max(1000, connectTimeoutMs));
+        restTemplate.setRequestFactory(factory);
+    }
+
+    @Value("${market.api.read-timeout-ms:10000}")
+    void configureReadTimeout(int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = requestFactory();
+        factory.setReadTimeout(Math.max(1000, readTimeoutMs));
+    }
+
+    private SimpleClientHttpRequestFactory requestFactory() {
+        if (restTemplate.getRequestFactory() instanceof SimpleClientHttpRequestFactory factory) {
+            return factory;
+        }
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        restTemplate.setRequestFactory(factory);
+        return factory;
     }
 
     /**

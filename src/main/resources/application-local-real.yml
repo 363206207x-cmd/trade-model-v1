@@ -1,0 +1,81 @@
+server:
+  address: 127.0.0.1
+  port: 8081
+
+market:
+  api:
+    base-url: https://api.binance.com
+    connect-timeout-ms: 5000
+    read-timeout-ms: 10000
+
+spring:
+  flyway:
+    enabled: false
+  datasource:
+    url: jdbc:h2:file:./data/trade-model-v1-local-real;MODE=MySQL;AUTO_SERVER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: false
+  h2:
+    console:
+      enabled: false
+
+trade-model:
+  auth:
+    enabled: false
+  schedulers:
+    enabled: true
+    push-recheck:
+      enabled: false
+    position-sync:
+      enabled: false
+    position-monitor:
+      enabled: false
+    market-data:
+      enabled: true
+    watchlist:
+      enabled: false
+    ohlcv-ingestion:
+      enabled: true
+      initial-delay-ms: 60000
+      fixed-delay-ms: 60000
+      symbols: BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT
+      timeframes: 5m,15m,1h,4h
+      bar-limit: 101
+      max-symbols: 6
+  analysis:
+    require-real-market-environment: true
+    scheduler:
+      enabled: true
+      initial-delay-ms: 300000
+      fixed-delay-ms: 300000
+      symbols: BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT
+      timeframes: 5m
+      required-market-timeframes: 5m,15m,1h,4h
+      required-closed-bars: 100
+  ohlcv:
+    public-provider:
+      enabled: true
+      external-calls-enabled: true
+  provider-call:
+    enabled: true
+    scheduler-enabled: false
+    profile-escalation-enabled: false
+    external-calls-enabled: true
+  providers:
+    coinglass:
+      enabled: false
+      external-calls-enabled: false
+  ai:
+    enabled: false
+    openai:
+      enabled: false
+    gemini:
+      enabled: false
+    xai:
+      enabled: false

@@ -23,6 +23,8 @@ public class AnalysisRunProperties {
         private long fixedDelayMs = 60000L;
         private List<String> symbols = new ArrayList<>(List.of("BTCUSDT"));
         private List<String> timeframes = new ArrayList<>(List.of("1m"));
+        private List<String> requiredMarketTimeframes = new ArrayList<>();
+        private int requiredClosedBars;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -34,6 +36,14 @@ public class AnalysisRunProperties {
         public void setSymbols(List<String> symbols) { this.symbols = normalize(symbols, List.of("BTCUSDT")); }
         public List<String> getTimeframes() { return timeframes; }
         public void setTimeframes(List<String> timeframes) { this.timeframes = normalize(timeframes, List.of("1m")); }
+        public List<String> getRequiredMarketTimeframes() { return requiredMarketTimeframes; }
+        public void setRequiredMarketTimeframes(List<String> values) {
+            this.requiredMarketTimeframes = normalize(values, List.of());
+        }
+        public int getRequiredClosedBars() { return requiredClosedBars; }
+        public void setRequiredClosedBars(int requiredClosedBars) {
+            this.requiredClosedBars = Math.max(0, requiredClosedBars);
+        }
 
         private static List<String> normalize(List<String> raw, List<String> defaults) {
             List<String> out = new ArrayList<>();

@@ -78,6 +78,6 @@ class PersistedOhlcvIngestionSchedulerTest {
 
     private PersistedOhlcvIngestionScheduler scheduler(boolean global, boolean enabled) {
         return new PersistedOhlcvIngestionScheduler(provider, ingestionService, global, enabled,
-                "BTCUSDT", "5m,15m,1h,4h", 100);
+                "BTCUSDT", "5m,15m,1h,4h", 100, 2);
     }
 }

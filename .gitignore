@@ -37,3 +37,4 @@ backup/
 data/*.mv.db
 data/*.trace.db
 data/*.lock.db
+.runtime/

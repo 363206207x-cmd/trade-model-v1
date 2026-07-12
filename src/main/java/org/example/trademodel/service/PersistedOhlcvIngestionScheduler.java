@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PersistedOhlcvIngestionScheduler {
     private static final Logger log = LoggerFactory.getLogger(PersistedOhlcvIngestionScheduler.class);
     private static final Set<String> PRODUCT_TIMEFRAMES = Set.of("5m", "15m", "1h", "4h");
-    private static final int MAX_SYMBOLS = 2;
 
     private final PublicOhlcvProvider provider;
     private final PersistedOhlcvIngestionService ingestionService;
@@ -32,6 +31,7 @@ public class PersistedOhlcvIngestionScheduler {
     private final List<String> symbols;
     private final List<String> timeframes;
     private final int barLimit;
+    private final int maxSymbols;
     private final Set<String> activeKeys = ConcurrentHashMap.newKeySet();
     private final Map<String, OhlcvIngestionHealth> health = new ConcurrentHashMap<>();
 
@@ -42,7 +42,8 @@ public class PersistedOhlcvIngestionScheduler {
             @Value("${trade-model.schedulers.ohlcv-ingestion.enabled:false}") boolean schedulerEnabled,
             @Value("${trade-model.schedulers.ohlcv-ingestion.symbols:}") String symbols,
             @Value("${trade-model.schedulers.ohlcv-ingestion.timeframes:5m,15m,1h,4h}") String timeframes,
-            @Value("${trade-model.schedulers.ohlcv-ingestion.bar-limit:100}") int barLimit
+            @Value("${trade-model.schedulers.ohlcv-ingestion.bar-limit:100}") int barLimit,
+            @Value("${trade-model.schedulers.ohlcv-ingestion.max-symbols:2}") int maxSymbols
     ) {
         this.provider = provider;
         this.ingestionService = ingestionService;
@@ -51,6 +52,7 @@ public class PersistedOhlcvIngestionScheduler {
         this.symbols = csv(symbols, true);
         this.timeframes = csv(timeframes, false);
         this.barLimit = Math.min(Math.max(barLimit, 1), 500);
+        this.maxSymbols = Math.min(Math.max(maxSymbols, 1), 20);
     }
 
     @Scheduled(
@@ -60,8 +62,9 @@ public class PersistedOhlcvIngestionScheduler {
         if (!globalSchedulersEnabled || !schedulerEnabled) {
             return;
         }
-        if (symbols.isEmpty() || symbols.size() > MAX_SYMBOLS || !PRODUCT_TIMEFRAMES.equals(Set.copyOf(timeframes))) {
-            log.error("OHLCV ingestion schedule rejected: allowlist must contain 1-2 symbols and exactly product timeframes");
+        if (symbols.isEmpty() || symbols.size() > maxSymbols || !PRODUCT_TIMEFRAMES.equals(Set.copyOf(timeframes))) {
+            log.error("OHLCV ingestion schedule rejected: allowlist must contain 1-{} symbols and exactly product timeframes",
+                    maxSymbols);
             return;
         }
         for (String symbol : symbols) {

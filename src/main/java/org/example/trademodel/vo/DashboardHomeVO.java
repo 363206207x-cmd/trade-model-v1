@@ -403,6 +403,10 @@ public class DashboardHomeVO {
         private String assetState;
         private String assetStateLabel;
         private Boolean worthOpening;
+        private BigDecimal latestPrice;
+        private String dataFreshness;
+        private Integer evidenceCount;
+        private LocalDateTime latestAnalysisTime;
 
         public Integer getSlot() {
             return slot;
@@ -515,6 +519,15 @@ public class DashboardHomeVO {
         public void setWorthOpening(Boolean worthOpening) {
             this.worthOpening = worthOpening;
         }
+
+        public BigDecimal getLatestPrice() { return latestPrice; }
+        public void setLatestPrice(BigDecimal latestPrice) { this.latestPrice = latestPrice; }
+        public String getDataFreshness() { return dataFreshness; }
+        public void setDataFreshness(String dataFreshness) { this.dataFreshness = dataFreshness; }
+        public Integer getEvidenceCount() { return evidenceCount; }
+        public void setEvidenceCount(Integer evidenceCount) { this.evidenceCount = evidenceCount; }
+        public LocalDateTime getLatestAnalysisTime() { return latestAnalysisTime; }
+        public void setLatestAnalysisTime(LocalDateTime latestAnalysisTime) { this.latestAnalysisTime = latestAnalysisTime; }
     }
 
     public static class PositionVO {
