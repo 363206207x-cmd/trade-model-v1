@@ -14,6 +14,8 @@ bash scripts/start-local-real-data.sh
 
 首次启动会为 6 个资产准备 4 个周期的数据。至少 5 个资产完成真实行情与规则分析时首页可进入就绪状态；不足 5 个时显示部分就绪或降级，不会用替代数据补齐。脚本会在首页数据准备完成后自动打开浏览器。
 
+分析链的真实行情门禁由已持久化 K 线的 provenance 决定，不由 `local-real` Profile 名称决定。每个资产必须具备 5m、15m、1h、4h 四周期的 fresh、closed、quality OK 数据，并保留真实 provider、source endpoint、source trace 和 fetch time，才会进入 Evidence → Score → Decision。已有文件型 H2 窗口满足这些条件时，重启会直接复用并重新分析，不会为了进入分析而重复下载整批历史 K 线。
+
 ## 打开
 
 访问：<http://127.0.0.1:8081/>

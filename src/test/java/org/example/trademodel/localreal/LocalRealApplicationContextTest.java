@@ -33,6 +33,9 @@ class LocalRealApplicationContextTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("LOCAL_REAL_DATA"))
                 .andExpect(jsonPath("$.marketData.closedBarCount").value(0))
+                .andExpect(jsonPath("$.assets[0].marketDataStatus").value("MARKET_DATA_NOT_READY"))
+                .andExpect(jsonPath("$.assets[0].realMarketEnvironment").value(false))
+                .andExpect(jsonPath("$.assets[0].analysisStatus").value("WAITING"))
                 .andExpect(jsonPath("$.ai.enabled").value(false))
                 .andExpect(jsonPath("$.notAutoTrading").value(true));
 

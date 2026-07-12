@@ -48,7 +48,6 @@ class LocalRealDataCoordinatorTest {
     @Test
     void analysisRunsAfterMinimumBarsAvailableForAllSixAssets() {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
-        when(ingestionScheduler.ingestOne(anyString(), anyString())).thenReturn(readyIngestion());
         when(analysisSchedulerService.marketDataReady(anyString())).thenReturn(true);
         List<AnalysisRunResult> results = successfulResults(
                 "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
@@ -58,12 +57,13 @@ class LocalRealDataCoordinatorTest {
         coordinator.bootstrap();
 
         assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DASHBOARD_READY);
+        verify(ingestionScheduler, never()).ingestOne(anyString(), anyString());
         verify(analysisSchedulerService).runScheduledCycle();
         coordinator.shutdown();
     }
 
     @Test
-    void fiveReadyAssetsMakeDashboardReadyWhileUnsupportedBnbStaysUnavailable() {
+    void fiveSuccessfulAssetsMakeDashboardReadyWhileUnsupportedBnbStaysUnavailable() {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
         when(ingestionScheduler.ingestOne(anyString(), anyString())).thenAnswer(invocation ->
                 "BNBUSDT".equals(invocation.getArgument(0))
@@ -99,6 +99,30 @@ class LocalRealDataCoordinatorTest {
 
         assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DEGRADED);
         assertThat(readiness.reasonCode()).isEqualTo("PUBLIC_OHLCV_BOOTSTRAP_DEGRADED");
+        coordinator.shutdown();
+    }
+
+    @Test
+    void previousFailedRunDoesNotBlockNewSuccessfulRun() {
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        when(analysisSchedulerService.marketDataReady(anyString())).thenReturn(true);
+        AnalysisRunResult failed = mock(AnalysisRunResult.class);
+        AnalysisRunResult success = mock(AnalysisRunResult.class);
+        when(success.isSuccessfulAnalysisAvailable()).thenReturn(true);
+        when(success.getSymbol()).thenReturn("BTCUSDT");
+        when(analysisSchedulerService.runScheduledCycle())
+                .thenReturn(List.of(failed), List.of(success));
+        LocalRealDataCoordinator coordinator = coordinator(readiness);
+
+        coordinator.bootstrap();
+        assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DEGRADED);
+
+        coordinator.recoverWhenMarketBecomesReady();
+
+        assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DASHBOARD_PARTIAL);
+        assertThat(readiness.asset("BTCUSDT").state()).isEqualTo(LocalRealAssetReadinessState.READY);
+        verify(analysisSchedulerService, org.mockito.Mockito.times(2)).runScheduledCycle();
+        verify(ingestionScheduler, never()).ingestOne(anyString(), anyString());
         coordinator.shutdown();
     }
 

@@ -14,10 +14,13 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class RuntimeKlineContextAssemblyServiceImpl implements RuntimeKlineContextAssemblyService {
     private static final String QUALITY_OK = "OK";
+    private static final Set<String> REAL_EXTERNAL_PROVIDERS = Set.of("KRAKEN", "BINANCE", "BINANCE_PUBLIC");
 
     @Override
     public RuntimeKlineContextDTO assemble(PersistedOhlcvReadinessResult readinessResult) {
@@ -44,6 +47,7 @@ public class RuntimeKlineContextAssemblyServiceImpl implements RuntimeKlineConte
         PersistedOhlcvBarDO latestClosedBar = latestClosedBar(bars);
         context.setLatestPrice(latestClosedBar.getClosePrice());
         context.setKlineItems(toRuntimeKlineItems(bars));
+        applyRealMarketProvenance(context, bars, latestClosedBar);
         context.setMissingFields(List.of());
         context.setFallbackStatus(null);
         context.setManualReviewRequired(true);
@@ -81,9 +85,46 @@ public class RuntimeKlineContextAssemblyServiceImpl implements RuntimeKlineConte
         context.setMissingFields(missingFields);
         context.setLatestPrice(null);
         context.setKlineItems(List.of());
+        context.setSourceMode(null);
+        context.setSourceProvider(null);
+        context.setSourceMarketType(null);
+        context.setRealMarketEnvironment(false);
+        context.setClosedBarCount(0);
+        context.setLatestClosedBarTimeMs(null);
+        context.setSourceTraceRefs(List.of());
         context.setManualReviewRequired(true);
         context.setNotTradeInstruction(true);
         return context;
+    }
+
+    private void applyRealMarketProvenance(RuntimeKlineContextDTO context,
+                                           List<PersistedOhlcvBarDO> bars,
+                                           PersistedOhlcvBarDO latestClosedBar) {
+        String provider = bars.get(0).getProvider();
+        String marketType = bars.get(0).getProviderMarketType();
+        boolean consistentProvider = bars.stream()
+                .allMatch(bar -> bar != null && safeEquals(provider, bar.getProvider()));
+        boolean consistentMarketType = bars.stream()
+                .allMatch(bar -> bar != null && safeEquals(marketType, bar.getProviderMarketType()));
+        boolean realProvider = consistentProvider && consistentMarketType
+                && isRealExternalProvider(provider) && "SPOT".equalsIgnoreCase(marketType);
+        context.setSourceProvider(provider);
+        context.setSourceMarketType(marketType);
+        context.setSourceMode(realProvider ? "REAL" : null);
+        context.setRealMarketEnvironment(realProvider);
+        context.setClosedBarCount(bars.size());
+        context.setLatestClosedBarTimeMs(latestClosedBar.getCloseTimeMs());
+        context.setSourceTraceRefs(bars.stream()
+                .map(PersistedOhlcvBarDO::getSourceTraceId)
+                .filter(this::hasText)
+                .distinct()
+                .toList());
+    }
+
+    private boolean isRealExternalProvider(String provider) {
+        if (!hasText(provider)) return false;
+        String normalized = provider.trim().toUpperCase(Locale.ROOT);
+        return REAL_EXTERNAL_PROVIDERS.contains(normalized);
     }
 
     private List<String> missingFieldsForNonFresh(PersistedOhlcvReadinessResult readinessResult) {

@@ -33,6 +33,7 @@ class RuntimeKlineContextAssemblyServiceImplTest {
         assertThat(context.getKlineItems()).hasSize(2);
         assertThat(context.getKlineItems().get(0).getClosePrice()).isEqualByComparingTo("102.30");
         assertThat(context.getKlineItems().get(0).getProvider()).isEqualTo("LOCAL_FIXTURE");
+        assertThat(context.isRealMarketEnvironment()).isFalse();
         assertThat(context.getPersistedOhlcvReadinessStatus()).isEqualTo("FRESH");
         assertThat(context.getPersistedOhlcvStaleReasonCode()).isEqualTo("NONE");
         assertThat(context.getPersistedOhlcvMissingFields()).isEmpty();
@@ -48,6 +49,62 @@ class RuntimeKlineContextAssemblyServiceImplTest {
         assertThat(context.getEventSource()).isNull();
         assertThat(context.getWickSource()).isNull();
         assertSafetyDefaults(context);
+    }
+
+    @Test
+    void runtimeContextReadsKrakenProvenance() {
+        PersistedOhlcvBarDO older = krakenBar(0L, 59_999L);
+        PersistedOhlcvBarDO latest = krakenBar(60_000L, 119_999L);
+
+        RuntimeKlineContextDTO context = service.assemble(freshReadiness(List.of(latest, older)));
+
+        assertThat(context.isRealMarketEnvironment()).isTrue();
+        assertThat(context.getSourceMode()).isEqualTo("REAL");
+        assertThat(context.getSourceProvider()).isEqualTo("KRAKEN");
+        assertThat(context.getSourceMarketType()).isEqualTo("SPOT");
+        assertThat(context.getClosedBarCount()).isEqualTo(2);
+        assertThat(context.getLatestClosedBarTimeMs()).isEqualTo(119_999L);
+        assertThat(context.getSourceTraceRefs()).containsExactly("trace-1");
+    }
+
+    @Test
+    void runtimeContextMarksRealOnlyFromActualProviderData() {
+        PersistedOhlcvBarDO mock = bar(0L, 59_999L, "100", "105", "98", "101");
+        mock.setProvider("MOCK_PROVIDER");
+        PersistedOhlcvReadinessResult mockReadiness = freshReadiness(List.of(mock));
+        mockReadiness.setRequiredWindowSize(1);
+
+        RuntimeKlineContextDTO mockContext = service.assemble(mockReadiness);
+
+        assertThat(mockContext.isRealMarketEnvironment()).isFalse();
+        assertThat(mockContext.getSourceMode()).isNull();
+    }
+
+    @Test
+    void localRealProfileAloneDoesNotImplyRealEnvironment() {
+        RuntimeKlineContextDTO profileOnlyContext = service.assemble(null);
+
+        assertThat(profileOnlyContext.isRealMarketEnvironment()).isFalse();
+    }
+
+    @Test
+    void mockBarsDoNotPassRealMarketGate() {
+        PersistedOhlcvBarDO mock = bar(0L, 59_999L, "100", "105", "98", "101");
+        mock.setProvider("MOCK_PROVIDER");
+        PersistedOhlcvReadinessResult readiness = freshReadiness(List.of(mock));
+        readiness.setRequiredWindowSize(1);
+
+        assertThat(service.assemble(readiness).isRealMarketEnvironment()).isFalse();
+    }
+
+    @Test
+    void fakeBarsDoNotPassRealMarketGate() {
+        PersistedOhlcvBarDO fake = bar(0L, 59_999L, "100", "105", "98", "101");
+        fake.setProvider("FAKE");
+        PersistedOhlcvReadinessResult readiness = freshReadiness(List.of(fake));
+        readiness.setRequiredWindowSize(1);
+
+        assertThat(service.assemble(readiness).isRealMarketEnvironment()).isFalse();
     }
 
     @Test
@@ -154,7 +211,7 @@ class RuntimeKlineContextAssemblyServiceImplTest {
     }
 
     @Test
-    void shouldFailClosedWhenFreshReadinessHasOpenCandle() {
+    void unclosedBarsDoNotPassRealMarketGate() {
         PersistedOhlcvBarDO open = bar(0L, 59_999L, "100.00", "105.00", "98.00", "101.10");
         open.setClosed(false);
         PersistedOhlcvReadinessResult readiness = freshReadiness(List.of(open));
@@ -305,6 +362,16 @@ class RuntimeKlineContextAssemblyServiceImplTest {
         bar.setIngestedAt(LocalDateTime.of(2026, 5, 17, 10, 0));
         bar.setQualityStatus("OK");
         bar.setIsDeleted(0);
+        return bar;
+    }
+
+    private PersistedOhlcvBarDO krakenBar(long openTimeMs, long closeTimeMs) {
+        PersistedOhlcvBarDO bar = bar(openTimeMs, closeTimeMs, "100", "105", "98", "101");
+        bar.setProvider("KRAKEN");
+        bar.setProviderMarketType("SPOT");
+        bar.setSourceEndpoint("/0/public/OHLC");
+        bar.setProvenanceVersion("kraken-public-ohlc-v1");
+        bar.setIngestionRunId("run-kraken");
         return bar;
     }
 
