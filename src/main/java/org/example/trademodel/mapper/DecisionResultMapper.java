@@ -14,8 +14,8 @@ import java.util.List;
 @Mapper
 public interface DecisionResultMapper {
 
-    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, confused_score, asset_state_snapshot, create_time) " +
-            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
+    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, valid_from, expires_at, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, confused_score, asset_state_snapshot, create_time) " +
+            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{validFrom}, #{expiresAt}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
     int insert(DecisionResult decision);
 
     @Select("SELECT * FROM tm_decision_result ORDER BY create_time DESC LIMIT #{limit}")
@@ -29,6 +29,7 @@ public interface DecisionResultMapper {
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            d.valid_from AS validFrom, d.expires_at AS expiresAt,
             COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
@@ -62,6 +63,7 @@ public interface DecisionResultMapper {
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            d.valid_from AS validFrom, d.expires_at AS expiresAt,
             COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,

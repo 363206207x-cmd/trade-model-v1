@@ -126,6 +126,7 @@ public class DashboardHomeVO {
         private String pageTitle = "首页总览";
         private String dataStatus = "WAITING_SYNC";
         private String aiStatus = "WAITING_SYNC";
+        private String aiStatusLabel = "等待同步";
         private String dataSourceText = "WAITING_SYNC";
         private LocalDateTime updatedAt;
 
@@ -151,6 +152,14 @@ public class DashboardHomeVO {
 
         public void setAiStatus(String aiStatus) {
             this.aiStatus = aiStatus;
+        }
+
+        public String getAiStatusLabel() {
+            return aiStatusLabel;
+        }
+
+        public void setAiStatusLabel(String aiStatusLabel) {
+            this.aiStatusLabel = aiStatusLabel;
         }
 
         public String getDataSourceText() {
@@ -923,6 +932,9 @@ public class DashboardHomeVO {
         private String roleLabel;
         private String runStatus;
         private String runStatusLabel;
+        private Boolean resultAvailable = false;
+        private String statusMessage;
+        private String stance;
         private String direction;
         private String confidenceLevel;
         private List<String> supportEvidence = new ArrayList<>();
@@ -974,6 +986,12 @@ public class DashboardHomeVO {
         public void setRunStatus(String runStatus) { this.runStatus = runStatus; }
         public String getRunStatusLabel() { return runStatusLabel; }
         public void setRunStatusLabel(String runStatusLabel) { this.runStatusLabel = runStatusLabel; }
+        public Boolean getResultAvailable() { return resultAvailable; }
+        public void setResultAvailable(Boolean resultAvailable) { this.resultAvailable = resultAvailable; }
+        public String getStatusMessage() { return statusMessage; }
+        public void setStatusMessage(String statusMessage) { this.statusMessage = statusMessage; }
+        public String getStance() { return stance; }
+        public void setStance(String stance) { this.stance = stance; }
 
         public String getDirection() {
             return direction;

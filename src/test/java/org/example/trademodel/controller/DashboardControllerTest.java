@@ -59,11 +59,15 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -95,10 +99,6 @@ public class DashboardControllerTest {
             "function hasRealPositionDetail(d)";
     private static final String UPDATE_MODE_HINT_START =
             "function updateModeHint()";
-    private static final String RENDER_HOME_POSITION_START =
-            "function renderHomePosition(d)";
-    private static final String RENDER_HOME_EXECUTION_START =
-            "function renderHomeExecution(d)";
     private static final String SECTION_END = "</section>";
 
     @Mock
@@ -254,14 +254,15 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void missingDataDoesNotCollapseRolePanelToSingleRow() throws Exception {
-        String html = Files.readString(DASHBOARD_TEMPLATE);
+    void unavailableAiRoleRendersStatusOnly() throws Exception {
+        String router = functionBody("renderHomeAiRoleTab");
+        String unavailable = functionBody("renderUnavailableAiRole");
 
-        assertThat(html).doesNotContain("function aiRoleEmptyState()");
-        assertThat(html).doesNotContain("return aiRoleEmptyState()");
-        assertThat(functionBody("renderGptFinalHomeRole")).contains("aiRoleSummaryStrip", "aiRoleEvidenceList", "aiRoleFooter");
-        assertThat(functionBody("renderGeminiReviewHomeRole")).contains("aiRoleSummaryStrip", "aiRoleEvidenceList");
-        assertThat(functionBody("renderGrokChallengeHomeRole")).contains("aiRoleSummaryStrip", "aiRoleEvidenceList");
+        assertThat(router.indexOf("role.resultAvailable !== true"))
+                .isLessThan(router.indexOf("renderGptFinalHomeRole"));
+        assertThat(unavailable).contains("运行状态", "状态说明");
+        assertThat(unavailable).doesNotContain(
+                "最终倾向", "AI 计划模式", "是否值得开仓", "AI 复核结果已返回");
     }
 
     @Test
@@ -437,12 +438,107 @@ public class DashboardControllerTest {
     @Test
     void floatingPnlDisplayedAsAmountNotPercent() throws Exception {
         String homePayloadRows = functionBody("renderHomePositionsFromPayload");
-        String legacyRow = functionBody("renderHomePosition");
 
         assertThat(homePayloadRows).contains("formatSignedAmount(p.floatingPnl)");
         assertThat(homePayloadRows).doesNotContain("formatPct(p.floatingPnl)");
-        assertThat(legacyRow).contains("formatSignedAmount(floatingPnlAmount)");
-        assertThat(legacyRow).doesNotContain("formatPct(unrealizedPnl)");
+    }
+
+    @Test
+    void sidebarSelectionRefreshesDashboardHome() throws Exception {
+        String sidebar = functionBody("renderSidebarSlots");
+        String tiles = functionBody("renderHomeAssetsFromPayload");
+        String searchSelection = functionBody("selectDashboardAsset");
+        String homeRequest = functionBody("fetchDashboardHome");
+
+        assertSelectionRefreshOrder(sidebar, "selectedSymbol = sym", "refreshDashboard()");
+        assertSelectionRefreshOrder(tiles, "selectedSymbol = sym", "refreshDashboard()");
+        assertSelectionRefreshOrder(searchSelection, "selectedSymbol = symbol", "refreshDashboard()");
+        assertThat(directFunctionCalls(sidebar)).contains("refreshDashboard");
+        assertThat(directFunctionCalls(tiles)).contains("refreshDashboard");
+        assertThat(directFunctionCalls(searchSelection)).contains("refreshDashboard");
+        assertThat(homeRequest).contains("/api/dashboard/home", "selectedSymbol=", "encodeURIComponent(selectedSymbol)");
+    }
+
+    @Test
+    void detailResponseCannotOverwriteHomeSemanticSections() throws Exception {
+        Set<String> detailCalls = directFunctionCalls(functionBody("requestDetailForSelectedSymbol"));
+
+        assertThat(detailCalls).contains("renderMainWorkbench", "renderDetail", "renderDisplayStatusCards");
+        assertThat(detailCalls).doesNotContain(
+                "renderDashboardHomePayload", "renderHomePositionsFromPayload",
+                "renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload",
+                "renderHomeAssetsFromPayload", "renderHomeSystemStateFromPayload");
+        assertThat(functionBody("requestDetailForSelectedSymbol")).doesNotContain(
+                "homePositionContent", "homeExecutionContent", "homeAiTabContent",
+                "homeConsistencyContent", "tilesRow");
+    }
+
+    @Test
+    void homeApiFailureRendersFailClosedEmptyState() throws Exception {
+        String refresh = functionBody("refreshDashboard");
+        String unavailable = functionBody("renderDashboardHomeUnavailable");
+        Set<String> diagnosticCalls = directFunctionCalls(functionBody("refreshDashboardDiagnostics"));
+
+        assertThat(directFunctionCalls(refresh)).contains(
+                "fetchDashboardHome", "renderDashboardHomeUnavailable", "refreshDashboardDiagnostics");
+        assertThat(unavailable).contains("首页数据暂不可用", "等待重新同步", "当前不展示执行计划");
+        assertThat(unavailable).doesNotContain("entryZone", "stopLoss", "takeProfitRules", "finalPlanMode");
+        assertThat(diagnosticCalls).doesNotContain(
+                "renderDashboardHomePayload", "renderHomePositionsFromPayload",
+                "renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload");
+    }
+
+    @Test
+    void legacyHomeRenderersAreNotCalledByCurrentHomeFlow() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        Set<String> currentFlow = reachableFunctionCalls("refreshDashboard");
+
+        assertThat(html).doesNotContain(
+                "function renderHomeDashboardRows(", "function renderHomePosition(",
+                "function renderHomeExecution(", "function renderHomeAiDecision(", "function renderTiles(");
+        assertThat(currentFlow).doesNotContain(
+                "renderHomeDashboardRows", "renderHomePosition", "renderHomeExecution",
+                "renderHomeAiDecision", "renderTiles");
+        assertThat(currentFlow).contains("fetchDashboardHome", "renderDashboardHomePayload");
+    }
+
+    @Test
+    void conflictStateUses70AndDirectionalBlockUses85() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String conflict = functionBody("resolveConflictState");
+        String directionalBlock = functionBody("resolveDirectionalBlock");
+
+        assertThat(html).contains(
+                "var CONFLICT_STATE_THRESHOLD = 70;",
+                "var DIRECTIONAL_PUSH_BLOCK_THRESHOLD = 85;");
+        assertThat(conflict).contains("score >= CONFLICT_STATE_THRESHOLD");
+        assertThat(conflict).doesNotContain("DIRECTIONAL_PUSH_BLOCK_THRESHOLD", "score > 0");
+        assertThat(directionalBlock).contains("directionalPushBlocked", "DIRECTIONAL_PUSH_BLOCK_THRESHOLD");
+        assertThat(directionalBlock).doesNotContain("CONFLICT_STATE_THRESHOLD", "score > 0");
+    }
+
+    @Test
+    void headerDisabledAiShowsChineseDisabledLabel() throws Exception {
+        String mapper = functionBody("headerAiStatusLabel");
+        String renderer = functionBody("renderDashboardHomePayload");
+
+        assertThat(mapper).contains("DISABLED: \"已禁用\"", "NOT_CONFIGURED: \"未配置\"",
+                "FAILED: \"调用失败\"", "MODEL_UNAVAILABLE: \"模型不可用\"");
+        assertThat(renderer).contains("header.aiStatusLabel || headerAiStatusLabel(header.aiStatus)");
+    }
+
+    @Test
+    void defaultSlotIsNonInteractivePlaceholder() throws Exception {
+        String tiles = functionBody("renderHomeAssetsFromPayload");
+        String tilePlaceholder = sourceSlice(tiles, "if (placeholder)", "var bias =");
+        String sidebar = functionBody("renderSidebarSlots");
+        String sidebarPlaceholder = sourceSlice(sidebar, "if (placeholder)", "var active =");
+
+        assertThat(tiles).contains("asset.slotType", "DEFAULT_SLOT", "el.classList.contains(\"placeholder\")");
+        assertThat(tilePlaceholder).contains("aria-disabled=\"true\"", "等待首轮分析");
+        assertThat(tilePlaceholder).doesNotContain("data-symbol=", "方向：", "风险等级", "是否值得开仓");
+        assertThat(sidebarPlaceholder).contains("<div", "aria-disabled=\"true\"", "等待首轮分析");
+        assertThat(sidebarPlaceholder).doesNotContain("<button", "data-symbol=");
     }
 
     @Test
@@ -1386,7 +1482,7 @@ public class DashboardControllerTest {
         String positionCard = htmlSection(HOME_POSITION_CARD_START);
         String executionCard = htmlSection(HOME_EXECUTION_CARD_START);
         String realPositionDetector = htmlBlock(HAS_REAL_POSITION_DETAIL_START, UPDATE_MODE_HINT_START);
-        String renderHomePosition = htmlBlock(RENDER_HOME_POSITION_START, RENDER_HOME_EXECUTION_START);
+        String renderHomePositions = functionBody("renderHomePositionsFromPayload");
 
         assertThat(html).contains(CANDIDATE_REVIEW_START);
         assertThat(html).contains(INTERNAL_PUSH_PREVIEW_START);
@@ -1408,22 +1504,14 @@ public class DashboardControllerTest {
         assertThat(realPositionDetector).doesNotContain("stopLoss");
         assertThat(realPositionDetector).doesNotContain("takeProfit");
 
-        assertThat(renderHomePosition).contains("hasRealPositionDetail(d)");
-        assertThat(renderHomePosition).contains("暂无手动录入持仓");
-        assertThat(renderHomePosition).contains("positionStatus");
-        assertThat(renderHomePosition).contains("positionSide");
-        assertThat(renderHomePosition).contains("avgOpenPrice");
-        assertThat(renderHomePosition).contains("positionQuantity");
-        assertThat(renderHomePosition).doesNotContain("fetch(");
-        assertThat(renderHomePosition).doesNotContain("/api/user-positions/manual-open");
-        assertThat(renderHomePosition).doesNotContain("/api/user-positions/");
-        assertThat(renderHomePosition).doesNotContain("orderBtn");
-        assertThat(renderHomePosition).doesNotContain("executeBtn");
-        assertThat(renderHomePosition).doesNotContain("buyBtn");
-        assertThat(renderHomePosition).doesNotContain("sellBtn");
-        assertThat(renderHomePosition).doesNotContain("autoOpen");
-        assertThat(renderHomePosition).doesNotContain("autoClose");
-        assertThat(renderHomePosition).doesNotContain("pushRecheckCreatedUserPosition");
+        assertThat(renderHomePositions).contains("positions", "positionStatusValue(p)", "p.symbol",
+                "p.direction", "p.entryPrice", "p.positionSize", "p.floatingPnl");
+        assertThat(renderHomePositions).doesNotContain("fetch(");
+        assertThat(renderHomePositions).doesNotContain("/api/user-positions/manual-open");
+        assertThat(renderHomePositions).doesNotContain("/api/user-positions/");
+        assertThat(renderHomePositions).doesNotContain("tradeType", "recommendedAction", "executionPlanDisplay");
+        assertThat(renderHomePositions).doesNotContain("orderBtn", "executeBtn", "buyBtn", "sellBtn");
+        assertThat(renderHomePositions).doesNotContain("autoOpen", "autoClose", "pushRecheckCreatedUserPosition");
     }
 
     @Test
@@ -3564,6 +3652,52 @@ public class DashboardControllerTest {
         int nextFunctionIndex = html.indexOf("\n    function ", startIndex + start.length());
         assertThat(nextFunctionIndex).isGreaterThan(startIndex);
         return html.substring(startIndex, nextFunctionIndex);
+    }
+
+    private Set<String> directFunctionCalls(String source) throws Exception {
+        Set<String> definedFunctions = definedFunctionNames();
+        Set<String> calls = new LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("\\b([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(").matcher(source);
+        while (matcher.find()) {
+            String candidate = matcher.group(1);
+            if (definedFunctions.contains(candidate)) calls.add(candidate);
+        }
+        return calls;
+    }
+
+    private Set<String> reachableFunctionCalls(String root) throws Exception {
+        Set<String> reachable = new LinkedHashSet<>();
+        ArrayDeque<String> pending = new ArrayDeque<>();
+        pending.add(root);
+        while (!pending.isEmpty()) {
+            String current = pending.removeFirst();
+            for (String called : directFunctionCalls(functionBody(current))) {
+                if (reachable.add(called)) pending.addLast(called);
+            }
+        }
+        return reachable;
+    }
+
+    private Set<String> definedFunctionNames() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        Set<String> names = new LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("(?m)^\\s{4}function\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(")
+                .matcher(html);
+        while (matcher.find()) names.add(matcher.group(1));
+        return names;
+    }
+
+    private void assertSelectionRefreshOrder(String source, String selection, String refresh) {
+        assertThat(source.indexOf(selection)).isNotNegative();
+        assertThat(source.indexOf(refresh)).isGreaterThan(source.indexOf(selection));
+    }
+
+    private String sourceSlice(String source, String start, String end) {
+        int startIndex = source.indexOf(start);
+        int endIndex = source.indexOf(end, startIndex + start.length());
+        assertThat(startIndex).isNotNegative();
+        assertThat(endIndex).isGreaterThan(startIndex);
+        return source.substring(startIndex, endIndex);
     }
 
     private String consistencyCardSection() throws Exception {

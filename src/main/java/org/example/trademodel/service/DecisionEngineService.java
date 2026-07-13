@@ -22,7 +22,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
@@ -46,6 +49,7 @@ public class DecisionEngineService {
     private final RuleConfigService ruleConfigService;
     private final AiDecisionOrchestratorService aiDecisionOrchestratorService;
     private final AiRoleResultsCodec aiRoleResultsCodec;
+    private Clock decisionClock = Clock.systemUTC();
 
     // ========= 最小规则键集合（仅限本阶段允许 keys） =========
     private static final String KEY_WORTH_OPENING_MIN_SCORE = "decision.worth_opening_min_score";
@@ -110,6 +114,11 @@ public class DecisionEngineService {
                 ? aiRoleResultsCodec
                 : new AiRoleResultsCodec(new ObjectMapper());
         logger.info("DecisionEngineService V3 (rule-layer direction + AI review-only orchestrator + real klines + multiTF) initialized successfully");
+    }
+
+    @Autowired(required = false)
+    void setDecisionClock(Clock decisionClock) {
+        this.decisionClock = decisionClock != null ? decisionClock : Clock.systemUTC();
     }
 
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId) {
@@ -313,7 +322,9 @@ public class DecisionEngineService {
 
             // Push 快照专用：使用正式 5m 主周期边界，不使用 1m 作为执行计划失效条件。
             BigDecimal pushTriggerPrice = null;
-            LocalDateTime pushExpiresAt = LocalDateTime.now().plusHours(24);
+            OffsetDateTime validFrom = OffsetDateTime.now(decisionClock).withOffsetSameInstant(ZoneOffset.UTC);
+            OffsetDateTime expiresAt = validFrom.plusHours(24);
+            LocalDateTime pushExpiresAt = expiresAt.toLocalDateTime();
             BigDecimal pushInvalidPriceBelow = null;
             BigDecimal pushInvalidPriceAbove = null;
             String pushInvalidationSummary = null;
@@ -395,6 +406,8 @@ public class DecisionEngineService {
             decision.setMultiTimeframeAligned(multiTfConvergence);
             decision.setPushTriggerPrice(pushTriggerPrice);
             decision.setPushExpiresAt(pushExpiresAt);
+            decision.setValidFrom(validFrom);
+            decision.setExpiresAt(expiresAt);
             decision.setPushInvalidPriceBelow(pushInvalidPriceBelow);
             decision.setPushInvalidPriceAbove(pushInvalidPriceAbove);
             decision.setPushInvalidationSummary(pushInvalidationSummary);
@@ -541,7 +554,7 @@ public class DecisionEngineService {
         facts.put("notExecutable", true);
         facts.put("ruleDirectionPreserved", true);
         request.setDecisionFacts(facts);
-        request.setRequestTime(LocalDateTime.now());
+        request.setRequestTime(utcLocalNow());
         try {
             return aiDecisionOrchestratorService.review(request);
         } catch (Exception e) {
@@ -551,14 +564,18 @@ public class DecisionEngineService {
         }
     }
 
-    private static AiOrchestratorResult ruleOnlyFallback(String analysisId, String traceId, String reasonCode) {
+    private AiOrchestratorResult ruleOnlyFallback(String analysisId, String traceId, String reasonCode) {
         AiOrchestratorResult result = new AiOrchestratorResult();
         result.setAnalysisId(analysisId);
         result.setTraceId(traceId);
         result.setOrchestrationMode(AiOrchestrationMode.RULE_ONLY_FALLBACK);
         result.setReasonCodes(List.of(reasonCode));
-        result.setCompletedAt(LocalDateTime.now());
+        result.setCompletedAt(utcLocalNow());
         return result;
+    }
+
+    private LocalDateTime utcLocalNow() {
+        return LocalDateTime.ofInstant(decisionClock.instant(), ZoneOffset.UTC);
     }
 
     private static String firstAiDowngradeReason(AiOrchestratorResult result) {

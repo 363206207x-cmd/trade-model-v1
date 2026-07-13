@@ -54,10 +54,12 @@ import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.Instant;
 import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -70,7 +72,7 @@ import static org.mockito.Mockito.lenient;
 @ExtendWith(MockitoExtension.class)
 class DashboardHomeServiceImplTest {
     private static final String ACTIVE_VALID_PERIOD =
-            "2026-07-01 00:00:00 ~ 2026-07-02 00:00:00";
+            "2026-07-01T00:00:00Z ~ 2026-07-02T00:00:00Z";
     private static final List<String> FORBIDDEN_TELEGRAM_STATUS_DEPENDENCIES = List.of(
             "Telegram",
             "Notification",
@@ -151,6 +153,7 @@ class DashboardHomeServiceImplTest {
         btc.setLeverageSuggestion("20x");
         btc.setPositionSuggestion("10%");
         btc.setValidPeriod(ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(btc);
         btc.setInvalidCondition("跌破 61000");
         btc.setAiRoleResults(structuredAiRoleResults(
                 List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
@@ -363,7 +366,8 @@ class DashboardHomeServiceImplTest {
 
         DashboardHomeVO home = service.getHome(null, 6);
 
-        assertThat(home.getHeader().getAiStatus()).isEqualTo("CONFIGURED");
+        assertThat(home.getHeader().getAiStatus()).isEqualTo("NOT_CALLED");
+        assertThat(home.getHeader().getAiStatusLabel()).isEqualTo("未调用");
         assertThat(home.getHeader().getDataSourceText()).isEqualTo("Binance public data / CONFIGURED");
         assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONFIGURED");
         assertThat(home.getDiagnostics().getAiProvider()).isEqualTo("CONFIGURED");
@@ -554,6 +558,7 @@ class DashboardHomeServiceImplTest {
         decision.setStopLoss("61000");
         decision.setTakeProfitRules("66000 / 69000");
         decision.setValidPeriod(ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
         allowMatchingSnapshot(decision);
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
@@ -608,6 +613,7 @@ class DashboardHomeServiceImplTest {
         btc.setLeverageSuggestion("20x");
         btc.setPositionSuggestion("10%");
         btc.setValidPeriod(ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(btc);
         btc.setInvalidCondition("BTC invalid");
 
         DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "MEDIUM", 70, 10,
@@ -618,6 +624,7 @@ class DashboardHomeServiceImplTest {
         eth.setLeverageSuggestion("3x");
         eth.setPositionSuggestion("5%");
         eth.setValidPeriod(ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(eth);
         eth.setInvalidCondition("ETH invalid");
         allowMatchingSnapshot(btc);
         allowMatchingSnapshot(eth);
@@ -845,10 +852,73 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
-        assertThat(gpt.getReviewConclusion()).isEqualTo("只映射显式结论");
+        assertThat(gpt.getResultAvailable()).isTrue();
+        assertThat(gpt.getStance()).isEqualTo("ABSTAIN");
+        assertThat(gpt.getReviewConclusion()).isEqualTo("证据不足，暂不判断");
+        assertThat(gpt.getFinalMarketBias()).isNull();
+        assertThat(gpt.getFinalPlanMode()).isNull();
         assertThat(gpt.getAgainstEvidence()).isEmpty();
         assertThat(home.getAiDecision().getTabs()).extracting(DashboardHomeVO.AiTabVO::getRole)
                 .doesNotContain("裁决", "FINAL", "AI_SUMMARY");
+    }
+
+    @Test
+    void disabledAiRoleHasNoBusinessResult() {
+        assertNonSuccessfulAiRole(AiProviderCallStatus.DISABLED, "AI 复核未启用");
+    }
+
+    @Test
+    void timeoutAiRoleHasNoBusinessResult() {
+        assertNonSuccessfulAiRole(AiProviderCallStatus.TIMEOUT, "AI 复核超时，本轮未采纳该角色");
+    }
+
+    @Test
+    void failedAiRoleHasNoBusinessResult() {
+        assertNonSuccessfulAiRole(AiProviderCallStatus.FAILED, "AI 复核失败，本轮未采纳该角色");
+    }
+
+    @Test
+    void notConfiguredAiRoleHasNoBusinessResult() {
+        assertNonSuccessfulAiRole(AiProviderCallStatus.NOT_CONFIGURED, "AI 模型未配置");
+    }
+
+    @Test
+    void budgetBlockedAiRoleHasNoBusinessResult() {
+        assertNonSuccessfulAiRole(AiProviderCallStatus.BUDGET_BLOCKED, "AI 预算门控阻断");
+    }
+
+    @Test
+    void successfulAbstainDoesNotExposeFinalDirection() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setAiRoleResults(structuredAiRoleResults(
+                List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足")),
+                synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true, null)));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.AiTabVO tab = aiTab(service.getHome("BTCUSDT", 6), "GPT_FINAL");
+
+        assertThat(tab.getResultAvailable()).isTrue();
+        assertThat(tab.getStance()).isEqualTo("ABSTAIN");
+        assertThat(tab.getReviewConclusion()).isEqualTo("证据不足，暂不判断");
+        assertThat(tab.getDirection()).isNull();
+        assertThat(tab.getFinalMarketBias()).isNull();
+        assertThat(tab.getFinalPlanMode()).isNull();
+        assertThat(tab.getWorthOpening()).isNull();
+        assertThat(tab.getSupportEvidence()).isEmpty();
+        assertThat(tab.getAgainstEvidence()).isEmpty();
+    }
+
+    @Test
+    void headerDisabledAiShowsChineseDisabledLabel() {
+        when(providerReadinessService.getReadiness())
+                .thenReturn(providerReadiness("CONFIGURED", "DISABLED", "WAITING_SYNC", "真实行情"));
+
+        DashboardHomeVO.HeaderVO header = service.getHome("BTCUSDT", 6).getHeader();
+
+        assertThat(header.getAiStatus()).isEqualTo("DISABLED");
+        assertThat(header.getAiStatusLabel()).isEqualTo("已禁用");
     }
 
     @Test
@@ -1014,6 +1084,7 @@ class DashboardHomeServiceImplTest {
     @Test
     void expiredAbsoluteValidPeriodBlocksSuggestion() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
         allowMatchingSnapshot(decision);
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
@@ -1052,6 +1123,50 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void legacyNoOffsetPlanFailsClosed() {
+        DecisionResultVO decision = completePlanDecision(
+                "BTCUSDT", "2026-07-01 00:00:00 ~ 2026-07-02 00:00:00");
+        allowMatchingSnapshot(decision);
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(suggestion.getStatus()).isEqualTo("LEGACY_TIMEZONE_UNVERIFIED");
+        assertThat(suggestion.getBlockedReason()).isEqualTo("历史计划时区不可验证，需重新分析");
+        assertThat(suggestion.getDirection()).isNull();
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getValidFrom()).isNull();
+        assertThat(suggestion.getExpiresAt()).isNull();
+    }
+
+    @Test
+    void offsetAwarePlanExpiryIsTimezoneIndependent() {
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        try {
+            for (String timeZone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(timeZone));
+                DecisionResultVO decision = completePlanDecision("BTCUSDT", null);
+                decision.setValidFrom(OffsetDateTime.parse("2026-07-01T08:00:00+08:00"));
+                decision.setExpiresAt(OffsetDateTime.parse("2026-07-02T08:00:00+08:00"));
+                allowMatchingSnapshot(decision);
+                when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+                DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6)
+                        .getExecutionSuggestion();
+
+                assertThat(suggestion.getStatus()).as(timeZone).isEqualTo("USABLE_REVIEW_PLAN");
+                assertThat(suggestion.getValidFrom().toInstant()).as(timeZone)
+                        .isEqualTo(Instant.parse("2026-07-01T00:00:00Z"));
+                assertThat(suggestion.getExpiresAt().toInstant()).as(timeZone)
+                        .isEqualTo(Instant.parse("2026-07-02T00:00:00Z"));
+            }
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
+    }
+
+    @Test
     void conflictFallbackUsesDirectionalBlockThreshold() {
         LightSystemStatusVO statusWithoutAggregate = new LightSystemStatusVO();
         when(decisionService.getLightSystemStatus()).thenReturn(statusWithoutAggregate);
@@ -1082,6 +1197,7 @@ class DashboardHomeServiceImplTest {
     @Test
     void mismatchedAssetStateTraceBlocksPlan() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
         AssetStateDO state = new AssetStateDO();
         state.setSymbol("BTCUSDT");
         state.setState(AssetStateEnum.CANDIDATE);
@@ -1140,6 +1256,38 @@ class DashboardHomeServiceImplTest {
         decision.setValidPeriod(validPeriod);
         decision.setInvalidCondition("结构失效");
         return decision;
+    }
+
+    private void setActivePlanValidity(DecisionResultVO decision) {
+        decision.setValidFrom(OffsetDateTime.parse("2026-07-01T00:00:00Z"));
+        decision.setExpiresAt(OffsetDateTime.parse("2026-07-02T00:00:00Z"));
+    }
+
+    private void assertNonSuccessfulAiRole(AiProviderCallStatus status, String expectedMessage) {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        AiProviderReviewResult role = role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "不应展示的业务结论");
+        role.setCallStatus(status);
+        decision.setAiRoleResults(structuredAiRoleResults(List.of(role),
+                synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true, "EVENT_WINDOW_REVIEW")));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.AiTabVO tab = aiTab(service.getHome("BTCUSDT", 6), "GPT_FINAL");
+
+        assertThat(tab.getRunStatus()).isEqualTo(status.name());
+        assertThat(tab.getResultAvailable()).isFalse();
+        assertThat(tab.getStatusMessage()).isEqualTo(expectedMessage);
+        assertThat(tab.getStance()).isNull();
+        assertThat(tab.getDirection()).isNull();
+        assertThat(tab.getFinalMarketBias()).isNull();
+        assertThat(tab.getFinalConfidence()).isNull();
+        assertThat(tab.getFinalRiskLevel()).isNull();
+        assertThat(tab.getFinalPlanMode()).isNull();
+        assertThat(tab.getWorthOpening()).isNull();
+        assertThat(tab.getReviewConclusion()).isNull();
+        assertThat(tab.getSupportEvidence()).isEmpty();
+        assertThat(tab.getAgainstEvidence()).isEmpty();
     }
 
     private void allowMatchingSnapshot(DecisionResultVO decision) {
@@ -1266,6 +1414,8 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAiDecision().getTabs()).extracting(DashboardHomeVO.AiTabVO::getRole)
                 .containsExactly("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         assertThat(home.getAiDecision().getTabs()).allSatisfy(tab -> {
+            assertThat(tab.getResultAvailable()).isFalse();
+            assertThat(tab.getStatusMessage()).isNotBlank();
             assertThat(tab.getDirection()).isNull();
             assertThat(tab.getConfidenceLevel()).isNull();
             assertThat(tab.getSupportEvidence()).isEmpty();

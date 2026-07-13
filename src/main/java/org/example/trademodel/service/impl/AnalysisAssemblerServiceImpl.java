@@ -49,10 +49,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -68,8 +69,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private static final AtomicBoolean FIRST_ANALYSIS_RUN_LOGGED = new AtomicBoolean(false);
     private static final ObjectMapper EXPLAIN_JSON = new ObjectMapper();
     private static final Logger log = LoggerFactory.getLogger(AnalysisAssemblerServiceImpl.class);
-    private static final DateTimeFormatter VALID_PERIOD_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
     private final PlanService planService;
@@ -99,6 +98,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private UserPositionRiskAdapter userPositionRiskAdapter;
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private boolean requireRealMarketEnvironment;
+    private Clock assemblerClock = Clock.systemUTC();
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -136,6 +136,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             return MARKET_ENV_SOURCE_SPOT_PERP_MIN;
         }
         return MARKET_ENV_SOURCE_HEURISTIC;
+    }
+
+    @Autowired(required = false)
+    void setAssemblerClock(Clock assemblerClock) {
+        this.assemblerClock = assemblerClock != null ? assemblerClock : Clock.systemUTC();
     }
 
     public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
@@ -510,7 +515,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
             LocalDateTime generatedAt = executionContext.getAnalysisTime() != null
                     ? executionContext.getAnalysisTime()
-                    : LocalDateTime.now();
+                    : utcLocalNow();
             MarketStructureBoundaryRequest request = new MarketStructureBoundaryRequest();
             request.setSymbol(symbol);
             request.setDirection(direction);
@@ -668,7 +673,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         ExecutionPlanDO persistedPlan = null;
         try {
             // 1. AnalysisRun
-            LocalDateTime persistStartedAt = LocalDateTime.now();
+            LocalDateTime persistStartedAt = utcLocalNow();
             AnalysisRunDO run = new AnalysisRunDO();
             run.setAnalysisId(analysis.getAnalysisId());
             run.setSymbol(analysis.getSymbol());
@@ -719,7 +724,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     edo.setEventWindowEnd(e.getEventWindowEnd());
                     edo.setImpactScore(e.getImpactScore());
                     edo.setSeverity(e.getSeverity());
-                    edo.setCreateTime(LocalDateTime.now());
+                    edo.setCreateTime(utcLocalNow());
                     evidenceItemMapper.insert(edo);
                 }
             }
@@ -765,11 +770,13 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 ddo.setMultiTfConvergence(decision.getMultiTfConvergence());
                 ddo.setAiRoleResults(decision.getAiRoleResults());
                 ddo.setIsAdopted(null);
-                LocalDateTime decisionCreateTime = LocalDateTime.now();
-                LocalDateTime pushExpiresAt = decision.getPushExpiresAt();
-                ddo.setValidPeriod(pushExpiresAt != null
-                        ? VALID_PERIOD_TIME_FORMATTER.format(decisionCreateTime) + " ~ "
-                        + VALID_PERIOD_TIME_FORMATTER.format(pushExpiresAt)
+                LocalDateTime decisionCreateTime = utcLocalNow();
+                OffsetDateTime validFrom = decision.getValidFrom();
+                OffsetDateTime expiresAt = decision.getExpiresAt();
+                ddo.setValidFrom(validFrom);
+                ddo.setExpiresAt(expiresAt);
+                ddo.setValidPeriod(validFrom != null && expiresAt != null
+                        ? validFrom + " ~ " + expiresAt
                         : null);
                 decisionInvalidCondition = decision.getPushInvalidationSummary();
                 ddo.setInvalidCondition(decisionInvalidCondition != null && !decisionInvalidCondition.trim().isEmpty()
@@ -838,7 +845,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setNotUserPositionCreation(booleanOrTrue(plan.getNotUserPositionCreation()));
                 pdo.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
                 pdo.setRevalidationReason(plan.getRevalidationReason());
-                pdo.setCreateTime(LocalDateTime.now());
+                pdo.setCreateTime(utcLocalNow());
                 executionPlanMapper.insert(pdo);
                 persistedPlan = pdo;
             }
@@ -862,7 +869,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 int updated = analysisRunMapper.markSuccess(
                         analysis.getAnalysisId(),
                         analysis.getDataQualityScore(),
-                        LocalDateTime.now(),
+                        utcLocalNow(),
                         context.getLeaseOwner(),
                         context.getClaimVersion() != null ? context.getClaimVersion() : 1);
                 if (updated != 1) {
@@ -1024,7 +1031,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         command.setSymbol(analysis.getSymbol());
         command.setTimeframe(analysis.getTimeframe());
         command.setEventType(eventType);
-        command.setOccurredAt(LocalDateTime.now());
+        command.setOccurredAt(utcLocalNow());
         command.setSeverityScore(severityScore);
         DecisionContext context = new DecisionContext();
         context.setSymbol(analysis.getSymbol());
@@ -1338,7 +1345,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         row.setDerivativesCrowdingState(env != null ? env.getDerivativesCrowdingState() : null);
         row.setSummary(env != null ? env.getSummary() : null);
         row.setSourceType(sourceType != null && !sourceType.isBlank() ? sourceType : MARKET_ENV_SOURCE_FALLBACK);
-        row.setCreateTime(LocalDateTime.now());
+        row.setCreateTime(utcLocalNow());
         marketEnvironmentSnapshotMapper.insert(row);
     }
 
@@ -1558,5 +1565,9 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             return "{\"version\":\"1\",\"summary\":\"serialization_failed\",\"primaryDrivers\":[],\"reviewReasons\":[],"
                     + "\"conflict\":{\"level\":\"\",\"score\":0,\"planMode\":\"\"},\"confused\":{\"score\":0}}";
         }
+    }
+
+    private LocalDateTime utcLocalNow() {
+        return LocalDateTime.ofInstant(assemblerClock.instant(), ZoneOffset.UTC);
     }
 }

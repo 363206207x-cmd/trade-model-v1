@@ -58,7 +58,6 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.time.Clock;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -69,7 +68,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
@@ -99,11 +97,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     );
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
     private static final int MIN_DATA_QUALITY_SCORE_FOR_PLAN = 60;
-    private static final DateTimeFormatter LEGACY_VALID_PERIOD_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
             "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*~\\s*"
                     + "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$");
+    private static final DateTimeFormatter OFFSET_PLAN_TIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     private final DecisionService decisionService;
     private final MonitorService monitorService;
@@ -220,8 +217,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
+        DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         DashboardHomeVO home = new DashboardHomeVO();
-        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness));
+        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
         home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
@@ -231,7 +229,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSelectedSymbol(normalizedSelected);
         home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision,
                 findPosition(positionRows, normalizedSelected)));
-        home.setAiDecision(buildAiDecision(selectedDecision));
+        home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
@@ -306,18 +304,54 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.HeaderVO buildHeader(LightSystemStatusVO systemStatus,
                                                  PositionSyncStatusVO positionSyncStatus,
                                                  ExternalContextSnapshot externalContext,
-                                                 ProviderReadinessVO providerReadiness) {
+                                                 ProviderReadinessVO providerReadiness,
+                                                 DashboardHomeVO.AiDecisionVO aiDecision) {
         DashboardHomeVO.HeaderVO header = new DashboardHomeVO.HeaderVO();
         header.setPageTitle("首页总览");
         header.setDataStatus(firstNonBlank(systemStatus != null ? systemStatus.getStatus() : null, "WAITING_SYNC"));
-        header.setAiStatus(firstNonBlank(providerReadiness != null ? providerReadiness.getAiProviderStatus() : null,
-                "WAITING_SYNC"));
+        String aiStatus = headerAiStatus(providerReadiness, aiDecision);
+        header.setAiStatus(aiStatus);
+        header.setAiStatusLabel(headerAiStatusLabel(aiStatus));
         header.setDataSourceText(dataSourceText(positionSyncStatus, externalContext, providerReadiness));
         if (localRealReadinessService != null) {
             header.setDataSourceText(localRealDataSourceText());
         }
         header.setUpdatedAt(LocalDateTime.now());
         return header;
+    }
+
+    private String headerAiStatus(ProviderReadinessVO providerReadiness,
+                                  DashboardHomeVO.AiDecisionVO aiDecision) {
+        String decisionStatus = trimToNull(aiDecision != null ? aiDecision.getRunStatus() : null);
+        String providerStatus = trimToNull(providerReadiness != null
+                ? providerReadiness.getAiProviderStatus() : null);
+        if (decisionStatus != null && !"NOT_CALLED".equalsIgnoreCase(decisionStatus)) {
+            return upper(decisionStatus);
+        }
+        if (providerStatus != null && switch (upper(providerStatus)) {
+            case "DISABLED", "NOT_CONFIGURED", "MODEL_UNAVAILABLE", "TIMEOUT", "FAILED",
+                    "BUDGET_BLOCKED", "RATE_LIMITED", "SUCCESS", "PARTIAL_SUCCESS" -> true;
+            default -> false;
+        }) {
+            return upper(providerStatus);
+        }
+        return decisionStatus != null ? upper(decisionStatus) : "NOT_CALLED";
+    }
+
+    private String headerAiStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "DISABLED" -> "已禁用";
+            case "NOT_CONFIGURED" -> "未配置";
+            case "MODEL_UNAVAILABLE" -> "模型不可用";
+            case "TIMEOUT" -> "调用超时";
+            case "FAILED", "INVALID_RESPONSE" -> "调用失败";
+            case "BUDGET_BLOCKED" -> "预算阻断";
+            case "RATE_LIMITED" -> "调用受限";
+            case "SUCCESS" -> "正常";
+            case "PARTIAL_SUCCESS" -> "部分可用";
+            case "NOT_CALLED", "STARTED" -> "未调用";
+            default -> "未知状态";
+        };
     }
 
     private DashboardHomeVO.SystemStateVO buildSystemState(LightSystemStatusVO systemStatus,
@@ -697,7 +731,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                             : "状态已更新，原计划需重新分析");
             suggestion.setSourceAnalysisId(decision != null ? trimToNull(decision.getAnalysisId()) : null);
             if (snapshotTraceStatus == SnapshotTraceStatus.MATCH) {
-                populateOriginalPlan(suggestion, decision);
+                PlanValidity validity = resolvePlanValidity(decision);
+                if (validity.status() == PlanValidityStatus.TIMEZONE_UNVERIFIED) {
+                    suggestion.setOriginalPlanLabel("历史计划时区不可验证，需重新分析");
+                } else if (validity.status() == PlanValidityStatus.INVALID) {
+                    suggestion.setOriginalPlanLabel("原计划有效期异常，需重新分析");
+                } else if (validity.status() == PlanValidityStatus.NOT_ACTIVE) {
+                    suggestion.setOriginalPlanLabel("原计划尚未进入有效期，需重新分析");
+                } else if (validity.status() == PlanValidityStatus.EXPIRED) {
+                    suggestion.setOriginalPlanLabel("原计划已失效，需重新分析");
+                } else {
+                    populateOriginalPlan(suggestion, decision, validity);
+                }
             }
             return suggestion;
         }
@@ -772,15 +817,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     BOUNDARY_INCOMPLETE_VALID_PERIOD);
             return suggestion;
         }
-        if (!hasText(decision.getValidPeriod())) {
-            blockSuggestion(suggestion, "VALID_PERIOD_MISSING", "当前暂无完整执行计划",
-                    "有效期缺失，等待重新分析");
-            return suggestion;
-        }
-        PlanValidity planValidity = parsePlanValidity(decision.getValidPeriod());
+        PlanValidity planValidity = resolvePlanValidity(decision);
         if (planValidity.status() == PlanValidityStatus.INVALID) {
             blockSuggestion(suggestion, "VALID_PERIOD_INVALID", "当前暂无完整执行计划",
                     "有效期格式异常，等待重新分析");
+            return suggestion;
+        }
+        if (planValidity.status() == PlanValidityStatus.TIMEZONE_UNVERIFIED) {
+            blockSuggestion(suggestion, "LEGACY_TIMEZONE_UNVERIFIED", "当前暂无完整执行计划",
+                    "历史计划时区不可验证，需重新分析");
             return suggestion;
         }
         if (planValidity.status() == PlanValidityStatus.NOT_ACTIVE) {
@@ -802,7 +847,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setTakeProfitRules(takeProfitRules);
         suggestion.setLeverageSuggestion(planLeverageLabel(decision.getLeverageSuggestion()));
         suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
-        suggestion.setValidPeriod(trimToNull(decision.getValidPeriod()));
+        suggestion.setValidPeriod(planValidityDisplay(decision, planValidity));
         suggestion.setValidFrom(planValidity.validFrom());
         suggestion.setExpiresAt(planValidity.expiresAt());
         suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
@@ -810,7 +855,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private void populateOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
-                                      DecisionResultVO decision) {
+                                      DecisionResultVO decision,
+                                      PlanValidity validity) {
         if (suggestion == null || decision == null) return;
         suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
         suggestion.setEntryZone(trimPlanValue(decision.getEntryZone()));
@@ -818,7 +864,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setTakeProfitRules(trimPlanValue(decision.getTakeProfitRules()));
         suggestion.setLeverageSuggestion(planLeverageLabel(decision.getLeverageSuggestion()));
         suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
-        suggestion.setValidPeriod(trimToNull(decision.getValidPeriod()));
+        suggestion.setValidPeriod(planValidityDisplay(decision, validity));
+        suggestion.setValidFrom(validity.validFrom());
+        suggestion.setExpiresAt(validity.expiresAt());
         suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
     }
 
@@ -879,10 +927,24 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (rolePayload == null) {
             tab.setRunStatus("NOT_CALLED");
             tab.setRunStatusLabel("未调用");
+            tab.setResultAvailable(false);
+            tab.setStatusMessage(aiRoleStatusMessage("NOT_CALLED"));
             return tab;
         }
-        tab.setRunStatus(trimToNull(rolePayload.callStatus()));
-        tab.setRunStatusLabel(aiRunStatusLabel(rolePayload.callStatus()));
+        String callStatus = firstNonBlank(trimToNull(rolePayload.callStatus()), "NOT_CALLED");
+        tab.setRunStatus(callStatus);
+        tab.setRunStatusLabel(aiRunStatusLabel(callStatus));
+        boolean resultAvailable = "SUCCESS".equalsIgnoreCase(callStatus);
+        tab.setResultAvailable(resultAvailable);
+        tab.setStatusMessage(aiRoleStatusMessage(callStatus));
+        if (!resultAvailable) {
+            return tab;
+        }
+        tab.setStance(trimToNull(rolePayload.stance()));
+        if ("ABSTAIN".equalsIgnoreCase(rolePayload.stance())) {
+            tab.setReviewConclusion("证据不足，暂不判断");
+            return tab;
+        }
         switch (role) {
             case "GPT_FINAL" -> populateFinalDecisionRole(tab, rolePayload, synthesis);
             case "GEMINI_REVIEW" -> populateConflictReviewRole(tab, rolePayload);
@@ -1444,34 +1506,56 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private PlanValidity parsePlanValidity(String validPeriod) {
-        String value = trimToNull(validPeriod);
+    private PlanValidity resolvePlanValidity(DecisionResultVO decision) {
+        if (decision == null) return PlanValidity.invalid();
+        OffsetDateTime structuredValidFrom = decision.getValidFrom();
+        OffsetDateTime structuredExpiresAt = decision.getExpiresAt();
+        if (structuredValidFrom != null || structuredExpiresAt != null) {
+            if (structuredValidFrom == null || structuredExpiresAt == null) return PlanValidity.invalid();
+            return evaluatePlanValidity(structuredValidFrom, structuredExpiresAt);
+        }
+
+        String value = trimToNull(decision.getValidPeriod());
         if (value == null) return PlanValidity.invalid();
         String normalized = upper(value);
         if (normalized.contains("EXPIRED") || normalized.contains("INVALIDATED")
                 || value.contains("已失效") || value.contains("已过期")) {
             return PlanValidity.expired();
         }
-        Matcher matcher = LEGACY_VALID_PERIOD_RANGE.matcher(value);
-        if (!matcher.matches()) return PlanValidity.invalid();
+        if (LEGACY_VALID_PERIOD_RANGE.matcher(value).matches()) {
+            return PlanValidity.timezoneUnverified();
+        }
+        String[] range = value.split("\\s*~\\s*", -1);
+        if (range.length != 2) return PlanValidity.invalid();
         try {
-            LocalDateTime localValidFrom = LocalDateTime.parse(matcher.group(1), LEGACY_VALID_PERIOD_FORMATTER);
-            LocalDateTime localExpiresAt = LocalDateTime.parse(matcher.group(2), LEGACY_VALID_PERIOD_FORMATTER);
-            if (!localValidFrom.isBefore(localExpiresAt)) return PlanValidity.invalid();
-            // Legacy persisted periods have no offset. The compatibility contract is UTC, matching analysis clocks.
-            OffsetDateTime validFrom = localValidFrom.atOffset(ZoneOffset.UTC);
-            OffsetDateTime expiresAt = localExpiresAt.atOffset(ZoneOffset.UTC);
-            OffsetDateTime now = OffsetDateTime.now(planValidityClock).withOffsetSameInstant(ZoneOffset.UTC);
-            if (now.isBefore(validFrom)) {
-                return new PlanValidity(PlanValidityStatus.NOT_ACTIVE, validFrom, expiresAt);
-            }
-            if (!now.isBefore(expiresAt)) {
-                return new PlanValidity(PlanValidityStatus.EXPIRED, validFrom, expiresAt);
-            }
-            return new PlanValidity(PlanValidityStatus.ACTIVE, validFrom, expiresAt);
+            return evaluatePlanValidity(OffsetDateTime.parse(range[0]), OffsetDateTime.parse(range[1]));
         } catch (DateTimeParseException ignored) {
             return PlanValidity.invalid();
         }
+    }
+
+    private PlanValidity evaluatePlanValidity(OffsetDateTime validFrom, OffsetDateTime expiresAt) {
+        if (validFrom == null || expiresAt == null
+                || !validFrom.toInstant().isBefore(expiresAt.toInstant())) {
+            return PlanValidity.invalid();
+        }
+        java.time.Instant now = planValidityClock.instant();
+        if (now.isBefore(validFrom.toInstant())) {
+            return new PlanValidity(PlanValidityStatus.NOT_ACTIVE, validFrom, expiresAt);
+        }
+        if (!now.isBefore(expiresAt.toInstant())) {
+            return new PlanValidity(PlanValidityStatus.EXPIRED, validFrom, expiresAt);
+        }
+        return new PlanValidity(PlanValidityStatus.ACTIVE, validFrom, expiresAt);
+    }
+
+    private String planValidityDisplay(DecisionResultVO decision, PlanValidity validity) {
+        if (validity.validFrom() != null && validity.expiresAt() != null) {
+            return OFFSET_PLAN_TIME_FORMAT.format(validity.validFrom())
+                    + " ~ " + OFFSET_PLAN_TIME_FORMAT.format(validity.expiresAt());
+        }
+        String display = trimToNull(decision != null ? decision.getValidPeriod() : null);
+        return display;
     }
 
     private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision) {
@@ -1492,7 +1576,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private enum SnapshotTraceStatus { MATCH, MISMATCH, UNVERIFIED }
-    private enum PlanValidityStatus { ACTIVE, NOT_ACTIVE, EXPIRED, INVALID }
+    private enum PlanValidityStatus { ACTIVE, NOT_ACTIVE, EXPIRED, INVALID, TIMEZONE_UNVERIFIED }
     private record PlanValidity(PlanValidityStatus status, OffsetDateTime validFrom, OffsetDateTime expiresAt) {
         private static PlanValidity invalid() {
             return new PlanValidity(PlanValidityStatus.INVALID, null, null);
@@ -1500,6 +1584,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
         private static PlanValidity expired() {
             return new PlanValidity(PlanValidityStatus.EXPIRED, null, null);
+        }
+
+        private static PlanValidity timezoneUnverified() {
+            return new PlanValidity(PlanValidityStatus.TIMEZONE_UNVERIFIED, null, null);
         }
     }
 
@@ -1577,10 +1665,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 .filter(Objects::nonNull)
                 .map(this::upper)
                 .toList();
-        if (statuses.contains("BUDGET_BLOCKED") || statuses.contains("RATE_LIMITED")) return "BUDGET_BLOCKED";
+        if (statuses.contains("BUDGET_BLOCKED")) return "BUDGET_BLOCKED";
+        if (statuses.contains("RATE_LIMITED")) return "RATE_LIMITED";
         if (statuses.contains("TIMEOUT")) return "TIMEOUT";
-        if (statuses.contains("FAILED") || statuses.contains("INVALID_RESPONSE")) return "FAILED";
-        if (statuses.contains("NOT_CONFIGURED")) return "MODEL_UNAVAILABLE";
+        if (statuses.contains("INVALID_RESPONSE")) return "INVALID_RESPONSE";
+        if (statuses.contains("FAILED")) return "FAILED";
+        if (statuses.contains("MODEL_UNAVAILABLE")) return "MODEL_UNAVAILABLE";
+        if (statuses.contains("NOT_CONFIGURED")) return "NOT_CONFIGURED";
         if (statuses.contains("DISABLED")) return "DISABLED";
         return "NOT_CALLED";
     }
@@ -1594,9 +1685,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "ABSTAIN" -> "成功弃权";
             case "DISABLED" -> "已禁用";
             case "TIMEOUT" -> "调用超时";
-            case "FAILED", "INVALID_RESPONSE" -> "调用失败";
-            case "BUDGET_BLOCKED", "RATE_LIMITED" -> "预算阻断";
-            case "MODEL_UNAVAILABLE", "NOT_CONFIGURED" -> "模型不可用";
+            case "FAILED" -> "调用失败";
+            case "INVALID_RESPONSE" -> "返回内容无效";
+            case "BUDGET_BLOCKED" -> "预算阻断";
+            case "RATE_LIMITED" -> "调用受限";
+            case "MODEL_UNAVAILABLE" -> "模型不可用";
+            case "NOT_CONFIGURED" -> "未配置";
             case "NOT_CALLED", "STARTED" -> "未调用";
             default -> "未知状态";
         };
@@ -1655,6 +1749,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return value.matches(".*\\p{IsHan}.*")
                 ? value
                 : "AI 复核结果已返回，等待人工复核";
+    }
+
+    private String aiRoleStatusMessage(String status) {
+        return switch (upper(status)) {
+            case "SUCCESS" -> "根据角色结果展示";
+            case "DISABLED" -> "AI 复核未启用";
+            case "NOT_CALLED", "STARTED" -> "本轮未调用该角色";
+            case "TIMEOUT" -> "AI 复核超时，本轮未采纳该角色";
+            case "FAILED" -> "AI 复核失败，本轮未采纳该角色";
+            case "INVALID_RESPONSE" -> "AI 返回内容无效，本轮未采纳";
+            case "NOT_CONFIGURED" -> "AI 模型未配置";
+            case "MODEL_UNAVAILABLE" -> "AI 模型不可用";
+            case "BUDGET_BLOCKED" -> "AI 预算门控阻断";
+            case "RATE_LIMITED" -> "AI 调用受限";
+            default -> "本轮未调用该角色";
+        };
     }
 
     private String planLeverageLabel(String leverageSuggestion) {

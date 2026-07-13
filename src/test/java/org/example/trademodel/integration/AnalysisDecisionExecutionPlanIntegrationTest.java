@@ -54,8 +54,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -500,10 +500,10 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     private String persistControlledAnalysisDecisionAndPlan() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 2, 9, 30);
-        DateTimeFormatter validPeriodFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        LocalDateTime validityNow = LocalDateTime.now(ZoneOffset.UTC);
-        String validPeriod = validityNow.minusHours(1).format(validPeriodFormatter)
-                + " ~ " + validityNow.plusHours(1).format(validPeriodFormatter);
+        OffsetDateTime validityNow = OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
+        OffsetDateTime validFrom = validityNow.minusHours(1);
+        OffsetDateTime expiresAt = validityNow.plusHours(1);
+        String validPeriod = validFrom + " ~ " + expiresAt;
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(ANALYSIS_ID);
         run.setSymbol(SYMBOL);
@@ -584,6 +584,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                         "CONFIRM", false, null)));
         decision.setIsAdopted(null);
         decision.setValidPeriod(validPeriod);
+        decision.setValidFrom(validFrom);
+        decision.setExpiresAt(expiresAt);
         decision.setInvalidCondition("decision invalidation fallback");
         decision.setEvidenceSummary("controlled evidence summary");
         decision.setExplanationJson("{\"summary\":\"controlled\"}");

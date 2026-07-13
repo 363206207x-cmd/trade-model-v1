@@ -9,9 +9,12 @@ This package audits the path from rule inputs to the Dashboard Home read model a
 - Market bias is derived independently for each symbol from the three persisted closed bars currently read for each of 5m, 15m, 1h, and 4h. This is a provisional `MarketBiasPolicy` mapping pending product-owned window and threshold rules, not a validated trend-strength model. Missing or invalid inputs return `WAIT`; no missing-data path defaults bullish.
 - A data-quality score below the current engine threshold of 60 blocks a usable review plan and downgrades the user-facing result to `WAIT`, low confidence, high risk, and not worth opening.
 - AI roles that are disabled, not called, timed out, failed, unavailable, or abstained are not counted as support. With zero successful roles, AI consistency and AI plan mode are not applicable.
+- Only `SUCCESS` role payloads may populate role-level business fields. Every non-success role renders only its run status and status explanation; successful `ABSTAIN` renders a compact no-judgment conclusion without direction or plan claims.
 - A conflict score above zero is not a directional block. Dashboard directional-block counts use the authoritative threshold of 85.
 - A usable execution plan requires the authoritative asset-state `trace_id` to match the plan decision's `AnalysisRun.trace_id`. A mismatch leaves current state visible but clears the plan with `状态已更新，原计划需重新分析`.
-- Plan validity is evaluated from structured `validFrom`/`expiresAt` in the Home read model. Legacy absolute ranges are parsed only under the documented UTC compatibility contract; missing or malformed validity fails closed, and `now >= expiresAt` blocks the plan.
+- Plan validity is evaluated from offset-aware `validFrom`/`expiresAt` in the Home read model. A legacy absolute range without an offset is `LEGACY_TIMEZONE_UNVERIFIED` and fails closed; it is never assumed to be UTC. Missing or malformed validity also fails closed, and `now >= expiresAt` blocks the plan.
+- `/api/dashboard/home` is the sole data authority for Home positions, execution suggestion, AI roles, consistency, asset tiles, and top KPIs. `/api/dashboard/detail` updates only the lower workbench and diagnostics and cannot overwrite those Home regions.
+- Asset-tile, sidebar, and search selection all set the selected symbol and request a fresh Home payload. A failed Home request clears cached business conclusions and displays `首页数据暂不可用` / `等待重新同步` / `当前不展示执行计划`.
 - An active manual position takes over the selected asset's main suggestion area. The original entry plan is retained only as a collapsed review/reference record.
 - Dashboard Home does not invent system stop/take-profit values or a next monitor time. It displays persisted monitor time only.
 
@@ -44,6 +47,12 @@ Repository conflicts and limitations are not hidden:
 - `WAITING_TRIGGER` and `TRIGGERED` are enum/schema/UI-complete but have no normal production writer.
 - The product vocabulary defines eight bias levels, but no authoritative numeric trend-strength threshold or window specification was found. `MarketBiasPolicy` is marked as a temporary implementation pending product confirmation. It currently compares the first open with the last close across only three bars per timeframe.
 - Position Monitor has persisted `monitoredAt`, but no authoritative per-row `nextMonitorAt` source. Dashboard leaves the next time empty instead of using a page-refresh countdown.
+
+### 2.1 Home rendering ownership
+
+`renderDashboardHomePayload(home)` is the only successful Home main-surface entry point. It delegates to the `renderHome*FromPayload` functions for KPIs, assets, positions, execution, and AI. `requestDetailForSelectedSymbol()` is intentionally limited to the detail workbench and diagnostic fetches. The old `renderHomeDashboardRows`, `renderHomePosition`, `renderHomeExecution`, `renderHomeAiDecision`, and `renderTiles` functions were removed, so the current Home call graph has no compatibility path that can reintroduce stale plan or AI data.
+
+`renderDashboardHomeUnavailable()` is the only exceptional Home writer. It clears cached Home decisions and writes explicit fail-closed empty states. The summary endpoint may continue to refresh diagnostics, but its call graph has no Home semantic renderer.
 
 ## 3. Semantic matrix
 
@@ -142,7 +151,9 @@ Repository conflicts and limitations are not hidden:
 | Conflict block count was inflated | Dashboard counted any `confusedScore > 0`. | Mapper query counts only scores at or above the directional block threshold 85. |
 | Asset state could be stale | Dashboard reconstructed current state from decision snapshot JSON. | Authoritative asset-state table first; snapshot compatibility fallback is explicit. |
 | Current state and old plan could be silently combined | Current asset state and latest decision were read by symbol without proving they came from the same analysis trace. | Compare authoritative state `trace_id` with the decision's `AnalysisRun.trace_id`; mismatch/unverified association blocks all plan fields. |
-| Plan expiry was textual only | The gate only searched for `EXPIRED`/`已过期` markers and could display an elapsed absolute range. | Parse the legacy absolute UTC range, expose structured `validFrom`/`expiresAt`, and block at or after expiry; malformed values fail closed. |
+| Plan expiry was textual only | The gate only searched for `EXPIRED`/`已过期` markers and could display an elapsed absolute range. | Persist offset-aware `validFrom`/`expiresAt`, expose them as the authority, and block before activation or at/after expiry. Offset-aware compatibility ranges may be evaluated; legacy no-offset ranges return `LEGACY_TIMEZONE_UNVERIFIED`. |
+| Detail responses could overwrite Home | The selected-symbol detail request still called legacy Home renderers after the Home payload was displayed. | Home and detail now have disjoint renderer call graphs; all three selection paths request Home first and detail only supplements the lower workbench. |
+| Failed AI roles retained conclusions | Role payload fields were mapped even when the call status was disabled, failed, timed out, or not configured. | `resultAvailable` is true only for `SUCCESS`; non-success roles return before mapping any business fields, and successful abstention exposes no final direction or plan. |
 | Modules contradicted selected asset | Some header values used first/average/max decisions. | Selected asset's decision supplies trend, risk, quality, AI conflict, execution, and AI review. |
 | Strong/weak direction levels disappeared downstream | Reverse-position and Hot Reset mapper SQL recognized only exact `BULLISH`/`BEARISH`. | Mapper contracts now recognize all strong/normal/weak bullish and bearish family values while excluding `RANGE`, `WAIT`, and unknown states. |
 | Position did not take over | Execution suggestion had no selected-position precedence. | Active selected manual position returns `POSITION_MONITORING`; original plan is review reference only. |
@@ -194,8 +205,10 @@ Focused tests cover:
 - Position takeover, real monitor timestamps, no fake next-monitor countdown, the existing-monitor/no-next-schedule state, and Chinese labels.
 - Plan analysis mismatch, state/run trace mismatch, blocked-field clearing, and absolute expiry before/equal/after/malformed cases.
 - Final user-visible Home DOM copy checks for raw `pendingCount`, `degraded`, and local-real failure codes.
+- Home/detail renderer ownership, asset-selection request order, fail-closed Home failure, and noninteractive `DEFAULT_SLOT` behavior through deterministic template call-graph assertions.
+- Offset-aware plan validity under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`, plus legacy no-offset fail-closed behavior.
 
-No live provider, local database, or six-asset runtime environment was used for this package. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs.
+The offline acceptance uses controlled service fixtures and the in-memory test database only. No live provider, external database, or six-asset runtime environment was used. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs. See `docs/DASHBOARD_INTERACTION_ACCEPTANCE.md`.
 
 ## 9. Remaining gaps
 
@@ -206,6 +219,7 @@ No live provider, local database, or six-asset runtime environment was used for 
 5. System stop/take-profit values have no real Position Monitor source in the current Home read model and remain blank rather than fabricated.
 6. Historical engineering diagnostics still carry internal vocabulary inside `.runtime-status-stack` and `.diagnostics-only`, both of which are explicitly `display:none`. They are not part of the user-visible Home surface; they must be translated or moved to a dedicated diagnostic page before either hidden container is ever exposed.
 7. Production readiness remains blocked by the repository's existing release-gate evidence requirements.
+8. Flyway V7 adds the offset-aware plan columns, but this branch does not claim a fresh controlled PostgreSQL V1-V7 run. PostgreSQL migration evidence for V7 remains a separate production-readiness gate.
 
 ## 10. Safety boundary
 

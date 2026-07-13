@@ -24,7 +24,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
     private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:16-alpine");
 
     @Test
-    void postgreSqlV6MigrationRuntimeTest() throws Exception {
+    void postgreSqlV7MigrationRuntimeTest() throws Exception {
         assumeTrue(dockerAvailable(), "Docker/Testcontainers is unavailable; PostgreSQL smoke skipped");
 
         try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(POSTGRES_IMAGE)) {
@@ -62,6 +62,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertProviderScanProfileV5ColumnsExist(connection);
                 assertProviderScanRuleDefaultsExist(connection);
                 assertDerivativesBusinessRuleDefaultsExist(connection);
+                assertDecisionPlanOffsetTimeColumnsExist(connection);
                 assertProviderScanProfileSaveLoadAndAudit(connection);
                 assertProviderScanProfileRollbackIsAtomic(connection);
                 assertFlywayHistorySucceeded(connection);
@@ -136,7 +137,26 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(6);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(7);
+            }
+        }
+    }
+
+    private static void assertDecisionPlanOffsetTimeColumnsExist(Connection connection) throws Exception {
+        for (String column : List.of("valid_from", "expires_at")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'tm_decision_result'
+                      AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).as("V7 column %s", column).isTrue();
+                    assertThat(rs.getString(1)).as("V7 column %s type", column)
+                            .isEqualTo("timestamp with time zone");
+                }
             }
         }
     }

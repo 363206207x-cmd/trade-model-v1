@@ -3284,6 +3284,8 @@
     var detailEvidenceTopItemsMap = {};
     var detailScoreTopItemsMap = {};
     var DEFAULT_DISPLAY_SLOT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"];
+    var CONFLICT_STATE_THRESHOLD = 70;
+    var DIRECTIONAL_PUSH_BLOCK_THRESHOLD = 85;
     var WATCHLIST_STATUS_READY = "WATCHLIST_REVIEW_ONLY_READY";
     var WATCHLIST_STATUS_EMPTY = "WATCHLIST_EMPTY_FAIL_CLOSED";
     var WATCHLIST_STATUS_MISSING = "WATCHLIST_CONFIG_MISSING";
@@ -4346,8 +4348,7 @@
         var modeSelect = document.getElementById("modeSelect");
         if (modeSelect) modeSelect.value = "custom";
         updateModeHint();
-        buildDisplayList();
-        renderTiles();
+        refreshDashboard();
     }
 
     function escapeHtml(value) {
@@ -5114,16 +5115,35 @@
             DISABLED: "已禁用",
             TIMEOUT: "调用超时",
             FAILED: "调用失败",
-            INVALID_RESPONSE: "调用失败",
+            INVALID_RESPONSE: "返回内容无效",
             BUDGET_BLOCKED: "预算阻断",
-            RATE_LIMITED: "预算阻断",
+            RATE_LIMITED: "调用受限",
             MODEL_UNAVAILABLE: "模型不可用",
-            NOT_CONFIGURED: "模型不可用",
+            NOT_CONFIGURED: "未配置",
             NOT_CALLED: "未调用",
             STARTED: "未调用"
         };
         var key = String(raw || "").trim().toUpperCase();
         return key ? (labels[key] || "未知状态") : "未调用";
+    }
+
+    function headerAiStatusLabel(raw) {
+        var labels = {
+            DISABLED: "已禁用",
+            NOT_CONFIGURED: "未配置",
+            MODEL_UNAVAILABLE: "模型不可用",
+            TIMEOUT: "调用超时",
+            FAILED: "调用失败",
+            INVALID_RESPONSE: "调用失败",
+            BUDGET_BLOCKED: "预算阻断",
+            RATE_LIMITED: "调用受限",
+            SUCCESS: "正常",
+            PARTIAL_SUCCESS: "部分可用",
+            NOT_CALLED: "未调用",
+            STARTED: "未调用"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "未知状态";
     }
 
     function aiConflictLevelLabel(raw) {
@@ -5546,105 +5566,6 @@
         return rows.join("");
     }
 
-    function renderHomePosition(d) {
-        var box = document.getElementById("homePositionContent");
-        if (!box) return;
-        var tableHead = positionTableHeadHtml();
-        var legacyManualEmptyText = "暂无手动录入持仓";
-        if (!d || !hasRealPositionDetail(d)) {
-            box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
-            return;
-        }
-        var symbol = pickField(d, ["assetSymbol", "asset_symbol", "positionSymbol", "position_symbol", "symbol"]);
-        var avgOpenPrice = pickField(d, ["entryPrice", "entry_price", "avgOpenPrice", "avg_open_price"]);
-        var positionQuantity = pickField(d, ["quantity", "positionQuantity", "position_quantity", "size", "positionSize", "position_size"]);
-        var positionSide = pickField(d, ["side", "positionSide", "position_side", "direction"]);
-        var positionStatus = pickField(d, ["positionStatus", "position_status", "status"]);
-        var positionOpenedAt = pickField(d, ["openedAt", "opened_at", "openTime", "open_time", "positionOpenTime", "position_open_time", "entryTime", "entry_time"]);
-        var floatingPnlAmount = pickField(d, ["floatingPnl", "floating_pnl", "unrealizedPnl", "unrealized_pnl", "pnl"]);
-        var latestPrice = pickField(d, ["latestPrice", "latest_price", "currentPrice", "current_price", "monitorPrice", "monitor_price"]);
-        var assetCell = positionAssetCellHtml(symbol, positionSide, [
-            { label: "用户开仓价", value: cleanBlankValue(formatPrice(avgOpenPrice)) },
-            { label: "杠杆", value: cleanBlankValue(positionLeverageText(d)) },
-            { label: "仓位", value: positionQuantity != null ? String(positionQuantity) : "" },
-            { label: "开仓时间", value: cleanBlankValue(formatDateTime(positionOpenedAt)) },
-            { label: "当前价", value: cleanBlankValue(formatPrice(latestPrice)) },
-            { label: "浮动盈亏", value: cleanBlankValue(formatSignedAmount(floatingPnlAmount)) }
-        ]);
-        box.innerHTML = tableHead + '<tr>'
-            + '<td class="position-asset-cell">' + assetCell + '</td>'
-            + '<td>' + positionMonitorCell(pickField(d, ["entryLogicStatusLabel", "entry_logic_status_label"]) || positionLogicStatusLabel(pickField(d, ["entryLogicStatus", "entry_logic_status"])), "等待首次监控") + '</td>'
-            + '<td>' + positionMonitorCell(pickField(d, ["directionSupportStatusLabel", "direction_support_status_label"]) || directionSupportStatusLabel(pickField(d, ["directionSupportStatus", "direction_support_status"])), "等待首次监控") + '</td>'
-            + '<td>' + positionMonitorCell(pickField(d, ["reversalStatusLabel", "reversal_status_label"]) || reversalStatusLabel(pickField(d, ["reversalStatus", "reversal_status"])), "等待首次监控") + '</td>'
-            + '<td>' + positionRiskHtml(d) + '</td>'
-            + '<td>' + positionCurrentAdviceHtml(d) + '</td>'
-            + '<td>' + positionMonitorTimeCellHtml(pickField(d, ["lastMonitorAt", "last_monitor_at"]), pickField(d, ["nextMonitorAt", "next_monitor_at"])) + '</td>'
-            + '<td></td>'
-            + '</tr>' + positionFillerRows(4) + '</tbody></table>';
-    }
-
-    function renderHomeExecution(d) {
-        var box = document.getElementById("homeExecutionContent");
-        if (!box) return;
-        function renderExecutionRows(rows, statusHtml) {
-            box.innerHTML = '<div class="execution-card-body">'
-                + (statusHtml || "")
-                + '<div class="execution-plan-panel"><table class="execution-plan-table"><tbody>'
-                + rows.map(function (r) { return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(cleanBlankValue(r[1])) + '</td></tr>'; }).join("")
-                + '</tbody></table></div>'
-                + '</div>';
-        }
-        if (!d) {
-            renderExecutionRows([
-                ["方向", ""],
-                ["入场区间", ""],
-                ["止损价", ""],
-                ["阶梯止盈", ""],
-                ["杠杆", ""],
-                ["仓位建议", ""],
-                ["有效期", ""],
-                ["失效条件", ""]
-            ]);
-            return;
-        }
-        var p = d.executionPlanDisplay || {};
-        function planValue(planKeys, decisionKeys) {
-            return displayPlanCell(pickField(p, planKeys || []) || pickField(d, decisionKeys || []));
-        }
-        var rawDirection = pickField(p, ["direction", "planDirection", "plan_direction"])
-            || pickField(d, ["marketBiasHierarchy", "market_bias_hierarchy"]);
-        var direction = biasText(rawDirection);
-        if (direction === "—") direction = displayPlanCell(rawDirection);
-        if (direction === "—") direction = assetDirectionText(d);
-        var entryZone = planValue(["entryZone", "entry_zone"], ["entryZone", "entry_zone"]);
-        var stopLoss = planValue(["stopLoss", "stop_loss"], ["stopLoss", "stop_loss"]);
-        var takeProfitRules = planValue(["takeProfitRules", "take_profit_rules"], ["takeProfitRules", "take_profit_rules"]);
-        var leverageSuggestion = planValue(["leverageSuggestion", "leverage_suggestion"], ["leverageSuggestion", "leverage_suggestion"]);
-        var positionSuggestion = planValue(["positionSuggestion", "position_suggestion"], ["positionSuggestion", "position_suggestion"]);
-        var rawValidPeriod = planValue(["validPeriod", "valid_period"], ["validPeriod", "valid_period"]);
-        var statusHtml = executionFailClosedStatusHtml(rawValidPeriod, entryZone, stopLoss, takeProfitRules);
-        var validPeriod = formatExecutionValidPeriod(
-            rawValidPeriod,
-            entryZone,
-            stopLoss,
-            takeProfitRules
-        );
-        var invalidCondition = statusHtml ? "" : planValue(["invalidCondition", "invalid_condition"], ["invalidCondition", "invalid_condition"]);
-        var hasPlan = [entryZone, stopLoss, takeProfitRules, leverageSuggestion, positionSuggestion, validPeriod, invalidCondition]
-            .some(function (v) { return v !== "—"; });
-        var rows = [
-            ["方向", hasPlan ? direction : ""],
-            ["入场区间", hasPlan ? entryZone : ""],
-            ["止损价", hasPlan ? stopLoss : ""],
-            ["阶梯止盈", hasPlan ? takeProfitRules : ""],
-            ["杠杆", hasPlan ? leverageSuggestion : ""],
-            ["仓位建议", hasPlan ? positionSuggestion : ""],
-            ["有效期", hasPlan ? validPeriod : ""],
-            ["失效条件", hasPlan ? invalidCondition : ""]
-        ];
-        renderExecutionRows(rows, statusHtml);
-    }
-
     function readAiRolePayload(d) {
         if (!d) return {};
         var raw = d.aiRoleResults != null ? d.aiRoleResults : d.ai_role_results;
@@ -5899,7 +5820,30 @@
             + '</div>';
     }
 
+    function renderUnavailableAiRole(role) {
+        role = role || {};
+        return '<div class="ai-evidence-grid">'
+            + aiRoleSummaryStrip([
+                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
+                ["状态说明", role.statusMessage, "本轮未调用该角色"]
+            ])
+            + '</div>';
+    }
+
+    function renderAbstainedAiRole(role) {
+        role = role || {};
+        return '<div class="ai-evidence-grid">'
+            + aiRoleSummaryStrip([
+                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "复核成功"],
+                ["角色结论", role.reviewConclusion, "证据不足，暂不判断"]
+            ])
+            + '</div>';
+    }
+
     function renderHomeAiRoleTab(role, tab) {
+        role = role || {};
+        if (role.resultAvailable !== true) return renderUnavailableAiRole(role);
+        if (String(role.stance || "").toUpperCase() === "ABSTAIN") return renderAbstainedAiRole(role);
         if (tab === "GPT_FINAL") return renderGptFinalHomeRole(role || {});
         if (tab === "GEMINI_REVIEW") return renderGeminiReviewHomeRole(role || {});
         return renderGrokChallengeHomeRole(role || {});
@@ -5971,13 +5915,15 @@
         var parts = [];
         if (risk) parts.push("风险等级：" + risk);
         if (conflictText) parts.push("冲突等级：" + conflictText);
-        parts.push("冲突阻断：" + (resolveIsConfused(d) ? "是" : "否"));
+        parts.push("进入冲突状态：" + (resolveIsConfused(d) ? "是" : "否"));
+        parts.push("资产方向阻断：" + (resolveDirectionalBlock(d) ? "是" : "否"));
         return parts.join("；");
     }
 
     function aiDowngradeReason(d) {
         if (!d) return "等待同步";
-        if (resolveIsConfused(d)) return "冲突阻断";
+        if (resolveDirectionalBlock(d)) return "资产方向阻断";
+        if (resolveIsConfused(d)) return "已进入冲突状态";
         if (isHighRisk(d)) return "高风险观察";
         var reasons = parseReviewReasons(d.reviewReasons != null ? d.reviewReasons : d.review_reasons);
         if (reasons.length) return reasons.slice(0, 2).join("；");
@@ -6029,48 +5975,6 @@
         return '<div class="ai-evidence-grid">'
             + aiReviewEvidencePanel(rows)
             + '</div>';
-    }
-
-    function renderHomeAiDecision(d) {
-        var payload = readAiRolePayload(d);
-        var tabs = document.getElementById("homeAiTabs");
-        var content = document.getElementById("homeAiTabContent");
-        if (tabs && content) {
-            Array.prototype.forEach.call(tabs.querySelectorAll(".ai-tab"), function (btn) {
-                var tab = btn.getAttribute("data-ai-tab");
-                btn.textContent = aiTabLabel(tab);
-                btn.classList.toggle("active", tab === activeAiTab);
-                btn.onclick = function () {
-                    activeAiTab = tab;
-                    renderHomeAiDecision(d);
-                };
-            });
-            content.innerHTML = renderAiRoleEvidencePanel(d, payload, activeAiTab);
-        }
-        var c = d ? resolveAiConflict(d) : { label: "—", score: null, source: "fallback" };
-        var planMode = d ? firstNonEmpty(d.aiPlanMode, d.ai_plan_mode, "—") : "—";
-        var consistency = document.getElementById("homeConsistencyContent");
-        if (consistency) {
-            consistency.innerHTML = renderHomeConsistencyCard({
-                consistency: c,
-                level: d ? c.label : "",
-                finalTendency: d ? cleanBlankValue(assetDirectionText(d)) : "",
-                conflictLevel: d ? cleanBlankValue(formatWithSource(c.label, c.source)) : "",
-                planMode: cleanBlankValue(planMode),
-                aiApplicable: ["GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE"].some(function (role) {
-                    return hasAiRoleRaw(aiRoleTextForTab(payload, role));
-                }),
-                confused: false,
-                directionalPushBlocked: !!(d && resolveIsConfused(d)),
-                downgradeReason: d ? aiDowngradeReason(d) : ""
-            });
-        }
-    }
-
-    function renderHomeDashboardRows(d) {
-        renderHomePosition(d);
-        renderHomeExecution(d);
-        renderHomeAiDecision(d);
     }
 
     function homeCardValue(card) {
@@ -6176,17 +6080,25 @@
         var list = fixedHomeAssetList(assets);
         box.innerHTML = list.map(function (asset, idx) {
             var rawSymbol = normalizeDisplaySymbol(asset.rawSymbol || asset.symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[idx]);
-            var placeholder = asset.__placeholder === true;
+            var placeholder = asset.__placeholder === true || String(asset.slotType || "").toUpperCase() === "DEFAULT_SLOT";
             var selected = rawSymbol && rawSymbol === selectedSymbol ? " selected" : "";
+            if (placeholder) {
+                return '<div class="coin-tile bias-neu placeholder" aria-disabled="true" data-slot-type="DEFAULT_SLOT">'
+                    + '<div class="tile-headline"><span class="coin-avatar neu ' + escapeHtml(coinAvatarClass(rawSymbol)) + '">'
+                    + escapeHtml(coinAvatarText(rawSymbol)) + '</span><span><span class="tile-symbol-text">'
+                    + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "")
+                    + '</span></span><span class="tile-score-pill neu">等待首轮分析</span></div>'
+                    + '<div class="tile-primary"><p class="empty-hint">等待首轮分析</p></div></div>';
+            }
             var bias = cleanBlankValue(asset.marketBiasLabel || marketBiasLabel(asset.marketBias));
-            var bcls = placeholder ? "neu" : biasClass(asset.marketBias);
+            var bcls = biasClass(asset.marketBias);
             var riskText = cleanBlankValue(asset.riskLabel || riskLevelLabel(asset.riskLevel));
             var confidenceText = cleanBlankValue(asset.confidenceLabel || confidenceLabel(asset.confidenceLevel));
             var stateText = cleanBlankValue(asset.assetStateLabel || assetStateLabel(asset.assetState));
             var worthText = asset.worthOpening === true ? "待复核候选" : (asset.worthOpening === false ? "暂不建议" : "暂无");
             var conclusionText = cleanBlankValue(asset.currentConclusion) || "暂无";
             var coinCls = coinAvatarClass(rawSymbol);
-            return '<div class="coin-tile bias-' + bcls + selected + (placeholder ? ' placeholder' : '') + '" data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '">' +
+            return '<div class="coin-tile bias-' + bcls + selected + '" data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '">' +
                 '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
                 + '<span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "") + '</span></span>'
                 + '<span class="tile-score-pill neu">' + escapeHtml(stateText) + '</span></div>' +
@@ -6380,7 +6292,7 @@
         if (!home) return;
         var header = home.header || {};
         setRuntimeStatus(header.dataStatus || "WAITING_SYNC");
-        setText("headerAiStatusText", localizeVisibleStatus(header.aiStatus || "WAITING_SYNC"));
+        setText("headerAiStatusText", header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
         setText("headerSourceStatusText", localizeVisibleStatus(header.dataSourceText || "WAITING_SYNC"));
         selectedSymbol = normalizeDisplaySymbol(home.selectedSymbol || selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
         window.__lastDashboardHome = home;
@@ -6401,6 +6313,36 @@
         renderHomeAiDecisionFromPayload(home.aiDecision || {});
         renderHomePushInboxFromPayload(home.pushInbox || {});
         updateAssetPoolPanel();
+        document.getElementById("lastUpdatedText").textContent = nowText();
+    }
+
+    function renderDashboardHomeUnavailable() {
+        window.__lastDashboardHome = null;
+        window.__lastHomeDiagnostics = {};
+        allDecisions = [];
+        displayDecisions = [];
+        setRuntimeStatus("WAITING_SYNC");
+        setText("headerAiStatusText", "等待同步");
+        setText("headerSourceStatusText", "等待重新同步");
+        renderHomeSystemStateFromPayload({});
+        renderHomeAlertEventRowsFromPayload({});
+        renderHomeAssetsFromPayload([]);
+        renderSidebarSlots();
+        var position = document.getElementById("homePositionContent");
+        if (position) {
+            position.innerHTML = '<div class="execution-fail-status" role="status"><p class="main">首页数据暂不可用</p><p class="sub">等待重新同步</p></div>';
+        }
+        var execution = document.getElementById("homeExecutionContent");
+        if (execution) {
+            execution.innerHTML = '<div class="execution-card-body"><div class="execution-fail-status" role="status"><p class="main">当前不展示执行计划</p><p class="sub">首页数据暂不可用，等待重新同步</p></div></div>';
+        }
+        var aiContent = document.getElementById("homeAiTabContent");
+        if (aiContent) aiContent.innerHTML = renderUnavailableAiRole({ runStatusLabel: "等待同步", statusMessage: "首页数据暂不可用，等待重新同步" });
+        var consistency = document.getElementById("homeConsistencyContent");
+        if (consistency) {
+            consistency.innerHTML = renderHomeConsistencyCard({ aiApplicable: false, summary: "首页数据暂不可用，等待重新同步" });
+        }
+        renderHomePushInboxFromPayload({});
         document.getElementById("lastUpdatedText").textContent = nowText();
     }
 
@@ -6500,20 +6442,24 @@
     function renderSidebarSlots() {
         var box = document.getElementById("sidebarSlotList");
         if (!box) return;
-        if (!displayDecisions.length) {
-            box.innerHTML = DEFAULT_DISPLAY_SLOT_SYMBOLS.map(function (sym) {
-                return '<div class="sidebar-slot placeholder"><span class="sidebar-market-row"><span class="sidebar-coin-avatar">' + escapeHtml(coinAvatarText(sym)) + '</span><span><span class="sidebar-slot-symbol">' + escapeHtml(sym) + '</span><span class="sidebar-slot-note">等待首轮分析</span></span><span class="sidebar-change">—</span></span></div>';
-            }).join("");
-            return;
-        }
-        box.innerHTML = displayDecisions.map(function (d) {
-            var active = d.symbol === selectedSymbol ? " active" : "";
-            var change = formatChangePct(d.priceChangePct != null ? d.priceChangePct : d.price_change_pct);
+        var homeAssets = window.__lastDashboardHome && Array.isArray(window.__lastDashboardHome.assets)
+            ? window.__lastDashboardHome.assets : [];
+        var slots = fixedHomeAssetList(homeAssets);
+        box.innerHTML = slots.map(function (asset) {
+            var symbol = normalizeDisplaySymbol(asset.rawSymbol || asset.symbol);
+            var placeholder = asset.__placeholder === true || String(asset.slotType || "").toUpperCase() === "DEFAULT_SLOT";
+            if (placeholder) {
+                return '<div class="sidebar-slot placeholder" aria-disabled="true"><span class="sidebar-market-row"><span class="sidebar-coin-avatar">'
+                    + escapeHtml(coinAvatarText(symbol)) + '</span><span><span class="sidebar-slot-symbol">'
+                    + escapeHtml(symbol) + '</span><span class="sidebar-slot-note">等待首轮分析</span></span><span class="sidebar-change">—</span></span></div>';
+            }
+            var active = symbol === selectedSymbol ? " active" : "";
+            var change = formatChangePct(asset.priceChangePct != null ? asset.priceChangePct : asset.price_change_pct);
             var down = String(change).trim().indexOf("-") === 0 ? " down" : "";
-            return '<button type="button" class="sidebar-slot' + active + '" data-symbol="' + escapeHtml(d.symbol || "") + '">'
+            return '<button type="button" class="sidebar-slot' + active + '" data-symbol="' + escapeHtml(symbol || "") + '">'
                 + '<span class="sidebar-market-row">'
-                + '<span class="sidebar-coin-avatar">' + escapeHtml(coinAvatarText(d.symbol)) + '</span>'
-                + '<span><span class="sidebar-slot-symbol">' + escapeHtml(d.symbol || "—") + '</span><span class="sidebar-slot-note">' + escapeHtml(formatPrice(d.latestPrice != null ? d.latestPrice : d.latest_price)) + '</span></span>'
+                + '<span class="sidebar-coin-avatar">' + escapeHtml(coinAvatarText(symbol)) + '</span>'
+                + '<span><span class="sidebar-slot-symbol">' + escapeHtml(symbol || "—") + '</span><span class="sidebar-slot-note">' + escapeHtml(formatPrice(asset.latestPrice != null ? asset.latestPrice : asset.latest_price)) + '</span></span>'
                 + '<span class="sidebar-change' + down + '">' + escapeHtml(change) + '</span>'
                 + '</span></button>';
         }).join("");
@@ -6522,24 +6468,9 @@
                 var sym = el.getAttribute("data-symbol");
                 if (!sym) return;
                 selectedSymbol = sym;
-                renderTiles();
-                requestDetailForSelectedSymbol();
+                refreshDashboard();
             });
         });
-    }
-
-    function renderPlaceholderTiles() {
-        return DEFAULT_DISPLAY_SLOT_SYMBOLS.map(function (sym) {
-            return '<div class="coin-tile bias-neu placeholder">'
-                + '<div class="tile-headline"><span class="coin-avatar neu ' + escapeHtml(coinAvatarClass(sym)) + '">' + escapeHtml(coinAvatarText(sym)) + '</span><span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(sym)) + '</span></span><span class="tile-score-pill neu">综合评分</span></div>'
-                + '<div class="tile-mainline"><span class="tile-direction-label">方向：</span><span class="tile-bias neu"></span></div>'
-                + '<div class="tile-compact-grid">'
-                + '<div class="tile-compact-row"><span class="label">置信度</span><span class="value"></span></div>'
-                + '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value"></span></div>'
-                + '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value"></span></div>'
-                + '</div>'
-                + '</div>';
-        }).join("");
     }
 
     function renderDecisionSectionShells(d, executionPlan, riskGuard, paperObs, aiConflict) {
@@ -7057,36 +6988,46 @@
     }
 
     function isConfusedState(d) {
-        return resolveConfusedState(d).isConfused;
+        return resolveConflictState(d).isConfused;
     }
 
-    function resolveConfusedState(d) {
+    function resolveConflictState(d) {
         var scoreRaw = d && (d.confusedScore != null ? d.confusedScore : d.confused_score);
         var stateRaw = d && (d.isConfused != null ? d.isConfused : d.is_confused);
-        if (scoreRaw != null && isFinite(Number(scoreRaw))) {
-            var s = Number(scoreRaw);
-            return { isConfused: s > 0, score: s, source: "backend" };
-        }
         if (stateRaw != null) {
             var state = stateRaw === true || String(stateRaw).toUpperCase() === "TRUE";
-            return { isConfused: state, score: state ? 1 : 0, source: "backend" };
+            return { isConfused: state, score: scoreRaw != null && isFinite(Number(scoreRaw)) ? Number(scoreRaw) : null, source: "backend" };
         }
-        // 缺少后端字段时，不再由前端 heuristic 主导 confused 语义。
+        if (scoreRaw != null && isFinite(Number(scoreRaw))) {
+            var score = Number(scoreRaw);
+            return { isConfused: score >= CONFLICT_STATE_THRESHOLD, score: score, source: "compatibility-threshold" };
+        }
         return { isConfused: false, score: null, source: "fallback" };
     }
 
+    function resolveDirectionalBlock(d) {
+        var blockRaw = d && (d.directionalPushBlocked != null ? d.directionalPushBlocked : d.directional_push_blocked);
+        var scoreRaw = d && (d.confusedScore != null ? d.confusedScore : d.confused_score);
+        if (blockRaw != null) {
+            return blockRaw === true || String(blockRaw).toUpperCase() === "TRUE";
+        }
+        return scoreRaw != null && isFinite(Number(scoreRaw))
+            ? Number(scoreRaw) >= DIRECTIONAL_PUSH_BLOCK_THRESHOLD
+            : false;
+    }
+
     function resolveConfusedScore(d) {
-        return resolveConfusedState(d).score;
+        return resolveConflictState(d).score;
     }
 
     function resolveIsConfused(d) {
-        return resolveConfusedState(d).isConfused;
+        return resolveConflictState(d).isConfused;
     }
 
     function confusedCount(decisions) {
         var n = 0;
         (decisions || []).forEach(function (d) {
-            var state = resolveConfusedState(d);
+            var state = resolveConflictState(d);
             if (state.source === "backend" && state.isConfused) n++;
         });
         return n;
@@ -7148,7 +7089,7 @@
         var sawDecisionField = false;
         var n = 0;
         (decisions || []).forEach(function (d) {
-            var state = resolveConfusedState(d);
+            var state = resolveConflictState(d);
             if (state.source === "backend") {
                 sawDecisionField = true;
                 if (state.isConfused) n++;
@@ -8852,74 +8793,6 @@
         renderSidebarPanel(systemStatus, alerts, openPositionCount);
     }
 
-    function renderTiles() {
-        var box = document.getElementById("tilesRow");
-        var tileItems = displayDecisions.slice(0, 6);
-        var usedSymbols = {};
-        tileItems.forEach(function (d) { if (d && d.symbol) usedSymbols[String(d.symbol).toUpperCase()] = true; });
-        var placeholderPool = uniqueSymbols((modeValue === "custom" ? loadCustomSymbols() : []).concat(DEFAULT_DISPLAY_SLOT_SYMBOLS));
-        var poolIndex = 0;
-        while (tileItems.length < 6) {
-            var sym = placeholderPool[poolIndex++] || ("SLOT" + (tileItems.length + 1));
-            if (usedSymbols[sym]) continue;
-            usedSymbols[sym] = true;
-            tileItems.push({ symbol: sym, __placeholder: true });
-        }
-        box.innerHTML = tileItems.map(function (d, idx) {
-            var placeholder = d.__placeholder === true;
-            var sel = ((!placeholder && d.symbol === selectedSymbol) || (placeholder && idx === 0)) ? " selected" : "";
-            var bias = placeholder ? "" : cleanBlankValue(assetDirectionText(d));
-            var bcls = placeholder ? "neu" : decisionBiasClass(d);
-            var riskText = placeholder ? "" : cleanBlankValue(decisionRiskText(d));
-            var riskCls = riskText === "极高" || riskText === "高" ? "tile-risk-high" : (riskText === "中" ? "tile-risk-medium" : (riskText === "低" ? "tile-risk-low" : ""));
-            var scoreText = placeholder ? "" : decisionScoreText(d);
-            var scoreLabel = !scoreText || scoreText === "—" ? "综合评分" : ("综合评分 " + scoreText);
-            var scoreTone = placeholder ? "neu" : scoreToneClass(d);
-            var confidenceTextValue = placeholder ? "" : cleanBlankValue(decisionConfidenceText(d));
-            var stateText = placeholder ? "" : cleanBlankValue(assetStateText(d));
-            var worthText = placeholder ? "" : cleanBlankValue(assetWorthOpenText(d));
-            var stateOpinion = stateText && worthText ? (stateText + " / " + worthText) : (stateText || worthText || "");
-            var worthCls = stateOpinion === "暂不建议" || stateOpinion.indexOf("高风险") >= 0 ? "tile-risk-medium" : (stateOpinion.indexOf("候选") >= 0 ? "tile-risk-low" : "");
-            var coinCls = coinAvatarClass(d.symbol);
-            return '<div class="coin-tile bias-' + bcls + sel + (placeholder ? ' placeholder' : '') + '" data-symbol="' + escapeHtml(d.symbol || "") + '" data-idx="' + idx + '">' +
-                '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(d.symbol)) + '</span>'
-                + '<span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(d.symbol) || "—") + '</span></span>'
-                + '<span class="tile-score-pill ' + scoreTone + '">' + escapeHtml(scoreLabel) + '</span></div>' +
-                '<div class="tile-primary">' +
-                '<div class="tile-mainline"><span class="tile-direction-label">方向：</span><span class="tile-bias ' + bcls + '">' + escapeHtml(bias) + '</span></div>' +
-                '<div class="tile-compact-grid">' +
-                '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceTextValue) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value ' + riskCls + '">' + escapeHtml(riskText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value ' + worthCls + '">' + escapeHtml(stateOpinion) + '</span></div>' +
-                '</div></div></div>';
-        }).join("");
-
-        if (!displayDecisions.length) {
-            renderSidebarSlots();
-            renderHomeDashboardRows(null);
-            renderMainWorkbench(null, null);
-            renderDetail(null);
-        } else {
-            Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
-                el.addEventListener("click", function () {
-                    if (el.classList.contains("placeholder")) return;
-                    selectedSymbol = el.getAttribute("data-symbol");
-                    renderTiles();
-                    requestDetailForSelectedSymbol();
-                });
-            });
-
-            renderSidebarSlots();
-            var cur = detailDecisionMap[selectedSymbol] || displayDecisions.find(function (x) { return x.symbol === selectedSymbol; });
-            var marketEnvironmentMini = selectedSymbol ? detailMarketEnvironmentMiniMap[selectedSymbol] : null;
-            var topItems = selectedSymbol ? detailEvidenceTopItemsMap[selectedSymbol] : [];
-            var scoreItems = selectedSymbol ? detailScoreTopItemsMap[selectedSymbol] : [];
-            renderHomeDashboardRows(cur || displayDecisions[0]);
-            renderMainWorkbench(cur || displayDecisions[0], marketEnvironmentMini);
-            renderDetail(cur || displayDecisions[0], marketEnvironmentMini, topItems, scoreItems);
-        }
-        updateAssetPoolPanel();
-    }
     function humanEvidenceSummary(d) {
         var e = d.evidenceSummary || "";
         if (!e.trim()) return "暂无可用摘要。";
@@ -8943,7 +8816,7 @@
 
     function executionBlock(d) {
         var c = resolveAiConflict(d);
-        var confusedState = resolveConfusedState(d);
+        var confusedState = resolveConflictState(d);
         var confused = confusedState.isConfused;
         var worth = pickIsWorthOpening(d);
         var rmRaw = d.readModelTruthStatus != null ? d.readModelTruthStatus : d.read_model_truth_status;
@@ -9144,7 +9017,7 @@
         var latestPriceText = formatPrice(d.latestPrice != null ? d.latestPrice : d.latest_price);
         var priceUpdatedText = priceUpdateTime(d);
         var conflict = resolveAiConflict(d);
-        var confusedState = resolveConfusedState(d);
+        var confusedState = resolveConflictState(d);
         var confusedScore = confusedState.score;
         var explanationObj = parseJsonObjectSafe(d.explanationJson || d.explanation_json);
         var reviewReasons = parseReviewReasons(d.reviewReasons || d.review_reasons);
@@ -9211,7 +9084,9 @@
             '<div class="kv"><span class="k">置信度</span><span class="v">' + decisionConfidenceText(d) + "</span></div>" +
             '<div class="kv"><span class="k">冲突等级</span><span class="v">' + escapeHtml(formatWithSource(conflict.label, conflict.source)) + "</span></div>" +
             '<div class="kv"><span class="k">冲突分</span><span class="v">' + (conflict.score != null ? escapeHtml(String(conflict.score)) : "—") + "</span></div>" +
-            '<div class="kv"><span class="k">冲突阻断分</span><span class="v">' + (confusedScore != null ? escapeHtml(String(confusedScore)) : "—") + (confusedState.source === "fallback" ? '（待后端字段）' : "") + "</span></div></div>";
+            '<div class="kv"><span class="k">冲突状态分</span><span class="v">' + (confusedScore != null ? escapeHtml(String(confusedScore)) : "—") + (confusedState.source === "fallback" ? '（待后端字段）' : "") + "</span></div>" +
+            '<div class="kv"><span class="k">进入冲突状态</span><span class="v">' + (confusedState.isConfused ? "是" : "否") + "</span></div>" +
+            '<div class="kv"><span class="k">资产方向阻断</span><span class="v">' + (resolveDirectionalBlock(d) ? "是" : "否") + "</span></div></div>";
 
         var reasonsHtml = reviewReasons.length
             ? "<ul>" + reviewReasons.slice(0, 6).map(function (r) { return "<li>" + escapeHtml(r) + "</li>"; }).join("") + "</ul>"
@@ -9312,26 +9187,22 @@
 
     function refreshDashboard() {
         fetchLocalRealPipelineStatus();
-        fetchDashboardHome()
-            .then(function (home) { return home; })
+        return fetchDashboardHome()
+            .then(function (home) {
+                requestDetailForSelectedSymbol();
+                return home;
+            })
             .catch(function () {
-                var legacyResult = refreshDashboardLegacy();
-                return legacyResult;
+                renderDashboardHomeUnavailable();
+                return refreshDashboardDiagnostics();
             });
     }
 
-    function refreshDashboardLegacy() {
+    function refreshDashboardDiagnostics() {
         return fetch("/api/dashboard/summary?limit=12")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (data) {
-                setRuntimeStatus(data.systemStatus ? data.systemStatus.status : "OK");
                 window.__lastHealth = data.systemHealth;
-                allDecisions = data.decisions || [];
-                buildDisplayList();
-                renderLayer1(data.systemStatus, data.systemHealth, data.alerts, allDecisions, data.openPositionCount);
-                renderTiles();
-                requestDetailForSelectedSymbol();
-                document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchPositionProviderStatus();
                 fetchWatchlistRuntimeStatus();
                 fetchRuleConfigAuditRuntimeStatus();
@@ -9384,8 +9255,8 @@
         fetchAccountRiskExposureStatus(symbol);
         fetchExternalContextStatus(symbol);
         fetchHotResetEventImpactSourceStatus(symbol);
-        if (!symbol) return;
-        fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
+        if (!symbol) return Promise.resolve(null);
+        return fetch("/api/dashboard/detail?symbol=" + encodeURIComponent(symbol))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (resp) {
                 var detail = resp && resp.decision ? resp.decision : null;
@@ -9395,13 +9266,12 @@
                 detailScoreTopItemsMap[symbol] = Array.isArray(resp && resp.scoreTopItems) ? resp.scoreTopItems : [];
                 renderDisplayStatusCards(detail);
                 if (!detail || !detail.symbol) {
-                    renderHomeDashboardRows(null);
                     renderMainWorkbench(null, null);
+                    renderDetail(null);
                     return;
                 }
                 detailDecisionMap[detail.symbol] = detail;
                 if (selectedSymbol === detail.symbol) {
-                    renderHomeDashboardRows(detail);
                     renderMainWorkbench(detail, detailMarketEnvironmentMiniMap[detail.symbol]);
                     renderDetail(
                         detail,
@@ -9412,7 +9282,7 @@
                 }
             })
             .catch(function () {
-                // Keep summary row rendering when detail API is temporarily unavailable.
+                // Detail diagnostics are optional; Home remains the only main semantic renderer.
             });
     }
 
@@ -9577,8 +9447,6 @@
         if (topSearch) topSearch.value = formatSymbolPair(symbol);
         if (sideSearch) sideSearch.value = formatSymbolPair(symbol);
         hideAssetSearchSuggestions();
-        buildDisplayList();
-        renderTiles();
         refreshDashboard();
     }
 
@@ -9894,8 +9762,6 @@
             searchQuery = this.value;
             var sideSearch = document.getElementById("sidebarSymbolSearch");
             if (sideSearch && sideSearch.value !== this.value) sideSearch.value = this.value;
-            buildDisplayList();
-            renderTiles();
             renderAssetSearchSuggestions();
         });
         topAssetSearchInput.addEventListener("focus", renderAssetSearchSuggestions);
@@ -9921,8 +9787,6 @@
             searchQuery = this.value;
             var topSearch = document.getElementById("symbolSearch");
             if (topSearch && topSearch.value !== this.value) topSearch.value = this.value;
-            buildDisplayList();
-            renderTiles();
             renderAssetSearchSuggestions();
         });
     }
@@ -9931,8 +9795,7 @@
         modeValue = this.value;
         try { localStorage.setItem(MODE_LS_KEY, modeValue); } catch (e) {}
         updateModeHint();
-        buildDisplayList();
-        renderTiles();
+        refreshDashboard();
     });
 
     document.getElementById("btnReset").addEventListener("click", function () {
@@ -9944,8 +9807,7 @@
         document.getElementById("modeSelect").value = "system";
         try { localStorage.setItem(MODE_LS_KEY, "system"); } catch (e) {}
         updateModeHint();
-        buildDisplayList();
-        renderTiles();
+        refreshDashboard();
     });
 
     document.getElementById("btnAdd").addEventListener("click", function () {
@@ -9962,8 +9824,7 @@
         var modeSelect = document.getElementById("modeSelect");
         if (modeSelect) modeSelect.value = "custom";
         updateModeHint();
-        buildDisplayList();
-        renderTiles();
+        refreshDashboard();
     });
 
     var btnRemove = document.getElementById("btnRemove");

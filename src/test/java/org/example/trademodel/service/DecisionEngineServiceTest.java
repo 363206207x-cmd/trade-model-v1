@@ -15,6 +15,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +93,18 @@ class DecisionEngineServiceTest {
 
         assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getReviewReasons()).contains("DATA_QUALITY_INSUFFICIENT");
+    }
+
+    @Test
+    void newDecisionPlanValidityUsesInjectedUtcClock() {
+        service.setDecisionClock(Clock.fixed(Instant.parse("2026-07-13T11:54:00Z"), ZoneOffset.UTC));
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-offset-time", 85, 65);
+
+        assertThat(decision.getValidFrom()).isEqualTo(OffsetDateTime.parse("2026-07-13T11:54:00Z"));
+        assertThat(decision.getExpiresAt()).isEqualTo(OffsetDateTime.parse("2026-07-14T11:54:00Z"));
+        assertThat(decision.getValidFrom().getOffset()).isEqualTo(ZoneOffset.UTC);
+        assertThat(decision.getExpiresAt().getOffset()).isEqualTo(ZoneOffset.UTC);
     }
 
     @Test
