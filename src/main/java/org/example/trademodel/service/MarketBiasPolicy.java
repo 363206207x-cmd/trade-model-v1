@@ -4,8 +4,9 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Deterministic four-timeframe market-bias contract.
- * Each timeframe uses the complete supplied window, from first open to last close.
+ * Provisional four-timeframe market-bias mapping pending a product-owned window/threshold contract.
+ * Runtime currently supplies three closed bars per timeframe and compares first open to last close;
+ * this is not a validated trend-strength model.
  */
 public final class MarketBiasPolicy {
 

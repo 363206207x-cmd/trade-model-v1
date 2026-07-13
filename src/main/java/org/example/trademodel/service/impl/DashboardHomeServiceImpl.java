@@ -12,6 +12,7 @@ import org.example.trademodel.derivatives.DerivativesEvidenceItem;
 import org.example.trademodel.derivatives.DerivativesEvidenceType;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
@@ -55,6 +56,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -63,6 +69,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class DashboardHomeServiceImpl implements DashboardHomeService {
@@ -91,6 +99,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     );
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
     private static final int MIN_DATA_QUALITY_SCORE_FOR_PLAN = 60;
+    private static final DateTimeFormatter LEGACY_VALID_PERIOD_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
+            "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*~\\s*"
+                    + "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$");
 
     private final DecisionService decisionService;
     private final MonitorService monitorService;
@@ -110,6 +123,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private AnalysisRunMapper analysisRunMapper;
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
+    private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -174,6 +188,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     @Autowired(required = false)
     void setAssetStateMapper(AssetStateMapper assetStateMapper) {
         this.assetStateMapper = assetStateMapper;
+    }
+
+    void setPlanValidityClock(Clock planValidityClock) {
+        this.planValidityClock = planValidityClock != null ? planValidityClock : Clock.systemUTC();
     }
 
     @Override
@@ -352,11 +370,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 "待复核机会",
                 pendingCount,
                 pendingCount != null && pendingCount > 0 ? String.valueOf(pendingCount) : "暂无",
-                "pendingCount",
+                "待复核数量",
                 pendingCount != null ? "CONNECTED" : "WAITING_SYNC",
                 pendingCount
         ));
-        Integer confusedCount = confusedCount(systemStatus, decisions);
+        Integer confusedCount = directionalBlockCount(systemStatus, decisions);
         state.setConfused(card(
                 "confused",
                 "冲突阻断",
@@ -671,9 +689,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             suggestion.setStatusLabel("持仓监控");
             suggestion.setPositionMode(true);
             suggestion.setPositionMonitor(activePosition);
-            suggestion.setOriginalPlanLabel("原执行计划，仅用于持仓复核和复盘对照");
+            SnapshotTraceStatus snapshotTraceStatus = executionSnapshotTraceStatus(decision);
+            suggestion.setOriginalPlanLabel(decision == null
+                    ? "暂无可关联的原执行计划"
+                    : snapshotTraceStatus == SnapshotTraceStatus.MATCH
+                            ? "原执行计划，仅用于持仓复核和复盘对照"
+                            : "状态已更新，原计划需重新分析");
             suggestion.setSourceAnalysisId(decision != null ? trimToNull(decision.getAnalysisId()) : null);
-            populateOriginalPlan(suggestion, decision);
+            if (snapshotTraceStatus == SnapshotTraceStatus.MATCH) {
+                populateOriginalPlan(suggestion, decision);
+            }
             return suggestion;
         }
         if (decision == null) {
@@ -709,6 +734,17 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "当前资产状态不允许形成新计划");
             return suggestion;
         }
+        SnapshotTraceStatus snapshotTraceStatus = executionSnapshotTraceStatus(decision);
+        if (snapshotTraceStatus == SnapshotTraceStatus.MISMATCH) {
+            blockSuggestion(suggestion, "STATE_SNAPSHOT_MISMATCH", "当前暂无完整执行计划",
+                    "状态已更新，原计划需重新分析");
+            return suggestion;
+        }
+        if (snapshotTraceStatus != SnapshotTraceStatus.MATCH) {
+            blockSuggestion(suggestion, "STATE_SNAPSHOT_UNVERIFIED", "当前暂无完整执行计划",
+                    "状态与计划关联信息不完整，需重新分析");
+            return suggestion;
+        }
         if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) {
             blockSuggestion(suggestion, "RISK_BLOCKED", "当前暂无完整执行计划",
                     "风险门控未通过，等待人工复核");
@@ -741,7 +777,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "有效期缺失，等待重新分析");
             return suggestion;
         }
-        if (expiredPlan(decision.getValidPeriod())) {
+        PlanValidity planValidity = parsePlanValidity(decision.getValidPeriod());
+        if (planValidity.status() == PlanValidityStatus.INVALID) {
+            blockSuggestion(suggestion, "VALID_PERIOD_INVALID", "当前暂无完整执行计划",
+                    "有效期格式异常，等待重新分析");
+            return suggestion;
+        }
+        if (planValidity.status() == PlanValidityStatus.NOT_ACTIVE) {
+            blockSuggestion(suggestion, "PLAN_NOT_ACTIVE", "当前暂无完整执行计划",
+                    "计划尚未进入有效期，等待重新分析");
+            return suggestion;
+        }
+        if (planValidity.status() == PlanValidityStatus.EXPIRED) {
             blockSuggestion(suggestion, "PLAN_EXPIRED", "当前暂无完整执行计划",
                     "计划已失效，等待重新分析");
             return suggestion;
@@ -756,6 +803,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setLeverageSuggestion(planLeverageLabel(decision.getLeverageSuggestion()));
         suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
         suggestion.setValidPeriod(trimToNull(decision.getValidPeriod()));
+        suggestion.setValidFrom(planValidity.validFrom());
+        suggestion.setExpiresAt(planValidity.expiresAt());
         suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
         return suggestion;
     }
@@ -789,6 +838,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         AiRoleResultsPayload.SynthesisPayload synthesis = payload != null ? payload.synthesis() : null;
         ai.setSchemaVersion(payload != null ? payload.schemaVersion() : null);
         int successfulRoles = successfulAiRoleCount(payload);
+        boolean aiApplicable = successfulRoles > 0;
         String runStatus = aiRunStatus(payload, successfulRoles);
         ai.setRunStatus(runStatus);
         ai.setRunStatusLabel(aiRunStatusLabel(runStatus));
@@ -801,18 +851,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         ai.setTabs(tabs);
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
-        consistency.setLevel(successfulRoles > 0 && decision != null
+        consistency.setAiApplicable(aiApplicable);
+        consistency.setLevel(aiApplicable && decision != null
                 ? trimToNull(decision.getAiConflictLevel()) : null);
-        consistency.setScore(successfulRoles > 0 && decision != null ? decision.getAiConflictScore() : null);
-        consistency.setConfused(directionalPushBlocked(decision));
+        consistency.setScore(aiApplicable && decision != null ? decision.getAiConflictScore() : null);
+        consistency.setConfused(aiApplicable && synthesis != null && Boolean.TRUE.equals(synthesis.confused()));
+        consistency.setDirectionalPushBlocked(directionalPushBlocked(decision));
         consistency.setConsistencyScore(null);
-        consistency.setConsistencyLevel(successfulRoles > 0
+        consistency.setConsistencyLevel(aiApplicable
                 ? aiConflictLevelLabel(decision != null ? decision.getAiConflictLevel() : null)
                 : "不适用");
-        consistency.setConsistencySummary(successfulRoles > 0
+        consistency.setConsistencySummary(aiApplicable
                 ? "基于本轮成功返回的 AI 角色形成一致性摘要"
                 : "AI 未运行，本轮仅使用规则判断");
-        consistency.setDowngradeReason(successfulRoles > 0 && synthesis != null
+        consistency.setDowngradeReason(aiApplicable && synthesis != null
                 ? aiDowngradeReasonLabel(synthesis.downgradeReason()) : null);
         ai.setConsistency(consistency);
         return ai;
@@ -1020,7 +1072,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         diagnostics.setAiCall(hasText(selectedDecision != null ? selectedDecision.getAiRoleResults() : null) ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setPushRecheck(pushInboxContext.readOk() ? "CONNECTED" : "UNKNOWN");
         diagnostics.setTelegram("WAITING_SYNC");
-        diagnostics.setConfused(confusedCount(systemStatus, decisions) != null ? "CONNECTED" : "UNKNOWN");
+        diagnostics.setConfused(directionalBlockCount(systemStatus, decisions) != null ? "CONNECTED" : "UNKNOWN");
         diagnostics.setHotReset(systemStatus != null && systemStatus.getHotResetFired() != null ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setOpportunityLog("UNKNOWN");
         diagnostics.setReview("UNKNOWN");
@@ -1205,8 +1257,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return new AiConflictSummary(trimToNull(decision.getAiConflictLevel()), decision.getAiConflictScore());
     }
 
-    private Integer confusedCount(LightSystemStatusVO systemStatus, List<DecisionResultVO> decisions) {
-        if (systemStatus != null && systemStatus.getConfusedCount() != null) {
+    private Integer directionalBlockCount(LightSystemStatusVO systemStatus, List<DecisionResultVO> decisions) {
+        if (systemStatus == null) {
+            return null;
+        }
+        if (systemStatus.getConfusedCount() != null) {
             return systemStatus.getConfusedCount();
         }
         if (decisions == null) {
@@ -1217,7 +1272,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         for (DecisionResultVO decision : decisions) {
             if (decision != null && decision.getConfusedScore() != null) {
                 sawField = true;
-                if (decision.getConfusedScore() > 0) {
+                if (decision.getConfusedScore() >= ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD) {
                     count++;
                 }
             }
@@ -1245,11 +1300,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private String localRealDataSourceText() {
         long ready = localRealReadinessService.readyAssetCount();
-        List<String> degraded = localRealReadinessService.assets().values().stream()
+        List<String> partiallyAvailable = localRealReadinessService.assets().values().stream()
                 .filter(item -> item.state() != LocalRealAssetReadinessState.READY)
                 .map(item -> item.symbol().replace("USDT", ""))
                 .toList();
-        String suffix = degraded.isEmpty() ? "" : " · degraded " + String.join(",", degraded);
+        String suffix = partiallyAvailable.isEmpty()
+                ? "" : " · 数据部分可用 " + String.join(",", partiallyAvailable);
         return "真实行情资产 " + ready + "/" + DEFAULT_SYMBOLS.size() + " · Kraken" + suffix;
     }
 
@@ -1388,10 +1444,63 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private boolean expiredPlan(String validPeriod) {
-        String value = upper(validPeriod);
-        return value.contains("EXPIRED") || value.contains("INVALIDATED")
-                || validPeriod.contains("已失效") || validPeriod.contains("已过期");
+    private PlanValidity parsePlanValidity(String validPeriod) {
+        String value = trimToNull(validPeriod);
+        if (value == null) return PlanValidity.invalid();
+        String normalized = upper(value);
+        if (normalized.contains("EXPIRED") || normalized.contains("INVALIDATED")
+                || value.contains("已失效") || value.contains("已过期")) {
+            return PlanValidity.expired();
+        }
+        Matcher matcher = LEGACY_VALID_PERIOD_RANGE.matcher(value);
+        if (!matcher.matches()) return PlanValidity.invalid();
+        try {
+            LocalDateTime localValidFrom = LocalDateTime.parse(matcher.group(1), LEGACY_VALID_PERIOD_FORMATTER);
+            LocalDateTime localExpiresAt = LocalDateTime.parse(matcher.group(2), LEGACY_VALID_PERIOD_FORMATTER);
+            if (!localValidFrom.isBefore(localExpiresAt)) return PlanValidity.invalid();
+            // Legacy persisted periods have no offset. The compatibility contract is UTC, matching analysis clocks.
+            OffsetDateTime validFrom = localValidFrom.atOffset(ZoneOffset.UTC);
+            OffsetDateTime expiresAt = localExpiresAt.atOffset(ZoneOffset.UTC);
+            OffsetDateTime now = OffsetDateTime.now(planValidityClock).withOffsetSameInstant(ZoneOffset.UTC);
+            if (now.isBefore(validFrom)) {
+                return new PlanValidity(PlanValidityStatus.NOT_ACTIVE, validFrom, expiresAt);
+            }
+            if (!now.isBefore(expiresAt)) {
+                return new PlanValidity(PlanValidityStatus.EXPIRED, validFrom, expiresAt);
+            }
+            return new PlanValidity(PlanValidityStatus.ACTIVE, validFrom, expiresAt);
+        } catch (DateTimeParseException ignored) {
+            return PlanValidity.invalid();
+        }
+    }
+
+    private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision) {
+        if (decision == null || !hasText(decision.getAnalysisId()) || !hasText(decision.getSymbol())
+                || assetStateMapper == null || analysisRunMapper == null) {
+            return SnapshotTraceStatus.UNVERIFIED;
+        }
+        try {
+            AssetStateDO state = assetStateMapper.selectBySymbol(normalizeSymbol(decision.getSymbol()));
+            AnalysisRunDO run = analysisRunMapper.selectById(decision.getAnalysisId());
+            String stateTraceId = state != null ? trimToNull(state.getTraceId()) : null;
+            String decisionTraceId = run != null ? trimToNull(run.getTraceId()) : null;
+            if (stateTraceId == null || decisionTraceId == null) return SnapshotTraceStatus.UNVERIFIED;
+            return stateTraceId.equals(decisionTraceId) ? SnapshotTraceStatus.MATCH : SnapshotTraceStatus.MISMATCH;
+        } catch (RuntimeException ignored) {
+            return SnapshotTraceStatus.UNVERIFIED;
+        }
+    }
+
+    private enum SnapshotTraceStatus { MATCH, MISMATCH, UNVERIFIED }
+    private enum PlanValidityStatus { ACTIVE, NOT_ACTIVE, EXPIRED, INVALID }
+    private record PlanValidity(PlanValidityStatus status, OffsetDateTime validFrom, OffsetDateTime expiresAt) {
+        private static PlanValidity invalid() {
+            return new PlanValidity(PlanValidityStatus.INVALID, null, null);
+        }
+
+        private static PlanValidity expired() {
+            return new PlanValidity(PlanValidityStatus.EXPIRED, null, null);
+        }
     }
 
     private String positionDirectionLabel(String direction) {

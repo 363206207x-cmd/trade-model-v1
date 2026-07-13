@@ -13,6 +13,7 @@ import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
@@ -20,6 +21,8 @@ import org.example.trademodel.entity.UserConfigDO;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
@@ -50,6 +53,8 @@ import java.math.BigDecimal;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -60,9 +65,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardHomeServiceImplTest {
+    private static final String ACTIVE_VALID_PERIOD =
+            "2026-07-01 00:00:00 ~ 2026-07-02 00:00:00";
     private static final List<String> FORBIDDEN_TELEGRAM_STATUS_DEPENDENCIES = List.of(
             "Telegram",
             "Notification",
@@ -97,6 +105,10 @@ class DashboardHomeServiceImplTest {
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     @Mock
     private AssetStateMapper assetStateMapper;
+    @Mock
+    private AnalysisRunMapper analysisRunMapper;
+    @Mock
+    private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
 
     private DashboardHomeServiceImpl service;
     private final AiRoleResultsCodec aiRoleResultsCodec = new AiRoleResultsCodec(new ObjectMapper());
@@ -116,6 +128,10 @@ class DashboardHomeServiceImplTest {
                 new ObjectMapper()
         );
         service.setAssetStateMapper(assetStateMapper);
+        service.setLocalRealDashboardSources(persistedOhlcvBarMapper, analysisRunMapper);
+        service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-01T12:00:00Z"), ZoneOffset.UTC));
+        lenient().when(analysisRunMapper.selectAverageScoreByAnalysisId(anyString())).thenReturn(null);
+        lenient().when(analysisRunMapper.countEvidenceByAnalysisId(anyString())).thenReturn(null);
     }
 
     @Test
@@ -134,12 +150,13 @@ class DashboardHomeServiceImplTest {
         btc.setTakeProfitRules("66000 / 69000");
         btc.setLeverageSuggestion("20x");
         btc.setPositionSuggestion("10%");
-        btc.setValidPeriod("12h");
+        btc.setValidPeriod(ACTIVE_VALID_PERIOD);
         btc.setInvalidCondition("跌破 61000");
         btc.setAiRoleResults(structuredAiRoleResults(
                 List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
                         AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "保持人工复核")),
                 synthesis("BULLISH", "HIGH", "HIGH", "REDUCED", true, "EVENT_WINDOW_REVIEW")));
+        allowMatchingSnapshot(btc);
 
         DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "EXTREME", 72, 80,
                 "LEVEL_4_EXTREME_DIVERGENCE", false, "{\"nextState\":\"HIGH_RISK\"}");
@@ -536,7 +553,8 @@ class DashboardHomeServiceImplTest {
         decision.setEntryZone("63000-64000");
         decision.setStopLoss("61000");
         decision.setTakeProfitRules("66000 / 69000");
-        decision.setValidPeriod("12h");
+        decision.setValidPeriod(ACTIVE_VALID_PERIOD);
+        allowMatchingSnapshot(decision);
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
         when(userPositionService.listOpenPositions()).thenReturn(List.of());
@@ -589,7 +607,7 @@ class DashboardHomeServiceImplTest {
         btc.setTakeProfitRules("BTC take profit");
         btc.setLeverageSuggestion("20x");
         btc.setPositionSuggestion("10%");
-        btc.setValidPeriod("12h");
+        btc.setValidPeriod(ACTIVE_VALID_PERIOD);
         btc.setInvalidCondition("BTC invalid");
 
         DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "MEDIUM", 70, 10,
@@ -599,8 +617,10 @@ class DashboardHomeServiceImplTest {
         eth.setTakeProfitRules("ETH take profit");
         eth.setLeverageSuggestion("3x");
         eth.setPositionSuggestion("5%");
-        eth.setValidPeriod("6h");
+        eth.setValidPeriod(ACTIVE_VALID_PERIOD);
         eth.setInvalidCondition("ETH invalid");
+        allowMatchingSnapshot(btc);
+        allowMatchingSnapshot(eth);
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth));
         when(userPositionService.listOpenPositions()).thenReturn(List.of());
@@ -615,7 +635,7 @@ class DashboardHomeServiceImplTest {
         assertThat(ethHome.getExecutionSuggestion().getTakeProfitRules()).isEqualTo("ETH take profit");
         assertThat(ethHome.getExecutionSuggestion().getLeverageSuggestion()).isEqualTo("3x");
         assertThat(ethHome.getExecutionSuggestion().getPositionSuggestion()).isEqualTo("5%");
-        assertThat(ethHome.getExecutionSuggestion().getValidPeriod()).isEqualTo("6h");
+        assertThat(ethHome.getExecutionSuggestion().getValidPeriod()).isEqualTo(ACTIVE_VALID_PERIOD);
         assertThat(ethHome.getExecutionSuggestion().getInvalidCondition()).isEqualTo("ETH invalid");
 
         DashboardHomeVO defaultHome = service.getHome(null, 6);
@@ -623,7 +643,7 @@ class DashboardHomeServiceImplTest {
         assertThat(defaultHome.getSelectedSymbol()).isEqualTo("BTCUSDT");
         assertThat(defaultHome.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-BTCUSDT");
         assertThat(defaultHome.getExecutionSuggestion().getEntryZone()).isEqualTo("BTC entry");
-        assertThat(defaultHome.getExecutionSuggestion().getValidPeriod()).isEqualTo("12h");
+        assertThat(defaultHome.getExecutionSuggestion().getValidPeriod()).isEqualTo(ACTIVE_VALID_PERIOD);
     }
 
     @Test
@@ -668,6 +688,7 @@ class DashboardHomeServiceImplTest {
         decision.setPositionSuggestion("10%");
         decision.setValidPeriod("2026-07-03 00:34:21 ~ 2026-07-04 00:34:21");
         decision.setInvalidCondition("结构失效：当前价高于近端 5m 摆动高点");
+        allowMatchingSnapshot(decision);
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
 
@@ -966,6 +987,123 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void aiNotApplicableOverridesDirectionalBlockInConsistencyCard() {
+        DecisionResultVO snapshotBlocked = decision("BTCUSDT", "WAIT", "LOW", "HIGH", 80, null,
+                null, false, "{\"state\":\"CANDIDATE\",\"directionalPushBlocked\":true}");
+        DecisionResultVO scoreBlocked = decision("BTCUSDT", "WAIT", "LOW", "HIGH", 80, 100,
+                "LEVEL_4_EXTREME_DIVERGENCE", false, "{\"state\":\"CANDIDATE\"}");
+        scoreBlocked.setConfusedScore(100);
+        ProviderReadinessVO aiDisabled = providerReadiness("CONFIGURED", "DISABLED", "WAITING_SYNC", "真实行情");
+        when(providerReadinessService.getReadiness()).thenReturn(aiDisabled);
+
+        for (DecisionResultVO decision : List.of(snapshotBlocked, scoreBlocked)) {
+            when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+            DashboardHomeVO.ConsistencyVO consistency = service.getHome("BTCUSDT", 6)
+                    .getAiDecision().getConsistency();
+
+            assertThat(consistency.getAiApplicable()).isFalse();
+            assertThat(consistency.getConsistencyLevel()).isEqualTo("不适用");
+            assertThat(consistency.getLevel()).isNull();
+            assertThat(consistency.getScore()).isNull();
+            assertThat(consistency.getConfused()).isFalse();
+            assertThat(consistency.getDirectionalPushBlocked()).isTrue();
+        }
+    }
+
+    @Test
+    void expiredAbsoluteValidPeriodBlocksSuggestion() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        allowMatchingSnapshot(decision);
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO beforeExpiry = service.getHome("BTCUSDT", 6)
+                .getExecutionSuggestion();
+        assertThat(beforeExpiry.getStatus()).isEqualTo("USABLE_REVIEW_PLAN");
+        assertThat(beforeExpiry.getValidFrom()).hasToString("2026-07-01T00:00Z");
+        assertThat(beforeExpiry.getExpiresAt()).hasToString("2026-07-02T00:00Z");
+
+        service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-02T00:00:00Z"), ZoneOffset.UTC));
+        DashboardHomeVO.ExecutionSuggestionVO atExpiry = service.getHome("BTCUSDT", 6)
+                .getExecutionSuggestion();
+        assertThat(atExpiry.getStatus()).isEqualTo("PLAN_EXPIRED");
+
+        service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-02T00:00:01Z"), ZoneOffset.UTC));
+        DashboardHomeVO.ExecutionSuggestionVO afterExpiry = service.getHome("BTCUSDT", 6)
+                .getExecutionSuggestion();
+        assertThat(afterExpiry.getStatus()).isEqualTo("PLAN_EXPIRED");
+        assertThat(afterExpiry.getEntryZone()).isNull();
+    }
+
+    @Test
+    void malformedValidPeriodFailsClosed() {
+        DecisionResultVO decision = completePlanDecision(
+                "BTCUSDT", "2026/07/01 00:00:00 - 2026/07/02 00:00:00");
+        allowMatchingSnapshot(decision);
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(suggestion.getStatus()).isEqualTo("VALID_PERIOD_INVALID");
+        assertThat(suggestion.getBlockedReason()).isEqualTo("有效期格式异常，等待重新分析");
+        assertThat(suggestion.getValidFrom()).isNull();
+        assertThat(suggestion.getExpiresAt()).isNull();
+    }
+
+    @Test
+    void conflictFallbackUsesDirectionalBlockThreshold() {
+        LightSystemStatusVO statusWithoutAggregate = new LightSystemStatusVO();
+        when(decisionService.getLightSystemStatus()).thenReturn(statusWithoutAggregate);
+        List<DecisionResultVO> decisions = List.of(
+                decision("BTCUSDT", "WAIT", "LOW", "LOW", 80, 1, null, false, null),
+                decision("ETHUSDT", "WAIT", "LOW", "LOW", 80, 69, null, false, null),
+                decision("SOLUSDT", "WAIT", "LOW", "LOW", 80, 70, null, false, null),
+                decision("BNBUSDT", "WAIT", "LOW", "LOW", 80, 84, null, false, null),
+                decision("XRPUSDT", "WAIT", "LOW", "LOW", 80, 85, null, false, null));
+        decisions.get(0).setConfusedScore(1);
+        decisions.get(1).setConfusedScore(69);
+        decisions.get(2).setConfusedScore(70);
+        decisions.get(3).setConfusedScore(84);
+        decisions.get(4).setConfusedScore(85);
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(decisions);
+
+        DashboardHomeVO.StatusCardVO thresholdFallback = service.getHome("BTCUSDT", 6)
+                .getSystemState().getConfused();
+        assertThat(thresholdFallback.getValue()).isEqualTo(1);
+
+        when(decisionService.getLightSystemStatus()).thenThrow(new IllegalStateException("status unavailable"));
+        DashboardHomeVO.StatusCardVO unavailable = service.getHome("BTCUSDT", 6)
+                .getSystemState().getConfused();
+        assertThat(unavailable.getValue()).isNull();
+        assertThat(unavailable.getStatus()).isEqualTo("WAITING_SYNC");
+    }
+
+    @Test
+    void mismatchedAssetStateTraceBlocksPlan() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol("BTCUSDT");
+        state.setState(AssetStateEnum.CANDIDATE);
+        state.setTraceId("trace-current-state");
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(decision.getAnalysisId());
+        run.setTraceId("trace-original-plan");
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(state);
+        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(asset(home, "BTC/USDT").getAssetStateLabel()).isEqualTo("候选");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("STATE_SNAPSHOT_MISMATCH");
+        assertThat(home.getExecutionSuggestion().getBlockedReason())
+                .isEqualTo("状态已更新，原计划需重新分析");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
+    }
+
+    @Test
     void noFakeAiEvidenceOrProviderCalls() {
         assertThat(Arrays.stream(DashboardHomeServiceImpl.class.getDeclaredFields())
                 .map(field -> field.getType().getSimpleName()))
@@ -989,6 +1127,32 @@ class DashboardHomeServiceImplTest {
                 synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true,
                         "GEMINI_CONTRADICTION_ONLY")));
         return decision;
+    }
+
+    private DecisionResultVO completePlanDecision(String symbol, String validPeriod) {
+        DecisionResultVO decision = decision(symbol, "BULLISH", "HIGH", "MEDIUM", 85, 10,
+                "LEVEL_1", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setEntryZone("100-105");
+        decision.setStopLoss("95");
+        decision.setTakeProfitRules("110 / 115");
+        decision.setLeverageSuggestion("2x");
+        decision.setPositionSuggestion("人工复核仓位");
+        decision.setValidPeriod(validPeriod);
+        decision.setInvalidCondition("结构失效");
+        return decision;
+    }
+
+    private void allowMatchingSnapshot(DecisionResultVO decision) {
+        String traceId = "trace-" + decision.getAnalysisId();
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol(decision.getSymbol());
+        state.setState(AssetStateEnum.CANDIDATE);
+        state.setTraceId(traceId);
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(decision.getAnalysisId());
+        run.setTraceId(traceId);
+        when(assetStateMapper.selectBySymbol(decision.getSymbol())).thenReturn(state);
+        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
     }
 
     private String structuredAiRoleResults(List<AiProviderReviewResult> roleResults,

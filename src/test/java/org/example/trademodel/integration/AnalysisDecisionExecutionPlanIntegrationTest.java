@@ -15,6 +15,7 @@ import org.example.trademodel.analysisrun.AnalysisRunCommand;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
@@ -25,6 +26,7 @@ import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -53,6 +55,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,6 +78,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Autowired
     private AnalysisRunMapper analysisRunMapper;
+    @Autowired
+    private AssetStateMapper assetStateMapper;
     @Autowired
     private EvidenceItemMapper evidenceItemMapper;
     @Autowired
@@ -117,6 +122,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                 "tm_persisted_ohlcv_bar",
                 "tm_ai_call_log",
                 "tm_user_position",
+                "tm_asset_state",
                 "tm_analysis_run")) {
             jdbcTemplate.update("DELETE FROM " + table);
         }
@@ -309,7 +315,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Test
     void persistedAnalysisDecisionAndExecutionPlanFlowIntoDashboardHomeExecutionSuggestion() {
-        persistControlledAnalysisDecisionAndPlan();
+        String validPeriod = persistControlledAnalysisDecisionAndPlan();
 
         assertThat(analysisRunMapper.selectById(ANALYSIS_ID)).isNotNull();
         assertThat(analysisRunMapper.selectEvidenceIdsByAnalysisId(ANALYSIS_ID)).containsExactly("ev-int-1");
@@ -327,7 +333,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(joined.getLeverageSuggestion()).isEqualTo("3x");
         assertThat(joined.getPositionSuggestion()).isEqualTo("10% account risk cap");
         assertThat(joined.getInvalidCondition()).isEqualTo("plan invalidation wins");
-        assertThat(joined.getExecutionPlanSummary()).isEqualTo("12h | plan invalidation wins");
+        assertThat(joined.getExecutionPlanSummary()).isEqualTo(validPeriod + " | plan invalidation wins");
 
         DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
 
@@ -338,7 +344,9 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo("66000 / 68500 / 71000 USDT");
         assertThat(home.getExecutionSuggestion().getLeverageSuggestion()).isEqualTo("3x");
         assertThat(home.getExecutionSuggestion().getPositionSuggestion()).isEqualTo("10% account risk cap");
-        assertThat(home.getExecutionSuggestion().getValidPeriod()).isEqualTo("12h");
+        assertThat(home.getExecutionSuggestion().getValidPeriod()).isEqualTo(validPeriod);
+        assertThat(home.getExecutionSuggestion().getValidFrom()).isNotNull();
+        assertThat(home.getExecutionSuggestion().getExpiresAt()).isNotNull();
         assertThat(home.getExecutionSuggestion().getInvalidCondition()).isEqualTo("plan invalidation wins");
 
         assertThat(home.getPositions()).isEmpty();
@@ -490,8 +498,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                 .orElseThrow();
     }
 
-    private void persistControlledAnalysisDecisionAndPlan() {
+    private String persistControlledAnalysisDecisionAndPlan() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 2, 9, 30);
+        DateTimeFormatter validPeriodFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime validityNow = LocalDateTime.now(ZoneOffset.UTC);
+        String validPeriod = validityNow.minusHours(1).format(validPeriodFormatter)
+                + " ~ " + validityNow.plusHours(1).format(validPeriodFormatter);
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(ANALYSIS_ID);
         run.setSymbol(SYMBOL);
@@ -516,6 +528,15 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         run.setUpdatedAt(now);
         run.setVersionNo(1);
         analysisRunMapper.insert(run);
+
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol(SYMBOL);
+        state.setState(org.example.trademodel.enums.AssetStateEnum.CANDIDATE);
+        state.setConfusedScore(8);
+        state.setConfusedLowStreak(0);
+        state.setLastUpdateTime(now);
+        state.setTraceId("trace-int-1");
+        assetStateMapper.mergeUpsertCore(state);
 
         EvidenceItemDO evidence = new EvidenceItemDO();
         evidence.setEvidenceId("ev-int-1");
@@ -562,7 +583,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                         "LEVEL_1_CONSISTENT", 12, "HIGH", "UNCHANGED",
                         "CONFIRM", false, null)));
         decision.setIsAdopted(null);
-        decision.setValidPeriod("12h");
+        decision.setValidPeriod(validPeriod);
         decision.setInvalidCondition("decision invalidation fallback");
         decision.setEvidenceSummary("controlled evidence summary");
         decision.setExplanationJson("{\"summary\":\"controlled\"}");
@@ -599,6 +620,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         plan.setNotUserPositionCreation(true);
         plan.setCreateTime(now.plusSeconds(2));
         executionPlanMapper.insert(plan);
+        return validPeriod;
     }
 
     private long persistDecisionTimeframes(String symbol, boolean bullish) {

@@ -6,10 +6,12 @@ This package audits the path from rule inputs to the Dashboard Home read model a
 
 - Asset state, market bias, confidence, risk, opening worthiness, AI review, conflict blocking, execution-plan readiness, and position-monitor state are separate concepts.
 - The authoritative asset state table is preferred over a decision snapshot; the snapshot is a compatibility fallback only.
-- Market bias is derived independently for each symbol from complete 5m, 15m, 1h, and 4h windows. Missing or invalid windows return `WAIT`; no missing-data path defaults bullish.
+- Market bias is derived independently for each symbol from the three persisted closed bars currently read for each of 5m, 15m, 1h, and 4h. This is a provisional `MarketBiasPolicy` mapping pending product-owned window and threshold rules, not a validated trend-strength model. Missing or invalid inputs return `WAIT`; no missing-data path defaults bullish.
 - A data-quality score below the current engine threshold of 60 blocks a usable review plan and downgrades the user-facing result to `WAIT`, low confidence, high risk, and not worth opening.
 - AI roles that are disabled, not called, timed out, failed, unavailable, or abstained are not counted as support. With zero successful roles, AI consistency and AI plan mode are not applicable.
 - A conflict score above zero is not a directional block. Dashboard directional-block counts use the authoritative threshold of 85.
+- A usable execution plan requires the authoritative asset-state `trace_id` to match the plan decision's `AnalysisRun.trace_id`. A mismatch leaves current state visible but clears the plan with `状态已更新，原计划需重新分析`.
+- Plan validity is evaluated from structured `validFrom`/`expiresAt` in the Home read model. Legacy absolute ranges are parsed only under the documented UTC compatibility contract; missing or malformed validity fails closed, and `now >= expiresAt` blocks the plan.
 - An active manual position takes over the selected asset's main suggestion area. The original entry plan is retained only as a collapsed review/reference record.
 - Dashboard Home does not invent system stop/take-profit values or a next monitor time. It displays persisted monitor time only.
 
@@ -28,8 +30,8 @@ Verified source contracts:
 
 | Contract | Current authority | Result |
 |---|---|---|
-| Eight asset states | `AssetStateEnum`, authoritative asset-state persistence, `GLOBAL_STATE_TRANSITION_MATRIX.md` | Eight values are supported end to end; `WAITING_TRIGGER` and `TRIGGERED` still have no normal production writer. |
-| Eight market-bias labels | `MarketBiasEnum` | Full enum and label coverage exists. No repository document defines a separate numeric threshold table. |
+| Eight asset states | `AssetStateEnum`, authoritative asset-state persistence, `GLOBAL_STATE_TRANSITION_MATRIX.md` | Enum, API, and UI mapping covers all eight values. The lifecycle is not complete: `WAITING_TRIGGER` and `TRIGGERED` have no normal production writer. |
+| Eight market-bias labels | `MarketBiasEnum`, provisional `MarketBiasPolicy` | Enum and label coverage exists. Runtime currently reads three bars per timeframe; no product-owned numeric/window specification proves this as a trend-strength model. |
 | Data-quality opening gate | `DecisionEngineService`, `ReviewReasonsBuilder`, monitor/baseline guards | Current engine threshold is 60. Historical/future notes mentioning 70 do not match the active decision contract. |
 | Confused thresholds | `ConfusedStatePolicy` | Enter at 70; directional push blocked at 85; exit requires two consecutive cycles below 55. |
 | AI roles and safety | AI role payload/orchestrator/conflict resolver contracts | Rule direction remains authoritative; AI is review-only and cannot create plans, positions, or orders. |
@@ -40,7 +42,7 @@ Repository conflicts and limitations are not hidden:
 
 - `GLOBAL_STATE_TRANSITION_MATRIX.md` records that there is no central legal transition graph for all eight asset states.
 - `WAITING_TRIGGER` and `TRIGGERED` are enum/schema/UI-complete but have no normal production writer.
-- The product vocabulary defines eight bias levels, but no authoritative numeric trend-strength thresholds were found. The new `MarketBiasPolicy` is therefore an explicit deterministic four-timeframe implementation contract, not a claim that a missing product threshold document exists.
+- The product vocabulary defines eight bias levels, but no authoritative numeric trend-strength threshold or window specification was found. `MarketBiasPolicy` is marked as a temporary implementation pending product confirmation. It currently compares the first open with the last close across only three bars per timeframe.
 - Position Monitor has persisted `monitoredAt`, but no authoritative per-row `nextMonitorAt` source. Dashboard leaves the next time empty instead of using a page-refresh countdown.
 
 ## 3. Semantic matrix
@@ -51,8 +53,8 @@ Repository conflicts and limitations are not hidden:
 |---|---|---|---|---|---|---|
 | 观察 | 普通观察状态 | `OBSERVING` | `assetState`, `assetStateLabel` | 观察 | Previously reconstructed only from a decision snapshot. | Authoritative state row is preferred; snapshot is fallback only. |
 | 候选 | 条件形成但仍需人工确认 | `CANDIDATE` | `assetState`, `assetStateLabel` | 候选 | Could be mixed with direction/worth-opening copy. | State, bias, and worthiness are rendered separately. |
-| 等待触发 | 候选条件等待触发 | `WAITING_TRIGGER` | `assetState`, `assetStateLabel` | 等待触发 | UI support existed without a normal producer. | End-to-end mapping is complete; missing producer remains documented. |
-| 已触发 | 触发条件成立 | `TRIGGERED` | `assetState`, `assetStateLabel` | 已触发 | UI support existed without a normal producer. | End-to-end mapping is complete; missing producer remains documented. |
+| 等待触发 | 候选条件等待触发 | `WAITING_TRIGGER` | `assetState`, `assetStateLabel` | 等待触发 | UI support exists without a normal producer. | Enum/API/UI mapping only; lifecycle producer remains missing. |
+| 已触发 | 触发条件成立 | `TRIGGERED` | `assetState`, `assetStateLabel` | 已触发 | UI support exists without a normal producer. | Enum/API/UI mapping only; lifecycle producer remains missing. |
 | 高风险观察 | Risk gate requires observation/review | `HIGH_RISK` | `assetState`, `assetStateLabel` | 高风险观察 | Low data quality could coexist with a normal-looking plan. | Low quality and high risk now block a usable plan. |
 | 已失效 | Current candidate/plan no longer valid | `INVALIDATED` | `assetState`, `assetStateLabel` | 已失效 | Boundary completeness could still dominate display. | Asset-state gate blocks plan fields. |
 | 冷却 | Post-conflict/event cooling | `COOLING` | `assetState`, `assetStateLabel` | 冷却 | Could be inferred from stale snapshot data. | Authoritative state is used first. |
@@ -62,13 +64,13 @@ Repository conflicts and limitations are not hidden:
 
 | 业务概念 | 方案定义 | 内部枚举/字段 | API 字段 | 当前前端显示 | 当前问题 | 修正结果 |
 |---|---|---|---|---|---|---|
-| 强偏多 | Four windows unanimously bullish | `STRONG_BULLISH` | `marketBias`, `marketBiasLabel` | 强偏多 | Direction used a short/latest-candle shortcut. | Uses the full supplied window for each of four timeframes. |
-| 偏多 | Three of four windows bullish | `BULLISH` | same | 偏多 | Intermediate levels were not produced consistently. | Deterministic four-timeframe level. |
+| 强偏多 | Current four-timeframe mapping is unanimously bullish | `STRONG_BULLISH` | `marketBias`, `marketBiasLabel` | 强偏多 | Direction used a short/latest-candle shortcut. | Provisional mapping uses three closed bars per timeframe; not a validated trend-strength claim. |
+| 偏多 | Three of four current timeframe mappings are bullish | `BULLISH` | same | 偏多 | Intermediate levels were not produced consistently. | Deterministic but temporary four-timeframe mapping pending product confirmation. |
 | 弱偏多 | Bullish windows exceed bearish without 3/4 agreement | `WEAK_BULLISH` | same | 弱偏多 | Missing data could default bullish. | Any missing/invalid timeframe returns `WAIT`. |
 | 震荡 | Bullish and bearish timeframe counts tie | `RANGE` | same | 震荡 | Range could be collapsed into a binary direction. | Preserved as its own final result when quality is sufficient. |
 | 弱偏空 | Bearish windows exceed bullish without 3/4 agreement | `WEAK_BEARISH` | same | 弱偏空 | Intermediate levels were not produced consistently. | Deterministic four-timeframe level. |
-| 偏空 | Three of four windows bearish | `BEARISH` | same | 偏空 | Direction-family consumers expected exact binary values. | Consumers recognize the complete bearish family. |
-| 强偏空 | Four windows unanimously bearish | `STRONG_BEARISH` | same | 强偏空 | Direction-family consumers expected exact binary values. | Consumers recognize the complete bearish family. |
+| 偏空 | Three of four current timeframe mappings are bearish | `BEARISH` | same | 偏空 | Direction-family consumers expected exact binary values. | Consumers recognize the bearish family; upstream mapping remains provisional. |
+| 强偏空 | Current four-timeframe mapping is unanimously bearish | `STRONG_BEARISH` | same | 强偏空 | Direction-family consumers expected exact binary values. | Consumers recognize the bearish family; this is not evidence of a validated strength model. |
 | 观望 | Missing/invalid structure or unified quality gate failure | `WAIT` | same | 观望 | Missing data or low quality could retain bullish output. | Fail-closed final user bias; raw rule bias stays diagnostic-only. |
 | 高/中/低置信 | Decision confidence after gates and AI review | `HIGH`, `MEDIUM`, `LOW` | `confidence`, `confidenceLabel` | 高/中/低 | Low quality could still show high confidence. | Quality failure forces low confidence. |
 | 低/中/高/极高风险 | Current selected-asset decision risk | `LOW`, `MEDIUM`, `HIGH`, `EXTREME` | `riskLevel`, `riskLevelLabel` | 低/中/高/极高 | Header used an aggregate maximum while other panels used selected asset. | Header and selected modules use the selected decision snapshot. |
@@ -107,6 +109,7 @@ Repository conflicts and limitations are not hidden:
 | 计划失效 | Original plan invalidated | `PLAN_INVALIDATED` | same | 原计划已失效 | Could be shown as new entry advice. | Position mode owns main panel; old plan is reference only. |
 | 风险升高 | Position risk requires manual review | `HIGH_RISK` | same | 风险升高 | Could imply an automatic action. | Manual-review wording only. |
 | 等待首次监控 | No persisted monitor log | `WAITING_MONITOR` | status plus labels | 等待首次监控 | Technical sync state leaked. | Explicit empty state, not a fake monitor result. |
+| 暂无下次监控排期 | A monitor log exists but no next schedule is persisted | null `nextMonitorAt` with non-null `lastMonitorAt` | `lastMonitorAt`, `nextMonitorAt` | 暂无下次监控排期 | Could incorrectly say first monitoring had never happened. | `等待首次监控` is reserved for positions with no monitor history. |
 | 方向支持 | Direction remains supported | `SUPPORTED` | `directionSupportStatus`, label | 当前方向仍获支持 | Raw enum leaked. | Dedicated mapping. |
 | 方向减弱 | Direction support weakened | `WEAKENED` | same | 方向支持减弱 | Raw enum leaked. | Dedicated mapping. |
 | 方向不支持 | Current direction no longer supported | `NOT_SUPPORTED` | same | 当前方向不再获支持 | Raw enum leaked. | Dedicated mapping. |
@@ -125,19 +128,21 @@ Repository conflicts and limitations are not hidden:
 | 数据不足 | Score below 60 | `INSUFFICIENT` | status/label | 数据不足 | Full plan fields could still appear. | Final bias `WAIT`; low confidence; high risk; no usable plan. |
 | 数据缺失 | No current score/snapshot | `MISSING` | status/label | 数据缺失 | Could be combined with stale plan data. | No usable plan; selected snapshot must exist. |
 | 数据源不可用 | Required source unavailable | `UNAVAILABLE` | status/label | 数据源不可用 | Technical code could leak. | Dedicated label and fail-closed plan. |
-| 可用人工复核计划 | All business and boundary gates pass | `USABLE_REVIEW_PLAN` | `executionSuggestion.status` | 完整只读计划 fields | Completeness alone previously allowed display. | Checks quality, state, risk, confused, directional block, worthiness, boundary, expiry, position, timeframe, and analysis ID. |
+| 可用人工复核计划 | All business and boundary gates pass | `USABLE_REVIEW_PLAN` | `executionSuggestion.status`, `validFrom`, `expiresAt` | 完整只读计划 fields | Completeness alone previously allowed display. | Checks quality, state, state/run trace match, risk, confused, directional block, worthiness, boundary, absolute expiry, position, timeframe, and analysis ID. |
 | 当前持仓监控 | Selected symbol has active manual position | `POSITION_MONITORING` | same plus `positionMonitor` | 持仓监控主视图 | New entry plan remained primary. | Actual entry/current/PnL/user stops and monitor state take over; original plan collapses. |
-| 阻断/缺失/不匹配 | Any required gate fails | `NO_DECISION`, `DATA_QUALITY_BLOCKED`, `ASSET_STATE_BLOCKED`, `RISK_BLOCKED`, `CONFLICT_BLOCKED`, `DIRECTION_BLOCKED`, `BOUNDARY_INCOMPLETE`, `PLAN_EXPIRED`, `ANALYSIS_MISMATCH` | status, Chinese title/reason | 当前暂无完整执行计划 + Chinese reason | Direction/boundary fields could survive a blocked state. | Blocked response clears direction, entry, stop, TP, leverage, position, validity, and invalid condition. |
+| 阻断/缺失/不匹配 | Any required gate fails | `NO_DECISION`, `DATA_QUALITY_BLOCKED`, `ASSET_STATE_BLOCKED`, `STATE_SNAPSHOT_MISMATCH`, `STATE_SNAPSHOT_UNVERIFIED`, `RISK_BLOCKED`, `CONFLICT_BLOCKED`, `DIRECTION_BLOCKED`, `BOUNDARY_INCOMPLETE`, `VALID_PERIOD_INVALID`, `PLAN_EXPIRED`, `ANALYSIS_MISMATCH` | status, Chinese title/reason | 当前暂无完整执行计划 + Chinese reason | Direction/boundary fields could survive a blocked state. | Blocked response clears direction, entry, stop, TP, leverage, position, validity, and invalid condition. |
 
 ## 4. Exact root causes and corrections
 
 | Observed problem | Root cause | Correction |
 |---|---|---|
-| Six assets appeared bullish | Binary latest/short-window direction and bullish-compatible defaults did not represent the full four-timeframe contract. | Full-window, symbol-scoped 5m/15m/1h/4h classification; missing data is `WAIT`; cross-symbol tests verify independent inputs. |
+| Six assets appeared bullish | Binary latest/short-window direction and bullish-compatible defaults conflated missing data with direction. | Symbol-scoped 5m/15m/1h/4h inputs and missing-data `WAIT` are covered in tests. Current inputs are only three bars per timeframe, so no six-asset runtime difference or validated strength claim is made. |
 | Quality 55 still looked confirmable | Quality gated `worthOpening` but not every downstream presentation field. | A single threshold-60 decision gate now downgrades all user conclusions and Dashboard plan output. |
 | AI disabled looked consistent | Orchestrator consistency flags defaulted true and conflict support used `3 - objectionCount`. | Defaults are false; support/objection/abstain are explicit successful-role counts; zero success is N/A. |
 | Conflict block count was inflated | Dashboard counted any `confusedScore > 0`. | Mapper query counts only scores at or above the directional block threshold 85. |
 | Asset state could be stale | Dashboard reconstructed current state from decision snapshot JSON. | Authoritative asset-state table first; snapshot compatibility fallback is explicit. |
+| Current state and old plan could be silently combined | Current asset state and latest decision were read by symbol without proving they came from the same analysis trace. | Compare authoritative state `trace_id` with the decision's `AnalysisRun.trace_id`; mismatch/unverified association blocks all plan fields. |
+| Plan expiry was textual only | The gate only searched for `EXPIRED`/`已过期` markers and could display an elapsed absolute range. | Parse the legacy absolute UTC range, expose structured `validFrom`/`expiresAt`, and block at or after expiry; malformed values fail closed. |
 | Modules contradicted selected asset | Some header values used first/average/max decisions. | Selected asset's decision supplies trend, risk, quality, AI conflict, execution, and AI review. |
 | Strong/weak direction levels disappeared downstream | Reverse-position and Hot Reset mapper SQL recognized only exact `BULLISH`/`BEARISH`. | Mapper contracts now recognize all strong/normal/weak bullish and bearish family values while excluding `RANGE`, `WAIT`, and unknown states. |
 | Position did not take over | Execution suggestion had no selected-position precedence. | Active selected manual position returns `POSITION_MONITORING`; original plan is review reference only. |
@@ -167,11 +172,11 @@ When the selected symbol has an active `OPEN` or `PARTIALLY_CLOSED` manual posit
 - Entry-logic status, direction support, reversal status, risk, and manual action.
 - Persisted last monitor time and real next monitor time only when provided.
 
-The original plan is labeled `原执行计划，仅用于持仓复核和复盘对照` and collapsed. No new leverage/position proposal is promoted in position mode.
+The original plan is labeled `原执行计划，仅用于持仓复核和复盘对照` and collapsed only when its trace matches the authoritative state. A mismatch is labeled `状态已更新，原计划需重新分析`; no associated decision is labeled `暂无可关联的原执行计划`. No new leverage/position proposal is promoted in position mode.
 
 ## 7. Snapshot consistency
 
-Dashboard Home resolves a selected decision once and uses it for selected-asset trend, risk, data quality, execution-plan gates, AI review, and conflict presentation. A plan must match the selected symbol/timeframe and source analysis ID. A missing or mismatched analysis ID fails closed and clears all plan boundary fields.
+Dashboard Home resolves a selected decision once and uses it for selected-asset trend, risk, data quality, execution-plan gates, AI review, and conflict presentation. A plan must match the selected symbol/timeframe/source analysis ID, and the authoritative asset-state `trace_id` must equal the corresponding `AnalysisRun.trace_id`. A missing, unreadable, or mismatched trace association fails closed and clears all plan boundary fields while the current state remains visible.
 
 Global counters remain explicitly aggregate. The directional conflict-block counter is aggregate by definition and uses the 85 threshold; it is not presented as the selected asset's conflict score.
 
@@ -179,15 +184,16 @@ Global counters remain explicitly aggregate. The directional conflict-block coun
 
 Focused tests cover:
 
-- All eight asset states through authoritative state/API/template paths.
-- All eight market-bias labels and complete-window classification.
+- All eight asset-state enum/API/UI mappings; this does not prove a complete lifecycle.
+- All eight market-bias labels under the current provisional three-bar-per-timeframe mapping.
 - Independent symbol inputs and missing-data `WAIT` behavior.
 - Low/missing data-quality plan blocking.
 - AI disabled, failed, partial, support, objection, abstain, and zero-success semantics.
-- Confused scores 0, 1, 69, 70, 84, and 85.
-- Position takeover, real monitor timestamps, no fake next-monitor countdown, and Chinese labels.
-- Plan analysis mismatch and blocked-field clearing.
-- Compact-card whitelist and no known raw business-enum fallback.
+- Confused scores 0, 1, 69, 70, 84, and 85, including unknown output when the authoritative system-status read fails.
+- Zero successful AI roles with asset directional blocking, confused score 100, and disabled AI remain `不适用`, never synthetic `极端分歧`.
+- Position takeover, real monitor timestamps, no fake next-monitor countdown, the existing-monitor/no-next-schedule state, and Chinese labels.
+- Plan analysis mismatch, state/run trace mismatch, blocked-field clearing, and absolute expiry before/equal/after/malformed cases.
+- Final user-visible Home DOM copy checks for raw `pendingCount`, `degraded`, and local-real failure codes.
 
 No live provider, local database, or six-asset runtime environment was used for this package. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs.
 
@@ -195,7 +201,7 @@ No live provider, local database, or six-asset runtime environment was used for 
 
 1. The repository still lacks a central legal transition graph for all eight asset states.
 2. `WAITING_TRIGGER` and `TRIGGERED` still lack normal production writers.
-3. A formal product-owned numeric threshold specification for the eight market-bias levels is absent; the deterministic four-timeframe policy is now testable but remains an implementation contract.
+3. A formal product-owned numeric threshold/window specification for the eight market-bias levels is absent. `MarketBiasPolicy` is a temporary implementation pending product confirmation, reads only three bars per timeframe, and must not be described as a validated trend-strength model.
 4. `nextMonitorAt` has no authoritative scheduler-derived per-position value, so Dashboard cannot display a real next time yet.
 5. System stop/take-profit values have no real Position Monitor source in the current Home read model and remain blank rather than fabricated.
 6. Historical engineering diagnostics still carry internal vocabulary inside `.runtime-status-stack` and `.diagnostics-only`, both of which are explicitly `display:none`. They are not part of the user-visible Home surface; they must be translated or moved to a dedicated diagnostic page before either hidden container is ever exposed.

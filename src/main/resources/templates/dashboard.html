@@ -2787,6 +2787,7 @@
                         <div class="consistency-row"><span>冲突等级</span><span class="value">等待同步</span></div>
                         <div class="consistency-row"><span>AI 计划模式</span><span class="value">等待同步</span></div>
                         <div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">否</span></div>
+                        <div class="consistency-row"><span>资产方向阻断</span><span class="value">否</span></div>
                         <div class="consistency-row"><span>降级原因</span><span class="value">暂无降级原因</span></div>
                     </div>
                     <div class="consistency-summary">
@@ -4974,11 +4975,18 @@
             + '</div>';
     }
 
-    function formatExecutionValidPeriod(raw, entryZone, stopLoss, takeProfitRules) {
+    function formatExecutionValidPeriod(raw, entryZone, stopLoss, takeProfitRules, expiresAt) {
         var text = raw == null ? "" : String(raw).trim();
         if (text.indexOf("周期不支持") >= 0 || text.indexOf("边界不足") >= 0) return "";
         if (!executionBoundaryComplete(entryZone, stopLoss, takeProfitRules)) return "";
         if (text.indexOf("已失效") >= 0) return text;
+        if (expiresAt != null && String(expiresAt).trim() !== "") {
+            var structuredExpiry = formatDateTime(expiresAt);
+            var structuredMatch = structuredExpiry.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/);
+            return structuredMatch
+                ? "有效至 " + structuredMatch[2] + "-" + structuredMatch[3] + " " + structuredMatch[4]
+                : "";
+        }
         if (!text || text === "—" || text === "暂无" || text === "待生成") return "";
         var parts = text.split("~");
         var end = parts.length > 1 ? parts[parts.length - 1].trim() : "";
@@ -5004,7 +5012,8 @@
             "NOT_CONNECTED": "未连接",
             "CONFIGURED": "已配置",
             "CONFIGURED_ONLY": "已配置",
-            "UNKNOWN": "未知",
+            "UNKNOWN": "未知状态",
+            "DEGRADED": "数据部分可用",
             "OK": "正常",
             "UP": "正常",
             "READY": "就绪",
@@ -5032,7 +5041,9 @@
             return "已阻断";
         }
         if (upper.indexOf("BLOCKED") >= 0) return "已阻断";
-        if (upper.indexOf("UNKNOWN") >= 0) return "未知";
+        if (upper.indexOf("DEGRADED") >= 0) return "数据部分可用";
+        if (upper.indexOf("UNKNOWN") >= 0) return "未知状态";
+        if (/^[A-Z][A-Z0-9_:-]*$/.test(upper)) return "未知状态";
         return text
             .replace(/WAITING_SYNC/gi, "待同步")
             .replace(/SIMULATED_FALLBACK|Simulated fallback|SIMULATED/gi, "本地模拟")
@@ -5040,7 +5051,7 @@
             .replace(/CONFIGURED_ONLY|CONFIGURED/gi, "已配置")
             .replace(/NOT_CONNECTED|DISCONNECTED/gi, "未连接")
             .replace(/CONNECTED/gi, "已连接")
-            .replace(/UNKNOWN/gi, "未知")
+            .replace(/UNKNOWN/gi, "未知状态")
             .replace(/BLOCKED_FAIL_CLOSED|FAIL_CLOSED|BLOCKED/gi, "已阻断")
             .replace(/\s*\/\s*/g, " · ");
     }
@@ -5405,7 +5416,7 @@
         }
         var fullTime = String(lastMonitorAt);
         var visible = formatDateTime(lastMonitorAt);
-        var next = nextMonitorAt ? (' · 下次 ' + formatDateTime(nextMonitorAt)) : '';
+        var next = nextMonitorAt ? (' · 下次 ' + formatDateTime(nextMonitorAt)) : ' · 暂无下次监控排期';
         return '<span class="position-monitor-time" data-full-time="' + escapeHtml(fullTime)
             + '" title="' + escapeHtml(visible + next) + '">' + escapeHtml(visible) + '</span>';
     }
@@ -5781,11 +5792,11 @@
         return Math.max(0, Math.min(100, Math.round(score)));
     }
 
-    function consistencyStatusText(level, confused) {
-        if (confused === true) return "极端分歧";
+    function consistencyStatusText(level, confused, aiApplicable) {
         var raw = String(level || "").trim();
+        if (aiApplicable === false || raw === "不适用") return "不适用";
+        if (confused === true) return "极端分歧";
         if (!raw) return "等待同步";
-        if (raw === "不适用") return "不适用";
         var upper = raw.toUpperCase();
         if (upper.indexOf("EXTREME") >= 0 || upper.indexOf("CRITICAL") >= 0 || upper.indexOf("LEVEL_4") >= 0 || upper.indexOf("L4") >= 0 || raw.indexOf("极端") >= 0) return "极端分歧";
         if (upper.indexOf("HIGH") >= 0 || upper.indexOf("SIGNIFICANT") >= 0 || upper.indexOf("LEVEL_3") >= 0 || upper.indexOf("L3") >= 0 || raw.indexOf("显著") >= 0 || raw.indexOf("高") >= 0) return "显著分歧";
@@ -5803,8 +5814,9 @@
     function renderHomeConsistencyCard(options) {
         options = options || {};
         var consistency = options.consistency || {};
+        var aiApplicable = options.aiApplicable !== false;
         var score = actualConsistencyScore(consistency);
-        var status = consistencyStatusText(options.level, options.confused);
+        var status = consistencyStatusText(options.level, options.confused, aiApplicable);
         var ringClass = score == null ? ' is-empty' : '';
         var scoreText = score == null ? "--" : String(score);
         var summary = aiRoleFallbackValue(options.summary, "等待 AI 三角色结果同步后生成一致性结论");
@@ -5816,8 +5828,9 @@
             + consistencyRow("一致性等级", status, "等待同步")
             + consistencyRow("最终倾向", options.finalTendency, "暂无")
             + consistencyRow("冲突等级", options.conflictLevel, "等待同步")
-            + consistencyRow("AI 计划模式", options.planMode, "等待同步")
-            + consistencyRow("是否进入冲突阻断", options.confused ? "是" : "否", "否")
+            + consistencyRow("AI 计划模式", aiApplicable ? options.planMode : "不适用", aiApplicable ? "等待同步" : "不适用")
+            + consistencyRow("是否进入冲突阻断", aiApplicable && options.confused ? "是" : "否", "否")
+            + consistencyRow("资产方向阻断", options.directionalPushBlocked ? "是" : "否", "否")
             + consistencyRow("降级原因", options.downgradeReason, "暂无降级原因")
             + '</div>'
             + '<div class="consistency-summary"><span>一句话摘要</span><p>' + escapeHtml(summary) + '</p></div>';
@@ -6044,7 +6057,11 @@
                 finalTendency: d ? cleanBlankValue(assetDirectionText(d)) : "",
                 conflictLevel: d ? cleanBlankValue(formatWithSource(c.label, c.source)) : "",
                 planMode: cleanBlankValue(planMode),
-                confused: !!(d && resolveIsConfused(d)),
+                aiApplicable: ["GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE"].some(function (role) {
+                    return hasAiRoleRaw(aiRoleTextForTab(payload, role));
+                }),
+                confused: false,
+                directionalPushBlocked: !!(d && resolveIsConfused(d)),
                 downgradeReason: d ? aiDowngradeReason(d) : ""
             });
         }
@@ -6257,7 +6274,8 @@
                 ["阶梯止盈", s.takeProfitRules],
                 ["杠杆", s.leverageSuggestion],
                 ["仓位建议", s.positionSuggestion],
-                ["有效期", formatExecutionValidPeriod(s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules)],
+                ["有效期", formatExecutionValidPeriod(
+                    s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules, s.expiresAt)],
                 ["失效条件", s.invalidCondition]
             ];
             return '<details class="execution-original-plan"><summary>'
@@ -6283,7 +6301,8 @@
                 ["风险等级", p.riskLevelLabel || riskLevelLabel(p.riskLevel)],
                 ["当前建议", p.suggestedManualActionText || manualActionLabel(p.suggestedManualAction)],
                 ["最近监控", p.lastMonitorAt ? formatDateTime(p.lastMonitorAt) : "等待首次监控"],
-                ["下次监控", p.nextMonitorAt ? formatDateTime(p.nextMonitorAt) : "等待首次监控"]
+                ["下次监控", p.nextMonitorAt ? formatDateTime(p.nextMonitorAt)
+                    : (p.lastMonitorAt ? "暂无下次监控排期" : "等待首次监控")]
             ];
             box.innerHTML = '<div class="execution-card-body">'
                 + '<div class="execution-fail-status" role="status"><p class="main">持仓监控</p><p class="sub">基于真实手动持仓与最近一次监控日志</p></div>'
@@ -6303,7 +6322,8 @@
             ["阶梯止盈", usable ? s.takeProfitRules : ""],
             ["杠杆", usable ? s.leverageSuggestion : ""],
             ["仓位建议", usable ? s.positionSuggestion : ""],
-            ["有效期", usable ? formatExecutionValidPeriod(s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules) : ""],
+            ["有效期", usable ? formatExecutionValidPeriod(
+                s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules, s.expiresAt) : ""],
             ["失效条件", usable ? s.invalidCondition : ""]
         ];
         box.innerHTML = '<div class="execution-card-body">' + statusHtml + executionRowsHtml(rows) + '</div>';
@@ -6337,7 +6357,9 @@
                 finalTendency: finalBias ? marketBiasLabel(finalBias) : "暂无",
                 conflictLevel: aiConflictLevelLabel(c.level),
                 planMode: planModeLabel(planMode),
+                aiApplicable: c.aiApplicable !== false && c.ai_applicable !== false,
                 confused: !!c.confused,
+                directionalPushBlocked: !!(c.directionalPushBlocked || c.directional_push_blocked),
                 downgradeReason: c.downgradeReason || c.downgrade_reason || finalRole.downgradeReason || c.blockReason || "",
                 summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
             });
@@ -6394,6 +6416,18 @@
             });
     }
 
+    function localRealFailureLabel(code) {
+        var labels = {
+            REAL_MARKET_ENVIRONMENT_REQUIRED: "真实行情环境尚未满足",
+            MARKET_DATA_UNAVAILABLE: "真实行情数据暂不可用",
+            AUTHORITATIVE_OHLCV_UNAVAILABLE: "权威行情窗口尚未齐备",
+            DATA_QUALITY_BLOCKED: "数据质量未通过",
+            ANALYSIS_FAILED: "分析未完成"
+        };
+        var key = String(code || "").trim().toUpperCase();
+        return key ? (labels[key] || "分析条件尚未满足") : "";
+    }
+
     function renderLocalRealPipelineStatus(status) {
         var banner = document.getElementById("localRealPipelineBanner");
         if (!banner || !status || status.mode !== "LOCAL_REAL_DATA") return;
@@ -6406,14 +6440,16 @@
         var marketReady = closedBars > 0 && assets.some(function (asset) {
             return asset && asset.marketDataStatus === "READY" && asset.realMarketEnvironment === true;
         });
-        var latestFailure = assets.map(function (asset) {
+        var latestFailureCode = assets.map(function (asset) {
             return asset && asset.latestAnalysisFailureCode;
         }).filter(Boolean)[0] || status.failureReasonCode || "";
         setText("localRealMarketStatus", marketReady ? "真实行情已就绪" : "真实行情等待同步");
         setText("localRealAnalysisStatus", completed > 0
                 ? (completed + " 个资产分析已完成")
                 : (closedBars > 0 ? "分析链未完成" : "分析链等待同步"));
-        setText("localRealFailureReason", completed > 0 || !latestFailure ? "" : ("原因：" + latestFailure));
+        var latestFailureLabel = localRealFailureLabel(latestFailureCode);
+        setText("localRealFailureReason", completed > 0 || !latestFailureLabel
+                ? "" : ("原因：" + latestFailureLabel));
     }
 
     function fetchLocalRealPipelineStatus() {

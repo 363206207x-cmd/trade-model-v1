@@ -3,6 +3,7 @@ package org.example.trademodel.vo;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -776,6 +777,8 @@ public class DashboardHomeVO {
         private String leverageSuggestion;
         private String positionSuggestion;
         private String validPeriod;
+        private OffsetDateTime validFrom;
+        private OffsetDateTime expiresAt;
         private String invalidCondition;
 
         public String getStatus() { return status; }
@@ -848,6 +851,11 @@ public class DashboardHomeVO {
         public void setValidPeriod(String validPeriod) {
             this.validPeriod = validPeriod;
         }
+
+        public OffsetDateTime getValidFrom() { return validFrom; }
+        public void setValidFrom(OffsetDateTime validFrom) { this.validFrom = validFrom; }
+        public OffsetDateTime getExpiresAt() { return expiresAt; }
+        public void setExpiresAt(OffsetDateTime expiresAt) { this.expiresAt = expiresAt; }
 
         public String getInvalidCondition() {
             return invalidCondition;
@@ -1212,6 +1220,8 @@ public class DashboardHomeVO {
         private String level;
         private Integer score;
         private Boolean confused;
+        private Boolean aiApplicable;
+        private Boolean directionalPushBlocked;
         private Integer consistencyScore;
         private String consistencyLevel;
         private String consistencySummary;
@@ -1239,6 +1249,13 @@ public class DashboardHomeVO {
 
         public void setConfused(Boolean confused) {
             this.confused = confused;
+        }
+
+        public Boolean getAiApplicable() { return aiApplicable; }
+        public void setAiApplicable(Boolean aiApplicable) { this.aiApplicable = aiApplicable; }
+        public Boolean getDirectionalPushBlocked() { return directionalPushBlocked; }
+        public void setDirectionalPushBlocked(Boolean directionalPushBlocked) {
+            this.directionalPushBlocked = directionalPushBlocked;
         }
 
         public Integer getConsistencyScore() {

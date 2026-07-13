@@ -304,6 +304,18 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void consistencyCardChecksAiApplicabilityBeforeAssetDirectionalBlock() throws Exception {
+        String statusFunction = functionBody("consistencyStatusText");
+        String payloadRenderer = functionBody("renderHomeAiDecisionFromPayload");
+
+        assertThat(statusFunction.indexOf("aiApplicable === false"))
+                .isLessThan(statusFunction.indexOf("confused === true"));
+        assertThat(payloadRenderer).contains("aiApplicable", "directionalPushBlocked");
+        assertThat(functionBody("renderHomeConsistencyCard"))
+                .contains("AI 计划模式", "不适用", "资产方向阻断");
+    }
+
+    @Test
     void consistencyCardHasNoTradingInstruction() throws Exception {
         String card = consistencyCardSection();
 
@@ -332,6 +344,48 @@ public class DashboardControllerTest {
 
         assertThat(html).contains("监控时间", "等待首次监控", "positionMonitorTimeCellHtml");
         assertThat(html).doesNotContain("下次验证", "POSITION_VALIDATION_COUNTDOWN_MS", "position-validation-countdown");
+    }
+
+    @Test
+    void existingMonitorWithoutNextScheduleDoesNotSayFirstMonitor() throws Exception {
+        String monitorTime = functionBody("positionMonitorTimeCellHtml");
+        String execution = functionBody("renderHomeExecutionFromPayload");
+
+        assertThat(monitorTime).contains("if (!lastMonitorAt)", "暂无下次监控排期");
+        assertThat(execution).contains("p.lastMonitorAt ? \"暂无下次监控排期\" : \"等待首次监控\"");
+    }
+
+    @Test
+    void executionSuggestionPrefersStructuredExpiry() throws Exception {
+        String formatter = functionBody("formatExecutionValidPeriod");
+        String payloadRenderer = functionBody("renderHomeExecutionFromPayload");
+
+        assertThat(formatter).contains("expiresAt", "structuredExpiry", "有效至");
+        assertThat(payloadRenderer).contains("s.expiresAt");
+    }
+
+    @Test
+    void visibleDashboardContainsNoPendingCountOrDegradedOrRawFailureCode() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        int mainStart = html.indexOf("<main class=\"dashboard-main\">");
+        int hiddenDiagnosticsStart = html.indexOf("<div class=\"runtime-status-stack\"", mainStart);
+        assertThat(mainStart).isNotNegative();
+        assertThat(hiddenDiagnosticsStart).isGreaterThan(mainStart);
+        String visibleDom = html.substring(mainStart, hiddenDiagnosticsStart);
+
+        assertThat(visibleDom).doesNotContain("pendingCount", "degraded",
+                "latestAnalysisFailureCode", "failureReasonCode");
+        assertThat(visibleDom).contains("待复核机会", "资产方向阻断", "等待首次监控");
+
+        String localRealRenderer = functionBody("renderLocalRealPipelineStatus");
+        assertThat(localRealRenderer).contains("localRealFailureLabel", "latestFailureLabel");
+        assertThat(localRealRenderer).doesNotContain("\"原因：\" + latestFailureCode");
+        assertThat(functionBody("localizeVisibleStatus"))
+                .contains("DEGRADED", "数据部分可用", "未知状态");
+        String serviceSource = Files.readString(Path.of(
+                "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"));
+        assertThat(serviceSource).contains("\"待复核数量\"");
+        assertThat(serviceSource).doesNotContain("\" · degraded \"");
     }
 
     @Test

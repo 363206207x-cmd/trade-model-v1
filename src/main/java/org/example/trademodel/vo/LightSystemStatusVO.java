@@ -13,8 +13,9 @@ public class LightSystemStatusVO {
     private Integer missedValidOpportunityCount;
 
     /**
-     * 当前处于困惑态的 symbol 个数：tm_asset_state 全库当前态中 confused_score 大于 0 的行数（每 symbol 一行）。
-     * 不是「当日困惑决策条数」。
+     * 当前方向结论被阻断的 symbol 个数：tm_asset_state 全库当前态中 confused_score 达到
+     * {@code ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD} 的行数（每 symbol 一行）。
+     * 不是「当日困惑决策条数」，也不包含仅大于 0 但未达到方向阻断阈值的行。
      */
     private Integer confusedCount;
 
