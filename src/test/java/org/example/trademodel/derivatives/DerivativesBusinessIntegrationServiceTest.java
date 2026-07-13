@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -247,6 +249,20 @@ class DerivativesBusinessIntegrationServiceTest {
     }
 
     @Test
+    void sixAssetsReceiveDistinctAnalysisScopedDerivativesEvidenceIds() {
+        List<String> symbols = List.of("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
+
+        Set<String> ids = symbols.stream()
+                .map(symbol -> service.evaluate(identityInput(symbol, "ana-cycle-" + symbol)))
+                .flatMap(assessment -> service.toEvidenceVos(assessment).stream())
+                .map(org.example.trademodel.vo.EvidenceItemVO::getEvidenceId)
+                .collect(Collectors.toSet());
+
+        assertThat(ids).hasSize(6);
+        assertThat(ids).allMatch(id -> id.startsWith("deriv-") && id.length() <= 64);
+    }
+
+    @Test
     void allEightScoresParticipateInDecisionAggregation() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"),
                 complete(bd("0.06"), bd("0.001"), bd("1.4"), bd("4000000"), bd("500000"), bd("0.90")), false));
@@ -434,6 +450,12 @@ class DerivativesBusinessIntegrationServiceTest {
                                                   boolean planComplete, AssetStateEnum state) {
         return new DerivativesBusinessInput("BTCUSDT", direction, current, comparison, true, timeframes, true,
                 90, true, planComplete, false, state, snapshot, "trace-biz1", "analysis-biz1", "v1.0");
+    }
+
+    private static DerivativesBusinessInput identityInput(String symbol, String analysisId) {
+        return new DerivativesBusinessInput(symbol, "NEUTRAL", bd("100"), bd("100"), true,
+                all("NEUTRAL"), true, 90, true, false, false, null, null,
+                "trace-" + symbol, analysisId, "v1.0");
     }
 
     private static Map<String, String> all(String direction) {

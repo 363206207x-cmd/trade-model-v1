@@ -8,6 +8,7 @@ import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
@@ -26,6 +28,11 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
     private static final Pattern AUTHORIZATION = Pattern.compile("(?i)(authorization\\s*[:=]\\s*)([^,;]+)");
     private static final Pattern SECRET_PARAM = Pattern.compile("(?i)(api[_-]?key|token|access[_-]?token|secret)=([^&\\s]+)");
     private static final Pattern URL_QUERY = Pattern.compile("https?://([^\\s?]+)\\?[^\\s]+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SQL_VALUES = Pattern.compile("(?i)(VALUES\\s*\\()([^)]*)(\\))");
+    private static final Pattern H2_UNIQUE_CONSTRAINT = Pattern.compile(
+            "(?i)\"(?:[A-Z0-9_]+\\.)?([A-Z0-9_]+)\\s+ON\\s+(?:[A-Z0-9_]+\\.)?([A-Z0-9_]+)\\(");
+    private static final Pattern NAMED_UNIQUE_CONSTRAINT = Pattern.compile(
+            "(?i)unique constraint \\\"([A-Z0-9_]+)\\\"");
 
     private final AnalysisIdempotencyGuard idempotencyGuard;
     private final AnalysisAssemblerService assemblerService;
@@ -94,12 +101,19 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             return AnalysisRunResult.executed(run, analysis, failedRecovery, expiredLeaseRecovery);
         } catch (Exception e) {
             String redactedMessage = redact(e.getMessage());
-            log.warn("analysis run failed analysisId={} traceId={} reason={}",
+            AnalysisPersistenceFailure persistenceFailure = classifyPersistenceFailure(e);
+            String failureCode = persistenceFailure != null
+                    ? persistenceFailure.failureCode() : e.getClass().getSimpleName();
+            log.warn("analysis run failed symbol={} analysisId={} traceId={} entity={} constraint={} failureCode={} reason={}",
+                    run != null ? run.getSymbol() : null,
                     run != null ? run.getAnalysisId() : null,
                     run != null ? run.getTraceId() : null,
+                    persistenceFailure != null ? persistenceFailure.entity() : "NOT_APPLICABLE",
+                    persistenceFailure != null ? persistenceFailure.constraintName() : "NOT_APPLICABLE",
+                    failureCode,
                     redactedMessage);
             if (run != null) {
-                idempotencyGuard.markFailed(context, e.getClass().getSimpleName(), redactedMessage);
+                idempotencyGuard.markFailed(context, failureCode, redactedMessage);
             }
             return AnalysisRunResult.failed(run, redactedMessage);
         }
@@ -233,7 +247,70 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
         }
         String t = AUTHORIZATION.matcher(raw).replaceAll("$1<redacted>");
         t = SECRET_PARAM.matcher(t).replaceAll("$1=<redacted>");
-        return URL_QUERY.matcher(t).replaceAll("https://$1?<redacted>");
+        t = URL_QUERY.matcher(t).replaceAll("https://$1?<redacted>");
+        return SQL_VALUES.matcher(t).replaceAll("$1<redacted>$3");
+    }
+
+    static AnalysisPersistenceFailure classifyPersistenceFailure(Throwable error) {
+        if (!isDuplicateKey(error)) {
+            return null;
+        }
+        String message = throwableMessages(error);
+        Matcher h2 = H2_UNIQUE_CONSTRAINT.matcher(message);
+        String constraint = null;
+        String table = null;
+        if (h2.find()) {
+            constraint = h2.group(1).toUpperCase(Locale.ROOT);
+            table = h2.group(2).toUpperCase(Locale.ROOT);
+        } else {
+            Matcher named = NAMED_UNIQUE_CONSTRAINT.matcher(message);
+            if (named.find()) {
+                constraint = named.group(1).toUpperCase(Locale.ROOT);
+            }
+            table = knownTable(message);
+        }
+        String failureCode = switch (table != null ? table : "") {
+            case "TM_ANALYSIS_RUN" -> "ANALYSIS_ID_COLLISION";
+            case "TM_ANALYSIS_INPUT_SNAPSHOT" -> "SNAPSHOT_ID_COLLISION";
+            case "TM_EVIDENCE_ITEM" -> "EVIDENCE_ID_COLLISION";
+            case "TM_SCORE_ITEM" -> "SCORE_ID_COLLISION";
+            case "TM_DECISION_RESULT" -> "DECISION_ID_COLLISION";
+            default -> "PERSISTENCE_ID_COLLISION";
+        };
+        return new AnalysisPersistenceFailure(failureCode,
+                table != null ? table.toLowerCase(Locale.ROOT) : "unknown",
+                constraint != null ? constraint : "UNKNOWN");
+    }
+
+    private static boolean isDuplicateKey(Throwable error) {
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof DuplicateKeyException
+                    || current.getClass().getSimpleName().contains("IntegrityConstraintViolation")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String throwableMessages(Throwable error) {
+        StringBuilder messages = new StringBuilder();
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current.getMessage() != null) {
+                messages.append(' ').append(current.getMessage());
+            }
+        }
+        return messages.toString();
+    }
+
+    private static String knownTable(String message) {
+        String upper = message.toUpperCase(Locale.ROOT);
+        for (String table : new String[]{"TM_ANALYSIS_RUN", "TM_ANALYSIS_INPUT_SNAPSHOT",
+                "TM_EVIDENCE_ITEM", "TM_SCORE_ITEM", "TM_DECISION_RESULT"}) {
+            if (upper.contains(table)) {
+                return table;
+            }
+        }
+        return null;
     }
 
     private static String safe(String raw) {
@@ -248,5 +325,8 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                                      String triggerReference, String requestId, LocalDateTime analysisTime,
                                      LocalDateTime canonicalAnalysisTimeBucket, String ruleVersion,
                                      String parentAnalysisId, String parentTraceId) {
+    }
+
+    record AnalysisPersistenceFailure(String failureCode, String entity, String constraintName) {
     }
 }

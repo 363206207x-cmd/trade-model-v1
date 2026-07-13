@@ -1,5 +1,6 @@
 package org.example.trademodel.derivatives;
 
+import org.example.trademodel.analysisrun.AnalysisPersistenceIds;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.providercall.ProviderDatasetType;
@@ -282,7 +283,8 @@ public class DerivativesBusinessIntegrationService {
         List<EvidenceItemVO> result = new ArrayList<>();
         for (DerivativesEvidenceItem item : assessment.evidence()) {
             EvidenceItemVO vo = new EvidenceItemVO();
-            vo.setEvidenceId("deriv-" + item.evidenceType().name() + "-" + result.size());
+            vo.setEvidenceId(AnalysisPersistenceIds.derivativesEvidenceId(
+                    assessment.analysisId(), item.evidenceType().name(), result.size()));
             vo.setEvidenceType(item.evidenceType().name());
             vo.setDirection(item.direction());
             vo.setStrength(item.strength() == null ? null : item.strength().doubleValue());

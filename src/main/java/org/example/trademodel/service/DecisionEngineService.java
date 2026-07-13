@@ -8,6 +8,7 @@ import org.example.trademodel.ai.AiProviderRequest;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.analysisrun.AnalysisPersistenceIds;
 import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
@@ -21,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -145,7 +145,7 @@ public class DecisionEngineService {
                                          EventImpactInputVO externalContextInput,
                                          DerivativesBusinessAssessment derivativesAssessment,
                                          Integer eightScoreComposite) {
-        String decisionId = "dec-" + Instant.now().toEpochMilli();
+        String decisionId = AnalysisPersistenceIds.decisionId();
         logger.info("[AI决策] === 开始为 {} {} analysisId={} 生成决策 ===", symbol, timeframe, analysisId);
 
         try {
