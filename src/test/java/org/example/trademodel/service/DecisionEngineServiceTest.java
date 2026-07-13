@@ -93,7 +93,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_dataQualityAtOrAbove60_doesNotChangeExistingWorthOpeningOutcome() {
-        DecisionBundleVO baseline = service.makeDecision("BTCUSDT", "1m", "analysis-2", null, 65);
+        DecisionBundleVO baseline = service.makeDecision("BTCUSDT", "1m", "analysis-2", 85, 65);
         DecisionBundleVO withGateBoundaryScore = service.makeDecision("BTCUSDT", "1m", "analysis-3", 60, 65);
 
         assertThat(withGateBoundaryScore.getIsWorthOpening()).isEqualTo(baseline.getIsWorthOpening());
@@ -110,14 +110,17 @@ class DecisionEngineServiceTest {
     }
 
     @Test
-    void makeDecision_dataQualityGate_doesNotAffectConfidenceRiskOrMarketBias() {
+    void makeDecision_dataQualityGateDowngradesUserConclusionConsistently() {
         DecisionBundleVO normal = service.makeDecision("BTCUSDT", "1m", "analysis-4", 60, 65);
         DecisionBundleVO gated = service.makeDecision("BTCUSDT", "1m", "analysis-5", 59, 65);
 
         assertThat(gated.getIsWorthOpening()).isFalse();
-        assertThat(gated.getConfidenceLevel()).isEqualTo(normal.getConfidenceLevel());
-        assertThat(gated.getRiskLevel()).isEqualTo(normal.getRiskLevel());
-        assertThat(gated.getMarketBiasHierarchy()).isEqualTo(normal.getMarketBiasHierarchy());
+        assertThat(gated.getConfidenceLevel()).isEqualTo("LOW");
+        assertThat(gated.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(gated.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(gated.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
+        assertThat(gated.getAiPlanMode()).isNull();
+        assertThat(normal.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
     }
 
     @Test
@@ -178,7 +181,7 @@ class DecisionEngineServiceTest {
                 85, 65, null, null, 100);
 
         assertThat(decision.getConclusionSummary()).contains("八项评分修正 +1");
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
     }
 
     @Test
@@ -203,10 +206,10 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-11", 85, 65);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BEARISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BEARISH");
         assertThat(decision.getAiRoleResults())
                 .contains("\"schemaVersion\":\"v1\"")
-                .contains("\"finalMarketBias\":\"BEARISH\"")
+                .contains("\"finalMarketBias\":\"STRONG_BEARISH\"")
                 .contains("\"ruleDirectionPreserved\":true");
         assertThat(decision.getAiRoleResults()).doesNotContain("最终裁决");
     }
@@ -232,7 +235,7 @@ class DecisionEngineServiceTest {
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-12", 85, 65);
 
         assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.OBSERVING);
-        assertThat(decision.getAiPlanMode()).isEqualTo("CONFUSED");
+        assertThat(decision.getAiPlanMode()).isNull();
     }
 
     @Test
@@ -282,7 +285,7 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-high", 85, 65, external);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
         assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
         assertThat(decision.getConfidenceLevel()).isEqualTo("MEDIUM");
         assertThat(decision.getIsWorthOpening()).isTrue();
@@ -296,7 +299,7 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-block", 85, 65, external);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
         assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
         assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
@@ -343,6 +346,9 @@ class DecisionEngineServiceTest {
         review.setGptConsistentWithRule(false);
         review.setGeminiConsistentWithRule(true);
         review.setGrokConsistentWithRule(true);
+        review.setSuccessfulProviderCount(3);
+        review.setAiSupportCount(2);
+        review.setAiObjectionCount(1);
         review.setConflictContribution(18);
         review.setReasonCodes(List.of("AI_CHALLENGE"));
         when(aiDecisionOrchestratorService.review(any())).thenReturn(review);
@@ -363,9 +369,9 @@ class DecisionEngineServiceTest {
         assertThat(context.isGptConsistentWithRule()).isFalse();
         assertThat(context.getAiProviderConflictContribution()).isEqualTo(18);
         assertThat(context.getAiOrchestrationMode()).isEqualTo("AI_ASSISTED");
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
         assertThat(decision.getAiRoleResults())
-                .contains("\"finalMarketBias\":\"BULLISH\"")
+                .contains("\"finalMarketBias\":\"STRONG_BULLISH\"")
                 .contains("\"ruleDirectionPreserved\":true");
         assertThat(decision.getAiRoleResults()).doesNotContain("Grok advisory");
         assertThat(decision.getAiRoleResults()).doesNotContain("Gemini advisory");
@@ -385,9 +391,36 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = serviceWithAi.makeDecision("BTCUSDT", "1m", "analysis-ai-fallback", 85, 65);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
         assertThat(decision.getAiRoleResults()).contains("RULE_ONLY_FALLBACK");
         assertThat(decision.getAiRoleResults()).contains("AI_ORCHESTRATOR_FAILED");
+        assertThat(decision.getAiPlanMode()).isNull();
+    }
+
+    @Test
+    void makeDecision_eachAssetUsesItsOwnMarketWindow() {
+        when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
+                .thenAnswer(invocation -> "ETHUSDT".equals(invocation.getArgument(0))
+                        ? bearishKlines() : bullishKlines());
+
+        DecisionBundleVO btc = service.makeDecision("BTCUSDT", "5m", "analysis-btc", 85, 65);
+        DecisionBundleVO eth = service.makeDecision("ETHUSDT", "5m", "analysis-eth", 85, 65);
+
+        assertThat(btc.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(eth.getMarketBiasHierarchy()).isEqualTo("STRONG_BEARISH");
+    }
+
+    @Test
+    void makeDecision_missingMarketWindowDoesNotDefaultBullish() {
+        when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
+                .thenReturn(List.of());
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-missing", 85, 65);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(decision.getConfidenceLevel()).isEqualTo("LOW");
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getIsWorthOpening()).isFalse();
     }
 
     private static List<String[]> bullishKlines() {

@@ -15,10 +15,18 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             throw new IllegalStateException("规则层必须先产出基础方向");
         }
 
-        int objectionCount = aiObjectionCount(context);
-        int supportCount = 3 - objectionCount;
+        int successfulProviderCount = clampCount(context.getAiSuccessfulProviderCount());
+        int objectionCount = Math.min(successfulProviderCount, clampCount(context.getAiObjectionCount()));
+        int supportCount = Math.min(successfulProviderCount - objectionCount,
+                clampCount(context.getAiSupportCount()));
         context.setAiObjectionCount(objectionCount);
         context.setAiSupportCount(supportCount);
+
+        if (successfulProviderCount == 0 || supportCount + objectionCount == 0) {
+            context.setAiConflictScore(0);
+            return result(context, null, context.getRuleConfidenceLevel(),
+                    "UNCHANGED", null, 0, 0, 0);
+        }
 
         int directionConflict = calculateDirectionConflict(context, objectionCount);
         int riskConflict = calculateRiskConflict(context);
@@ -91,18 +99,8 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         return Math.max(0, Math.min(25, contribution));
     }
 
-    private int aiObjectionCount(DecisionContext ctx) {
-        int count = 0;
-        if (!ctx.isGptConsistentWithRule()) {
-            count++;
-        }
-        if (!ctx.isGeminiConsistentWithRule()) {
-            count++;
-        }
-        if (!ctx.isGrokConsistentWithRule()) {
-            count++;
-        }
-        return count;
+    private int clampCount(Integer value) {
+        return value == null ? 0 : Math.max(0, Math.min(3, value));
     }
 
     private AiConflictResult result(DecisionContext context, AiConflictLevelEnum level, String adjustedConfidence,

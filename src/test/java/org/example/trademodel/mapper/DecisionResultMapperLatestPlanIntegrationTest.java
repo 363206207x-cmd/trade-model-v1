@@ -110,4 +110,28 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getInvalidCondition()).isEqualTo("decision-fallback-invalid");
         assertThat(row.getExecutionPlanSummary()).isEqualTo("2h | decision-fallback-invalid");
     }
+
+    @Test
+    void countOpenSymbolsWithReverseSignal_recognizesStrongAndWeakDirectionFamilies() {
+        jdbcTemplate.update(
+                "INSERT INTO tm_real_position(position_id, symbol, position_side, position_status) VALUES (?,?,?,?)",
+                "position-strong-bear", "BTCUSDT", "LONG", "OPEN");
+        jdbcTemplate.update(
+                "INSERT INTO tm_real_position(position_id, symbol, position_side, position_status) VALUES (?,?,?,?)",
+                "position-weak-bull", "ETHUSDT", "SHORT", "OPEN");
+        jdbcTemplate.update(
+                "INSERT INTO tm_real_position(position_id, symbol, position_side, position_status) VALUES (?,?,?,?)",
+                "position-range", "SOLUSDT", "LONG", "OPEN");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
+                "decision-strong-bear", "analysis-strong-bear", "BTCUSDT", "STRONG_BEARISH");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
+                "decision-weak-bull", "analysis-weak-bull", "ETHUSDT", "WEAK_BULLISH");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
+                "decision-range", "analysis-range", "SOLUSDT", "RANGE");
+
+        assertThat(decisionResultMapper.countOpenSymbolsWithReverseSignal()).isEqualTo(2);
+    }
 }

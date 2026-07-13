@@ -1713,7 +1713,7 @@
             font-size: 0.68rem;
             font-weight: 560;
         }
-        .position-validation-countdown {
+        .position-monitor-time {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -2707,9 +2707,9 @@
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
                     <table class="position-table"><thead><tr>
-                        <th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>人工处理</th>
+                        <th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>监控时间</th><th>人工处理</th>
                     </tr></thead><tbody>
-                        <tr class="position-empty-row"><td><div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div></td><td></td><td></td><td></td><td></td><td></td><td><span class="position-monitor-waiting">等待监控</span></td><td></td></tr>
+                        <tr class="position-empty-row"><td><div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div></td><td></td><td></td><td></td><td></td><td></td><td><span class="position-monitor-waiting">等待首次监控</span></td><td></td></tr>
                         <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                         <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                         <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
@@ -3275,11 +3275,7 @@
  */
 (function () {
     var REFRESH_MS = 30000;
-    var POSITION_VALIDATION_COUNTDOWN_MS = 15000;
     var refreshTimer = null;
-    var validationCountdownTimer = null;
-    var dashboardLastRefreshAt = null;
-    var dashboardRefreshInFlight = false;
     var allDecisions = [];
     var displayDecisions = [];
     var detailDecisionMap = {};
@@ -5055,17 +5051,165 @@
         return text.replace(/\s*\/\s*/g, " · ");
     }
 
+    function assetStateLabel(raw) {
+        var labels = {
+            OBSERVING: "观察",
+            CANDIDATE: "候选",
+            WAITING_TRIGGER: "等待触发",
+            TRIGGERED: "已触发",
+            HIGH_RISK: "高风险观察",
+            INVALIDATED: "已失效",
+            COOLING: "冷却",
+            CONFUSED: "冲突状态"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "暂无";
+    }
+
+    function marketBiasLabel(raw) {
+        var labels = {
+            STRONG_BULLISH: "强偏多",
+            BULLISH: "偏多",
+            WEAK_BULLISH: "弱偏多",
+            RANGE: "震荡",
+            WEAK_BEARISH: "弱偏空",
+            BEARISH: "偏空",
+            STRONG_BEARISH: "强偏空",
+            WAIT: "观望"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "暂无";
+    }
+
+    function confidenceLabel(raw) {
+        var labels = { HIGH: "高", MEDIUM: "中", LOW: "低" };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "暂无";
+    }
+
+    function riskLevelLabel(raw) {
+        var labels = { LOW: "低", MEDIUM: "中", HIGH: "高", EXTREME: "极高", WAITING_MONITOR: "等待首次监控" };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "暂无";
+    }
+
+    function aiRunStatusLabel(raw) {
+        var labels = {
+            SUCCESS: "复核成功",
+            PARTIAL_SUCCESS: "部分角色复核成功",
+            SUPPORT: "成功支持",
+            CHALLENGE: "成功反对",
+            ABSTAIN: "成功弃权",
+            DISABLED: "已禁用",
+            TIMEOUT: "调用超时",
+            FAILED: "调用失败",
+            INVALID_RESPONSE: "调用失败",
+            BUDGET_BLOCKED: "预算阻断",
+            RATE_LIMITED: "预算阻断",
+            MODEL_UNAVAILABLE: "模型不可用",
+            NOT_CONFIGURED: "模型不可用",
+            NOT_CALLED: "未调用",
+            STARTED: "未调用"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "未调用";
+    }
+
+    function aiConflictLevelLabel(raw) {
+        var labels = {
+            LEVEL_1_CONSISTENT: "无显著分歧",
+            LEVEL_2_LIGHT_DIVERGENCE: "轻微分歧",
+            LEVEL_2_REVIEW: "轻微分歧",
+            LEVEL_3_SIGNIFICANT_DIVERGENCE: "显著分歧",
+            LEVEL_3_DIVERGENCE: "显著分歧",
+            LEVEL_4_EXTREME_DIVERGENCE: "极端分歧"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "不适用";
+    }
+
+    function planModeLabel(raw) {
+        var labels = {
+            FULL: "完整计划复核",
+            CONFIRM: "确认复核",
+            PREPARE_ONLY: "仅准备复核",
+            ADVISORY: "人工复核建议",
+            REVIEW_ONLY: "仅供人工复核",
+            DOWNGRADED: "已降级复核",
+            REDUCED: "降级复核",
+            CONFUSED: "冲突阻断",
+            WAIT: "等待更多证据",
+            BLOCKED: "已阻断",
+            NO_PLAN: "暂无计划"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "暂无";
+    }
+
+    function positionLogicStatusLabel(raw) {
+        var labels = {
+            LOGIC_VALID: "入场逻辑仍成立",
+            LOGIC_WEAKENED: "入场逻辑减弱",
+            PLAN_INVALIDATED: "原计划已失效",
+            HIGH_RISK: "风险升高",
+            WAITING_MONITOR: "等待首次监控"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "等待首次监控";
+    }
+
+    function directionSupportStatusLabel(raw) {
+        var labels = {
+            SUPPORTED: "当前方向仍获支持",
+            WEAKENED: "方向支持减弱",
+            NOT_SUPPORTED: "当前方向不再获支持",
+            RISK_BLOCKED: "方向结论受风险阻断",
+            WAITING_SYNC: "等待首次监控",
+            WAITING_MONITOR: "等待首次监控"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "等待首次监控";
+    }
+
+    function reversalStatusLabel(raw) {
+        var labels = {
+            NO_REVERSAL_SIGNAL: "暂无反转信号",
+            MANUAL_REVIEW_REQUIRED: "需人工复核反转风险",
+            RISK_REVIEW: "需复核高风险变化",
+            WAITING_MONITOR: "等待首次监控"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "等待首次监控";
+    }
+
+    function manualActionLabel(raw) {
+        var labels = {
+            HOLD: "人工继续观察",
+            MANUAL_REVIEW: "人工复核",
+            TIGHTEN_STOP_REVIEW: "复核是否收紧止损",
+            REDUCE_POSITION_REVIEW: "复核是否降低仓位",
+            RECHECK_PLAN: "复核执行计划",
+            RISK_REVIEW: "风险复核"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "等待首次监控";
+    }
+
+    function dataQualityStatusLabel(raw) {
+        var labels = {
+            SUFFICIENT: "数据充分",
+            PARTIAL: "数据部分可用",
+            INSUFFICIENT: "数据不足",
+            MISSING: "数据缺失",
+            UNAVAILABLE: "数据源不可用"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "未知状态") : "暂无";
+    }
+
     function mapAssetStateEnum(raw) {
-        var v = (raw || "").toString().trim().toUpperCase();
-        if (v === "OBSERVING") return "观察";
-        if (v === "CANDIDATE") return "候选";
-        if (v === "WAITING_TRIGGER") return "等待触发";
-        if (v === "TRIGGERED") return "已触发";
-        if (v === "HIGH_RISK") return "高风险观察";
-        if (v === "INVALIDATED") return "已失效";
-        if (v === "COOLING") return "冷却";
-        if (v === "CONFUSED") return "冲突阻断";
-        return "";
+        var label = assetStateLabel(raw);
+        return label === "暂无" || label === "未知状态" ? "" : label;
     }
 
     function assetStateText(d) {
@@ -5124,7 +5268,7 @@
         if (v === "PARTIALLY_CLOSED") return "部分平仓";
         if (v === "CLOSED") return "已关闭";
         if (v === "MANUAL") return "手动录入";
-        return normalizeReadableText(raw);
+        return "未知状态";
     }
 
     function positionMonitorConclusionText(d) {
@@ -5147,7 +5291,7 @@
         if (v === "MANUAL_REVIEW") return "人工复核";
         if (v === "RECHECK_PLAN") return "复核计划";
         if (v === "RISK_REVIEW") return "风险复核";
-        return normalizeReadableText(raw);
+        return "未知状态";
     }
 
     function positionLeverageText(d) {
@@ -5161,7 +5305,7 @@
 
     function positionTableHeadHtml() {
         return '<table class="position-table"><thead><tr>'
-            + '<th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>下次验证</th><th>人工处理</th>'
+            + '<th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>监控时间</th><th>人工处理</th>'
             + '</tr></thead><tbody>';
     }
 
@@ -5236,14 +5380,15 @@
             "suggestedManualActionText", "suggested_manual_action_text",
             "manualActionText", "manual_action_text"
         ]));
-        var advice = backendAdviceText || positionAdviceText(pickField(d, [
+        var action = pickField(d, [
             "suggestedManualAction", "suggested_manual_action",
             "currentAdvice", "current_advice",
             "positionAdvice", "position_advice",
             "monitorAdvice", "monitor_advice",
             "monitorSuggestedAction", "monitor_suggested_action",
             "suggestedAction", "suggested_action"
-        ])) || "等待监控";
+        ]);
+        var advice = backendAdviceText || manualActionLabel(action);
         var meta = [];
         var pressure = positionStopTakePressureText(d);
         var state = positionMonitorStateText(d);
@@ -5254,54 +5399,15 @@
             + '</div>';
     }
 
-    function positionValidationRawTime(d) {
-        return pickField(d, ["positionUpdatedAt", "position_updated_at", "updatedAt", "updated_at", "monitorTime", "monitor_time", "monitoredAt", "monitored_at"]);
-    }
-
-    function positionValidationCellHtml(rawTime) {
-        var fullTime = rawTime != null ? String(rawTime) : "";
-        var title = rawTime != null ? formatDateTime(rawTime) : "";
-        return '<span class="position-validation-countdown" data-full-time="' + escapeHtml(fullTime) + '" title="' + escapeHtml(title) + '">等待监控</span>';
-    }
-
-    function positionValidationCadenceMs() {
-        if (!REFRESH_MS || REFRESH_MS <= 0) return 0;
-        return POSITION_VALIDATION_COUNTDOWN_MS > 0 ? POSITION_VALIDATION_COUNTDOWN_MS : REFRESH_MS;
-    }
-
-    function formatPositionValidationCountdownText() {
-        if (dashboardRefreshInFlight) return "验证中";
-        var cadenceMs = positionValidationCadenceMs();
-        if (!cadenceMs || !dashboardLastRefreshAt) return "等待监控";
-        var elapsedMs = Date.now() - dashboardLastRefreshAt;
-        var remaining = Math.ceil((cadenceMs - elapsedMs) / 1000);
-        if (remaining <= 0) return "验证中";
-        return remaining + "s";
-    }
-
-    function updatePositionValidationCountdown() {
-        var text = formatPositionValidationCountdownText();
-        Array.prototype.forEach.call(document.querySelectorAll(".position-validation-countdown"), function (el) {
-            el.textContent = text;
-        });
-    }
-
-    function schedulePositionValidationCountdown() {
-        if (validationCountdownTimer) clearInterval(validationCountdownTimer);
-        validationCountdownTimer = null;
-        if (positionValidationCadenceMs() > 0) validationCountdownTimer = setInterval(updatePositionValidationCountdown, 1000);
-        updatePositionValidationCountdown();
-    }
-
-    function markPositionValidationStarted() {
-        dashboardRefreshInFlight = true;
-        updatePositionValidationCountdown();
-    }
-
-    function markPositionValidationFinished() {
-        dashboardLastRefreshAt = Date.now();
-        dashboardRefreshInFlight = false;
-        updatePositionValidationCountdown();
+    function positionMonitorTimeCellHtml(lastMonitorAt, nextMonitorAt) {
+        if (!lastMonitorAt) {
+            return '<span class="position-monitor-waiting">等待首次监控</span>';
+        }
+        var fullTime = String(lastMonitorAt);
+        var visible = formatDateTime(lastMonitorAt);
+        var next = nextMonitorAt ? (' · 下次 ' + formatDateTime(nextMonitorAt)) : '';
+        return '<span class="position-monitor-time" data-full-time="' + escapeHtml(fullTime)
+            + '" title="' + escapeHtml(visible + next) + '">' + escapeHtml(visible) + '</span>';
     }
 
     function positionRiskHtml(d) {
@@ -5310,8 +5416,8 @@
             "monitorRiskLevel", "monitor_risk_level",
             "riskLevel", "risk_level"
         ]);
-        var mapped = raw != null ? riskLevelText(raw) : "";
-        return positionMonitorCell(mapped && mapped !== "—" ? mapped : raw, "等待监控");
+        var backendLabel = pickField(d, ["riskLevelLabel", "risk_level_label", "positionRiskLevelLabel", "position_risk_level_label"]);
+        return positionMonitorCell(backendLabel || riskLevelLabel(raw), "等待首次监控");
     }
 
     function positionBasicMetaHtml(items) {
@@ -5413,7 +5519,7 @@
             for (var j = 0; j < 8; j++) {
                 var cell = "";
                 if (i === 0 && j === 0) cell = '<div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div>';
-                if (i === 0 && j === 6) cell = '<span class="position-monitor-waiting">等待监控</span>';
+                if (i === 0 && j === 6) cell = '<span class="position-monitor-waiting">等待首次监控</span>';
                 cells.push('<td>' + cell + '</td>');
             }
             rows.push('<tr class="position-empty-row">' + cells.join("") + '</tr>');
@@ -5456,15 +5562,14 @@
         ]);
         box.innerHTML = tableHead + '<tr>'
             + '<td class="position-asset-cell">' + assetCell + '</td>'
-            + '<td>' + positionMonitorFieldHtml(d, ["entryLogicStatus", "entry_logic_status", "entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
-            + '<td>' + positionMonitorFieldHtml(d, ["directionSupportStatus", "direction_support_status", "directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
-            + '<td>' + positionMonitorFieldHtml(d, ["reversalStatus", "reversal_status", "positionReversalStatus", "position_reversal_status", "monitorReversalStatus", "monitor_reversal_status"], "等待监控") + '</td>'
+            + '<td>' + positionMonitorCell(pickField(d, ["entryLogicStatusLabel", "entry_logic_status_label"]) || positionLogicStatusLabel(pickField(d, ["entryLogicStatus", "entry_logic_status"])), "等待首次监控") + '</td>'
+            + '<td>' + positionMonitorCell(pickField(d, ["directionSupportStatusLabel", "direction_support_status_label"]) || directionSupportStatusLabel(pickField(d, ["directionSupportStatus", "direction_support_status"])), "等待首次监控") + '</td>'
+            + '<td>' + positionMonitorCell(pickField(d, ["reversalStatusLabel", "reversal_status_label"]) || reversalStatusLabel(pickField(d, ["reversalStatus", "reversal_status"])), "等待首次监控") + '</td>'
             + '<td>' + positionRiskHtml(d) + '</td>'
             + '<td>' + positionCurrentAdviceHtml(d) + '</td>'
-            + '<td>' + positionValidationCellHtml(positionValidationRawTime(d)) + '</td>'
+            + '<td>' + positionMonitorTimeCellHtml(pickField(d, ["lastMonitorAt", "last_monitor_at"]), pickField(d, ["nextMonitorAt", "next_monitor_at"])) + '</td>'
             + '<td></td>'
             + '</tr>' + positionFillerRows(4) + '</tbody></table>';
-        updatePositionValidationCountdown();
     }
 
     function renderHomeExecution(d) {
@@ -5680,6 +5785,7 @@
         if (confused === true) return "极端分歧";
         var raw = String(level || "").trim();
         if (!raw) return "等待同步";
+        if (raw === "不适用") return "不适用";
         var upper = raw.toUpperCase();
         if (upper.indexOf("EXTREME") >= 0 || upper.indexOf("CRITICAL") >= 0 || upper.indexOf("LEVEL_4") >= 0 || upper.indexOf("L4") >= 0 || raw.indexOf("极端") >= 0) return "极端分歧";
         if (upper.indexOf("HIGH") >= 0 || upper.indexOf("SIGNIFICANT") >= 0 || upper.indexOf("LEVEL_3") >= 0 || upper.indexOf("L3") >= 0 || raw.indexOf("显著") >= 0 || raw.indexOf("高") >= 0) return "显著分歧";
@@ -5724,13 +5830,14 @@
         var conclusion = role.finalConclusion || role.reviewConclusion;
         return '<div class="ai-evidence-grid">'
             + aiRoleSummaryStrip([
+                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
                 ["最终倾向", biasText(finalBias) !== "—" ? biasText(finalBias) : finalBias, "暂无"],
                 ["置信度", confidenceLabelText(confidence), "暂无"],
                 ["最终结论", conclusion, "等待同步"]
             ])
             + aiRoleEvidenceList([
-                ["风险等级", localizeVisibleStatus(role.finalRiskLevel || ""), "暂无"],
-                ["AI 计划模式", localizeVisibleStatus(role.finalPlanMode || ""), "等待同步"],
+                ["风险等级", riskLevelLabel(role.finalRiskLevel), "暂无"],
+                ["AI 计划模式", planModeLabel(role.finalPlanMode), "暂无"],
                 ["是否值得开仓", role.worthOpening, "等待同步"],
                 ["裁决摘要", role.decisionSummary || conclusion, "等待同步"],
                 ["最终采纳的核心支持证据", role.coreSupportingEvidence || role.supportEvidence, "暂无该角色证据"],
@@ -5744,6 +5851,7 @@
         role = role || {};
         return '<div class="ai-evidence-grid">'
             + aiRoleSummaryStrip([
+                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
                 ["复核结论", role.reviewConclusion, "等待同步"],
                 ["复核意见", role.reviewVerdict, "等待同步"],
                 ["是否需要人工复核", role.manualReviewRequired, "等待同步"]
@@ -5763,6 +5871,7 @@
         role = role || {};
         return '<div class="ai-evidence-grid">'
             + aiRoleSummaryStrip([
+                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
                 ["反方论点", role.challengeThesis, "等待同步"],
                 ["反方挑战结论", role.challengeConclusion, "等待同步"],
                 ["风险提示摘要", role.challengeConclusion || role.challengeThesis, "等待同步"]
@@ -6023,19 +6132,12 @@
 
     function riskLabelText(raw) {
         var v = String(raw || "").toUpperCase();
-        if (v === "EXTREME" || v === "VERY_HIGH") return "极高";
-        if (v === "HIGH") return "高";
-        if (v === "MEDIUM") return "中";
-        if (v === "LOW") return "低";
-        return raw || "";
+        if (v === "VERY_HIGH") return "极高";
+        return riskLevelLabel(raw);
     }
 
     function confidenceLabelText(raw) {
-        var v = String(raw || "").toUpperCase();
-        if (v === "HIGH") return "高";
-        if (v === "MEDIUM") return "中";
-        if (v === "LOW") return "低";
-        return raw || "";
+        return confidenceLabel(raw);
     }
 
     function fixedHomeAssetList(assets) {
@@ -6057,47 +6159,27 @@
         var list = fixedHomeAssetList(assets);
         box.innerHTML = list.map(function (asset, idx) {
             var rawSymbol = normalizeDisplaySymbol(asset.rawSymbol || asset.symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[idx]);
-            var placeholder = asset.__placeholder === true || asset.slotType === "DEFAULT_SLOT";
+            var placeholder = asset.__placeholder === true;
             var selected = rawSymbol && rawSymbol === selectedSymbol ? " selected" : "";
-            var bias = cleanBlankValue(asset.marketBiasLabel || biasText(asset.marketBias));
+            var bias = cleanBlankValue(asset.marketBiasLabel || marketBiasLabel(asset.marketBias));
             var bcls = placeholder ? "neu" : biasClass(asset.marketBias);
-            var scoreLabel = asset.compositeScore == null ? "综合评分" : ("综合评分 " + asset.compositeScore);
-            var scoreTone = asset.compositeScore == null ? "neu" : (Number(asset.compositeScore) >= 75 ? "bull" : (Number(asset.compositeScore) <= 45 ? "bear" : "neu"));
-            var riskText = cleanBlankValue(localizeVisibleStatus(asset.riskLabel || riskLabelText(asset.riskLevel)));
-            var confidenceText = cleanBlankValue(localizeVisibleStatus(asset.confidenceLabel || confidenceLabelText(asset.confidenceLevel)));
-            var stateText = cleanBlankValue(localizeVisibleStatus(asset.assetStateLabel || ""));
-            var worthText = asset.worthOpening === true ? "待复核候选" : (asset.worthOpening === false ? "暂不建议" : "");
-            var stateOpinion = stateText && worthText ? (stateText + " / " + worthText) : (stateText || worthText || "");
-            var priceText = formatPrice(asset.latestPrice);
-            var freshnessText = cleanBlankValue(localizeVisibleStatus(asset.dataFreshness)) || "NO_DATA";
-            var providerText = cleanBlankValue(asset.sourceProvider) || "暂无";
-            var unavailableReason = cleanBlankValue(asset.unavailableReason);
-            var timeframeFreshness = asset.timeframeFreshness || {};
-            var timeframeFreshnessText = ["5m", "15m", "1h", "4h"].map(function (timeframe) {
-                return timeframe + ":" + (cleanBlankValue(localizeVisibleStatus(timeframeFreshness[timeframe])) || "NO_DATA");
-            }).join(" · ");
-            var dataStatusText = String(asset.dataFreshness || "").toUpperCase() === "UNAVAILABLE"
-                ? ("数据源不可用" + (unavailableReason ? (" · " + unavailableReason) : ""))
-                : freshnessText;
-            var evidenceText = asset.evidenceCount == null ? "暂无" : String(asset.evidenceCount);
-            var analysisTimeText = formatDateTime(asset.latestAnalysisTime);
+            var riskText = cleanBlankValue(asset.riskLabel || riskLevelLabel(asset.riskLevel));
+            var confidenceText = cleanBlankValue(asset.confidenceLabel || confidenceLabel(asset.confidenceLevel));
+            var stateText = cleanBlankValue(asset.assetStateLabel || assetStateLabel(asset.assetState));
+            var worthText = asset.worthOpening === true ? "待复核候选" : (asset.worthOpening === false ? "暂不建议" : "暂无");
+            var conclusionText = cleanBlankValue(asset.currentConclusion) || "暂无";
             var coinCls = coinAvatarClass(rawSymbol);
             return '<div class="coin-tile bias-' + bcls + selected + (placeholder ? ' placeholder' : '') + '" data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '">' +
                 '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
                 + '<span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "") + '</span></span>'
-                + '<span class="tile-score-pill ' + scoreTone + '">' + escapeHtml(scoreLabel) + '</span></div>' +
+                + '<span class="tile-score-pill neu">' + escapeHtml(stateText) + '</span></div>' +
                 '<div class="tile-primary">' +
                 '<div class="tile-mainline"><span class="tile-direction-label">方向：</span><span class="tile-bias ' + bcls + '">' + escapeHtml(bias) + '</span></div>' +
                 '<div class="tile-compact-grid">' +
                 '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value">' + escapeHtml(stateOpinion) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">最新价</span><span class="value">' + escapeHtml(priceText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">数据来源</span><span class="value">' + escapeHtml(providerText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">数据状态</span><span class="value">' + escapeHtml(dataStatusText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">四周期新鲜度</span><span class="value">' + escapeHtml(timeframeFreshnessText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">证据数</span><span class="value">' + escapeHtml(evidenceText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">分析时间</span><span class="value">' + escapeHtml(analysisTimeText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value">' + escapeHtml(worthText) + '</span></div>' +
+                '<div class="tile-compact-row"><span class="label">当前结论</span><span class="value">' + escapeHtml(conclusionText) + '</span></div>' +
                 '</div></div></div>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
@@ -6120,7 +6202,6 @@
         });
         if (!list.length) {
             box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
-            updatePositionValidationCountdown();
             return;
         }
         var rows = list.slice(0, 5).map(function (p) {
@@ -6136,47 +6217,96 @@
             ]);
             return '<tr>'
                 + '<td class="position-asset-cell">' + assetCell + '</td>'
-                + '<td>' + positionMonitorFieldHtml(p, ["entryLogicStatus", "entry_logic_status", "entryLogic", "entry_logic", "positionEntryLogic", "position_entry_logic", "monitorEntryLogic", "monitor_entry_logic", "entryReason", "entry_reason"], "等待监控") + '</td>'
-                + '<td>' + positionMonitorFieldHtml(p, ["directionSupportStatus", "direction_support_status", "directionSupport", "direction_support", "positionDirectionSupport", "position_direction_support", "monitorDirectionSupport", "monitor_direction_support"], "等待监控") + '</td>'
-                + '<td>' + positionMonitorFieldHtml(p, ["reversalStatus", "reversal_status", "positionReversalStatus", "position_reversal_status", "monitorReversalStatus", "monitor_reversal_status"], "等待监控") + '</td>'
+                + '<td>' + positionMonitorCell(p.entryLogicStatusLabel || positionLogicStatusLabel(p.entryLogicStatus), "等待首次监控") + '</td>'
+                + '<td>' + positionMonitorCell(p.directionSupportStatusLabel || directionSupportStatusLabel(p.directionSupportStatus), "等待首次监控") + '</td>'
+                + '<td>' + positionMonitorCell(p.reversalStatusLabel || reversalStatusLabel(p.reversalStatus), "等待首次监控") + '</td>'
                 + '<td>' + positionRiskHtml(p) + '</td>'
                 + '<td>' + positionCurrentAdviceHtml(p) + '</td>'
-                + '<td>' + positionValidationCellHtml(p.updatedAt || p.updated_at || p.monitorTime || p.monitor_time || p.monitoredAt || p.monitored_at) + '</td>'
+                + '<td>' + positionMonitorTimeCellHtml(p.lastMonitorAt || p.last_monitor_at, p.nextMonitorAt || p.next_monitor_at) + '</td>'
                 + '<td>' + positionCloseActionHtml(positionId, p.symbol, positionStatus) + '</td>'
                 + '</tr>';
         });
         box.innerHTML = tableHead + rows.join("") + positionFillerRows(Math.max(0, 5 - rows.length)) + '</tbody></table>';
         bindManualCloseButtons();
-        updatePositionValidationCountdown();
     }
 
     function renderHomeExecutionFromPayload(suggestion) {
         var box = document.getElementById("homeExecutionContent");
         if (!box) return;
         var s = suggestion || {};
-        var direction = biasText(s.direction);
-        if (direction === "—") direction = s.direction || "";
-        var entryZone = s.entryZone || "";
-        var stopLoss = s.stopLoss || "";
-        var takeProfitRules = s.takeProfitRules || "";
-        var statusHtml = executionFailClosedStatusHtml(s.validPeriod || "", entryZone, stopLoss, takeProfitRules);
-        var validPeriod = formatExecutionValidPeriod(s.validPeriod || "", entryZone, stopLoss, takeProfitRules);
+        function displayValue(value, fallback) {
+            var cleaned = cleanBlankValue(value);
+            return cleaned || fallback || "暂无";
+        }
+        function priceValue(value) {
+            var formatted = formatPrice(value);
+            return formatted === "—" ? "暂无" : formatted;
+        }
+        function executionRowsHtml(rows) {
+            return '<div class="execution-plan-panel"><table class="execution-plan-table"><tbody>'
+                + rows.map(function (r) {
+                    return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(displayValue(r[1], r[2])) + '</td></tr>';
+                }).join("")
+                + '</tbody></table></div>';
+        }
+        function originalPlanDetailsHtml() {
+            var originalRows = [
+                ["方向", marketBiasLabel(s.direction)],
+                ["入场区间", s.entryZone],
+                ["止损价", s.stopLoss],
+                ["阶梯止盈", s.takeProfitRules],
+                ["杠杆", s.leverageSuggestion],
+                ["仓位建议", s.positionSuggestion],
+                ["有效期", formatExecutionValidPeriod(s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules)],
+                ["失效条件", s.invalidCondition]
+            ];
+            return '<details class="execution-original-plan"><summary>'
+                + escapeHtml(s.originalPlanLabel || "原执行计划，仅用于持仓复核和复盘对照")
+                + '</summary>' + executionRowsHtml(originalRows) + '</details>';
+        }
+        if (s.positionMode === true && s.positionMonitor) {
+            var p = s.positionMonitor;
+            var pnlText = priceValue(p.floatingPnl);
+            if (p.pnlPct != null) pnlText += "（" + formatPct(p.pnlPct) + "）";
+            var positionRows = [
+                ["持仓状态", p.positionStatusLabel || "持仓中"],
+                ["用户开仓价", priceValue(p.entryPrice)],
+                ["当前价", priceValue(p.currentPrice)],
+                ["浮动盈亏", pnlText],
+                ["用户止损", priceValue(p.userStopLoss)],
+                ["用户止盈", priceValue(p.userTakeProfit)],
+                ["系统建议止损", priceValue(p.systemSuggestedStopLoss)],
+                ["系统建议止盈", priceValue(p.systemSuggestedTakeProfit)],
+                ["入场逻辑", p.entryLogicStatusLabel || positionLogicStatusLabel(p.entryLogicStatus)],
+                ["方向支持", p.directionSupportStatusLabel || directionSupportStatusLabel(p.directionSupportStatus)],
+                ["反转状态", p.reversalStatusLabel || reversalStatusLabel(p.reversalStatus)],
+                ["风险等级", p.riskLevelLabel || riskLevelLabel(p.riskLevel)],
+                ["当前建议", p.suggestedManualActionText || manualActionLabel(p.suggestedManualAction)],
+                ["最近监控", p.lastMonitorAt ? formatDateTime(p.lastMonitorAt) : "等待首次监控"],
+                ["下次监控", p.nextMonitorAt ? formatDateTime(p.nextMonitorAt) : "等待首次监控"]
+            ];
+            box.innerHTML = '<div class="execution-card-body">'
+                + '<div class="execution-fail-status" role="status"><p class="main">持仓监控</p><p class="sub">基于真实手动持仓与最近一次监控日志</p></div>'
+                + executionRowsHtml(positionRows)
+                + originalPlanDetailsHtml()
+                + '</div>';
+            return;
+        }
+        var usable = String(s.status || "").toUpperCase() === "USABLE_REVIEW_PLAN";
+        var statusTitle = s.statusLabel || (usable ? "完整执行计划，仅供人工复核" : "当前暂无完整执行计划");
+        var statusHtml = '<div class="execution-fail-status" role="status"><p class="main">' + escapeHtml(statusTitle) + '</p>'
+            + (s.blockedReason ? '<p class="sub">' + escapeHtml(s.blockedReason) + '</p>' : '') + '</div>';
         var rows = [
-            ["方向", direction],
-            ["入场区间", entryZone],
-            ["止损价", stopLoss],
-            ["阶梯止盈", takeProfitRules],
-            ["杠杆", s.leverageSuggestion || ""],
-            ["仓位建议", s.positionSuggestion || ""],
-            ["有效期", validPeriod],
-            ["失效条件", statusHtml ? "" : (s.invalidCondition || "")]
+            ["方向", usable ? marketBiasLabel(s.direction) : ""],
+            ["入场区间", usable ? s.entryZone : ""],
+            ["止损价", usable ? s.stopLoss : ""],
+            ["阶梯止盈", usable ? s.takeProfitRules : ""],
+            ["杠杆", usable ? s.leverageSuggestion : ""],
+            ["仓位建议", usable ? s.positionSuggestion : ""],
+            ["有效期", usable ? formatExecutionValidPeriod(s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules) : ""],
+            ["失效条件", usable ? s.invalidCondition : ""]
         ];
-        box.innerHTML = '<div class="execution-card-body">'
-            + (statusHtml || "")
-            + '<div class="execution-plan-panel"><table class="execution-plan-table"><tbody>'
-            + rows.map(function (r) { return '<tr><th>' + escapeHtml(r[0]) + '</th><td>' + escapeHtml(cleanBlankValue(r[1])) + '</td></tr>'; }).join("")
-            + '</tbody></table></div>'
-            + '</div>';
+        box.innerHTML = '<div class="execution-card-body">' + statusHtml + executionRowsHtml(rows) + '</div>';
     }
 
     function renderHomeAiDecisionFromPayload(aiDecision) {
@@ -6204,9 +6334,9 @@
             consistency.innerHTML = renderHomeConsistencyCard({
                 consistency: c,
                 level: c.consistencyLevel || c.consistency_level || "",
-                finalTendency: biasText(finalBias) !== "—" ? biasText(finalBias) : finalBias,
-                conflictLevel: localizeVisibleStatus(c.level || ""),
-                planMode: localizeVisibleStatus(planMode),
+                finalTendency: finalBias ? marketBiasLabel(finalBias) : "暂无",
+                conflictLevel: aiConflictLevelLabel(c.level),
+                planMode: planModeLabel(planMode),
                 confused: !!c.confused,
                 downgradeReason: c.downgradeReason || c.downgrade_reason || finalRole.downgradeReason || c.blockReason || "",
                 summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
@@ -6640,17 +6770,8 @@
     }
 
     function biasText(bias) {
-        var v = String(bias || "").toUpperCase();
-        if (!v) return "—";
-        if (v === "STRONG_BULLISH") return "强偏多";
-        if (v === "BULLISH") return "偏多";
-        if (v === "WEAK_BULLISH") return "弱偏多";
-        if (v === "RANGE") return "震荡";
-        if (v === "WEAK_BEARISH") return "弱偏空";
-        if (v === "BEARISH") return "偏空";
-        if (v === "STRONG_BEARISH") return "强偏空";
-        if (v === "WAIT") return "等待";
-        return "—";
+        var label = marketBiasLabel(bias);
+        return label === "暂无" ? "—" : label;
     }
 
     function biasClass(bias) {
@@ -6700,13 +6821,8 @@
     }
 
     function riskLevelText(level) {
-        var v = (level || "").toString().toUpperCase();
-        if (!v) return "—";
-        if (v === "LOW") return "低";
-        if (v === "MEDIUM") return "中";
-        if (v === "HIGH") return "高";
-        if (v === "EXTREME") return "极高";
-        return "—";
+        var label = riskLevelLabel(level);
+        return label === "暂无" ? "—" : label;
     }
 
     function convergenceText(v) {
@@ -9159,20 +9275,12 @@
     }
 
     function refreshDashboard() {
-        markPositionValidationStarted();
         fetchLocalRealPipelineStatus();
         fetchDashboardHome()
-            .then(function (home) {
-                markPositionValidationFinished();
-                return home;
-            })
+            .then(function (home) { return home; })
             .catch(function () {
                 var legacyResult = refreshDashboardLegacy();
-                if (legacyResult && typeof legacyResult.then === "function") {
-                    legacyResult.then(markPositionValidationFinished).catch(markPositionValidationFinished);
-                } else {
-                    markPositionValidationFinished();
-                }
+                return legacyResult;
             });
     }
 
@@ -9276,7 +9384,6 @@
         if (refreshTimer) clearInterval(refreshTimer);
         refreshTimer = null;
         if (REFRESH_MS > 0) refreshTimer = setInterval(refreshDashboard, REFRESH_MS);
-        schedulePositionValidationCountdown();
     }
 
     function telegramChannelStatusText() {

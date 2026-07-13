@@ -130,11 +130,11 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
         result.setEntryUpper(entry.add(entryBuffer));
         result.setEntrySourceType("SUPPORT_RETEST");
         result.setEntrySourceRef(support.getSourceRef());
-        result.setEntryReason("support retest zone from fresh OHLCV swing low");
+        result.setEntryReason("基于新鲜 OHLCV 摆动低点的支撑回踩区");
         result.setStopPrice(stop);
         result.setStopSourceType("SWING_LOW_STRUCTURE_BUFFER");
         result.setStopSourceRef(support.getSourceRef());
-        result.setStopReason("below selected support swing low by deterministic structure buffer");
+        result.setStopReason("位于选定支撑摆动低点下方，并包含确定性结构缓冲");
 
         List<BoundaryLevelDTO> targets = resistances.stream()
                 .filter(level -> level.getPrice().compareTo(entry) > 0)
@@ -172,11 +172,11 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
         result.setEntryUpper(entry.add(entryBuffer));
         result.setEntrySourceType("RESISTANCE_RETEST");
         result.setEntrySourceRef(resistance.getSourceRef());
-        result.setEntryReason("resistance retest zone from fresh OHLCV swing high");
+        result.setEntryReason("基于新鲜 OHLCV 摆动高点的阻力回踩区");
         result.setStopPrice(stop);
         result.setStopSourceType("SWING_HIGH_STRUCTURE_BUFFER");
         result.setStopSourceRef(resistance.getSourceRef());
-        result.setStopReason("above selected resistance swing high by deterministic structure buffer");
+        result.setStopReason("位于选定阻力摆动高点上方，并包含确定性结构缓冲");
 
         List<BoundaryLevelDTO> targets = supports.stream()
                 .filter(level -> level.getPrice().compareTo(entry) < 0)
@@ -206,8 +206,8 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
                 dto.setTargetType(longDirection ? "STRUCTURE_RESISTANCE" : "STRUCTURE_SUPPORT");
                 dto.setSourceRef(target.getSourceRef());
                 dto.setReason(longDirection
-                        ? "next resistance level from fresh OHLCV swing high"
-                        : "next support level from fresh OHLCV swing low");
+                        ? "取自新鲜 OHLCV 摆动高点的下一阻力位"
+                        : "取自新鲜 OHLCV 摆动低点的下一支撑位");
                 dto.setRr(computeRr(entry, stop, target.getPrice(), longDirection));
                 takeProfitTargets.add(dto);
             }
@@ -224,7 +224,7 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
             ladder.setTargetType("RR_LADDER");
             ladder.setRuleRef("RR_LADDER");
             ladder.setSourceRef("RR_LADDER:" + result.getEntrySourceRef() + ":" + result.getStopSourceRef());
-            ladder.setReason("explicit RR ladder target from source-owned entry and stop");
+            ladder.setReason("基于来源明确的入场与止损边界生成 RR 阶梯目标");
             ladder.setRr(RR_LADDER_TARGET);
             takeProfitTargets.add(ladder);
         } else {
@@ -268,8 +268,8 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
                 level.setBarTime(bar.getCloseTimeMs());
                 level.setSourceRef(levelSourceRef(support ? "SUPPORT" : "RESISTANCE", timeframe, i, bar));
                 level.setReason(support
-                        ? "pivot swing low from fresh OHLCV"
-                        : "pivot swing high from fresh OHLCV");
+                        ? "新鲜 OHLCV 中识别的枢轴摆动低点"
+                        : "新鲜 OHLCV 中识别的枢轴摆动高点");
                 level.setStrength(touchStrength(bars, level.getPrice(), support, tolerance));
                 levels.add(level);
             }
@@ -444,10 +444,10 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
             return null;
         }
         String normalized = raw.trim().toUpperCase(Locale.ROOT);
-        if ("LONG".equals(normalized) || "BULLISH".equals(normalized) || "做多".equals(raw.trim())) {
+        if ("LONG".equals(normalized) || normalized.endsWith("BULLISH") || "做多".equals(raw.trim())) {
             return LONG;
         }
-        if ("SHORT".equals(normalized) || "BEARISH".equals(normalized) || "做空".equals(raw.trim())) {
+        if ("SHORT".equals(normalized) || normalized.endsWith("BEARISH") || "做空".equals(raw.trim())) {
             return SHORT;
         }
         if ("CONFLICT".equals(normalized) || "CONFLICTING".equals(normalized) || "MIXED".equals(normalized)) {

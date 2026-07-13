@@ -29,8 +29,8 @@ public class LightSystemStatusVO {
      * 反转信号数量：当前仍有 OPEN 持仓的 distinct symbol 中，该 symbol 在 tm_decision_result 最新一条决策的
      * {@code market_bias_hierarchy}（规范化后）与持仓 {@code position_side} 方向相反的数量。
      * <p>
-     * 反向判定：LONG + BEARISH、SHORT + BULLISH；同向：LONG + BULLISH、SHORT + BEARISH。
-     * 不计入：无 OPEN 持仓、决策方向缺失、非 BULLISH/BEARISH（含 RANGE/WAIT 等）、持仓 side 缺失或非 LONG/SHORT。
+     * 反向判定：LONG + 任一偏空级别、SHORT + 任一偏多级别；强/中/弱方向使用同一方向族语义。
+     * 不计入：无 OPEN 持仓、决策方向缺失、RANGE/WAIT/未知方向、持仓 side 缺失或非 LONG/SHORT。
      * 计数按 symbol 去重（同一 symbol 多条 OPEN 仅计一次）；比较使用每 symbol 最新决策，create_time 并列时以 decision_id 决胜。
      */
     private Integer reverseSignalCount;

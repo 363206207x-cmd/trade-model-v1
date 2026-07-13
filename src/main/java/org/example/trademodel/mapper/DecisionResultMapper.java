@@ -104,7 +104,8 @@ public interface DecisionResultMapper {
             + "hot_reset_invalidated_at = #{invalidatedAt}, hot_reset_reason_code = #{reasonCode} "
             + "WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol} "
             + "AND (hot_reset_invalidated IS NULL OR hot_reset_invalidated = FALSE) "
-            + "AND (is_worth_opening = TRUE OR market_bias_hierarchy IN ('BULLISH', 'BEARISH'))")
+            + "AND (is_worth_opening = TRUE OR UPPER(TRIM(market_bias_hierarchy)) IN "
+            + "('STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH'))")
     int markHotResetInvalidatedBySymbol(
             @Param("normalizedSymbol") String normalizedSymbol,
             @Param("eventId") String eventId,
@@ -113,7 +114,7 @@ public interface DecisionResultMapper {
 
     /**
      * OPEN 持仓（每 symbol 一条代表行，多条 OPEN 时按 position_id 取首条）与每 symbol 最新决策（create_time DESC，并列时 decision_id DESC）；
-     * 仅在最新 bias 为 BULLISH/BEARISH 且与 LONG/SHORT 反向时计入；按 symbol 去重计数。
+     * 仅在最新 bias 属于完整多空方向族且与 LONG/SHORT 反向时计入；按 symbol 去重计数。
      */
     @Select("""
             SELECT COUNT(*) FROM (
@@ -139,10 +140,9 @@ public interface DecisionResultMapper {
                 WHERE symbol IS NOT NULL AND TRIM(symbol) <> ''
               ) d ON d.sym = ps.sym AND d.rn = 1
               WHERE ps.rn = 1
-                AND UPPER(TRIM(d.bias_raw)) IN ('BULLISH', 'BEARISH')
                 AND (
-                  (ps.side = 'LONG' AND UPPER(TRIM(d.bias_raw)) = 'BEARISH')
-                  OR (ps.side = 'SHORT' AND UPPER(TRIM(d.bias_raw)) = 'BULLISH')
+                  (ps.side = 'LONG' AND UPPER(TRIM(d.bias_raw)) IN ('WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH'))
+                  OR (ps.side = 'SHORT' AND UPPER(TRIM(d.bias_raw)) IN ('STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH'))
                 )
             ) cnt
             """)

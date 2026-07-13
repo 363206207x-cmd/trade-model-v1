@@ -234,8 +234,16 @@ class AiDecisionOrchestratorServiceImplTest {
 
         assertThat(partial.getOrchestrationMode()).isEqualTo(AiOrchestrationMode.PARTIAL_FALLBACK);
         assertThat(partial.isPartialFallbackUsed()).isTrue();
+        assertThat(partial.getAiSupportCount()).isEqualTo(1);
+        assertThat(partial.isGptConsistentWithRule()).isTrue();
+        assertThat(partial.isGeminiConsistentWithRule()).isFalse();
+        assertThat(partial.isGrokConsistentWithRule()).isFalse();
         assertThat(failed.getOrchestrationMode()).isEqualTo(AiOrchestrationMode.RULE_ONLY_FALLBACK);
         assertThat(failed.getSuccessfulProviderCount()).isZero();
+        assertThat(failed.getAiSupportCount()).isZero();
+        assertThat(failed.isGptConsistentWithRule()).isFalse();
+        assertThat(failed.isGeminiConsistentWithRule()).isFalse();
+        assertThat(failed.isGrokConsistentWithRule()).isFalse();
     }
 
     @Test
@@ -266,6 +274,8 @@ class AiDecisionOrchestratorServiceImplTest {
         assertThat(openai.calls.get()).isZero();
         assertThat(result.getOrchestrationMode()).isEqualTo(AiOrchestrationMode.RULE_ONLY_FALLBACK);
         assertThat(result.getProviderSubmittedCount()).isZero();
+        assertThat(result.getAiSupportCount()).isZero();
+        assertThat(result.isGptConsistentWithRule()).isFalse();
     }
 
     @Test

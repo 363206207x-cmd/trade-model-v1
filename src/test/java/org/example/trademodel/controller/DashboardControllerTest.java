@@ -319,10 +319,65 @@ public class DashboardControllerTest {
         String positionRows = functionBody("renderHomePositionsFromPayload");
         String advice = functionBody("positionCurrentAdviceHtml");
 
-        assertThat(positionRows).contains("entryLogicStatus", "entry_logic_status");
-        assertThat(positionRows).contains("directionSupportStatus", "direction_support_status");
+        assertThat(positionRows).contains("entryLogicStatusLabel", "entryLogicStatus");
+        assertThat(positionRows).contains("directionSupportStatusLabel", "directionSupportStatus");
+        assertThat(positionRows).contains("reversalStatusLabel", "lastMonitorAt", "nextMonitorAt");
         assertThat(advice).contains("suggestedManualActionText", "suggested_manual_action_text");
         assertThat(advice).contains("suggestedManualAction", "suggested_manual_action");
+    }
+
+    @Test
+    void positionMonitorUsesPersistedMonitorTimeAndNoPageRefreshCountdown() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("监控时间", "等待首次监控", "positionMonitorTimeCellHtml");
+        assertThat(html).doesNotContain("下次验证", "POSITION_VALIDATION_COUNTDOWN_MS", "position-validation-countdown");
+    }
+
+    @Test
+    void assetCardsContainBusinessSemanticsInsteadOfDiagnosticsDump() throws Exception {
+        String renderer = functionBody("renderHomeAssetsFromPayload");
+
+        assertThat(renderer).contains("assetStateLabel", "marketBiasLabel", "confidenceLabel", "riskLevelLabel");
+        assertThat(renderer).contains("是否值得开仓", "当前结论");
+        assertThat(renderer).doesNotContain("数据来源", "数据状态", "四周期新鲜度", "证据数", "分析时间");
+    }
+
+    @Test
+    void executionCardSwitchesToRealPositionMonitorWithoutInventingSystemStops() throws Exception {
+        String renderer = functionBody("renderHomeExecutionFromPayload");
+
+        assertThat(renderer).contains("s.positionMode === true", "s.positionMonitor");
+        assertThat(renderer).contains("用户止损", "用户止盈", "系统建议止损", "系统建议止盈");
+        assertThat(renderer).contains("原执行计划，仅用于持仓复核和复盘对照");
+        assertThat(renderer).contains("等待首次监控");
+    }
+
+    @Test
+    void dashboardDefinesDedicatedChineseStatusLabelMappers() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains(
+                "function assetStateLabel", "function marketBiasLabel", "function confidenceLabel",
+                "function riskLevelLabel", "function aiRunStatusLabel", "function aiConflictLevelLabel",
+                "function planModeLabel", "function positionLogicStatusLabel",
+                "function directionSupportStatusLabel", "function reversalStatusLabel",
+                "function manualActionLabel", "function dataQualityStatusLabel");
+        assertThat(html).contains("未知状态");
+    }
+
+    @Test
+    void homepageBusinessRenderersDoNotExposeKnownInternalEnumsOrEnglishPlanCodes() throws Exception {
+        String renderedBusinessSections = functionBody("renderHomeAssetsFromPayload")
+                + functionBody("renderHomePositionsFromPayload")
+                + functionBody("renderHomeExecutionFromPayload")
+                + functionBody("renderGptFinalHomeRole")
+                + functionBody("renderGeminiReviewHomeRole")
+                + functionBody("renderGrokChallengeHomeRole");
+
+        assertThat(renderedBusinessSections).doesNotContain(
+                "WAITING_MONITOR", "WAITING_SYNC", "LEVEL_1_CONSISTENT", "moderate_leverage",
+                "NO_DATA", "SUPPORTED", "NO_REVERSAL_SIGNAL", "AI_ORCHESTRATOR_DISABLED");
     }
 
     @Test

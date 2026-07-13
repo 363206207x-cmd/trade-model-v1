@@ -553,10 +553,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             return null;
         }
         String normalized = raw.toUpperCase(Locale.ROOT);
-        if ("BULLISH".equals(normalized) || BOUNDARY_DIRECTION_LONG.equals(normalized) || "做多".equals(raw)) {
+        if (normalized.endsWith("BULLISH") || BOUNDARY_DIRECTION_LONG.equals(normalized) || "做多".equals(raw)) {
             return BOUNDARY_DIRECTION_LONG;
         }
-        if ("BEARISH".equals(normalized) || BOUNDARY_DIRECTION_SHORT.equals(normalized) || "做空".equals(raw)) {
+        if (normalized.endsWith("BEARISH") || BOUNDARY_DIRECTION_SHORT.equals(normalized) || "做空".equals(raw)) {
             return BOUNDARY_DIRECTION_SHORT;
         }
         return null;

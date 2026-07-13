@@ -410,6 +410,7 @@ public class DashboardHomeVO {
         private String unavailableReason;
         private Integer evidenceCount;
         private LocalDateTime latestAnalysisTime;
+        private String currentConclusion;
 
         public Integer getSlot() {
             return slot;
@@ -537,12 +538,15 @@ public class DashboardHomeVO {
         public void setEvidenceCount(Integer evidenceCount) { this.evidenceCount = evidenceCount; }
         public LocalDateTime getLatestAnalysisTime() { return latestAnalysisTime; }
         public void setLatestAnalysisTime(LocalDateTime latestAnalysisTime) { this.latestAnalysisTime = latestAnalysisTime; }
+        public String getCurrentConclusion() { return currentConclusion; }
+        public void setCurrentConclusion(String currentConclusion) { this.currentConclusion = currentConclusion; }
     }
 
     public static class PositionVO {
         private Long positionId;
         private String symbol;
         private String direction;
+        private String directionLabel;
         private BigDecimal entryPrice;
         private BigDecimal currentPrice;
         private BigDecimal floatingPnl;
@@ -551,14 +555,26 @@ public class DashboardHomeVO {
         private BigDecimal leverage;
         private BigDecimal positionSize;
         private String positionStatus;
+        private String positionStatusLabel;
+        private BigDecimal userStopLoss;
+        private BigDecimal userTakeProfit;
+        private BigDecimal systemSuggestedStopLoss;
+        private BigDecimal systemSuggestedTakeProfit;
         private String monitorConclusion;
         private String entryLogicStatus;
+        private String entryLogicStatusLabel;
         private String directionSupportStatus;
+        private String directionSupportStatusLabel;
         private String reversalStatus;
+        private String reversalStatusLabel;
         private String riskLevel;
+        private String riskLevelLabel;
         private String suggestedManualAction;
         private String suggestedManualActionText;
         private LocalDateTime updatedAt;
+        private LocalDateTime openedAt;
+        private LocalDateTime lastMonitorAt;
+        private LocalDateTime nextMonitorAt;
 
         public Long getPositionId() {
             return positionId;
@@ -583,6 +599,9 @@ public class DashboardHomeVO {
         public void setDirection(String direction) {
             this.direction = direction;
         }
+
+        public String getDirectionLabel() { return directionLabel; }
+        public void setDirectionLabel(String directionLabel) { this.directionLabel = directionLabel; }
 
         public BigDecimal getEntryPrice() {
             return entryPrice;
@@ -648,6 +667,17 @@ public class DashboardHomeVO {
             this.positionStatus = positionStatus;
         }
 
+        public String getPositionStatusLabel() { return positionStatusLabel; }
+        public void setPositionStatusLabel(String positionStatusLabel) { this.positionStatusLabel = positionStatusLabel; }
+        public BigDecimal getUserStopLoss() { return userStopLoss; }
+        public void setUserStopLoss(BigDecimal userStopLoss) { this.userStopLoss = userStopLoss; }
+        public BigDecimal getUserTakeProfit() { return userTakeProfit; }
+        public void setUserTakeProfit(BigDecimal userTakeProfit) { this.userTakeProfit = userTakeProfit; }
+        public BigDecimal getSystemSuggestedStopLoss() { return systemSuggestedStopLoss; }
+        public void setSystemSuggestedStopLoss(BigDecimal systemSuggestedStopLoss) { this.systemSuggestedStopLoss = systemSuggestedStopLoss; }
+        public BigDecimal getSystemSuggestedTakeProfit() { return systemSuggestedTakeProfit; }
+        public void setSystemSuggestedTakeProfit(BigDecimal systemSuggestedTakeProfit) { this.systemSuggestedTakeProfit = systemSuggestedTakeProfit; }
+
         public String getMonitorConclusion() {
             return monitorConclusion;
         }
@@ -664,6 +694,9 @@ public class DashboardHomeVO {
             this.entryLogicStatus = entryLogicStatus;
         }
 
+        public String getEntryLogicStatusLabel() { return entryLogicStatusLabel; }
+        public void setEntryLogicStatusLabel(String entryLogicStatusLabel) { this.entryLogicStatusLabel = entryLogicStatusLabel; }
+
         public String getDirectionSupportStatus() {
             return directionSupportStatus;
         }
@@ -671,6 +704,9 @@ public class DashboardHomeVO {
         public void setDirectionSupportStatus(String directionSupportStatus) {
             this.directionSupportStatus = directionSupportStatus;
         }
+
+        public String getDirectionSupportStatusLabel() { return directionSupportStatusLabel; }
+        public void setDirectionSupportStatusLabel(String directionSupportStatusLabel) { this.directionSupportStatusLabel = directionSupportStatusLabel; }
 
         public String getReversalStatus() {
             return reversalStatus;
@@ -680,6 +716,9 @@ public class DashboardHomeVO {
             this.reversalStatus = reversalStatus;
         }
 
+        public String getReversalStatusLabel() { return reversalStatusLabel; }
+        public void setReversalStatusLabel(String reversalStatusLabel) { this.reversalStatusLabel = reversalStatusLabel; }
+
         public String getRiskLevel() {
             return riskLevel;
         }
@@ -687,6 +726,9 @@ public class DashboardHomeVO {
         public void setRiskLevel(String riskLevel) {
             this.riskLevel = riskLevel;
         }
+
+        public String getRiskLevelLabel() { return riskLevelLabel; }
+        public void setRiskLevelLabel(String riskLevelLabel) { this.riskLevelLabel = riskLevelLabel; }
 
         public String getSuggestedManualAction() {
             return suggestedManualAction;
@@ -711,9 +753,22 @@ public class DashboardHomeVO {
         public void setUpdatedAt(LocalDateTime updatedAt) {
             this.updatedAt = updatedAt;
         }
+        public LocalDateTime getOpenedAt() { return openedAt; }
+        public void setOpenedAt(LocalDateTime openedAt) { this.openedAt = openedAt; }
+        public LocalDateTime getLastMonitorAt() { return lastMonitorAt; }
+        public void setLastMonitorAt(LocalDateTime lastMonitorAt) { this.lastMonitorAt = lastMonitorAt; }
+        public LocalDateTime getNextMonitorAt() { return nextMonitorAt; }
+        public void setNextMonitorAt(LocalDateTime nextMonitorAt) { this.nextMonitorAt = nextMonitorAt; }
     }
 
     public static class ExecutionSuggestionVO {
+        private String status;
+        private String statusLabel;
+        private String blockedReason;
+        private String sourceAnalysisId;
+        private Boolean positionMode = false;
+        private PositionVO positionMonitor;
+        private String originalPlanLabel;
         private String direction;
         private String entryZone;
         private String stopLoss;
@@ -722,6 +777,21 @@ public class DashboardHomeVO {
         private String positionSuggestion;
         private String validPeriod;
         private String invalidCondition;
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+        public String getStatusLabel() { return statusLabel; }
+        public void setStatusLabel(String statusLabel) { this.statusLabel = statusLabel; }
+        public String getBlockedReason() { return blockedReason; }
+        public void setBlockedReason(String blockedReason) { this.blockedReason = blockedReason; }
+        public String getSourceAnalysisId() { return sourceAnalysisId; }
+        public void setSourceAnalysisId(String sourceAnalysisId) { this.sourceAnalysisId = sourceAnalysisId; }
+        public Boolean getPositionMode() { return positionMode; }
+        public void setPositionMode(Boolean positionMode) { this.positionMode = positionMode; }
+        public PositionVO getPositionMonitor() { return positionMonitor; }
+        public void setPositionMonitor(PositionVO positionMonitor) { this.positionMonitor = positionMonitor; }
+        public String getOriginalPlanLabel() { return originalPlanLabel; }
+        public void setOriginalPlanLabel(String originalPlanLabel) { this.originalPlanLabel = originalPlanLabel; }
 
         public String getDirection() {
             return direction;
@@ -790,9 +860,22 @@ public class DashboardHomeVO {
 
     public static class AiDecisionVO {
         private String schemaVersion;
+        private String runStatus;
+        private String runStatusLabel;
+        private String decisionMode;
+        private String decisionModeLabel;
         private String activeTab = "GPT_FINAL";
         private List<AiTabVO> tabs = new ArrayList<>();
         private ConsistencyVO consistency = new ConsistencyVO();
+
+        public String getRunStatus() { return runStatus; }
+        public void setRunStatus(String runStatus) { this.runStatus = runStatus; }
+        public String getRunStatusLabel() { return runStatusLabel; }
+        public void setRunStatusLabel(String runStatusLabel) { this.runStatusLabel = runStatusLabel; }
+        public String getDecisionMode() { return decisionMode; }
+        public void setDecisionMode(String decisionMode) { this.decisionMode = decisionMode; }
+        public String getDecisionModeLabel() { return decisionModeLabel; }
+        public void setDecisionModeLabel(String decisionModeLabel) { this.decisionModeLabel = decisionModeLabel; }
 
         public String getSchemaVersion() {
             return schemaVersion;
@@ -830,6 +913,8 @@ public class DashboardHomeVO {
     public static class AiTabVO {
         private String role;
         private String roleLabel;
+        private String runStatus;
+        private String runStatusLabel;
         private String direction;
         private String confidenceLevel;
         private List<String> supportEvidence = new ArrayList<>();
@@ -876,6 +961,11 @@ public class DashboardHomeVO {
         public void setRoleLabel(String roleLabel) {
             this.roleLabel = roleLabel;
         }
+
+        public String getRunStatus() { return runStatus; }
+        public void setRunStatus(String runStatus) { this.runStatus = runStatus; }
+        public String getRunStatusLabel() { return runStatusLabel; }
+        public void setRunStatusLabel(String runStatusLabel) { this.runStatusLabel = runStatusLabel; }
 
         public String getDirection() {
             return direction;

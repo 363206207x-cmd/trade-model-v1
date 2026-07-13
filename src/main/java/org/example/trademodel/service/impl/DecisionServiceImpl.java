@@ -23,6 +23,7 @@ import org.example.trademodel.mapper.MissedOpportunityMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.AssetStateService;
+import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -92,7 +93,8 @@ public class DecisionServiceImpl implements DecisionService {
         long missedCostMs = System.currentTimeMillis() - missedStart;
         System.out.println("[PERF] db_count_missed_opportunity_biz_date=" + missedCostMs + " ms");
 
-        vo.setConfusedCount(assetStateMapper.countSymbolsWhereConfusedScorePositive());
+        vo.setConfusedCount(assetStateMapper.countDirectionalPushBlocked(
+                ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD));
         vo.setPendingCount(pushSnapshotMapper.countPendingRecheckBacklog());
         vo.setReverseSignalCount(decisionResultMapper.countOpenSymbolsWithReverseSignal());
 
