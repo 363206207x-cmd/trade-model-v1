@@ -46,7 +46,8 @@
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            background: #f7f9fc;
+            padding-left: var(--sidebar-width);
+            background: var(--bg-canvas);
             color: var(--text-primary);
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
             font-size: 13px;
@@ -65,7 +66,7 @@
             width: min(100%, 1504px);
             margin: 0 auto;
             padding: 10px clamp(24px, 3vw, 44px);
-            background: rgba(255, 255, 255, 0.94);
+            background: color-mix(in srgb, var(--bg-surface) 94%, transparent);
             border-bottom: 1px solid var(--border-subtle);
             position: sticky;
             top: 0;
@@ -108,7 +109,7 @@
             border: 1px solid rgba(226, 232, 240, 0.74);
             border-radius: 999px;
             padding: 4px 10px;
-            background: #fff;
+            background: var(--bg-surface);
             color: var(--text-primary);
             font-size: 0.76rem;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
@@ -122,13 +123,27 @@
             color: var(--text-primary);
             font-weight: 600;
         }
-        .status-pill .pill-value.ok-text,
         #runtimeText,
         #headerAiStatusText {
-            color: var(--status-ok);
-            background: rgba(34, 197, 94, 0.12);
             border-radius: 999px;
             padding: 1px 8px;
+        }
+        .status-pill .pill-value.ok-text,
+        .status-pill .pill-value.status-ok {
+            color: var(--status-ok);
+            background: rgba(34, 197, 94, 0.12);
+        }
+        .status-pill .pill-value.status-warn {
+            color: #a16207;
+            background: rgba(234, 179, 8, 0.14);
+        }
+        .status-pill .pill-value.status-error {
+            color: var(--status-error);
+            background: rgba(239, 68, 68, 0.12);
+        }
+        .status-pill .pill-value.status-muted {
+            color: var(--text-secondary);
+            background: rgba(100, 116, 139, 0.1);
         }
         .header-icon-row {
             display: inline-flex;
@@ -141,12 +156,14 @@
             height: 30px;
             border-radius: 999px;
             background: transparent;
-            color: #111827;
+            color: var(--text-primary);
             display: inline-grid;
             place-items: center;
             position: relative;
             font-size: 0;
             font-weight: 800;
+            border: 0;
+            cursor: pointer;
         }
         .icon-only:hover { background: var(--bg-elevated); }
         .icon-search::before {
@@ -184,6 +201,18 @@
             background: currentColor;
             transform: translateY(8px);
         }
+        .icon-theme::before {
+            content: "";
+            width: 14px;
+            height: 14px;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            box-shadow: inset -4px -2px 0 -1px currentColor;
+        }
+        .icon-only:focus-visible {
+            outline: 2px solid rgba(47, 117, 255, 0.45);
+            outline-offset: 2px;
+        }
         .muted { color: var(--text-secondary); font-size: 0.82rem; }
         .btn {
             border: 1px solid rgba(226, 232, 240, 0.74);
@@ -217,7 +246,7 @@
             min-width: 0;
             padding: 14px 14px;
             overflow-y: auto;
-            background: #fff;
+            background: var(--bg-surface);
             border-right: 1px solid var(--border-subtle);
             box-shadow: none;
             backdrop-filter: blur(12px);
@@ -379,6 +408,7 @@
             border: 0;
         }
         @media (max-width: 1180px) {
+            body { padding-left: 0; }
             .top-bar,
             .wrap { margin-left: auto; margin-right: auto; }
             .home-sidebar {
@@ -727,10 +757,11 @@
         }
         .position-execution-row {
             grid-template-columns: minmax(0, 13fr) minmax(320px, 7fr);
+            align-items: start;
         }
         .ai-decision-row {
             grid-template-columns: minmax(0, 3fr) minmax(230px, 1fr);
-            align-items: stretch;
+            align-items: start;
         }
         .compact-list {
             display: grid;
@@ -1211,9 +1242,13 @@
         .runtime-status-stack {
             display: none;
         }
+        @media (max-width: 1600px) {
+            .position-execution-row {
+                grid-template-columns: 1fr;
+            }
+        }
         @media (max-width: 1020px) {
             .home-alert-event-row,
-            .position-execution-row,
             .ai-decision-row {
                 grid-template-columns: 1fr;
             }
@@ -1444,6 +1479,22 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .tile-compact-row.conclusion {
+            align-items: start;
+            min-height: 42px;
+        }
+        .tile-compact-row.conclusion .label {
+            padding-top: 1px;
+        }
+        .tile-compact-row.conclusion .value {
+            display: -webkit-box;
+            overflow: hidden;
+            text-overflow: clip;
+            white-space: normal;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-height: 1.4;
+        }
         .tile-risk-high { color: var(--status-error); }
         .tile-risk-medium { color: var(--status-warn); }
         .tile-risk-low { color: var(--status-ok); }
@@ -1458,10 +1509,14 @@
         }
         .tile-headline {
             display: grid;
-            grid-template-columns: 26px minmax(0, 1fr) auto;
-            align-items: center;
-            gap: 7px;
+            grid-template-columns: 26px minmax(0, 1fr);
+            align-items: start;
+            column-gap: 7px;
+            row-gap: 5px;
             margin-bottom: 7px;
+        }
+        .tile-headline .coin-avatar {
+            grid-row: 1 / span 2;
         }
         .coin-avatar {
             width: 24px;
@@ -1483,7 +1538,10 @@
             line-height: 1.15;
         }
         .tile-score-pill {
-            min-width: 68px;
+            grid-column: 2;
+            min-width: 0;
+            max-width: 100%;
+            justify-self: start;
             text-align: center;
             border-radius: 6px;
             padding: 2px 7px;
@@ -2587,6 +2645,40 @@
             .local-real-pipeline-banner { align-items: flex-start; flex-direction: column; gap: 4px; }
             .local-real-pipeline-banner .pipeline-reason { margin-left: 0; }
         }
+        [data-theme="dark"] .kpi-card,
+        [data-theme="dark"] .compact-list,
+        [data-theme="dark"] .review-center-btn,
+        [data-theme="dark"] .ai-tab,
+        [data-theme="dark"] #btnRemove,
+        [data-theme="dark"] .asset-pool-toggle,
+        [data-theme="dark"] .coin-tile,
+        [data-theme="dark"] .coin-tile.bias-bull,
+        [data-theme="dark"] .coin-tile.bias-bear,
+        [data-theme="dark"] .coin-tile.selected,
+        [data-theme="dark"] .coin-tile.placeholder,
+        [data-theme="dark"] .ai-evidence-item,
+        [data-theme="dark"] .execution-plan-panel {
+            background: var(--bg-surface);
+            border-color: var(--border-subtle);
+        }
+        [data-theme="dark"] .ai-downgrade-row,
+        [data-theme="dark"] .consistency-summary {
+            background: var(--bg-elevated);
+            border-color: var(--border-subtle);
+        }
+        [data-theme="dark"] .position-table,
+        [data-theme="dark"] .execution-plan-table,
+        [data-theme="dark"] .position-table th,
+        [data-theme="dark"] .position-table td,
+        [data-theme="dark"] .execution-plan-table th,
+        [data-theme="dark"] .execution-plan-table td {
+            border-color: var(--border-subtle);
+        }
+        [data-theme="dark"] .position-table th,
+        [data-theme="dark"] .execution-plan-table th {
+            color: var(--text-secondary);
+            background: var(--bg-elevated);
+        }
     </style>
 </head>
 <body data-monitor-mode="system">
@@ -2595,12 +2687,13 @@
             <h1>首页总览 <span class="header-update">更新时间：<span id="lastUpdatedText">--:--:--</span></span></h1>
         </div>
         <div class="top-right">
-            <span class="status-pill"><span class="runtime-dot" id="runtimeDot"></span><span class="pill-label">数据状态</span><span class="pill-value" id="runtimeText">待同步</span></span>
-            <span class="status-pill"><span class="pill-label">AI 状态</span><span class="pill-value" id="headerAiStatusText">待同步</span></span>
+            <span class="status-pill"><span class="runtime-dot" id="runtimeDot"></span><span class="pill-label">数据状态</span><span class="pill-value status-muted" id="runtimeText">待同步</span></span>
+            <span class="status-pill"><span class="pill-label">AI 状态</span><span class="pill-value status-muted" id="headerAiStatusText">待同步</span></span>
             <span class="status-pill"><span class="pill-label">数据源</span><span class="pill-value" id="headerSourceStatusText">待同步</span></span>
-            <span class="header-icon-row" aria-hidden="true">
-                <span class="icon-only icon-search"></span>
-                <span class="icon-only icon-bell"></span>
+            <span class="header-icon-row">
+                <span class="icon-only icon-search" aria-hidden="true"></span>
+                <span class="icon-only icon-bell" aria-hidden="true"></span>
+                <button type="button" class="icon-only icon-theme" id="themeBtn" aria-label="切换明暗主题" title="切换明暗主题">夜间主题</button>
             </span>
         </div>
     </header>
@@ -2613,6 +2706,21 @@
 
     <div class="wrap">
         <div class="dashboard-shell">
+            <aside class="home-sidebar" aria-label="资产导航">
+                <div class="sidebar-brand">
+                    <span class="sidebar-logo" aria-hidden="true"></span>
+                    <span>
+                        <span class="sidebar-brand-title">TRINE LOGIC</span>
+                        <span class="sidebar-brand-subtitle">离线复核工作台</span>
+                    </span>
+                </div>
+                <section class="sidebar-card" aria-label="资产监控列表">
+                    <h2 class="sidebar-title">资产监控</h2>
+                    <div class="sidebar-slot-list" id="sidebarSlotList"></div>
+                </section>
+                <div class="sidebar-divider" aria-hidden="true"></div>
+                <p class="sidebar-brand-subtitle">状态与方向分开显示，结论仅供人工复核。</p>
+            </aside>
             <main class="dashboard-main">
         <!-- 第一层 -->
         <div class="layer1">
@@ -4851,26 +4959,6 @@
         }).join("");
     }
 
-    function updateHeaderPills(decisions) {
-        var ai = "待同步";
-        var list = decisions || [];
-        if (list.length) {
-            var maxLevel = null;
-            list.forEach(function (d) {
-                var c = resolveAiConflict(d);
-                if (c.level != null && (maxLevel == null || c.level > maxLevel)) maxLevel = c.level;
-            });
-            ai = maxLevel != null ? ("冲突等级 " + maxLevel) : "已同步";
-        }
-        setText("headerAiStatusText", localizeVisibleStatus(ai));
-        var sourceText = firstNonEmpty(
-            lastExternalContextPayload && lastExternalContextPayload.sourceHealth,
-            marketQuoteRuntimeStatus && marketQuoteRuntimeStatus.sourceHealth,
-            "待同步"
-        );
-        setText("headerSourceStatusText", localizeVisibleStatus(sourceText));
-    }
-
     function renderHomeAlertEventRow(systemStatus, alerts) {
         var alertBox = document.getElementById("homeAlertList");
         if (alertBox) {
@@ -5144,6 +5232,30 @@
         };
         var key = String(raw || "").trim().toUpperCase();
         return key ? (labels[key] || "未知状态") : "未知状态";
+    }
+
+    function setHeaderPillTone(element, tone) {
+        if (!element) return;
+        element.classList.remove("status-ok", "status-warn", "status-error", "status-muted");
+        element.classList.add("status-" + tone);
+    }
+
+    function setHeaderAiStatus(rawStatus, visibleLabel) {
+        var element = document.getElementById("headerAiStatusText");
+        if (!element) return;
+        var status = String(rawStatus || "WAITING_SYNC").trim().toUpperCase();
+        var tone = "muted";
+        if (status === "SUCCESS") {
+            tone = "ok";
+        } else if (status === "FAILED" || status === "INVALID_RESPONSE") {
+            tone = "error";
+        } else if (status === "PARTIAL_SUCCESS" || status === "TIMEOUT"
+                || status === "MODEL_UNAVAILABLE" || status === "BUDGET_BLOCKED"
+                || status === "RATE_LIMITED") {
+            tone = "warn";
+        }
+        element.textContent = visibleLabel || headerAiStatusLabel(status);
+        setHeaderPillTone(element, tone);
     }
 
     function aiConflictLevelLabel(raw) {
@@ -5748,7 +5860,7 @@
             + '<div class="consistency-list">'
             + consistencyRow("一致性等级", status, "等待同步")
             + consistencyRow("最终倾向", options.finalTendency, "暂无")
-            + consistencyRow("冲突等级", options.conflictLevel, "等待同步")
+            + consistencyRow("冲突等级", aiApplicable ? options.conflictLevel : "不适用", aiApplicable ? "等待同步" : "不适用")
             + consistencyRow("AI 计划模式", aiApplicable ? options.planMode : "不适用", aiApplicable ? "等待同步" : "不适用")
             + consistencyRow("是否进入冲突阻断", aiApplicable && options.confused ? "是" : "否", "否")
             + consistencyRow("资产方向阻断", options.directionalPushBlocked ? "是" : "否", "否")
@@ -6108,7 +6220,7 @@
                 '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText) + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">是否值得开仓</span><span class="value">' + escapeHtml(worthText) + '</span></div>' +
-                '<div class="tile-compact-row"><span class="label">当前结论</span><span class="value">' + escapeHtml(conclusionText) + '</span></div>' +
+                '<div class="tile-compact-row conclusion"><span class="label">当前结论</span><span class="value">' + escapeHtml(conclusionText) + '</span></div>' +
                 '</div></div></div>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
@@ -6263,13 +6375,14 @@
             var finalRole = tabList.find(function (t) { return t.role === "GPT_FINAL"; }) || {};
             var finalBias = finalRole.finalMarketBias || finalRole.direction || "";
             var planMode = finalRole.finalPlanMode || "";
+            var aiApplicable = c.aiApplicable !== false && c.ai_applicable !== false;
             consistency.innerHTML = renderHomeConsistencyCard({
                 consistency: c,
                 level: c.consistencyLevel || c.consistency_level || "",
-                finalTendency: finalBias ? marketBiasLabel(finalBias) : "暂无",
-                conflictLevel: aiConflictLevelLabel(c.level),
-                planMode: planModeLabel(planMode),
-                aiApplicable: c.aiApplicable !== false && c.ai_applicable !== false,
+                finalTendency: aiApplicable && finalBias ? marketBiasLabel(finalBias) : "暂无",
+                conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : "不适用",
+                planMode: aiApplicable ? planModeLabel(planMode) : "不适用",
+                aiApplicable: aiApplicable,
                 confused: !!c.confused,
                 directionalPushBlocked: !!(c.directionalPushBlocked || c.directional_push_blocked),
                 downgradeReason: c.downgradeReason || c.downgrade_reason || finalRole.downgradeReason || c.blockReason || "",
@@ -6292,7 +6405,7 @@
         if (!home) return;
         var header = home.header || {};
         setRuntimeStatus(header.dataStatus || "WAITING_SYNC");
-        setText("headerAiStatusText", header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
+        setHeaderAiStatus(header.aiStatus, header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
         setText("headerSourceStatusText", localizeVisibleStatus(header.dataSourceText || "WAITING_SYNC"));
         selectedSymbol = normalizeDisplaySymbol(home.selectedSymbol || selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
         window.__lastDashboardHome = home;
@@ -6322,7 +6435,7 @@
         allDecisions = [];
         displayDecisions = [];
         setRuntimeStatus("WAITING_SYNC");
-        setText("headerAiStatusText", "等待同步");
+        setHeaderAiStatus("WAITING_SYNC", "等待同步");
         setText("headerSourceStatusText", "等待重新同步");
         renderHomeSystemStateFromPayload({});
         renderHomeAlertEventRowsFromPayload({});
@@ -7388,7 +7501,6 @@
         setText("marketQuoteReviewOnlyValue", "只读行情状态，不是交易信号。");
         setText("marketQuoteBoundaryValue", "dashboard-only sample；Watchlist Pool 才是候选边界；Display Slots 不是行情候选池。");
         setText("marketQuoteReasonValue", qs.reason || "—");
-        updateHeaderPills(allDecisions);
     }
 
     function fetchMarketQuoteRuntimeStatus(symbol) {
@@ -8536,7 +8648,6 @@
         setText("externalContextReviewOnlyValue", "review-only；manual review only；not trade instruction。");
         setText("externalContextExecutionBoundaryValue", firstNonEmpty(p.executionBoundary, "not executable；not auto trading；not order execution；not Push send；not external channel；not external fetch。"));
         setText("externalContextReasonValue", Array.isArray(p.reasonCodes) ? p.reasonCodes.join(",") : "—");
-        updateHeaderPills(allDecisions);
         renderHomeEventList(window.__lastSystemStatus || {}, p);
     }
 
@@ -8687,20 +8798,24 @@
         if (status.indexOf("ERROR") >= 0 || status.indexOf("DOWN") >= 0 || status.indexOf("FAIL") >= 0 || status.indexOf("BLOCK") >= 0 || status.indexOf("NOT_CONNECTED") >= 0) {
             dot.style.background = "var(--status-error)";
             text.textContent = localizeVisibleStatus(statusText) || "运行异常";
+            setHeaderPillTone(text, "error");
             return;
         }
         if (status.indexOf("WAITING") >= 0 || status.indexOf("SYNC") >= 0 || status.indexOf("UNKNOWN") >= 0) {
             dot.style.background = "var(--gray-blue)";
             text.textContent = localizeVisibleStatus(statusText) || "待同步";
+            setHeaderPillTone(text, "muted");
             return;
         }
         if (status.indexOf("WARN") >= 0 || status.indexOf("PARTIAL") >= 0 || status.indexOf("CONFIGURED") >= 0) {
             dot.style.background = "var(--status-warn)";
             text.textContent = localizeVisibleStatus(statusText) || "运行关注";
+            setHeaderPillTone(text, "warn");
             return;
         }
         dot.style.background = "var(--status-ok)";
         text.textContent = localizeVisibleStatus(statusText) || "系统运行中";
+        setHeaderPillTone(text, "ok");
     }
 
     /** 中层最多 6 条：list.slice(0, 6)，禁止渲染第 7、8 个币。 */
@@ -8788,7 +8903,6 @@
         document.getElementById("kpi-opportunity").innerHTML = kpiHtml("待复核机会", opportunity.value, opportunity.note, opportunity.level);
         document.getElementById("kpi-confused").innerHTML = kpiHtml("冲突阻断", confusedValue, confusedNote, ccMetric.value > 0 ? 3 : (ccMetric.value === 0 ? 1 : 0));
         document.getElementById("kpi-hot-reset").innerHTML = kpiHtml("热重置", hotValue, hotNote, hot.fired ? 3 : 1);
-        updateHeaderPills(decisions);
         renderHomeAlertEventRow(systemStatus, alerts);
         renderSidebarPanel(systemStatus, alerts, openPositionCount);
     }
@@ -9465,15 +9579,14 @@
         box.classList.add("open");
         input.setAttribute("aria-expanded", "true");
         Array.prototype.forEach.call(box.querySelectorAll("button"), function (btn) {
-            var handled = false;
-            var select = function (event) {
-                if (handled) return;
-                handled = true;
+            btn.addEventListener("mousedown", function (event) {
                 event.preventDefault();
+            });
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
                 selectDashboardAsset(btn.getAttribute("data-symbol") || "");
-            };
-            btn.addEventListener("pointerdown", select);
-            btn.addEventListener("mousedown", select);
+            });
         });
     }
 
@@ -9500,15 +9613,14 @@
         }).join("");
         box.classList.add("open");
         Array.prototype.forEach.call(box.querySelectorAll("button"), function (btn) {
-            var handled = false;
-            var select = function (event) {
-                if (handled) return;
-                handled = true;
+            btn.addEventListener("mousedown", function (event) {
                 event.preventDefault();
+            });
+            btn.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
                 selectManualAsset(btn.getAttribute("data-symbol") || "");
-            };
-            btn.addEventListener("pointerdown", select);
-            btn.addEventListener("mousedown", select);
+            });
         });
     }
 

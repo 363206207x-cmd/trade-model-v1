@@ -210,6 +210,8 @@ Focused tests cover:
 
 The offline acceptance uses controlled service fixtures and the in-memory test database only. No live provider, external database, or six-asset runtime environment was used. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs. See `docs/DASHBOARD_INTERACTION_ACCEPTANCE.md`.
 
+Actual browser rendering is recorded separately in `docs/DASHBOARD_VISUAL_ACCEPTANCE.md`. That pass covers all ten required deterministic fixture scenarios, thirteen interactions, and CSS viewports 1920 x 1080, 1440 x 900, and 1366 x 768. The screenshots remain local `.runtime` evidence and are explicitly not described as real-market results.
+
 ## 9. Remaining gaps
 
 1. The repository still lacks a central legal transition graph for all eight asset states.

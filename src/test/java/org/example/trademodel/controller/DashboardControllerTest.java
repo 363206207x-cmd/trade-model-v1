@@ -313,7 +313,21 @@ public class DashboardControllerTest {
                 .isLessThan(statusFunction.indexOf("confused === true"));
         assertThat(payloadRenderer).contains("aiApplicable", "directionalPushBlocked");
         assertThat(functionBody("renderHomeConsistencyCard"))
-                .contains("AI 计划模式", "不适用", "资产方向阻断");
+                .contains(
+                        "冲突等级", "aiApplicable ? options.conflictLevel : \"不适用\"",
+                        "AI 计划模式", "不适用", "资产方向阻断");
+    }
+
+    @Test
+    void aiNotApplicableUsesExplicitNonApplicableConsistencyValues() throws Exception {
+        String payloadRenderer = functionBody("renderHomeAiDecisionFromPayload");
+
+        assertThat(payloadRenderer).contains(
+                "var aiApplicable",
+                "conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : \"不适用\"",
+                "planMode: aiApplicable ? planModeLabel(planMode) : \"不适用\"");
+        assertThat(payloadRenderer).contains(
+                "finalTendency: aiApplicable && finalBias ? marketBiasLabel(finalBias) : \"暂无\"");
     }
 
     @Test
@@ -399,6 +413,18 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void assetConclusionUsesBoundedTwoLineLayout() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String renderer = functionBody("renderHomeAssetsFromPayload");
+
+        assertThat(renderer).contains("tile-compact-row conclusion", "当前结论");
+        assertThat(html).contains(
+                ".tile-compact-row.conclusion .value",
+                "-webkit-line-clamp: 2",
+                "white-space: normal");
+    }
+
+    @Test
     void executionCardSwitchesToRealPositionMonitorWithoutInventingSystemStops() throws Exception {
         String renderer = functionBody("renderHomeExecutionFromPayload");
 
@@ -457,6 +483,62 @@ public class DashboardControllerTest {
         assertThat(directFunctionCalls(tiles)).contains("refreshDashboard");
         assertThat(directFunctionCalls(searchSelection)).contains("refreshDashboard");
         assertThat(homeRequest).contains("/api/dashboard/home", "selectedSymbol=", "encodeURIComponent(selectedSymbol)");
+    }
+
+    @Test
+    void assetSuggestionSelectionCannotClickThroughToUnderlyingCard() throws Exception {
+        String topSearch = functionBody("renderAssetSearchSuggestions");
+        String manualSearch = functionBody("renderManualSymbolSuggestions");
+
+        assertThat(topSearch).contains(
+                "btn.addEventListener(\"click\"",
+                "event.stopPropagation()",
+                "selectDashboardAsset");
+        assertThat(manualSearch).contains(
+                "btn.addEventListener(\"click\"",
+                "event.stopPropagation()",
+                "selectManualAsset");
+        assertThat(topSearch).doesNotContain("btn.addEventListener(\"pointerdown\"");
+        assertThat(manualSearch).doesNotContain("btn.addEventListener(\"pointerdown\"");
+    }
+
+    @Test
+    void dashboardProvidesVisibleSidebarAndThemeControl() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains(
+                "<aside class=\"home-sidebar\" aria-label=\"资产导航\">",
+                "id=\"sidebarSlotList\"",
+                "id=\"themeBtn\"",
+                "aria-label=\"切换明暗主题\"");
+        assertThat(html).contains("body { padding-left: 0; }");
+    }
+
+    @Test
+    void diagnosticRefreshCannotOverwriteHomeHeaderPills() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String homeRenderer = functionBody("renderDashboardHomePayload");
+
+        assertThat(html).doesNotContain("function updateHeaderPills(", "updateHeaderPills(allDecisions)");
+        assertThat(homeRenderer).contains(
+                "setRuntimeStatus(header.dataStatus",
+                "setHeaderAiStatus(header.aiStatus",
+                "setText(\"headerSourceStatusText\"");
+        assertThat(functionBody("setHeaderAiStatus")).contains(
+                "status === \"SUCCESS\"",
+                "status === \"TIMEOUT\"",
+                "setHeaderPillTone(element, tone)");
+    }
+
+    @Test
+    void mediumDesktopStacksPositionAndExecutionCards() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains(
+                "@media (max-width: 1600px)",
+                ".position-execution-row",
+                "grid-template-columns: 1fr",
+                "align-items: start");
     }
 
     @Test
@@ -562,6 +644,26 @@ public class DashboardControllerTest {
         assertThat(html).contains("white-space: nowrap");
         assertThat(html).contains("word-break: keep-all");
         assertThat(html).contains("overflow-wrap: anywhere");
+    }
+
+    @Test
+    void assetHeadlineKeepsStatusOnItsOwnBoundedRow() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains("grid-template-columns: 26px minmax(0, 1fr)");
+        assertThat(html).contains(".tile-headline .coin-avatar", "grid-row: 1 / span 2");
+        assertThat(html).contains(".tile-score-pill", "grid-column: 2", "max-width: 100%");
+    }
+
+    @Test
+    void darkThemeKeepsPositionAndExecutionTableHeadersReadable() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+
+        assertThat(html).contains(
+                "[data-theme=\"dark\"] .position-table th",
+                "[data-theme=\"dark\"] .execution-plan-table th",
+                "background: var(--bg-elevated)",
+                "color: var(--text-secondary)");
     }
 
     @Test
