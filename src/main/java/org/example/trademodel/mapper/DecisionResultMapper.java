@@ -125,8 +125,10 @@ public interface DecisionResultMapper {
     @Select("SELECT MAX(create_time) FROM tm_decision_result")
     LocalDateTime selectLastDecisionTime();
 
-    @Select("SELECT COUNT(*) FROM tm_decision_result WHERE CAST(create_time AS DATE) = CURRENT_DATE")
-    int countDecisionsToday();
+    @Select("SELECT COUNT(*) FROM tm_decision_result "
+            + "WHERE create_time >= #{startInclusive} AND create_time < #{endExclusive}")
+    int countDecisionsInRange(@Param("startInclusive") LocalDateTime startInclusive,
+                              @Param("endExclusive") LocalDateTime endExclusive);
 
     @Select("SELECT * FROM tm_decision_result WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
     DecisionResult selectLatestByAnalysisId(String analysisId);

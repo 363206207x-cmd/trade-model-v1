@@ -168,6 +168,7 @@ Repository conflicts and limitations are not hidden:
 | Position showed a newer same-symbol plan as its origin | The position branch received the selected latest decision and reused its plan fields without proving position provenance. | The branch now receives a separately resolved original-plan object. It accepts only the latest same-position monitor's exact plan/analysis reference, verifies plan/decision/run analysis IDs and symbols, and never reads the new-opportunity decision while a position is active. |
 | Monitor countdown was fake | Browser refresh cadence was rendered as next business validation. | Fake countdown removed; latest persisted log time is shown and unknown next time remains empty. |
 | English/internal values leaked | Raw enum/free-text fallback was used across business fields. | Dedicated field-specific mappings return Chinese labels and unknown values return `未知状态`; generated boundary explanations are Chinese at source. |
+| UTC-naive timestamps were queried with the database local clock | Decision `create_time` and Push Recheck `create_time` are written as UTC wall-clock values without an offset, while their KPI/window queries used `CURRENT_DATE` or `CURRENT_TIMESTAMP`. | Reviewer Round 8 replaces both queries with caller-supplied UTC bounds from injected clocks. Decision count uses `[start, end)`; Recheck uses `[windowStart, asOf]` and excludes future rows. |
 
 ## 5. Asset-card whitelist
 
@@ -216,6 +217,12 @@ This selected decision is the new-opportunity read model only. When an active po
 
 Global counters remain explicitly aggregate. The directional conflict-block counter is aggregate by definition and uses the 85 threshold; it is not presented as the selected asset's conflict score.
 
+### 7.1 Reviewer Round 8 UTC-naive closure
+
+UTC-naive is a compatibility storage contract, not database-local time. `DecisionServiceImpl` now calculates the current UTC calendar-day start and end from an injected clock and passes both values to `DecisionResultMapper`. `RunBaselineServiceImpl` calculates one UTC as-of and 30/60-minute window start from its injected clock and passes both values to `PushRecheckLogMapper`.
+
+The two queries no longer use database current date/time, date casts, H2 `DATEADD`, or PostgreSQL interval variants. Detailed SQL inventory, boundary results, and unresolved mixed-basis contracts are recorded in `docs/UTC_NAIVE_TIME_BASIS_AUDIT.md`. This is a bounded fix, not a claim that every historical timestamp column has been migrated or normalized.
+
 ## 8. Test evidence
 
 Focused tests cover:
@@ -241,6 +248,7 @@ Focused tests cover:
 - Home/detail renderer ownership, asset-selection request order, fail-closed Home failure, and noninteractive `DEFAULT_SLOT` behavior through deterministic template call-graph assertions.
 - Offset-aware plan validity under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`, plus legacy no-offset fail-closed behavior.
 - Decision-to-Push Snapshot UTC-naive conversion under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`; all three preserve the same 24-hour expiry. Push Recheck is valid one second before expiry and expired at the exact boundary and one second after it.
+- Decision-day and Run Baseline Recheck queries produce identical explicit UTC bounds under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`. Decision midnight is half-open; the Recheck window includes exact start/as-of and excludes one second before/after.
 - The AI conflict KPI and consistency card consume the same assembled backend consistency object; the KPI preserves the raw enum in `value` and emits its Chinese label in `valueLabel`.
 
 The offline acceptance uses controlled service fixtures and the in-memory test database only. No live provider, external database, or six-asset runtime environment was used. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs. See `docs/DASHBOARD_INTERACTION_ACCEPTANCE.md`.
@@ -257,6 +265,7 @@ Browser and deterministic DOM-target rendering evidence is recorded separately i
 6. Historical engineering diagnostics still carry internal vocabulary inside `.runtime-status-stack` and `.diagnostics-only`, both of which are explicitly `display:none`. They are not part of the user-visible Home surface; they must be translated or moved to a dedicated diagnostic page before either hidden container is ever exposed.
 7. Production readiness remains blocked by the repository's existing release-gate evidence requirements.
 8. Flyway V7 adds the offset-aware plan columns, but this branch does not claim a fresh controlled PostgreSQL V1-V7 run. PostgreSQL migration evidence for V7 remains a separate production-readiness gate.
+9. `tm_analysis_run.analysis_time` and `tm_hot_reset_event.event_time` still accept historical no-offset inputs whose basis is not uniformly provable. Their Run Baseline database-clock windows require a separate contract package before they can be classified as UTC-safe; this round does not guess or silently relabel them.
 
 ## 10. Safety boundary
 

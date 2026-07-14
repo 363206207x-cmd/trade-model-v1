@@ -10,14 +10,17 @@ import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.RunBaselineService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.KeyCountVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.RunBaselineVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +43,7 @@ public class RunBaselineServiceImpl implements RunBaselineService {
     private final AnalysisRunMapper analysisRunMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final HotResetEventMapper hotResetEventMapper;
+    private Clock clock = Clock.systemUTC();
 
     public RunBaselineServiceImpl(SystemHealthService systemHealthService,
                                   PositionSyncService positionSyncService,
@@ -59,20 +63,26 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         this.hotResetEventMapper = hotResetEventMapper;
     }
 
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
+
     @Override
     public RunBaselineVO getRunBaseline(int windowMinutes) {
         long assembleStartMs = System.currentTimeMillis();
         int effectiveWindowMinutes = windowMinutes > 0 ? windowMinutes : DEFAULT_WINDOW_MINUTES;
+        LocalDateTime asOfUtc = UtcLocalTimePolicy.now(clock);
 
         RunBaselineVO vo = new RunBaselineVO();
-        vo.setGeneratedAt(LocalDateTime.now());
+        vo.setGeneratedAt(asOfUtc);
         vo.setWindowMinutes(effectiveWindowMinutes);
         vo.setSystemHealth(buildSystemHealthSnapshot());
         vo.setPositionSync(buildPositionSyncSnapshot());
         vo.setPerformance(buildPerformanceSummary(assembleStartMs));
         vo.setAlertSummary(buildAlertSummary(effectiveWindowMinutes));
         vo.setDataQualitySummary(buildDataQualitySummary(effectiveWindowMinutes));
-        vo.setRecheckSummary(buildRecheckSummary(effectiveWindowMinutes));
+        vo.setRecheckSummary(buildRecheckSummary(effectiveWindowMinutes, asOfUtc));
         vo.setHotResetSummary(buildHotResetSummary(effectiveWindowMinutes));
         return vo;
     }
@@ -172,12 +182,14 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.RecheckSummary buildRecheckSummary(int windowMinutes) {
+    private RunBaselineVO.RecheckSummary buildRecheckSummary(int windowMinutes, LocalDateTime asOfUtc) {
         RunBaselineVO.RecheckSummary summary = new RunBaselineVO.RecheckSummary();
         LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
         int total = 0;
+        LocalDateTime windowStartUtc = asOfUtc.minusMinutes(windowMinutes);
         for (RecheckStatusEnum statusEnum : RecheckStatusEnum.values()) {
-            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(statusEnum.name(), windowMinutes));
+            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(
+                    statusEnum.name(), windowStartUtc, asOfUtc));
             counts.put(statusEnum.name(), count);
             total += count;
         }

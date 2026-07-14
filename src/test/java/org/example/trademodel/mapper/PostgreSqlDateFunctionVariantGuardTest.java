@@ -11,6 +11,7 @@ import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,8 +40,55 @@ class PostgreSqlDateFunctionVariantGuardTest {
     }
 
     @Test
-    void pushRecheckLogMapperKeepsH2DateaddFallbackAndAddsPostgreSqlIntervalVariant() throws Exception {
-        assertDateaddVariant(PushRecheckLogMapper.class.getMethod("countByStatusInWindow", String.class, int.class));
+    void decisionCountUsesBoundedRangeSql() throws Exception {
+        Method method = DecisionResultMapper.class.getMethod(
+                "countDecisionsInRange", LocalDateTime.class, LocalDateTime.class);
+        String boundedSql = sql(genericSelect(method));
+
+        assertThat(boundedSql)
+                .contains("create_time >= #{startInclusive}")
+                .contains("create_time < #{endExclusive}");
+    }
+
+    @Test
+    void decisionCountDoesNotDependOnDatabaseCurrentDate() throws Exception {
+        String boundedSql = sql(genericSelect(DecisionResultMapper.class.getMethod(
+                "countDecisionsInRange", LocalDateTime.class, LocalDateTime.class)))
+                .toUpperCase(Locale.ROOT);
+
+        assertThat(boundedSql)
+                .doesNotContain("CURRENT_DATE")
+                .doesNotContain("CURRENT_TIMESTAMP")
+                .doesNotContain("CAST(CREATE_TIME AS DATE)");
+    }
+
+    @Test
+    void recheckWindowUsesBoundedRangeSql() throws Exception {
+        Method method = PushRecheckLogMapper.class.getMethod(
+                "countByStatusInWindow", String.class, LocalDateTime.class, LocalDateTime.class);
+        String boundedSql = sql(genericSelect(method));
+
+        assertThat(boundedSql)
+                .contains("create_time >= #{windowStartInclusive}")
+                .contains("create_time <= #{asOfInclusive}");
+        assertThat(method.getAnnotationsByType(Select.class)).hasSize(1);
+    }
+
+    @Test
+    void utcNaiveQueriesDoNotUseDatabaseCurrentTime() throws Exception {
+        String decisionSql = sql(genericSelect(DecisionResultMapper.class.getMethod(
+                "countDecisionsInRange", LocalDateTime.class, LocalDateTime.class)));
+        String recheckSql = sql(genericSelect(PushRecheckLogMapper.class.getMethod(
+                "countByStatusInWindow", String.class, LocalDateTime.class, LocalDateTime.class)));
+        String utcNaiveSql = (decisionSql + " " + recheckSql).toUpperCase(Locale.ROOT);
+
+        assertThat(utcNaiveSql)
+                .doesNotContain("CURRENT_DATE")
+                .doesNotContain("CURRENT_TIMESTAMP")
+                .doesNotContain("LOCALTIMESTAMP")
+                .doesNotContain("DATEADD")
+                .doesNotContain("INTERVAL '1 MINUTE'")
+                .doesNotContain("CAST(CREATE_TIME AS DATE)");
     }
 
     @Test
