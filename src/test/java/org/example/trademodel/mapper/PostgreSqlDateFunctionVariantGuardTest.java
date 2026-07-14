@@ -1,7 +1,9 @@
 package org.example.trademodel.mapper;
 
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
+import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.vo.KeyCountVO;
@@ -89,6 +91,12 @@ class PostgreSqlDateFunctionVariantGuardTest {
         String alertTypeSql = sql(genericSelect(MonitorAlertMapper.class.getMethod(
                 "countByStatusAndTypeInWindow", String.class, String.class,
                 LocalDateTime.class, LocalDateTime.class)));
+        String alertThrottleSql = sql(genericSelect(MonitorAlertMapper.class.getMethod(
+                "countOpenInThrottleWindow", String.class, String.class,
+                LocalDateTime.class, LocalDateTime.class)));
+        String alertSemanticSql = sql(genericSelect(MonitorAlertMapper.class.getMethod(
+                "countAnyInSemanticWindow", String.class, String.class,
+                LocalDateTime.class, LocalDateTime.class)));
         String analysisSql = sql(genericSelect(AnalysisRunMapper.class.getMethod(
                 "countInWindow", LocalDateTime.class, LocalDateTime.class)));
         String lowQualitySql = sql(genericSelect(AnalysisRunMapper.class.getMethod(
@@ -98,7 +106,8 @@ class PostgreSqlDateFunctionVariantGuardTest {
         String hotResetTypeSql = sql(genericSelect(HotResetEventMapper.class.getMethod(
                 "selectTriggerTypeCountsInWindow", LocalDateTime.class, LocalDateTime.class)));
         String utcNaiveSql = String.join(" ", decisionSql, recheckSql, alertSql, alertTypeSql,
-                analysisSql, lowQualitySql, hotResetSql, hotResetTypeSql).toUpperCase(Locale.ROOT);
+                alertThrottleSql, alertSemanticSql, analysisSql, lowQualitySql,
+                hotResetSql, hotResetTypeSql).toUpperCase(Locale.ROOT);
 
         assertThat(utcNaiveSql)
                 .doesNotContain("CURRENT_DATE")
@@ -110,9 +119,33 @@ class PostgreSqlDateFunctionVariantGuardTest {
     }
 
     @Test
-    void monitorAlertWriteThrottleKeepsExistingDatabaseClockVariants() throws Exception {
-        assertDateaddVariant(MonitorAlertMapper.class.getMethod("countOpenInThrottleWindow", String.class, String.class, int.class));
-        assertDateaddVariant(MonitorAlertMapper.class.getMethod("countAnyInSemanticWindow", String.class, String.class, int.class));
+    void monitorAlertWriteThrottleUsesExplicitBoundedUtcRange() throws Exception {
+        assertBoundedUtcRange(MonitorAlertMapper.class.getMethod(
+                "countOpenInThrottleWindow", String.class, String.class,
+                LocalDateTime.class, LocalDateTime.class), "created_at");
+        assertBoundedUtcRange(MonitorAlertMapper.class.getMethod(
+                "countAnyInSemanticWindow", String.class, String.class,
+                LocalDateTime.class, LocalDateTime.class), "created_at");
+    }
+
+    @Test
+    void databaseDefaultTimeIsNotUsedForNewMonitorAlerts() throws Exception {
+        Insert insert = MonitorAlertMapper.class.getMethod("insert", MonitorAlertDO.class)
+                .getAnnotation(Insert.class);
+        String insertSql = String.join(" ", insert.value());
+        String upperSql = insertSql.toUpperCase(Locale.ROOT);
+
+        assertThat(insertSql)
+                .contains("created_at")
+                .contains("updated_at")
+                .contains("#{createdAtUtc}")
+                .contains("#{updatedAtUtc}")
+                .contains("#{cooldownUntilUtc}");
+        assertThat(upperSql)
+                .doesNotContain("CURRENT_TIMESTAMP")
+                .doesNotContain("CURRENT_DATE")
+                .doesNotContain("DATEADD")
+                .doesNotContain("INTERVAL '1 MINUTE'");
     }
 
     @Test

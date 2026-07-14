@@ -3,6 +3,7 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.HotResetEventTypeEnum;
@@ -34,8 +35,13 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,11 +49,17 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class HotResetServiceImplTest {
+
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-07-14T12:00:00Z");
+    private static final LocalDateTime FIXED_UTC = LocalDateTime.parse("2026-07-14T12:00:00");
 
     @Mock private AssetStateMapper assetStateMapper;
     @Mock private HotResetEventMapper hotResetEventMapper;
@@ -67,6 +79,7 @@ class HotResetServiceImplTest {
         service = new HotResetServiceImpl(assetStateMapper, hotResetEventMapper, decisionResultMapper,
                 executionPlanMapper, pushSnapshotMapper, confusedStateService, userPositionRiskAdapter,
                 schedulerProvider, ruleConfigContractService);
+        service.setClock(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
         lenient().when(schedulerProvider.getIfAvailable()).thenReturn(scheduler);
         lenient().when(ruleConfigContractService.requireHotResetThresholds()).thenReturn(thresholds());
     }
@@ -329,6 +342,90 @@ class HotResetServiceImplTest {
                 .extracting(java.lang.reflect.Field::getName)
                 .doesNotContain("openAction", "closeAction", "reduceAction", "reverseAction",
                         "orderAction", "executionAction", "autoTradingAction", "executablePayload", "providerPayload");
+    }
+
+    @Test
+    void hotResetFallbackOccurredAtIsUtcAcrossJvmZones() {
+        mockTriggeredPath();
+        whenRebuildReturns(executed("ana-rebuild", false, false));
+        TimeZone original = TimeZone.getDefault();
+        List<HotResetResult> results = new ArrayList<>();
+
+        try {
+            for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
+                command.setEventKey("event-key-" + zone);
+                command.setOccurredAt(null);
+                results.add(service.evaluateAndExecute(command));
+            }
+        } finally {
+            TimeZone.setDefault(original);
+        }
+
+        ArgumentCaptor<HotResetEventDO> events = ArgumentCaptor.forClass(HotResetEventDO.class);
+        verify(hotResetEventMapper, times(3)).insert(events.capture());
+        assertThat(events.getAllValues()).allSatisfy(event -> {
+            assertThat(event.getEventTime()).isEqualTo(FIXED_UTC);
+            assertThat(event.getCreateTime()).isEqualTo(FIXED_UTC);
+            assertThat(event.getCompletedAt()).isEqualTo(FIXED_UTC);
+        });
+        assertThat(results).allSatisfy(result -> {
+            assertThat(result.getOccurredAt()).isEqualTo(FIXED_UTC);
+            assertThat(result.getCompletedAt()).isEqualTo(FIXED_UTC);
+        });
+    }
+
+    @Test
+    void legacyHotResetPathDoesNotUseJvmLocalTime() {
+        DecisionResult current = new DecisionResult();
+        current.setDecisionId("decision-legacy");
+        current.setAnalysisId("ana-test");
+        current.setSymbol("BTCUSDT");
+        HotResetServiceImpl legacyService = spy(service);
+        ArgumentCaptor<HotResetCommand> command = ArgumentCaptor.forClass(HotResetCommand.class);
+        doReturn(new HotResetResult()).when(legacyService).evaluateAndExecute(command.capture());
+        TimeZone original = TimeZone.getDefault();
+
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            legacyService.executeHotReset(new DecisionContext(), current);
+        } finally {
+            TimeZone.setDefault(original);
+        }
+
+        assertThat(command.getValue().getOccurredAt()).isNull();
+        assertThat(command.getValue().getEventKey()).isEqualTo("legacy-hot-reset-decision-legacy");
+    }
+
+    @Test
+    void hotResetWriteAndBaselineUseSameUtcWindow() {
+        mockTriggeredPath();
+        whenRebuildReturns(executed("ana-rebuild", false, false));
+        HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
+        command.setOccurredAt(null);
+
+        service.evaluateAndExecute(command);
+
+        ArgumentCaptor<HotResetEventDO> event = ArgumentCaptor.forClass(HotResetEventDO.class);
+        verify(hotResetEventMapper).insert(event.capture());
+        assertThat(event.getValue().getEventTime())
+                .isBetween(LocalDateTime.parse("2026-07-14T11:30:00"), FIXED_UTC)
+                .isEqualTo(FIXED_UTC);
+        ArgumentCaptor<AssetStateDO> core = ArgumentCaptor.forClass(AssetStateDO.class);
+        ArgumentCaptor<AssetStateDO> hot = ArgumentCaptor.forClass(AssetStateDO.class);
+        verify(assetStateMapper).mergeUpsertCore(core.capture());
+        verify(assetStateMapper).updateHotResetColumns(hot.capture());
+        assertThat(core.getValue().getLastUpdateTime()).isEqualTo(FIXED_UTC);
+        assertThat(hot.getValue().getLastUpdateTime()).isEqualTo(FIXED_UTC);
+        assertThat(hot.getValue().getHotResetTime()).isEqualTo(FIXED_UTC);
+        verify(decisionResultMapper).markHotResetInvalidatedBySymbol(
+                eq("BTCUSDT"), anyString(), anyString(), eq(FIXED_UTC));
+        verify(executionPlanMapper).markNeedsRevalidationForHotReset(
+                eq("ana-test"), eq("BTCUSDT"), anyString(), anyString(), eq(FIXED_UTC));
+        ArgumentCaptor<HotResetEventDO> rebuild = ArgumentCaptor.forClass(HotResetEventDO.class);
+        verify(hotResetEventMapper).updateRebuildOutcome(rebuild.capture());
+        assertThat(rebuild.getValue().getCompletedAt()).isEqualTo(FIXED_UTC);
     }
 
     private void assertUnsafePreStateInvalidates(AssetStateEnum preState) {

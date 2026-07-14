@@ -23,6 +23,7 @@ import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -60,6 +62,7 @@ public class HotResetServiceImpl implements HotResetService {
     private final UserPositionRiskAdapter userPositionRiskAdapter;
     private final ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider;
     private final RuleConfigContractService ruleConfigContractService;
+    private Clock clock = Clock.systemUTC();
 
     public HotResetServiceImpl(AssetStateMapper assetStateMapper,
                                HotResetEventMapper hotResetEventMapper,
@@ -94,6 +97,11 @@ public class HotResetServiceImpl implements HotResetService {
         this.ruleConfigContractService = ruleConfigContractService;
     }
 
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
+
     @Override
     public boolean shouldTriggerHotReset(int confusedScore, boolean multiTimeframeAligned) {
         return confusedScore >= LEGACY_MIN_CONFUSED_SCORE_THRESHOLD && !multiTimeframeAligned;
@@ -107,8 +115,9 @@ public class HotResetServiceImpl implements HotResetService {
     @Override
     @Transactional
     public HotResetResult evaluateAndExecute(HotResetCommand command) {
+        LocalDateTime nowUtc = UtcLocalTimePolicy.now(clock);
         HotResetPolicy.Evaluation evaluation = evaluatePolicy(command);
-        HotResetResult result = baseResult(command, evaluation);
+        HotResetResult result = baseResult(command, evaluation, nowUtc);
         if (!evaluation.isTriggered()) {
             result.setExecutionStatus("NOT_TRIGGERED");
             return result;
@@ -120,8 +129,8 @@ public class HotResetServiceImpl implements HotResetService {
         }
 
         String normalizedSymbol = normalizeSymbol(command.getSymbol());
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime occurredAt = command.getOccurredAt() != null ? command.getOccurredAt() : now;
+        LocalDateTime occurredAt = command.getOccurredAt() != null ? command.getOccurredAt() : nowUtc;
+        result.setOccurredAt(occurredAt);
         String eventId = "hre-" + UUID.randomUUID().toString().substring(0, 12);
 
         AssetStateDO currentState = assetStateMapper.selectBySymbol(normalizedSymbol);
@@ -142,17 +151,18 @@ public class HotResetServiceImpl implements HotResetService {
 
         int confusedLowStreak = confusedResult != null ? confusedResult.getConfusedLowStreak() : 0;
         int confusedScoreAfter = confusedResult != null ? confusedResult.getConfusedScore() : confusedScoreBefore;
-        persistAssetState(normalizedSymbol, postState, confusedScoreAfter, confusedLowStreak, command, occurredAt, preState);
+        persistAssetState(normalizedSymbol, postState, confusedScoreAfter, confusedLowStreak,
+                command, occurredAt, nowUtc, preState);
 
         String reasonCode = evaluation.getReasonCode();
         int decisionCount = decisionResultMapper.markHotResetInvalidatedBySymbol(
-                normalizedSymbol, eventId, reasonCode, now);
+                normalizedSymbol, eventId, reasonCode, nowUtc);
         int planCount = executionPlanMapper.markNeedsRevalidationForHotReset(
                 command.getAnalysisId(), normalizedSymbol, eventId,
-                command.getEventType().name() + ":" + reasonCode, now);
+                command.getEventType().name() + ":" + reasonCode, nowUtc);
         int pushCount = pushSnapshotMapper.invalidatePendingBySymbolForHotReset(normalizedSymbol);
 
-        HotResetEventDO event = buildEvent(command, eventId, evaluation, occurredAt, now, preState, postState,
+        HotResetEventDO event = buildEvent(command, eventId, evaluation, occurredAt, nowUtc, preState, postState,
                 confusedScoreBefore, confusedScoreAfter, confusedLowStreak, riskResult,
                 decisionCount, planCount, pushCount);
         hotResetEventMapper.insert(event);
@@ -171,7 +181,7 @@ public class HotResetServiceImpl implements HotResetService {
         result.setAccountRiskBlocked(riskResult.isRiskBlocked());
         result.setRebuildTriggered(true);
         result.setExecutionStatus("COMPLETED");
-        result.setCompletedAt(now);
+        result.setCompletedAt(nowUtc);
 
         runRebuildAfterCommit(event, result);
         return result;
@@ -200,7 +210,8 @@ public class HotResetServiceImpl implements HotResetService {
         }
     }
 
-    private HotResetResult baseResult(HotResetCommand command, HotResetPolicy.Evaluation evaluation) {
+    private HotResetResult baseResult(HotResetCommand command, HotResetPolicy.Evaluation evaluation,
+                                      LocalDateTime nowUtc) {
         HotResetResult result = new HotResetResult();
         if (command != null) {
             result.setEventKey(command.getEventKey());
@@ -213,7 +224,7 @@ public class HotResetServiceImpl implements HotResetService {
         result.setTriggered(false);
         result.setDeduplicated(false);
         result.setReasonCodes(evaluation.getReasonCodes());
-        result.setCompletedAt(LocalDateTime.now());
+        result.setCompletedAt(nowUtc);
         return result;
     }
 
@@ -248,13 +259,13 @@ public class HotResetServiceImpl implements HotResetService {
 
     private void persistAssetState(String normalizedSymbol, AssetStateEnum postState, int confusedScore,
                                    int confusedLowStreak, HotResetCommand command, LocalDateTime occurredAt,
-                                   AssetStateEnum preState) {
+                                   LocalDateTime nowUtc, AssetStateEnum preState) {
         AssetStateDO core = new AssetStateDO();
         core.setSymbol(normalizedSymbol);
         core.setState(postState);
         core.setConfusedScore(confusedScore);
         core.setConfusedLowStreak(Math.max(0, confusedLowStreak));
-        core.setLastUpdateTime(LocalDateTime.now());
+        core.setLastUpdateTime(nowUtc);
         core.setTraceId(command.getTraceId());
         assetStateMapper.mergeUpsertCore(core);
 
@@ -266,7 +277,7 @@ public class HotResetServiceImpl implements HotResetService {
         hot.setHotResetTime(occurredAt);
         hot.setPreResetState(preState.name());
         hot.setPostResetState(postState.name());
-        hot.setLastUpdateTime(LocalDateTime.now());
+        hot.setLastUpdateTime(nowUtc);
         assetStateMapper.updateHotResetColumns(hot);
     }
 
@@ -309,7 +320,7 @@ public class HotResetServiceImpl implements HotResetService {
         event.setPreState(preState.name());
         event.setPostState(postState.name());
         event.setCompletedAt(completedAt);
-        event.setCreateTime(LocalDateTime.now());
+        event.setCreateTime(completedAt);
         return event;
     }
 
@@ -328,10 +339,12 @@ public class HotResetServiceImpl implements HotResetService {
     }
 
     private void runRebuild(HotResetEventDO event, HotResetResult result) {
+        LocalDateTime completedAtUtc = UtcLocalTimePolicy.now(clock);
         HotResetEventDO update = new HotResetEventDO();
         update.setEventId(event.getEventId());
         update.setRebuildTriggered(true);
-        update.setCompletedAt(LocalDateTime.now());
+        update.setCompletedAt(completedAtUtc);
+        result.setCompletedAt(completedAtUtc);
         try {
             AnalysisSchedulerService scheduler = analysisSchedulerServiceProvider.getIfAvailable();
             if (scheduler == null) {

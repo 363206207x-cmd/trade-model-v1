@@ -1,6 +1,18 @@
 package org.example.trademodel.mapper;
 
 import org.example.trademodel.TradeModelApplication;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.service.DecisionService;
+import org.example.trademodel.service.PositionSyncService;
+import org.example.trademodel.service.RuntimeMetricService;
+import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.impl.MonitorAlertWriteServiceImpl;
+import org.example.trademodel.service.impl.RunBaselineServiceImpl;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.LightSystemStatusVO;
+import org.example.trademodel.vo.RunBaselineVO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,9 +20,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = TradeModelApplication.class)
 @Transactional
@@ -118,6 +136,74 @@ class UtcNaiveTimeBasisMapperIntegrationTest {
         assertThat(hotResetEventMapper.countInWindow(windowStartUtc, asOfUtc)).isZero();
         assertThat(hotResetEventMapper.selectTriggerTypeCountsInWindow(windowStartUtc, asOfUtc))
                 .noneMatch(row -> marker.equals(row.getKey()));
+    }
+
+    @Test
+    void monitorAlertWriteThenBaselineCountUsesSameWindow() {
+        LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
+        LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+        int before = monitorAlertMapper.countByStatusInWindow("OPEN", windowStartUtc, asOfUtc);
+
+        writeHighRiskMonitorAlert("writer-baseline-current", Instant.parse("2026-07-14T12:00:00Z"));
+        RunBaselineVO baseline = runBaselineAt(Instant.parse("2026-07-14T12:00:00Z"));
+
+        assertThat(baseline.getAlertSummary().getOpenCountWindow()).isEqualTo(before + 1);
+        MonitorAlertDO stored = monitorAlertMapper.listByAnalysisId("writer-baseline-current").get(0);
+        assertThat(stored.getCreatedAt()).isEqualTo("2026-07-14 12:00:00");
+        assertThat(stored.getUpdatedAt()).isEqualTo("2026-07-14 12:00:00");
+        assertThat(stored.getCooldownUntil()).isEqualTo("2026-07-14 12:15:00");
+    }
+
+    @Test
+    void monitorAlertBaselineExcludesFutureRowsAfterRealWriterInsert() {
+        LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
+        LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+        int before = monitorAlertMapper.countByStatusInWindow("OPEN", windowStartUtc, asOfUtc);
+
+        writeHighRiskMonitorAlert("writer-baseline-future", Instant.parse("2026-07-14T12:00:01Z"));
+        RunBaselineVO baseline = runBaselineAt(Instant.parse("2026-07-14T12:00:00Z"));
+
+        assertThat(monitorAlertMapper.listByAnalysisId("writer-baseline-future"))
+                .singleElement()
+                .extracting(MonitorAlertDO::getCreatedAt)
+                .isEqualTo("2026-07-14 12:00:01");
+        assertThat(baseline.getAlertSummary().getOpenCountWindow()).isEqualTo(before);
+    }
+
+    private void writeHighRiskMonitorAlert(String analysisId, Instant instant) {
+        MonitorAlertWriteServiceImpl writer = new MonitorAlertWriteServiceImpl(monitorAlertMapper);
+        writer.setClock(Clock.fixed(instant, ZoneOffset.UTC));
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setTraceId("trace-" + analysisId);
+        run.setRuleVersion("v1");
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        analysis.setAnalysisId(analysisId);
+        analysis.setSymbol("BTCUSDT");
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setRiskLevel("HIGH");
+
+        writer.emitAfterAnalysisPersist(run, analysis, decision);
+    }
+
+    private RunBaselineVO runBaselineAt(Instant instant) {
+        SystemHealthService systemHealthService = mock(SystemHealthService.class);
+        PositionSyncService positionSyncService = mock(PositionSyncService.class);
+        DecisionService decisionService = mock(DecisionService.class);
+        RuntimeMetricService runtimeMetricService = mock(RuntimeMetricService.class);
+        when(systemHealthService.getSystemHealth()).thenReturn(Map.of());
+        when(runtimeMetricService.snapshot()).thenReturn(Map.of());
+        when(decisionService.getLightSystemStatus()).thenReturn(new LightSystemStatusVO());
+        RunBaselineServiceImpl baseline = new RunBaselineServiceImpl(
+                systemHealthService,
+                positionSyncService,
+                decisionService,
+                runtimeMetricService,
+                monitorAlertMapper,
+                analysisRunMapper,
+                pushRecheckLogMapper,
+                hotResetEventMapper);
+        baseline.setClock(Clock.fixed(instant, ZoneOffset.UTC));
+        return baseline.getRunBaseline(30);
     }
 
     private void insertDecision(String id, String createTime) {

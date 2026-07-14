@@ -1,7 +1,29 @@
 package org.example.trademodel.postgresql;
 
 import org.flywaydb.core.Flyway;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.HotResetEventMapper;
+import org.example.trademodel.mapper.MonitorAlertMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
+import org.example.trademodel.service.DecisionService;
+import org.example.trademodel.service.PositionSyncService;
+import org.example.trademodel.service.RuntimeMetricService;
+import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.impl.MonitorAlertWriteServiceImpl;
+import org.example.trademodel.service.impl.RunBaselineServiceImpl;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.LightSystemStatusVO;
+import org.example.trademodel.vo.RunBaselineVO;
 import org.junit.jupiter.api.Test;
+import org.postgresql.ds.PGSimpleDataSource;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -13,11 +35,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class PostgreSqlFlywayMigrationSmokeTest {
 
@@ -68,7 +96,86 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertFlywayHistorySucceeded(connection);
                 assertUserPositionIdentityGeneratedKey(connection);
             }
+            assertMonitorAlertUtcNaiveAcrossSessionTimezones(postgres);
         }
+    }
+
+    private static void assertMonitorAlertUtcNaiveAcrossSessionTimezones(
+            PostgreSQLContainer<?> postgres) throws Exception {
+        PGSimpleDataSource dataSource = new PGSimpleDataSource();
+        dataSource.setUrl(postgres.getJdbcUrl());
+        dataSource.setUser(postgres.getUsername());
+        dataSource.setPassword(postgres.getPassword());
+        Environment environment = new Environment(
+                "controlled-postgresql", new JdbcTransactionFactory(), dataSource);
+        Configuration configuration = new Configuration(environment);
+        configuration.setDatabaseId("postgresql");
+        configuration.setMapUnderscoreToCamelCase(true);
+        configuration.addMapper(MonitorAlertMapper.class);
+        SqlSessionFactory sessions = new SqlSessionFactoryBuilder().build(configuration);
+        LocalDateTime expectedUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+
+        for (String sessionTimezone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+            try (SqlSession session = sessions.openSession(false)) {
+                try (Statement statement = session.getConnection().createStatement()) {
+                    statement.execute("SET TIME ZONE '" + sessionTimezone + "'");
+                }
+                MonitorAlertMapper mapper = session.getMapper(MonitorAlertMapper.class);
+                String analysisId = "pg-time-basis-" + sessionTimezone.replace('/', '-');
+                writeMonitorAlert(mapper, analysisId);
+
+                try (PreparedStatement statement = session.getConnection().prepareStatement(
+                        "SELECT created_at, updated_at, cooldown_until FROM tm_monitor_alert WHERE analysis_id = ?")) {
+                    statement.setString(1, analysisId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        assertThat(result.next()).isTrue();
+                        assertThat(result.getObject(1, LocalDateTime.class)).isEqualTo(expectedUtc);
+                        assertThat(result.getObject(2, LocalDateTime.class)).isEqualTo(expectedUtc);
+                        assertThat(result.getObject(3, LocalDateTime.class))
+                                .isEqualTo(LocalDateTime.parse("2026-07-14T12:15:00"));
+                    }
+                }
+
+                RunBaselineVO baseline = runBaseline(mapper);
+                assertThat(baseline.getAlertSummary().getOpenCountWindow()).isEqualTo(1);
+                session.rollback();
+            }
+        }
+    }
+
+    private static void writeMonitorAlert(MonitorAlertMapper mapper, String analysisId) {
+        MonitorAlertWriteServiceImpl writer = new MonitorAlertWriteServiceImpl(mapper);
+        writer.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setTraceId("trace-" + analysisId);
+        run.setRuleVersion("v1");
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        analysis.setAnalysisId(analysisId);
+        analysis.setSymbol("BTCUSDT");
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setRiskLevel("HIGH");
+        writer.emitAfterAnalysisPersist(run, analysis, decision);
+    }
+
+    private static RunBaselineVO runBaseline(MonitorAlertMapper mapper) {
+        SystemHealthService systemHealthService = mock(SystemHealthService.class);
+        PositionSyncService positionSyncService = mock(PositionSyncService.class);
+        DecisionService decisionService = mock(DecisionService.class);
+        RuntimeMetricService runtimeMetricService = mock(RuntimeMetricService.class);
+        when(systemHealthService.getSystemHealth()).thenReturn(Map.of());
+        when(runtimeMetricService.snapshot()).thenReturn(Map.of());
+        when(decisionService.getLightSystemStatus()).thenReturn(new LightSystemStatusVO());
+        RunBaselineServiceImpl baseline = new RunBaselineServiceImpl(
+                systemHealthService,
+                positionSyncService,
+                decisionService,
+                runtimeMetricService,
+                mapper,
+                mock(AnalysisRunMapper.class),
+                mock(PushRecheckLogMapper.class),
+                mock(HotResetEventMapper.class));
+        baseline.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
+        return baseline.getRunBaseline(30);
     }
 
     private static boolean dockerAvailable() {

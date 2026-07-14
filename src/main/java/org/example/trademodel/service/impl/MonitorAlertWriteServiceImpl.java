@@ -4,10 +4,13 @@ import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.mapper.MonitorAlertMapper;
 import org.example.trademodel.service.MonitorAlertWriteService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -47,9 +50,15 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
     static final int DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES = 45;
 
     private final MonitorAlertMapper monitorAlertMapper;
+    private Clock clock = Clock.systemUTC();
 
     public MonitorAlertWriteServiceImpl(MonitorAlertMapper monitorAlertMapper) {
         this.monitorAlertMapper = monitorAlertMapper;
+    }
+
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Override
@@ -160,43 +169,53 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
         if (monitorAlertMapper.countByAnalysisIdAndAlertType(analysisId, alertType) > 0) {
             return;
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime nowUtc = UtcLocalTimePolicy.now(clock);
+        LocalDateTime throttleStartUtc = nowUtc.minusMinutes(DEFAULT_ALERT_COOLDOWN_MINUTES);
+        LocalDateTime semanticStartUtc = nowUtc.minusMinutes(DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES);
         boolean windowHasOpen = monitorAlertMapper.countOpenInThrottleWindow(
-                symbol, alertType, DEFAULT_ALERT_COOLDOWN_MINUTES) > 0;
+                symbol, alertType, throttleStartUtc, nowUtc) > 0;
 
         if (windowHasOpen) {
-            MonitorAlertDO suppressed = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);
+            MonitorAlertDO suppressed = baseRow(
+                    analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion, nowUtc);
             suppressed.setStatus("SUPPRESSED");
             suppressed.setSuppressReason(String.format(
                     "THROTTLE_DB:%dm window: OPEN already exists for same asset_symbol+alert_type; skip duplicate OPEN",
                     DEFAULT_ALERT_COOLDOWN_MINUTES));
             suppressed.setCooldownUntil(null);
+            suppressed.setCooldownUntilUtc(null);
             monitorAlertMapper.insert(suppressed);
             return;
         }
 
         boolean semanticSimilarRecent = monitorAlertMapper.countAnyInSemanticWindow(
-                symbol, alertType, DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES) > 0;
+                symbol, alertType, semanticStartUtc, nowUtc) > 0;
         if (semanticSimilarRecent) {
-            MonitorAlertDO suppressed = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);
+            MonitorAlertDO suppressed = baseRow(
+                    analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion, nowUtc);
             suppressed.setStatus("SUPPRESSED");
             suppressed.setSuppressReason(String.format(
                     "SEMANTIC_SIMILAR_RECENT:%dm window: similar alert_type already emitted for same asset_symbol",
                     DEFAULT_SEMANTIC_SUPPRESS_WINDOW_MINUTES));
             suppressed.setCooldownUntil(null);
+            suppressed.setCooldownUntilUtc(null);
             monitorAlertMapper.insert(suppressed);
             return;
         }
 
-        MonitorAlertDO open = baseRow(analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion);
+        MonitorAlertDO open = baseRow(
+                analysisId, symbol, alertType, alertLevel, message, traceId, ruleVersion, nowUtc);
         open.setStatus("OPEN");
         open.setSuppressReason(null);
-        open.setCooldownUntil(now.plusMinutes(DEFAULT_ALERT_COOLDOWN_MINUTES).format(TS));
+        LocalDateTime cooldownUntilUtc = nowUtc.plusMinutes(DEFAULT_ALERT_COOLDOWN_MINUTES);
+        open.setCooldownUntil(cooldownUntilUtc.format(TS));
+        open.setCooldownUntilUtc(cooldownUntilUtc);
         monitorAlertMapper.insert(open);
     }
 
     private static MonitorAlertDO baseRow(String analysisId, String symbol, String alertType, String alertLevel,
-                                          String message, String traceId, String ruleVersion) {
+                                          String message, String traceId, String ruleVersion,
+                                          LocalDateTime nowUtc) {
         MonitorAlertDO row = new MonitorAlertDO();
         row.setId("mal-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         row.setAnalysisId(analysisId);
@@ -207,6 +226,10 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
         row.setTraceId(traceId);
         row.setRuleVersion(ruleVersion);
         row.setCreatedBy("system");
+        row.setCreatedAt(nowUtc.format(TS));
+        row.setUpdatedAt(nowUtc.format(TS));
+        row.setCreatedAtUtc(nowUtc);
+        row.setUpdatedAtUtc(nowUtc);
         row.setIsDeleted(0);
         row.setVersionNo(1);
         return row;
