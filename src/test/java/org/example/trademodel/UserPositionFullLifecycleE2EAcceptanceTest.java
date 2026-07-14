@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -68,7 +69,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
     private static final String ANALYSIS_ID = "analysis-p3-e2e-user-position";
 
     @Test
-    void manualUserPositionFlowsThroughMonitorCloseReviewAndRuleFeedbackWithoutExecutableSurfaces()
+    void activeMonitorAndClosedReviewUseSameSourceResolution()
             throws Exception {
         UserPositionMapper userPositionMapper = mock(UserPositionMapper.class);
         Map<Long, UserPositionDO> positions = new LinkedHashMap<>();
@@ -78,7 +79,13 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         ExecutionPlanDO executionPlan = executionPlan();
         when(executionPlanMapper.selectByPlanId(PLAN_ID)).thenReturn(executionPlan);
-        when(executionPlanMapper.selectLatestByAnalysisId(ANALYSIS_ID)).thenReturn(executionPlan);
+        ExecutionPlanDO latestSiblingPlanB = executionPlan();
+        latestSiblingPlanB.setPlanId("plan-latest-sibling-B");
+        latestSiblingPlanB.setEntryZone("B-entry");
+        latestSiblingPlanB.setStopLoss("B-stop");
+        latestSiblingPlanB.setTakeProfitRules("B-tp");
+        lenient().when(executionPlanMapper.selectLatestByAnalysisId(ANALYSIS_ID))
+                .thenReturn(latestSiblingPlanB);
         AnalysisRunDO analysisRun = new AnalysisRunDO();
         analysisRun.setAnalysisId(ANALYSIS_ID);
         analysisRun.setSymbol("BTCUSDT");
@@ -112,7 +119,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         ArgumentCaptor<WriteReviewResultReq> reviewCaptor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
         when(reviewService.saveOrUpdate(reviewCaptor.capture())).thenAnswer(invocation -> reviewState(invocation.getArgument(0)));
         UserPositionReviewAdapter reviewAdapter =
-                new DefaultUserPositionReviewAdapter(userPositionMapper, executionPlanMapper, monitorLogService, reviewService);
+                new DefaultUserPositionReviewAdapter(userPositionMapper, executionPlanMapper, analysisRunMapper,
+                        monitorLogService, reviewService);
 
         UserPositionVO opened = userPositionService.manualOpen(openPositionRequest());
 
@@ -165,6 +173,9 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(reviewSummary.getReviewStatus()).isEqualTo("REVIEW_SUMMARY_READY");
         assertThat(reviewSummary.getPositionStatus()).isEqualTo("CLOSED");
         assertThat(reviewSummary.getExecutionPlanId()).isEqualTo(PLAN_ID);
+        assertThat(reviewSummary.getExecutionPlanId()).isNotEqualTo("plan-latest-sibling-B");
+        assertThat(reviewSummary.getEntryZone()).isEqualTo("110");
+        assertThat(reviewSummary.getEntryZone()).isNotEqualTo("B-entry");
         assertThat(reviewSummary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_FOUND");
         assertThat(reviewSummary.getMonitorLogCount()).isEqualTo(1);
         assertThat(reviewSummary.getExecutionDeviationStatus()).isEqualTo("DEVIATED");
@@ -188,11 +199,17 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(reviewCaptor.getValue().getErrorType()).isEqualTo("PLAN_EXECUTION_MISMATCH");
 
         verify(userPositionMapper, times(1)).insert(any(UserPositionDO.class));
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
         assertNoForbiddenExecutableFields(
                 UserPositionVO.class,
                 PositionMonitorResultDTO.class,
                 UserPositionReviewSummaryDTO.class,
                 UserPositionReviewFeedbackResultDTO.class);
+    }
+
+    @Test
+    void exactPlanASurvivesMonitorCloseAndReviewWithoutPlanBSubstitution() throws Exception {
+        activeMonitorAndClosedReviewUseSameSourceResolution();
     }
 
     private static void wireUserPositionMapper(UserPositionMapper mapper, Map<Long, UserPositionDO> positions) {

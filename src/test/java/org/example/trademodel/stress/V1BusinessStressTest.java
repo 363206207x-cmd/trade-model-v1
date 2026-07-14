@@ -470,6 +470,9 @@ class V1BusinessStressTest {
         plan.setExecutionPlanStatus("VALID");
         plan.setSourceGateStatus("VALID");
         plan.setSourceGateComplete(true);
+        plan.setEntryZone("95-105");
+        plan.setStopLoss("90");
+        plan.setTakeProfitRules("120");
         plan.setManualReviewRequired(true);
         plan.setNotTradeInstruction(true);
         plan.setNotExecutable(true);

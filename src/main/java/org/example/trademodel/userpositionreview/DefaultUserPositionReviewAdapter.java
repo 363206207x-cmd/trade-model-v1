@@ -3,12 +3,12 @@ package org.example.trademodel.userpositionreview;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
-import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
-import org.example.trademodel.positionmonitor.PositionMonitorSourceContract.SourceReference;
-import org.example.trademodel.positionmonitor.PositionMonitorSourceContract.SourceType;
+import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPolicy;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.vo.ReviewStateVO;
@@ -31,16 +31,17 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     private static final String DEVIATED = "DEVIATED";
 
     private final UserPositionMapper userPositionMapper;
-    private final ExecutionPlanMapper executionPlanMapper;
+    private final PositionPlanSourceResolver positionPlanSourceResolver;
     private final PositionMonitorLogService positionMonitorLogService;
     private final ReviewService reviewService;
 
     public DefaultUserPositionReviewAdapter(UserPositionMapper userPositionMapper,
                                             ExecutionPlanMapper executionPlanMapper,
+                                            AnalysisRunMapper analysisRunMapper,
                                             PositionMonitorLogService positionMonitorLogService,
                                             ReviewService reviewService) {
         this.userPositionMapper = userPositionMapper;
-        this.executionPlanMapper = executionPlanMapper;
+        this.positionPlanSourceResolver = new PositionPlanSourceResolver(executionPlanMapper, analysisRunMapper);
         this.positionMonitorLogService = positionMonitorLogService;
         this.reviewService = reviewService;
     }
@@ -48,18 +49,20 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     @Override
     public UserPositionReviewSummaryDTO buildSummary(Long positionId) {
         UserPositionDO position = requireClosedPosition(positionId);
-        ExecutionPlanDO plan = resolvePlan(position);
+        PositionPlanSourceResolver.Resolution planSource = resolvePlan(position);
+        ExecutionPlanDO plan = planSource.verified() ? planSource.executionPlan() : null;
         List<PositionMonitorLogDTO> logs = positionMonitorLogService.listAllByPositionIdForReview(position.getId());
 
         UserPositionReviewSummaryDTO summary = new UserPositionReviewSummaryDTO();
         fillPosition(summary, position);
-        fillPlan(summary, position, plan);
+        fillPlan(summary, position, planSource);
         fillPnl(summary, position);
         fillExecutionDeviation(summary, position, plan);
         fillMonitorFacts(summary, position, logs);
         summary.setReviewStatus("REVIEW_SUMMARY_READY");
         if (PLAN_CONTEXT_MISSING.equals(summary.getPlanContextStatus())) {
             summary.getReviewReasons().add(PLAN_CONTEXT_MISSING);
+            summary.getReviewReasons().add("PLAN_SOURCE_UNVERIFIED");
         }
         if (NOT_COMPUTABLE.equals(summary.getExecutionDeviationStatus())) {
             summary.getReviewReasons().add("EXECUTION_DEVIATION_NOT_COMPUTABLE");
@@ -75,8 +78,8 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
             throw new IllegalArgumentException("feedback request is required");
         }
         UserPositionDO position = requireClosedPosition(positionId);
-        ExecutionPlanDO plan = resolvePlan(position);
-        String analysisId = feedbackAnalysisId(position, plan);
+        PositionPlanSourceResolver.Resolution planSource = resolvePlan(position);
+        String analysisId = feedbackAnalysisId(position, planSource);
 
         WriteReviewResultReq req = new WriteReviewResultReq();
         req.setAnalysisId(analysisId);
@@ -141,14 +144,9 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         return position;
     }
 
-    private ExecutionPlanDO resolvePlan(UserPositionDO position) {
-        SourceReference sourceReference = PositionMonitorSourceContract.parse(position.getSourceRefId());
-        if (sourceReference == null) {
-            return null;
-        }
-        return sourceReference.type() == SourceType.EXECUTION_PLAN
-                ? executionPlanMapper.selectByPlanId(sourceReference.id())
-                : executionPlanMapper.selectOnlyByAnalysisId(sourceReference.id());
+    private PositionPlanSourceResolver.Resolution resolvePlan(UserPositionDO position) {
+        return positionPlanSourceResolver.resolveTypedReference(
+                position.getId(), position.getAssetSymbol(), position.getSourceRefId());
     }
 
     private static void fillPosition(UserPositionReviewSummaryDTO summary, UserPositionDO position) {
@@ -168,16 +166,20 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         summary.setHoldingDurationSeconds(Duration.between(position.getOpenedAt(), position.getClosedAt()).getSeconds());
     }
 
-    private static void fillPlan(UserPositionReviewSummaryDTO summary, UserPositionDO position, ExecutionPlanDO plan) {
-        if (plan == null) {
+    private static void fillPlan(UserPositionReviewSummaryDTO summary,
+                                 UserPositionDO position,
+                                 PositionPlanSourceResolver.Resolution planSource) {
+        if (planSource == null || !planSource.verified()) {
             summary.setPlanContextStatus(PLAN_CONTEXT_MISSING);
+            summary.setSourceRefId(null);
             summary.setAnalysisId("USER_POSITION_" + position.getId());
             summary.setExecutionDeviationStatus(NOT_COMPUTABLE);
             return;
         }
+        ExecutionPlanDO plan = planSource.executionPlan();
         summary.setPlanContextStatus(PLAN_CONTEXT_FOUND);
-        summary.setAnalysisId(plan.getAnalysisId());
-        summary.setExecutionPlanId(plan.getPlanId());
+        summary.setAnalysisId(planSource.analysisId());
+        summary.setExecutionPlanId(planSource.executionPlanId());
         summary.setExecutionPlanStatus(plan.getExecutionPlanStatus());
         summary.setSourceGateStatus(plan.getSourceGateStatus());
         summary.setSourceGateComplete(plan.getSourceGateComplete());
@@ -267,7 +269,9 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     private static void fillMonitorFacts(UserPositionReviewSummaryDTO summary,
                                          UserPositionDO position,
                                          List<PositionMonitorLogDTO> logs) {
-        List<PositionMonitorLogDTO> safeLogs = logs == null ? List.of() : logs;
+        List<PositionMonitorLogDTO> safeLogs = logs == null ? List.of() : logs.stream()
+                .map(PositionMonitorLogSourceViewPolicy::sanitize)
+                .toList();
         summary.setMonitorLogs(safeLogs);
         summary.setMonitorLogCount(safeLogs.size());
 
@@ -327,9 +331,10 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
                 || "RISK_REVIEW".equals(suggestedAction);
     }
 
-    private static String feedbackAnalysisId(UserPositionDO position, ExecutionPlanDO plan) {
-        if (plan != null && trimToNull(plan.getAnalysisId()) != null) {
-            return plan.getAnalysisId().trim();
+    private static String feedbackAnalysisId(UserPositionDO position,
+                                             PositionPlanSourceResolver.Resolution planSource) {
+        if (planSource != null && planSource.verified() && trimToNull(planSource.analysisId()) != null) {
+            return planSource.analysisId().trim();
         }
         return "USER_POSITION_" + position.getId();
     }

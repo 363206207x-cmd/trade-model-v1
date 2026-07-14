@@ -13,6 +13,7 @@ import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewSummaryDTO;
@@ -161,6 +162,32 @@ class ReviewCenterServiceImplTest {
 
         assertThat(vo.getPushReviews()).extracting(ReviewCenterDashboardVO.PushReviewItem::getExpired)
                 .containsExactly(false, true, true);
+    }
+
+    @Test
+    void reviewCenterTimelineHidesInternalSentinel() {
+        UserPositionReviewSummaryDTO summary = positionSummary();
+        PositionMonitorLogDTO internal = monitorLog();
+        internal.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        internal.setExecutionPlanId("must-not-survive");
+        summary.setMonitorLogs(List.of(internal));
+        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of(position()));
+        when(userPositionReviewAdapter.buildSummary(7L)).thenReturn(summary);
+        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+                .thenReturn(List.of());
+        when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
+        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+
+        ReviewCenterDashboardVO vo = service.getDashboard();
+
+        assertThat(vo.getPositionReviews()).singleElement().satisfies(item ->
+                assertThat(item.getMonitorTimeline()).singleElement().satisfies(log -> {
+                    assertThat(log.getAnalysisId()).isNull();
+                    assertThat(log.getExecutionPlanId()).isNull();
+                    assertThat(log.isSourceVerified()).isFalse();
+                    assertThat(log.getSourceStatus()).isEqualTo("UNVERIFIED");
+                    assertThat(log.getSourceStatusLabel()).isEqualTo("来源不可验证");
+                }));
     }
 
     private static UserPositionDO position() {

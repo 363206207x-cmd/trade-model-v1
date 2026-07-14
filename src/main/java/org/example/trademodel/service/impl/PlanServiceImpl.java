@@ -9,6 +9,7 @@ import org.example.trademodel.dto.planboundary.SourceTraceBoundaryProducerResult
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
@@ -124,9 +125,7 @@ public class PlanServiceImpl implements PlanService {
     }
 
     private static String resolvePlanMode(ExecutionPlanVO plan, DecisionBundleVO decisionBundle) {
-        boolean hasConcreteExecutionFields = hasConcrete(plan.getEntryZone())
-                && hasConcrete(plan.getStopLoss())
-                && hasConcrete(plan.getTakeProfitRules());
+        boolean hasConcreteExecutionFields = ExecutionPlanReviewPolicy.hasCompleteBoundaries(plan);
         if (Boolean.TRUE.equals(decisionBundle.getIsWorthOpening()) && hasConcreteExecutionFields) {
             return ExecutionPlanVO.PLAN_MODE_SEMI_STRUCTURED;
         }
@@ -298,9 +297,7 @@ public class PlanServiceImpl implements PlanService {
     }
 
     private static void enforceBoundaryCompleteness(ExecutionPlanVO plan) {
-        if (plan == null || hasConcrete(plan.getEntryZone())
-                && hasConcrete(plan.getStopLoss())
-                && hasConcrete(plan.getTakeProfitRules())) {
+        if (plan == null || ExecutionPlanReviewPolicy.hasCompleteBoundaries(plan)) {
             return;
         }
         String status = plan.getExecutionPlanStatus();
@@ -444,14 +441,6 @@ public class PlanServiceImpl implements PlanService {
             return blockingReason;
         }
         return null;
-    }
-
-    private static boolean hasConcrete(String value) {
-        if (value == null) {
-            return false;
-        }
-        String trimmed = value.trim();
-        return !trimmed.isEmpty() && !PLACEHOLDER_NOT_AVAILABLE.equals(trimmed);
     }
 
     private static boolean isBlankStatic(String value) {

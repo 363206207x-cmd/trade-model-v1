@@ -13,6 +13,7 @@ import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPolicy;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.ReviewCenterService;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
@@ -133,8 +134,13 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
             item.setFinalPnl(summary.getGrossPnl());
             item.setExecutionDeviation(summary.getExecutionDeviationStatus());
             item.setExecutionDeviationDetail(summary.getExecutionDeviationReasons());
-            item.setMonitorTimeline(summary.getMonitorLogs());
-            item.setMonitorConclusion(latestMonitorConclusion(summary.getMonitorLogs()));
+            List<PositionMonitorLogDTO> safeMonitorLogs = summary.getMonitorLogs() == null
+                    ? List.of()
+                    : summary.getMonitorLogs().stream()
+                            .map(PositionMonitorLogSourceViewPolicy::sanitize)
+                            .toList();
+            item.setMonitorTimeline(safeMonitorLogs);
+            item.setMonitorConclusion(latestMonitorConclusion(safeMonitorLogs));
             item.setReviewStatus(summary.getReviewStatus());
             item.setOriginalExecutionPlan(toPlanSummary(summary));
         } catch (IllegalArgumentException ex) {

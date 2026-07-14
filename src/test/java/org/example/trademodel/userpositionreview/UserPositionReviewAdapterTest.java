@@ -1,8 +1,10 @@
 package org.example.trademodel.userpositionreview;
 
 import org.example.trademodel.dto.req.WriteReviewResultReq;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
@@ -30,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +46,8 @@ class UserPositionReviewAdapterTest {
     @Mock
     private ExecutionPlanMapper executionPlanMapper;
     @Mock
+    private AnalysisRunMapper analysisRunMapper;
+    @Mock
     private PositionMonitorLogService positionMonitorLogService;
     @Mock
     private ReviewService reviewService;
@@ -53,8 +59,11 @@ class UserPositionReviewAdapterTest {
         adapter = new DefaultUserPositionReviewAdapter(
                 userPositionMapper,
                 executionPlanMapper,
+                analysisRunMapper,
                 positionMonitorLogService,
                 reviewService);
+        lenient().when(analysisRunMapper.selectById(anyString())).thenAnswer(invocation ->
+                analysisRun(invocation.getArgument(0), "BTCUSDT"));
     }
 
     @Test
@@ -225,9 +234,9 @@ class UserPositionReviewAdapterTest {
 
     @Test
     void feedbackRecordsThroughExistingReviewServiceAndDerivesAnalysisIdServerSide() {
-        UserPositionDO position = closedPosition(19L, "LONG", "client-sent-must-not-matter", "100", "112", "95", "120");
+        UserPositionDO position = closedPosition(19L, "LONG", "plan-19", "100", "112", "95", "120");
         when(userPositionMapper.selectById(19L)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("client-sent-must-not-matter"))
+        when(executionPlanMapper.selectByPlanId("plan-19"))
                 .thenReturn(plan("plan-19", "ana-server-19", "100", "95", "120"));
         ReviewStateVO state = new ReviewStateVO();
         state.setReviewId("review-19");
@@ -269,6 +278,99 @@ class UserPositionReviewAdapterTest {
         verify(reviewService).saveOrUpdate(captor.capture());
         assertThat(captor.getValue().getAnalysisId()).isEqualTo("USER_POSITION_20");
         assertThat(result.getAnalysisId()).isEqualTo("USER_POSITION_20");
+    }
+
+    @Test
+    void closedPositionCrossSymbolTypedPlanFailsClosed() {
+        UserPositionDO position = closedPosition(21L, "LONG", "plan-foreign", "100", "112", "95", "120");
+        when(userPositionMapper.selectById(21L)).thenReturn(position);
+        when(executionPlanMapper.selectByPlanId("plan-foreign"))
+                .thenReturn(plan("plan-foreign", "ana-foreign", "100", "95", "120"));
+        when(analysisRunMapper.selectById("ana-foreign"))
+                .thenReturn(analysisRun("ana-foreign", "ETHUSDT"));
+        when(positionMonitorLogService.listAllByPositionIdForReview(21L)).thenReturn(List.of());
+
+        assertUnverifiedPlanSummary(adapter.buildSummary(21L), 21L);
+    }
+
+    @Test
+    void closedPositionMissingAnalysisRunFailsClosed() {
+        UserPositionDO position = closedPosition(22L, "LONG", "plan-no-run", "100", "112", "95", "120");
+        when(userPositionMapper.selectById(22L)).thenReturn(position);
+        when(executionPlanMapper.selectByPlanId("plan-no-run"))
+                .thenReturn(plan("plan-no-run", "ana-no-run", "100", "95", "120"));
+        when(analysisRunMapper.selectById("ana-no-run")).thenReturn(null);
+        when(positionMonitorLogService.listAllByPositionIdForReview(22L)).thenReturn(List.of());
+
+        assertUnverifiedPlanSummary(adapter.buildSummary(22L), 22L);
+    }
+
+    @Test
+    void closedPositionPlanRunAnalysisMismatchFailsClosed() {
+        UserPositionDO position = closedPosition(23L, "LONG", "plan-run-mismatch", "100", "112", "95", "120");
+        when(userPositionMapper.selectById(23L)).thenReturn(position);
+        when(executionPlanMapper.selectByPlanId("plan-run-mismatch"))
+                .thenReturn(plan("plan-run-mismatch", "ana-plan", "100", "95", "120"));
+        when(analysisRunMapper.selectById("ana-plan"))
+                .thenReturn(analysisRun("ana-other", "BTCUSDT"));
+        when(positionMonitorLogService.listAllByPositionIdForReview(23L)).thenReturn(List.of());
+
+        assertUnverifiedPlanSummary(adapter.buildSummary(23L), 23L);
+    }
+
+    @Test
+    void closedPositionAmbiguousAnalysisSourceFailsClosed() {
+        UserPositionDO position = closedPosition(24L, "LONG",
+                PositionMonitorSourceContract.analysisReference("ana-ambiguous"),
+                "100", "112", "95", "120");
+        when(userPositionMapper.selectById(24L)).thenReturn(position);
+        when(executionPlanMapper.selectOnlyByAnalysisId("ana-ambiguous")).thenReturn(null);
+        when(positionMonitorLogService.listAllByPositionIdForReview(24L)).thenReturn(List.of());
+
+        assertUnverifiedPlanSummary(adapter.buildSummary(24L), 24L);
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+    }
+
+    @Test
+    void closedPositionExactVerifiedPlanStillBuildsReview() {
+        UserPositionDO position = closedPosition(25L, "LONG", "plan-exact", "100", "112", "95", "120");
+        when(userPositionMapper.selectById(25L)).thenReturn(position);
+        when(executionPlanMapper.selectByPlanId("plan-exact"))
+                .thenReturn(plan("plan-exact", "ana-exact", "100", "95", "120"));
+        when(positionMonitorLogService.listAllByPositionIdForReview(25L)).thenReturn(List.of());
+
+        UserPositionReviewSummaryDTO summary = adapter.buildSummary(25L);
+
+        assertThat(summary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_FOUND");
+        assertThat(summary.getAnalysisId()).isEqualTo("ana-exact");
+        assertThat(summary.getExecutionPlanId()).isEqualTo("plan-exact");
+        assertThat(summary.getEntryZone()).isEqualTo("100");
+    }
+
+    @Test
+    void unverifiedClosedPositionFeedbackNeverTargetsForeignAnalysis() {
+        UserPositionDO position = closedPosition(26L, "LONG", "plan-foreign-feedback",
+                "100", "112", "95", "120");
+        when(userPositionMapper.selectById(26L)).thenReturn(position);
+        when(executionPlanMapper.selectByPlanId("plan-foreign-feedback"))
+                .thenReturn(plan("plan-foreign-feedback", "ana-foreign-feedback", "100", "95", "120"));
+        when(analysisRunMapper.selectById("ana-foreign-feedback"))
+                .thenReturn(analysisRun("ana-foreign-feedback", "ETHUSDT"));
+        when(reviewService.saveOrUpdate(any())).thenAnswer(invocation -> {
+            WriteReviewResultReq request = invocation.getArgument(0);
+            ReviewStateVO state = new ReviewStateVO();
+            state.setAnalysisId(request.getAnalysisId());
+            return state;
+        });
+
+        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedback(
+                26L, new UserPositionReviewFeedbackReq());
+
+        ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
+        verify(reviewService).saveOrUpdate(captor.capture());
+        assertThat(captor.getValue().getAnalysisId()).isEqualTo("USER_POSITION_26");
+        assertThat(captor.getValue().getAnalysisId()).isNotEqualTo("ana-foreign-feedback");
+        assertThat(result.getAnalysisId()).isEqualTo("USER_POSITION_26");
     }
 
     private static UserPositionDO positionWithStatus(Long id, String status) {
@@ -321,6 +423,29 @@ class UserPositionReviewAdapterTest {
         plan.setInvalidCondition("invalid when stop breached");
         plan.setRecommendedAction("WATCH");
         return plan;
+    }
+
+    private static AnalysisRunDO analysisRun(String analysisId, String symbol) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTraceId("trace-" + analysisId);
+        return run;
+    }
+
+    private static void assertUnverifiedPlanSummary(UserPositionReviewSummaryDTO summary, Long positionId) {
+        assertThat(summary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_MISSING");
+        assertThat(summary.getExecutionDeviationStatus()).isEqualTo("NOT_COMPUTABLE");
+        assertThat(summary.getAnalysisId()).isEqualTo("USER_POSITION_" + positionId);
+        assertThat(summary.getSourceRefId()).isNull();
+        assertThat(summary.getExecutionPlanId()).isNull();
+        assertThat(summary.getExecutionPlanStatus()).isNull();
+        assertThat(summary.getEntryZone()).isNull();
+        assertThat(summary.getPlanStopLoss()).isNull();
+        assertThat(summary.getTakeProfitRules()).isNull();
+        assertThat(summary.getInvalidCondition()).isNull();
+        assertThat(summary.getRecommendedAction()).isNull();
+        assertThat(summary.getReviewReasons()).contains("PLAN_SOURCE_UNVERIFIED");
     }
 
     private static PositionMonitorLogDTO log(Long logId,

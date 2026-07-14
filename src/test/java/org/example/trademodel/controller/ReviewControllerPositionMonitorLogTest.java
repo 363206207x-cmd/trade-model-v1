@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
@@ -23,6 +24,8 @@ import java.util.List;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -66,6 +69,9 @@ class ReviewControllerPositionMonitorLogTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].positionId").value(7))
                 .andExpect(jsonPath("$.data[0].analysisId").value("ana-p0-4"))
+                .andExpect(jsonPath("$.data[0].sourceVerified").value(true))
+                .andExpect(jsonPath("$.data[0].sourceStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data[0].sourceStatusLabel").value("来源已验证"))
                 .andExpect(jsonPath("$.data[0].logicStatus").value("HIGH_RISK"))
                 .andExpect(jsonPath("$.data[0].suggestedAction").value("RISK_REVIEW"))
                 .andExpect(jsonPath("$.data[0].reviewOnly").value(true))
@@ -88,6 +94,25 @@ class ReviewControllerPositionMonitorLogTest {
 
         verify(positionMonitorLogService).listByPositionId(7L, 20);
         verify(reviewService, never()).saveOrUpdate(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void monitorLogControllerHidesInternalSentinel() throws Exception {
+        PositionMonitorLogDTO unverified = dto(12L);
+        unverified.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        unverified.setExecutionPlanId("must-not-survive");
+        when(positionMonitorLogService.listByPositionId(7L, 20)).thenReturn(List.of(unverified));
+
+        String body = mockMvc.perform(get("/api/review/positions/7/monitor-logs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].analysisId").value(nullValue()))
+                .andExpect(jsonPath("$.data[0].executionPlanId").value(nullValue()))
+                .andExpect(jsonPath("$.data[0].sourceVerified").value(false))
+                .andExpect(jsonPath("$.data[0].sourceStatus").value("UNVERIFIED"))
+                .andExpect(jsonPath("$.data[0].sourceStatusLabel").value("来源不可验证"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).doesNotContain(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
     }
 
     @Test

@@ -99,7 +99,7 @@ class PositionMonitorLogServiceImplTest {
     }
 
     @Test
-    void unverifiedMonitorSourceUsesStructuralStatusNotFakePlanIdentity() {
+    void unverifiedMonitorLogDtoHidesInternalSentinel() {
         when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "OPEN"));
         when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
             PositionMonitorLogDO row = invocation.getArgument(0);
@@ -117,8 +117,28 @@ class PositionMonitorLogServiceImplTest {
         assertThat(captor.getValue().getAnalysisId())
                 .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         assertThat(captor.getValue().getExecutionPlanId()).isNull();
-        assertThat(result.getAnalysisId()).isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
-        assertThat(PositionMonitorSourceContract.isUnverifiedAnalysisId(result.getAnalysisId())).isTrue();
+        assertThat(result.getAnalysisId()).isNull();
+        assertThat(result.getExecutionPlanId()).isNull();
+        assertThat(result.isSourceVerified()).isFalse();
+        assertThat(result.getSourceStatus()).isEqualTo("UNVERIFIED");
+        assertThat(result.getSourceStatusLabel()).isEqualTo("来源不可验证");
+        assertThat(result.toString()).doesNotContain(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+    }
+
+    @Test
+    void verifiedMonitorLogRetainsRealAnalysisId() {
+        PositionMonitorLogDO row = logRow(204L, 7L, "analysis-verified", "LOGIC_VALID", "HOLD",
+                LocalDateTime.of(2026, 6, 22, 9, 0));
+        row.setExecutionPlanId("plan-verified");
+        when(positionMonitorLogMapper.selectById(204L)).thenReturn(row);
+
+        PositionMonitorLogDTO result = service.findById(204L);
+
+        assertThat(result.getAnalysisId()).isEqualTo("analysis-verified");
+        assertThat(result.getExecutionPlanId()).isEqualTo("plan-verified");
+        assertThat(result.isSourceVerified()).isTrue();
+        assertThat(result.getSourceStatus()).isEqualTo("VERIFIED");
+        assertThat(result.getSourceStatusLabel()).isEqualTo("来源已验证");
     }
 
     @Test

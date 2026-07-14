@@ -22,6 +22,7 @@ import org.example.trademodel.service.MacroEventService;
 import org.example.trademodel.service.NewsEventService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.service.support.ExternalContextImportRequest;
 import org.example.trademodel.service.support.ExternalContextImportResult;
@@ -185,7 +186,7 @@ class PositionMonitorServiceImplTest {
     }
 
     @Test
-    void stopBreachedPlanInvalidAndIncompleteSourceGateInvalidatePlan() {
+    void stopBreachedAndPersistedInvalidPlansInvalidateWhileIncompleteGateWeakens() {
         UserPositionDO longBreached = position(7L, "LONG", "OPEN", "plan-long-breached", "100", "130");
         arrange(longBreached, "99", risk("LOW", false), plan("plan-long-breached", "ana-7", "VALID", true));
         assertThat(service.monitorUserPosition(7L).getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
@@ -201,8 +202,78 @@ class PositionMonitorServiceImplTest {
         UserPositionDO incompleteSource = position(10L, "LONG", "OPEN", "plan-source-missing", "90", "120");
         arrange(incompleteSource, "100", risk("LOW", false), plan("plan-source-missing", "ana-10", "VALID", false));
         PositionMonitorResultDTO result = service.monitorUserPosition(10L);
-        assertThat(result.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
         assertThat(result.getReasonCodes()).contains("SOURCE_GATE_INCOMPLETE");
+    }
+
+    @Test
+    void needsRevalidationPlanNeverLogsLogicValid() {
+        UserPositionDO position = position(101L, "LONG", "OPEN", "plan-revalidate", "90", "120");
+        ExecutionPlanDO plan = plan("plan-revalidate", "ana-101", "VALID", true);
+        plan.setNeedsRevalidation(true);
+        plan.setRevalidationReason("HOT_RESET_REVIEW_REQUIRED");
+        arrange(position, "100", risk("LOW", false), plan);
+
+        PositionMonitorResultDTO result = service.monitorUserPosition(101L);
+
+        assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(result.getReasonCodes()).contains("PLAN_REVALIDATION_REQUIRED");
+    }
+
+    @Test
+    void validPlanWithMissingExactBoundaryNeverLogsLogicValid() {
+        assertIncompleteBoundary(102L, null, "90", "120");
+    }
+
+    @Test
+    void validPlanWithPlaceholderEntryNeverLogsLogicValid() {
+        assertIncompleteBoundary(103L, "待生成", "90", "120");
+    }
+
+    @Test
+    void validPlanWithPlaceholderStopNeverLogsLogicValid() {
+        assertIncompleteBoundary(104L, "100-101", "—", "120");
+    }
+
+    @Test
+    void validPlanWithPlaceholderTakeProfitNeverLogsLogicValid() {
+        assertIncompleteBoundary(105L, "100-101", "90", "暂无");
+    }
+
+    @Test
+    void placeholderBoundaryVariantsShareOnePolicy() {
+        assertThat(Arrays.asList(null, "", "  ", "暂无", "—", "待生成"))
+                .allSatisfy(value -> assertThat(ExecutionPlanReviewPolicy.isConcreteBoundary(value)).isFalse());
+        assertThat(ExecutionPlanReviewPolicy.isConcreteBoundary("100-101")).isTrue();
+    }
+
+    @Test
+    void invalidPlanStillProducesPlanInvalidated() {
+        UserPositionDO position = position(106L, "LONG", "OPEN", "plan-invalid-contract", "90", "120");
+        arrange(position, "100", risk("LOW", false),
+                plan("plan-invalid-contract", "ana-106", "INVALID", true));
+
+        PositionMonitorResultDTO result = service.monitorUserPosition(106L);
+
+        assertThat(result.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(result.getReasonCodes()).contains("PLAN_INVALID");
+    }
+
+    @Test
+    void blockedPlanStillProducesPlanInvalidated() {
+        UserPositionDO position = position(107L, "LONG", "OPEN", "plan-blocked-contract", "90", "120");
+        ExecutionPlanDO plan = plan("plan-blocked-contract", "ana-107", "BLOCKED", true);
+        plan.setSourceGateStatus("BLOCKED");
+        arrange(position, "100", risk("LOW", false), plan);
+
+        PositionMonitorResultDTO result = service.monitorUserPosition(107L);
+
+        assertThat(result.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(result.getReasonCodes()).contains("PLAN_INVALID");
     }
 
     @Test
@@ -520,7 +591,30 @@ class PositionMonitorServiceImplTest {
         plan.setExecutionPlanStatus(status);
         plan.setSourceGateStatus(sourceGateComplete ? "VALID" : "INCOMPLETE");
         plan.setSourceGateComplete(sourceGateComplete);
+        plan.setEntryZone("100-101");
+        plan.setStopLoss("90");
+        plan.setTakeProfitRules("120");
         return plan;
+    }
+
+    private void assertIncompleteBoundary(Long positionId,
+                                          String entryZone,
+                                          String stopLoss,
+                                          String takeProfitRules) {
+        String planId = "plan-boundary-" + positionId;
+        String analysisId = "ana-boundary-" + positionId;
+        UserPositionDO position = position(positionId, "LONG", "OPEN", planId, "90", "120");
+        ExecutionPlanDO plan = plan(planId, analysisId, "VALID", true);
+        plan.setEntryZone(entryZone);
+        plan.setStopLoss(stopLoss);
+        plan.setTakeProfitRules(takeProfitRules);
+        arrange(position, "100", risk("LOW", false), plan);
+
+        PositionMonitorResultDTO result = service.monitorUserPosition(positionId);
+
+        assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(result.getReasonCodes()).contains("PLAN_BOUNDARY_INCOMPLETE");
     }
 
     private static PositionMonitorLogDTO previousLog(String riskLevel) {
