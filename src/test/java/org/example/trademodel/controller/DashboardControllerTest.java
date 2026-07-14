@@ -478,6 +478,16 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void verifiedOriginalPlanUsesBackendIdentityAndLabelWithoutInferringValidity() throws Exception {
+        String renderer = functionBody("renderHomeExecutionFromPayload");
+
+        assertThat(renderer).contains(
+                "String(s.originalPlanIdentity || \"\").toUpperCase() !== \"VERIFIED\"",
+                "escapeHtml(s.originalPlanLabel || \"原执行计划，仅用于持仓复核和复盘对照\")");
+        assertThat(renderer).doesNotContain("originalPlanCurrentValidity");
+    }
+
+    @Test
     void positionSourceFixtureSeparatesVerifiedAndUnverifiedOriginalPlans() throws Exception {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
         int unverifiedStart = fixture.indexOf("\"originalPlanIdentity\": \"UNVERIFIED\"");

@@ -759,7 +759,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         try {
             ExecutionPlanDO plan = requestedPlanId != null
                     ? executionPlanMapper.selectByPlanId(requestedPlanId)
-                    : executionPlanMapper.selectLatestByAnalysisId(requestedAnalysisId);
+                    : executionPlanMapper.selectOnlyByAnalysisId(requestedAnalysisId);
             String resolvedPlanId = plan != null ? trimToNull(plan.getPlanId()) : null;
             String resolvedAnalysisId = plan != null ? trimToNull(plan.getAnalysisId()) : null;
             if (resolvedPlanId == null || resolvedAnalysisId == null
@@ -781,8 +781,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             position.setSourceAnalysisId(resolvedAnalysisId);
             position.setSourceExecutionPlanId(resolvedPlanId);
             position.setSourceTraceId(sourceTraceId);
-            return new ResolvedOriginalPlan(true, sourceDecision, resolvedAnalysisId,
-                    resolvedPlanId, sourceTraceId, null);
+            return new ResolvedOriginalPlan("VERIFIED", plan, sourceDecision, sourceRun,
+                    resolvedAnalysisId, resolvedPlanId, sourceTraceId, null);
         } catch (RuntimeException ignored) {
             clearUnverifiedOriginalPlanSource(position);
             return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_SOURCE_READ_FAILED");
@@ -831,7 +831,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
 
             DecisionResultVO originalDecision = resolvedOriginalPlan.decision();
-            OriginalPlanPresentation presentation = originalPlanPresentation(originalDecision);
+            OriginalPlanPresentation presentation = originalPlanPresentation(resolvedOriginalPlan);
             suggestion.setOriginalPlanIdentity("VERIFIED");
             suggestion.setOriginalPlanCurrentValidity(presentation.status());
             suggestion.setOriginalPlanLabel(presentation.label());
@@ -950,9 +950,40 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return suggestion;
     }
 
-    private OriginalPlanPresentation originalPlanPresentation(DecisionResultVO decision) {
+    private OriginalPlanPresentation originalPlanPresentation(ResolvedOriginalPlan resolvedOriginalPlan) {
+        DecisionResultVO decision = resolvedOriginalPlan != null ? resolvedOriginalPlan.decision() : null;
+        ExecutionPlanDO executionPlan = resolvedOriginalPlan != null ? resolvedOriginalPlan.executionPlan() : null;
         PlanValidity validity = resolvePlanValidity(decision);
-        SnapshotTraceStatus traceStatus = executionSnapshotTraceStatus(decision);
+        if (executionPlan == null) {
+            return new OriginalPlanPresentation("PLAN_INCOMPLETE",
+                    "原计划边界不完整，仅用于历史复核", validity);
+        }
+        if (Boolean.TRUE.equals(executionPlan.getNeedsRevalidation())) {
+            String reason = revalidationReviewCopy(executionPlan);
+            String label = "原计划需要重新验证，仅用于历史复核";
+            return new OriginalPlanPresentation("REVALIDATION_REQUIRED",
+                    reason == null ? label : label + "：" + reason, validity);
+        }
+        String executionPlanStatus = upper(executionPlan.getExecutionPlanStatus());
+        String sourceGateStatus = upper(executionPlan.getSourceGateStatus());
+        if ("INVALID".equals(executionPlanStatus) || "INVALID".equals(sourceGateStatus)) {
+            return new OriginalPlanPresentation("PLAN_INVALID",
+                    "原计划已失效，仅用于历史复核", validity);
+        }
+        if ("BLOCKED".equals(executionPlanStatus) || "BLOCKED".equals(sourceGateStatus)) {
+            return new OriginalPlanPresentation("PLAN_BLOCKED",
+                    "原计划已被门控阻断，仅用于历史复核", validity);
+        }
+        if ("INCOMPLETE".equals(executionPlanStatus)
+                || "INCOMPLETE".equals(sourceGateStatus)
+                || !Boolean.TRUE.equals(executionPlan.getSourceGateComplete())
+                || !activeCompatiblePlanStatus(executionPlanStatus)
+                || !activeCompatiblePlanStatus(sourceGateStatus)) {
+            return new OriginalPlanPresentation("PLAN_INCOMPLETE",
+                    "原计划边界不完整，仅用于历史复核", validity);
+        }
+        SnapshotTraceStatus traceStatus = executionSnapshotTraceStatus(
+                decision, resolvedOriginalPlan.analysisRun());
         if (traceStatus == SnapshotTraceStatus.MISMATCH) {
             return new OriginalPlanPresentation("STATE_MISMATCH",
                     "状态已更新，原计划不再作为当前执行依据", validity);
@@ -964,7 +995,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return switch (validity.status()) {
             case ACTIVE -> new OriginalPlanPresentation("ACTIVE",
                     "原执行计划，仅用于持仓复核和复盘对照", validity);
-            case EXPIRED -> new OriginalPlanPresentation("EXPIRED", "原计划已失效", validity);
+            case EXPIRED -> new OriginalPlanPresentation("EXPIRED",
+                    "原计划已失效，仅用于历史复核", validity);
             case TIMEZONE_UNVERIFIED -> new OriginalPlanPresentation("TIMEZONE_UNVERIFIED",
                     "历史计划时区不可验证", validity);
             case NOT_ACTIVE -> new OriginalPlanPresentation("NOT_ACTIVE",
@@ -972,6 +1004,26 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case INVALID -> new OriginalPlanPresentation("INVALID",
                     "原计划有效期异常，仅用于历史复核", validity);
         };
+    }
+
+    private boolean activeCompatiblePlanStatus(String status) {
+        return "VALID".equals(status) || "REVIEW_ONLY".equals(status);
+    }
+
+    private String revalidationReviewCopy(ExecutionPlanDO executionPlan) {
+        String reason = trimToNull(executionPlan != null ? executionPlan.getRevalidationReason() : null);
+        String normalized = upper(reason);
+        if (normalized.contains("EXTREME_PRICE_MOVE")) return "极端价格波动触发重新验证";
+        if (normalized.contains("OI_COLLAPSE")) return "持仓量快速收缩触发重新验证";
+        if (normalized.contains("LIQUIDITY_DRAIN")) return "流动性快速下降触发重新验证";
+        if (normalized.contains("SYSTEMIC_SHOCK")) return "系统性冲击触发重新验证";
+        if (reason != null && reason.codePoints().anyMatch(codePoint -> codePoint >= 0x4E00 && codePoint <= 0x9FFF)) {
+            return reason.length() <= 120 ? reason : reason.substring(0, 120);
+        }
+        if (trimToNull(executionPlan != null ? executionPlan.getHotResetEventId() : null) != null) {
+            return "Hot Reset 已触发重新验证";
+        }
+        return reason == null ? null : "重验证原因已记录，等待人工复核";
     }
 
     private void populateOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
@@ -1668,13 +1720,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision) {
+        return executionSnapshotTraceStatus(decision, null);
+    }
+
+    private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision, AnalysisRunDO resolvedRun) {
         if (decision == null || !hasText(decision.getAnalysisId()) || !hasText(decision.getSymbol())
-                || assetStateMapper == null || analysisRunMapper == null) {
+                || assetStateMapper == null || (resolvedRun == null && analysisRunMapper == null)) {
             return SnapshotTraceStatus.UNVERIFIED;
         }
         try {
             AssetStateDO state = assetStateMapper.selectBySymbol(normalizeSymbol(decision.getSymbol()));
-            AnalysisRunDO run = analysisRunMapper.selectById(decision.getAnalysisId());
+            AnalysisRunDO run = resolvedRun != null
+                    ? resolvedRun
+                    : analysisRunMapper.selectById(decision.getAnalysisId());
             String stateTraceId = state != null ? trimToNull(state.getTraceId()) : null;
             String decisionTraceId = run != null ? trimToNull(run.getTraceId()) : null;
             if (stateTraceId == null || decisionTraceId == null) return SnapshotTraceStatus.UNVERIFIED;
@@ -2028,14 +2086,21 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private record ResolvedOriginalPlan(boolean verified,
+    private record ResolvedOriginalPlan(String identityStatus,
+                                        ExecutionPlanDO executionPlan,
                                         DecisionResultVO decision,
+                                        AnalysisRunDO analysisRun,
                                         String analysisId,
                                         String executionPlanId,
                                         String traceId,
-                                        String reason) {
-        private static ResolvedOriginalPlan unverified(String reason) {
-            return new ResolvedOriginalPlan(false, null, null, null, null, reason);
+                                        String failureReason) {
+        private boolean verified() {
+            return "VERIFIED".equals(identityStatus);
+        }
+
+        private static ResolvedOriginalPlan unverified(String failureReason) {
+            return new ResolvedOriginalPlan("UNVERIFIED", null, null, null,
+                    null, null, null, failureReason);
         }
     }
 

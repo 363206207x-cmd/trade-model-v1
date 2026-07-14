@@ -683,7 +683,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void monitorAnalysisIdResolvesExactOriginalPlan() {
+    void analysisOnlyWithSinglePlanResolvesOriginalPlan() {
         UserPositionVO position = activeManualPosition(34L, "BTCUSDT", null);
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
@@ -697,8 +697,95 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo("analysis-plan-A");
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
         assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
-        verify(executionPlanMapper).selectLatestByAnalysisId("analysis-plan-A");
+        verify(executionPlanMapper).selectOnlyByAnalysisId("analysis-plan-A");
         verify(executionPlanMapper, never()).selectByPlanId(anyString());
+    }
+
+    @Test
+    void analysisOnlyWithMultiplePlansFailsClosed() {
+        UserPositionVO position = activeManualPosition(341L, "BTCUSDT", null);
+        PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-shared");
+        when(positionMonitorLogService.listByPositionId(341L, 1)).thenReturn(List.of(monitor));
+        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-shared")).thenReturn(null);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        verify(executionPlanMapper).selectOnlyByAnalysisId("analysis-shared");
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+    }
+
+    @Test
+    void analysisOnlyWithNoPlanFailsClosed() {
+        UserPositionVO position = activeManualPosition(342L, "BTCUSDT", null);
+        PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-no-plan");
+        when(positionMonitorLogService.listByPositionId(342L, 1)).thenReturn(List.of(monitor));
+        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-no-plan")).thenReturn(null);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        verify(decisionResultMapper, never()).findByAnalysisIdAndPlanIdJoined(anyString(), anyString());
+    }
+
+    @Test
+    void analysisOnlyMultiplePlansNeverSelectsLatestSibling() {
+        UserPositionVO position = activeManualPosition(343L, "BTCUSDT", null);
+        PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-shared");
+        ExecutionPlanDO latestSiblingB = validExecutionPlan("plan-B", "analysis-shared");
+        latestSiblingB.setEntryZone("B-entry");
+        when(positionMonitorLogService.listByPositionId(343L, 1)).thenReturn(List.of(monitor));
+        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-shared")).thenReturn(null);
+        lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-shared")).thenReturn(latestSiblingB);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+    }
+
+    @Test
+    void monitorExecutionPlanIdStillResolvesExactPlanAmongSiblings() {
+        UserPositionVO position = activeManualPosition(344L, "BTCUSDT", null);
+        DecisionResultVO planA = sourcePlanDecision("analysis-shared", "BTCUSDT", "A");
+        DecisionResultVO latestSiblingB = sourcePlanDecision("analysis-shared", "BTCUSDT", "B");
+        stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-A");
+        lenient().when(executionPlanMapper.selectOnlyByAnalysisId("analysis-shared")).thenReturn(null);
+        lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-shared"))
+                .thenReturn(validExecutionPlan("plan-B", "analysis-shared"));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestSiblingB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
+        verify(executionPlanMapper).selectByPlanId("plan-A");
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+    }
+
+    @Test
+    void monitorExecutionPlanIdAndAnalysisIdMismatchFailsClosed() {
+        UserPositionVO position = activeManualPosition(345L, "BTCUSDT", null);
+        PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-monitor-A");
+        monitor.setExecutionPlanId("plan-A");
+        when(positionMonitorLogService.listByPositionId(345L, 1)).thenReturn(List.of(monitor));
+        when(executionPlanMapper.selectByPlanId("plan-A"))
+                .thenReturn(validExecutionPlan("plan-A", "analysis-plan-B"));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        verify(decisionResultMapper, never()).findByAnalysisIdAndPlanIdJoined(anyString(), anyString());
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
     }
 
     @Test
@@ -769,6 +856,132 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPositions().get(0).getSourceRefId()).isEqualTo("plan-or-analysis-type-unknown");
         verify(executionPlanMapper, never()).selectByPlanId("plan-or-analysis-type-unknown");
         verify(executionPlanMapper, never()).selectLatestByAnalysisId("plan-or-analysis-type-unknown");
+    }
+
+    @Test
+    void invalidOriginalPlanIsNotMarkedActive() {
+        OriginalPlanFixture fixture = originalPlanFixture(381L, "INVALID-A");
+        fixture.executionPlan().setExecutionPlanStatus("INVALID");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_INVALID", "原计划已失效，仅用于历史复核", "INVALID-A");
+    }
+
+    @Test
+    void blockedOriginalPlanIsNotMarkedActive() {
+        OriginalPlanFixture fixture = originalPlanFixture(382L, "BLOCKED-A");
+        fixture.executionPlan().setExecutionPlanStatus("BLOCKED");
+        fixture.executionPlan().setSourceGateStatus("BLOCKED");
+        fixture.executionPlan().setSourceGateComplete(false);
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_BLOCKED",
+                "原计划已被门控阻断，仅用于历史复核", "BLOCKED-A");
+    }
+
+    @Test
+    void incompleteOriginalPlanIsNotMarkedActive() {
+        OriginalPlanFixture fixture = originalPlanFixture(383L, "INCOMPLETE-A");
+        fixture.executionPlan().setExecutionPlanStatus("INCOMPLETE");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_INCOMPLETE",
+                "原计划边界不完整，仅用于历史复核", "INCOMPLETE-A");
+    }
+
+    @Test
+    void sourceGateIncompleteOriginalPlanIsNotMarkedActive() {
+        OriginalPlanFixture fixture = originalPlanFixture(384L, "SOURCE-INCOMPLETE-A");
+        fixture.executionPlan().setSourceGateStatus("INCOMPLETE");
+        fixture.executionPlan().setSourceGateComplete(false);
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_INCOMPLETE",
+                "原计划边界不完整，仅用于历史复核", "SOURCE-INCOMPLETE-A");
+    }
+
+    @Test
+    void sourceGateCompleteFalseOriginalPlanIsNotMarkedActive() {
+        OriginalPlanFixture fixture = originalPlanFixture(3841L, "SOURCE-FLAG-INCOMPLETE-A");
+        fixture.executionPlan().setSourceGateStatus("VALID");
+        fixture.executionPlan().setSourceGateComplete(false);
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_INCOMPLETE",
+                "原计划边界不完整，仅用于历史复核", "SOURCE-FLAG-INCOMPLETE-A");
+    }
+
+    @Test
+    void needsRevalidationOriginalPlanIsNotMarkedActive() {
+        OriginalPlanFixture fixture = originalPlanFixture(385L, "REVALIDATE-A");
+        fixture.executionPlan().setNeedsRevalidation(true);
+        fixture.executionPlan().setRevalidationReason("证据结构发生变化，等待重新验证");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "REVALIDATION_REQUIRED",
+                "原计划需要重新验证，仅用于历史复核：证据结构发生变化，等待重新验证", "REVALIDATE-A");
+    }
+
+    @Test
+    void hotResetRevalidationReasonIsPreservedAsReviewCopy() {
+        OriginalPlanFixture fixture = originalPlanFixture(386L, "HOT-RESET-A");
+        fixture.executionPlan().setNeedsRevalidation(true);
+        fixture.executionPlan().setRevalidationReason("EXTREME_PRICE_MOVE:PRICE_MOVE_THRESHOLD_BREACHED");
+        fixture.executionPlan().setHotResetEventId("hot-reset-event-1");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "REVALIDATION_REQUIRED",
+                "原计划需要重新验证，仅用于历史复核：极端价格波动触发重新验证", "HOT-RESET-A");
+        assertThat(suggestion.getOriginalPlanLabel()).doesNotContain("EXTREME_PRICE_MOVE");
+    }
+
+    @Test
+    void verifiedInactivePlanStillShowsOnlyHistoricalPlanA() {
+        OriginalPlanFixture fixture = originalPlanFixtureWithLatestB(387L, "HISTORICAL-A");
+        fixture.executionPlan().setExecutionPlanStatus("BLOCKED");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_BLOCKED",
+                "原计划已被门控阻断，仅用于历史复核", "HISTORICAL-A");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("LATEST-B-entry");
+        assertThat(suggestion.getStatus()).isNotEqualTo("USABLE_REVIEW_PLAN");
+    }
+
+    @Test
+    void invalidPlanNeverFallsBackToLatestPlanB() {
+        OriginalPlanFixture fixture = originalPlanFixtureWithLatestB(388L, "INVALID-SOURCE-A");
+        fixture.executionPlan().setExecutionPlanStatus("INVALID");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_INVALID",
+                "原计划已失效，仅用于历史复核", "INVALID-SOURCE-A");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("LATEST-B-entry");
+        assertThat(suggestion.getSourceAnalysisId()).isNotEqualTo("analysis-latest-B");
+    }
+
+    @Test
+    void executionPlanStatusAndDecisionExpiryUseDeterministicPriority() {
+        OriginalPlanFixture fixture = originalPlanFixture(389L, "PRIORITY-A");
+        fixture.executionPlan().setExecutionPlanStatus("INVALID");
+        fixture.decision().setValidFrom(OffsetDateTime.parse("2026-06-01T00:00:00Z"));
+        fixture.decision().setExpiresAt(OffsetDateTime.parse("2026-06-02T00:00:00Z"));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertVerifiedHistoricalPlan(suggestion, "PLAN_INVALID",
+                "原计划已失效，仅用于历史复核", "PRIORITY-A");
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isNotEqualTo("STATE_MISMATCH");
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isNotEqualTo("EXPIRED");
+        verify(assetStateMapper, never()).selectBySymbol("BTCUSDT");
     }
 
     @Test
@@ -1622,42 +1835,40 @@ class DashboardHomeServiceImplTest {
         return decision;
     }
 
-    private void stubMonitorExecutionPlanSource(UserPositionVO position,
-                                                DecisionResultVO sourceDecision,
-                                                String planId,
-                                                String sourceTraceId,
-                                                String currentStateTraceId) {
+    private ExecutionPlanDO stubMonitorExecutionPlanSource(UserPositionVO position,
+                                                           DecisionResultVO sourceDecision,
+                                                           String planId,
+                                                           String sourceTraceId,
+                                                           String currentStateTraceId) {
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         monitor.setExecutionPlanId(planId);
         monitor.setLogicStatus("LOGIC_VALID");
         when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
-        stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
+        return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
     }
 
-    private void stubMonitorAnalysisSource(UserPositionVO position,
-                                           DecisionResultVO sourceDecision,
-                                           String planId,
-                                           String sourceTraceId,
-                                           String currentStateTraceId) {
+    private ExecutionPlanDO stubMonitorAnalysisSource(UserPositionVO position,
+                                                      DecisionResultVO sourceDecision,
+                                                      String planId,
+                                                      String sourceTraceId,
+                                                      String currentStateTraceId) {
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
-        stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, true);
+        return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, true);
     }
 
-    private void stubResolvedOriginalPlan(DecisionResultVO sourceDecision,
-                                          String planId,
-                                          String sourceTraceId,
-                                          String currentStateTraceId,
-                                          boolean resolveByAnalysisId) {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId(sourceDecision.getAnalysisId());
+    private ExecutionPlanDO stubResolvedOriginalPlan(DecisionResultVO sourceDecision,
+                                                     String planId,
+                                                     String sourceTraceId,
+                                                     String currentStateTraceId,
+                                                     boolean resolveByAnalysisId) {
+        ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
         if (resolveByAnalysisId) {
-            when(executionPlanMapper.selectLatestByAnalysisId(sourceDecision.getAnalysisId())).thenReturn(plan);
+            when(executionPlanMapper.selectOnlyByAnalysisId(sourceDecision.getAnalysisId())).thenReturn(plan);
         } else {
             when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
         }
@@ -1675,6 +1886,62 @@ class DashboardHomeServiceImplTest {
         state.setState(AssetStateEnum.CANDIDATE);
         state.setTraceId(currentStateTraceId);
         lenient().when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
+        return plan;
+    }
+
+    private PositionMonitorLogDTO analysisOnlyMonitor(UserPositionVO position, String analysisId) {
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setAnalysisId(analysisId);
+        monitor.setLogicStatus("LOGIC_VALID");
+        return monitor;
+    }
+
+    private ExecutionPlanDO validExecutionPlan(String planId, String analysisId) {
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setPlanId(planId);
+        plan.setAnalysisId(analysisId);
+        plan.setExecutionPlanStatus("VALID");
+        plan.setSourceGateStatus("VALID");
+        plan.setSourceGateComplete(true);
+        plan.setNeedsRevalidation(false);
+        return plan;
+    }
+
+    private OriginalPlanFixture originalPlanFixture(Long positionId, String marker) {
+        UserPositionVO position = activeManualPosition(positionId, "BTCUSDT", null);
+        DecisionResultVO sourceDecision = sourcePlanDecision(
+                "analysis-source-" + positionId, "BTCUSDT", marker);
+        ExecutionPlanDO plan = stubMonitorExecutionPlanSource(
+                position, sourceDecision, "plan-source-" + positionId,
+                "trace-source-" + positionId, "trace-source-" + positionId);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        return new OriginalPlanFixture(position, plan, sourceDecision);
+    }
+
+    private OriginalPlanFixture originalPlanFixtureWithLatestB(Long positionId, String marker) {
+        OriginalPlanFixture fixture = originalPlanFixture(positionId, marker);
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "LATEST-B");
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        return fixture;
+    }
+
+    private void assertVerifiedHistoricalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                              String expectedValidity,
+                                              String expectedLabel,
+                                              String marker) {
+        assertThat(suggestion.getStatus()).isEqualTo("POSITION_MONITORING");
+        assertThat(suggestion.getPositionMode()).isTrue();
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo(expectedValidity);
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isNotEqualTo("ACTIVE");
+        assertThat(suggestion.getOriginalPlanLabel()).isEqualTo(expectedLabel);
+        assertThat(suggestion.getEntryZone()).isEqualTo(marker + "-entry");
+        assertThat(suggestion.getStopLoss()).isEqualTo(marker + "-stop");
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo(marker + "-tp");
+        assertThat(suggestion.getSourceAnalysisId()).isNotBlank();
+        assertThat(suggestion.getSourceExecutionPlanId()).isNotBlank();
+        assertThat(suggestion.getStatus()).isNotEqualTo("USABLE_REVIEW_PLAN");
     }
 
     private void assertUnverifiedOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion) {
@@ -1722,9 +1989,7 @@ class DashboardHomeServiceImplTest {
         monitor.setLogicStatus("LOGIC_VALID");
         when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
 
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId(sourceDecision.getAnalysisId());
+        ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
         when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
         when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(sourceDecision.getAnalysisId(), planId))
                 .thenReturn(sourceDecision);
@@ -1740,6 +2005,11 @@ class DashboardHomeServiceImplTest {
         state.setState(AssetStateEnum.CANDIDATE);
         state.setTraceId(traceId);
         when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
+    }
+
+    private record OriginalPlanFixture(UserPositionVO position,
+                                       ExecutionPlanDO executionPlan,
+                                       DecisionResultVO decision) {
     }
 
     private String structuredAiRoleResults(List<AiProviderReviewResult> roleResults,

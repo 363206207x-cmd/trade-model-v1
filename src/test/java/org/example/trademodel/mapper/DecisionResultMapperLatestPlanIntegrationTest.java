@@ -1,6 +1,7 @@
 package org.example.trademodel.mapper;
 
 import org.example.trademodel.TradeModelApplication;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,9 @@ class DecisionResultMapperLatestPlanIntegrationTest {
 
     @Autowired
     private DecisionResultMapper decisionResultMapper;
+
+    @Autowired
+    private ExecutionPlanMapper executionPlanMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -112,7 +116,7 @@ class DecisionResultMapperLatestPlanIntegrationTest {
     }
 
     @Test
-    void findByAnalysisIdAndPlanIdJoined_returnsExactSourcePlanInsteadOfLatestSiblingPlan() {
+    void analysisOnlyMultiplePlansDoNotResolveAndExactPlanIdStillReturnsA() {
         jdbcTemplate.update(
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score, trace_id) "
                         + "VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?, ?)",
@@ -133,6 +137,13 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                         + "VALUES (?,?,?,?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
                 "plan-latest-B", "ana-source-plan-it", "SEMI_STRUCTURED", "B-entry", "B-stop", "B-tp",
                 "B-leverage", "B-position", "B-invalid");
+
+        assertThat(executionPlanMapper.selectOnlyByAnalysisId("ana-source-plan-it")).isNull();
+
+        ExecutionPlanDO exactPlan = executionPlanMapper.selectByPlanId("plan-source-A");
+        assertThat(exactPlan).isNotNull();
+        assertThat(exactPlan.getPlanId()).isEqualTo("plan-source-A");
+        assertThat(exactPlan.getEntryZone()).isEqualTo("A-entry");
 
         DecisionResultVO row = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
                 "ana-source-plan-it", "plan-source-A");

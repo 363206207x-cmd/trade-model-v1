@@ -17,6 +17,15 @@ public interface ExecutionPlanMapper {
     @Select("SELECT * FROM tm_execution_plan WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
     ExecutionPlanDO selectLatestByAnalysisId(@Param("analysisId") String analysisId);
 
+    @Select("""
+            SELECT ep.*
+            FROM tm_execution_plan ep
+            WHERE ep.analysis_id = #{analysisId}
+              AND (SELECT COUNT(*) FROM tm_execution_plan WHERE analysis_id = #{analysisId}) = 1
+            LIMIT 1
+            """)
+    ExecutionPlanDO selectOnlyByAnalysisId(@Param("analysisId") String analysisId);
+
     @Select("SELECT * FROM tm_execution_plan WHERE plan_id = #{planId} ORDER BY create_time DESC LIMIT 1")
     ExecutionPlanDO selectByPlanId(@Param("planId") String planId);
 
