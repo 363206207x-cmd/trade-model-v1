@@ -21,6 +21,7 @@ SCENARIOS = {
     "normal",
     "low-quality",
     "ai-disabled-blocked",
+    "ai-all-abstain",
     "ai-timeout",
     "plan-expired",
     "trace-mismatch",
@@ -170,6 +171,43 @@ def ai_decision_success() -> dict[str, object]:
             "consistencySummary": "三角色结论大体一致，保留短周期风险复核",
             "confused": False,
             "aiApplicable": True,
+            "directionalPushBlocked": False,
+            "downgradeReason": "暂无降级原因",
+        },
+    }
+
+
+def ai_decision_all_abstain() -> dict[str, object]:
+    tabs = []
+    for role, role_label in (
+        ("GPT_FINAL", "最终裁决官"),
+        ("GEMINI_REVIEW", "冲突复核官"),
+        ("GROK_CHALLENGE", "反方挑战官"),
+    ):
+        tabs.append({
+            "role": role,
+            "roleLabel": role_label,
+            "runStatus": "SUCCESS",
+            "runStatusLabel": "复核成功",
+            "resultAvailable": True,
+            "stance": "ABSTAIN",
+            "reviewConclusion": "证据不足，暂不判断",
+        })
+    return {
+        "schemaVersion": "AI_ROLE_RESULTS_SCHEMA_V1",
+        "runStatus": "SUCCESS",
+        "runStatusLabel": "正常",
+        "decisionMode": "NOT_APPLICABLE",
+        "decisionModeLabel": "不适用",
+        "activeTab": "GPT_FINAL",
+        "tabs": tabs,
+        "consistency": {
+            "level": None,
+            "consistencyLevel": "不适用",
+            "consistencyScore": None,
+            "consistencySummary": "AI 成功返回，但所有角色均因证据不足而弃权",
+            "confused": False,
+            "aiApplicable": False,
             "directionalPushBlocked": False,
             "downgradeReason": "暂无降级原因",
         },
@@ -329,6 +367,12 @@ def scenario_home(scenario: str, selected_symbol: str) -> dict[str, object]:
         home["systemState"]["aiConflict"] = status_card("不适用", "AI 复核未启用", "PARTIAL")
         home["systemState"]["confused"] = status_card("否", "AI 一致性不适用")
 
+    elif scenario == "ai-all-abstain":
+        home["aiDecision"] = ai_decision_all_abstain()
+        home["systemState"]["aiConflict"] = status_card(
+            "不适用", "本轮未形成可裁决 AI 意见", "NOT_APPLICABLE")
+        home["systemState"]["confused"] = status_card("否", "AI 一致性不适用")
+
     elif scenario == "ai-timeout":
         home["header"].update({"aiStatus": "TIMEOUT", "aiStatusLabel": "调用超时"})
         home["aiDecision"] = unavailable_ai("TIMEOUT", "调用超时", "AI 复核超时，本轮未采纳该角色")
@@ -387,6 +431,43 @@ def detail_fixture(symbol: str) -> dict[str, object]:
         "evidenceTopItems": [],
         "scoreTopItems": [],
     }
+
+
+def render_static_fixture(scenario: str, output: Path) -> None:
+    """Build a self-contained fixture for browser environments that cannot bind localhost."""
+    home_payload = {"success": True, "data": scenario_home(scenario, "BTCUSDT")}
+    detail_payload = detail_fixture("BTCUSDT")
+    fixtures = json.dumps({
+        "home": home_payload,
+        "detail": detail_payload,
+        "localReal": {"mode": "VISUAL_ACCEPTANCE_FIXTURE", "status": "OFFLINE"},
+        "summary": {"systemHealth": {"status": "离线视觉验收"}, "decisions": []},
+    }, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    interceptor = f"""<script id=\"dashboard-static-fixture\">
+(() => {{
+  const fixtures = {fixtures};
+  window.fetch = function(input, options) {{
+    const method = String((options && options.method) || "GET").toUpperCase();
+    const url = String(input || "");
+    if (method !== "GET") {{
+      return Promise.resolve(new Response(JSON.stringify({{success:false,message:"离线视觉验收 fixture 拒绝所有写请求"}}), {{status:405,headers:{{"Content-Type":"application/json"}}}}));
+    }}
+    let payload = {{success:true,data:{{}},status:"NOT_APPLICABLE",statusLabel:"不适用"}};
+    if (url.indexOf("/api/dashboard/home") >= 0) payload = fixtures.home;
+    else if (url.indexOf("/api/dashboard/detail") >= 0) payload = fixtures.detail;
+    else if (url.indexOf("/api/local-real/status") >= 0) payload = fixtures.localReal;
+    else if (url.indexOf("/api/dashboard/summary") >= 0) payload = fixtures.summary;
+    return Promise.resolve(new Response(JSON.stringify(payload), {{status:200,headers:{{"Content-Type":"application/json"}}}}));
+  }};
+}})();
+</script>"""
+    html = TEMPLATE.read_text(encoding="utf-8").replace("REFRESH_MS = 30000;", "REFRESH_MS = 0;")
+    html = html.replace("</head>", interceptor + "\n</head>", 1)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(html, encoding="utf-8")
+    print(f"DASHBOARD_STATIC_FIXTURE: {output.resolve()}", flush=True)
+    print("DASHBOARD_VISUAL_FIXTURE_EXTERNAL_CALLS: 0", flush=True)
+    print("DASHBOARD_VISUAL_FIXTURE_WRITES: REJECTED", flush=True)
 
 
 class FixtureHandler(BaseHTTPRequestHandler):
@@ -521,7 +602,12 @@ class FixtureHandler(BaseHTTPRequestHandler):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Offline Dashboard visual acceptance fixture server")
     parser.add_argument("--port", type=int, default=18081)
+    parser.add_argument("--scenario", choices=sorted(SCENARIOS), default="normal")
+    parser.add_argument("--static-output", type=Path)
     args = parser.parse_args()
+    if args.static_output:
+        render_static_fixture(args.scenario, args.static_output)
+        return
     server = ThreadingHTTPServer(("127.0.0.1", args.port), FixtureHandler)
     print(f"DASHBOARD_VISUAL_FIXTURE_URL: http://127.0.0.1:{args.port}/dashboard?scenario=normal", flush=True)
     print("DASHBOARD_VISUAL_FIXTURE_EXTERNAL_CALLS: 0", flush=True)

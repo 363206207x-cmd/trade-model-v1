@@ -3,6 +3,7 @@ package org.example.trademodel.service.impl;
 import java.time.LocalDate;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.RuntimeMetricService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.springframework.stereotype.Service;
@@ -95,7 +97,8 @@ public class DecisionServiceImpl implements DecisionService {
 
         vo.setConfusedCount(assetStateMapper.countDirectionalPushBlocked(
                 ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD));
-        vo.setPendingCount(pushSnapshotMapper.countPendingRecheckBacklog());
+        vo.setPendingCount(pushSnapshotMapper.countPendingRecheckBacklog(
+                UtcLocalTimePolicy.now(Clock.systemUTC())));
         vo.setReverseSignalCount(decisionResultMapper.countOpenSymbolsWithReverseSignal());
 
         // Dashboard 口径：展示 tm_asset_state 全库最近一次 hot_reset_time 对应的“当前行语义”。

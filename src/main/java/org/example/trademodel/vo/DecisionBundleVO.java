@@ -42,7 +42,10 @@ public class DecisionBundleVO {
 
     /** 推送二次校验漂移基准：本 run 最后一根 1m 收盘价（与 K 线事实一致） */
     private BigDecimal pushTriggerPrice;
-    /** 推送计划过期时刻（本 run 决策时刻 + 固定 TTL） */
+    /**
+     * UTC-naive compatibility timestamp for {@code tm_push_snapshot.expires_at}.
+     * It must only be produced and consumed with {@link java.time.ZoneOffset#UTC}.
+     */
     private LocalDateTime pushExpiresAt;
     /** 权威计划有效起点，始终携带 UTC 偏移。 */
     private OffsetDateTime validFrom;

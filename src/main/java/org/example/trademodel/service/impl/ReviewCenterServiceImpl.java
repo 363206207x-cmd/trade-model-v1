@@ -15,12 +15,15 @@ import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.ReviewCenterService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewSummaryDTO;
 import org.example.trademodel.vo.ReviewAggregateVO;
 import org.example.trademodel.vo.ReviewCenterDashboardVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +51,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final ReviewResultMapper reviewResultMapper;
     private final AnalysisRunMapper analysisRunMapper;
+    private Clock clock = Clock.systemUTC();
 
     public ReviewCenterServiceImpl(UserPositionMapper userPositionMapper,
                                    UserPositionReviewAdapter userPositionReviewAdapter,
@@ -63,6 +67,11 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.reviewResultMapper = reviewResultMapper;
         this.analysisRunMapper = analysisRunMapper;
+    }
+
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Override
@@ -235,7 +244,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         return firstNonBlank(joinNonBlank(side, quantity), side, quantity);
     }
 
-    private static Boolean isExpired(TmPushSnapshotDO row) {
+    private Boolean isExpired(TmPushSnapshotDO row) {
         String status = trimToNull(row.getPushStatus());
         if (status != null && status.toUpperCase(Locale.ROOT).contains("EXPIRED")) {
             return true;
@@ -243,7 +252,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         if (row.getExpiresAt() == null) {
             return null;
         }
-        return row.getExpiresAt().isBefore(LocalDateTime.now());
+        return !UtcLocalTimePolicy.now(clock).isBefore(row.getExpiresAt());
     }
 
     private static Boolean ruleIssue(String errorType) {

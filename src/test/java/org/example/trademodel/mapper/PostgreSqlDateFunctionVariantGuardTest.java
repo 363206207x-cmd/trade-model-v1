@@ -8,6 +8,7 @@ import org.example.trademodel.vo.KeyCountVO;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -24,7 +25,7 @@ class PostgreSqlDateFunctionVariantGuardTest {
     @Test
     void pushSnapshotMapperKeepsH2DateaddFallbackAndAddsPostgreSqlIntervalVariant() throws Exception {
         Method method = PushSnapshotMapper.class.getMethod("listPendingRecheckNext",
-                String.class, String.class, String.class, int.class, int.class, int.class);
+                String.class, String.class, String.class, int.class, int.class, LocalDateTime.class, int.class);
         assertThat(method.getReturnType()).isAssignableFrom(List.class);
         assertDateaddVariant(method);
     }

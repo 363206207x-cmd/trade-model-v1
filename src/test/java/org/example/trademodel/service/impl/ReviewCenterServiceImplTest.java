@@ -25,7 +25,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +41,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class ReviewCenterServiceImplTest {
+    private static final Instant NOW = Instant.parse("2026-07-13T12:00:00Z");
     @Mock
     private UserPositionMapper userPositionMapper;
     @Mock
@@ -65,6 +69,7 @@ class ReviewCenterServiceImplTest {
                 pushRecheckLogMapper,
                 reviewResultMapper,
                 analysisRunMapper);
+        service.setClock(Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -140,6 +145,24 @@ class ReviewCenterServiceImplTest {
         verify(pushRecheckLogMapper).selectLatestByPushId(3L);
     }
 
+    @Test
+    void pushExpiryUsesUtcNaiveExactBoundary() {
+        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of());
+        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+                .thenReturn(List.of());
+        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+
+        TmPushSnapshotDO before = pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 12, 0, 1));
+        TmPushSnapshotDO equal = pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 12, 0));
+        TmPushSnapshotDO after = pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 11, 59, 59));
+        when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(before, equal, after));
+
+        ReviewCenterDashboardVO vo = service.getDashboard();
+
+        assertThat(vo.getPushReviews()).extracting(ReviewCenterDashboardVO.PushReviewItem::getExpired)
+                .containsExactly(false, true, true);
+    }
+
     private static UserPositionDO position() {
         UserPositionDO row = new UserPositionDO();
         row.setId(7L);
@@ -189,13 +212,17 @@ class ReviewCenterServiceImplTest {
     }
 
     private static TmPushSnapshotDO pushSnapshot() {
+        return pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 12, 10));
+    }
+
+    private static TmPushSnapshotDO pushSnapshotAt(LocalDateTime expiresAt) {
         TmPushSnapshotDO row = new TmPushSnapshotDO();
         row.setPushId(3L);
         row.setSymbol("SOLUSDT");
         row.setPushType("WATCHLIST");
         row.setPushStatus("CAPTURED");
         row.setPushCreateTime(LocalDateTime.of(2026, 6, 24, 12, 0));
-        row.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        row.setExpiresAt(expiresAt);
         return row;
     }
 

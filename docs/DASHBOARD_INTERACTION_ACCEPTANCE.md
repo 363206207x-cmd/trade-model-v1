@@ -6,7 +6,7 @@ This acceptance closes the Dashboard Home interaction semantics on branch `codex
 
 - Backend states are exercised with deterministic service fixtures and the existing in-memory integration-test database.
 - Frontend ownership and interaction order are exercised against the shipped `dashboard.html` source through deterministic call-graph and DOM-target assertions in `DashboardControllerTest`.
-- The repository has no existing browser scenario-injection harness for all nine states below. No external browser dependency was added and no screenshot is claimed.
+- `scripts/dashboard-visual-acceptance-fixture.py` now includes an `ai-all-abstain` scenario and can generate a self-contained, no-network fixture when localhost binding is unavailable. The Reviewer regression uses deterministic fixture/DOM-target assertions; it does not claim a new PNG screenshot.
 - No AI/provider call, secret read, scheduler trigger, position mutation, order action, external Push, or Telegram action occurs.
 
 ## Scenario acceptance
@@ -14,6 +14,7 @@ This acceptance closes the Dashboard Home interaction semantics on branch `codex
 | Scenario | Operation | Expected | Actual | DOM or test evidence | Result |
 |---|---|---|---|---|---|
 | AI disabled plus asset directional block | Initial Home load | AI consistency and plan mode are `不适用`; asset directional block remains independently `是`; no synthetic extreme divergence | Home read model separates `aiApplicable=false` from `directionalPushBlocked=true`; disabled role contains no business result | `aiNotApplicableOverridesDirectionalBlockInConsistencyCard`, `disabledAiRoleHasNoBusinessResult`, `headerDisabledAiShowsChineseDisabledLabel` | PASS |
+| Three successful AI roles all abstain | Initial Home load and all three role tabs | Header remains `正常`; every role says `复核成功 / 证据不足，暂不判断`; KPI, consistency, conflict, and plan mode are not applicable; score is `--` | Applicability requires support or challenge, not merely a successful call; the exact all-abstain summary is retained | `allThreeSuccessfulAbstainMakeConsistencyNotApplicable`, `allAbstainKpiShowsNotApplicable`, `allAbstainOfflineFixtureUsesNotApplicableDomContract` | PASS |
 | AI timeout | Initial Home load and role-tab view | Role shows timeout status and explanation only; no direction, confidence, risk, or AI plan | `resultAvailable=false`; role renderer exits through the unavailable-state panel | `timeoutAiRoleHasNoBusinessResult`, `unavailableAiRoleRendersStatusOnly` | PASS |
 | Data quality insufficient | Initial Home load | Final suggestion is fail-closed and contains no plan boundary | Low quality produces `DATA_QUALITY_BLOCKED`; all direction/entry/stop/TP/validity fields are clear | `lowDataQualityAndMissingAnalysisSnapshotHideEveryPlanBoundary` | PASS |
 | Plan expired | Initial Home load at before/equal/after expiry clocks | Before expiry is usable; equal/after expiry are blocked and plan fields are clear | Offset-aware `Instant` comparison blocks at `now >= expiresAt` | `expiredAbsoluteValidPeriodBlocksSuggestion`, `offsetAwarePlanExpiryIsTimezoneIndependent` | PASS |
@@ -38,5 +39,7 @@ This acceptance closes the Dashboard Home interaction semantics on branch `codex
 ## Decision
 
 Offline Dashboard interaction acceptance: **PASS** for the scoped semantic contract.
+
+Plan `validFrom`/`expiresAt` are offset-aware authority. The historical Push Snapshot timestamp remains no-timezone storage, but its production and consumption contract is explicitly UTC-naive. AI call success does not establish consistency applicability, `ABSTAIN` is neither support nor objection, and the AI conflict KPI is derived from the same backend consistency object as the card.
 
 This is not production acceptance. The eight-state lifecycle remains incomplete, the three-bar-per-timeframe market-bias policy remains provisional, Flyway V7 still needs separate controlled PostgreSQL evidence, and production deployment readiness remains **BLOCKED**.

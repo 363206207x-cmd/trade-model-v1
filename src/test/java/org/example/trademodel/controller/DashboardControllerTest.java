@@ -87,6 +87,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class DashboardControllerTest {
     private static final Path DASHBOARD_TEMPLATE =
             Path.of("src/main/resources/templates/dashboard.html");
+    private static final Path DASHBOARD_VISUAL_FIXTURE =
+            Path.of("scripts/dashboard-visual-acceptance-fixture.py");
     private static final String INTERNAL_PUSH_PREVIEW_START =
             "<section class=\"card module-status-card review-display-card\" id=\"internalPushPreviewDisplay\"";
     private static final String CANDIDATE_REVIEW_START =
@@ -328,6 +330,35 @@ public class DashboardControllerTest {
                 "planMode: aiApplicable ? planModeLabel(planMode) : \"不适用\"");
         assertThat(payloadRenderer).contains(
                 "finalTendency: aiApplicable && finalBias ? marketBiasLabel(finalBias) : \"暂无\"");
+    }
+
+    @Test
+    void allAbstainOfflineFixtureUsesNotApplicableDomContract() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+        String router = functionBody("renderHomeAiRoleTab");
+        String card = functionBody("renderHomeConsistencyCard");
+
+        assertThat(fixture).contains(
+                "\"ai-all-abstain\"",
+                "(\"GPT_FINAL\", \"最终裁决官\")",
+                "(\"GEMINI_REVIEW\", \"冲突复核官\")",
+                "(\"GROK_CHALLENGE\", \"反方挑战官\")",
+                "\"runStatus\": \"SUCCESS\"",
+                "\"stance\": \"ABSTAIN\"",
+                "\"reviewConclusion\": \"证据不足，暂不判断\"",
+                "\"aiApplicable\": False",
+                "\"consistencyLevel\": \"不适用\"",
+                "\"consistencyScore\": None",
+                "AI 成功返回，但所有角色均因证据不足而弃权");
+        assertThat(router).contains(
+                "String(role.stance || \"\").toUpperCase() === \"ABSTAIN\"",
+                "renderAbstainedAiRole(role)");
+        assertThat(functionBody("renderAbstainedAiRole"))
+                .contains("运行状态", "复核成功", "角色结论", "证据不足，暂不判断");
+        assertThat(card).contains(
+                "var scoreText = score == null ? \"--\"",
+                "aiApplicable ? options.conflictLevel : \"不适用\"",
+                "aiApplicable ? options.planMode : \"不适用\"");
     }
 
     @Test

@@ -4,7 +4,7 @@
 
 Dashboard Home passed the required deterministic browser acceptance on branch `codex/dashboard-state-semantics-audit-fix`, based on `ac8c8ca469944a40551e3472eb8c99d1582d83f7` plus this closure change.
 
-- Acceptance result: **PASS** for the ten required fixture scenarios, thirteen interactions, and three desktop CSS viewports.
+- Acceptance result: **PASS** for the original ten browser fixture scenarios, thirteen interactions, and three desktop CSS viewports. Reviewer regression scenario `ai-all-abstain` additionally passes deterministic fixture/DOM-target validation.
 - Evidence source: the real `dashboard.html` served by `scripts/dashboard-visual-acceptance-fixture.py` on offline `localhost`.
 - Fixture refresh is disabled so test timing remains deterministic. Production refresh behavior is unchanged.
 - Every non-GET request is rejected by the fixture. No live AI, market provider, CoinGlass, Push, Telegram, scheduler, position write, order, or secret was used.
@@ -36,6 +36,7 @@ The in-app browser was genuinely set to the listed CSS viewports. Its screenshot
 | H. Position without monitor record | 1366 x 768 | Load `position-waiting` | Uniform first-monitor waiting state | Logic, direction support, reversal, risk, advice, and monitor times say `等待首次监控` or `暂无`; no unsupported `暂无反转信号`, `当前方向仍获支持`, or low-risk claim is shown. | `05-position-waiting-1366x768.png` | PASS |
 | I. Default placeholder | 1440 x 900 | Load `placeholder`, hover and click placeholder | Noninteractive `等待首轮分析` card | Placeholder is a `DIV`, has `aria-disabled=true`, has no `data-symbol`, uses the default cursor and no transform, does not change selection, and contains no fabricated direction/risk. | `09-default-placeholder-1440x900.png` | PASS |
 | J. Home failure after stale data | 1366 x 768 | First Home call succeeds; asset switch makes the next Home call fail | Clear old business state and show explicit resync states | Before failure the selected asset has valid fixture data. After failure there is no selected stale card; trend becomes `— / 等待同步`; position says `首页数据暂不可用`; execution says `当前不展示执行计划`; AI consistency is `不适用`; prior asset terms are absent. | `07-home-failure-1366x768.png` | PASS |
+| K. All AI roles abstain | Deterministic fixture/DOM target | Load `ai-all-abstain`, inspect KPI, role tabs, and consistency renderer contract | Three successful roles remain successful but do not create a consensus, score, conflict level, or AI plan mode | Fixture supplies three `SUCCESS + ABSTAIN` roles. Each role renders `复核成功 / 证据不足，暂不判断`; KPI and card render `不适用`; score fallback is `--`; exact summary is `AI 成功返回，但所有角色均因证据不足而弃权`. | No new PNG claimed; `allAbstainOfflineFixtureUsesNotApplicableDomContract` | PASS |
 
 ## 4. Interaction acceptance
 
@@ -63,6 +64,7 @@ The in-app browser was genuinely set to the listed CSS viewports. Its screenshot
 - The tested surfaces contain no `自动开仓`, `自动平仓`, `自动反手`, `自动下单`, or `order submitted` wording.
 - `AI 已禁用` is muted rather than green; timeout is warning-toned; status badges do not inherit market direction colors.
 - AI conflict blocking and asset directional blocking are separate rows.
+- Successful provider calls do not imply an applicable consistency result. `ABSTAIN` contributes to neither support nor objection, and the all-abstain scenario contains no `等待同步`, `未知状态`, or `确认复核` in its AI result contract.
 
 ## 6. Browser-found corrections
 
@@ -78,10 +80,13 @@ The browser pass found and closed these P0/P1 presentation defects in the curren
 8. Put long asset-state badges on their own headline row so symbols and status text cannot overlap.
 9. Added a functional light/dark theme control and corrected dark table-header contrast.
 10. Made the Home-failure fixture reproducibly return one valid Home snapshot before failing the next asset-switch request.
+11. Added a Reviewer regression fixture for three successful `ABSTAIN` roles and kept KPI/card applicability synchronized through one backend consistency object.
 
 ## 7. Screenshot manifest
 
 Generation timezone: Asia/Shanghai (`+0800`).
+
+The Reviewer regression generated a self-contained `.runtime/dashboard-visual-acceptance/12-ai-all-abstain.html` artifact for deterministic inspection. The current controlled browser policy did not permit localhost or `file://` navigation, so no new screenshot or browser-only claim is made; the fixture payload and final DOM-target rendering branches are asserted in `DashboardControllerTest`.
 
 | File | CSS viewport | PNG pixels | Generated | SHA-256 |
 |---|---:|---:|---|---|

@@ -14,6 +14,7 @@ import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.slf4j.Logger;
@@ -324,7 +325,7 @@ public class DecisionEngineService {
             BigDecimal pushTriggerPrice = null;
             OffsetDateTime validFrom = OffsetDateTime.now(decisionClock).withOffsetSameInstant(ZoneOffset.UTC);
             OffsetDateTime expiresAt = validFrom.plusHours(24);
-            LocalDateTime pushExpiresAt = expiresAt.toLocalDateTime();
+            LocalDateTime pushExpiresAt = UtcLocalTimePolicy.fromOffsetDateTime(expiresAt);
             BigDecimal pushInvalidPriceBelow = null;
             BigDecimal pushInvalidPriceAbove = null;
             String pushInvalidationSummary = null;
@@ -370,7 +371,8 @@ public class DecisionEngineService {
             String effectiveConfidence = decisionInputsSufficient
                     ? conflict.getAdjustedConfidence() != null ? conflict.getAdjustedConfidence() : confidenceLevel
                     : "LOW";
-            String effectiveAiPlanMode = decisionInputsSufficient && aiReview.getSuccessfulProviderCount() > 0
+            String effectiveAiPlanMode = decisionInputsSufficient
+                    && aiReview.getAiSupportCount() + aiReview.getAiObjectionCount() > 0
                     ? conflict.getPlanMode() : null;
             decision.setConfidenceLevel(effectiveConfidence);
             decision.setRiskLevel(riskLevelLabel);

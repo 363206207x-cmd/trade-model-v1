@@ -42,6 +42,7 @@ import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -220,7 +221,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         DashboardHomeVO home = new DashboardHomeVO();
         home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
-        home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision));
+        home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(buildAssets(decisions, effectiveLimit));
@@ -356,7 +357,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private DashboardHomeVO.SystemStateVO buildSystemState(LightSystemStatusVO systemStatus,
                                                            List<DecisionResultVO> decisions,
-                                                           DecisionResultVO selectedDecision) {
+                                                           DecisionResultVO selectedDecision,
+                                                           DashboardHomeVO.AiDecisionVO aiDecision) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
         DecisionResultVO trendDecision = selectedDecision != null ? selectedDecision : firstDecision(decisions);
         state.setMarketTrend(card(
@@ -388,15 +390,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 selectedDataQuality != null ? "CONNECTED" : "WAITING_SYNC",
                 selectedDataQuality
         ));
-        AiConflictSummary conflict = aiConflictSummary(trendDecision);
+        DashboardHomeVO.ConsistencyVO consistency = aiDecision != null ? aiDecision.getConsistency() : null;
+        boolean aiApplicable = consistency != null && Boolean.TRUE.equals(consistency.getAiApplicable());
+        String conflictLevel = aiApplicable ? trimToNull(consistency.getLevel()) : null;
+        Integer conflictScore = aiApplicable ? consistency.getScore() : null;
         state.setAiConflict(card(
                 "aiConflict",
                 "AI 冲突等级",
-                conflict.level(),
-                conflict.level(),
-                "AI 冲突",
-                conflict.level() != null || conflict.score() != null ? "CONNECTED" : "WAITING_SYNC",
-                conflict.score()
+                conflictLevel,
+                aiApplicable ? consistency.getConsistencyLevel() : "不适用",
+                aiApplicable ? "AI 冲突" : "本轮未形成可裁决 AI 意见",
+                aiApplicable
+                        ? conflictLevel != null || conflictScore != null ? "CONNECTED" : "WAITING_SYNC"
+                        : "NOT_APPLICABLE",
+                conflictScore
         ));
         Integer pendingCount = systemStatus != null ? systemStatus.getPendingCount() : null;
         state.setPendingReview(card(
@@ -885,13 +892,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         AiRoleResultsPayload payload = parsed.current() ? parsed.payload() : null;
         AiRoleResultsPayload.SynthesisPayload synthesis = payload != null ? payload.synthesis() : null;
         ai.setSchemaVersion(payload != null ? payload.schemaVersion() : null);
-        int successfulRoles = successfulAiRoleCount(payload);
-        boolean aiApplicable = successfulRoles > 0;
-        String runStatus = aiRunStatus(payload, successfulRoles);
+        AiRoleStats roleStats = aiRoleStats(payload);
+        boolean aiApplicable = roleStats.adjudicative() > 0;
+        String runStatus = aiRunStatus(payload, roleStats.successful());
         ai.setRunStatus(runStatus);
         ai.setRunStatusLabel(aiRunStatusLabel(runStatus));
         ai.setDecisionMode(payload != null ? trimToNull(payload.orchestrationMode()) : "RULE_ONLY_FALLBACK");
-        ai.setDecisionModeLabel(successfulRoles > 0 ? "AI 辅助复核" : "仅规则判断");
+        ai.setDecisionModeLabel(aiApplicable
+                ? "AI 辅助复核"
+                : roleStats.successful() > 0 ? "AI 复核无可裁决结论" : "仅规则判断");
         List<DashboardHomeVO.AiTabVO> tabs = new ArrayList<>();
         for (String role : AI_ROLES) {
             AiRoleResultsPayload.RolePayload rolePayload = payload != null ? payload.roles().get(role) : null;
@@ -909,9 +918,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         consistency.setConsistencyLevel(aiApplicable
                 ? aiConflictLevelLabel(decision != null ? decision.getAiConflictLevel() : null)
                 : "不适用");
-        consistency.setConsistencySummary(aiApplicable
-                ? "基于本轮成功返回的 AI 角色形成一致性摘要"
-                : "AI 未运行，本轮仅使用规则判断");
+        consistency.setConsistencySummary(consistencySummary(roleStats));
         consistency.setDowngradeReason(aiApplicable && synthesis != null
                 ? aiDowngradeReasonLabel(synthesis.downgradeReason()) : null);
         ai.setConsistency(consistency);
@@ -1039,15 +1046,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int invalidated = 0;
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
         try {
-            waiting = Math.max(0, pushSnapshotMapper.countPendingRecheckBacklog());
+            LocalDateTime nowUtc = UtcLocalTimePolicy.now(planValidityClock);
+            waiting = Math.max(0, pushSnapshotMapper.countPendingRecheckBacklog(nowUtc));
             executable = safeCountPushStatuses(EXECUTABLE_PUSH_STATUSES);
             invalidated = safeCountPushStatuses(INVALIDATED_PUSH_STATUSES);
-            items.addAll(pushItems("CAPTURED", limit));
+            items.addAll(pushItems("CAPTURED", limit, nowUtc));
             if (items.size() < limit) {
-                items.addAll(pushItems("RECHECK_REVIEW_WAITING", limit - items.size()));
+                items.addAll(pushItems("RECHECK_REVIEW_WAITING", limit - items.size(), nowUtc));
             }
             if (items.size() < limit) {
-                items.addAll(pushItems("RECHECK_VALID_WAITING", limit - items.size()));
+                items.addAll(pushItems("RECHECK_VALID_WAITING", limit - items.size(), nowUtc));
             }
             readOk = true;
         } catch (RuntimeException ignored) {
@@ -1085,12 +1093,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<DashboardHomeVO.PushItemVO> pushItems(String status, int limit) {
+    private List<DashboardHomeVO.PushItemVO> pushItems(String status, int limit, LocalDateTime nowUtc) {
         if (limit <= 0) {
             return List.of();
         }
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
-        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listPendingRecheck(status, limit);
+        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listPendingRecheck(status, nowUtc, limit);
         for (TmPushSnapshotDO row : rows == null ? List.<TmPushSnapshotDO>of() : rows) {
             if (row == null) {
                 continue;
@@ -1305,18 +1313,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
         }
         return count > 0 ? Math.round((float) sum / count) : null;
-    }
-
-    private AiConflictSummary aiConflictSummary(DecisionResultVO decision) {
-        if (decision == null) {
-            return new AiConflictSummary(null, null);
-        }
-        AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(decision.getAiRoleResults());
-        AiRoleResultsPayload payload = parsed.current() ? parsed.payload() : null;
-        if (successfulAiRoleCount(payload) == 0) {
-            return new AiConflictSummary(null, null);
-        }
-        return new AiConflictSummary(trimToNull(decision.getAiConflictLevel()), decision.getAiConflictScore());
     }
 
     private Integer directionalBlockCount(LightSystemStatusVO systemStatus, List<DecisionResultVO> decisions) {
@@ -1646,13 +1642,37 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return label != null ? label : "未知状态";
     }
 
-    private int successfulAiRoleCount(AiRoleResultsPayload payload) {
-        if (payload == null) return 0;
-        int count = 0;
+    private AiRoleStats aiRoleStats(AiRoleResultsPayload payload) {
+        if (payload == null) return new AiRoleStats(0, 0, 0, 0);
+        int successful = 0;
+        int support = 0;
+        int challenge = 0;
+        int abstain = 0;
         for (AiRoleResultsPayload.RolePayload role : payload.roles().values()) {
-            if (role != null && "SUCCESS".equalsIgnoreCase(role.callStatus())) count++;
+            if (role == null || !"SUCCESS".equalsIgnoreCase(role.callStatus())) continue;
+            successful++;
+            switch (upper(role.stance())) {
+                case "SUPPORT" -> support++;
+                case "CHALLENGE" -> challenge++;
+                case "ABSTAIN" -> abstain++;
+                default -> {
+                }
+            }
         }
-        return count;
+        return new AiRoleStats(successful, support, challenge, abstain);
+    }
+
+    private String consistencySummary(AiRoleStats stats) {
+        if (stats.adjudicative() > 0) {
+            return "基于本轮成功返回的 AI 角色形成一致性摘要";
+        }
+        if (stats.successful() > 0 && stats.abstain() == stats.successful()) {
+            return "AI 成功返回，但所有角色均因证据不足而弃权";
+        }
+        if (stats.successful() > 0) {
+            return "AI 成功返回，但未形成可裁决意见";
+        }
+        return "AI 未运行，本轮仅使用规则判断";
     }
 
     private String aiRunStatus(AiRoleResultsPayload payload, int successfulRoles) {
@@ -1889,7 +1909,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return trimmed == null ? "" : trimmed.toUpperCase(Locale.ROOT);
     }
 
-    private record AiConflictSummary(String level, Integer score) {
+    private record AiRoleStats(int successful, int support, int challenge, int abstain) {
+        int adjudicative() {
+            return support + challenge;
+        }
     }
 
     private record PushInboxContext(DashboardHomeVO.PushInboxVO pushInbox, boolean readOk) {

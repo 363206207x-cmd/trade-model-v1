@@ -10,6 +10,7 @@ import org.example.trademodel.ai.AiReviewConflictLevel;
 import org.example.trademodel.ai.AiReviewStance;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.controller.DashboardHomeController;
 import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
@@ -48,6 +49,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.lang.reflect.Field;
@@ -66,8 +69,12 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardHomeServiceImplTest {
@@ -205,8 +212,9 @@ class DashboardHomeServiceImplTest {
         when(userPositionService.listOpenPositions()).thenReturn(List.of(position, nonManualPosition));
         when(positionMonitorLogService.listByPositionId(9L, 1)).thenReturn(List.of());
         when(positionSyncService.getPositionSyncStatus()).thenReturn(sync);
-        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(7);
-        when(pushSnapshotMapper.listPendingRecheck(anyString(), anyInt())).thenReturn(List.of());
+        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(7);
+        when(pushSnapshotMapper.listPendingRecheck(anyString(), any(LocalDateTime.class), anyInt()))
+                .thenReturn(List.of());
 
         DashboardHomeVO home = service.getHome("BTCUSDT", 6);
 
@@ -218,6 +226,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getRiskLevel().getHelper()).isEqualTo("选中资产决策风险");
         assertThat(home.getSystemState().getMarketTrend().getValue()).isEqualTo("BULLISH");
         assertThat(home.getSystemState().getAiConflict().getValue()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
         assertThat(home.getSystemState().getAiConflict().getScore()).isEqualTo(25);
 
         assertThat(home.getAssets()).hasSize(6);
@@ -312,7 +321,7 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(userPositionService.listOpenPositions()).thenReturn(List.of(nonManualPosition));
-        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(3);
+        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(3);
         when(pushSnapshotMapper.countByPushStatuses(anyList())).thenAnswer(invocation -> {
             List<String> statuses = invocation.getArgument(0);
             if (statuses.contains("RECHECK_REVIEW_PASSED")) {
@@ -434,10 +443,13 @@ class DashboardHomeServiceImplTest {
         latestLog.setPushId(101L);
         latestLog.setRecheckStatus("DRIFTED");
 
-        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(1);
-        when(pushSnapshotMapper.listPendingRecheck("CAPTURED", 6)).thenReturn(List.of(snapshot));
-        when(pushSnapshotMapper.listPendingRecheck("RECHECK_REVIEW_WAITING", 5)).thenReturn(List.of());
-        when(pushSnapshotMapper.listPendingRecheck("RECHECK_VALID_WAITING", 5)).thenReturn(List.of());
+        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(1);
+        when(pushSnapshotMapper.listPendingRecheck(eq("CAPTURED"), any(LocalDateTime.class), eq(6)))
+                .thenReturn(List.of(snapshot));
+        when(pushSnapshotMapper.listPendingRecheck(eq("RECHECK_REVIEW_WAITING"), any(LocalDateTime.class), eq(5)))
+                .thenReturn(List.of());
+        when(pushSnapshotMapper.listPendingRecheck(eq("RECHECK_VALID_WAITING"), any(LocalDateTime.class), eq(5)))
+                .thenReturn(List.of());
         when(pushRecheckLogMapper.selectLatestByPushId(101L)).thenReturn(latestLog);
 
         DashboardHomeVO home = service.getHome(null, 6);
@@ -911,6 +923,113 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void singleSuccessfulAbstainMakesConsistencyNotApplicable() {
+        DecisionResultVO decision = decisionWithRoles(List.of(
+                role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足")));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getAiDecision().getRunStatus()).isEqualTo("PARTIAL_SUCCESS");
+        assertConsistencyNotApplicable(home);
+    }
+
+    @Test
+    void allThreeSuccessfulAbstainMakeConsistencyNotApplicable() {
+        DecisionResultVO decision = allAbstainDecision();
+        decision.setConfusedScore(100);
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getAiDecision().getRunStatus()).isEqualTo("SUCCESS");
+        assertThat(home.getAiDecision().getRunStatusLabel()).isEqualTo("复核成功");
+        assertThat(home.getAiDecision().getDecisionModeLabel()).isEqualTo("AI 复核无可裁决结论");
+        assertThat(home.getAiDecision().getTabs()).allSatisfy(tab -> {
+            assertThat(tab.getRunStatusLabel()).isEqualTo("复核成功");
+            assertThat(tab.getReviewConclusion()).isEqualTo("证据不足，暂不判断");
+        });
+        assertThat(home.getAiDecision().getConsistency().getDirectionalPushBlocked()).isTrue();
+        assertConsistencyNotApplicable(home);
+    }
+
+    @Test
+    void supportPlusAbstainUsesOnlySupportVote() {
+        DecisionResultVO decision = decisionWithRoles(List.of(
+                role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "支持"),
+                role(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "弃权")));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getAiDecision().getConsistency().getAiApplicable()).isTrue();
+        assertThat(home.getSystemState().getAiConflict().getValue()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(aiTab(home, "GPT_FINAL").getStance()).isEqualTo("SUPPORT");
+        assertThat(aiTab(home, "GEMINI_REVIEW").getStance()).isEqualTo("ABSTAIN");
+    }
+
+    @Test
+    void challengePlusAbstainUsesOnlyChallengeVote() {
+        DecisionResultVO decision = decisionWithRoles(List.of(
+                role(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                        AiReviewStance.CHALLENGE, "GEMINI_CONTRADICTION_ONLY", "反对"),
+                role(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "弃权")));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertThat(home.getAiDecision().getConsistency().getAiApplicable()).isTrue();
+        assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
+        assertThat(aiTab(home, "GEMINI_REVIEW").getStance()).isEqualTo("CHALLENGE");
+        assertThat(aiTab(home, "GROK_CHALLENGE").getStance()).isEqualTo("ABSTAIN");
+    }
+
+    @Test
+    void allAbstainKpiShowsNotApplicable() {
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(allAbstainDecision()));
+
+        DashboardHomeVO.StatusCardVO card = service.getHome("BTCUSDT", 6).getSystemState().getAiConflict();
+
+        assertThat(card.getValue()).isNull();
+        assertThat(card.getValueLabel()).isEqualTo("不适用");
+        assertThat(card.getHelper()).isEqualTo("本轮未形成可裁决 AI 意见");
+        assertThat(card.getStatus()).isEqualTo("NOT_APPLICABLE");
+    }
+
+    @Test
+    void realDashboardHomeServiceLocalizesAiConflictKpi() {
+        DecisionResultVO decision = decisionWithRoles(List.of(
+                role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "支持")));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.StatusCardVO card = service.getHome("BTCUSDT", 6).getSystemState().getAiConflict();
+
+        assertThat(card.getValue()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(card.getValueLabel()).isEqualTo("轻微分歧");
+    }
+
+    @Test
+    void controllerSerializesLocalizedAiConflictKpiFromServiceOutput() throws Exception {
+        DecisionResultVO decision = decisionWithRoles(List.of(
+                role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "支持")));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new DashboardHomeController(service)).build();
+
+        mockMvc.perform(get("/api/dashboard/home")
+                        .param("selectedSymbol", "BTCUSDT")
+                        .param("limit", "6"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.systemState.aiConflict.value").value("LEVEL_2_REVIEW"))
+                .andExpect(jsonPath("$.data.systemState.aiConflict.valueLabel").value("轻微分歧"));
+    }
+
+    @Test
     void headerDisabledAiShowsChineseDisabledLabel() {
         when(providerReadinessService.getReadiness())
                 .thenReturn(providerReadiness("CONFIGURED", "DISABLED", "WAITING_SYNC", "真实行情"));
@@ -1243,6 +1362,36 @@ class DashboardHomeServiceImplTest {
                 synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true,
                         "GEMINI_CONTRADICTION_ONLY")));
         return decision;
+    }
+
+    private DecisionResultVO decisionWithRoles(List<AiProviderReviewResult> roles) {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setAiRoleResults(structuredAiRoleResults(roles,
+                synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true, null)));
+        return decision;
+    }
+
+    private DecisionResultVO allAbstainDecision() {
+        return decisionWithRoles(List.of(
+                role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足"),
+                role(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足"),
+                role(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE,
+                        AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足")));
+    }
+
+    private void assertConsistencyNotApplicable(DashboardHomeVO home) {
+        DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
+        assertThat(consistency.getAiApplicable()).isFalse();
+        assertThat(consistency.getLevel()).isNull();
+        assertThat(consistency.getScore()).isNull();
+        assertThat(consistency.getConsistencyLevel()).isEqualTo("不适用");
+        assertThat(consistency.getConsistencySummary())
+                .isEqualTo("AI 成功返回，但所有角色均因证据不足而弃权");
+        assertThat(home.getSystemState().getAiConflict().getValue()).isNull();
+        assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("不适用");
     }
 
     private DecisionResultVO completePlanDecision(String symbol, String validPeriod) {

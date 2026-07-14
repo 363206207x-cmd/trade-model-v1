@@ -8,11 +8,12 @@ This package audits the path from rule inputs to the Dashboard Home read model a
 - The authoritative asset state table is preferred over a decision snapshot; the snapshot is a compatibility fallback only.
 - Market bias is derived independently for each symbol from the three persisted closed bars currently read for each of 5m, 15m, 1h, and 4h. This is a provisional `MarketBiasPolicy` mapping pending product-owned window and threshold rules, not a validated trend-strength model. Missing or invalid inputs return `WAIT`; no missing-data path defaults bullish.
 - A data-quality score below the current engine threshold of 60 blocks a usable review plan and downgrades the user-facing result to `WAIT`, low confidence, high risk, and not worth opening.
-- AI roles that are disabled, not called, timed out, failed, unavailable, or abstained are not counted as support. With zero successful roles, AI consistency and AI plan mode are not applicable.
+- AI roles that are disabled, not called, timed out, failed, unavailable, or abstained are not counted as support. AI consistency and AI plan mode require at least one successful `SUPPORT` or `CHALLENGE`; successful calls that all return `ABSTAIN` remain not applicable.
 - Only `SUCCESS` role payloads may populate role-level business fields. Every non-success role renders only its run status and status explanation; successful `ABSTAIN` renders a compact no-judgment conclusion without direction or plan claims.
 - A conflict score above zero is not a directional block. Dashboard directional-block counts use the authoritative threshold of 85.
 - A usable execution plan requires the authoritative asset-state `trace_id` to match the plan decision's `AnalysisRun.trace_id`. A mismatch leaves current state visible but clears the plan with `状态已更新，原计划需重新分析`.
 - Plan validity is evaluated from offset-aware `validFrom`/`expiresAt` in the Home read model. A legacy absolute range without an offset is `LEGACY_TIMEZONE_UNVERIFIED` and fails closed; it is never assumed to be UTC. Missing or malformed validity also fails closed, and `now >= expiresAt` blocks the plan.
+- Plan `validFrom`/`expiresAt` remain the offset-aware authority. The historical no-timezone `tm_push_snapshot.expires_at` column is a UTC-naive compatibility timestamp: every producer and consumer converts through UTC, uses a UTC clock, and treats `now >= expiresAt` as expired.
 - `/api/dashboard/home` is the sole data authority for Home positions, execution suggestion, AI roles, consistency, asset tiles, and top KPIs. `/api/dashboard/detail` updates only the lower workbench and diagnostics and cannot overwrite those Home regions.
 - Asset-tile, sidebar, and search selection all set the selected symbol and request a fresh Home payload. A failed Home request clears cached business conclusions and displays `首页数据暂不可用` / `等待重新同步` / `当前不展示执行计划`.
 - An active manual position takes over the selected asset's main suggestion area. The original entry plan is retained only as a collapsed review/reference record.
@@ -99,7 +100,7 @@ Repository conflicts and limitations are not hidden:
 | 失败 | Provider/response failure | `FAILED`, `INVALID_RESPONSE` | same | 调用失败 | Failure could be treated as absence of objection. | Failure is excluded from support and conflict votes. |
 | 预算阻断 | Budget/rate limit prevented call | `BUDGET_BLOCKED`, `RATE_LIMITED` | same | 预算阻断 | Internal code could leak. | Structured Chinese label, no raw fallback. |
 | 模型不可用 | Model is unconfigured/unavailable | `MODEL_UNAVAILABLE`, `NOT_CONFIGURED` | same | 模型不可用 | Internal code could leak. | Structured Chinese label, no raw fallback. |
-| 不适用 | Zero successful AI roles | null conflict/mode | `consistencyLevelLabel`, `planModeLabel` | 不适用 | Previously level 1/confirm could be shown. | No synthetic consistency score or AI plan mode. |
+| 不适用 | Zero adjudicative AI roles, including all-success/all-`ABSTAIN` | null conflict/mode | `consistencyLevelLabel`, `planModeLabel` | 不适用 | Successful calls could be mistaken for a usable consensus. | No synthetic score or mode; all-abstain summary is `AI 成功返回，但所有角色均因证据不足而弃权`. |
 | 无显著分歧 | Successful roles materially agree | `LEVEL_1_CONSISTENT` | `conflictLevel`, label | 无显著分歧 | Could be produced with zero success. | Requires actual successful role evidence. |
 | 轻微分歧 | Review-level disagreement | `LEVEL_2_LIGHT_DIVERGENCE` | same | 轻微分歧 | Aliases leaked as raw enums. | Dedicated mapping accepts current aliases. |
 | 显著分歧 | Material disagreement | `LEVEL_3_SIGNIFICANT_DIVERGENCE` | same | 显著分歧 | Raw enum leaked. | Chinese label only. |
@@ -199,7 +200,7 @@ Focused tests cover:
 - All eight market-bias labels under the current provisional three-bar-per-timeframe mapping.
 - Independent symbol inputs and missing-data `WAIT` behavior.
 - Low/missing data-quality plan blocking.
-- AI disabled, failed, partial, support, objection, abstain, and zero-success semantics.
+- AI disabled, failed, partial, support, objection, abstain, zero-success, and all-success/all-abstain semantics. `ABSTAIN` is neither support nor objection.
 - Confused scores 0, 1, 69, 70, 84, and 85, including unknown output when the authoritative system-status read fails.
 - Zero successful AI roles with asset directional blocking, confused score 100, and disabled AI remain `不适用`, never synthetic `极端分歧`.
 - Position takeover, real monitor timestamps, no fake next-monitor countdown, the existing-monitor/no-next-schedule state, and Chinese labels.
@@ -207,10 +208,12 @@ Focused tests cover:
 - Final user-visible Home DOM copy checks for raw `pendingCount`, `degraded`, and local-real failure codes.
 - Home/detail renderer ownership, asset-selection request order, fail-closed Home failure, and noninteractive `DEFAULT_SLOT` behavior through deterministic template call-graph assertions.
 - Offset-aware plan validity under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`, plus legacy no-offset fail-closed behavior.
+- Decision-to-Push Snapshot UTC-naive conversion under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`; all three preserve the same 24-hour expiry. Push Recheck is valid one second before expiry and expired at the exact boundary and one second after it.
+- The AI conflict KPI and consistency card consume the same assembled backend consistency object; the KPI preserves the raw enum in `value` and emits its Chinese label in `valueLabel`.
 
 The offline acceptance uses controlled service fixtures and the in-memory test database only. No live provider, external database, or six-asset runtime environment was used. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs. See `docs/DASHBOARD_INTERACTION_ACCEPTANCE.md`.
 
-Actual browser rendering is recorded separately in `docs/DASHBOARD_VISUAL_ACCEPTANCE.md`. That pass covers all ten required deterministic fixture scenarios, thirteen interactions, and CSS viewports 1920 x 1080, 1440 x 900, and 1366 x 768. The screenshots remain local `.runtime` evidence and are explicitly not described as real-market results.
+Browser and deterministic DOM-target rendering evidence is recorded separately in `docs/DASHBOARD_VISUAL_ACCEPTANCE.md`. The original browser pass covers ten scenarios, thirteen interactions, and CSS viewports 1920 x 1080, 1440 x 900, and 1366 x 768; the Reviewer regression adds the eleventh `ai-all-abstain` fixture with deterministic fixture/DOM assertions and no fabricated screenshot. Existing screenshots remain local `.runtime` evidence and are not real-market results.
 
 ## 9. Remaining gaps
 

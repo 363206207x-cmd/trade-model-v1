@@ -2,12 +2,30 @@ package org.example.trademodel.service;
 
 import org.example.trademodel.ai.AiOrchestrationMode;
 import org.example.trademodel.ai.AiOrchestratorResult;
+import org.example.trademodel.ai.AiProviderCallStatus;
+import org.example.trademodel.ai.AiProviderName;
+import org.example.trademodel.ai.AiProviderReviewResult;
+import org.example.trademodel.ai.AiProviderRole;
+import org.example.trademodel.ai.AiReviewStance;
 import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.RuleConfigDO;
+import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.enums.RecheckStatusEnum;
+import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
+import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.risk.UserPositionRiskAdapter;
+import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.service.impl.PushRecheckServiceImpl;
 import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.EventImpactInputVO;
+import org.example.trademodel.vo.ExecutionPlanVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,12 +35,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +52,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +72,20 @@ class DecisionEngineServiceTest {
     private RuleConfigService ruleConfigService;
     @Mock
     private AiDecisionOrchestratorService aiDecisionOrchestratorService;
+    @Mock
+    private PushSnapshotMapper pushSnapshotMapper;
+    @Mock
+    private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    @Mock
+    private PushRecheckLogMapper pushRecheckLogMapper;
+    @Mock
+    private PushRecheckDispatchConfigService pushRecheckDispatchConfigService;
+    @Mock
+    private UserPositionRiskAdapter userPositionRiskAdapter;
+    @Mock
+    private MarketQuoteClient marketQuoteClient;
+    @Mock
+    private RuleConfigContractService ruleConfigContractService;
 
     private DecisionEngineService service;
 
@@ -81,6 +118,11 @@ class DecisionEngineServiceTest {
                 ));
         lenient().when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, false, false, "none"));
+        lenient().when(userPositionRiskAdapter.currentRisk())
+                .thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        lenient().when(ruleConfigContractService.requirePushRecheckThresholds())
+                .thenReturn(new RuleConfigContractService.PushRecheckThresholds(
+                        new java.math.BigDecimal("0.02"), 70, 85, 60));
         when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenAnswer(invocation -> "1m".equals(invocation.getArgument(1))
                         ? bullishKlines()
@@ -103,8 +145,80 @@ class DecisionEngineServiceTest {
 
         assertThat(decision.getValidFrom()).isEqualTo(OffsetDateTime.parse("2026-07-13T11:54:00Z"));
         assertThat(decision.getExpiresAt()).isEqualTo(OffsetDateTime.parse("2026-07-14T11:54:00Z"));
+        assertThat(decision.getPushExpiresAt()).isEqualTo(LocalDateTime.parse("2026-07-14T11:54:00"));
         assertThat(decision.getValidFrom().getOffset()).isEqualTo(ZoneOffset.UTC);
         assertThat(decision.getExpiresAt().getOffset()).isEqualTo(ZoneOffset.UTC);
+    }
+
+    @Test
+    void pushSnapshotTtlIsTwentyFourHoursAcrossJvmTimezones() {
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-07-13T12:00:00Z"), ZoneOffset.UTC);
+        service.setDecisionClock(fixedClock);
+        PushSnapshotService snapshotService = new PushSnapshotService(pushSnapshotMapper, accountRiskSnapshotMapper);
+        snapshotService.setClock(fixedClock);
+        List<TmPushSnapshotDO> captured = new ArrayList<>();
+        doAnswer(invocation -> {
+            captured.add(invocation.getArgument(0));
+            return 1;
+        }).when(pushSnapshotMapper).insert(any(TmPushSnapshotDO.class));
+        TimeZone original = TimeZone.getDefault();
+
+        try {
+            for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                DecisionBundleVO decision = service.makeDecision(
+                        "BTCUSDT", "5m", "analysis-zone-" + zone.replace('/', '-'), 85, 65);
+                assertThat(decision.getExpiresAt())
+                        .isEqualTo(OffsetDateTime.parse("2026-07-14T12:00:00Z"));
+                assertThat(decision.getPushExpiresAt())
+                        .isEqualTo(LocalDateTime.parse("2026-07-14T12:00:00"));
+
+                AnalysisRunDO run = new AnalysisRunDO();
+                run.setRuleVersion("v-test");
+                run.setTraceId("trace-" + zone);
+                AssetAnalysisVO analysis = new AssetAnalysisVO();
+                analysis.setAnalysisId("analysis-" + zone);
+                analysis.setSymbol("BTCUSDT");
+                analysis.setTimeframe("5m");
+                ExecutionPlanVO plan = new ExecutionPlanVO();
+                plan.setEntryZone("100-102");
+                plan.setStopLoss("98");
+                snapshotService.insertAuthoritativeSnapshot(run, analysis, decision, plan, 10L);
+            }
+        } finally {
+            TimeZone.setDefault(original);
+        }
+
+        assertThat(captured).hasSize(3);
+        assertThat(captured).allSatisfy(snapshot -> {
+            assertThat(snapshot.getExpiresAt()).isEqualTo(LocalDateTime.parse("2026-07-14T12:00:00"));
+            assertThat(snapshot.getPushCreateTime()).isEqualTo(LocalDateTime.parse("2026-07-13T12:00:00"));
+            assertThat(snapshot.getCreateTime()).isEqualTo(LocalDateTime.parse("2026-07-13T12:00:00"));
+        });
+        verify(pushSnapshotMapper, times(3)).insert(any(TmPushSnapshotDO.class));
+
+        TmPushSnapshotDO persistedSnapshot = captured.get(0);
+        persistedSnapshot.setPushId(501L);
+        when(pushSnapshotMapper.selectByPushId(501L)).thenReturn(persistedSnapshot);
+        PushRecheckServiceImpl recheckService = new PushRecheckServiceImpl(
+                pushSnapshotMapper,
+                accountRiskSnapshotMapper,
+                pushRecheckLogMapper,
+                pushRecheckDispatchConfigService,
+                userPositionRiskAdapter,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
+                ruleConfigContractService);
+
+        recheckService.setClock(Clock.fixed(Instant.parse("2026-07-14T11:59:59Z"), ZoneOffset.UTC));
+        RecheckResult before = recheckService.recheck(501L, new java.math.BigDecimal("100"));
+        recheckService.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
+        RecheckResult equal = recheckService.recheck(501L, new java.math.BigDecimal("100"));
+        recheckService.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:01Z"), ZoneOffset.UTC));
+        RecheckResult after = recheckService.recheck(501L, new java.math.BigDecimal("100"));
+
+        assertThat(before.getRecheckStatus()).isNotEqualTo(RecheckStatusEnum.EXPIRED);
+        assertThat(equal.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
+        assertThat(after.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
     }
 
     @Test
@@ -414,6 +528,35 @@ class DecisionEngineServiceTest {
     }
 
     @Test
+    void allAbstainDoesNotProduceAiPlanMode() {
+        AiOrchestratorResult review = new AiOrchestratorResult();
+        review.setOrchestrationMode(AiOrchestrationMode.AI_ASSISTED);
+        review.setSuccessfulProviderCount(3);
+        review.setAiSupportCount(0);
+        review.setAiObjectionCount(0);
+        review.setProviderResults(List.of(
+                successfulRole(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW, AiReviewStance.ABSTAIN),
+                successfulRole(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW, AiReviewStance.ABSTAIN),
+                successfulRole(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE, AiReviewStance.ABSTAIN)));
+        when(aiDecisionOrchestratorService.review(any())).thenReturn(review);
+        DecisionEngineService serviceWithAi = new DecisionEngineService(
+                ohlcvSnapshotSource,
+                aiConflictResolverService,
+                confusedStateService,
+                assetStateService,
+                ruleConfigService,
+                aiDecisionOrchestratorService);
+
+        DecisionBundleVO decision = serviceWithAi.makeDecision(
+                "BTCUSDT", "5m", "analysis-all-abstain", 85, 65);
+
+        assertThat(decision.getAiPlanMode()).isNull();
+        assertThat(decision.getAiRoleResults()).contains("\"callStatus\":\"SUCCESS\"")
+                .contains("\"stance\":\"ABSTAIN\"")
+                .contains("\"ruleDirectionPreserved\":true");
+    }
+
+    @Test
     void makeDecision_eachAssetUsesItsOwnMarketWindow() {
         when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenAnswer(invocation -> "ETHUSDT".equals(invocation.getArgument(0))
@@ -453,6 +596,19 @@ class DecisionEngineServiceTest {
                 new String[]{"0", "108", "109", "101", "104"},
                 new String[]{"0", "104", "105", "98", "100"}
         );
+    }
+
+    private static AiProviderReviewResult successfulRole(AiProviderName provider,
+                                                         AiProviderRole role,
+                                                         AiReviewStance stance) {
+        AiProviderReviewResult result = new AiProviderReviewResult();
+        result.setProvider(provider);
+        result.setRole(role);
+        result.setCallStatus(AiProviderCallStatus.SUCCESS);
+        result.setStance(stance);
+        result.setReasonCodes(List.of("INSUFFICIENT_DATA"));
+        result.setSummary("Insufficient evidence");
+        return result;
     }
 
     private static EventImpactInputVO externalInput(boolean blocked, String riskLevel, String sourceHealth, List<String> reasons) {

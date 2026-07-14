@@ -3,12 +3,15 @@ package org.example.trademodel.service;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,6 +44,7 @@ public class PushRecheckScheduler {
     private final PushRecheckDispatchConfigService dispatchConfigService;
     private final boolean schedulersEnabled;
     private final boolean pushRecheckSchedulerEnabled;
+    private Clock clock = Clock.systemUTC();
 
     public PushRecheckScheduler(
             PushSnapshotMapper pushSnapshotMapper,
@@ -59,6 +63,11 @@ public class PushRecheckScheduler {
         this.schedulersEnabled = schedulersEnabled;
         this.pushRecheckSchedulerEnabled = pushRecheckSchedulerEnabled;
         applyRuntimeConfig(dispatchConfigService.loadOrInit(defaultLimit, maxAttempts, minRetryMinutes));
+    }
+
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Scheduled(initialDelay = 15000, fixedRate = 30000)
@@ -81,6 +90,7 @@ public class PushRecheckScheduler {
                     PENDING_PUSH_STATUS_LEGACY_WAITING,
                     maxAttempts,
                     minRetryMinutes,
+                    UtcLocalTimePolicy.now(clock),
                     defaultLimit);
             if (pending == null || pending.isEmpty()) {
                 return;

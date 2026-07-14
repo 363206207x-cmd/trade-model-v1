@@ -7,12 +7,15 @@ import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -34,11 +37,17 @@ public class PushSnapshotService {
 
     private final PushSnapshotMapper pushSnapshotMapper;
     private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    private Clock clock = Clock.systemUTC();
 
     public PushSnapshotService(PushSnapshotMapper pushSnapshotMapper,
                                AccountRiskSnapshotMapper accountRiskSnapshotMapper) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
+    }
+
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     /**
@@ -63,7 +72,7 @@ public class PushSnapshotService {
             return;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = UtcLocalTimePolicy.now(clock);
         TmPushSnapshotDO row = new TmPushSnapshotDO();
         row.setAnalysisId(analysis.getAnalysisId());
         row.setSymbol(analysis.getSymbol());
@@ -92,7 +101,7 @@ public class PushSnapshotService {
                 ? accountRiskSnapshotId
                 : ensureAccountRiskSnapshot(run, analysis, decision, plan);
         row.setAccountRiskSnapshotId(riskSnapshotId);
-        row.setExpiresAt(decision.getPushExpiresAt());
+        row.setExpiresAt(resolvePushExpiry(decision));
 
         pushSnapshotMapper.insert(row);
     }
@@ -123,9 +132,18 @@ public class PushSnapshotService {
         risk.setSnapshotVersion(SNAPSHOT_VERSION_V2);
         risk.setSourceNote("ROUND2_MINIMAL_TRUTH_UPGRADED");
         risk.setTraceId(run.getTraceId());
-        risk.setCreateTime(LocalDateTime.now());
+        risk.setCreateTime(UtcLocalTimePolicy.now(clock));
         accountRiskSnapshotMapper.insert(risk);
         return risk.getId();
+    }
+
+    private static LocalDateTime resolvePushExpiry(DecisionBundleVO decision) {
+        LocalDateTime authoritative = UtcLocalTimePolicy.fromOffsetDateTime(decision.getExpiresAt());
+        LocalDateTime compatibility = decision.getPushExpiresAt();
+        if (authoritative != null && compatibility != null && !authoritative.equals(compatibility)) {
+            throw new IllegalStateException("push expiry UTC compatibility timestamp is inconsistent");
+        }
+        return authoritative != null ? authoritative : compatibility;
     }
 
     private static Round2RiskJudgement judgeRisk(boolean isWorthOpening,

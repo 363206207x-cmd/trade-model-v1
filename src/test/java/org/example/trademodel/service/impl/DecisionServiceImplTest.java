@@ -325,7 +325,7 @@ class DecisionServiceImplTest {
         when(decisionResultMapper.countDecisionsToday()).thenReturn(0);
         when(missedOpportunityMapper.countByBizDate(any(LocalDate.class))).thenReturn(5);
         when(assetStateMapper.countDirectionalPushBlocked(85)).thenReturn(3);
-        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(11);
+        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(11);
         when(decisionResultMapper.countOpenSymbolsWithReverseSignal()).thenReturn(2);
         when(assetStateService.findLatestHotResetSnapshot()).thenReturn(null);
 
