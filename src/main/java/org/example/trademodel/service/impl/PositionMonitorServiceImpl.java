@@ -2,12 +2,14 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.derivatives.DerivativesBusinessInput;
 import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -22,6 +24,9 @@ import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorPolicy;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract.SourceReference;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract.SourceType;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
@@ -59,6 +64,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final ScoreItemMapper scoreItemMapper;
     private final DecisionResultMapper decisionResultMapper;
     private final ObjectMapper objectMapper;
+    private final AnalysisRunMapper analysisRunMapper;
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
@@ -73,7 +79,23 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper) {
         this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
-                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper, objectMapper, null);
+                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper,
+                objectMapper, null, null);
+    }
+
+    public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
+                                      MarketPriceSnapshotService marketPriceSnapshotService,
+                                      UserPositionRiskAdapter userPositionRiskAdapter,
+                                      ExecutionPlanMapper executionPlanMapper,
+                                      PositionMonitorLogService positionMonitorLogService,
+                                      EvidenceItemMapper evidenceItemMapper,
+                                      ScoreItemMapper scoreItemMapper,
+                                      DecisionResultMapper decisionResultMapper,
+                                      ObjectMapper objectMapper,
+                                      ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
+        this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
+                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper,
+                objectMapper, null, externalContextEvidenceBuilder);
     }
 
     @Autowired
@@ -86,6 +108,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       ScoreItemMapper scoreItemMapper,
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper,
+                                      AnalysisRunMapper analysisRunMapper,
                                       ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
         this.userPositionMapper = userPositionMapper;
         this.marketPriceSnapshotService = marketPriceSnapshotService;
@@ -96,6 +119,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         this.scoreItemMapper = scoreItemMapper;
         this.decisionResultMapper = decisionResultMapper;
         this.objectMapper = objectMapper;
+        this.analysisRunMapper = analysisRunMapper;
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
     }
 
@@ -261,7 +285,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
         RecordPositionMonitorLogCommand command = new RecordPositionMonitorLogCommand();
         command.setPositionId(position.getId());
-        command.setAnalysisId(planContext.analysisId);
+        command.setAnalysisId(planContext.missing
+                ? PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID
+                : planContext.analysisId);
         command.setExecutionPlanId(planContext.executionPlanId);
         command.setCurrentPrice(currentPrice);
         command.setLogicStatus(logicStatus);
@@ -425,21 +451,28 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
     private PlanContext resolvePlanContext(UserPositionDO position, Set<String> reasons) {
         String sourceRefId = optionalText(position.getSourceRefId());
-        if (sourceRefId == null) {
-            reasons.add("PLAN_CONTEXT_MISSING");
-            return PlanContext.missing("USER_POSITION_" + position.getId());
+        SourceReference sourceReference = PositionMonitorSourceContract.parse(sourceRefId);
+        if (sourceReference == null || analysisRunMapper == null) {
+            return unverifiedPlanContext(reasons);
         }
-        ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(sourceRefId);
-        if (plan == null) {
-            plan = executionPlanMapper.selectLatestByAnalysisId(sourceRefId);
+        ExecutionPlanDO plan;
+        try {
+            plan = sourceReference.type() == SourceType.EXECUTION_PLAN
+                    ? executionPlanMapper.selectByPlanId(sourceReference.id())
+                    : executionPlanMapper.selectOnlyByAnalysisId(sourceReference.id());
+        } catch (RuntimeException ignored) {
+            return unverifiedPlanContext(reasons);
         }
-        if (plan == null) {
-            reasons.add("PLAN_CONTEXT_MISSING");
-            return PlanContext.missing(sourceRefId);
+        String analysisId = optionalText(plan == null ? null : plan.getAnalysisId());
+        String executionPlanId = optionalText(plan == null ? null : plan.getPlanId());
+        AnalysisRunDO analysisRun;
+        try {
+            analysisRun = analysisId == null ? null : analysisRunMapper.selectById(analysisId);
+        } catch (RuntimeException ignored) {
+            return unverifiedPlanContext(reasons);
         }
-        String analysisId = optionalText(plan.getAnalysisId());
-        if (analysisId == null) {
-            analysisId = sourceRefId;
+        if (!validPlanSourceIdentity(position, sourceReference, analysisRun, analysisId, executionPlanId)) {
+            return unverifiedPlanContext(reasons);
         }
         boolean sourceGateBlocked = !Boolean.TRUE.equals(plan.getSourceGateComplete())
                 || "BLOCKED".equals(normalize(plan.getSourceGateStatus()))
@@ -454,7 +487,38 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         } else if ("INCOMPLETE".equals(status) || "REVIEW_ONLY".equals(status)) {
             reasons.add("PLAN_REVIEW_REQUIRED");
         }
-        return new PlanContext(plan, analysisId, optionalText(plan.getPlanId()), false, sourceGateBlocked);
+        return new PlanContext(plan, analysisId, executionPlanId, false, sourceGateBlocked);
+    }
+
+    private boolean validPlanSourceIdentity(UserPositionDO position,
+                                            SourceReference sourceReference,
+                                            AnalysisRunDO analysisRun,
+                                            String analysisId,
+                                            String executionPlanId) {
+        if (position == null || sourceReference == null || analysisRun == null
+                || analysisId == null || executionPlanId == null) {
+            return false;
+        }
+        if (!analysisId.equals(optionalText(analysisRun.getAnalysisId()))) {
+            return false;
+        }
+        if (sourceReference.type() == SourceType.EXECUTION_PLAN
+                && !sourceReference.id().equals(executionPlanId)) {
+            return false;
+        }
+        if (sourceReference.type() == SourceType.ANALYSIS
+                && !sourceReference.id().equals(analysisId)) {
+            return false;
+        }
+        String positionSymbol = normalizeSourceSymbol(position.getAssetSymbol());
+        String runSymbol = normalizeSourceSymbol(analysisRun.getSymbol());
+        return positionSymbol != null && positionSymbol.equals(runSymbol);
+    }
+
+    private PlanContext unverifiedPlanContext(Set<String> reasons) {
+        reasons.add("PLAN_SOURCE_UNVERIFIED");
+        reasons.add("PLAN_CONTEXT_MISSING");
+        return PlanContext.missing();
     }
 
     private boolean riskIncreased(Long positionId, String currentRiskLevel) {
@@ -575,6 +639,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    private static String normalizeSourceSymbol(String value) {
+        String normalized = normalize(value);
+        return normalized == null ? null : normalized.replace("/", "").replace("-", "").replace("_", "");
+    }
+
     private static class PlanContext {
         private final ExecutionPlanDO plan;
         private final String analysisId;
@@ -594,8 +663,8 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             this.sourceGateBlockedOrIncomplete = sourceGateBlockedOrIncomplete;
         }
 
-        private static PlanContext missing(String analysisId) {
-            return new PlanContext(null, analysisId, null, true, false);
+        private static PlanContext missing() {
+            return new PlanContext(null, null, null, true, false);
         }
     }
 }

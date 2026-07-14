@@ -81,21 +81,22 @@ class PlanServiceImplTest {
     }
 
     @Test
-    void generateExecutionPlan_withCompleteSourceTraceIsReadyReviewOnlyButStillAdvisory() {
+    void generateExecutionPlan_withCompleteSourceTraceButNoBoundaryProducerIsIncomplete() {
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setIsWorthOpening(true);
 
         ExecutionPlanVO plan = service.generateExecutionPlan(decision, null, null, null, validSourceTrace());
 
         assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
-        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_READY_REVIEW_ONLY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_INCOMPLETE);
         assertThat(plan.getSourceTraceStatus()).isEqualTo("VALID");
         assertThat(plan.getSourceTraceComplete()).isTrue();
-        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
         assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
         assertThat(plan.getSourceGateComplete()).isTrue();
         assertThat(plan.getSourceCompletenessSummary()).contains("source gate VALID");
-        assertThat(plan.getNotExecutableReason()).isEqualTo("MANUAL_REVIEW_REQUIRED");
+        assertThat(plan.getNotExecutableReason()).isEqualTo("PLAN_BOUNDARY_INCOMPLETE");
+        assertThat(plan.getMissingSourceReasons()).contains("executionBoundary");
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
         assertThat(plan.getNotExecutable()).isTrue();
@@ -105,7 +106,7 @@ class PlanServiceImplTest {
     }
 
     @Test
-    void generateExecutionPlan_withCompleteSourceTraceAndReadyRiskGuardStaysReviewOnly() {
+    void generateExecutionPlan_withCompleteSourceTraceAndReadyRiskGuardStillNeedsBoundaries() {
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setIsWorthOpening(true);
 
@@ -119,7 +120,8 @@ class PlanServiceImplTest {
         );
 
         assertThat(plan.getPlanMode()).isEqualTo(ExecutionPlanVO.PLAN_MODE_ADVISORY);
-        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_READY_REVIEW_ONLY);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_INCOMPLETE);
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
         assertThat(plan.getRiskActionGuardReady()).isTrue();
         assertThat(plan.getRiskActionGuardBlockingReason()).isNull();
         assertThat(plan.getManualReviewRequired()).isTrue();
@@ -327,6 +329,30 @@ class PlanServiceImplTest {
         assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_WATCH_ONLY);
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void validSourceTraceWithoutReadyBoundaryProducerCannotRemainBoundaryComplete() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        SourceTraceBoundaryProducerResult unavailable = new SourceTraceBoundaryProducerResult();
+        unavailable.setSourceTrace(validSourceTrace());
+        unavailable.setSourceTraceReady(true);
+        unavailable.setBoundaryReady(false);
+        unavailable.setMissingFields(List.of("entry", "stop", "takeProfitLevels"));
+        unavailable.setBlockingReasons(List.of("BOUNDARY_PRODUCER_NOT_READY"));
+
+        ExecutionPlanVO plan = service.generateExecutionPlan(
+                decision, null, null, null, unavailable, readyRiskActionGuard());
+
+        assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+        assertThat(plan.getSourceGateComplete()).isTrue();
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        assertThat(plan.getReadinessStatus()).isEqualTo(ExecutionPlanVO.READINESS_INCOMPLETE);
+        assertThat(plan.getEntryZone()).isEqualTo("暂无");
+        assertThat(plan.getStopLoss()).isEqualTo("暂无");
+        assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
+        assertThat(plan.getNotExecutableReason()).isEqualTo("PLAN_BOUNDARY_INCOMPLETE");
     }
 
     @Test

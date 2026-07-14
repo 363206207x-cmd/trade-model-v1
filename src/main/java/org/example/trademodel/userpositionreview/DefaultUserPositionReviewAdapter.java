@@ -5,6 +5,9 @@ import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract.SourceReference;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract.SourceType;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewService;
@@ -139,15 +142,13 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     }
 
     private ExecutionPlanDO resolvePlan(UserPositionDO position) {
-        String sourceRefId = trimToNull(position.getSourceRefId());
-        if (sourceRefId == null) {
+        SourceReference sourceReference = PositionMonitorSourceContract.parse(position.getSourceRefId());
+        if (sourceReference == null) {
             return null;
         }
-        ExecutionPlanDO byPlanId = executionPlanMapper.selectByPlanId(sourceRefId);
-        if (byPlanId != null) {
-            return byPlanId;
-        }
-        return executionPlanMapper.selectLatestByAnalysisId(sourceRefId);
+        return sourceReference.type() == SourceType.EXECUTION_PLAN
+                ? executionPlanMapper.selectByPlanId(sourceReference.id())
+                : executionPlanMapper.selectOnlyByAnalysisId(sourceReference.id());
     }
 
     private static void fillPosition(UserPositionReviewSummaryDTO summary, UserPositionDO position) {

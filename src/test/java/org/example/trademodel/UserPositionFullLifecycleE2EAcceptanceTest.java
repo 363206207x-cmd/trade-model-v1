@@ -29,8 +29,10 @@ import java.util.stream.Collectors;
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -40,6 +42,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
@@ -72,9 +75,15 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         wireUserPositionMapper(userPositionMapper, positions);
 
         ExecutionPlanMapper executionPlanMapper = mock(ExecutionPlanMapper.class);
+        AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         ExecutionPlanDO executionPlan = executionPlan();
         when(executionPlanMapper.selectByPlanId(PLAN_ID)).thenReturn(executionPlan);
         when(executionPlanMapper.selectLatestByAnalysisId(ANALYSIS_ID)).thenReturn(executionPlan);
+        AnalysisRunDO analysisRun = new AnalysisRunDO();
+        analysisRun.setAnalysisId(ANALYSIS_ID);
+        analysisRun.setSymbol("BTCUSDT");
+        analysisRun.setTraceId("trace-" + ANALYSIS_ID);
+        when(analysisRunMapper.selectById(ANALYSIS_ID)).thenReturn(analysisRun);
 
         MarketQuoteClient marketQuoteClient = mock(MarketQuoteClient.class);
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
@@ -97,6 +106,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
                 scoreItemMapper,
                 decisionResultMapper,
                 new ObjectMapper(),
+                analysisRunMapper,
                 null);
         ReviewService reviewService = mock(ReviewService.class);
         ArgumentCaptor<WriteReviewResultReq> reviewCaptor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
@@ -225,7 +235,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         req.setStopLoss(new BigDecimal("90"));
         req.setTakeProfit(new BigDecimal("120"));
         req.setSourceType("MANUAL");
-        req.setSourceRefId(PLAN_ID);
+        req.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(PLAN_ID));
         return req;
     }
 

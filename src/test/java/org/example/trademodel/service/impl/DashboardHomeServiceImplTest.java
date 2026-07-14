@@ -20,6 +20,8 @@ import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserConfigDO;
+import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
@@ -27,13 +29,22 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
+import org.example.trademodel.mapper.ScoreItemMapper;
+import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
+import org.example.trademodel.market.client.MarketQuoteClient;
+import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
+import org.example.trademodel.risk.UserPositionRiskAdapter;
+import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PositionMonitorLogService;
@@ -63,8 +74,10 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +90,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -859,6 +873,134 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void exactPlanA_monitorLogsAAndDashboardShowsOnlyA() {
+        long positionId = 371L;
+        String analysisA = "analysis-monitor-A";
+        String planAId = "plan-monitor-A";
+        List<PositionMonitorLogDTO> capturedLogs = new ArrayList<>();
+        wireCapturedMonitorLogs(positionId, capturedLogs);
+
+        UserPositionDO positionDO = monitorPosition(positionId,
+                PositionMonitorSourceContract.executionPlanReference(planAId));
+        UserPositionVO positionVO = activeManualPosition(positionId, "BTCUSDT", positionDO.getSourceRefId());
+        UserPositionMapper monitorPositionMapper = mock(UserPositionMapper.class);
+        MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
+        UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
+        when(monitorPositionMapper.selectById(positionId)).thenReturn(positionDO);
+        when(quoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(monitorQuote("100")));
+        when(riskAdapter.currentRisk()).thenReturn(allowedMonitorRisk());
+
+        ExecutionPlanDO exactPlanA = validExecutionPlan(planAId, analysisA);
+        exactPlanA.setEntryZone("PLAN-A-entry");
+        exactPlanA.setStopLoss("PLAN-A-stop");
+        exactPlanA.setTakeProfitRules("PLAN-A-tp");
+        exactPlanA.setLeverageSuggestion("2x");
+        exactPlanA.setPositionSuggestion("PLAN-A-position");
+        exactPlanA.setInvalidCondition("PLAN-A-invalid");
+        when(executionPlanMapper.selectByPlanId(planAId)).thenReturn(exactPlanA);
+        AnalysisRunDO runA = sourceRun(analysisA, "BTCUSDT", "trace-monitor-A");
+        when(analysisRunMapper.selectById(analysisA)).thenReturn(runA);
+
+        PositionMonitorServiceImpl monitorService = new PositionMonitorServiceImpl(
+                monitorPositionMapper,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient),
+                riskAdapter,
+                executionPlanMapper,
+                positionMonitorLogService,
+                mock(EvidenceItemMapper.class),
+                mock(ScoreItemMapper.class),
+                decisionResultMapper,
+                new ObjectMapper(),
+                analysisRunMapper,
+                null);
+
+        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPosition(positionId);
+
+        assertThat(monitorResult.getAnalysisId()).isEqualTo(analysisA);
+        assertThat(monitorResult.getExecutionPlanId()).isEqualTo(planAId);
+        assertThat(capturedLogs).singleElement().satisfies(log -> {
+            assertThat(log.getAnalysisId()).isEqualTo(analysisA);
+            assertThat(log.getExecutionPlanId()).isEqualTo(planAId);
+        });
+
+        DecisionResultVO joinedDecisionA = sourcePlanDecision(analysisA, "BTCUSDT", "SIBLING-B");
+        DecisionResultVO latestDecisionB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "LATEST-B");
+        when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(analysisA, planAId))
+                .thenReturn(joinedDecisionA);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionVO));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestDecisionB));
+        when(assetStateMapper.selectBySymbol("BTCUSDT"))
+                .thenReturn(sourceState("BTCUSDT", "trace-monitor-A"));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion =
+                service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo(analysisA);
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(planAId);
+        assertThat(suggestion.getEntryZone()).isEqualTo("PLAN-A-entry");
+        assertThat(suggestion.getStopLoss()).isEqualTo("PLAN-A-stop");
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo("PLAN-A-tp");
+        assertThat(List.of(suggestion.getEntryZone(), suggestion.getStopLoss(), suggestion.getTakeProfitRules()))
+                .doesNotContain("SIBLING-B-entry", "SIBLING-B-stop", "SIBLING-B-tp",
+                        "LATEST-B-entry", "LATEST-B-stop", "LATEST-B-tp");
+    }
+
+    @Test
+    void positionMonitorToDashboardDoesNotReintroduceLatestSiblingFallback() {
+        long positionId = 372L;
+        String ambiguousAnalysis = "analysis-shared-A-B";
+        List<PositionMonitorLogDTO> capturedLogs = new ArrayList<>();
+        wireCapturedMonitorLogs(positionId, capturedLogs);
+
+        UserPositionDO positionDO = monitorPosition(positionId, ambiguousAnalysis);
+        UserPositionVO positionVO = activeManualPosition(positionId, "BTCUSDT", ambiguousAnalysis);
+        UserPositionMapper monitorPositionMapper = mock(UserPositionMapper.class);
+        MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
+        UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
+        when(monitorPositionMapper.selectById(positionId)).thenReturn(positionDO);
+        when(quoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(monitorQuote("100")));
+        when(riskAdapter.currentRisk()).thenReturn(allowedMonitorRisk());
+        ExecutionPlanDO latestSiblingB = validExecutionPlan("plan-latest-B", ambiguousAnalysis);
+        latestSiblingB.setEntryZone("LATEST-B-entry");
+        lenient().when(executionPlanMapper.selectLatestByAnalysisId(ambiguousAnalysis))
+                .thenReturn(latestSiblingB);
+
+        PositionMonitorServiceImpl monitorService = new PositionMonitorServiceImpl(
+                monitorPositionMapper,
+                org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient),
+                riskAdapter,
+                executionPlanMapper,
+                positionMonitorLogService,
+                mock(EvidenceItemMapper.class),
+                mock(ScoreItemMapper.class),
+                decisionResultMapper,
+                new ObjectMapper(),
+                analysisRunMapper,
+                null);
+
+        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPosition(positionId);
+
+        assertThat(monitorResult.getAnalysisId()).isNull();
+        assertThat(capturedLogs).singleElement().satisfies(log -> {
+            assertThat(log.getAnalysisId()).isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+            assertThat(log.getExecutionPlanId()).isNull();
+        });
+
+        DecisionResultVO latestDecisionB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "LATEST-B");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionVO));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestDecisionB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion =
+                service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("LATEST-B-entry");
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(ambiguousAnalysis);
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(ambiguousAnalysis);
+    }
+
+    @Test
     void invalidOriginalPlanIsNotMarkedActive() {
         OriginalPlanFixture fixture = originalPlanFixture(381L, "INVALID-A");
         fixture.executionPlan().setExecutionPlanStatus("INVALID");
@@ -925,7 +1067,7 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "REVALIDATION_REQUIRED",
-                "原计划需要重新验证，仅用于历史复核：证据结构发生变化，等待重新验证", "REVALIDATE-A");
+                "原计划需要重新验证，仅用于历史复核：重验证原因已记录，等待人工复核", "REVALIDATE-A");
     }
 
     @Test
@@ -940,6 +1082,136 @@ class DashboardHomeServiceImplTest {
         assertVerifiedHistoricalPlan(suggestion, "REVALIDATION_REQUIRED",
                 "原计划需要重新验证，仅用于历史复核：极端价格波动触发重新验证", "HOT-RESET-A");
         assertThat(suggestion.getOriginalPlanLabel()).doesNotContain("EXTREME_PRICE_MOVE");
+    }
+
+    @Test
+    void hotResetFallbackUsesChineseOnly() {
+        OriginalPlanFixture fixture = originalPlanFixture(3861L, "HOT-RESET-FALLBACK-A");
+        fixture.executionPlan().setNeedsRevalidation(true);
+        fixture.executionPlan().setRevalidationReason(null);
+        fixture.executionPlan().setHotResetEventId("hot-reset-event-2");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanLabel())
+                .isEqualTo("原计划需要重新验证，仅用于历史复核：热重置已触发重新验证")
+                .doesNotContain("Hot Reset");
+    }
+
+    @Test
+    void mixedChineseAndInternalCodeDoesNotLeak() {
+        OriginalPlanFixture fixture = originalPlanFixture(3862L, "MIXED-REASON-A");
+        fixture.executionPlan().setNeedsRevalidation(true);
+        fixture.executionPlan().setRevalidationReason("热重置 UNKNOWN_INTERNAL_CODE");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanLabel())
+                .isEqualTo("原计划需要重新验证，仅用于历史复核：重验证原因已记录，等待人工复核")
+                .doesNotContain("UNKNOWN_INTERNAL_CODE");
+    }
+
+    @Test
+    void unknownRevalidationReasonUsesGenericChineseCopy() {
+        OriginalPlanFixture fixture = originalPlanFixture(3863L, "UNKNOWN-REASON-A");
+        fixture.executionPlan().setNeedsRevalidation(true);
+        fixture.executionPlan().setRevalidationReason("{\"errorCode\":\"UNMAPPED_REASON\"}");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanLabel())
+                .isEqualTo("原计划需要重新验证，仅用于历史复核：重验证原因已记录，等待人工复核")
+                .doesNotContain("errorCode", "UNMAPPED_REASON", "{");
+    }
+
+    @Test
+    void knownRevalidationReasonsUseWhitelistLabels() {
+        List<List<String>> cases = List.of(
+                List.of("EXTREME_PRICE_MOVE", "极端价格波动触发重新验证"),
+                List.of("OI_COLLAPSE", "持仓量快速收缩触发重新验证"),
+                List.of("LIQUIDITY_DRAIN", "流动性快速下降触发重新验证"),
+                List.of("SYSTEMIC_SHOCK", "系统性冲击触发重新验证")
+        );
+        long positionId = 3864L;
+        for (List<String> item : cases) {
+            OriginalPlanFixture fixture = originalPlanFixture(positionId++, "KNOWN-REASON-A");
+            fixture.executionPlan().setNeedsRevalidation(true);
+            fixture.executionPlan().setRevalidationReason(item.get(0));
+
+            DashboardHomeVO.ExecutionSuggestionVO suggestion =
+                    service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+            assertThat(suggestion.getOriginalPlanLabel()).endsWith(item.get(1));
+            assertThat(suggestion.getOriginalPlanLabel()).doesNotContain(item.get(0));
+        }
+    }
+
+    @Test
+    void validStatusWithMissingEntryIsPlanIncomplete() {
+        OriginalPlanFixture fixture = originalPlanFixture(390L, "MISSING-ENTRY-A");
+        fixture.executionPlan().setEntryZone(null);
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isEqualTo("MISSING-ENTRY-A-stop");
+    }
+
+    @Test
+    void validStatusWithMissingStopIsPlanIncomplete() {
+        OriginalPlanFixture fixture = originalPlanFixture(391L, "MISSING-STOP-A");
+        fixture.executionPlan().setStopLoss(null);
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
+        assertThat(suggestion.getStopLoss()).isNull();
+    }
+
+    @Test
+    void validStatusWithMissingTakeProfitIsPlanIncomplete() {
+        OriginalPlanFixture fixture = originalPlanFixture(392L, "MISSING-TP-A");
+        fixture.executionPlan().setTakeProfitRules(null);
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
+        assertThat(suggestion.getTakeProfitRules()).isNull();
+    }
+
+    @Test
+    void placeholderBoundariesArePlanIncomplete() {
+        List<String> placeholders = List.of("暂无", "—", "待生成");
+        long positionId = 393L;
+        for (String placeholder : placeholders) {
+            OriginalPlanFixture fixture = originalPlanFixture(positionId++, "PLACEHOLDER-A");
+            fixture.executionPlan().setEntryZone(placeholder);
+
+            DashboardHomeVO.ExecutionSuggestionVO suggestion =
+                    service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+            assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
+            assertThat(suggestion.getEntryZone()).isNull();
+        }
+    }
+
+    @Test
+    void incompletePlanANeverBorrowsBoundariesFromPlanB() {
+        OriginalPlanFixture fixture = originalPlanFixture(396L, "PLAN-A");
+        fixture.executionPlan().setEntryZone("暂无");
+        fixture.decision().setEntryZone("PLAN-B-entry");
+        fixture.decision().setStopLoss("PLAN-B-stop");
+        fixture.decision().setTakeProfitRules("PLAN-B-tp");
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isEqualTo("PLAN-A-stop");
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo("PLAN-A-tp");
+        assertThat(List.of(suggestion.getStopLoss(), suggestion.getTakeProfitRules()))
+                .doesNotContain("PLAN-B-stop", "PLAN-B-tp");
     }
 
     @Test
@@ -1822,6 +2094,79 @@ class DashboardHomeServiceImplTest {
         return position;
     }
 
+    private void wireCapturedMonitorLogs(long positionId, List<PositionMonitorLogDTO> capturedLogs) {
+        when(positionMonitorLogService.listByPositionId(positionId, 1))
+                .thenAnswer(invocation -> capturedLogs.isEmpty()
+                        ? List.of()
+                        : List.of(capturedLogs.get(capturedLogs.size() - 1)));
+        when(positionMonitorLogService.recordMonitorRun(any())).thenAnswer(invocation -> {
+            RecordPositionMonitorLogCommand command = invocation.getArgument(0);
+            PositionMonitorLogDTO log = new PositionMonitorLogDTO();
+            log.setLogId((long) capturedLogs.size() + 1);
+            log.setPositionId(command.getPositionId());
+            log.setAnalysisId(command.getAnalysisId());
+            log.setExecutionPlanId(command.getExecutionPlanId());
+            log.setCurrentPrice(command.getCurrentPrice());
+            log.setLogicStatus(command.getLogicStatus());
+            log.setRiskLevel(command.getRiskLevel());
+            log.setSuggestedAction(command.getSuggestedAction());
+            log.setTraceId(command.getTraceId());
+            log.setCreatedAt(LocalDateTime.of(2026, 7, 1, 11, 0));
+            capturedLogs.add(log);
+            return log;
+        });
+    }
+
+    private UserPositionDO monitorPosition(long positionId, String sourceRefId) {
+        UserPositionDO position = new UserPositionDO();
+        position.setId(positionId);
+        position.setAssetSymbol("BTCUSDT");
+        position.setSide("LONG");
+        position.setStatus("OPEN");
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(BigDecimal.ONE);
+        position.setLeverage(BigDecimal.ONE);
+        position.setStopLoss(new BigDecimal("90"));
+        position.setTakeProfit(new BigDecimal("120"));
+        position.setSourceType("MANUAL");
+        position.setSourceRefId(sourceRefId);
+        return position;
+    }
+
+    private MarketQuoteSnapshot monitorQuote(String price) {
+        MarketQuoteSnapshot quote = new MarketQuoteSnapshot();
+        quote.setProvider("fixture");
+        quote.setSymbolNormalized("BTCUSDT");
+        quote.setLastPrice(new BigDecimal(price));
+        quote.setFetchedAtEpochMillis(System.currentTimeMillis());
+        return quote;
+    }
+
+    private UserPositionRiskResult allowedMonitorRisk() {
+        UserPositionRiskResult risk = new UserPositionRiskResult();
+        risk.setRiskStatus("RISK_ALLOWED");
+        risk.setRiskLevel("LOW");
+        risk.setRiskBlocked(false);
+        risk.setReasonCodes(List.of("RISK_ALLOWED"));
+        return risk;
+    }
+
+    private AnalysisRunDO sourceRun(String analysisId, String symbol, String traceId) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTraceId(traceId);
+        return run;
+    }
+
+    private AssetStateDO sourceState(String symbol, String traceId) {
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol(symbol);
+        state.setState(AssetStateEnum.CANDIDATE);
+        state.setTraceId(traceId);
+        return state;
+    }
+
     private DecisionResultVO sourcePlanDecision(String analysisId, String symbol, String marker) {
         DecisionResultVO decision = completePlanDecision(symbol, ACTIVE_VALID_PERIOD);
         decision.setAnalysisId(analysisId);
@@ -1867,6 +2212,7 @@ class DashboardHomeServiceImplTest {
                                                      String currentStateTraceId,
                                                      boolean resolveByAnalysisId) {
         ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
+        copyExactPlanFields(plan, sourceDecision);
         if (resolveByAnalysisId) {
             when(executionPlanMapper.selectOnlyByAnalysisId(sourceDecision.getAnalysisId())).thenReturn(plan);
         } else {
@@ -1906,6 +2252,15 @@ class DashboardHomeServiceImplTest {
         plan.setSourceGateComplete(true);
         plan.setNeedsRevalidation(false);
         return plan;
+    }
+
+    private void copyExactPlanFields(ExecutionPlanDO plan, DecisionResultVO decision) {
+        plan.setEntryZone(decision.getEntryZone());
+        plan.setStopLoss(decision.getStopLoss());
+        plan.setTakeProfitRules(decision.getTakeProfitRules());
+        plan.setLeverageSuggestion(decision.getLeverageSuggestion());
+        plan.setPositionSuggestion(decision.getPositionSuggestion());
+        plan.setInvalidCondition(decision.getInvalidCondition());
     }
 
     private OriginalPlanFixture originalPlanFixture(Long positionId, String marker) {
@@ -1990,6 +2345,7 @@ class DashboardHomeServiceImplTest {
         when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
 
         ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
+        copyExactPlanFields(plan, sourceDecision);
         when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
         when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(sourceDecision.getAnalysisId(), planId))
                 .thenReturn(sourceDecision);

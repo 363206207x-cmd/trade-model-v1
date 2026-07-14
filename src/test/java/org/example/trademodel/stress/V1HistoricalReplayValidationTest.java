@@ -1,6 +1,7 @@
 package org.example.trademodel.stress;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
@@ -8,6 +9,7 @@ import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -19,6 +21,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
@@ -607,6 +610,7 @@ class V1HistoricalReplayValidationTest {
         private final MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
         private final UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         private final ExecutionPlanMapper planMapper = mock(ExecutionPlanMapper.class);
+        private final AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         private final PositionMonitorLogService logService = mock(PositionMonitorLogService.class);
         private final PositionMonitorServiceImpl service;
         private final AtomicLong logIds = new AtomicLong(3000L);
@@ -622,16 +626,21 @@ class V1HistoricalReplayValidationTest {
                     org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient),
                     riskAdapter, planMapper, logService,
                     mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class), mock(DecisionResultMapper.class),
-                    new ObjectMapper(), null);
+                    new ObjectMapper(), analysisRunMapper, null);
         }
 
         private PositionMonitorResultDTO monitor(MonitorPoint point) {
             String planId = "plan-replay-" + point.name();
             when(positionMapper.selectById(point.id()))
-                    .thenReturn(paperPosition(point.id(), "OPEN", planId, point.stopLoss(), point.takeProfit()));
+                    .thenReturn(paperPosition(point.id(), "OPEN",
+                            PositionMonitorSourceContract.executionPlanReference(planId),
+                            point.stopLoss(), point.takeProfit()));
             when(quoteClient.fetch24hTicker(SYMBOL)).thenReturn(Optional.of(quote(point.currentPrice())));
             when(riskAdapter.currentRisk()).thenReturn(point.risk());
-            lenient().when(planMapper.selectByPlanId(planId)).thenReturn(monitorPlan(planId));
+            ExecutionPlanDO plan = monitorPlan(planId);
+            lenient().when(planMapper.selectByPlanId(planId)).thenReturn(plan);
+            lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
+                    .thenReturn(analysisRun(plan.getAnalysisId(), SYMBOL));
             return service.monitorUserPosition(point.id());
         }
 
@@ -644,5 +653,13 @@ class V1HistoricalReplayValidationTest {
             when(positionMapper.listOpenPositions()).thenReturn(List.of());
             return service.monitorOpenUserPositions();
         }
+    }
+
+    private static AnalysisRunDO analysisRun(String analysisId, String symbol) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTraceId("trace-" + analysisId);
+        return run;
     }
 }

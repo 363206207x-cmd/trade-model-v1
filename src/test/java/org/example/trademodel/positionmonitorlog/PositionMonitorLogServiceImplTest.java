@@ -4,6 +4,7 @@ import org.example.trademodel.entity.PositionMonitorLogDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.impl.PositionMonitorLogServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -95,6 +96,29 @@ class PositionMonitorLogServiceImplTest {
         assertSafetyFields(weakened);
         assertSafetyFields(invalidated);
         assertSafetyFields(highRisk);
+    }
+
+    @Test
+    void unverifiedMonitorSourceUsesStructuralStatusNotFakePlanIdentity() {
+        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "OPEN"));
+        when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
+            PositionMonitorLogDO row = invocation.getArgument(0);
+            row.setLogId(203L);
+            return 1;
+        });
+        RecordPositionMonitorLogCommand command = command("LOGIC_WEAKENED", "LOW", "MANUAL_REVIEW");
+        command.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        command.setExecutionPlanId(null);
+
+        PositionMonitorLogDTO result = service.recordMonitorRun(command);
+
+        ArgumentCaptor<PositionMonitorLogDO> captor = ArgumentCaptor.forClass(PositionMonitorLogDO.class);
+        verify(positionMonitorLogMapper).insert(captor.capture());
+        assertThat(captor.getValue().getAnalysisId())
+                .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        assertThat(captor.getValue().getExecutionPlanId()).isNull();
+        assertThat(result.getAnalysisId()).isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        assertThat(PositionMonitorSourceContract.isUnverifiedAnalysisId(result.getAnalysisId())).isTrue();
     }
 
     @Test

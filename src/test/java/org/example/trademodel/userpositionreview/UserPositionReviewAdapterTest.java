@@ -5,6 +5,7 @@ import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewService;
@@ -165,11 +166,12 @@ class UserPositionReviewAdapterTest {
     }
 
     @Test
-    void exactAnalysisIdFallbackLinksPlanAndMissingPlanKeepsSafeNotComputableSummary() {
-        UserPositionDO byAnalysis = closedPosition(13L, "LONG", "ana-13", "100", "111", "95", "120");
+    void typedUniqueAnalysisLinksPlanAndMissingPlanKeepsSafeNotComputableSummary() {
+        UserPositionDO byAnalysis = closedPosition(13L, "LONG",
+                PositionMonitorSourceContract.analysisReference("ana-13"),
+                "100", "111", "95", "120");
         when(userPositionMapper.selectById(13L)).thenReturn(byAnalysis);
-        when(executionPlanMapper.selectByPlanId("ana-13")).thenReturn(null);
-        when(executionPlanMapper.selectLatestByAnalysisId("ana-13"))
+        when(executionPlanMapper.selectOnlyByAnalysisId("ana-13"))
                 .thenReturn(plan("plan-from-analysis", "ana-13", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForReview(13L)).thenReturn(List.of());
         assertThat(adapter.buildSummary(13L).getExecutionPlanId()).isEqualTo("plan-from-analysis");
@@ -296,7 +298,9 @@ class UserPositionReviewAdapterTest {
         row.setOpenedAt(LocalDateTime.of(2026, 6, 22, 8, 0));
         row.setClosedAt(LocalDateTime.of(2026, 6, 22, 10, 0));
         row.setSourceType("MANUAL");
-        row.setSourceRefId(sourceRefId);
+        row.setSourceRefId(sourceRefId == null || PositionMonitorSourceContract.parse(sourceRefId) != null
+                ? sourceRefId
+                : PositionMonitorSourceContract.executionPlanReference(sourceRefId));
         return row;
     }
 

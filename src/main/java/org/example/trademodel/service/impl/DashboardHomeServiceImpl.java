@@ -44,6 +44,7 @@ import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
@@ -633,8 +634,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setNextMonitorAt(null);
             row.setSourceRefId(trimToNull(position.getSourceRefId()));
             if (latestMonitorLog != null && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
-                row.setSourceAnalysisId(trimToNull(latestMonitorLog.getAnalysisId()));
-                row.setSourceExecutionPlanId(trimToNull(latestMonitorLog.getExecutionPlanId()));
+                String monitorAnalysisId = trimToNull(latestMonitorLog.getAnalysisId());
+                if (!PositionMonitorSourceContract.isUnverifiedAnalysisId(monitorAnalysisId)) {
+                    row.setSourceAnalysisId(monitorAnalysisId);
+                    row.setSourceExecutionPlanId(trimToNull(latestMonitorLog.getExecutionPlanId()));
+                }
             }
             rows.add(row);
         }
@@ -838,7 +842,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             suggestion.setSourceAnalysisId(resolvedOriginalPlan.analysisId());
             suggestion.setSourceExecutionPlanId(resolvedOriginalPlan.executionPlanId());
             suggestion.setSourceTraceId(resolvedOriginalPlan.traceId());
-            populateOriginalPlan(suggestion, originalDecision, presentation.validity());
+            populateOriginalPlan(suggestion, resolvedOriginalPlan.executionPlan(),
+                    originalDecision, presentation.validity());
             return suggestion;
         }
         DecisionResultVO decision = selectedDecisionForNewOpportunity;
@@ -982,6 +987,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return new OriginalPlanPresentation("PLAN_INCOMPLETE",
                     "原计划边界不完整，仅用于历史复核", validity);
         }
+        if (!hasCompleteOriginalPlanBoundaries(executionPlan)) {
+            return new OriginalPlanPresentation("PLAN_INCOMPLETE",
+                    "原计划边界不完整，仅用于历史复核", validity);
+        }
         SnapshotTraceStatus traceStatus = executionSnapshotTraceStatus(
                 decision, resolvedOriginalPlan.analysisRun());
         if (traceStatus == SnapshotTraceStatus.MISMATCH) {
@@ -1017,29 +1026,35 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (normalized.contains("OI_COLLAPSE")) return "持仓量快速收缩触发重新验证";
         if (normalized.contains("LIQUIDITY_DRAIN")) return "流动性快速下降触发重新验证";
         if (normalized.contains("SYSTEMIC_SHOCK")) return "系统性冲击触发重新验证";
-        if (reason != null && reason.codePoints().anyMatch(codePoint -> codePoint >= 0x4E00 && codePoint <= 0x9FFF)) {
-            return reason.length() <= 120 ? reason : reason.substring(0, 120);
+        if (reason == null
+                && trimToNull(executionPlan != null ? executionPlan.getHotResetEventId() : null) != null) {
+            return "热重置已触发重新验证";
         }
-        if (trimToNull(executionPlan != null ? executionPlan.getHotResetEventId() : null) != null) {
-            return "Hot Reset 已触发重新验证";
-        }
-        return reason == null ? null : "重验证原因已记录，等待人工复核";
+        return "重验证原因已记录，等待人工复核";
     }
 
     private void populateOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                      ExecutionPlanDO executionPlan,
                                       DecisionResultVO decision,
                                       PlanValidity validity) {
-        if (suggestion == null || decision == null) return;
+        if (suggestion == null || executionPlan == null || decision == null) return;
         suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
-        suggestion.setEntryZone(trimPlanValue(decision.getEntryZone()));
-        suggestion.setStopLoss(trimPlanValue(decision.getStopLoss()));
-        suggestion.setTakeProfitRules(trimPlanValue(decision.getTakeProfitRules()));
-        suggestion.setLeverageSuggestion(planLeverageLabel(decision.getLeverageSuggestion()));
-        suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
+        suggestion.setEntryZone(trimPlanValue(executionPlan.getEntryZone()));
+        suggestion.setStopLoss(trimPlanValue(executionPlan.getStopLoss()));
+        suggestion.setTakeProfitRules(trimPlanValue(executionPlan.getTakeProfitRules()));
+        suggestion.setLeverageSuggestion(planLeverageLabel(executionPlan.getLeverageSuggestion()));
+        suggestion.setPositionSuggestion(trimToNull(executionPlan.getPositionSuggestion()));
         suggestion.setValidPeriod(planValidityDisplay(decision, validity));
         suggestion.setValidFrom(validity.validFrom());
         suggestion.setExpiresAt(validity.expiresAt());
-        suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
+        suggestion.setInvalidCondition(trimPlanValue(executionPlan.getInvalidCondition()));
+    }
+
+    private boolean hasCompleteOriginalPlanBoundaries(ExecutionPlanDO executionPlan) {
+        return executionPlan != null
+                && trimPlanValue(executionPlan.getEntryZone()) != null
+                && trimPlanValue(executionPlan.getStopLoss()) != null
+                && trimPlanValue(executionPlan.getTakeProfitRules()) != null;
     }
 
     private void blockSuggestion(DashboardHomeVO.ExecutionSuggestionVO suggestion,

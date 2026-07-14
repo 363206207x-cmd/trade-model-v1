@@ -3,6 +3,7 @@ package org.example.trademodel.stress;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
@@ -10,6 +11,7 @@ import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -21,6 +23,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
@@ -645,6 +648,7 @@ class V1BusinessStressTest {
         private final MarketQuoteClient marketQuoteClient = mock(MarketQuoteClient.class);
         private final UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         private final ExecutionPlanMapper executionPlanMapper = mock(ExecutionPlanMapper.class);
+        private final AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         private final InMemoryMonitorLogService monitorLogService = new InMemoryMonitorLogService();
         private final PositionMonitorServiceImpl service;
 
@@ -653,16 +657,21 @@ class V1BusinessStressTest {
                     org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                     riskAdapter, executionPlanMapper,
                     monitorLogService, mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class),
-                    mock(DecisionResultMapper.class), new ObjectMapper(), null);
+                    mock(DecisionResultMapper.class), new ObjectMapper(), analysisRunMapper, null);
         }
 
         private PositionMonitorResultDTO monitor(MonitorScenario scenario) {
             String planId = "plan-" + scenario.name();
-            UserPositionDO position = position(scenario.id(), "OPEN", planId, "BTCUSDT", scenario.stopLoss(), scenario.takeProfit());
+            UserPositionDO position = position(scenario.id(), "OPEN",
+                    PositionMonitorSourceContract.executionPlanReference(planId),
+                    "BTCUSDT", scenario.stopLoss(), scenario.takeProfit());
             when(userPositionMapper.selectById(scenario.id())).thenReturn(position);
             when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("BTCUSDT", scenario.currentPrice())));
             when(riskAdapter.currentRisk()).thenReturn(scenario.risk());
-            lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(monitorPlan(planId));
+            ExecutionPlanDO plan = monitorPlan(planId);
+            lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+            lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
+                    .thenReturn(analysisRun(plan.getAnalysisId(), "BTCUSDT"));
             return service.monitorUserPosition(scenario.id());
         }
 
@@ -683,6 +692,14 @@ class V1BusinessStressTest {
         private UserPositionMapper userPositionMapper() {
             return userPositionMapper;
         }
+    }
+
+    private static AnalysisRunDO analysisRun(String analysisId, String symbol) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTraceId("trace-" + analysisId);
+        return run;
     }
 
     private static final class InMemoryMonitorLogService implements org.example.trademodel.service.PositionMonitorLogService {
