@@ -1,6 +1,7 @@
 package org.example.trademodel.userpositionreview;
 
 import org.example.trademodel.dto.req.WriteReviewResultReq;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapter {
@@ -49,16 +51,16 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     @Override
     public UserPositionReviewSummaryDTO buildSummary(Long positionId) {
         UserPositionDO position = requireClosedPosition(positionId);
-        PositionPlanSourceResolver.Resolution planSource = resolvePlan(position);
-        ExecutionPlanDO plan = planSource.verified() ? planSource.executionPlan() : null;
-        List<PositionMonitorLogDTO> logs = positionMonitorLogService.listAllByPositionIdForReview(position.getId());
+        ResolvedPositionReviewContext context = resolveReviewContext(position);
+        PositionPlanSourceResolver.Resolution planSource = context.planSource();
+        ExecutionPlanDO plan = context.executionPlan();
 
         UserPositionReviewSummaryDTO summary = new UserPositionReviewSummaryDTO();
         fillPosition(summary, position);
         fillPlan(summary, position, planSource);
         fillPnl(summary, position);
         fillExecutionDeviation(summary, position, plan);
-        fillMonitorFacts(summary, position, logs);
+        fillMonitorFacts(summary, position, context.monitorLogs());
         summary.setReviewStatus("REVIEW_SUMMARY_READY");
         if (PLAN_CONTEXT_MISSING.equals(summary.getPlanContextStatus())) {
             summary.getReviewReasons().add(PLAN_CONTEXT_MISSING);
@@ -78,8 +80,8 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
             throw new IllegalArgumentException("feedback request is required");
         }
         UserPositionDO position = requireClosedPosition(positionId);
-        PositionPlanSourceResolver.Resolution planSource = resolvePlan(position);
-        String analysisId = feedbackAnalysisId(position, planSource);
+        ResolvedPositionReviewContext context = resolveReviewContext(position);
+        String analysisId = feedbackAnalysisId(position, context.planSource());
 
         WriteReviewResultReq req = new WriteReviewResultReq();
         req.setAnalysisId(analysisId);
@@ -144,9 +146,79 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         return position;
     }
 
-    private PositionPlanSourceResolver.Resolution resolvePlan(UserPositionDO position) {
-        return positionPlanSourceResolver.resolveTypedReference(
-                position.getId(), position.getAssetSymbol(), position.getSourceRefId());
+    private ResolvedPositionReviewContext resolveReviewContext(UserPositionDO position) {
+        List<PositionMonitorLogDTO> rawLogs;
+        try {
+            rawLogs = positionMonitorLogService.listAllByPositionIdForReview(position.getId());
+        } catch (RuntimeException ignored) {
+            rawLogs = List.of();
+        }
+
+        List<PositionMonitorLogDTO> safeLogs = new ArrayList<>();
+        PositionPlanSourceResolver.Resolution latestTrustedSource = null;
+        PositionMonitorLogDTO latestTrustedLog = null;
+        String failureReason = "TRUSTED_MONITOR_SOURCE_MISSING";
+        for (PositionMonitorLogDTO log : rawLogs == null ? List.<PositionMonitorLogDTO>of() : rawLogs) {
+            if (log == null) {
+                continue;
+            }
+            if (!Objects.equals(position.getId(), log.getPositionId())) {
+                PositionMonitorLogSourceViewPolicy.markUnverified(log, true);
+                failureReason = "MONITOR_POSITION_MISMATCH";
+                safeLogs.add(log);
+                continue;
+            }
+            PositionPlanSourceResolver.Resolution monitorSource = positionPlanSourceResolver
+                    .resolveTrustedMonitorSource(position.getId(), position.getAssetSymbol(),
+                            position.getSourceRefId(), log.getAnalysisId(), log.getExecutionPlanId());
+            if (monitorSource.verified()) {
+                PositionMonitorLogSourceViewPolicy.markVerified(
+                        log, monitorSource.analysisId(), monitorSource.executionPlanId());
+                if (latestTrustedLog == null || isNewerMonitorLog(log, latestTrustedLog)) {
+                    latestTrustedLog = log;
+                    latestTrustedSource = monitorSource;
+                }
+            } else {
+                failureReason = monitorSource.failureReason();
+                PositionMonitorLogSourceViewPolicy.markUnverified(log, true);
+            }
+            safeLogs.add(log);
+        }
+
+        PositionPlanSourceResolver.Resolution source = latestTrustedSource;
+        if (source == null) {
+            source = positionPlanSourceResolver.resolveTypedReference(
+                    position.getId(), position.getAssetSymbol(), position.getSourceRefId());
+            if (!source.verified()) {
+                failureReason = source.failureReason();
+            }
+        }
+        return new ResolvedPositionReviewContext(
+                source,
+                source.verified() ? source.executionPlan() : null,
+                source.verified() ? source.analysisRun() : null,
+                source.verified() ? source.analysisId() : null,
+                source.verified() ? source.executionPlanId() : null,
+                List.copyOf(safeLogs),
+                failureReason);
+    }
+
+    private static boolean isNewerMonitorLog(PositionMonitorLogDTO candidate,
+                                             PositionMonitorLogDTO current) {
+        if (candidate.getCreatedAt() != null && current.getCreatedAt() != null) {
+            int timeComparison = candidate.getCreatedAt().compareTo(current.getCreatedAt());
+            if (timeComparison != 0) {
+                return timeComparison > 0;
+            }
+        } else if (candidate.getCreatedAt() != null) {
+            return true;
+        } else if (current.getCreatedAt() != null) {
+            return false;
+        }
+        if (candidate.getLogId() != null && current.getLogId() != null) {
+            return candidate.getLogId() > current.getLogId();
+        }
+        return true;
     }
 
     private static void fillPosition(UserPositionReviewSummaryDTO summary, UserPositionDO position) {
@@ -270,7 +342,7 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
                                          UserPositionDO position,
                                          List<PositionMonitorLogDTO> logs) {
         List<PositionMonitorLogDTO> safeLogs = logs == null ? List.of() : logs.stream()
-                .map(PositionMonitorLogSourceViewPolicy::sanitize)
+                .map(PositionMonitorLogSourceViewPolicy::sanitizeResolvedBusinessView)
                 .toList();
         summary.setMonitorLogs(safeLogs);
         summary.setMonitorLogCount(safeLogs.size());
@@ -365,5 +437,15 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         summary.setNotAutoReverse(true);
         summary.setNotUserPositionMutation(true);
         summary.setNotRuleAutoApply(true);
+    }
+
+    private record ResolvedPositionReviewContext(
+            PositionPlanSourceResolver.Resolution planSource,
+            ExecutionPlanDO executionPlan,
+            AnalysisRunDO analysisRun,
+            String analysisId,
+            String executionPlanId,
+            List<PositionMonitorLogDTO> monitorLogs,
+            String failureReason) {
     }
 }

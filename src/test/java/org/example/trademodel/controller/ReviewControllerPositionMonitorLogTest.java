@@ -60,7 +60,7 @@ class ReviewControllerPositionMonitorLogTest {
     }
 
     @Test
-    void reviewEndpointQueriesMonitorLogsReadOnlyWithSafetyFields() throws Exception {
+    void genericMonitorLogApiDoesNotClaimVerifiedWithoutResolverEvidence() throws Exception {
         when(positionMonitorLogService.listByPositionId(7L, 20)).thenReturn(List.of(dto(11L)));
 
         mockMvc.perform(get("/api/review/positions/7/monitor-logs"))
@@ -69,9 +69,9 @@ class ReviewControllerPositionMonitorLogTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].positionId").value(7))
                 .andExpect(jsonPath("$.data[0].analysisId").value("ana-p0-4"))
-                .andExpect(jsonPath("$.data[0].sourceVerified").value(true))
-                .andExpect(jsonPath("$.data[0].sourceStatus").value("VERIFIED"))
-                .andExpect(jsonPath("$.data[0].sourceStatusLabel").value("来源已验证"))
+                .andExpect(jsonPath("$.data[0].sourceVerified").value(false))
+                .andExpect(jsonPath("$.data[0].sourceStatus").value("PENDING_VERIFICATION"))
+                .andExpect(jsonPath("$.data[0].sourceStatusLabel").value("来源待验证"))
                 .andExpect(jsonPath("$.data[0].logicStatus").value("HIGH_RISK"))
                 .andExpect(jsonPath("$.data[0].suggestedAction").value("RISK_REVIEW"))
                 .andExpect(jsonPath("$.data[0].reviewOnly").value(true))

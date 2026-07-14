@@ -373,6 +373,115 @@ class UserPositionReviewAdapterTest {
         assertThat(result.getAnalysisId()).isEqualTo("USER_POSITION_26");
     }
 
+    @Test
+    void typedAnalysisMonitorsA_thenSiblingBAppears_closedReviewStillUsesA() {
+        UserPositionDO position = closedPosition(27L, "LONG",
+                PositionMonitorSourceContract.analysisReference("analysis-X"),
+                "100", "112", "95", "120");
+        PositionMonitorLogDTO monitorA = sourceLog(271L, 27L, "analysis-X", "plan-A",
+                LocalDateTime.of(2026, 6, 22, 9, 0));
+        when(userPositionMapper.selectById(27L)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForReview(27L)).thenReturn(List.of(monitorA));
+        when(executionPlanMapper.selectByPlanId("plan-A"))
+                .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
+        lenient().when(executionPlanMapper.selectOnlyByAnalysisId("analysis-X")).thenReturn(null);
+        lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-X"))
+                .thenReturn(plan("plan-B", "analysis-X", "B-entry", "B-stop", "B-tp"));
+
+        UserPositionReviewSummaryDTO summary = adapter.buildSummary(27L);
+
+        assertThat(summary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_FOUND");
+        assertThat(summary.getExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(summary.getEntryZone()).isEqualTo("A-entry");
+        assertThat(summary.getEntryZone()).isNotEqualTo("B-entry");
+        assertThat(summary.getMonitorLogs()).singleElement().satisfies(log -> {
+            assertThat(log.isSourceVerified()).isTrue();
+            assertThat(log.getAnalysisId()).isEqualTo("analysis-X");
+            assertThat(log.getExecutionPlanId()).isEqualTo("plan-A");
+        });
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+    }
+
+    @Test
+    void closedReviewAndFeedbackUseSameMonitorResolvedPlanA() {
+        UserPositionDO position = closedPosition(28L, "LONG",
+                PositionMonitorSourceContract.analysisReference("analysis-X"),
+                "100", "112", "95", "120");
+        PositionMonitorLogDTO monitorA = sourceLog(281L, 28L, "analysis-X", "plan-A",
+                LocalDateTime.of(2026, 6, 22, 9, 0));
+        when(userPositionMapper.selectById(28L)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForReview(28L)).thenReturn(List.of(monitorA));
+        when(executionPlanMapper.selectByPlanId("plan-A"))
+                .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
+        when(reviewService.saveOrUpdate(any())).thenAnswer(invocation -> {
+            WriteReviewResultReq request = invocation.getArgument(0);
+            ReviewStateVO state = new ReviewStateVO();
+            state.setReviewId("review-28");
+            state.setAnalysisId(request.getAnalysisId());
+            return state;
+        });
+
+        UserPositionReviewSummaryDTO summary = adapter.buildSummary(28L);
+        UserPositionReviewFeedbackResultDTO feedback = adapter.recordFeedback(
+                28L, new UserPositionReviewFeedbackReq());
+
+        ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
+        verify(reviewService).saveOrUpdate(captor.capture());
+        assertThat(summary.getExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(summary.getAnalysisId()).isEqualTo("analysis-X");
+        assertThat(feedback.getAnalysisId()).isEqualTo("analysis-X");
+        assertThat(captor.getValue().getAnalysisId()).isEqualTo(summary.getAnalysisId());
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
+        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+    }
+
+    @Test
+    void legacyGuessedSiblingBDoesNotReachDashboardOrReviewCenter() {
+        UserPositionDO position = closedPosition(29L, "LONG",
+                PositionMonitorSourceContract.executionPlanReference("plan-A"),
+                "100", "112", "95", "120");
+        PositionMonitorLogDTO guessedB = sourceLog(291L, 29L, "analysis-X", "plan-B",
+                LocalDateTime.of(2026, 6, 22, 9, 0));
+        when(userPositionMapper.selectById(29L)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForReview(29L)).thenReturn(List.of(guessedB));
+        when(executionPlanMapper.selectByPlanId("plan-A"))
+                .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
+
+        UserPositionReviewSummaryDTO summary = adapter.buildSummary(29L);
+
+        assertThat(summary.getExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(summary.getEntryZone()).isEqualTo("A-entry");
+        assertThat(summary.getMonitorLogs()).singleElement().satisfies(log -> {
+            assertThat(log.isSourceVerified()).isFalse();
+            assertThat(log.getAnalysisId()).isNull();
+            assertThat(log.getExecutionPlanId()).isNull();
+        });
+        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+    }
+
+    @Test
+    void untypedLegacyPositionCannotPromoteOldMonitorIds() {
+        UserPositionDO position = closedPosition(30L, "LONG", null,
+                "100", "112", "95", "120");
+        position.setSourceRefId("legacy-untyped");
+        PositionMonitorLogDTO legacy = sourceLog(301L, 30L, "analysis-X", "plan-A",
+                LocalDateTime.of(2026, 6, 22, 9, 0));
+        when(userPositionMapper.selectById(30L)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForReview(30L)).thenReturn(List.of(legacy));
+
+        UserPositionReviewSummaryDTO summary = adapter.buildSummary(30L);
+
+        assertUnverifiedPlanSummary(summary, 30L);
+        assertThat(summary.getMonitorLogs()).singleElement().satisfies(log -> {
+            assertThat(log.isSourceVerified()).isFalse();
+            assertThat(log.getAnalysisId()).isNull();
+            assertThat(log.getExecutionPlanId()).isNull();
+        });
+        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+    }
+
     private static UserPositionDO positionWithStatus(Long id, String status) {
         UserPositionDO row = closedPosition(id, "LONG", null, "100", "110", "95", "120");
         row.setStatus(status);
@@ -471,6 +580,18 @@ class UserPositionReviewAdapterTest {
         dto.setNotOrderExecution(true);
         dto.setNotAutoTrading(true);
         dto.setNotPositionMutation(true);
+        return dto;
+    }
+
+    private static PositionMonitorLogDTO sourceLog(Long logId,
+                                                   Long positionId,
+                                                   String analysisId,
+                                                   String executionPlanId,
+                                                   LocalDateTime createdAt) {
+        PositionMonitorLogDTO dto = log(logId, "LOGIC_VALID", "HOLD", "LOW", createdAt);
+        dto.setPositionId(positionId);
+        dto.setAnalysisId(analysisId);
+        dto.setExecutionPlanId(executionPlanId);
         return dto;
     }
 

@@ -190,6 +190,35 @@ class ReviewCenterServiceImplTest {
                 }));
     }
 
+    @Test
+    void legacyGuessedSiblingBDoesNotReachReviewCenterTimeline() {
+        UserPositionReviewSummaryDTO summary = positionSummary();
+        PositionMonitorLogDTO guessedSibling = monitorLog();
+        guessedSibling.setAnalysisId("analysis-X");
+        guessedSibling.setExecutionPlanId("plan-B");
+        guessedSibling.setSourceVerified(false);
+        guessedSibling.setSourceStatus("PENDING_VERIFICATION");
+        guessedSibling.setSourceStatusLabel("来源待验证");
+        summary.setMonitorLogs(List.of(guessedSibling));
+        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of(position()));
+        when(userPositionReviewAdapter.buildSummary(7L)).thenReturn(summary);
+        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+                .thenReturn(List.of());
+        when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
+        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+
+        ReviewCenterDashboardVO vo = service.getDashboard();
+
+        assertThat(vo.getPositionReviews()).singleElement().satisfies(item ->
+                assertThat(item.getMonitorTimeline()).singleElement().satisfies(log -> {
+                    assertThat(log.getAnalysisId()).isNull();
+                    assertThat(log.getExecutionPlanId()).isNull();
+                    assertThat(log.isSourceVerified()).isFalse();
+                    assertThat(log.getSourceStatus()).isEqualTo("UNVERIFIED");
+                    assertThat(log.getSourceStatusLabel()).isEqualTo("来源不可验证");
+                }));
+    }
+
     private static UserPositionDO position() {
         UserPositionDO row = new UserPositionDO();
         row.setId(7L);

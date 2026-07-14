@@ -137,7 +137,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
             List<PositionMonitorLogDTO> safeMonitorLogs = summary.getMonitorLogs() == null
                     ? List.of()
                     : summary.getMonitorLogs().stream()
-                            .map(PositionMonitorLogSourceViewPolicy::sanitize)
+                            .map(PositionMonitorLogSourceViewPolicy::sanitizeResolvedBusinessView)
                             .toList();
             item.setMonitorTimeline(safeMonitorLogs);
             item.setMonitorConclusion(latestMonitorConclusion(safeMonitorLogs));

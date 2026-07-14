@@ -126,7 +126,7 @@ class PositionMonitorLogServiceImplTest {
     }
 
     @Test
-    void verifiedMonitorLogRetainsRealAnalysisId() {
+    void legacyNonSentinelMonitorRowIsNotAutomaticallyVerified() {
         PositionMonitorLogDO row = logRow(204L, 7L, "analysis-verified", "LOGIC_VALID", "HOLD",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         row.setExecutionPlanId("plan-verified");
@@ -136,9 +136,9 @@ class PositionMonitorLogServiceImplTest {
 
         assertThat(result.getAnalysisId()).isEqualTo("analysis-verified");
         assertThat(result.getExecutionPlanId()).isEqualTo("plan-verified");
-        assertThat(result.isSourceVerified()).isTrue();
-        assertThat(result.getSourceStatus()).isEqualTo("VERIFIED");
-        assertThat(result.getSourceStatusLabel()).isEqualTo("来源已验证");
+        assertThat(result.isSourceVerified()).isFalse();
+        assertThat(result.getSourceStatus()).isEqualTo("PENDING_VERIFICATION");
+        assertThat(result.getSourceStatusLabel()).isEqualTo("来源待验证");
     }
 
     @Test

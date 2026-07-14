@@ -44,7 +44,6 @@ import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
-import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
@@ -243,11 +242,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(buildAssets(decisions, effectiveLimit));
-        List<DashboardHomeVO.PositionVO> positionRows = buildPositions(positions);
+        PositionRowsResult positionRowsResult = buildPositions(positions);
+        List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
         home.setSelectedSymbol(normalizedSelected);
         DashboardHomeVO.PositionVO activePosition = findPosition(positionRows, normalizedSelected);
-        ResolvedOriginalPlan resolvedOriginalPlan = resolveOriginalPlan(activePosition);
+        PositionPlanSourceResolver.Resolution activePositionSource = activePosition == null
+                ? null : positionRowsResult.trustedSources().get(activePosition.getPositionId());
+        ResolvedOriginalPlan resolvedOriginalPlan = resolveOriginalPlan(activePosition, activePositionSource);
         home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision, activePosition, resolvedOriginalPlan));
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
@@ -593,8 +595,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return asset;
     }
 
-    private List<DashboardHomeVO.PositionVO> buildPositions(List<UserPositionVO> positions) {
+    private PositionRowsResult buildPositions(List<UserPositionVO> positions) {
         List<DashboardHomeVO.PositionVO> rows = new ArrayList<>();
+        Map<Long, PositionPlanSourceResolver.Resolution> trustedSources = new LinkedHashMap<>();
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
             if (!isActiveManualPosition(position)) {
                 continue;
@@ -636,16 +639,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setLastMonitorAt(latestMonitorLog != null ? latestMonitorLog.getCreatedAt() : null);
             row.setNextMonitorAt(null);
             row.setSourceRefId(trimToNull(position.getSourceRefId()));
-            if (latestMonitorLog != null && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
-                String monitorAnalysisId = trimToNull(latestMonitorLog.getAnalysisId());
-                if (!PositionMonitorSourceContract.isUnverifiedAnalysisId(monitorAnalysisId)) {
-                    row.setSourceAnalysisId(monitorAnalysisId);
-                    row.setSourceExecutionPlanId(trimToNull(latestMonitorLog.getExecutionPlanId()));
+            if (latestMonitorLog != null
+                    && positionPlanSourceResolver != null
+                    && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
+                PositionPlanSourceResolver.Resolution trustedSource = positionPlanSourceResolver
+                        .resolveTrustedMonitorSource(position.getId(), position.getAssetSymbol(),
+                                position.getSourceRefId(), latestMonitorLog.getAnalysisId(),
+                                latestMonitorLog.getExecutionPlanId());
+                if (trustedSource.verified()) {
+                    row.setSourceAnalysisId(trustedSource.analysisId());
+                    row.setSourceExecutionPlanId(trustedSource.executionPlanId());
+                    row.setSourceTraceId(trustedSource.sourceTraceId());
+                    trustedSources.put(position.getId(), trustedSource);
                 }
             }
             rows.add(row);
         }
-        return rows;
+        return new PositionRowsResult(List.copyOf(rows), Map.copyOf(trustedSources));
     }
 
     private boolean isManualPosition(UserPositionVO position) {
@@ -749,28 +759,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
-    private ResolvedOriginalPlan resolveOriginalPlan(DashboardHomeVO.PositionVO position) {
+    private ResolvedOriginalPlan resolveOriginalPlan(DashboardHomeVO.PositionVO position,
+                                                     PositionPlanSourceResolver.Resolution source) {
         if (position == null) {
             return ResolvedOriginalPlan.unverified("NO_ACTIVE_POSITION");
         }
-        String requestedPlanId = trimToNull(position.getSourceExecutionPlanId());
-        String requestedAnalysisId = trimToNull(position.getSourceAnalysisId());
-        if (requestedPlanId == null && requestedAnalysisId == null) {
+        if (source == null || !source.verified()) {
             clearUnverifiedOriginalPlanSource(position);
             return ResolvedOriginalPlan.unverified("NO_VERIFIABLE_MONITOR_SOURCE");
         }
-        if (positionPlanSourceResolver == null || decisionResultMapper == null) {
+        if (decisionResultMapper == null) {
             clearUnverifiedOriginalPlanSource(position);
             return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_READ_MODEL_UNAVAILABLE");
         }
         try {
-            PositionPlanSourceResolver.Resolution source = positionPlanSourceResolver.resolveMonitorReference(
-                    position.getPositionId(), position.getSymbol(), requestedAnalysisId, requestedPlanId);
-            if (!source.verified()) {
-                clearUnverifiedOriginalPlanSource(position);
-                return ResolvedOriginalPlan.unverified(source.failureReason());
-            }
-
             DecisionResultVO sourceDecision = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
                     source.analysisId(), source.executionPlanId());
             if (!validOriginalPlanDecision(position, sourceDecision, source.analysisId())) {
@@ -2069,6 +2071,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int adjudicative() {
             return support + challenge;
         }
+    }
+
+    private record PositionRowsResult(
+            List<DashboardHomeVO.PositionVO> rows,
+            Map<Long, PositionPlanSourceResolver.Resolution> trustedSources) {
     }
 
     private record ResolvedOriginalPlan(String identityStatus,

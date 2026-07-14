@@ -678,6 +678,45 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void legacyGuessedSiblingBDoesNotReachDashboard() {
+        UserPositionVO position = activeManualPosition(321L, "BTCUSDT",
+                PositionMonitorSourceContract.executionPlanReference("plan-A"));
+        PositionMonitorLogDTO guessedSibling = analysisOnlyMonitor(position, "analysis-X");
+        guessedSibling.setExecutionPlanId("plan-B");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-X", "BTCUSDT", "B");
+        when(positionMonitorLogService.listByPositionId(321L, 1)).thenReturn(List.of(guessedSibling));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertUnverifiedOriginalPlan(home.getExecutionSuggestion());
+        assertThat(home.getPositions()).singleElement().satisfies(row -> {
+            assertThat(row.getSourceAnalysisId()).isNull();
+            assertThat(row.getSourceExecutionPlanId()).isNull();
+            assertThat(row.getSourceTraceId()).isNull();
+        });
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNotEqualTo("B-entry");
+        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+    }
+
+    @Test
+    void legacyUntypedPositionWithOldPlanIdsFailsClosed() {
+        UserPositionVO position = activeManualPosition(322L, "BTCUSDT", "legacy-untyped-source");
+        PositionMonitorLogDTO legacy = analysisOnlyMonitor(position, "analysis-A");
+        legacy.setExecutionPlanId("plan-A");
+        when(positionMonitorLogService.listByPositionId(322L, 1)).thenReturn(List.of(legacy));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertUnverifiedOriginalPlan(home.getExecutionSuggestion());
+        assertThat(home.getPositions().get(0).getSourceAnalysisId()).isNull();
+        assertThat(home.getPositions().get(0).getSourceExecutionPlanId()).isNull();
+        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+    }
+
+    @Test
     void monitorExecutionPlanIdResolvesExactOriginalPlan() {
         UserPositionVO position = activeManualPosition(33L, "BTCUSDT", "ambiguous-source-ref");
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
@@ -697,7 +736,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void analysisOnlyWithSinglePlanResolvesOriginalPlan() {
+    void typedAnalysisMonitorExactPlanResolvesOriginalPlan() {
         UserPositionVO position = activeManualPosition(34L, "BTCUSDT", null);
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
@@ -711,31 +750,31 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo("analysis-plan-A");
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
         assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
-        verify(executionPlanMapper).selectOnlyByAnalysisId("analysis-plan-A");
-        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+        verify(executionPlanMapper).selectByPlanId("plan-A");
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
     }
 
     @Test
     void analysisOnlyWithMultiplePlansFailsClosed() {
-        UserPositionVO position = activeManualPosition(341L, "BTCUSDT", null);
+        UserPositionVO position = activeManualPosition(341L, "BTCUSDT",
+                PositionMonitorSourceContract.analysisReference("analysis-shared"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-shared");
         when(positionMonitorLogService.listByPositionId(341L, 1)).thenReturn(List.of(monitor));
-        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-shared")).thenReturn(null);
         when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
-        verify(executionPlanMapper).selectOnlyByAnalysisId("analysis-shared");
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
         verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
     }
 
     @Test
     void analysisOnlyWithNoPlanFailsClosed() {
-        UserPositionVO position = activeManualPosition(342L, "BTCUSDT", null);
+        UserPositionVO position = activeManualPosition(342L, "BTCUSDT",
+                PositionMonitorSourceContract.analysisReference("analysis-no-plan"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-no-plan");
         when(positionMonitorLogService.listByPositionId(342L, 1)).thenReturn(List.of(monitor));
-        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-no-plan")).thenReturn(null);
         when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
@@ -746,12 +785,12 @@ class DashboardHomeServiceImplTest {
 
     @Test
     void analysisOnlyMultiplePlansNeverSelectsLatestSibling() {
-        UserPositionVO position = activeManualPosition(343L, "BTCUSDT", null);
+        UserPositionVO position = activeManualPosition(343L, "BTCUSDT",
+                PositionMonitorSourceContract.analysisReference("analysis-shared"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-shared");
         ExecutionPlanDO latestSiblingB = validExecutionPlan("plan-B", "analysis-shared");
         latestSiblingB.setEntryZone("B-entry");
         when(positionMonitorLogService.listByPositionId(343L, 1)).thenReturn(List.of(monitor));
-        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-shared")).thenReturn(null);
         lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-shared")).thenReturn(latestSiblingB);
         when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
 
@@ -787,7 +826,8 @@ class DashboardHomeServiceImplTest {
 
     @Test
     void monitorExecutionPlanIdAndAnalysisIdMismatchFailsClosed() {
-        UserPositionVO position = activeManualPosition(345L, "BTCUSDT", null);
+        UserPositionVO position = activeManualPosition(345L, "BTCUSDT",
+                PositionMonitorSourceContract.executionPlanReference("plan-A"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-monitor-A");
         monitor.setExecutionPlanId("plan-A");
         when(positionMonitorLogService.listByPositionId(345L, 1)).thenReturn(List.of(monitor));
@@ -2206,6 +2246,7 @@ class DashboardHomeServiceImplTest {
                                                            String planId,
                                                            String sourceTraceId,
                                                            String currentStateTraceId) {
+        position.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(planId));
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
@@ -2220,11 +2261,13 @@ class DashboardHomeServiceImplTest {
                                                       String planId,
                                                       String sourceTraceId,
                                                       String currentStateTraceId) {
+        position.setSourceRefId(PositionMonitorSourceContract.analysisReference(sourceDecision.getAnalysisId()));
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
+        monitor.setExecutionPlanId(planId);
         when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
-        return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, true);
+        return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
     }
 
     private ExecutionPlanDO stubResolvedOriginalPlan(DecisionResultVO sourceDecision,
@@ -2428,6 +2471,7 @@ class DashboardHomeServiceImplTest {
                                            DecisionResultVO sourceDecision,
                                            String planId,
                                            String traceId) {
+        position.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(planId));
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());

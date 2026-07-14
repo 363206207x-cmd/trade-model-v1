@@ -32,17 +32,30 @@ public final class PositionPlanSourceResolver {
                 : resolve(positionId, positionSymbol, null, reference.id());
     }
 
-    public Resolution resolveMonitorReference(Long positionId,
-                                              String positionSymbol,
-                                              String monitorAnalysisId,
-                                              String monitorExecutionPlanId) {
+    public Resolution resolveTrustedMonitorSource(Long positionId,
+                                                  String positionSymbol,
+                                                  String positionTypedSourceRefId,
+                                                  String monitorAnalysisId,
+                                                  String monitorExecutionPlanId) {
+        SourceReference positionSource = PositionMonitorSourceContract.parse(positionTypedSourceRefId);
+        if (positionSource == null) {
+            return Resolution.unverified("TYPED_SOURCE_REFERENCE_REQUIRED");
+        }
         String analysisId = trimToNull(monitorAnalysisId);
         String executionPlanId = trimToNull(monitorExecutionPlanId);
         if (PositionMonitorSourceContract.isUnverifiedAnalysisId(analysisId)) {
             return Resolution.unverified("MONITOR_SOURCE_UNVERIFIED");
         }
-        if (executionPlanId == null && analysisId == null) {
-            return Resolution.unverified("MONITOR_SOURCE_MISSING");
+        if (executionPlanId == null || analysisId == null) {
+            return Resolution.unverified("MONITOR_EXACT_SOURCE_REQUIRED");
+        }
+        if (positionSource.type() == SourceType.EXECUTION_PLAN
+                && !positionSource.id().equals(executionPlanId)) {
+            return Resolution.unverified("POSITION_MONITOR_PLAN_MISMATCH");
+        }
+        if (positionSource.type() == SourceType.ANALYSIS
+                && !positionSource.id().equals(analysisId)) {
+            return Resolution.unverified("POSITION_MONITOR_ANALYSIS_MISMATCH");
         }
         return resolve(positionId, positionSymbol, executionPlanId, analysisId);
     }
