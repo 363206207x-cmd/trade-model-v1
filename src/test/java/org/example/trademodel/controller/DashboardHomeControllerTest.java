@@ -34,7 +34,7 @@ class DashboardHomeControllerTest {
     void homeReturnsApiResponseSuccess() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("BTCUSDT");
-        when(dashboardHomeService.getHome("BTCUSDT", 6)).thenReturn(home);
+        when(dashboardHomeService.getHome("BTCUSDT", 6, null)).thenReturn(home);
 
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -46,7 +46,7 @@ class DashboardHomeControllerTest {
                 .andExpect(jsonPath("$.data.safety.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.data.safety.notAutoTrading").value(true));
 
-        verify(dashboardHomeService).getHome("BTCUSDT", 6);
+        verify(dashboardHomeService).getHome("BTCUSDT", 6, null);
     }
 
     @Test
@@ -79,7 +79,7 @@ class DashboardHomeControllerTest {
         ai.setConsistency(consistency);
         home.setAiDecision(ai);
 
-        when(dashboardHomeService.getHome("BTCUSDT", 6)).thenReturn(home);
+        when(dashboardHomeService.getHome("BTCUSDT", 6, null)).thenReturn(home);
 
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -96,5 +96,24 @@ class DashboardHomeControllerTest {
                 .andExpect(jsonPath("$.data.executionSuggestion.entryZone").doesNotExist())
                 .andExpect(jsonPath("$.data.executionSuggestion.stopLoss").doesNotExist())
                 .andExpect(jsonPath("$.data.executionSuggestion.takeProfitRules").doesNotExist());
+    }
+
+    @Test
+    void homeControllerPassesSelectedPositionId() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedSymbol("BTCUSDT");
+        home.setSelectedPositionId(42L);
+        home.setPositionSelectionStatus("EXACT_POSITION_SELECTED");
+        when(dashboardHomeService.getHome("BTCUSDT", 6, 42L)).thenReturn(home);
+
+        mockMvc.perform(get("/api/dashboard/home")
+                        .param("selectedSymbol", "BTCUSDT")
+                        .param("positionId", "42")
+                        .param("limit", "6"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.selectedPositionId").value(42))
+                .andExpect(jsonPath("$.data.positionSelectionStatus").value("EXACT_POSITION_SELECTED"));
+
+        verify(dashboardHomeService).getHome("BTCUSDT", 6, 42L);
     }
 }

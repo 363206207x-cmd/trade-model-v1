@@ -16,6 +16,9 @@ public class DashboardHomeVO {
     private List<AssetVO> assets = new ArrayList<>();
     private List<PositionVO> positions = new ArrayList<>();
     private String selectedSymbol;
+    private Long selectedPositionId;
+    private String positionSelectionStatus;
+    private Integer matchingPositionCount;
     private ExecutionSuggestionVO executionSuggestion = new ExecutionSuggestionVO();
     private AiDecisionVO aiDecision = new AiDecisionVO();
     private PushInboxVO pushInbox = new PushInboxVO();
@@ -77,6 +80,30 @@ public class DashboardHomeVO {
 
     public void setSelectedSymbol(String selectedSymbol) {
         this.selectedSymbol = selectedSymbol;
+    }
+
+    public Long getSelectedPositionId() {
+        return selectedPositionId;
+    }
+
+    public void setSelectedPositionId(Long selectedPositionId) {
+        this.selectedPositionId = selectedPositionId;
+    }
+
+    public String getPositionSelectionStatus() {
+        return positionSelectionStatus;
+    }
+
+    public void setPositionSelectionStatus(String positionSelectionStatus) {
+        this.positionSelectionStatus = positionSelectionStatus;
+    }
+
+    public Integer getMatchingPositionCount() {
+        return matchingPositionCount;
+    }
+
+    public void setMatchingPositionCount(Integer matchingPositionCount) {
+        this.matchingPositionCount = matchingPositionCount;
     }
 
     public ExecutionSuggestionVO getExecutionSuggestion() {

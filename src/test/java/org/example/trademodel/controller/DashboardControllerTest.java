@@ -491,7 +491,7 @@ public class DashboardControllerTest {
     void positionSourceFixtureSeparatesVerifiedAndUnverifiedOriginalPlans() throws Exception {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
         int unverifiedStart = fixture.indexOf("\"originalPlanIdentity\": \"UNVERIFIED\"");
-        int unverifiedEnd = fixture.indexOf("elif scenario == \"placeholder\"", unverifiedStart);
+        int unverifiedEnd = fixture.indexOf("elif scenario == \"multi-position\"", unverifiedStart);
 
         assertThat(fixture).contains(
                 "\"sourceAnalysisId\": \"analysis-position-source\"",
@@ -556,6 +556,68 @@ public class DashboardControllerTest {
         assertThat(directFunctionCalls(tiles)).contains("refreshDashboard");
         assertThat(directFunctionCalls(searchSelection)).contains("refreshDashboard");
         assertThat(homeRequest).contains("/api/dashboard/home", "selectedSymbol=", "encodeURIComponent(selectedSymbol)");
+    }
+
+    @Test
+    void positionRowClickPassesPositionIdToHomeRequest() throws Exception {
+        String positionRows = functionBody("renderHomePositionsFromPayload");
+        String rowBinding = functionBody("bindHomePositionRows");
+        String homeRequest = functionBody("fetchDashboardHome");
+
+        assertThat(positionRows).contains(
+                "home-position-row", "data-position-id=", "data-symbol=", "bindHomePositionRows()");
+        assertThat(rowBinding).contains(
+                "selectedSymbol = symbol", "selectedPositionId = positionId", "refreshDashboard()");
+        assertThat(homeRequest).contains(
+                "&positionId=", "encodeURIComponent(selectedPositionId)");
+    }
+
+    @Test
+    void assetClickClearsSelectedPositionId() throws Exception {
+        String sidebar = functionBody("renderSidebarSlots");
+        String tiles = functionBody("renderHomeAssetsFromPayload");
+        String searchSelection = functionBody("selectDashboardAsset");
+
+        assertSelectionRefreshOrder(sidebar, "selectedPositionId = null", "refreshDashboard()");
+        assertSelectionRefreshOrder(tiles, "selectedPositionId = null", "refreshDashboard()");
+        assertSelectionRefreshOrder(searchSelection, "selectedPositionId = null", "refreshDashboard()");
+    }
+
+    @Test
+    void multiPositionFailureClearsPreviousPlan() throws Exception {
+        String payloadRenderer = functionBody("renderDashboardHomePayload");
+        String executionRenderer = functionBody("renderHomeExecutionFromPayload");
+        String unavailable = functionBody("renderDashboardHomeUnavailable");
+        int selectionStart = executionRenderer.indexOf("if (selectionBlocked)");
+        int positionModeStart = executionRenderer.indexOf("if (s.positionMode", selectionStart);
+
+        assertThat(payloadRenderer).contains(
+                "home.selectedPositionId != null", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH",
+                "renderHomeExecutionFromPayload");
+        assertThat(selectionStart).isGreaterThanOrEqualTo(0);
+        assertThat(positionModeStart).isGreaterThan(selectionStart);
+        assertThat(executionRenderer.substring(selectionStart, positionModeStart))
+                .contains("box.innerHTML", "请选择具体持仓")
+                .doesNotContain("entryZone", "stopLoss", "takeProfitRules", "sourceAnalysisId");
+        assertThat(unavailable).contains("selectedPositionId = null", "当前不展示执行计划");
+    }
+
+    @Test
+    void multiPositionOfflineFixtureRequiresExactPositionSelection() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+        int multiPositionStart = fixture.indexOf("elif scenario == \"multi-position\"");
+        int placeholderStart = fixture.indexOf("elif scenario == \"placeholder\"", multiPositionStart);
+
+        assertThat(fixture).contains(
+                "\"multi-position\"", "selected_position_id == 9101", "selected_position_id == 9102",
+                "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND",
+                "position_review_suggestion(position_a, \"POSITION-A\")",
+                "position_review_suggestion(position_b, \"POSITION-B\")",
+                "\"entryZone\": f\"{marker}-entry\"");
+        assertThat(multiPositionStart).isGreaterThanOrEqualTo(0);
+        assertThat(placeholderStart).isGreaterThan(multiPositionStart);
+        assertThat(fixture.substring(multiPositionStart, placeholderStart))
+                .contains("请选择具体持仓", "originalPlanIdentity", "UNVERIFIED");
     }
 
     @Test

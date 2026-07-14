@@ -210,7 +210,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     @Override
-    public DashboardHomeVO getHome(String selectedSymbol, Integer limit) {
+    public DashboardHomeVO getHome(String selectedSymbol, Integer limit, Long selectedPositionId) {
         int effectiveLimit = normalizeLimit(limit);
         LightSystemStatusVO systemStatus = safeSystemStatus();
         List<DecisionResultVO> decisions = safeDecisions(Math.max(effectiveLimit, DEFAULT_LIMIT));
@@ -246,11 +246,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
         home.setSelectedSymbol(normalizedSelected);
-        DashboardHomeVO.PositionVO activePosition = findPosition(positionRows, normalizedSelected);
+        PositionSelectionResult positionSelection = resolveSelectedPosition(
+                positionRows, normalizedSelected, selectedPositionId);
+        DashboardHomeVO.PositionVO activePosition = positionSelection.selectedPosition();
+        home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
+        home.setPositionSelectionStatus(positionSelection.status().name());
+        home.setMatchingPositionCount(positionSelection.matchingPositionCount());
         PositionPlanSourceResolver.Resolution activePositionSource = activePosition == null
                 ? null : positionRowsResult.trustedSources().get(activePosition.getPositionId());
         ResolvedOriginalPlan resolvedOriginalPlan = resolveOriginalPlan(activePosition, activePositionSource);
-        home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision, activePosition, resolvedOriginalPlan));
+        home.setExecutionSuggestion(positionSelection.blocked()
+                ? buildPositionSelectionSuggestion(positionSelection)
+                : buildExecutionSuggestion(selectedDecision, activePosition, resolvedOriginalPlan));
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
@@ -951,6 +958,35 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return suggestion;
     }
 
+    private DashboardHomeVO.ExecutionSuggestionVO buildPositionSelectionSuggestion(
+            PositionSelectionResult selection) {
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
+        PositionSelectionStatus status = selection != null
+                ? selection.status() : PositionSelectionStatus.POSITION_NOT_FOUND;
+        suggestion.setStatus(status.name());
+        suggestion.setPositionMode(false);
+        suggestion.setOriginalPlanIdentity("UNVERIFIED");
+        suggestion.setOriginalPlanCurrentValidity("UNVERIFIED");
+        switch (status) {
+            case POSITION_SELECTION_REQUIRED -> {
+                suggestion.setStatusLabel("请选择具体持仓");
+                suggestion.setBlockedReason("当前标的存在多笔开放手动持仓");
+                suggestion.setOriginalPlanLabel("请选择具体持仓");
+            }
+            case POSITION_SYMBOL_MISMATCH -> {
+                suggestion.setStatusLabel("所选持仓与当前标的不匹配");
+                suggestion.setBlockedReason("请从当前标的的持仓列表重新选择");
+                suggestion.setOriginalPlanLabel("所选持仓与当前标的不匹配");
+            }
+            default -> {
+                suggestion.setStatusLabel("所选持仓不存在");
+                suggestion.setBlockedReason("请选择当前仍开放的手动持仓");
+                suggestion.setOriginalPlanLabel("所选持仓不存在");
+            }
+        }
+        return suggestion;
+    }
+
     private OriginalPlanPresentation originalPlanPresentation(ResolvedOriginalPlan resolvedOriginalPlan) {
         DecisionResultVO decision = resolvedOriginalPlan != null ? resolvedOriginalPlan.decision() : null;
         ExecutionPlanDO executionPlan = resolvedOriginalPlan != null ? resolvedOriginalPlan.executionPlan() : null;
@@ -1628,14 +1664,44 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return "当前条件不足，继续观察";
     }
 
-    private DashboardHomeVO.PositionVO findPosition(List<DashboardHomeVO.PositionVO> positions, String symbol) {
+    private PositionSelectionResult resolveSelectedPosition(List<DashboardHomeVO.PositionVO> positions,
+                                                            String symbol,
+                                                            Long selectedPositionId) {
         String normalized = normalizeSymbol(symbol);
-        if (normalized == null) return null;
-        for (DashboardHomeVO.PositionVO position : positions == null
-                ? List.<DashboardHomeVO.PositionVO>of() : positions) {
-            if (normalized.equals(normalizeSymbol(position.getSymbol()))) return position;
+        List<DashboardHomeVO.PositionVO> available = positions == null ? List.of() : positions;
+        List<DashboardHomeVO.PositionVO> matching = normalized == null ? List.of() : available.stream()
+                .filter(position -> normalized.equals(normalizeSymbol(position.getSymbol())))
+                .toList();
+
+        if (selectedPositionId != null) {
+            if (selectedPositionId <= 0) {
+                return PositionSelectionResult.blocked(
+                        PositionSelectionStatus.POSITION_NOT_FOUND, matching.size());
+            }
+            DashboardHomeVO.PositionVO selected = available.stream()
+                    .filter(position -> Objects.equals(position.getPositionId(), selectedPositionId))
+                    .findFirst()
+                    .orElse(null);
+            if (selected == null) {
+                return PositionSelectionResult.blocked(
+                        PositionSelectionStatus.POSITION_NOT_FOUND, matching.size());
+            }
+            if (normalized == null || !normalized.equals(normalizeSymbol(selected.getSymbol()))) {
+                return PositionSelectionResult.blocked(
+                        PositionSelectionStatus.POSITION_SYMBOL_MISMATCH, matching.size());
+            }
+            return new PositionSelectionResult(
+                    PositionSelectionStatus.EXACT_POSITION_SELECTED, selected, matching.size());
         }
-        return null;
+        if (matching.isEmpty()) {
+            return new PositionSelectionResult(PositionSelectionStatus.NO_POSITION, null, 0);
+        }
+        if (matching.size() == 1) {
+            return new PositionSelectionResult(
+                    PositionSelectionStatus.UNIQUE_POSITION_SELECTED, matching.get(0), 1);
+        }
+        return PositionSelectionResult.blocked(
+                PositionSelectionStatus.POSITION_SELECTION_REQUIRED, matching.size());
     }
 
     private boolean planAllowedAssetState(String state) {
@@ -2076,6 +2142,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private record PositionRowsResult(
             List<DashboardHomeVO.PositionVO> rows,
             Map<Long, PositionPlanSourceResolver.Resolution> trustedSources) {
+    }
+
+    private enum PositionSelectionStatus {
+        NO_POSITION,
+        UNIQUE_POSITION_SELECTED,
+        EXACT_POSITION_SELECTED,
+        POSITION_SELECTION_REQUIRED,
+        POSITION_NOT_FOUND,
+        POSITION_SYMBOL_MISMATCH
+    }
+
+    private record PositionSelectionResult(PositionSelectionStatus status,
+                                           DashboardHomeVO.PositionVO selectedPosition,
+                                           int matchingPositionCount) {
+        private boolean blocked() {
+            return status == PositionSelectionStatus.POSITION_SELECTION_REQUIRED
+                    || status == PositionSelectionStatus.POSITION_NOT_FOUND
+                    || status == PositionSelectionStatus.POSITION_SYMBOL_MISMATCH;
+        }
+
+        private static PositionSelectionResult blocked(PositionSelectionStatus status,
+                                                       int matchingPositionCount) {
+            return new PositionSelectionResult(status, null, matchingPositionCount);
+        }
     }
 
     private record ResolvedOriginalPlan(String identityStatus,

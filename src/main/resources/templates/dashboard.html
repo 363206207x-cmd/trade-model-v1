@@ -1658,6 +1658,17 @@
             height: 25px;
             color: var(--text-secondary);
         }
+        .position-table tbody tr.home-position-row {
+            cursor: pointer;
+        }
+        .position-table tbody tr.home-position-row:hover td,
+        .position-table tbody tr.home-position-row.selected td {
+            background: rgba(47, 117, 255, 0.06);
+        }
+        .position-table tbody tr.home-position-row:focus-visible {
+            outline: 2px solid var(--brand-accent);
+            outline-offset: -2px;
+        }
         .position-table tbody tr:last-child td,
         .execution-plan-table tbody tr:last-child th,
         .execution-plan-table tbody tr:last-child td {
@@ -3606,6 +3617,7 @@
     var HOT_RESET_POINT_BLOCKED = "POINT_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var HOT_RESET_TRADING_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
     var selectedSymbol = null;
+    var selectedPositionId = null;
     var searchQuery = "";
     var modeValue = "system";
     var activeAiTab = "GPT_FINAL";
@@ -5645,12 +5657,35 @@
 
     function bindManualCloseButtons() {
         Array.prototype.forEach.call(document.querySelectorAll(".position-action-btn[data-position-id]"), function (btn) {
-            btn.addEventListener("click", function () {
+            btn.addEventListener("click", function (event) {
+                event.stopPropagation();
                 showManualCloseDrawer(
                     btn.getAttribute("data-position-id"),
                     btn.getAttribute("data-position-symbol") || "",
                     btn.getAttribute("data-position-status") || ""
                 );
+            });
+        });
+    }
+
+    function bindHomePositionRows() {
+        Array.prototype.forEach.call(document.querySelectorAll(".home-position-row[data-position-id]"), function (row) {
+            function selectRow() {
+                var positionId = normalizePositionId(row.getAttribute("data-position-id"));
+                var symbol = normalizeSymbolInput(row.getAttribute("data-symbol") || "");
+                if (!positionId || !symbol) return;
+                selectedSymbol = symbol;
+                selectedPositionId = positionId;
+                refreshDashboard();
+            }
+            row.addEventListener("click", function (event) {
+                if (event.target && event.target.closest(".position-action-btn")) return;
+                selectRow();
+            });
+            row.addEventListener("keydown", function (event) {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                selectRow();
             });
         });
     }
@@ -6228,6 +6263,7 @@
                 var sym = el.getAttribute("data-symbol");
                 if (!sym || el.classList.contains("placeholder")) return;
                 selectedSymbol = sym;
+                selectedPositionId = null;
                 refreshDashboard();
             });
         });
@@ -6248,6 +6284,8 @@
         var rows = list.slice(0, 5).map(function (p) {
             var positionId = p.positionId != null ? p.positionId : p.id;
             var positionStatus = positionStatusValue(p);
+            var positionSymbol = normalizeSymbolInput(p.symbol || "");
+            var selectedRow = normalizePositionId(selectedPositionId) === normalizePositionId(positionId);
             var assetCell = positionAssetCellHtml(p.symbol, p.direction, [
                 { label: "用户开仓价", value: cleanBlankValue(formatPrice(p.entryPrice)) },
                 { label: "杠杆", value: p.leverage != null ? String(p.leverage) : "" },
@@ -6256,7 +6294,10 @@
                 { label: "当前价", value: cleanBlankValue(formatPrice(p.currentPrice)) },
                 { label: "浮动盈亏", value: cleanBlankValue(formatSignedAmount(p.floatingPnl)) }
             ]);
-            return '<tr>'
+            return '<tr class="home-position-row' + (selectedRow ? ' selected' : '') + '" tabindex="0"'
+                + ' data-position-id="' + escapeHtml(normalizePositionId(positionId)) + '"'
+                + ' data-symbol="' + escapeHtml(positionSymbol) + '"'
+                + ' aria-selected="' + (selectedRow ? 'true' : 'false') + '">'
                 + '<td class="position-asset-cell">' + assetCell + '</td>'
                 + '<td>' + positionMonitorCell(p.entryLogicStatusLabel || positionLogicStatusLabel(p.entryLogicStatus), "等待首次监控") + '</td>'
                 + '<td>' + positionMonitorCell(p.directionSupportStatusLabel || directionSupportStatusLabel(p.directionSupportStatus), "等待首次监控") + '</td>'
@@ -6268,6 +6309,7 @@
                 + '</tr>';
         });
         box.innerHTML = tableHead + rows.join("") + positionFillerRows(Math.max(0, 5 - rows.length)) + '</tbody></table>';
+        bindHomePositionRows();
         bindManualCloseButtons();
     }
 
@@ -6309,6 +6351,16 @@
             return '<details class="execution-original-plan"><summary>'
                 + escapeHtml(s.originalPlanLabel || "原执行计划，仅用于持仓复核和复盘对照")
                 + '</summary>' + executionRowsHtml(originalRows) + '</details>';
+        }
+        var selectionBlocked = [
+            "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH"
+        ].indexOf(String(s.status || "").toUpperCase()) >= 0;
+        if (selectionBlocked) {
+            box.innerHTML = '<div class="execution-card-body"><div class="execution-fail-status" role="status">'
+                + '<p class="main">' + escapeHtml(s.statusLabel || "请选择具体持仓") + '</p>'
+                + (s.blockedReason ? '<p class="sub">' + escapeHtml(s.blockedReason) + '</p>' : '')
+                + '</div></div>';
+            return;
         }
         if (s.positionMode === true && s.positionMonitor) {
             var p = s.positionMonitor;
@@ -6412,6 +6464,12 @@
         setHeaderAiStatus(header.aiStatus, header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
         setText("headerSourceStatusText", localizeVisibleStatus(header.dataSourceText || "WAITING_SYNC"));
         selectedSymbol = normalizeDisplaySymbol(home.selectedSymbol || selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
+        var positionSelectionStatus = String(home.positionSelectionStatus || "").toUpperCase();
+        if (home.selectedPositionId != null) {
+            selectedPositionId = normalizePositionId(home.selectedPositionId);
+        } else if (["POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH"].indexOf(positionSelectionStatus) < 0) {
+            selectedPositionId = null;
+        }
         window.__lastDashboardHome = home;
         window.__lastHomeDiagnostics = home.diagnostics || {};
         window.__lastSystemStatus = {
@@ -6436,6 +6494,7 @@
     function renderDashboardHomeUnavailable() {
         window.__lastDashboardHome = null;
         window.__lastHomeDiagnostics = {};
+        selectedPositionId = null;
         allDecisions = [];
         displayDecisions = [];
         setRuntimeStatus("WAITING_SYNC");
@@ -6466,6 +6525,7 @@
     function fetchDashboardHome() {
         var query = "?limit=6";
         if (selectedSymbol) query += "&selectedSymbol=" + encodeURIComponent(selectedSymbol);
+        if (selectedPositionId) query += "&positionId=" + encodeURIComponent(selectedPositionId);
         return fetch("/api/dashboard/home" + query)
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (resp) {
@@ -6585,6 +6645,7 @@
                 var sym = el.getAttribute("data-symbol");
                 if (!sym) return;
                 selectedSymbol = sym;
+                selectedPositionId = null;
                 refreshDashboard();
             });
         });
@@ -9559,6 +9620,7 @@
         var symbol = normalizeSymbolInput(rawSymbol);
         if (!symbol) return;
         selectedSymbol = symbol;
+        selectedPositionId = null;
         searchQuery = symbol;
         var topSearch = document.getElementById("symbolSearch");
         var sideSearch = document.getElementById("sidebarSymbolSearch");
@@ -9673,6 +9735,8 @@
                     setManualPositionMessage("已保存手动持仓", "ok");
                     setPositionFlowMessage("已保存手动持仓", "ok");
                     selectedSymbol = symbol;
+                    selectedPositionId = window.__lastManualPositionId != null
+                        ? normalizePositionId(window.__lastManualPositionId) : null;
                     searchQuery = symbol;
                     var topSearch = document.getElementById("symbolSearch");
                     var sideSearch = document.getElementById("sidebarSymbolSearch");

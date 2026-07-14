@@ -20,7 +20,8 @@ public class DashboardHomeController {
     @GetMapping("/home")
     public ApiResponse<DashboardHomeVO> home(
             @RequestParam(value = "selectedSymbol", required = false) String selectedSymbol,
-            @RequestParam(value = "limit", required = false) Integer limit) {
-        return ApiResponse.success(dashboardHomeService.getHome(selectedSymbol, limit));
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "positionId", required = false) Long selectedPositionId) {
+        return ApiResponse.success(dashboardHomeService.getHome(selectedSymbol, limit, selectedPositionId));
     }
 }

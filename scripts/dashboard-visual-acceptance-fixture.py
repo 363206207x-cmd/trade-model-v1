@@ -27,6 +27,7 @@ SCENARIOS = {
     "trace-mismatch",
     "position-monitored",
     "position-waiting",
+    "multi-position",
     "placeholder",
     "home-failure",
     "detail-late",
@@ -297,9 +298,9 @@ def base_home(selected_symbol: str) -> dict[str, object]:
     }
 
 
-def monitored_position(symbol: str, with_monitor: bool) -> dict[str, object]:
+def monitored_position(symbol: str, with_monitor: bool, position_id: int = 9001) -> dict[str, object]:
     position = {
-        "positionId": 9001,
+        "positionId": position_id,
         "symbol": symbol,
         "direction": "LONG",
         "directionLabel": "做多持仓",
@@ -337,7 +338,27 @@ def monitored_position(symbol: str, with_monitor: bool) -> dict[str, object]:
     return position
 
 
-def scenario_home(scenario: str, selected_symbol: str) -> dict[str, object]:
+def position_review_suggestion(position: dict[str, object], marker: str) -> dict[str, object]:
+    return {
+        "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
+        "positionMonitor": copy.deepcopy(position),
+        "originalPlanIdentity": "VERIFIED", "originalPlanCurrentValidity": "ACTIVE",
+        "sourceAnalysisId": f"analysis-{marker}",
+        "sourceExecutionPlanId": f"plan-{marker}",
+        "sourceTraceId": f"trace-{marker}",
+        "originalPlanLabel": "原执行计划，仅用于持仓复核和复盘对照",
+        "direction": "BULLISH", "entryZone": f"{marker}-entry", "stopLoss": f"{marker}-stop",
+        "takeProfitRules": f"{marker}-tp", "leverageSuggestion": "不高于 2 倍",
+        "positionSuggestion": "仅供人工复核", "validPeriod": "有效至 07-14 12:00",
+        "invalidCondition": f"{marker}-invalid",
+    }
+
+
+def scenario_home(
+    scenario: str,
+    selected_symbol: str,
+    selected_position_id: int | None = None,
+) -> dict[str, object]:
     home = base_home(selected_symbol)
     home["diagnostics"]["scenario"] = scenario
     selected_asset = next((item for item in home["assets"] if item["rawSymbol"] == selected_symbol), home["assets"][0])
@@ -402,25 +423,52 @@ def scenario_home(scenario: str, selected_symbol: str) -> dict[str, object]:
                 "sourceExecutionPlanId": "plan-position-source",
                 "sourceTraceId": "trace-position-source",
             })
-            home["executionSuggestion"] = {
-                "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
-                "positionMonitor": copy.deepcopy(position),
-                "originalPlanIdentity": "VERIFIED", "originalPlanCurrentValidity": "ACTIVE",
-                "sourceAnalysisId": "analysis-position-source",
-                "sourceExecutionPlanId": "plan-position-source",
-                "sourceTraceId": "trace-position-source",
-                "originalPlanLabel": "原执行计划，仅用于持仓复核和复盘对照",
-                "direction": "BULLISH", "entryZone": "62800 - 63200", "stopLoss": "61200",
-                "takeProfitRules": "第一目标 65500；第二目标 67500", "leverageSuggestion": "不高于 2 倍",
-                "positionSuggestion": "仅供人工复核", "validPeriod": "有效至 07-14 12:00",
+            home["selectedPositionId"] = position["positionId"]
+            home["positionSelectionStatus"] = "UNIQUE_POSITION_SELECTED"
+            home["matchingPositionCount"] = 1
+            home["executionSuggestion"] = position_review_suggestion(position, "position-source")
+            home["executionSuggestion"].update({
+                "entryZone": "62800 - 63200", "stopLoss": "61200",
+                "takeProfitRules": "第一目标 65500；第二目标 67500",
                 "invalidCondition": "结构破坏后重新分析",
-            }
+            })
         else:
             home["executionSuggestion"] = {
                 "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
                 "positionMonitor": copy.deepcopy(position),
                 "originalPlanIdentity": "UNVERIFIED", "originalPlanCurrentValidity": "UNVERIFIED",
                 "originalPlanLabel": "暂无可关联的原执行计划",
+            }
+
+    elif scenario == "multi-position":
+        position_a = monitored_position(selected_symbol, True, 9101)
+        position_b = monitored_position(selected_symbol, True, 9102)
+        position_a.update({"entryPrice": "61000.00", "sourceExecutionPlanId": "plan-POSITION-A"})
+        position_b.update({"entryPrice": "62000.00", "sourceExecutionPlanId": "plan-POSITION-B"})
+        home["positions"] = [position_a, position_b]
+        home["pushInbox"]["hasOpenPosition"] = True
+        home["matchingPositionCount"] = 2
+        if selected_position_id == 9101:
+            home["selectedPositionId"] = 9101
+            home["positionSelectionStatus"] = "EXACT_POSITION_SELECTED"
+            home["executionSuggestion"] = position_review_suggestion(position_a, "POSITION-A")
+        elif selected_position_id == 9102:
+            home["selectedPositionId"] = 9102
+            home["positionSelectionStatus"] = "EXACT_POSITION_SELECTED"
+            home["executionSuggestion"] = position_review_suggestion(position_b, "POSITION-B")
+        else:
+            home["selectedPositionId"] = None
+            home["positionSelectionStatus"] = (
+                "POSITION_SELECTION_REQUIRED" if selected_position_id is None else "POSITION_NOT_FOUND"
+            )
+            home["executionSuggestion"] = {
+                "status": home["positionSelectionStatus"],
+                "statusLabel": "请选择具体持仓" if selected_position_id is None else "所选持仓不存在",
+                "blockedReason": "当前标的存在多笔开放手动持仓",
+                "positionMode": False,
+                "originalPlanIdentity": "UNVERIFIED",
+                "originalPlanCurrentValidity": "UNVERIFIED",
+                "originalPlanLabel": "请选择具体持仓",
             }
 
     elif scenario == "placeholder":
@@ -579,7 +627,15 @@ class FixtureHandler(BaseHTTPRequestHandler):
                     return
             symbol = query.get("selectedSymbol", ["BTCUSDT"])[0].upper()
             home_scenario = "normal" if scenario == "detail-late" else scenario
-            self._json({"success": True, "data": scenario_home(home_scenario, symbol)})
+            raw_position_id = query.get("positionId", [None])[0]
+            try:
+                selected_position_id = int(raw_position_id) if raw_position_id is not None else None
+            except ValueError:
+                selected_position_id = -1
+            self._json({
+                "success": True,
+                "data": scenario_home(home_scenario, symbol, selected_position_id),
+            })
             return
 
         if parsed.path == "/api/dashboard/detail":

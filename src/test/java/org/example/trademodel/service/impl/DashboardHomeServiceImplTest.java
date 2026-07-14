@@ -639,6 +639,160 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void singlePositionForSymbolStillAutoSelects() {
+        OriginalPlanFixture fixture = originalPlanFixture(301L, "SINGLE-A");
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, null);
+
+        assertThat(home.getPositionSelectionStatus()).isEqualTo("UNIQUE_POSITION_SELECTED");
+        assertThat(home.getMatchingPositionCount()).isEqualTo(1);
+        assertThat(home.getSelectedPositionId()).isEqualTo(301L);
+        assertThat(home.getExecutionSuggestion().getPositionMonitor().getPositionId()).isEqualTo(301L);
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo(fixture.decision().getEntryZone());
+    }
+
+    @Test
+    void multiplePositionsSameSymbolWithoutPositionIdFailClosed() {
+        MultiPositionFixture fixture = twoSameSymbolPositions();
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, null);
+
+        assertThat(home.getPositionSelectionStatus()).isEqualTo("POSITION_SELECTION_REQUIRED");
+        assertThat(home.getMatchingPositionCount()).isEqualTo(2);
+        assertThat(home.getSelectedPositionId()).isNull();
+        assertPositionSelectionBlocked(home.getExecutionSuggestion(), "POSITION_SELECTION_REQUIRED", "请选择具体持仓");
+        assertThat(home.getExecutionSuggestion().getEntryZone())
+                .isNotEqualTo(fixture.planA().getEntryZone())
+                .isNotEqualTo(fixture.planB().getEntryZone());
+    }
+
+    @Test
+    void selectedPositionIdBShowsOnlyPlanB() {
+        MultiPositionFixture fixture = twoSameSymbolPositions();
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, fixture.positionB().getId());
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = home.getExecutionSuggestion();
+
+        assertThat(home.getPositionSelectionStatus()).isEqualTo("EXACT_POSITION_SELECTED");
+        assertThat(home.getSelectedPositionId()).isEqualTo(fixture.positionB().getId());
+        assertThat(suggestion.getPositionMonitor().getPositionId()).isEqualTo(fixture.positionB().getId());
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo(fixture.planB().getAnalysisId());
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-position-B");
+        assertThat(suggestion.getEntryZone()).isEqualTo("POSITION-B-entry");
+        assertThat(suggestion.getStopLoss()).isEqualTo("POSITION-B-stop");
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo("POSITION-B-tp");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("POSITION-A-entry");
+    }
+
+    @Test
+    void selectedPositionIdANeverShowsPlanB() {
+        MultiPositionFixture fixture = twoSameSymbolPositions();
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, fixture.positionA().getId());
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = home.getExecutionSuggestion();
+
+        assertThat(home.getSelectedPositionId()).isEqualTo(fixture.positionA().getId());
+        assertThat(suggestion.getPositionMonitor().getPositionId()).isEqualTo(fixture.positionA().getId());
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo(fixture.planA().getAnalysisId());
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-position-A");
+        assertThat(suggestion.getEntryZone()).isEqualTo("POSITION-A-entry");
+        assertThat(suggestion.getStopLoss()).isEqualTo("POSITION-A-stop");
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo("POSITION-A-tp");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("POSITION-B-entry");
+    }
+
+    @Test
+    void selectedPositionIdFromAnotherSymbolFailsClosed() {
+        UserPositionVO btc = activeManualPosition(311L, "BTCUSDT", null);
+        UserPositionVO eth = activeManualPosition(312L, "ETHUSDT", null);
+        DecisionResultVO btcPlan = sourcePlanDecision("analysis-btc-A", "BTCUSDT", "BTC-A");
+        DecisionResultVO ethPlan = sourcePlanDecision("analysis-eth-B", "ETHUSDT", "ETH-B");
+        stubMonitorExecutionPlanSource(btc, btcPlan, "plan-btc-A", "trace-shared", "trace-shared");
+        stubMonitorExecutionPlanSource(eth, ethPlan, "plan-eth-B", "trace-eth", "trace-eth");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(btc, eth));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 312L);
+
+        assertThat(home.getPositionSelectionStatus()).isEqualTo("POSITION_SYMBOL_MISMATCH");
+        assertPositionSelectionBlocked(home.getExecutionSuggestion(), "POSITION_SYMBOL_MISMATCH",
+                "所选持仓与当前标的不匹配");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNotEqualTo("BTC-A-entry");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNotEqualTo("ETH-B-entry");
+    }
+
+    @Test
+    void unknownSelectedPositionIdDoesNotFallbackToFirstPosition() {
+        twoSameSymbolPositions();
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 999999L);
+
+        assertThat(home.getPositionSelectionStatus()).isEqualTo("POSITION_NOT_FOUND");
+        assertThat(home.getSelectedPositionId()).isNull();
+        assertPositionSelectionBlocked(home.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
+    }
+
+    @Test
+    void nonPositiveSelectedPositionIdFailsClosed() {
+        twoSameSymbolPositions();
+
+        DashboardHomeVO zero = service.getHome("BTCUSDT", 6, 0L);
+        DashboardHomeVO negative = service.getHome("BTCUSDT", 6, -1L);
+
+        assertPositionSelectionBlocked(zero.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
+        assertPositionSelectionBlocked(negative.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
+        assertThat(zero.getSelectedPositionId()).isNull();
+        assertThat(negative.getSelectedPositionId()).isNull();
+    }
+
+    @Test
+    void closedPositionIdCannotBeSelected() {
+        OriginalPlanFixture active = originalPlanFixture(321L, "ACTIVE-A");
+        UserPositionVO closed = activeManualPosition(322L, "BTCUSDT", null);
+        closed.setStatus("CLOSED");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(active.position(), closed));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 322L);
+
+        assertThat(home.getPositions()).extracting(DashboardHomeVO.PositionVO::getPositionId)
+                .containsExactly(321L);
+        assertPositionSelectionBlocked(home.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNotEqualTo("ACTIVE-A-entry");
+    }
+
+    @Test
+    void nonManualPositionIdCannotBeSelected() {
+        OriginalPlanFixture active = originalPlanFixture(331L, "MANUAL-A");
+        UserPositionVO systemPosition = activeManualPosition(332L, "BTCUSDT", null);
+        systemPosition.setSourceType("SYSTEM");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(active.position(), systemPosition));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 332L);
+
+        assertThat(home.getPositions()).extracting(DashboardHomeVO.PositionVO::getPositionId)
+                .containsExactly(331L);
+        assertPositionSelectionBlocked(home.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNotEqualTo("MANUAL-A-entry");
+    }
+
+    @Test
+    void twoSameSymbolPositionsNeverCrossOriginalPlans() {
+        MultiPositionFixture fixture = twoSameSymbolPositions();
+
+        DashboardHomeVO.ExecutionSuggestionVO selectedA = service
+                .getHome("BTCUSDT", 6, fixture.positionA().getId()).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO selectedB = service
+                .getHome("BTCUSDT", 6, fixture.positionB().getId()).getExecutionSuggestion();
+
+        assertThat(selectedA.getPositionMonitor().getPositionId()).isEqualTo(fixture.positionA().getId());
+        assertThat(selectedA.getEntryZone()).isEqualTo("POSITION-A-entry");
+        assertThat(selectedA.getSourceExecutionPlanId()).isEqualTo("plan-position-A");
+        assertThat(selectedA.getEntryZone()).isNotEqualTo(selectedB.getEntryZone());
+        assertThat(selectedB.getPositionMonitor().getPositionId()).isEqualTo(fixture.positionB().getId());
+        assertThat(selectedB.getEntryZone()).isEqualTo("POSITION-B-entry");
+        assertThat(selectedB.getSourceExecutionPlanId()).isEqualTo("plan-position-B");
+    }
+
+    @Test
     void positionFromPlanA_latestDecisionB_neverShowsBAsOriginalPlan() {
         UserPositionVO position = activeManualPosition(31L, "BTCUSDT", null);
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
@@ -2415,6 +2569,35 @@ class DashboardHomeServiceImplTest {
         return fixture;
     }
 
+    private MultiPositionFixture twoSameSymbolPositions() {
+        UserPositionVO positionA = activeManualPosition(3411L, "BTCUSDT", null);
+        UserPositionVO positionB = activeManualPosition(3412L, "BTCUSDT", null);
+        DecisionResultVO planA = sourcePlanDecision("analysis-position-A", "BTCUSDT", "POSITION-A");
+        DecisionResultVO planB = sourcePlanDecision("analysis-position-B", "BTCUSDT", "POSITION-B");
+        stubMonitorExecutionPlanSource(positionA, planA, "plan-position-A", "trace-shared", "trace-shared");
+        stubMonitorExecutionPlanSource(positionB, planB, "plan-position-B", "trace-shared", "trace-shared");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionA, positionB));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(planB));
+        return new MultiPositionFixture(positionA, positionB, planA, planB);
+    }
+
+    private void assertPositionSelectionBlocked(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                                String status,
+                                                String statusLabel) {
+        assertThat(suggestion.getStatus()).isEqualTo(status);
+        assertThat(suggestion.getStatusLabel()).isEqualTo(statusLabel);
+        assertThat(suggestion.getPositionMode()).isFalse();
+        assertThat(suggestion.getPositionMonitor()).isNull();
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("UNVERIFIED");
+        assertThat(suggestion.getDirection()).isNull();
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
+        assertThat(suggestion.getSourceAnalysisId()).isNull();
+        assertThat(suggestion.getSourceExecutionPlanId()).isNull();
+        assertThat(suggestion.getSourceTraceId()).isNull();
+    }
+
     private void assertVerifiedHistoricalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
                                               String expectedValidity,
                                               String expectedLabel,
@@ -2501,6 +2684,12 @@ class DashboardHomeServiceImplTest {
     private record OriginalPlanFixture(UserPositionVO position,
                                        ExecutionPlanDO executionPlan,
                                        DecisionResultVO decision) {
+    }
+
+    private record MultiPositionFixture(UserPositionVO positionA,
+                                        UserPositionVO positionB,
+                                        DecisionResultVO planA,
+                                        DecisionResultVO planB) {
     }
 
     private String structuredAiRoleResults(List<AiProviderReviewResult> roleResults,
