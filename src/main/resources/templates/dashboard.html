@@ -6291,6 +6291,10 @@
                 + '</tbody></table></div>';
         }
         function originalPlanDetailsHtml() {
+            if (String(s.originalPlanIdentity || "").toUpperCase() !== "VERIFIED") {
+                return '<p class="muted execution-original-plan-empty">'
+                    + escapeHtml(s.originalPlanLabel || "暂无可关联的原执行计划") + '</p>';
+            }
             var originalRows = [
                 ["方向", marketBiasLabel(s.direction)],
                 ["入场区间", s.entryZone],

@@ -90,6 +90,38 @@ public interface DecisionResultMapper {
             """)
     DecisionResultVO findLatestDecisionResultBySymbolJoined(@Param("normalizedSymbol") String normalizedSymbol);
 
+    @Select("""
+            SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
+            ar.timeframe AS timeframe,
+            d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
+            d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
+            d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
+            d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
+            d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            d.valid_from AS validFrom, d.expires_at AS expiresAt,
+            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
+            d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
+            d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
+            p.recommended_action AS recommendedAction,
+            p.plan_mode AS planMode,
+            p.entry_zone AS entryZone,
+            p.stop_loss AS stopLoss,
+            p.take_profit_rules AS takeProfitRules,
+            p.leverage_suggestion AS leverageSuggestion,
+            p.position_suggestion AS positionSuggestion,
+            ar.data_quality_score AS dataQualityScore
+            FROM tm_decision_result d
+            INNER JOIN tm_execution_plan p
+              ON p.plan_id = #{planId} AND p.analysis_id = d.analysis_id
+            INNER JOIN tm_analysis_run ar ON ar.analysis_id = d.analysis_id
+            WHERE d.analysis_id = #{analysisId}
+            ORDER BY d.create_time DESC, d.decision_id DESC
+            LIMIT 1
+            """)
+    DecisionResultVO findByAnalysisIdAndPlanIdJoined(@Param("analysisId") String analysisId,
+                                                     @Param("planId") String planId);
+
     @Select("SELECT MAX(create_time) FROM tm_decision_result")
     LocalDateTime selectLastDecisionTime();
 

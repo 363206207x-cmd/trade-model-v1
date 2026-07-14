@@ -396,15 +396,32 @@ def scenario_home(scenario: str, selected_symbol: str) -> dict[str, object]:
         home["positions"] = [position]
         home["pushInbox"]["hasOpenPosition"] = True
         home["pushInbox"]["counts"]["positionRisk"] = 1 if scenario == "position-monitored" else 0
-        home["executionSuggestion"] = {
-            "status": "POSITION_MONITOR", "statusLabel": "持仓监控", "positionMode": True,
-            "positionMonitor": copy.deepcopy(position),
-            "originalPlanLabel": "原执行计划，仅用于持仓复核和复盘对照",
-            "direction": "BULLISH", "entryZone": "62800 - 63200", "stopLoss": "61200",
-            "takeProfitRules": "第一目标 65500；第二目标 67500", "leverageSuggestion": "不高于 2 倍",
-            "positionSuggestion": "仅供人工复核", "validPeriod": "有效至 07-14 12:00",
-            "invalidCondition": "结构破坏后重新分析",
-        }
+        if scenario == "position-monitored":
+            position.update({
+                "sourceAnalysisId": "analysis-position-source",
+                "sourceExecutionPlanId": "plan-position-source",
+                "sourceTraceId": "trace-position-source",
+            })
+            home["executionSuggestion"] = {
+                "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
+                "positionMonitor": copy.deepcopy(position),
+                "originalPlanIdentity": "VERIFIED", "originalPlanCurrentValidity": "ACTIVE",
+                "sourceAnalysisId": "analysis-position-source",
+                "sourceExecutionPlanId": "plan-position-source",
+                "sourceTraceId": "trace-position-source",
+                "originalPlanLabel": "原执行计划，仅用于持仓复核和复盘对照",
+                "direction": "BULLISH", "entryZone": "62800 - 63200", "stopLoss": "61200",
+                "takeProfitRules": "第一目标 65500；第二目标 67500", "leverageSuggestion": "不高于 2 倍",
+                "positionSuggestion": "仅供人工复核", "validPeriod": "有效至 07-14 12:00",
+                "invalidCondition": "结构破坏后重新分析",
+            }
+        else:
+            home["executionSuggestion"] = {
+                "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
+                "positionMonitor": copy.deepcopy(position),
+                "originalPlanIdentity": "UNVERIFIED", "originalPlanCurrentValidity": "UNVERIFIED",
+                "originalPlanLabel": "暂无可关联的原执行计划",
+            }
 
     elif scenario == "placeholder":
         home["assets"] = home["assets"][:-1]

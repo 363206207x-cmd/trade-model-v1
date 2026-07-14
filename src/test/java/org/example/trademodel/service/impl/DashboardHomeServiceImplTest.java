@@ -16,6 +16,7 @@ import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserConfigDO;
@@ -23,6 +24,8 @@ import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.providercall.ProviderCallResult;
@@ -72,6 +75,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -118,6 +123,10 @@ class DashboardHomeServiceImplTest {
     private AnalysisRunMapper analysisRunMapper;
     @Mock
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
+    @Mock
+    private DecisionResultMapper decisionResultMapper;
+    @Mock
+    private ExecutionPlanMapper executionPlanMapper;
 
     private DashboardHomeServiceImpl service;
     private final AiRoleResultsCodec aiRoleResultsCodec = new AiRoleResultsCodec(new ObjectMapper());
@@ -138,6 +147,7 @@ class DashboardHomeServiceImplTest {
         );
         service.setAssetStateMapper(assetStateMapper);
         service.setLocalRealDashboardSources(persistedOhlcvBarMapper, analysisRunMapper);
+        service.setOriginalPlanSources(decisionResultMapper, executionPlanMapper, analysisRunMapper);
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-01T12:00:00Z"), ZoneOffset.UTC));
         lenient().when(analysisRunMapper.selectAverageScoreByAnalysisId(anyString())).thenReturn(null);
         lenient().when(analysisRunMapper.countEvidenceByAnalysisId(anyString())).thenReturn(null);
@@ -166,7 +176,6 @@ class DashboardHomeServiceImplTest {
                 List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
                         AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "保持人工复核")),
                 synthesis("BULLISH", "HIGH", "HIGH", "REDUCED", true, "EVENT_WINDOW_REVIEW")));
-        allowMatchingSnapshot(btc);
 
         DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "EXTREME", 72, 80,
                 "LEVEL_4_EXTREME_DIVERGENCE", false, "{\"nextState\":\"HIGH_RISK\"}");
@@ -185,6 +194,7 @@ class DashboardHomeServiceImplTest {
         position.setLeverage(new BigDecimal("2"));
         position.setSourceType("MANUAL");
         position.setUpdatedAt(LocalDateTime.of(2026, 6, 27, 2, 0));
+        allowResolvedOriginalPlan(position, btc, "plan-btc-source", "trace-" + btc.getAnalysisId());
 
         UserPositionVO nonManualPosition = new UserPositionVO();
         nonManualPosition.setId(10L);
@@ -210,7 +220,6 @@ class DashboardHomeServiceImplTest {
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth, sol, bnb));
         when(monitorService.getRecentAlerts(2)).thenReturn(List.of(alert));
         when(userPositionService.listOpenPositions()).thenReturn(List.of(position, nonManualPosition));
-        when(positionMonitorLogService.listByPositionId(9L, 1)).thenReturn(List.of());
         when(positionSyncService.getPositionSyncStatus()).thenReturn(sync);
         when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(7);
         when(pushSnapshotMapper.listPendingRecheck(anyString(), any(LocalDateTime.class), anyInt()))
@@ -265,7 +274,7 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getLeverage()).isNotEqualByComparingTo("20");
         assertThat(homePosition.getCurrentPrice()).isNull();
         assertThat(homePosition.getFloatingPnl()).isNull();
-        assertThat(homePosition.getMonitorConclusion()).isNull();
+        assertThat(homePosition.getMonitorConclusion()).isEqualTo("入场逻辑仍成立");
         assertThat(home.getExecutionSuggestion().getPositionMode()).isTrue();
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("POSITION_MONITORING");
         assertThat(home.getExecutionSuggestion().getPositionMonitor()).isSameAs(homePosition);
@@ -613,6 +622,153 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getPnlPct()).isEqualByComparingTo("10.00000000");
         assertThat(homePosition.getAccountImpactPct()).isEqualByComparingTo("30.00000000");
         assertThat(homePosition.getSuggestedManualActionText()).isEqualTo("人工复核");
+    }
+
+    @Test
+    void positionFromPlanA_latestDecisionB_neverShowsBAsOriginalPlan() {
+        UserPositionVO position = activeManualPosition(31L, "BTCUSDT", null);
+        DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-A");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("ACTIVE");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo("analysis-plan-A");
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
+        assertThat(suggestion.getStopLoss()).isEqualTo("A-stop");
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo("A-tp");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
+        assertThat(suggestion.getStopLoss()).isNotEqualTo("B-stop");
+        assertThat(suggestion.getTakeProfitRules()).isNotEqualTo("B-tp");
+        assertThat(suggestion.getSourceAnalysisId()).isNotEqualTo("analysis-latest-B");
+    }
+
+    @Test
+    void positionWithNoSourceReferenceHidesOriginalPlan() {
+        UserPositionVO position = activeManualPosition(32L, "BTCUSDT", null);
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionId(32L, 1)).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+    }
+
+    @Test
+    void monitorExecutionPlanIdResolvesExactOriginalPlan() {
+        UserPositionVO position = activeManualPosition(33L, "BTCUSDT", "ambiguous-source-ref");
+        DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-A");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
+        verify(executionPlanMapper).selectByPlanId("plan-A");
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+    }
+
+    @Test
+    void monitorAnalysisIdResolvesExactOriginalPlan() {
+        UserPositionVO position = activeManualPosition(34L, "BTCUSDT", null);
+        DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        stubMonitorAnalysisSource(position, planA, "plan-A", "trace-A", "trace-A");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo("analysis-plan-A");
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
+        assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
+        verify(executionPlanMapper).selectLatestByAnalysisId("analysis-plan-A");
+        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+    }
+
+    @Test
+    void originalPlanSymbolMismatchFailsClosed() {
+        UserPositionVO position = activeManualPosition(35L, "BTCUSDT", null);
+        DecisionResultVO otherAssetPlan = sourcePlanDecision("analysis-eth-A", "ETHUSDT", "ETH-A");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        stubMonitorExecutionPlanSource(position, otherAssetPlan, "plan-eth-A", "trace-eth", "trace-eth");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
+    }
+
+    @Test
+    void monitorFromAnotherPositionCannotSupplyOriginalPlanIdentity() {
+        UserPositionVO position = activeManualPosition(351L, "BTCUSDT", null);
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        PositionMonitorLogDTO wrongPositionMonitor = new PositionMonitorLogDTO();
+        wrongPositionMonitor.setPositionId(999L);
+        wrongPositionMonitor.setAnalysisId("analysis-other-position-A");
+        wrongPositionMonitor.setExecutionPlanId("plan-other-position-A");
+        when(positionMonitorLogService.listByPositionId(351L, 1)).thenReturn(List.of(wrongPositionMonitor));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertUnverifiedOriginalPlan(suggestion);
+        verify(executionPlanMapper, never()).selectByPlanId("plan-other-position-A");
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId("analysis-other-position-A");
+    }
+
+    @Test
+    void sourceTraceMismatchDoesNotPromoteNewDecision() {
+        UserPositionVO position = activeManualPosition(36L, "BTCUSDT", null);
+        DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-current-B");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("STATE_MISMATCH");
+        assertThat(suggestion.getOriginalPlanLabel())
+                .isEqualTo("状态已更新，原计划不再作为当前执行依据");
+        assertThat(suggestion.getEntryZone()).isEqualTo("A-entry");
+        assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo("analysis-plan-A");
+    }
+
+    @Test
+    void activePositionNeverFallsBackToLatestSymbolDecision() {
+        UserPositionVO position = activeManualPosition(37L, "BTCUSDT", "plan-or-analysis-type-unknown");
+        DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
+        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionId(37L, 1)).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+
+        assertUnverifiedOriginalPlan(home.getExecutionSuggestion());
+        assertThat(home.getPositions().get(0).getSourceRefId()).isEqualTo("plan-or-analysis-type-unknown");
+        verify(executionPlanMapper, never()).selectByPlanId("plan-or-analysis-type-unknown");
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId("plan-or-analysis-type-unknown");
     }
 
     @Test
@@ -1439,6 +1595,108 @@ class DashboardHomeServiceImplTest {
         assertThat(tab.getAgainstEvidence()).isEmpty();
     }
 
+    private UserPositionVO activeManualPosition(Long id, String symbol, String sourceRefId) {
+        UserPositionVO position = new UserPositionVO();
+        position.setId(id);
+        position.setAssetSymbol(symbol);
+        position.setSide("LONG");
+        position.setStatus("OPEN");
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(BigDecimal.ONE);
+        position.setLeverage(BigDecimal.ONE);
+        position.setSourceType("MANUAL");
+        position.setSourceRefId(sourceRefId);
+        return position;
+    }
+
+    private DecisionResultVO sourcePlanDecision(String analysisId, String symbol, String marker) {
+        DecisionResultVO decision = completePlanDecision(symbol, ACTIVE_VALID_PERIOD);
+        decision.setAnalysisId(analysisId);
+        decision.setEntryZone(marker + "-entry");
+        decision.setStopLoss(marker + "-stop");
+        decision.setTakeProfitRules(marker + "-tp");
+        decision.setLeverageSuggestion(marker + "-leverage");
+        decision.setPositionSuggestion(marker + "-position");
+        decision.setInvalidCondition(marker + "-invalid");
+        setActivePlanValidity(decision);
+        return decision;
+    }
+
+    private void stubMonitorExecutionPlanSource(UserPositionVO position,
+                                                DecisionResultVO sourceDecision,
+                                                String planId,
+                                                String sourceTraceId,
+                                                String currentStateTraceId) {
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setAnalysisId(sourceDecision.getAnalysisId());
+        monitor.setExecutionPlanId(planId);
+        monitor.setLogicStatus("LOGIC_VALID");
+        when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
+        stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
+    }
+
+    private void stubMonitorAnalysisSource(UserPositionVO position,
+                                           DecisionResultVO sourceDecision,
+                                           String planId,
+                                           String sourceTraceId,
+                                           String currentStateTraceId) {
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setAnalysisId(sourceDecision.getAnalysisId());
+        when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
+        stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, true);
+    }
+
+    private void stubResolvedOriginalPlan(DecisionResultVO sourceDecision,
+                                          String planId,
+                                          String sourceTraceId,
+                                          String currentStateTraceId,
+                                          boolean resolveByAnalysisId) {
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setPlanId(planId);
+        plan.setAnalysisId(sourceDecision.getAnalysisId());
+        if (resolveByAnalysisId) {
+            when(executionPlanMapper.selectLatestByAnalysisId(sourceDecision.getAnalysisId())).thenReturn(plan);
+        } else {
+            when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+        }
+        when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(sourceDecision.getAnalysisId(), planId))
+                .thenReturn(sourceDecision);
+
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(sourceDecision.getAnalysisId());
+        run.setSymbol(sourceDecision.getSymbol());
+        run.setTraceId(sourceTraceId);
+        when(analysisRunMapper.selectById(sourceDecision.getAnalysisId())).thenReturn(run);
+
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol(sourceDecision.getSymbol());
+        state.setState(AssetStateEnum.CANDIDATE);
+        state.setTraceId(currentStateTraceId);
+        lenient().when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
+    }
+
+    private void assertUnverifiedOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion) {
+        assertThat(suggestion.getStatus()).isEqualTo("POSITION_MONITORING");
+        assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("UNVERIFIED");
+        assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("UNVERIFIED");
+        assertThat(suggestion.getOriginalPlanLabel()).isEqualTo("暂无可关联的原执行计划");
+        assertThat(suggestion.getDirection()).isNull();
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
+        assertThat(suggestion.getLeverageSuggestion()).isNull();
+        assertThat(suggestion.getPositionSuggestion()).isNull();
+        assertThat(suggestion.getValidPeriod()).isNull();
+        assertThat(suggestion.getValidFrom()).isNull();
+        assertThat(suggestion.getExpiresAt()).isNull();
+        assertThat(suggestion.getInvalidCondition()).isNull();
+        assertThat(suggestion.getSourceAnalysisId()).isNull();
+        assertThat(suggestion.getSourceExecutionPlanId()).isNull();
+        assertThat(suggestion.getSourceTraceId()).isNull();
+    }
+
     private void allowMatchingSnapshot(DecisionResultVO decision) {
         String traceId = "trace-" + decision.getAnalysisId();
         AssetStateDO state = new AssetStateDO();
@@ -1447,9 +1705,41 @@ class DashboardHomeServiceImplTest {
         state.setTraceId(traceId);
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(decision.getAnalysisId());
+        run.setSymbol(decision.getSymbol());
         run.setTraceId(traceId);
         when(assetStateMapper.selectBySymbol(decision.getSymbol())).thenReturn(state);
         when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+    }
+
+    private void allowResolvedOriginalPlan(UserPositionVO position,
+                                           DecisionResultVO sourceDecision,
+                                           String planId,
+                                           String traceId) {
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setAnalysisId(sourceDecision.getAnalysisId());
+        monitor.setExecutionPlanId(planId);
+        monitor.setLogicStatus("LOGIC_VALID");
+        when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
+
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setPlanId(planId);
+        plan.setAnalysisId(sourceDecision.getAnalysisId());
+        when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+        when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(sourceDecision.getAnalysisId(), planId))
+                .thenReturn(sourceDecision);
+
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(sourceDecision.getAnalysisId());
+        run.setSymbol(sourceDecision.getSymbol());
+        run.setTraceId(traceId);
+        when(analysisRunMapper.selectById(sourceDecision.getAnalysisId())).thenReturn(run);
+
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol(sourceDecision.getSymbol());
+        state.setState(AssetStateEnum.CANDIDATE);
+        state.setTraceId(traceId);
+        when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
     }
 
     private String structuredAiRoleResults(List<AiProviderReviewResult> roleResults,

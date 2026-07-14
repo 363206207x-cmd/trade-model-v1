@@ -16,7 +16,7 @@ This package audits the path from rule inputs to the Dashboard Home read model a
 - Plan `validFrom`/`expiresAt` remain the offset-aware authority. The historical no-timezone `tm_push_snapshot.expires_at` column is a UTC-naive compatibility timestamp: every producer and consumer converts through UTC, uses a UTC clock, and treats `now >= expiresAt` as expired.
 - `/api/dashboard/home` is the sole data authority for Home positions, execution suggestion, AI roles, consistency, asset tiles, and top KPIs. `/api/dashboard/detail` updates only the lower workbench and diagnostics and cannot overwrite those Home regions.
 - Asset-tile, sidebar, and search selection all set the selected symbol and request a fresh Home payload. A failed Home request clears cached business conclusions and displays `首页数据暂不可用` / `等待重新同步` / `当前不展示执行计划`.
-- An active manual position takes over the selected asset's main suggestion area. The original entry plan is retained only as a collapsed review/reference record.
+- An active manual position takes over the selected asset's main suggestion area. Its original plan is resolved only from a same-position monitor log's `executionPlanId` or `analysisId`; it never falls back to the latest same-symbol decision. A verified original plan is retained only as a collapsed review/reference record.
 - Dashboard Home does not invent system stop/take-profit values or a next monitor time. It displays persisted monitor time only.
 
 Production deployment readiness remains **BLOCKED**. This package adds no order, auto-open, auto-close, auto-reverse, auto-trading, position mutation, external Push, or Telegram capability.
@@ -40,6 +40,7 @@ Verified source contracts:
 | Confused thresholds | `ConfusedStatePolicy` | Enter at 70; directional push blocked at 85; exit requires two consecutive cycles below 55. |
 | AI roles and safety | AI role payload/orchestrator/conflict resolver contracts | Rule direction remains authoritative; AI is review-only and cannot create plans, positions, or orders. |
 | Position Monitor | `PositionMonitorResultDTO`, monitor log enums/services | Monitor writes logs only; it never closes, reduces, reverses, or otherwise mutates a position. |
+| Position original-plan identity | Latest same-position monitor log, `ExecutionPlanMapper`, `DecisionResultMapper`, `AnalysisRunMapper` | `executionPlanId` is preferred, then `analysisId`. `UserPosition.sourceRefId` has no plan-reference type contract and is diagnostic-only; it is never guessed as an execution-plan or analysis ID. |
 | Execution plan | `ExecutionPlanVO`, plan/boundary services, Dashboard Home gate | A complete boundary alone is insufficient; the selected decision snapshot and all business gates must match. |
 
 Repository conflicts and limitations are not hidden:
@@ -139,7 +140,9 @@ Repository conflicts and limitations are not hidden:
 | 数据缺失 | No current score/snapshot | `MISSING` | status/label | 数据缺失 | Could be combined with stale plan data. | No usable plan; selected snapshot must exist. |
 | 数据源不可用 | Required source unavailable | `UNAVAILABLE` | status/label | 数据源不可用 | Technical code could leak. | Dedicated label and fail-closed plan. |
 | 可用人工复核计划 | All business and boundary gates pass | `USABLE_REVIEW_PLAN` | `executionSuggestion.status`, `validFrom`, `expiresAt` | 完整只读计划 fields | Completeness alone previously allowed display. | Checks quality, state, state/run trace match, risk, confused, directional block, worthiness, boundary, absolute expiry, position, timeframe, and analysis ID. |
-| 当前持仓监控 | Selected symbol has active manual position | `POSITION_MONITORING` | same plus `positionMonitor` | 持仓监控主视图 | New entry plan remained primary. | Actual entry/current/PnL/user stops and monitor state take over; original plan collapses. |
+| 当前持仓监控 | Selected symbol has active manual position | `POSITION_MONITORING` | same plus `positionMonitor` | 持仓监控主视图 | New entry plan remained primary. | Actual entry/current/PnL/user stops and monitor state take over; only a source-verified original plan may collapse below it. |
+| 原计划来源不可验证 | No trusted monitor `executionPlanId` or `analysisId`, or any source join fails | `originalPlanIdentity=UNVERIFIED` | identity/validity plus empty plan fields | 暂无可关联的原执行计划 | Latest same-symbol decision could be mislabeled as the position's original plan. | No symbol fallback, no `sourceRefId` guessing, no plan fields, and no empty original-plan table. |
+| 原计划身份已确认、当前已失效 | Exact monitor source joins to same-symbol plan/decision/run, but validity or current-state trace no longer matches | `originalPlanIdentity=VERIFIED`; validity is `EXPIRED`, `STATE_MISMATCH`, `TIMEZONE_UNVERIFIED`, or another review state | identity and current validity are separate | Historical review label plus collapsed plan | Identity and current executability were conflated. | Historical plan remains review-only and can never become a new executable suggestion. |
 | 阻断/缺失/不匹配 | Any required gate fails | `NO_DECISION`, `DATA_QUALITY_BLOCKED`, `ASSET_STATE_BLOCKED`, `STATE_SNAPSHOT_MISMATCH`, `STATE_SNAPSHOT_UNVERIFIED`, `RISK_BLOCKED`, `CONFLICT_BLOCKED`, `DIRECTION_BLOCKED`, `BOUNDARY_INCOMPLETE`, `VALID_PERIOD_INVALID`, `PLAN_EXPIRED`, `ANALYSIS_MISMATCH` | status, Chinese title/reason | 当前暂无完整执行计划 + Chinese reason | Direction/boundary fields could survive a blocked state. | Blocked response clears direction, entry, stop, TP, leverage, position, validity, and invalid condition. |
 
 ## 4. Exact root causes and corrections
@@ -158,6 +161,7 @@ Repository conflicts and limitations are not hidden:
 | Modules contradicted selected asset | Some header values used first/average/max decisions. | Selected asset's decision supplies trend, risk, quality, AI conflict, execution, and AI review. |
 | Strong/weak direction levels disappeared downstream | Reverse-position and Hot Reset mapper SQL recognized only exact `BULLISH`/`BEARISH`. | Mapper contracts now recognize all strong/normal/weak bullish and bearish family values while excluding `RANGE`, `WAIT`, and unknown states. |
 | Position did not take over | Execution suggestion had no selected-position precedence. | Active selected manual position returns `POSITION_MONITORING`; original plan is review reference only. |
+| Position showed a newer same-symbol plan as its origin | The position branch received the selected latest decision and reused its plan fields without proving position provenance. | The branch now receives a separately resolved original-plan object. It accepts only the latest same-position monitor's exact plan/analysis reference, verifies plan/decision/run analysis IDs and symbols, and never reads the new-opportunity decision while a position is active. |
 | Monitor countdown was fake | Browser refresh cadence was rendered as next business validation. | Fake countdown removed; latest persisted log time is shown and unknown next time remains empty. |
 | English/internal values leaked | Raw enum/free-text fallback was used across business fields. | Dedicated field-specific mappings return Chinese labels and unknown values return `未知状态`; generated boundary explanations are Chinese at source. |
 
@@ -184,11 +188,20 @@ When the selected symbol has an active `OPEN` or `PARTIALLY_CLOSED` manual posit
 - Entry-logic status, direction support, reversal status, risk, and manual action.
 - Persisted last monitor time and real next monitor time only when provided.
 
-The original plan is labeled `原执行计划，仅用于持仓复核和复盘对照` and collapsed only when its trace matches the authoritative state. A mismatch is labeled `状态已更新，原计划需重新分析`; no associated decision is labeled `暂无可关联的原执行计划`. No new leverage/position proposal is promoted in position mode.
+Original-plan identity and current validity are independent:
+
+1. Identity is verified only from the latest monitor row for the same `positionId`: exact `executionPlanId` first, otherwise its `analysisId`. The resolved execution plan, decision, and analysis run must exist, share the same analysis ID, and match the position symbol.
+2. `UserPosition.sourceRefId` is retained only for diagnostics. The current contract does not identify whether it is an execution-plan ID or analysis ID, so Dashboard never guesses its type.
+3. A verified source is labeled `原执行计划，仅用于持仓复核和复盘对照` while current. Expiry, invalidity, an unverifiable legacy timezone, or a current-state trace mismatch changes only its historical-validity label; it does not replace plan A with a newer plan B.
+4. An unverified source is labeled `暂无可关联的原执行计划`. Direction, entry, stop, take profit, leverage, position suggestion, validity, invalid condition, and source analysis ID are all empty, and the browser does not render an empty original-plan disclosure/table.
+
+No historical original plan is executable, and no new leverage/position proposal is promoted in position mode.
 
 ## 7. Snapshot consistency
 
 Dashboard Home resolves a selected decision once and uses it for selected-asset trend, risk, data quality, execution-plan gates, AI review, and conflict presentation. A plan must match the selected symbol/timeframe/source analysis ID, and the authoritative asset-state `trace_id` must equal the corresponding `AnalysisRun.trace_id`. A missing, unreadable, or mismatched trace association fails closed and clears all plan boundary fields while the current state remains visible.
+
+This selected decision is the new-opportunity read model only. When an active position exists, its original plan is loaded through the separate position-source resolver described above. The selected latest same-symbol decision, current asset-state decision, first decision, and frontend cache are prohibited fallbacks for original-plan identity.
 
 Global counters remain explicitly aggregate. The directional conflict-block counter is aggregate by definition and uses the 85 threshold; it is not presented as the selected asset's conflict score.
 
@@ -203,6 +216,9 @@ Focused tests cover:
 - AI disabled, failed, partial, support, objection, abstain, zero-success, and all-success/all-abstain semantics. `ABSTAIN` is neither support nor objection.
 - Confused scores 0, 1, 69, 70, 84, and 85, including unknown output when the authoritative system-status read fails.
 - Zero successful AI roles with asset directional blocking, confused score 100, and disabled AI remain `不适用`, never synthetic `极端分歧`.
+- Position plan A remains isolated from a newer same-symbol decision B; exact monitor plan ID and monitor analysis ID paths are covered independently.
+- Missing/ambiguous `sourceRefId`, wrong-symbol sources, wrong-position monitor rows, and failed source joins hide every original-plan field instead of falling back by symbol.
+- A verified historical plan with a current-state trace mismatch remains plan A and is labeled as no longer current; it is never replaced by plan B.
 - Position takeover, real monitor timestamps, no fake next-monitor countdown, the existing-monitor/no-next-schedule state, and Chinese labels.
 - Plan analysis mismatch, state/run trace mismatch, blocked-field clearing, and absolute expiry before/equal/after/malformed cases.
 - Final user-visible Home DOM copy checks for raw `pendingCount`, `degraded`, and local-real failure codes.
@@ -213,7 +229,7 @@ Focused tests cover:
 
 The offline acceptance uses controlled service fixtures and the in-memory test database only. No live provider, external database, or six-asset runtime environment was used. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs. See `docs/DASHBOARD_INTERACTION_ACCEPTANCE.md`.
 
-Browser and deterministic DOM-target rendering evidence is recorded separately in `docs/DASHBOARD_VISUAL_ACCEPTANCE.md`. The original browser pass covers ten scenarios, thirteen interactions, and CSS viewports 1920 x 1080, 1440 x 900, and 1366 x 768; the Reviewer regression adds the eleventh `ai-all-abstain` fixture with deterministic fixture/DOM assertions and no fabricated screenshot. Existing screenshots remain local `.runtime` evidence and are not real-market results.
+Browser and deterministic DOM-target rendering evidence is recorded separately in `docs/DASHBOARD_VISUAL_ACCEPTANCE.md`. The original browser pass covers ten scenarios, thirteen interactions, and CSS viewports 1920 x 1080, 1440 x 900, and 1366 x 768; Reviewer regressions add `ai-all-abstain` and verified/unverified position-source fixture/DOM assertions without fabricating new screenshots. Existing screenshots remain local `.runtime` evidence and are not real-market results.
 
 ## 9. Remaining gaps
 

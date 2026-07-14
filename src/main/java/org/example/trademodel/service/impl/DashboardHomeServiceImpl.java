@@ -14,6 +14,7 @@ import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.providercall.AssetPriority;
@@ -26,6 +27,8 @@ import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
 import org.example.trademodel.localreal.LocalRealAssetReadinessState;
@@ -119,6 +122,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private AnalysisRunMapper analysisRunMapper;
+    private DecisionResultMapper decisionResultMapper;
+    private ExecutionPlanMapper executionPlanMapper;
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
     private Clock planValidityClock = Clock.systemUTC();
@@ -188,6 +193,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.assetStateMapper = assetStateMapper;
     }
 
+    @Autowired(required = false)
+    void setOriginalPlanSources(DecisionResultMapper decisionResultMapper,
+                                ExecutionPlanMapper executionPlanMapper,
+                                AnalysisRunMapper analysisRunMapper) {
+        this.decisionResultMapper = decisionResultMapper;
+        this.executionPlanMapper = executionPlanMapper;
+        this.analysisRunMapper = analysisRunMapper;
+    }
+
     void setPlanValidityClock(Clock planValidityClock) {
         this.planValidityClock = planValidityClock != null ? planValidityClock : Clock.systemUTC();
     }
@@ -228,8 +242,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<DashboardHomeVO.PositionVO> positionRows = buildPositions(positions);
         home.setPositions(positionRows);
         home.setSelectedSymbol(normalizedSelected);
-        home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision,
-                findPosition(positionRows, normalizedSelected)));
+        DashboardHomeVO.PositionVO activePosition = findPosition(positionRows, normalizedSelected);
+        ResolvedOriginalPlan resolvedOriginalPlan = resolveOriginalPlan(activePosition);
+        home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision, activePosition, resolvedOriginalPlan));
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
@@ -616,6 +631,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setOpenedAt(position.getOpenedAt());
             row.setLastMonitorAt(latestMonitorLog != null ? latestMonitorLog.getCreatedAt() : null);
             row.setNextMonitorAt(null);
+            row.setSourceRefId(trimToNull(position.getSourceRefId()));
+            if (latestMonitorLog != null && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
+                row.setSourceAnalysisId(trimToNull(latestMonitorLog.getAnalysisId()));
+                row.setSourceExecutionPlanId(trimToNull(latestMonitorLog.getExecutionPlanId()));
+            }
             rows.add(row);
         }
         return rows;
@@ -722,37 +742,106 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
+    private ResolvedOriginalPlan resolveOriginalPlan(DashboardHomeVO.PositionVO position) {
+        if (position == null) {
+            return ResolvedOriginalPlan.unverified("NO_ACTIVE_POSITION");
+        }
+        String requestedPlanId = trimToNull(position.getSourceExecutionPlanId());
+        String requestedAnalysisId = trimToNull(position.getSourceAnalysisId());
+        if (requestedPlanId == null && requestedAnalysisId == null) {
+            clearUnverifiedOriginalPlanSource(position);
+            return ResolvedOriginalPlan.unverified("NO_VERIFIABLE_MONITOR_SOURCE");
+        }
+        if (executionPlanMapper == null || decisionResultMapper == null || analysisRunMapper == null) {
+            clearUnverifiedOriginalPlanSource(position);
+            return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_READ_MODEL_UNAVAILABLE");
+        }
+        try {
+            ExecutionPlanDO plan = requestedPlanId != null
+                    ? executionPlanMapper.selectByPlanId(requestedPlanId)
+                    : executionPlanMapper.selectLatestByAnalysisId(requestedAnalysisId);
+            String resolvedPlanId = plan != null ? trimToNull(plan.getPlanId()) : null;
+            String resolvedAnalysisId = plan != null ? trimToNull(plan.getAnalysisId()) : null;
+            if (resolvedPlanId == null || resolvedAnalysisId == null
+                    || (requestedPlanId != null && !requestedPlanId.equals(resolvedPlanId))
+                    || (requestedAnalysisId != null && !requestedAnalysisId.equals(resolvedAnalysisId))) {
+                clearUnverifiedOriginalPlanSource(position);
+                return ResolvedOriginalPlan.unverified("PLAN_SOURCE_REFERENCE_MISMATCH");
+            }
+
+            DecisionResultVO sourceDecision = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
+                    resolvedAnalysisId, resolvedPlanId);
+            AnalysisRunDO sourceRun = analysisRunMapper.selectById(resolvedAnalysisId);
+            if (!validOriginalPlanIdentity(position, sourceDecision, sourceRun, resolvedAnalysisId)) {
+                clearUnverifiedOriginalPlanSource(position);
+                return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_IDENTITY_UNVERIFIED");
+            }
+
+            String sourceTraceId = trimToNull(sourceRun.getTraceId());
+            position.setSourceAnalysisId(resolvedAnalysisId);
+            position.setSourceExecutionPlanId(resolvedPlanId);
+            position.setSourceTraceId(sourceTraceId);
+            return new ResolvedOriginalPlan(true, sourceDecision, resolvedAnalysisId,
+                    resolvedPlanId, sourceTraceId, null);
+        } catch (RuntimeException ignored) {
+            clearUnverifiedOriginalPlanSource(position);
+            return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_SOURCE_READ_FAILED");
+        }
+    }
+
+    private boolean validOriginalPlanIdentity(DashboardHomeVO.PositionVO position,
+                                              DecisionResultVO decision,
+                                              AnalysisRunDO run,
+                                              String expectedAnalysisId) {
+        if (position == null || decision == null || run == null || expectedAnalysisId == null) {
+            return false;
+        }
+        if (!expectedAnalysisId.equals(trimToNull(decision.getAnalysisId()))
+                || !expectedAnalysisId.equals(trimToNull(run.getAnalysisId()))) {
+            return false;
+        }
+        String positionSymbol = normalizeSymbol(position.getSymbol());
+        String decisionSymbol = normalizeSymbol(decision.getSymbol());
+        String runSymbol = normalizeSymbol(run.getSymbol());
+        return positionSymbol != null && positionSymbol.equals(decisionSymbol) && positionSymbol.equals(runSymbol);
+    }
+
+    private void clearUnverifiedOriginalPlanSource(DashboardHomeVO.PositionVO position) {
+        if (position == null) return;
+        position.setSourceAnalysisId(null);
+        position.setSourceExecutionPlanId(null);
+        position.setSourceTraceId(null);
+    }
+
     private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(
-            DecisionResultVO decision, DashboardHomeVO.PositionVO activePosition) {
+            DecisionResultVO selectedDecisionForNewOpportunity,
+            DashboardHomeVO.PositionVO activePosition,
+            ResolvedOriginalPlan resolvedOriginalPlan) {
         DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
         if (activePosition != null) {
             suggestion.setStatus("POSITION_MONITORING");
             suggestion.setStatusLabel("持仓监控");
             suggestion.setPositionMode(true);
             suggestion.setPositionMonitor(activePosition);
-            SnapshotTraceStatus snapshotTraceStatus = executionSnapshotTraceStatus(decision);
-            suggestion.setOriginalPlanLabel(decision == null
-                    ? "暂无可关联的原执行计划"
-                    : snapshotTraceStatus == SnapshotTraceStatus.MATCH
-                            ? "原执行计划，仅用于持仓复核和复盘对照"
-                            : "状态已更新，原计划需重新分析");
-            suggestion.setSourceAnalysisId(decision != null ? trimToNull(decision.getAnalysisId()) : null);
-            if (snapshotTraceStatus == SnapshotTraceStatus.MATCH) {
-                PlanValidity validity = resolvePlanValidity(decision);
-                if (validity.status() == PlanValidityStatus.TIMEZONE_UNVERIFIED) {
-                    suggestion.setOriginalPlanLabel("历史计划时区不可验证，需重新分析");
-                } else if (validity.status() == PlanValidityStatus.INVALID) {
-                    suggestion.setOriginalPlanLabel("原计划有效期异常，需重新分析");
-                } else if (validity.status() == PlanValidityStatus.NOT_ACTIVE) {
-                    suggestion.setOriginalPlanLabel("原计划尚未进入有效期，需重新分析");
-                } else if (validity.status() == PlanValidityStatus.EXPIRED) {
-                    suggestion.setOriginalPlanLabel("原计划已失效，需重新分析");
-                } else {
-                    populateOriginalPlan(suggestion, decision, validity);
-                }
+            if (resolvedOriginalPlan == null || !resolvedOriginalPlan.verified()) {
+                suggestion.setOriginalPlanIdentity("UNVERIFIED");
+                suggestion.setOriginalPlanCurrentValidity("UNVERIFIED");
+                suggestion.setOriginalPlanLabel("暂无可关联的原执行计划");
+                return suggestion;
             }
+
+            DecisionResultVO originalDecision = resolvedOriginalPlan.decision();
+            OriginalPlanPresentation presentation = originalPlanPresentation(originalDecision);
+            suggestion.setOriginalPlanIdentity("VERIFIED");
+            suggestion.setOriginalPlanCurrentValidity(presentation.status());
+            suggestion.setOriginalPlanLabel(presentation.label());
+            suggestion.setSourceAnalysisId(resolvedOriginalPlan.analysisId());
+            suggestion.setSourceExecutionPlanId(resolvedOriginalPlan.executionPlanId());
+            suggestion.setSourceTraceId(resolvedOriginalPlan.traceId());
+            populateOriginalPlan(suggestion, originalDecision, presentation.validity());
             return suggestion;
         }
+        DecisionResultVO decision = selectedDecisionForNewOpportunity;
         if (decision == null) {
             blockSuggestion(suggestion, "NO_COMPLETE_PLAN", "当前暂无完整执行计划", "暂无有效分析快照");
             return suggestion;
@@ -859,6 +948,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setExpiresAt(planValidity.expiresAt());
         suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
         return suggestion;
+    }
+
+    private OriginalPlanPresentation originalPlanPresentation(DecisionResultVO decision) {
+        PlanValidity validity = resolvePlanValidity(decision);
+        SnapshotTraceStatus traceStatus = executionSnapshotTraceStatus(decision);
+        if (traceStatus == SnapshotTraceStatus.MISMATCH) {
+            return new OriginalPlanPresentation("STATE_MISMATCH",
+                    "状态已更新，原计划不再作为当前执行依据", validity);
+        }
+        if (traceStatus == SnapshotTraceStatus.UNVERIFIED) {
+            return new OriginalPlanPresentation("STATE_UNVERIFIED",
+                    "原执行计划来源已确认，但当前状态关联不可验证", validity);
+        }
+        return switch (validity.status()) {
+            case ACTIVE -> new OriginalPlanPresentation("ACTIVE",
+                    "原执行计划，仅用于持仓复核和复盘对照", validity);
+            case EXPIRED -> new OriginalPlanPresentation("EXPIRED", "原计划已失效", validity);
+            case TIMEZONE_UNVERIFIED -> new OriginalPlanPresentation("TIMEZONE_UNVERIFIED",
+                    "历史计划时区不可验证", validity);
+            case NOT_ACTIVE -> new OriginalPlanPresentation("NOT_ACTIVE",
+                    "原计划尚未进入有效期，仅用于历史复核", validity);
+            case INVALID -> new OriginalPlanPresentation("INVALID",
+                    "原计划有效期异常，仅用于历史复核", validity);
+        };
     }
 
     private void populateOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
@@ -1913,6 +2026,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int adjudicative() {
             return support + challenge;
         }
+    }
+
+    private record ResolvedOriginalPlan(boolean verified,
+                                        DecisionResultVO decision,
+                                        String analysisId,
+                                        String executionPlanId,
+                                        String traceId,
+                                        String reason) {
+        private static ResolvedOriginalPlan unverified(String reason) {
+            return new ResolvedOriginalPlan(false, null, null, null, null, reason);
+        }
+    }
+
+    private record OriginalPlanPresentation(String status, String label, PlanValidity validity) {
     }
 
     private record PushInboxContext(DashboardHomeVO.PushInboxVO pushInbox, boolean readOk) {

@@ -585,6 +585,10 @@ public class DashboardHomeVO {
         private LocalDateTime openedAt;
         private LocalDateTime lastMonitorAt;
         private LocalDateTime nextMonitorAt;
+        private String sourceRefId;
+        private String sourceAnalysisId;
+        private String sourceExecutionPlanId;
+        private String sourceTraceId;
 
         public Long getPositionId() {
             return positionId;
@@ -769,6 +773,14 @@ public class DashboardHomeVO {
         public void setLastMonitorAt(LocalDateTime lastMonitorAt) { this.lastMonitorAt = lastMonitorAt; }
         public LocalDateTime getNextMonitorAt() { return nextMonitorAt; }
         public void setNextMonitorAt(LocalDateTime nextMonitorAt) { this.nextMonitorAt = nextMonitorAt; }
+        public String getSourceRefId() { return sourceRefId; }
+        public void setSourceRefId(String sourceRefId) { this.sourceRefId = sourceRefId; }
+        public String getSourceAnalysisId() { return sourceAnalysisId; }
+        public void setSourceAnalysisId(String sourceAnalysisId) { this.sourceAnalysisId = sourceAnalysisId; }
+        public String getSourceExecutionPlanId() { return sourceExecutionPlanId; }
+        public void setSourceExecutionPlanId(String sourceExecutionPlanId) { this.sourceExecutionPlanId = sourceExecutionPlanId; }
+        public String getSourceTraceId() { return sourceTraceId; }
+        public void setSourceTraceId(String sourceTraceId) { this.sourceTraceId = sourceTraceId; }
     }
 
     public static class ExecutionSuggestionVO {
@@ -776,9 +788,13 @@ public class DashboardHomeVO {
         private String statusLabel;
         private String blockedReason;
         private String sourceAnalysisId;
+        private String sourceExecutionPlanId;
+        private String sourceTraceId;
         private Boolean positionMode = false;
         private PositionVO positionMonitor;
         private String originalPlanLabel;
+        private String originalPlanIdentity;
+        private String originalPlanCurrentValidity;
         private String direction;
         private String entryZone;
         private String stopLoss;
@@ -798,12 +814,22 @@ public class DashboardHomeVO {
         public void setBlockedReason(String blockedReason) { this.blockedReason = blockedReason; }
         public String getSourceAnalysisId() { return sourceAnalysisId; }
         public void setSourceAnalysisId(String sourceAnalysisId) { this.sourceAnalysisId = sourceAnalysisId; }
+        public String getSourceExecutionPlanId() { return sourceExecutionPlanId; }
+        public void setSourceExecutionPlanId(String sourceExecutionPlanId) { this.sourceExecutionPlanId = sourceExecutionPlanId; }
+        public String getSourceTraceId() { return sourceTraceId; }
+        public void setSourceTraceId(String sourceTraceId) { this.sourceTraceId = sourceTraceId; }
         public Boolean getPositionMode() { return positionMode; }
         public void setPositionMode(Boolean positionMode) { this.positionMode = positionMode; }
         public PositionVO getPositionMonitor() { return positionMonitor; }
         public void setPositionMonitor(PositionVO positionMonitor) { this.positionMonitor = positionMonitor; }
         public String getOriginalPlanLabel() { return originalPlanLabel; }
         public void setOriginalPlanLabel(String originalPlanLabel) { this.originalPlanLabel = originalPlanLabel; }
+        public String getOriginalPlanIdentity() { return originalPlanIdentity; }
+        public void setOriginalPlanIdentity(String originalPlanIdentity) { this.originalPlanIdentity = originalPlanIdentity; }
+        public String getOriginalPlanCurrentValidity() { return originalPlanCurrentValidity; }
+        public void setOriginalPlanCurrentValidity(String originalPlanCurrentValidity) {
+            this.originalPlanCurrentValidity = originalPlanCurrentValidity;
+        }
 
         public String getDirection() {
             return direction;

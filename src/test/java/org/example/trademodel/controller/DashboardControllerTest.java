@@ -466,6 +466,38 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void unverifiedPositionSourceDoesNotRenderEmptyOriginalPlanTable() throws Exception {
+        String renderer = functionBody("renderHomeExecutionFromPayload");
+
+        assertThat(renderer).contains(
+                "String(s.originalPlanIdentity || \"\").toUpperCase() !== \"VERIFIED\"",
+                "暂无可关联的原执行计划",
+                "execution-original-plan-empty");
+        assertThat(renderer.indexOf("originalPlanIdentity"))
+                .isLessThan(renderer.indexOf("var originalRows"));
+    }
+
+    @Test
+    void positionSourceFixtureSeparatesVerifiedAndUnverifiedOriginalPlans() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+        int unverifiedStart = fixture.indexOf("\"originalPlanIdentity\": \"UNVERIFIED\"");
+        int unverifiedEnd = fixture.indexOf("elif scenario == \"placeholder\"", unverifiedStart);
+
+        assertThat(fixture).contains(
+                "\"sourceAnalysisId\": \"analysis-position-source\"",
+                "\"sourceExecutionPlanId\": \"plan-position-source\"",
+                "\"sourceTraceId\": \"trace-position-source\"",
+                "\"originalPlanIdentity\": \"VERIFIED\"",
+                "\"originalPlanCurrentValidity\": \"ACTIVE\"");
+        assertThat(unverifiedStart).isGreaterThanOrEqualTo(0);
+        assertThat(unverifiedEnd).isGreaterThan(unverifiedStart);
+        assertThat(fixture.substring(unverifiedStart, unverifiedEnd))
+                .contains("暂无可关联的原执行计划")
+                .doesNotContain("\"entryZone\"", "\"stopLoss\"", "\"takeProfitRules\"",
+                        "\"sourceAnalysisId\"", "\"sourceExecutionPlanId\"");
+    }
+
+    @Test
     void dashboardDefinesDedicatedChineseStatusLabelMappers() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 
