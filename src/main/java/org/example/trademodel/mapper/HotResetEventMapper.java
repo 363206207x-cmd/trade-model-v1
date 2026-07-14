@@ -3,11 +3,14 @@ package org.example.trademodel.mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.vo.KeyCountVO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -45,20 +48,21 @@ public interface HotResetEventMapper {
     Integer countByAnalysisId(@Param("analysisId") String analysisId);
 
     @Select("SELECT COUNT(*) FROM tm_hot_reset_event "
-            + "WHERE event_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_hot_reset_event "
-            + "WHERE event_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
-    Integer countInWindow(@Param("windowMinutes") int windowMinutes);
+            + "WHERE event_time >= #{windowStartInclusive} "
+            + "AND event_time <= #{asOfInclusive}")
+    Integer countInWindow(@Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                          @Param("asOfInclusive") LocalDateTime asOfInclusive);
 
-    @Select("SELECT trigger_type AS key, COUNT(*) AS count "
+    @Results({
+            @Result(column = "trigger_key", property = "key"),
+            @Result(column = "trigger_count", property = "count")
+    })
+    @Select("SELECT trigger_type AS trigger_key, COUNT(*) AS trigger_count "
             + "FROM tm_hot_reset_event "
-            + "WHERE event_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP) "
+            + "WHERE event_time >= #{windowStartInclusive} "
+            + "AND event_time <= #{asOfInclusive} "
             + "GROUP BY trigger_type ORDER BY COUNT(*) DESC, trigger_type ASC")
-    @Select(value = "SELECT trigger_type AS key, COUNT(*) AS count "
-            + "FROM tm_hot_reset_event "
-            + "WHERE event_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute') "
-            + "GROUP BY trigger_type ORDER BY COUNT(*) DESC, trigger_type ASC",
-            databaseId = "postgresql")
-    List<KeyCountVO> selectTriggerTypeCountsInWindow(@Param("windowMinutes") int windowMinutes);
+    List<KeyCountVO> selectTriggerTypeCountsInWindow(
+            @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+            @Param("asOfInclusive") LocalDateTime asOfInclusive);
 }

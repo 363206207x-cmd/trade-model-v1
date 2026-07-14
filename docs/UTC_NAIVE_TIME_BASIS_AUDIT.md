@@ -2,7 +2,7 @@
 
 ## 1. Scope and decision
 
-This audit closes the two Reviewer Round 8 findings where an application-written UTC wall-clock value was stored in a timestamp-without-time-zone column and later compared with the database session clock.
+This audit records the Reviewer Round 8 timestamp fixes and the Reviewer Round 10 closure for Dashboard UTC-day metrics and Run Baseline read windows. Round 10 removes database-clock calculations from the Baseline alert, analysis-run, Push Recheck, and Hot Reset queries without relabeling every historical writer as UTC-proven.
 
 The compatibility contract is:
 
@@ -20,14 +20,14 @@ This package does not migrate columns to `TIMESTAMP WITH TIME ZONE`, change busi
 | `tm_decision_result.create_time` | `AnalysisAssemblerServiceImpl` | UTC-naive from the assembler clock | Explicit UTC day `[startInclusive, endExclusive)` | No | Fixed in Round 8 |
 | `tm_push_recheck_log.create_time` and `recheck_time` | `PushRecheckServiceImpl` | UTC-naive through `UtcLocalTimePolicy` | Explicit UTC window `[windowStartInclusive, asOfInclusive]` | No | Fixed in Round 8 |
 | `tm_push_snapshot.expires_at` | `PushSnapshotService` | UTC-naive through `UtcLocalTimePolicy` | Explicit UTC as-of supplied by callers | No | Existing contract retained |
-| `tm_analysis_run.analysis_time` | `AnalysisTimePolicy` and analysis-run orchestration | UTC-naive for generated/offset-aware inputs; legacy no-offset input is also accepted | Run Baseline still contains database-clock window SQL | Potentially yes | Follow-up contract required; not silently relabeled as fixed |
-| `tm_hot_reset_event.event_time` | Hot Reset command/event persistence | Caller-provided no-offset time; assembler-triggered events use UTC-naive | Run Baseline still contains database-clock window SQL | Input basis is not uniform | Follow-up contract required before changing query semantics |
-| `tm_monitor_alert.created_at` | Database default for monitor-alert inserts | Database-session time | Database-session time windows | No proven UTC-naive mix in reviewed writer | No change |
-| `biz_date` fields | Missed-opportunity business records | Business date, not an instant | Explicit `biz_date` equality | Not applicable | Kept separate from UTC instant policy |
+| `tm_analysis_run.analysis_time` | `AnalysisTimePolicy` and analysis-run orchestration | UTC-naive for generated/offset-aware inputs; legacy no-offset input is also accepted | Explicit Baseline UTC window `[windowStartInclusive, asOfInclusive]` | Historical input basis is not uniformly proven | Baseline read fixed in Round 10; broader writer audit remains |
+| `tm_hot_reset_event.event_time` | Hot Reset command/event persistence | Caller-provided no-offset time; assembler-triggered events use UTC-naive | Explicit Baseline UTC window `[windowStartInclusive, asOfInclusive]` | Historical input basis is not uniformly proven | Baseline read fixed in Round 10; broader writer audit remains |
+| `tm_monitor_alert.created_at` | Database default for monitor-alert inserts | Database-session time | Explicit Baseline UTC window `[windowStartInclusive, asOfInclusive]` | No proven UTC-naive mix in reviewed writer | Baseline read fixed; write-side throttle queries unchanged |
+| `tm_missed_opportunity.biz_date` | Missed-opportunity business records | Business date, not an instant | Dashboard passes the same UTC calendar date used by decision-today metrics | Not applicable | Dashboard UTC-day contract fixed in Round 10; column type unchanged |
 
 The limited audit searched mapper SQL for `CURRENT_DATE`, `CURRENT_TIMESTAMP`, `LOCALTIMESTAMP`, `NOW()`, `DATEADD`, `INTERVAL`, and date casts, and searched writers for `UtcLocalTimePolicy.now`, `utcLocalNow`, and UTC `LocalDateTime.ofInstant` conversions.
 
-Only the two confirmed Reviewer findings are changed in this package. Ambiguous historical contracts are recorded rather than guessed. They remain part of production-readiness blocking evidence.
+Round 10 changes only Dashboard today-count selection and Run Baseline read queries. `MonitorAlertMapper.countOpenInThrottleWindow` and `countAnyInSemanticWindow` remain write-side throttle contracts and were intentionally not changed. Ambiguous historical writer contracts are recorded rather than guessed and remain part of production-readiness blocking evidence.
 
 ## 3. Decision count contract
 
@@ -46,25 +46,32 @@ create_time >= :startInclusive
 AND create_time < :endExclusive
 ```
 
-The contract is `today decisions = decisions in the current UTC calendar day`. It does not use the JVM default timezone or database current date. The existing Dashboard label is unchanged pending product confirmation; the internal KPI basis is explicitly UTC.
+The same `utcDate` is also passed to `MissedOpportunityMapper.countByBizDate`. The contract is therefore `Dashboard today = the current UTC calendar day` for both decisions and missed opportunities. Neither metric uses the JVM default timezone or database current date, and `tm_missed_opportunity.biz_date` remains a date column.
 
-## 4. Push Recheck window contract
+## 4. Unified Run Baseline window contract
 
-`RunBaselineServiceImpl` obtains one UTC-naive as-of value from its injected clock and uses it for every status count:
+`RunBaselineServiceImpl` obtains one UTC-naive as-of value from its injected clock, derives one start boundary, and passes that exact pair to every Baseline summary:
 
 ```text
 asOfUtc = UtcLocalTimePolicy.now(clock)
 windowStartUtc = asOfUtc - windowMinutes
 ```
 
-`PushRecheckLogMapper.countByStatusInWindow` applies:
+The covered timestamp columns are:
+
+- `tm_monitor_alert.created_at`
+- `tm_analysis_run.analysis_time`
+- `tm_push_recheck_log.create_time`
+- `tm_hot_reset_event.event_time`
+
+Every Baseline query, including Hot Reset trigger-type grouping, applies:
 
 ```sql
 create_time >= :windowStartInclusive
 AND create_time <= :asOfInclusive
 ```
 
-The upper bound excludes future records. The mapper has one portable SQL definition and no H2/PostgreSQL database-clock variants.
+The upper bound excludes future records. These Baseline methods each have one portable SQL definition and no `CURRENT_TIMESTAMP`, `CURRENT_DATE`, H2 `DATEADD`, or PostgreSQL interval calculation. Push Recheck retains its existing explicit range contract. Monitor Alert write-side throttle methods retain their existing clock contract because they are outside this bounded read-side package.
 
 ## 5. Boundary evidence
 
@@ -85,7 +92,7 @@ Decision day boundaries:
 | `2026-07-14T23:59:59` | Yes |
 | `2026-07-15T00:00:00` | No |
 
-Recheck window for `asOfUtc=2026-07-14T12:00:00`, 30 minutes:
+Unified Baseline window for `asOfUtc=2026-07-14T12:00:00`, 30 minutes:
 
 | Stored UTC-naive time | Included |
 |---|---|
@@ -95,11 +102,14 @@ Recheck window for `asOfUtc=2026-07-14T12:00:00`, 30 minutes:
 | `2026-07-14T12:00:00` | Yes |
 | `2026-07-14T12:00:01` | No |
 
+The five-point boundary fixture is executed for Monitor Alert, Analysis Run, low-data-quality Analysis Run, Push Recheck, Hot Reset count, and Hot Reset trigger-type distribution. Fixed-clock service tests also prove that JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York` pass the same two boundaries to every mapper.
+
 ## 6. Safety and remaining gates
 
 - No live AI or market provider was called.
 - No secret was read.
 - No production database or migration was accessed.
 - No position, order, scheduler, external Push, Telegram, webhook, or email behavior changed.
+- The broader historical time basis of `analysis_time` and `event_time` is not declared fully normalized by this read-side fix.
 - PostgreSQL/Flyway V7 controlled execution is still not complete.
 - Production readiness remains `BLOCKED`; production deployment cannot proceed.

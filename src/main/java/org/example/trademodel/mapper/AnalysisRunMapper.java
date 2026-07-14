@@ -154,19 +154,16 @@ public interface AnalysisRunMapper {
     Double selectAverageScoreByAnalysisId(@Param("analysisId") String analysisId);
 
     @Select("SELECT COUNT(*) FROM tm_analysis_run "
-            + "WHERE analysis_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_analysis_run "
-            + "WHERE analysis_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
-    Integer countInWindow(@Param("windowMinutes") int windowMinutes);
+            + "WHERE analysis_time >= #{windowStartInclusive} "
+            + "AND analysis_time <= #{asOfInclusive}")
+    Integer countInWindow(@Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                          @Param("asOfInclusive") LocalDateTime asOfInclusive);
 
     @Select("SELECT COUNT(*) FROM tm_analysis_run "
-            + "WHERE analysis_time >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP) "
+            + "WHERE analysis_time >= #{windowStartInclusive} "
+            + "AND analysis_time <= #{asOfInclusive} "
             + "AND data_quality_score IS NOT NULL AND data_quality_score < #{threshold}")
-    @Select(value = "SELECT COUNT(*) FROM tm_analysis_run "
-            + "WHERE analysis_time >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute') "
-            + "AND data_quality_score IS NOT NULL AND data_quality_score < #{threshold}",
-            databaseId = "postgresql")
-    Integer countLowQualityInWindow(@Param("windowMinutes") int windowMinutes,
+    Integer countLowQualityInWindow(@Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                                    @Param("asOfInclusive") LocalDateTime asOfInclusive,
                                     @Param("threshold") int threshold);
 }

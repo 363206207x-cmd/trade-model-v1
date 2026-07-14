@@ -171,7 +171,7 @@ Repository conflicts and limitations are not hidden:
 | Two same-symbol positions could cross original plans | Home selected the first position matching `symbol`, so list order implicitly chose identity before plan-source resolution. | `symbol` now selects only the asset. `positionId` selects the exact position; a unique position may auto-select, while multiple matches return `POSITION_SELECTION_REQUIRED` with no plan fields. Invalid exact IDs never fall back. |
 | Monitor countdown was fake | Browser refresh cadence was rendered as next business validation. | Fake countdown removed; latest persisted log time is shown and unknown next time remains empty. |
 | English/internal values leaked | Raw enum/free-text fallback was used across business fields. | Dedicated field-specific mappings return Chinese labels and unknown values return `未知状态`; generated boundary explanations are Chinese at source. |
-| UTC-naive timestamps were queried with the database local clock | Decision `create_time` and Push Recheck `create_time` are written as UTC wall-clock values without an offset, while their KPI/window queries used `CURRENT_DATE` or `CURRENT_TIMESTAMP`. | Reviewer Round 8 replaces both queries with caller-supplied UTC bounds from injected clocks. Decision count uses `[start, end)`; Recheck uses `[windowStart, asOf]` and excludes future rows. |
+| UTC-naive metrics were split across JVM/database local clocks | Decision and missed-opportunity “today” used different calendar dates, while Baseline alert/analysis/Hot Reset windows were calculated by the database and Recheck used caller UTC. | Round 8 introduced explicit Decision/Recheck bounds. Round 10 reuses one UTC date for both Dashboard today metrics and one `[windowStartUtc, asOfUtc]` pair for every Baseline mapper, including grouped Hot Reset counts. |
 
 ## 5. Asset-card whitelist
 
@@ -234,6 +234,14 @@ An explicit ID is accepted only when it identifies a `MANUAL` position in `OPEN`
 
 The shipped offline localhost fixture exercised the full DOM flow: initial asset-only request showed `请选择具体持仓`; row A sent `positionId=9101` and rendered only `POSITION-A` plan markers; row B sent `positionId=9102` and rendered only `POSITION-B` markers; clicking the BTC asset removed `positionId`, restored the selection-required state, and removed both plans. The fixture rejects every write request and made no provider call.
 
+### 7.3 Reviewer Round 10 unified UTC-day and Baseline closure
+
+Dashboard LightSystemStatus now derives one `utcDate` from its injected clock and uses it for both the half-open decision range and `tm_missed_opportunity.biz_date`. Fixed-instant tests under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York` produce the same business date and UTC midnight boundaries.
+
+Run Baseline calculates `asOfUtc` once and derives `windowStartUtc` once. The same inclusive pair is passed to Monitor Alert, Analysis Run, low-data-quality Analysis Run, Push Recheck, Hot Reset count, and Hot Reset trigger-type distribution. Their Baseline SQL contains explicit `>= #{windowStartInclusive}` and `<= #{asOfInclusive}` predicates, so records after the as-of boundary are excluded. The Monitor Alert write-side throttle methods are unchanged.
+
+This closes the Baseline read dependence on database-local clocks. It does not claim that every historical `analysis_time` or Hot Reset `event_time` writer has a uniformly proven time basis; that broader inventory remains a separate audit. Production readiness remains `BLOCKED`.
+
 ## 8. Test evidence
 
 Focused tests cover:
@@ -260,7 +268,7 @@ Focused tests cover:
 - Home/detail renderer ownership, asset-selection request order, fail-closed Home failure, and noninteractive `DEFAULT_SLOT` behavior through deterministic template call-graph assertions.
 - Offset-aware plan validity under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`, plus legacy no-offset fail-closed behavior.
 - Decision-to-Push Snapshot UTC-naive conversion under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`; all three preserve the same 24-hour expiry. Push Recheck is valid one second before expiry and expired at the exact boundary and one second after it.
-- Decision-day and Run Baseline Recheck queries produce identical explicit UTC bounds under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`. Decision midnight is half-open; the Recheck window includes exact start/as-of and excludes one second before/after.
+- Dashboard decision and missed-opportunity today metrics use one UTC date under JVM defaults `UTC`, `Asia/Shanghai`, and `America/New_York`. All Run Baseline mappers receive one explicit UTC window; Monitor Alert, Analysis Run, low-quality run, Push Recheck, Hot Reset, and trigger distribution include exact start/as-of and exclude one second before/after.
 - The AI conflict KPI and consistency card consume the same assembled backend consistency object; the KPI preserves the raw enum in `value` and emits its Chinese label in `valueLabel`.
 
 The offline acceptance uses controlled service fixtures and the in-memory test database only. No live provider, external database, or six-asset runtime environment was used. Therefore this audit does not claim a fresh six-asset live-data result and does not fabricate one. Runtime evidence must be collected separately with real persisted symbol/analysis IDs. See `docs/DASHBOARD_INTERACTION_ACCEPTANCE.md`.
@@ -277,7 +285,7 @@ Browser and deterministic DOM-target rendering evidence is recorded separately i
 6. Historical engineering diagnostics still carry internal vocabulary inside `.runtime-status-stack` and `.diagnostics-only`, both of which are explicitly `display:none`. They are not part of the user-visible Home surface; they must be translated or moved to a dedicated diagnostic page before either hidden container is ever exposed.
 7. Production readiness remains blocked by the repository's existing release-gate evidence requirements.
 8. Flyway V7 adds the offset-aware plan columns, but this branch does not claim a fresh controlled PostgreSQL V1-V7 run. PostgreSQL migration evidence for V7 remains a separate production-readiness gate.
-9. `tm_analysis_run.analysis_time` and `tm_hot_reset_event.event_time` still accept historical no-offset inputs whose basis is not uniformly provable. Their Run Baseline database-clock windows require a separate contract package before they can be classified as UTC-safe; this round does not guess or silently relabel them.
+9. `tm_analysis_run.analysis_time` and `tm_hot_reset_event.event_time` still accept historical no-offset inputs whose basis is not uniformly provable. Run Baseline now reads them with explicit UTC boundaries and no database clock, but the broader writer/history contract still requires a separate audit before those columns can be classified as uniformly UTC-safe.
 
 ## 10. Safety boundary
 

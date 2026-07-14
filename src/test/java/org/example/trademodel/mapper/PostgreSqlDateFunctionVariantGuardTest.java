@@ -18,9 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PostgreSqlDateFunctionVariantGuardTest {
 
     @Test
-    void analysisRunMapperKeepsH2DateaddFallbackAndAddsPostgreSqlIntervalVariants() throws Exception {
-        assertDateaddVariant(AnalysisRunMapper.class.getMethod("countInWindow", int.class));
-        assertDateaddVariant(AnalysisRunMapper.class.getMethod("countLowQualityInWindow", int.class, int.class));
+    void analysisRunBaselineUsesExplicitBoundedUtcRange() throws Exception {
+        assertBoundedUtcRange(AnalysisRunMapper.class.getMethod(
+                "countInWindow", LocalDateTime.class, LocalDateTime.class), "analysis_time");
+        assertBoundedUtcRange(AnalysisRunMapper.class.getMethod(
+                "countLowQualityInWindow", LocalDateTime.class, LocalDateTime.class, int.class), "analysis_time");
     }
 
     @Test
@@ -32,11 +34,13 @@ class PostgreSqlDateFunctionVariantGuardTest {
     }
 
     @Test
-    void hotResetEventMapperKeepsH2DateaddFallbackAndAddsPostgreSqlIntervalVariants() throws Exception {
-        assertDateaddVariant(HotResetEventMapper.class.getMethod("countInWindow", int.class));
-        Method grouped = HotResetEventMapper.class.getMethod("selectTriggerTypeCountsInWindow", int.class);
+    void hotResetEventBaselineUsesExplicitBoundedUtcRange() throws Exception {
+        assertBoundedUtcRange(HotResetEventMapper.class.getMethod(
+                "countInWindow", LocalDateTime.class, LocalDateTime.class), "event_time");
+        Method grouped = HotResetEventMapper.class.getMethod(
+                "selectTriggerTypeCountsInWindow", LocalDateTime.class, LocalDateTime.class);
         assertThat(grouped.getGenericReturnType().getTypeName()).contains(KeyCountVO.class.getSimpleName());
-        assertDateaddVariant(grouped);
+        assertBoundedUtcRange(grouped, "event_time");
     }
 
     @Test
@@ -80,7 +84,21 @@ class PostgreSqlDateFunctionVariantGuardTest {
                 "countDecisionsInRange", LocalDateTime.class, LocalDateTime.class)));
         String recheckSql = sql(genericSelect(PushRecheckLogMapper.class.getMethod(
                 "countByStatusInWindow", String.class, LocalDateTime.class, LocalDateTime.class)));
-        String utcNaiveSql = (decisionSql + " " + recheckSql).toUpperCase(Locale.ROOT);
+        String alertSql = sql(genericSelect(MonitorAlertMapper.class.getMethod(
+                "countByStatusInWindow", String.class, LocalDateTime.class, LocalDateTime.class)));
+        String alertTypeSql = sql(genericSelect(MonitorAlertMapper.class.getMethod(
+                "countByStatusAndTypeInWindow", String.class, String.class,
+                LocalDateTime.class, LocalDateTime.class)));
+        String analysisSql = sql(genericSelect(AnalysisRunMapper.class.getMethod(
+                "countInWindow", LocalDateTime.class, LocalDateTime.class)));
+        String lowQualitySql = sql(genericSelect(AnalysisRunMapper.class.getMethod(
+                "countLowQualityInWindow", LocalDateTime.class, LocalDateTime.class, int.class)));
+        String hotResetSql = sql(genericSelect(HotResetEventMapper.class.getMethod(
+                "countInWindow", LocalDateTime.class, LocalDateTime.class)));
+        String hotResetTypeSql = sql(genericSelect(HotResetEventMapper.class.getMethod(
+                "selectTriggerTypeCountsInWindow", LocalDateTime.class, LocalDateTime.class)));
+        String utcNaiveSql = String.join(" ", decisionSql, recheckSql, alertSql, alertTypeSql,
+                analysisSql, lowQualitySql, hotResetSql, hotResetTypeSql).toUpperCase(Locale.ROOT);
 
         assertThat(utcNaiveSql)
                 .doesNotContain("CURRENT_DATE")
@@ -92,11 +110,18 @@ class PostgreSqlDateFunctionVariantGuardTest {
     }
 
     @Test
-    void monitorAlertMapperKeepsH2DateaddFallbackAndAddsPostgreSqlIntervalVariants() throws Exception {
+    void monitorAlertWriteThrottleKeepsExistingDatabaseClockVariants() throws Exception {
         assertDateaddVariant(MonitorAlertMapper.class.getMethod("countOpenInThrottleWindow", String.class, String.class, int.class));
         assertDateaddVariant(MonitorAlertMapper.class.getMethod("countAnyInSemanticWindow", String.class, String.class, int.class));
-        assertDateaddVariant(MonitorAlertMapper.class.getMethod("countByStatusInWindow", String.class, int.class));
-        assertDateaddVariant(MonitorAlertMapper.class.getMethod("countByStatusAndTypeInWindow", String.class, String.class, int.class));
+    }
+
+    @Test
+    void monitorAlertBaselineUsesExplicitBoundedUtcRange() throws Exception {
+        assertBoundedUtcRange(MonitorAlertMapper.class.getMethod(
+                "countByStatusInWindow", String.class, LocalDateTime.class, LocalDateTime.class), "created_at");
+        assertBoundedUtcRange(MonitorAlertMapper.class.getMethod(
+                "countByStatusAndTypeInWindow", String.class, String.class,
+                LocalDateTime.class, LocalDateTime.class), "created_at");
     }
 
     @Test
@@ -139,6 +164,22 @@ class PostgreSqlDateFunctionVariantGuardTest {
                 .contains("YYYY-MM-DD HH24:MI:SS")
                 .doesNotContain("FORMATDATETIME")
                 .doesNotContain("DATEADD");
+    }
+
+    private static void assertBoundedUtcRange(Method method, String timestampColumn) {
+        Select select = genericSelect(method);
+        String boundedSql = sql(select);
+        String upperSql = boundedSql.toUpperCase(Locale.ROOT);
+
+        assertThat(method.getAnnotationsByType(Select.class)).hasSize(1);
+        assertThat(boundedSql)
+                .contains(timestampColumn + " >= #{windowStartInclusive}")
+                .contains(timestampColumn + " <= #{asOfInclusive}");
+        assertThat(upperSql)
+                .doesNotContain("CURRENT_TIMESTAMP")
+                .doesNotContain("CURRENT_DATE")
+                .doesNotContain("DATEADD")
+                .doesNotContain("INTERVAL '1 MINUTE'");
     }
 
     private static Select genericSelect(Method method) {

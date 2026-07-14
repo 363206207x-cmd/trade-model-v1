@@ -102,7 +102,7 @@ public class DecisionServiceImpl implements DecisionService {
         System.out.println("[PERF] db_count_decisions_today=" + countTodayCostMs + " ms");
 
         long missedStart = System.currentTimeMillis();
-        int missedToday = missedOpportunityMapper.countByBizDate(LocalDate.now());
+        int missedToday = missedOpportunityMapper.countByBizDate(utcDate);
         vo.setMissedValidOpportunityCount(missedToday);
         long missedCostMs = System.currentTimeMillis() - missedStart;
         System.out.println("[PERF] db_count_missed_opportunity_biz_date=" + missedCostMs + " ms");

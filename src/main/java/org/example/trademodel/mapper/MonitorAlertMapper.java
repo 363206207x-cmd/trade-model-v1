@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.MonitorAlertDO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -88,26 +89,20 @@ public interface MonitorAlertMapper {
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert "
-            + "WHERE is_deleted = 0 "
-            + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
-    Integer countByStatusInWindow(@Param("status") String status, @Param("windowMinutes") int windowMinutes);
+            + "AND created_at >= #{windowStartInclusive} "
+            + "AND created_at <= #{asOfInclusive}")
+    Integer countByStatusInWindow(@Param("status") String status,
+                                  @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                                  @Param("asOfInclusive") LocalDateTime asOfInclusive);
 
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
             + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert "
-            + "WHERE is_deleted = 0 "
-            + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
-            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
+            + "AND created_at >= #{windowStartInclusive} "
+            + "AND created_at <= #{asOfInclusive}")
     Integer countByStatusAndTypeInWindow(@Param("status") String status,
                                          @Param("alertType") String alertType,
-                                         @Param("windowMinutes") int windowMinutes);
+                                         @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                                         @Param("asOfInclusive") LocalDateTime asOfInclusive);
 }

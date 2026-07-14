@@ -345,8 +345,39 @@ class DecisionServiceImplTest {
     }
 
     @Test
-    void decisionCountUsesUtcDayAcrossJvmTimezones() {
+    void lightSystemStatusUsesOneUtcDateForAllTodayMetrics() {
         service.setClock(Clock.fixed(Instant.parse("2026-07-14T23:30:00Z"), ZoneOffset.UTC));
+
+        service.getLightSystemStatus();
+
+        verify(decisionResultMapper).countDecisionsInRange(
+                LocalDateTime.parse("2026-07-14T00:00:00"),
+                LocalDateTime.parse("2026-07-15T00:00:00"));
+        verify(missedOpportunityMapper).countByBizDate(LocalDate.parse("2026-07-14"));
+    }
+
+    @Test
+    void missedOpportunityBizDateIsTimezoneIndependent() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T23:30:00Z"), ZoneOffset.UTC));
+        TimeZone original = TimeZone.getDefault();
+
+        try {
+            for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                service.getLightSystemStatus();
+            }
+        } finally {
+            TimeZone.setDefault(original);
+        }
+
+        ArgumentCaptor<LocalDate> bizDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        verify(missedOpportunityMapper, times(3)).countByBizDate(bizDateCaptor.capture());
+        assertThat(bizDateCaptor.getAllValues()).containsOnly(LocalDate.parse("2026-07-14"));
+    }
+
+    @Test
+    void utcMidnightDecisionAndMissedMetricsStayOnSameDate() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-15T00:00:00Z"), ZoneOffset.UTC));
         TimeZone original = TimeZone.getDefault();
 
         try {
@@ -360,9 +391,12 @@ class DecisionServiceImplTest {
 
         ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDate> bizDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
         verify(decisionResultMapper, times(3)).countDecisionsInRange(startCaptor.capture(), endCaptor.capture());
-        assertThat(startCaptor.getAllValues()).containsOnly(LocalDateTime.parse("2026-07-14T00:00:00"));
-        assertThat(endCaptor.getAllValues()).containsOnly(LocalDateTime.parse("2026-07-15T00:00:00"));
+        verify(missedOpportunityMapper, times(3)).countByBizDate(bizDateCaptor.capture());
+        assertThat(startCaptor.getAllValues()).containsOnly(LocalDateTime.parse("2026-07-15T00:00:00"));
+        assertThat(endCaptor.getAllValues()).containsOnly(LocalDateTime.parse("2026-07-16T00:00:00"));
+        assertThat(bizDateCaptor.getAllValues()).containsOnly(LocalDate.parse("2026-07-15"));
     }
 
     private static UserPositionDO manualUserPosition(String symbol, String status, LocalDateTime openedAt) {

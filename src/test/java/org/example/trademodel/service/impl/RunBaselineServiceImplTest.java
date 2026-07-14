@@ -120,4 +120,77 @@ class RunBaselineServiceImplTest {
                 .countByStatusInWindow(anyString(), eq(LocalDateTime.parse("2026-07-14T11:30:00")),
                         eq(LocalDateTime.parse("2026-07-14T12:00:00")));
     }
+
+    @Test
+    void runBaselinePassesOneUtcWindowToEveryMapper() {
+        LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
+        LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+
+        service.getRunBaseline(30);
+
+        verify(monitorAlertMapper).countByStatusInWindow("OPEN", windowStartUtc, asOfUtc);
+        verify(monitorAlertMapper).countByStatusInWindow("SUPPRESSED", windowStartUtc, asOfUtc);
+        verify(monitorAlertMapper).countByStatusAndTypeInWindow(
+                "OPEN", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
+                windowStartUtc, asOfUtc);
+        verify(monitorAlertMapper).countByStatusAndTypeInWindow(
+                "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
+                windowStartUtc, asOfUtc);
+        verify(analysisRunMapper).countInWindow(windowStartUtc, asOfUtc);
+        verify(analysisRunMapper).countLowQualityInWindow(windowStartUtc, asOfUtc, 60);
+        for (RecheckStatusEnum status : RecheckStatusEnum.values()) {
+            verify(pushRecheckLogMapper).countByStatusInWindow(status.name(), windowStartUtc, asOfUtc);
+        }
+        verify(hotResetEventMapper).countInWindow(windowStartUtc, asOfUtc);
+        verify(hotResetEventMapper).selectTriggerTypeCountsInWindow(windowStartUtc, asOfUtc);
+    }
+
+    @Test
+    void alertBaselineWindowIsTimezoneIndependent() {
+        runAcrossJvmTimezones();
+
+        LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
+        LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+        verify(monitorAlertMapper, times(3)).countByStatusInWindow("OPEN", windowStartUtc, asOfUtc);
+        verify(monitorAlertMapper, times(3)).countByStatusInWindow("SUPPRESSED", windowStartUtc, asOfUtc);
+        verify(monitorAlertMapper, times(3)).countByStatusAndTypeInWindow(
+                "OPEN", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
+                windowStartUtc, asOfUtc);
+        verify(monitorAlertMapper, times(3)).countByStatusAndTypeInWindow(
+                "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
+                windowStartUtc, asOfUtc);
+    }
+
+    @Test
+    void dataQualityBaselineWindowIsTimezoneIndependent() {
+        runAcrossJvmTimezones();
+
+        LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
+        LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+        verify(analysisRunMapper, times(3)).countInWindow(windowStartUtc, asOfUtc);
+        verify(analysisRunMapper, times(3)).countLowQualityInWindow(windowStartUtc, asOfUtc, 60);
+    }
+
+    @Test
+    void hotResetBaselineWindowIsTimezoneIndependent() {
+        runAcrossJvmTimezones();
+
+        LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
+        LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
+        verify(hotResetEventMapper, times(3)).countInWindow(windowStartUtc, asOfUtc);
+        verify(hotResetEventMapper, times(3)).selectTriggerTypeCountsInWindow(windowStartUtc, asOfUtc);
+    }
+
+    private void runAcrossJvmTimezones() {
+        TimeZone original = TimeZone.getDefault();
+        try {
+            for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                RunBaselineVO result = service.getRunBaseline(30);
+                assertThat(result.getGeneratedAt()).isEqualTo(LocalDateTime.parse("2026-07-14T12:00:00"));
+            }
+        } finally {
+            TimeZone.setDefault(original);
+        }
+    }
 }
