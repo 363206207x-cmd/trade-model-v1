@@ -65,6 +65,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     "uk_tm_persisted_ohlcv_bar_source",
                     "idx_tm_persisted_ohlcv_bar_ingestion_run"));
             assertFlywayHistorySucceeded(connection);
+            assertDecisionPlanOffsetTimeColumns(connection);
         }
     }
 
@@ -137,13 +138,43 @@ class ControlledPostgreSqlFlywaySmokeTest {
 
     private static void assertFlywayHistorySucceeded(Connection connection) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT COUNT(*)
+                SELECT COUNT(*), COUNT(DISTINCT version), MIN(version), MAX(version)
                 FROM flyway_schema_history
                 WHERE success = TRUE
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(4);
+                assertThat(rs.getInt(1)).isEqualTo(7);
+                assertThat(rs.getInt(2)).isEqualTo(7);
+                assertThat(rs.getString(3)).isEqualTo("1");
+                assertThat(rs.getString(4)).isEqualTo("7");
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*) FROM flyway_schema_history WHERE success = FALSE
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).isZero();
+            }
+        }
+    }
+
+    private static void assertDecisionPlanOffsetTimeColumns(Connection connection) throws Exception {
+        for (String column : List.of("valid_from", "expires_at")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT data_type, is_nullable
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'tm_decision_result'
+                      AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).as("V7 column %s", column).isTrue();
+                    assertThat(rs.getString("data_type")).isEqualTo("timestamp with time zone");
+                    assertThat(rs.getString("is_nullable")).isEqualTo("YES");
+                }
             }
         }
     }

@@ -41,6 +41,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -50,62 +51,74 @@ import static org.mockito.Mockito.when;
 class PostgreSqlFlywayMigrationSmokeTest {
 
     private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:16-alpine");
+    private static final String CONTROLLED_CONFIRM = "I_CONFIRM_DISPOSABLE_NON_PRODUCTION_POSTGRESQL";
+    private static final String CONTROLLED_RUN = "I_UNDERSTAND_THIS_WRITES_SCHEMA_TO_CONTROLLED_DB";
 
     @Test
     void postgreSqlV7MigrationRuntimeTest() throws Exception {
+        DatabaseTarget controlledTarget = controlledDatabaseTarget();
+        if (controlledTarget != null) {
+            assertPostgreSqlRuntime(controlledTarget);
+            return;
+        }
+
         assumeTrue(dockerAvailable(), "Docker/Testcontainers is unavailable; PostgreSQL smoke skipped");
 
         try (PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(POSTGRES_IMAGE)) {
             postgres.start();
-
-            Flyway.configure()
-                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
-                    .locations("classpath:db/migration")
-                    .load()
-                    .migrate();
-
-            try (Connection connection = DriverManager.getConnection(
-                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
-                assertThat(countTradeModelTables(connection)).isEqualTo(27);
-                assertTablesExist(connection, List.of(
-                        "tm_analysis_run",
-                        "tm_decision_result",
-                        "tm_execution_plan",
-                        "tm_user_position",
-                        "tm_position_monitor_log",
-                        "tm_review_result",
-                        "tm_opportunity_log",
-                        "tm_push_snapshot",
-                        "tm_push_recheck_log",
-                        "tm_ai_call_log",
-                        "tm_asset_state"));
-                assertIndexesExist(connection, List.of(
-                        "idx_tm_user_position_status_opened_at",
-                        "idx_tm_push_snapshot_analysis_id",
-                        "idx_tm_ai_call_log_trace_id",
-                        "uk_tm_review_result_analysis_id",
-                        "uk_tm_persisted_ohlcv_bar_source",
-                        "idx_tm_persisted_ohlcv_bar_ingestion_run"));
-                assertOhlcvProvenanceColumnsExist(connection);
-                assertProviderScanProfileV5ColumnsExist(connection);
-                assertProviderScanRuleDefaultsExist(connection);
-                assertDerivativesBusinessRuleDefaultsExist(connection);
-                assertDecisionPlanOffsetTimeColumnsExist(connection);
-                assertProviderScanProfileSaveLoadAndAudit(connection);
-                assertProviderScanProfileRollbackIsAtomic(connection);
-                assertFlywayHistorySucceeded(connection);
-                assertUserPositionIdentityGeneratedKey(connection);
-            }
-            assertMonitorAlertUtcNaiveAcrossSessionTimezones(postgres);
+            assertPostgreSqlRuntime(new DatabaseTarget(
+                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()));
         }
     }
 
+    private static void assertPostgreSqlRuntime(DatabaseTarget target) throws Exception {
+        Flyway.configure()
+                .dataSource(target.jdbcUrl(), target.username(), target.password())
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+
+        try (Connection connection = DriverManager.getConnection(
+                target.jdbcUrl(), target.username(), target.password())) {
+            assertThat(countTradeModelTables(connection)).isEqualTo(27);
+            assertTablesExist(connection, List.of(
+                    "tm_analysis_run",
+                    "tm_decision_result",
+                    "tm_execution_plan",
+                    "tm_user_position",
+                    "tm_position_monitor_log",
+                    "tm_review_result",
+                    "tm_opportunity_log",
+                    "tm_push_snapshot",
+                    "tm_push_recheck_log",
+                    "tm_ai_call_log",
+                    "tm_asset_state"));
+            assertIndexesExist(connection, List.of(
+                    "idx_tm_user_position_status_opened_at",
+                    "idx_tm_push_snapshot_analysis_id",
+                    "idx_tm_ai_call_log_trace_id",
+                    "uk_tm_review_result_analysis_id",
+                    "uk_tm_persisted_ohlcv_bar_source",
+                    "idx_tm_persisted_ohlcv_bar_ingestion_run"));
+            assertOhlcvProvenanceColumnsExist(connection);
+            assertProviderScanProfileV5ColumnsExist(connection);
+            assertProviderScanRuleDefaultsExist(connection);
+            assertDerivativesBusinessRuleDefaultsExist(connection);
+            assertDecisionPlanOffsetTimeColumnsExist(connection);
+            String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
+            assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
+            assertFlywayHistorySucceeded(connection);
+            assertUserPositionIdentityGeneratedKey(connection);
+        }
+        assertMonitorAlertUtcNaiveAcrossSessionTimezones(target);
+    }
+
     private static void assertMonitorAlertUtcNaiveAcrossSessionTimezones(
-            PostgreSQLContainer<?> postgres) throws Exception {
+            DatabaseTarget target) throws Exception {
         PGSimpleDataSource dataSource = new PGSimpleDataSource();
-        dataSource.setUrl(postgres.getJdbcUrl());
-        dataSource.setUser(postgres.getUsername());
-        dataSource.setPassword(postgres.getPassword());
+        dataSource.setUrl(target.jdbcUrl());
+        dataSource.setUser(target.username());
+        dataSource.setPassword(target.password());
         Environment environment = new Environment(
                 "controlled-postgresql", new JdbcTransactionFactory(), dataSource);
         Configuration configuration = new Configuration(environment);
@@ -184,6 +197,31 @@ class PostgreSqlFlywayMigrationSmokeTest {
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    private static DatabaseTarget controlledDatabaseTarget() {
+        String jdbcUrl = System.getenv("CONTROLLED_POSTGRESQL_JDBC_URL");
+        String username = System.getenv("CONTROLLED_POSTGRESQL_USERNAME");
+        String password = System.getenv("CONTROLLED_POSTGRESQL_PASSWORD");
+        if (!hasText(jdbcUrl) && !hasText(username) && !hasText(password)) {
+            return null;
+        }
+        assertThat(jdbcUrl).as("controlled PostgreSQL JDBC URL").isNotBlank();
+        assertThat(username).as("controlled PostgreSQL username").isNotBlank();
+        assertThat(password).as("controlled PostgreSQL password presence").isNotBlank();
+        assertThat(System.getenv("CONTROLLED_POSTGRESQL_EVIDENCE_CONFIRM"))
+                .isEqualTo(CONTROLLED_CONFIRM);
+        assertThat(System.getenv("CONTROLLED_POSTGRESQL_FLYWAY_RUN"))
+                .isEqualTo(CONTROLLED_RUN);
+        assertThat(jdbcUrl).isEqualTo(
+                "jdbc:postgresql://127.0.0.1:55432/trade_model_v1_test");
+        assertThat(username).isEqualTo("trade_model_test");
+        assertThat(jdbcUrl.toLowerCase()).doesNotContain("prod", "production", "live", "primary", "main");
+        return new DatabaseTarget(jdbcUrl, username, password);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static int countTradeModelTables(Connection connection) throws Exception {
@@ -307,14 +345,17 @@ class PostgreSqlFlywayMigrationSmokeTest {
         }
     }
 
-    private static void assertProviderScanProfileSaveLoadAndAudit(Connection connection) throws Exception {
+    private static String assertProviderScanProfileSaveLoadAndAudit(Connection connection) throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        String profileUserId = "pg-v5-smoke-" + suffix;
+        String auditId = "pg-v5-audit-" + suffix;
         Timestamp now = Timestamp.valueOf(LocalDateTime.of(2026, 7, 10, 12, 0));
         try (PreparedStatement insert = connection.prepareStatement("""
                 INSERT INTO tm_user_config(user_id, scan_base_profile, scan_position_profile, scan_pool_profile,
                   scan_auto_escalation_enabled, scan_manual_override_until, scan_update_reason, scan_updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
-            insert.setString(1, "pg-v5-smoke"); insert.setString(2, "AUTO"); insert.setString(3, "HIGH");
+            insert.setString(1, profileUserId); insert.setString(2, "AUTO"); insert.setString(3, "HIGH");
             insert.setString(4, "LOW"); insert.setBoolean(5, true); insert.setTimestamp(6, now);
             insert.setString(7, "V5_POSTGRESQL_SMOKE"); insert.setTimestamp(8, now);
             assertThat(insert.executeUpdate()).isEqualTo(1);
@@ -324,7 +365,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                        scan_auto_escalation_enabled, scan_manual_override_until, scan_update_reason, scan_updated_at
                 FROM tm_user_config WHERE user_id = ?
                 """)) {
-            query.setString(1, "pg-v5-smoke");
+            query.setString(1, profileUserId);
             try (ResultSet rs = query.executeQuery()) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getString(1)).isEqualTo("AUTO");
@@ -336,27 +377,33 @@ class PostgreSqlFlywayMigrationSmokeTest {
         try (PreparedStatement audit = connection.prepareStatement("""
                 INSERT INTO tm_rule_version_log(id, rule_version, change_category, change_summary, change_detail,
                   operator, publish_time, rollback_flag, created_by, updated_by, is_deleted, version_no)
-                VALUES ('pg-v5-audit', 'v5', 'SCAN_PROFILE_CONFIG', 'profile saved', 'traceId=pg-v5',
+                VALUES (?, 'v5', 'SCAN_PROFILE_CONFIG', 'profile saved', 'traceId=pg-v5',
                   'pg-smoke', '2026-07-10T12:00:00Z', 'N', 'pg-smoke', 'pg-smoke', 0, 1)
                 """)) {
+            audit.setString(1, auditId);
             assertThat(audit.executeUpdate()).isEqualTo(1);
         }
+        return profileUserId;
     }
 
-    private static void assertProviderScanProfileRollbackIsAtomic(Connection connection) throws Exception {
+    private static void assertProviderScanProfileRollbackIsAtomic(
+            Connection connection,
+            String profileUserId) throws Exception {
         boolean previous = connection.getAutoCommit();
         connection.setAutoCommit(false);
         try (PreparedStatement update = connection.prepareStatement("""
-                UPDATE tm_user_config SET scan_base_profile = 'EMERGENCY' WHERE user_id = 'pg-v5-smoke'
+                UPDATE tm_user_config SET scan_base_profile = 'EMERGENCY' WHERE user_id = ?
                 """)) {
+            update.setString(1, profileUserId);
             assertThat(update.executeUpdate()).isEqualTo(1);
             connection.rollback();
         } finally {
             connection.setAutoCommit(previous);
         }
         try (PreparedStatement query = connection.prepareStatement("""
-                SELECT scan_base_profile FROM tm_user_config WHERE user_id = 'pg-v5-smoke'
+                SELECT scan_base_profile FROM tm_user_config WHERE user_id = ?
                 """)) {
+            query.setString(1, profileUserId);
             try (ResultSet rs = query.executeQuery()) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getString(1)).isEqualTo("AUTO");
@@ -413,5 +460,8 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertThat(keys.getLong(1)).isPositive();
             }
         }
+    }
+
+    private record DatabaseTarget(String jdbcUrl, String username, String password) {
     }
 }
