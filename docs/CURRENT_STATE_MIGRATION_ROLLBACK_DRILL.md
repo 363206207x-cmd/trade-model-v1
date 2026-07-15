@@ -20,9 +20,16 @@ fail-closed read-only application smoke. Same-row-count status/time/plan
 mutations were detected and rollback restored the original content
 fingerprint. Its result is
 `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`, but its dataset status is explicitly
-`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`. Final P3 remains
-`BLOCKED_NOT_RUN` until a separately sanctioned sanitized current-state clone
-is acquired and rehearsed.
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`.
+
+Greenfield provenance addendum (2026-07-15): approved decision
+`TMV1-GREENFIELD-20260715-001` selects `GREENFIELD_NEW_DATABASE`, requires no
+historical business-data preservation, records no existing formal business
+database, and sets the go-live initial state to `EMPTY`. The P3.2
+sanitized-clone route and final gate are therefore
+`NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`, not PASS. This historical
+migration/rollback process and its tooling remain available for recovery,
+incident analysis, or a future separately approved existing-data mode.
 
 ## Scope
 
@@ -35,11 +42,11 @@ after an approximately 1h27m interrupted Docker/Testcontainers/PostgreSQL
 evidence run. That is retained as historical evidence.
 
 Subsequent P1/P2 controlled evidence completed fresh V1-V7 and V6-V7 on
-disposable PostgreSQL 16.14 with no skipped PostgreSQL test. The still-open
-PF4 gate is narrower: rehearse migration from the actual sanitized
-current-main-like dataset, prove its backup and restore, resolve historical
-time-basis policy, define rollback decision points, and collect a redacted
-evidence bundle before any production deployment decision.
+disposable PostgreSQL 16.14 with no skipped PostgreSQL test. The former
+existing-data P3.2 route is no longer an open gate for the approved Greenfield
+mode. Greenfield P3-G must instead prove empty-database first boot,
+backup/restore, read-only deployment rehearsal, rollback decision points, and
+a redacted evidence bundle before any later phase or deployment decision.
 
 ## Existing Assets Reviewed
 
@@ -52,7 +59,7 @@ evidence bundle before any production deployment decision.
 | `scripts/prod-backup.sh` | Requires explicit PostgreSQL env vars and uses `pg_dump`; no DB URL or secrets are hardcoded. |
 | `scripts/prod-restore.sh` | Requires explicit restore env vars and confirmation; custom restore uses `--no-owner`, `--no-acl`, and `--exit-on-error`. |
 | `scripts/generate-p3-release-like-fixture.sh` | Produces a fixed-seed V6 generated fixture, aggregate checks, custom dump, and generated-only attestation under ignored runtime storage. |
-| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, strict attestation/path validation, generated/sanitized class isolation, bounded container-native backup/restore, structure/content evidence, dedicated read-only app role, and cleanup trap. Generated P3.1 passed; final sanitized P3.2 is not run. |
+| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, strict attestation/path validation, generated/sanitized class isolation, bounded container-native backup/restore, structure/content evidence, dedicated read-only app role, and cleanup trap. Generated P3.1 passed; sanitized P3.2 is retained but not applicable to the approved Greenfield route. |
 | `scripts/prod-release-gate.sh` | Can require backup evidence, does not run restore automatically, and remains incomplete until restore and human evidence are recorded. |
 | `docs/PRODUCTION_READINESS_RUNBOOK.md` | Contains production migration policy, server skeleton, smoke commands, and restore troubleshooting; PDR-PF4 adds the explicit current-state/rollback drill shape. |
 
@@ -261,10 +268,11 @@ removed its auxiliary databases and container.
 - The run used PostgreSQL 16 container-native backup/restore. The official
   `prod-backup.sh` and `prod-restore.sh` operational path was not executed, so
   that distinct gate remains blocked.
-- This generated run is not a sanitized current-state release dataset and is
-  ineligible for the final sanitized-clone gate.
-- Final P3.2 remains `BLOCKED_NOT_RUN`; harness and generated evidence cannot
-  replace sanctioned sanitized-clone evidence.
+- This generated run is not a sanitized current-state release dataset. It
+  proves the harness and generated rehearsal, not existing-data migration.
+- Decision `TMV1-GREENFIELD-20260715-001` makes the P3.2 sanitized-clone route
+  `NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`, not PASS. No fake
+  sanitized clone will be produced.
 - Historical time cutovers remain unverified and no timestamp was shifted.
 - No Java business logic changed.
 - No schema.sql or Flyway SQL migration changed.
@@ -275,17 +283,19 @@ Production readiness remains BLOCKED.
 
 Production deployment cannot proceed.
 
-PDR-PF4 defines the remaining drill and evidence requirements. Generated P3.1
-proves that the local rehearsal machinery works, but it does not prove the
-shape or history of a sanctioned current-state clone. Production migration
-readiness remains blocked until P3.2 and the human release gates are complete.
+PDR-PF4 defines reusable drill and evidence requirements. Generated P3.1
+proves that the local rehearsal machinery works, but it does not prove
+existing-data migration. Under the approved Greenfield mode, readiness remains
+blocked pending a separate Greenfield P3-G empty-database first-boot,
+backup/restore, and read-only deployment rehearsal plus all human release
+gates.
 
 ## Next Remediation Recommendation
 
-Recommended next package: **Sanctioned Sanitized Release-Like Clone
-Acquisition and P3 Final Evidence P3.2**. Access to an approved sanitized
-release-like dataset, writer cutover evidence, and human owners remains
-required. P4 is not allowed.
+Recommended next package after PR #1127 is merged/effective: **Greenfield
+Production Database First-Boot, Backup/Restore and Read-Only Deployment
+Rehearsal P3-G**. The sanitized-clone route is stopped by the approved
+Greenfield decision. P4 is not allowed.
 
 ## Prohibited Items Preserved
 

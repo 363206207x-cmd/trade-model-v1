@@ -4,29 +4,41 @@
 
 - Package branch: `codex/postgresql-current-state-clone-rehearsal-p3`
 - Base merged-main commit: `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf`
+- Approved provenance decision: `TMV1-GREENFIELD-20260715-001`
+- Data provenance mode: `GREENFIELD_NEW_DATABASE`
+- Go-live database initial state: `EMPTY`
 - Generated P3.1 rehearsal: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`
 - Source dataset status: `GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`
-- Final sanitized current-state clone gate: `BLOCKED_NOT_RUN`
+- P3.2 sanitized-clone route: `NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`
+- Final sanitized current-state clone gate: `NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`
+- Greenfield P3-G: `NEXT_ALLOWED_AFTER_PR_EFFECTIVE`
 - P4 allowed: `NO`
 - Production readiness: `BLOCKED`
 
 P3 now has an executed end-to-end generated-data rehearsal. That rehearsal
 proves the bounded harness, PostgreSQL 16 backup/restore, V6-to-V7 migration,
 aggregate inventory, and local application smoke against deterministic
-repository-generated data. It does **not** prove behavior against a sanctioned
-sanitized current-state clone and must not be called a completed final P3 gate.
+repository-generated data. It proves
+`P3_HARNESS_AND_GENERATED_REHEARSAL: PASS`, not existing-data migration.
+
+The approved Greenfield decision states that no historical business data must
+be preserved, no existing formal business database exists, and the formal
+database starts `EMPTY`. Therefore no sanitized clone will be searched for or
+fabricated. P3.2 is not applicable rather than passed.
 
 Detailed generated evidence is in
 `docs/P3_GENERATED_RELEASE_LIKE_FIXTURE_EVIDENCE.md`.
 
-## Two Dataset Classes
+## Retained Dataset-Class Tooling
 
-The runner accepts two deliberately separate contracts:
+The retained runner accepts two deliberately separate contracts. The
+sanitized class remains support tooling but is not part of the currently
+approved Greenfield route:
 
-| Dataset class | Confirmation | Successful result | Final sanitized-clone gate |
+| Dataset class | Confirmation | Successful runner result | Current Greenfield classification |
 |---|---|---|---|
-| `GENERATED_RELEASE_LIKE` | `I_CONFIRM_GENERATED_NON_PRODUCTION_RELEASE_LIKE_DATASET` | `PASS_GENERATED_RELEASE_LIKE_REHEARSAL` | `BLOCKED_NOT_RUN` |
-| `SANITIZED_RELEASE_LIKE` | `I_CONFIRM_SANITIZED_NON_PRODUCTION_RELEASE_LIKE_DATASET` | `PASS_SANITIZED_RELEASE_LIKE_REHEARSAL` | pending evidence review |
+| `GENERATED_RELEASE_LIKE` | `I_CONFIRM_GENERATED_NON_PRODUCTION_RELEASE_LIKE_DATASET` | `PASS_GENERATED_RELEASE_LIKE_REHEARSAL` | harness evidence only |
+| `SANITIZED_RELEASE_LIKE` | `I_CONFIRM_SANITIZED_NON_PRODUCTION_RELEASE_LIKE_DATASET` | `PASS_SANITIZED_RELEASE_LIKE_REHEARSAL` | `NOT_APPLICABLE_BY_GREENFIELD_DECISION` |
 
 A generated attestation cannot be passed as a sanitized attestation. Neither
 class can set `P4_ALLOWED: YES`, and neither run claims production readiness.
@@ -54,9 +66,13 @@ The attestation states `DATA_SOURCE_CLASS=GENERATED_RELEASE_LIKE`, all real
 data inclusion fields are `NO`, and
 `SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO`.
 
-## Sanitized Input Gate
+## Retained Sanitized Input Gate
 
-Final P3.2 requires a separately sanctioned custom-format dump and attestation:
+This gate is retained for recovery tooling or a future separately approved
+existing-data migration mode. It is not active for decision
+`TMV1-GREENFIELD-20260715-001`, and no sanitized input is being sought or
+created. If a future approved mode activates it, the existing contract requires
+a separately sanctioned custom-format dump and attestation:
 
 ```text
 P3_SANITIZED_DUMP_FILE
@@ -207,11 +223,13 @@ skipped and are not reported as PostgreSQL evidence.
 
 ## Remaining Gates
 
-1. Acquire an approved, sanitized, non-production release-like current-state
-   custom dump and separate attestation.
-2. Run P3.2 under `SANITIZED_RELEASE_LIKE` and review its redacted bundle.
-3. Complete operational writer-cutover evidence; generated/local rows cannot
-   establish production deployment history.
+1. Merge/effect the approved Greenfield provenance decision before starting
+   any next database package.
+2. Execute Greenfield P3-G against an empty controlled PostgreSQL database:
+   first boot, V1-to-V7 migration, backup/restore, and read-only deployment
+   rehearsal with bounded redacted evidence.
+3. Define the empty-database operational cutover and ownership evidence;
+   generated/local rows cannot establish production deployment history.
 4. Complete controlled server, secret-store/rotation, HTTPS/proxy auth, and
    release-owner gates.
 5. Execute and evidence the official operational backup/restore scripts in an
@@ -220,5 +238,6 @@ skipped and are not reported as PostgreSQL evidence.
    `PROD_RESTORE_SCRIPT` remain `NOT_EXECUTED` and the operational-script gate
    remains `BLOCKED`.
 
-Next package: **Sanctioned Sanitized Release-Like Clone Acquisition and P3
-Final Evidence P3.2**. Production deployment cannot proceed.
+Next package after PR #1127 is merged/effective: **Greenfield Production
+Database First-Boot, Backup/Restore and Read-Only Deployment Rehearsal P3-G**.
+P4 remains blocked. Production deployment cannot proceed.

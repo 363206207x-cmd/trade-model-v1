@@ -40,14 +40,16 @@ The following do not count as completed:
 ## Current Active Block
 
 - Current merged main evidence includes PR #1125 Dashboard state-semantics closure and PR #1126 / commit `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf` controlled PostgreSQL V1-V7/V6-V7, three-session-timezone, Dashboard validity, aggregate historical-time semantics, and fail-closed app-smoke evidence. Earlier PDR/LIVE, business-stress, provider, and replay evidence remains historical context.
-- Current active block: `P3.1 Generated Release-Like Rehearsal closure; P3.2 Sanitized Clone Final Evidence`.
+- Current active block: approved Greenfield provenance closure in Draft PR `#1127`.
 - Current level: `LOCAL_ACCEPTANCE_FREEZE_DONE effective; PRODUCTION_DEPLOYMENT_READINESS blocked`
 - Capability movement from this P3 branch: none. The runner and tests are evidence tooling only and do not add trading, provider, scheduler, Push, or production deployment behavior.
-- Current P3.1 result: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`. The generated non-production V6 dataset completed source inventory, PostgreSQL 16 backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, fail-closed app smoke, and zero unexpected business writes. It is not a sanitized clone and does not establish operational writer cutover.
-- Current P3.2 result: `BLOCKED_NOT_RUN`. Next required action is sanctioned sanitized release-like clone acquisition and P3 final evidence. P4 remains not allowed.
+- Approved provenance decision: `TMV1-GREENFIELD-20260715-001` selects `GREENFIELD_NEW_DATABASE`, requires no historical business-data preservation, records no existing formal business database, and sets the go-live initial state to `EMPTY`.
+- Current P3.1 result: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`. The generated non-production V6 dataset completed source inventory, PostgreSQL 16 backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, fail-closed app smoke, strict attestation parsing, and zero unexpected business writes. It proves `P3_HARNESS_AND_GENERATED_REHEARSAL: PASS`; it is not production history or existing-data migration evidence.
+- Current P3.2 result: `NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`, not PASS. The sanitized-clone route is stopped; no dump search, acquisition, or fabricated sanitized clone is required.
+- Next phase: Greenfield P3-G becomes allowed only after PR #1127 is merged/effective. P4 remains blocked.
 - Effective-state rule: merged main at `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf` remains the P2.1 effective baseline. This Draft branch does not count as completed state.
 
-PDR-M7 is historical production-readiness evidence, not the only currently allowed work. Current allowed work is P3.1 evidence closure and the explicitly scoped sanctioned P3.2 sanitized-clone acquisition/rehearsal. No production server, production DB, unapproved or unsanitized dump, live provider call, auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, or production-ready claim is allowed.
+PDR-M7 is historical production-readiness evidence, not the only currently allowed work. Current allowed work is the Greenfield provenance closure and final review of Draft PR #1127. After it is merged/effective, only an explicitly scoped Greenfield P3-G package may begin. No production server, production DB, dump search or fabrication, live provider call, auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, P4 start, or production-ready claim is allowed.
 
 ## Historical Runtime Slice Log
 

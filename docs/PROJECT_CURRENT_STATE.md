@@ -6,15 +6,15 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3.1 Generated Release-Like Rehearsal closure; P3.2 Sanitized Clone Final Evidence remains
-Next Business Phase: P4 controlled staging evidence only after sanitized P3.2 evidence is reviewed and merged/effective
-Next Business Phase Allowed: NO while this PR is unmerged and P3.2 is BLOCKED_NOT_RUN; NO for production deployment
+Current Work Package: Approved Greenfield database provenance closure in Draft PR #1127
+Next Business Phase: Greenfield P3-G first-boot, backup/restore, and read-only deployment rehearsal after PR #1127 is merged/effective
+Next Business Phase Allowed: NO while Draft PR #1127 is unmerged; P4 remains BLOCKED; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## P3 Generated And Sanitized Release-Like Rehearsal
+## P3 Greenfield Provenance Closure
 
 Merged main `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf` remains the effective P2.1
 PostgreSQL/Flyway V7 evidence baseline. The P3 branch adds a guarded localhost
@@ -22,19 +22,35 @@ runner, deterministic generated V6 fixture, aggregate-only
 fingerprint/verification SQL, offline safety tests, and evidence/status
 documentation.
 
-P3.1 result: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`.
+Release Owner / Data Owner decision
+`TMV1-GREENFIELD-20260715-001` approves:
+
+- `DATA_PROVENANCE_MODE: GREENFIELD_NEW_DATABASE`;
+- no historical business data must be preserved;
+- no existing formal business database exists; and
+- the go-live database initial state is `EMPTY`.
+
+P3.1 result remains `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`.
 
 The deterministic generated dataset completed source/recovery inventory and
 fingerprint matching, PostgreSQL 16 container-native backup/restore,
 V6-to-V7 migration, historical-time inventory, fail-closed application smoke,
 and zero unexpected business writes. Its source status is
-`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`; it does not establish writer
-cutover or final current-state evidence.
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`; it proves the harness and
+generated rehearsal only. Local H2, test fixtures, and generated PostgreSQL
+data are not production history.
 
-P3.2 final sanitized-clone gate remains `BLOCKED_NOT_RUN`. P4 cannot start and
-production deployment cannot proceed.
+The P3.2 sanitized-clone route and final gate are
+`NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`, not PASS. No fake sanitized
+clone will be created. The retained sanitized-clone support code remains
+available for recovery/incident use or a future separately approved migration
+mode.
 
-Details: `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`.
+After PR #1127 is merged/effective, the next allowed package is Greenfield
+P3-G. P4 cannot start and production deployment cannot proceed.
+
+Details: `docs/GREENFIELD_DATABASE_PROVENANCE_DECISION.md` and
+`docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`.
 
 ---
 
@@ -731,13 +747,13 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 ## Current Allowed Work
 
-Only the following work is allowed during and after P2 V1 Business Stress Test:
+Only the following work is allowed under the current Greenfield provenance closure:
 
-1. Local deterministic V1 business stress testing with synthetic/test fixtures.
-2. Guarded local harness dry-run or confirmed local JUnit execution only.
-3. Status-source and production-readiness evidence documentation updates.
-4. Keeping production readiness BLOCKED and production deployment blocked.
-5. The next explicitly scoped remediation/business package after P2 stress evidence is reviewed.
+1. Documentation, compatibility status-source, and PR metadata updates for the approved Greenfield decision.
+2. Retaining existing P3 generated-data and sanitized-clone support tools without executing or changing them.
+3. Final review and merge decision for Draft PR #1127.
+4. Greenfield P3-G only after PR #1127 is merged/effective and a separate package is explicitly scoped.
+5. Keeping P4 and production deployment blocked.
 6. Production-readiness remediation only when explicitly scoped.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
@@ -1007,5 +1023,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: none
-- UNRELATED_OPEN_PRS: none
+- CURRENT_PACKAGE_PR: Draft PR #1127
+- UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE
