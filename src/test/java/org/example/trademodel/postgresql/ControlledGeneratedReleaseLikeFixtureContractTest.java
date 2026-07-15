@@ -87,10 +87,29 @@ class ControlledGeneratedReleaseLikeFixtureContractTest {
                 "PII_CANDIDATE_TOTAL PRODUCTION_REFERENCE_CANDIDATE_TOTAL",
                 "require_metric \"${key}\" 0",
                 "current-state-clone-fingerprint.sql",
-                "fingerprint-first.txt",
-                "fingerprint-second.txt",
+                "current-state-clone-content-fingerprint.sql",
+                "structure-fingerprint-first.txt",
+                "structure-fingerprint-second.txt",
+                "content-fingerprint-first.txt",
+                "content-fingerprint-second.txt",
                 "cmp -s",
-                "BLOCKED_NONDETERMINISTIC_GENERATED_FINGERPRINT");
+                "BLOCKED_NONDETERMINISTIC_GENERATED_STRUCTURE_FINGERPRINT",
+                "BLOCKED_NONDETERMINISTIC_GENERATED_CONTENT_FINGERPRINT",
+                "ControlledCurrentStateContentFingerprintTest");
+    }
+
+    @Test
+    void generatedContentFingerprintDetectsSameRowCountMutationsOffline() throws Exception {
+        String test = Files.readString(Path.of(
+                "src/test/java/org/example/trademodel/postgresql/ControlledCurrentStateContentFingerprintTest.java"));
+
+        assertThat(test).contains(
+                "sameRowCountStatusMutationIsDetected",
+                "sameRowCountTimeMutationIsDetected",
+                "sameRowCountPlanBoundaryMutationIsDetected",
+                "rollbackRestoresFingerprint",
+                "sessionTimezoneDoesNotChangeFingerprint",
+                "fingerprintOutputDoesNotContainRawModifiedValues");
     }
 
     @Test
@@ -129,6 +148,9 @@ class ControlledGeneratedReleaseLikeFixtureContractTest {
                 "REAL_ACCOUNT_DATA_INCLUDED=NO",
                 "REAL_MARKET_PROVIDER_DATA_INCLUDED=NO",
                 "SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO",
+                "p3-attestation-validate.sh",
+                "ATTESTATION_UNIQUENESS_STATUS: PASS",
+                "ATTESTATION_VERSION_CROSSCHECK: PASS",
                 "FINAL_SANITIZED_CLONE_ELIGIBILITY: NO",
                 "PRODUCTION_READINESS: BLOCKED");
         assertThat(script).doesNotContain(

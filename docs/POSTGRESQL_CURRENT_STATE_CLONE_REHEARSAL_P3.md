@@ -88,9 +88,11 @@ Aggregate candidate scans supplement but do not replace that attestation.
 
 It rejects remote hosts, alternate ports/database names, production-like
 indicators, relative input paths, mismatched class/confirmation/attestation,
-non-custom dumps, and database-creation entries. Every external command is
-bounded. The exit trap stops the local app and removes the container on
-success, failure, or interruption.
+non-custom dumps, database-creation entries, duplicate/conflicting/unknown
+attestation keys, invalid/future attestation timestamps, source-version
+mismatches, and symlinked input files or parent directories. Every external
+command is bounded. The exit trap stops the local app and removes the
+container on success, failure, or interruption.
 
 SQL files are passed explicitly to background psql processes; an empty stdin
 cannot count as successful evidence. Backup and restore use `pg_dump` and
@@ -107,22 +109,29 @@ The generated run completed on 2026-07-15 with:
 |---|---|
 | Source Flyway | V6 |
 | Source row counts | analysis=138, decision=120, plan=121, position=7, monitor=8, OHLCV=1200 |
-| Source fingerprint | `515192907bc261379d2b20e8c2389fc9d17f155f670965a8a0f4fa2dfea7a051` |
-| Repeated generation fingerprint | `MATCH` |
+| Source structure fingerprint | `dc2f3d64b0a3b5cfc23e980528a77741e538ae8582150438a58536e23f277cda` |
+| Source content fingerprint | `3b77c183a8cd99693f0a582eae8dd608a2bef89d47877ecfa89b0467e9f4b179` |
+| Same-row-count mutation detection | `PASS` for status, timestamp, and plan-boundary mutations with rollback restoration |
+| Timezone-independent content fingerprint | `PASS` for UTC, Asia/Shanghai, and America/New_York |
 | Controlled backup | `PASS` |
-| Backup SHA-256 | `eee90d3f00d50b949709d9d26695b0780bd7a4878d78d0fc8b4e680b70475958` |
+| Backup SHA-256 | `9074dc0523e1f3c5026b406d86383cfa71053d226899db087b115843ebb02ff3` |
 | Recovery restore | `PASS` |
-| Source/recovery fingerprint | `MATCH` |
+| Source/recovery structure / full content | `MATCH / MATCH` |
 | Migration path | `V6_TO_V7` |
 | Migration | `PASS` |
 | Historical validity rewrites | `0` |
+| Pre/post migration stable content | `MATCH`; V7 validity columns alone are excluded and separately proven all null |
 | Historical-time inventory | `PASS_READ_ONLY_AGGREGATE` |
 | Application smoke | `PASS` |
+| Application database role | random dedicated `READ_ONLY`; connect limited to rehearsal DB |
+| Write probe / Flyway during app smoke | `DENIED / DISABLED` |
+| App pre/post full content | `MATCH` |
 | Same-symbol A/B plan isolation | `PASS` |
 | Incomplete-plan fail-closed case | `PASS` |
 | Expired historical-plan fail-closed case | `PASS` |
 | Revalidation fail-closed case | `PASS` |
-| Post-migration fingerprint | `9dc3ccd45cdd947351bdd0d7f6c3a1ffe1e3091a60367a50ad3eb715b60964d9` |
+| Post-migration structure fingerprint | `aac46a72990a9c5dccc90b8afaffbd9b2a4080788320b00b939533397a347323` |
+| Post-migration content fingerprint | `e037df07fb60366a724d5f04072fc8508e4fb6dd23dc1f016e55006d3bce94cf` |
 | Unexpected business writes | `0` |
 | Container cleanup | `PASS` |
 
@@ -135,22 +144,31 @@ failure, and migration still must apply exactly one V7 row.
 The runner uses:
 
 - `scripts/current-state-clone-fingerprint.sql`
+- `scripts/current-state-clone-content-fingerprint.sql`
 - `scripts/current-state-clone-restore-verification.sql`
 - `scripts/historical-time-basis-inventory.sh`
+- `scripts/p3-attestation-validate.sh`
 
-Evidence contains schema/table/index/constraint counts, sequence state,
-Flyway status/checksum, integrity anomaly counts, time distributions,
-aggregate hashes, and PASS/BLOCKED markers. It excludes business rows,
-identifiers, quantities, prices, reason text/JSON, credentials, URLs, and
-provider keys.
+The structure fingerprint contains schema/table/index/constraint counts,
+sequence state, and Flyway status/checksum. The independent content
+fingerprint contains only table name, row count, and two seeded
+`hashtextextended` sum/XOR pairs for each `tm_*` table. Evidence also includes
+integrity anomaly counts, time distributions, aggregate hashes, and
+PASS/BLOCKED markers. It excludes business rows, field values, identifiers,
+quantities, prices, reason text/JSON, credentials, URLs, and provider keys.
 
 The historical inventory is compatible with V6 and V7. It reports whether the
 two V7 validity columns exist and never invents values for V6 or legacy rows.
 
 ## Application Smoke Contract
 
-The app starts only against the disposable rehearsal DB. All schedulers, AI,
-market providers, external calls, Push, and provider escalation are disabled.
+The app starts only against the disposable rehearsal DB through a newly
+generated read-only role. That role is non-superuser, cannot create databases
+or roles, cannot create in the schema, and can connect only to the rehearsal
+database. It receives schema usage and SELECT-only table/sequence access. A
+no-op UPDATE must be denied before startup. Flyway is disabled, SQL init is
+`never`, and Hikari is read-only. All schedulers, AI, market providers,
+external calls, Push, and provider escalation are disabled.
 The generated run checks:
 
 - health and Run Baseline;
@@ -163,7 +181,8 @@ The generated run checks:
   current executable suggestion;
 - revalidation-required history remains review-only;
 - no forbidden trading language; and
-- unchanged business-table counts after app startup and requests.
+- unchanged structure and full content fingerprints after app startup and
+  requests.
 
 ## Tests
 
@@ -172,6 +191,12 @@ The generated run checks:
   fingerprinting, dump policy, cleanup, and ignored artifacts.
 - `ControlledGeneratedReleaseLikeFixtureFlywayTest` can create only the exact
   local generated V6 database after explicit confirmation.
+- `ControlledCurrentStateContentFingerprintTest` proves same-data equality,
+  same-row-count mutation detection, rollback restoration, three-session
+  timezone stability, and value-redacted output against real PostgreSQL.
+- `P3AttestationValidateScriptTest` proves duplicate/conflicting keys,
+  malformed/future timestamps, class impersonation, and PostgreSQL/Flyway
+  mismatches fail closed without raw attestation output.
 - `ControlledCurrentStateCloneRehearsalP3ContractTest` proves generated and
   sanitized classes cannot impersonate one another and never unlock P4.
 - `ControlledCurrentStateCloneFlywayActionTest` validates only the observed
@@ -189,6 +214,11 @@ skipped and are not reported as PostgreSQL evidence.
    establish production deployment history.
 4. Complete controlled server, secret-store/rotation, HTTPS/proxy auth, and
    release-owner gates.
+5. Execute and evidence the official operational backup/restore scripts in an
+   approved PostgreSQL 16 environment. This P3.1 run used the equivalent
+   container-native commands, so `PROD_BACKUP_SCRIPT` and
+   `PROD_RESTORE_SCRIPT` remain `NOT_EXECUTED` and the operational-script gate
+   remains `BLOCKED`.
 
 Next package: **Sanctioned Sanitized Release-Like Clone Acquisition and P3
 Final Evidence P3.2**. Production deployment cannot proceed.

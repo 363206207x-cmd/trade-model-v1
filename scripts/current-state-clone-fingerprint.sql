@@ -6,6 +6,7 @@
 BEGIN TRANSACTION READ ONLY;
 SET LOCAL statement_timeout = '120s';
 SET LOCAL lock_timeout = '5s';
+SET LOCAL TIME ZONE 'UTC';
 
 SELECT 'SCHEMA_TABLE_COUNT', COUNT(*)
 FROM information_schema.tables

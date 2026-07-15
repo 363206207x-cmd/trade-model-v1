@@ -262,24 +262,58 @@ for key in \
   require_metric "${key}" 0 "${TMP_DIR}/sanitization-verification.txt"
 done
 
+if ! run_bounded 300 env \
+  P3_CONTENT_FINGERPRINT_JDBC_URL="jdbc:postgresql://${HOST}:${PORT}/${DATABASE}" \
+  P3_CONTENT_FINGERPRINT_USERNAME="${USERNAME}" \
+  P3_CONTENT_FINGERPRINT_PASSWORD="${PASSWORD}" \
+  P3_CONTENT_FINGERPRINT_DATABASE="${DATABASE}" \
+  P3_CONTENT_FINGERPRINT_CONFIRM="I_CONFIRM_LOCAL_P3_CONTENT_FINGERPRINT" \
+    ./mvnw -q -Dtest=ControlledCurrentStateContentFingerprintTest test \
+    >"${TMP_DIR}/content-fingerprint-test.log" 2>&1; then
+  blocked "BLOCKED_GENERATED_CONTENT_FINGERPRINT_TEST"
+fi
+
 if ! run_bounded_with_input 180 "${ROOT_DIR}/scripts/current-state-clone-fingerprint.sql" \
   docker exec -i \
   --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
   "${CONTAINER_NAME}" psql --username="${USERNAME}" --dbname="${DATABASE}" --no-psqlrc \
-  >"${TMP_DIR}/fingerprint-first.txt"; then
-  blocked "BLOCKED_GENERATED_FINGERPRINT"
+  >"${TMP_DIR}/structure-fingerprint-first.txt"; then
+  blocked "BLOCKED_GENERATED_STRUCTURE_FINGERPRINT"
 fi
 if ! run_bounded_with_input 180 "${ROOT_DIR}/scripts/current-state-clone-fingerprint.sql" \
   docker exec -i \
   --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
   "${CONTAINER_NAME}" psql --username="${USERNAME}" --dbname="${DATABASE}" --no-psqlrc \
-  >"${TMP_DIR}/fingerprint-second.txt"; then
-  blocked "BLOCKED_GENERATED_FINGERPRINT"
+  >"${TMP_DIR}/structure-fingerprint-second.txt"; then
+  blocked "BLOCKED_GENERATED_STRUCTURE_FINGERPRINT"
 fi
-if ! cmp -s "${TMP_DIR}/fingerprint-first.txt" "${TMP_DIR}/fingerprint-second.txt"; then
-  blocked "BLOCKED_NONDETERMINISTIC_GENERATED_FINGERPRINT"
+if ! cmp -s "${TMP_DIR}/structure-fingerprint-first.txt" \
+  "${TMP_DIR}/structure-fingerprint-second.txt"; then
+  blocked "BLOCKED_NONDETERMINISTIC_GENERATED_STRUCTURE_FINGERPRINT"
 fi
-SOURCE_FINGERPRINT="$(sha256_file "${TMP_DIR}/fingerprint-first.txt")"
+SOURCE_STRUCTURE_FINGERPRINT="$(sha256_file "${TMP_DIR}/structure-fingerprint-first.txt")"
+
+if ! run_bounded_with_input 180 \
+  "${ROOT_DIR}/scripts/current-state-clone-content-fingerprint.sql" \
+  docker exec -i \
+  --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
+  "${CONTAINER_NAME}" psql --username="${USERNAME}" --dbname="${DATABASE}" --no-psqlrc \
+  --set="fingerprint_mode=FULL" >"${TMP_DIR}/content-fingerprint-first.txt"; then
+  blocked "BLOCKED_GENERATED_CONTENT_FINGERPRINT"
+fi
+if ! run_bounded_with_input 180 \
+  "${ROOT_DIR}/scripts/current-state-clone-content-fingerprint.sql" \
+  docker exec -i \
+  --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
+  "${CONTAINER_NAME}" psql --username="${USERNAME}" --dbname="${DATABASE}" --no-psqlrc \
+  --set="fingerprint_mode=FULL" >"${TMP_DIR}/content-fingerprint-second.txt"; then
+  blocked "BLOCKED_GENERATED_CONTENT_FINGERPRINT"
+fi
+if ! cmp -s "${TMP_DIR}/content-fingerprint-first.txt" \
+  "${TMP_DIR}/content-fingerprint-second.txt"; then
+  blocked "BLOCKED_NONDETERMINISTIC_GENERATED_CONTENT_FINGERPRINT"
+fi
+SOURCE_CONTENT_FINGERPRINT="$(sha256_file "${TMP_DIR}/content-fingerprint-first.txt")"
 
 POSTGRESQL_VERSION="$(run_bounded 30 docker exec "${CONTAINER_NAME}" psql \
   --username="${USERNAME}" --dbname="${DATABASE}" --no-psqlrc -Atqc 'SHOW server_version')"
@@ -326,13 +360,22 @@ SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO
 EOF
 chmod 600 "${ATTESTATION_FILE}"
 
+if ! bash "${ROOT_DIR}/scripts/p3-attestation-validate.sh" \
+  "${ATTESTATION_FILE}" "GENERATED_RELEASE_LIKE" "${TMP_DIR}/dump-list.txt" "6" \
+  >"${TMP_DIR}/attestation-validation.txt"; then
+  blocked "BLOCKED_GENERATED_ATTESTATION_VALIDATION"
+fi
+
 GENERATED_DUMP_SHA256="$(sha256_file "${DUMP_FILE}")"
 GENERATED_ATTESTATION_SHA256="$(sha256_file "${ATTESTATION_FILE}")"
 FIXTURE_GENERATOR_SHA256="$(cat \
   "${ROOT_DIR}/scripts/generate-p3-release-like-fixture.sh" \
   "${ROOT_DIR}/scripts/p3-generated-fixture-data.sql" \
   "${ROOT_DIR}/scripts/p3-generated-fixture-verification.sql" \
+  "${ROOT_DIR}/scripts/current-state-clone-content-fingerprint.sql" \
+  "${ROOT_DIR}/scripts/p3-attestation-validate.sh" \
   "${ROOT_DIR}/src/test/java/org/example/trademodel/postgresql/ControlledGeneratedReleaseLikeFixtureFlywayTest.java" \
+  "${ROOT_DIR}/src/test/java/org/example/trademodel/postgresql/ControlledCurrentStateContentFingerprintTest.java" \
   | sha256_stream)"
 
 remove_container
@@ -346,7 +389,13 @@ FIXTURE_SEED: 20260715
 DATASET_CLASS: GENERATED_RELEASE_LIKE
 SOURCE_FLYWAY_VERSION: 6
 SOURCE_ROW_COUNTS: analysis=138,decision=120,plan=121,position=7,monitor=8,ohlcv=1200
-SOURCE_FINGERPRINT: ${SOURCE_FINGERPRINT}
+SOURCE_STRUCTURE_FINGERPRINT: ${SOURCE_STRUCTURE_FINGERPRINT}
+SOURCE_CONTENT_FINGERPRINT: ${SOURCE_CONTENT_FINGERPRINT}
+STRUCTURE_FINGERPRINT_STATUS: PASS
+CONTENT_FINGERPRINT_STATUS: PASS
+SAME_ROW_COUNT_MUTATION_DETECTION: PASS
+ATTESTATION_UNIQUENESS_STATUS: PASS
+ATTESTATION_VERSION_CROSSCHECK: PASS
 GENERATED_DUMP_SHA256: ${GENERATED_DUMP_SHA256}
 GENERATED_ATTESTATION_SHA256: ${GENERATED_ATTESTATION_SHA256}
 FIXTURE_GENERATOR_SHA256: ${FIXTURE_GENERATOR_SHA256}

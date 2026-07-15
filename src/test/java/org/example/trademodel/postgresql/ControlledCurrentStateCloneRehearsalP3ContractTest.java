@@ -60,6 +60,49 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
     }
 
     @Test
+    void symlinkDumpFailsClosed() throws Exception {
+        Map<String, String> environment = completeInputContract();
+        Path target = Path.of(environment.get("P3_SANITIZED_DUMP_FILE"));
+        Path symlink = tempDir.resolve("linked-dump.dump");
+        Files.createSymbolicLink(symlink, target);
+        environment.put("P3_SANITIZED_DUMP_FILE", symlink.toString());
+
+        ScriptResult result = run(environment);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.output()).contains("P3_RESULT: BLOCKED_DUMP_SYMLINK_PATH");
+    }
+
+    @Test
+    void symlinkAttestationFailsClosed() throws Exception {
+        Map<String, String> environment = completeInputContract();
+        Path target = Path.of(environment.get("P3_SANITIZATION_ATTESTATION_FILE"));
+        Path symlink = tempDir.resolve("linked-attestation.txt");
+        Files.createSymbolicLink(symlink, target);
+        environment.put("P3_SANITIZATION_ATTESTATION_FILE", symlink.toString());
+
+        ScriptResult result = run(environment);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.output()).contains("P3_RESULT: BLOCKED_ATTESTATION_SYMLINK_PATH");
+    }
+
+    @Test
+    void symlinkedParentDirectoryFailsClosed() throws Exception {
+        Map<String, String> environment = completeInputContract();
+        Path target = Path.of(environment.get("P3_SANITIZED_DUMP_FILE"));
+        Path parentSymlink = tempDir.toRealPath().resolve("linked-input-parent");
+        Files.createSymbolicLink(parentSymlink, target.getParent());
+        environment.put("P3_SANITIZED_DUMP_FILE",
+                parentSymlink.resolve(target.getFileName()).toString());
+
+        ScriptResult result = run(environment);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.output()).contains("P3_RESULT: BLOCKED_DUMP_SYMLINK_PATH");
+    }
+
+    @Test
     void missingAttestationFailsClosed() throws Exception {
         Map<String, String> environment = completeInputContract();
         environment.remove("P3_SANITIZATION_ATTESTATION_FILE");
@@ -152,7 +195,9 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
 
         assertThat(script).contains(
                 "BACKUP_SHA256=\"$(sha256_file \"${BACKUP_FILE}\")\"",
-                "SOURCE_TO_RECOVERY_FINGERPRINT: MATCH",
+                "SOURCE_TO_RECOVERY_STRUCTURE_FINGERPRINT: MATCH",
+                "SOURCE_TO_RECOVERY_CONTENT: MATCH",
+                "PRE_TO_POST_MIGRATION_STABLE_CONTENT: MATCH",
                 "RESTORE_DATA_INTEGRITY_MISMATCH",
                 "cmp -s \"${TMP_DIR}/source-verification.txt\"");
     }
@@ -234,17 +279,66 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
     @Test
     void aggregateSqlNeverReturnsBusinessRowsOrFreeTextValues() throws Exception {
         String fingerprint = Files.readString(Path.of("scripts/current-state-clone-fingerprint.sql"));
+        String contentFingerprint = Files.readString(
+                Path.of("scripts/current-state-clone-content-fingerprint.sql"));
         String verification = Files.readString(
                 Path.of("scripts/current-state-clone-restore-verification.sql"));
 
-        assertThat(fingerprint).contains("COUNT(*)", "BEGIN TRANSACTION READ ONLY");
+        assertThat(fingerprint).contains(
+                "COUNT(*)", "BEGIN TRANSACTION READ ONLY", "SET LOCAL TIME ZONE 'UTC'");
+        assertThat(contentFingerprint).contains(
+                "BEGIN TRANSACTION READ ONLY",
+                "SET LOCAL TIME ZONE 'UTC'",
+                "to_jsonb(row_data)",
+                "hashtextextended",
+                "bit_xor",
+                "20260715",
+                "11270031",
+                "MIGRATION_STABLE");
         assertThat(verification).contains(
                 "SECRET_CANDIDATE_TOTAL",
                 "PII_CANDIDATE_TOTAL",
                 "PRODUCTION_REFERENCE_CANDIDATE_TOTAL",
                 "BEGIN TRANSACTION READ ONLY");
         assertThat(fingerprint).doesNotContain("entry_price", "quantity", "source_ref_id");
+        assertThat(contentFingerprint).doesNotContain("STRING_AGG", "SELECT *");
         assertThat(verification).doesNotContain("SELECT *");
+    }
+
+    @Test
+    void applicationSmokeUsesDedicatedReadOnlyRoleAndDisablesFlyway() throws Exception {
+        String script = Files.readString(RUNNER);
+        String roleSql = Files.readString(Path.of("scripts/p3-application-readonly-role.sql"));
+
+        assertThat(script).contains(
+                "APPLICATION_DATABASE_ROLE=\"p3_app_readonly_$$_${RANDOM}\"",
+                "SPRING_DATASOURCE_USERNAME=\"${APPLICATION_DATABASE_ROLE}\"",
+                "SPRING_DATASOURCE_HIKARI_READ_ONLY=true",
+                "SPRING_FLYWAY_ENABLED=false",
+                "SPRING_SQL_INIT_MODE=never",
+                "READ_ONLY_ROLE_WRITE_PROBE: DENIED",
+                "APP_CONTENT_FINGERPRINT: MATCH");
+        assertThat(roleSql).contains(
+                "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT",
+                "default_transaction_read_only = on",
+                "REVOKE CONNECT, TEMPORARY ON DATABASE",
+                "GRANT CONNECT",
+                "GRANT USAGE ON SCHEMA public",
+                "GRANT SELECT ON ALL TABLES",
+                "GRANT SELECT ON ALL SEQUENCES",
+                "REVOKE CREATE ON SCHEMA public FROM PUBLIC");
+        assertThat(roleSql).doesNotContain("GRANT USAGE, SELECT ON ALL SEQUENCES");
+    }
+
+    @Test
+    void operationalBackupScriptsAreNotMisreportedAsExecuted() throws Exception {
+        String script = Files.readString(RUNNER);
+
+        assertThat(script).contains(
+                "BACKUP_RESTORE_EXECUTION_PATH: POSTGRESQL_16_CONTAINER_NATIVE",
+                "PROD_BACKUP_SCRIPT: NOT_EXECUTED",
+                "PROD_RESTORE_SCRIPT: NOT_EXECUTED",
+                "OPERATIONAL_SCRIPT_GATE: BLOCKED");
     }
 
     @Test
@@ -313,7 +407,8 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
                 "PASS_READ_ONLY_GENERATED_RELEASE_LIKE",
                 "PASS_GENERATED_RELEASE_LIKE_REHEARSAL");
         assertThat(script).contains(
-                "SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO",
+                "p3-attestation-validate.sh",
+                "FINAL_SANITIZED_CLONE_GATE=\"BLOCKED_NOT_RUN\"",
                 "P4_ALLOWED: NO",
                 "PRODUCTION_READINESS: BLOCKED");
     }
@@ -386,7 +481,7 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
         Path attestation = validAttestation("controlled-process");
 
         Map<String, String> environment = new HashMap<>();
-        environment.put("P3_SANITIZED_DUMP_FILE", dump.toString());
+        environment.put("P3_SANITIZED_DUMP_FILE", dump.toRealPath().toString());
         environment.put("P3_SANITIZATION_ATTESTATION_FILE", attestation.toString());
         environment.put("P3_DATASET_ID", "p3-contract-fixture");
         environment.put("P3_DATASET_CLASS", "SANITIZED_RELEASE_LIKE");
@@ -410,7 +505,7 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
                 LOCAL_CONTROLLED_REHEARSAL_ALLOWED=YES
                 NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE=YES
                 """.formatted(owner));
-        return attestation;
+        return attestation.toRealPath();
     }
 
     private Path validGeneratedAttestation() throws IOException {
@@ -432,7 +527,7 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
                 REAL_MARKET_PROVIDER_DATA_INCLUDED=NO
                 SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO
                 """);
-        return attestation;
+        return attestation.toRealPath();
     }
 
     private ScriptResult run(Map<String, String> additions) throws Exception {

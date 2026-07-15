@@ -14,8 +14,11 @@ the current-state dataset backup/restore drill defined by this document.
 
 P3.1 addendum (2026-07-15): a deterministic generated release-like V6 dataset
 completed source inventory, container-native PostgreSQL 16 backup/restore,
-source/recovery fingerprint comparison, V6-to-V7 migration, aggregate
-historical-time inventory, and fail-closed application smoke. Its result is
+source/recovery structure and full-content fingerprint comparison, V6-to-V7
+stable-content comparison, aggregate historical-time inventory, and
+fail-closed read-only application smoke. Same-row-count status/time/plan
+mutations were detected and rollback restored the original content
+fingerprint. Its result is
 `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`, but its dataset status is explicitly
 `GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`. Final P3 remains
 `BLOCKED_NOT_RUN` until a separately sanctioned sanitized current-state clone
@@ -49,7 +52,7 @@ evidence bundle before any production deployment decision.
 | `scripts/prod-backup.sh` | Requires explicit PostgreSQL env vars and uses `pg_dump`; no DB URL or secrets are hardcoded. |
 | `scripts/prod-restore.sh` | Requires explicit restore env vars and confirmation; custom restore uses `--no-owner`, `--no-acl`, and `--exit-on-error`. |
 | `scripts/generate-p3-release-like-fixture.sh` | Produces a fixed-seed V6 generated fixture, aggregate checks, custom dump, and generated-only attestation under ignored runtime storage. |
-| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, generated/sanitized class isolation, bounded container-native backup/restore, aggregate evidence, app smoke, and cleanup trap. Generated P3.1 passed; final sanitized P3.2 is not run. |
+| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, strict attestation/path validation, generated/sanitized class isolation, bounded container-native backup/restore, structure/content evidence, dedicated read-only app role, and cleanup trap. Generated P3.1 passed; final sanitized P3.2 is not run. |
 | `scripts/prod-release-gate.sh` | Can require backup evidence, does not run restore automatically, and remains incomplete until restore and human evidence are recorded. |
 | `docs/PRODUCTION_READINESS_RUNBOOK.md` | Contains production migration policy, server skeleton, smoke commands, and restore troubleshooting; PDR-PF4 adds the explicit current-state/rollback drill shape. |
 
@@ -246,8 +249,18 @@ removed its auxiliary databases and container.
 - Fresh V1-V7 and V6-V7 controlled-local migration evidence is complete.
 - Generated P3.1 executed PostgreSQL 16 backup, clean restore, V6-to-V7
   migration, and application smoke against deterministic synthetic data.
-- Its source/recovery aggregate fingerprints matched and unexpected business
-  writes were `0`.
+- Its source/recovery structure and full-content fingerprints matched. The
+  V6/V7 migration-stable content matched after excluding only the two new,
+  separately verified null validity columns.
+- Application smoke used a random dedicated read-only role; its write probe
+  was denied, Flyway was disabled, and the full app before/after content
+  fingerprint matched. Unexpected business writes were `0`.
+- Attestation uniqueness, class, generation time, PostgreSQL dump-header
+  version, and restored Flyway version checks passed without copying raw
+  attestation content.
+- The run used PostgreSQL 16 container-native backup/restore. The official
+  `prod-backup.sh` and `prod-restore.sh` operational path was not executed, so
+  that distinct gate remains blocked.
 - This generated run is not a sanitized current-state release dataset and is
   ineligible for the final sanitized-clone gate.
 - Final P3.2 remains `BLOCKED_NOT_RUN`; harness and generated evidence cannot

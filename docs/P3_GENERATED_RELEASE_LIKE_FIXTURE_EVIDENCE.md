@@ -2,9 +2,10 @@
 
 ## Decision
 
-- Package: `Generated Release-Like Dataset and P3 End-to-End Rehearsal P3.1`
+- Package: `P3.1 Evidence Integrity Hardening`
 - Base merged-main commit: `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf`
-- Evidence branch starting head: `58fb6eb70e8ce3dab65e8e4ccbf852f72c9d02dc`
+- Original P3.1 evidence head: `58fb6eb70e8ce3dab65e8e4ccbf852f72c9d02dc`
+- Evidence-hardening starting head: `49fbf42cdab115acb25d3599104e1fefde4025bf`
 - Fixture seed: `20260715`
 - Generated fixture: `PASS`
 - Generated P3 rehearsal: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`
@@ -49,11 +50,14 @@ content is stored in this document.
 | Bind target | disposable localhost `127.0.0.1:55434` |
 | Source Flyway version | `6` |
 | Seed | `20260715` |
-| Source fingerprint | `515192907bc261379d2b20e8c2389fc9d17f155f670965a8a0f4fa2dfea7a051` |
-| Deterministic rerun | `PASS`, same source fingerprint on repeated generation |
-| Generated dump SHA-256 | `164ce23db6f7deb2ef400d8bea05f4e93ce5b85501a2e2e9e729ec7a9a1ce5a1` |
-| Generated attestation SHA-256 | `225b315047d8830ba2ddc241080f71df49da8cbdeee9d1655bf98283c445dfac` |
-| Fixture generator SHA-256 | `821f1968f37dbce0f8427c1651ffc4c75d9d55ca13b5f925a79e32b42191652b` |
+| Source structure fingerprint | `dc2f3d64b0a3b5cfc23e980528a77741e538ae8582150438a58536e23f277cda` |
+| Source content fingerprint | `3b77c183a8cd99693f0a582eae8dd608a2bef89d47877ecfa89b0467e9f4b179` |
+| Same-row-count mutation detection | `PASS` for status, timestamp, and plan-boundary changes; rollback restores the original fingerprint |
+| Session-timezone stability | `PASS` for UTC, Asia/Shanghai, and America/New_York |
+| Generated dump SHA-256 | `450ab83c73a7016f425a24a6ced09e50a3bc5e989ef3077ab5782a17bf01cc3f` |
+| Generated attestation SHA-256 | `8a0ea380c7b288803e5e4aab367c80df096a28333780a81c2a2b1038c0d42443` |
+| Fixture generator SHA-256 | `c15ca7891ea303c137fb720dd4e8e416349999308a2edc43fd1b4c4764677710` |
+| Attestation uniqueness / version cross-check | `PASS / PASS` |
 | Secret candidates | `0` |
 | PII candidates | `0` |
 | Production-reference candidates | `0` |
@@ -61,8 +65,15 @@ content is stored in this document.
 
 The dump and attestation are ignored runtime artifacts. Their hashes can vary
 between exports because the archive and attestation carry generation-time
-metadata; deterministic database content is proven by the repeated aggregate
-source fingerprint.
+metadata; deterministic database content is proven by repeated structure and
+content captures, not by archive-byte equality.
+
+The structure fingerprint records schema shape, row counts, indexes,
+constraints, sequences, and Flyway history. The separate content fingerprint
+records, for every `tm_*` table, only its name, row count, and sum/XOR
+aggregates from `hashtextextended(to_jsonb(row)::text, seed)` under two fixed
+seeds. It never emits a business row or raw field value and does not aggregate
+whole-table text with `STRING_AGG`.
 
 ## Generated Coverage
 
@@ -88,20 +99,28 @@ non-executable, not auto-trading, and not order execution.
 
 | Gate | Result |
 |---|---|
-| Executed at UTC | `2026-07-15T11:22:24Z` |
+| Executed at UTC | `2026-07-15T12:04:27Z` |
 | Source restore | `PASS` |
 | Source read-only inventory | `PASS_READ_ONLY_GENERATED_RELEASE_LIKE` |
 | Controlled backup | `PASS` |
 | Backup tool | PostgreSQL `16.14_CONTAINER_NATIVE` |
-| Backup SHA-256 | `eee90d3f00d50b949709d9d26695b0780bd7a4878d78d0fc8b4e680b70475958` |
+| Backup SHA-256 | `9074dc0523e1f3c5026b406d86383cfa71053d226899db087b115843ebb02ff3` |
 | Recovery restore | `PASS` |
-| Source/recovery fingerprint | `MATCH` |
+| Source/recovery structure fingerprint | `MATCH` |
+| Source/recovery full content fingerprint | `MATCH` |
 | Migration path | `V6_TO_V7` |
 | Migration result | `PASS` |
 | Historical V7 validity rewrite | `0` rows; legacy rows remain null/fail-closed |
-| Post-migration fingerprint | `9dc3ccd45cdd947351bdd0d7f6c3a1ffe1e3091a60367a50ad3eb715b60964d9` |
+| Pre/post migration stable content | `MATCH`; only V7 `valid_from` / `expires_at` are excluded from this comparison |
+| Post-migration structure fingerprint | `aac46a72990a9c5dccc90b8afaffbd9b2a4080788320b00b939533397a347323` |
+| Post-migration full content fingerprint | `e037df07fb60366a724d5f04072fc8508e4fb6dd23dc1f016e55006d3bce94cf` |
+| Migration-stable content fingerprint | `7dd43e56b56785aa69036ea064453ef7d438c168680119b98b89ee6cb506404d` |
 | Historical-time inventory | `PASS_READ_ONLY_AGGREGATE` |
 | Application smoke | `PASS` |
+| Application database role | randomized, connect-only-to-rehearsal, read-only, non-superuser/non-createdb/non-createrole |
+| Read-only write probe | `DENIED` with accepted read-only/permission SQLSTATE classification |
+| Flyway during app smoke | `DISABLED`; SQL init `never`; Hikari read-only `true` |
+| Application content fingerprint | `MATCH` before/after smoke |
 | Unexpected business writes | `0` |
 | Container cleanup | `PASS` |
 
@@ -110,8 +129,13 @@ The rehearsal database alone migrated to V7.
 
 ## Application Scenarios
 
-The app ran only against the disposable rehearsal database with schedulers,
-AI, market/provider calls, Push, and all external calls disabled.
+The app ran only against the disposable rehearsal database with a dedicated
+random read-only role. The role cannot connect to the other disposable
+databases, create schema objects, create databases/roles, use superuser
+capabilities, or write business rows. A no-op `UPDATE` probe was required to
+fail before startup. Flyway was disabled, SQL initialization was `never`, and
+Hikari was explicitly read-only. Schedulers, AI, market/provider calls, Push,
+and all external calls were disabled.
 
 - Health: `HTTP_200_UP`
 - Dashboard Home: `HTTP_200_FAIL_CLOSED`
@@ -124,6 +148,7 @@ AI, market/provider calls, Push, and all external calls disabled.
 - incomplete historical plan remains fail-closed
 - expired historical plan remains position-monitoring history, not executable
 - revalidation-required historical plan remains fail-closed
+- application full-content fingerprint before/after smoke: `MATCH`
 - unexpected business writes: `0`
 
 The A/B check reads the exact structured
@@ -157,6 +182,15 @@ The real run exposed and closed these evidence-harness defects:
 9. Production-indicator checks treat `live` as a delimited token, so the
    approved `release-like` dataset ID is not misclassified while explicit
    `live` IDs still fail closed.
+10. Content integrity no longer relies on row counts: two-seed sum/XOR hashes
+    detect same-row-count changes to status, timestamps, and plan boundaries.
+11. Attestation validation now rejects duplicate/conflicting/unknown keys,
+    invalid or future generation timestamps, class impersonation, and
+    PostgreSQL/Flyway version mismatches without copying raw attestation data.
+12. Dump and attestation paths use `realpath` and reject symlinks in the file
+    or any parent component.
+13. Application smoke runs under a dedicated read-only database role and
+    requires both an explicit write denial and unchanged content fingerprint.
 
 ## Safety And Remaining Gates
 
@@ -167,6 +201,9 @@ The real run exposed and closed these evidence-harness defects:
 - No order, automatic position action, external Push, Telegram, webhook, or
   email was executed.
 - No destructive action occurred outside the disposable local databases.
+- Backup/restore evidence used PostgreSQL 16 container-native tools.
+  `scripts/prod-backup.sh` and `scripts/prod-restore.sh` were not executed, so
+  the separate operational-script gate remains `BLOCKED`.
 - Writer cutover remains `MISSING_OPERATIONAL_EVIDENCE`.
 - The sanitized current-state clone acquisition and final P3 evidence remain
   unperformed.

@@ -14,6 +14,8 @@ USERNAME="p3_local_operator"
 CONTAINER_NAME="trade-model-v1-p3-$(date -u +%Y%m%d%H%M%S)-$$"
 APP_PORT="18083"
 APP_PID=""
+APPLICATION_DATABASE_ROLE=""
+APPLICATION_DATABASE_PASSWORD=""
 CONTAINER_STARTED=0
 CONTAINER_CLEANUP="NOT_STARTED"
 EVIDENCE_DIR_PREPARED=0
@@ -54,9 +56,29 @@ file_size_bytes() {
 
 canonical_existing_file() {
   local file_path="$1"
-  local directory
-  directory="$(cd "$(dirname "${file_path}")" && pwd -P)"
-  printf '%s/%s\n' "${directory}" "$(basename "${file_path}")"
+  realpath "${file_path}"
+}
+
+path_contains_symlink_or_dot_component() {
+  local file_path="$1"
+  case "${file_path}" in
+    */../*|*/..|*/./*|*/.) return 0 ;;
+  esac
+  local current=""
+  local remainder="${file_path#/}"
+  local component
+  local old_ifs="${IFS}"
+  IFS='/'
+  for component in ${remainder}; do
+    [ -n "${component}" ] || continue
+    current="${current}/${component}"
+    if [ -L "${current}" ]; then
+      IFS="${old_ifs}"
+      return 0
+    fi
+  done
+  IFS="${old_ifs}"
+  return 1
 }
 
 blocked() {
@@ -199,7 +221,7 @@ scalar_query() {
   docker_psql "${database}" -Atqc "${sql}"
 }
 
-capture_fingerprint() {
+capture_structure_fingerprint() {
   local database="$1"
   local output_file="$2"
   run_bounded_with_input 180 "${ROOT_DIR}/scripts/current-state-clone-fingerprint.sql" \
@@ -209,6 +231,22 @@ capture_fingerprint() {
     --username="${USERNAME}" \
     --dbname="${database}" \
     --no-psqlrc \
+    >"${output_file}"
+}
+
+capture_content_fingerprint() {
+  local database="$1"
+  local mode="$2"
+  local output_file="$3"
+  run_bounded_with_input 180 \
+    "${ROOT_DIR}/scripts/current-state-clone-content-fingerprint.sql" \
+    docker exec -i \
+    --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
+    "${CONTAINER_NAME}" psql \
+    --username="${USERNAME}" \
+    --dbname="${database}" \
+    --no-psqlrc \
+    --set="fingerprint_mode=${mode}" \
     >"${output_file}"
 }
 
@@ -282,9 +320,9 @@ run_flyway_action() {
 }
 
 capture_table_counts() {
-  local fingerprint_file="$1"
+  local structure_fingerprint_file="$1"
   local output_file="$2"
-  grep '^TABLE_ROW_COUNT|' "${fingerprint_file}" | sort >"${output_file}"
+  grep '^TABLE_ROW_COUNT|' "${structure_fingerprint_file}" | sort >"${output_file}"
 }
 
 required_vars=(
@@ -382,6 +420,12 @@ fi
 if [ ! -f "${P3_SANITIZATION_ATTESTATION_FILE}" ]; then
   blocked "BLOCKED_ATTESTATION_FILE_NOT_FOUND"
 fi
+if path_contains_symlink_or_dot_component "${P3_SANITIZED_DUMP_FILE}"; then
+  blocked "BLOCKED_DUMP_SYMLINK_PATH"
+fi
+if path_contains_symlink_or_dot_component "${P3_SANITIZATION_ATTESTATION_FILE}"; then
+  blocked "BLOCKED_ATTESTATION_SYMLINK_PATH"
+fi
 
 DUMP_FILE="$(canonical_existing_file "${P3_SANITIZED_DUMP_FILE}")"
 ATTESTATION_FILE="$(canonical_existing_file "${P3_SANITIZATION_ATTESTATION_FILE}")"
@@ -391,56 +435,13 @@ fi
 if ! path_is_allowed "${ATTESTATION_FILE}"; then
   blocked "BLOCKED_ATTESTATION_PATH_INSIDE_REPOSITORY"
 fi
-
-attestation_keys=(
-  DATA_SOURCE_CLASS
-  SANITIZATION_OWNER_OR_PROCESS
-  GENERATED_AT_UTC
-  SOURCE_POSTGRESQL_VERSION
-  SOURCE_FLYWAY_VERSION
-  USER_IDENTIFIERS_REMOVED_OR_PSEUDONYMIZED
-  SECRETS_REMOVED
-  FREE_TEXT_CLEANED_OR_REPLACED
-  LOCAL_CONTROLLED_REHEARSAL_ALLOWED
-  NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE
-)
-for attestation_key in "${attestation_keys[@]}"; do
-  if ! grep -Eq "^${attestation_key}=[^[:space:]].*$" "${ATTESTATION_FILE}"; then
-    blocked "BLOCKED_SANITIZATION_ATTESTATION_INCOMPLETE"
-  fi
-done
-if ! grep -Fqx "DATA_SOURCE_CLASS=${DATASET_CLASS}" "${ATTESTATION_FILE}" \
-  || ! grep -Eq '^USER_IDENTIFIERS_REMOVED_OR_PSEUDONYMIZED=YES$' "${ATTESTATION_FILE}" \
-  || ! grep -Eq '^SECRETS_REMOVED=YES$' "${ATTESTATION_FILE}" \
-  || ! grep -Eq '^FREE_TEXT_CLEANED_OR_REPLACED=YES$' "${ATTESTATION_FILE}" \
-  || ! grep -Eq '^LOCAL_CONTROLLED_REHEARSAL_ALLOWED=YES$' "${ATTESTATION_FILE}" \
-  || ! grep -Eq '^NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE=YES$' "${ATTESTATION_FILE}"; then
+if ! bash "${ROOT_DIR}/scripts/p3-attestation-validate.sh" \
+  "${ATTESTATION_FILE}" "${DATASET_CLASS}"; then
   blocked "BLOCKED_SANITIZATION_ATTESTATION_MISMATCH"
-fi
-if [ "${DATASET_CLASS}" = "GENERATED_RELEASE_LIKE" ]; then
-  generated_attestation_keys=(
-    FIXTURE_SEED
-    REAL_USER_DATA_INCLUDED
-    REAL_ACCOUNT_DATA_INCLUDED
-    REAL_MARKET_PROVIDER_DATA_INCLUDED
-    SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE
-  )
-  for attestation_key in "${generated_attestation_keys[@]}"; do
-    if ! grep -Eq "^${attestation_key}=[^[:space:]].*$" "${ATTESTATION_FILE}"; then
-      blocked "BLOCKED_GENERATED_ATTESTATION_INCOMPLETE"
-    fi
-  done
-  if ! grep -Eq '^FIXTURE_SEED=20260715$' "${ATTESTATION_FILE}" \
-    || ! grep -Eq '^REAL_USER_DATA_INCLUDED=NO$' "${ATTESTATION_FILE}" \
-    || ! grep -Eq '^REAL_ACCOUNT_DATA_INCLUDED=NO$' "${ATTESTATION_FILE}" \
-    || ! grep -Eq '^REAL_MARKET_PROVIDER_DATA_INCLUDED=NO$' "${ATTESTATION_FILE}" \
-    || ! grep -Eq '^SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO$' "${ATTESTATION_FILE}"; then
-    blocked "BLOCKED_GENERATED_ATTESTATION_MISMATCH"
-  fi
 fi
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/postgresql-p3-rehearsal.XXXXXX")"
-for command_name in docker pg_restore psql curl jq java; do
+for command_name in docker pg_restore psql curl jq java realpath; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     blocked "BLOCKED_REQUIRED_TOOL_MISSING"
   fi
@@ -453,6 +454,11 @@ fi
 if grep -Eiq '(DATABASE PROPERTIES|CREATE DATABASE|; [0-9]+ [0-9]+ DATABASE )' \
   "${TMP_DIR}/dump-list.txt"; then
   blocked "BLOCKED_DUMP_CONTAINS_DATABASE_CREATION"
+fi
+if ! bash "${ROOT_DIR}/scripts/p3-attestation-validate.sh" \
+  "${ATTESTATION_FILE}" "${DATASET_CLASS}" "${TMP_DIR}/dump-list.txt" \
+  >"${TMP_DIR}/attestation-dump-crosscheck.txt"; then
+  blocked "BLOCKED_SANITIZATION_ATTESTATION_MISMATCH"
 fi
 
 DUMP_SHA256="$(sha256_file "${DUMP_FILE}")"
@@ -478,6 +484,8 @@ cd "${ROOT_DIR}"
   echo "DATASET_ID_SHA256: ${DATASET_ID_SHA256}"
   echo "ATTESTATION_SHA256: ${ATTESTATION_SHA256}"
   echo "ATTESTATION_REQUIRED_FIELDS: PASS"
+  echo "ATTESTATION_UNIQUENESS_STATUS: PASS"
+  echo "ATTESTATION_VERSION_CROSSCHECK: PENDING_SOURCE_RESTORE"
   echo "ATTESTATION_CONTENT: NOT_COPIED"
   echo "FINAL_SANITIZED_CLONE_ELIGIBILITY: $([ "${DATASET_CLASS}" = "SANITIZED_RELEASE_LIKE" ] && echo PENDING_REVIEW || echo NO)"
 } >"${EVIDENCE_DIR}/input-attestation-summary.txt"
@@ -554,6 +562,11 @@ case "${SOURCE_FLYWAY_VERSION}" in
   6|7) ;;
   *) blocked "BLOCKED_UNSUPPORTED_SOURCE_FLYWAY_VERSION" ;;
 esac
+if ! bash "${ROOT_DIR}/scripts/p3-attestation-validate.sh" \
+  "${ATTESTATION_FILE}" "${DATASET_CLASS}" "${TMP_DIR}/dump-list.txt" \
+  "${SOURCE_FLYWAY_VERSION}" >"${TMP_DIR}/attestation-version-crosscheck.txt"; then
+  blocked "BLOCKED_ATTESTATION_VERSION_MISMATCH"
+fi
 
 UNKNOWN_EXTENSIONS="$(scalar_query "${SOURCE_DATABASE}" "SELECT COUNT(*) FROM pg_extension WHERE extname <> 'plpgsql'")"
 FOREIGN_SERVERS="$(scalar_query "${SOURCE_DATABASE}" "SELECT COUNT(*) FROM pg_foreign_server")"
@@ -593,13 +606,17 @@ TM_TABLE_COUNT="$(scalar_query "${SOURCE_DATABASE}" "SELECT COUNT(*) FROM inform
   echo "UNAPPROVED_FUNCTION_LANGUAGES: ${UNAPPROVED_FUNCTION_LANGUAGES}"
   echo "NETWORK_FUNCTION_CANDIDATES: ${NETWORK_FUNCTION_CANDIDATES}"
   echo "FLYWAY_VALIDATE: PASS"
+  echo "ATTESTATION_VERSION_CROSSCHECK: PASS"
 } >"${EVIDENCE_DIR}/source-identity.txt"
 docker_psql "${SOURCE_DATABASE}" -AtF '|' -c \
   "SELECT installed_rank,version,description,success,checksum FROM flyway_schema_history ORDER BY installed_rank" \
   >"${EVIDENCE_DIR}/flyway-before.txt"
 
 enter_stage "source-aggregate-validation"
-capture_fingerprint "${SOURCE_DATABASE}" "${EVIDENCE_DIR}/source-fingerprint.txt"
+capture_structure_fingerprint \
+  "${SOURCE_DATABASE}" "${EVIDENCE_DIR}/source-structure-fingerprint.txt"
+capture_content_fingerprint \
+  "${SOURCE_DATABASE}" "FULL" "${EVIDENCE_DIR}/source-content-fingerprint.txt"
 capture_restore_verification "${SOURCE_DATABASE}" "${TMP_DIR}/source-verification.txt"
 for verification_key in \
   DECISION_WITHOUT_ANALYSIS \
@@ -624,7 +641,10 @@ if ! grep -q '^HISTORICAL_TIME_INVENTORY_RESULT: PASS_READ_ONLY$' "${EVIDENCE_DI
   blocked "BLOCKED_SOURCE_INVENTORY_FAILED"
 fi
 
-SOURCE_FINGERPRINT="$(sha256_file "${EVIDENCE_DIR}/source-fingerprint.txt")"
+SOURCE_STRUCTURE_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/source-structure-fingerprint.txt")"
+SOURCE_CONTENT_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/source-content-fingerprint.txt")"
 SOURCE_INVENTORY_FINGERPRINT="$(awk -F '|' '$1 == "AGGREGATE_MD5" {print $2; exit}' "${EVIDENCE_DIR}/source-inventory.txt")"
 
 enter_stage "controlled-backup"
@@ -660,7 +680,12 @@ fi
   echo "BACKUP_SIZE_BYTES: $(file_size_bytes "${BACKUP_FILE}")"
   echo "BACKUP_SHA256: ${BACKUP_SHA256}"
   echo "SOURCE_FLYWAY_VERSION: ${SOURCE_FLYWAY_VERSION}"
-  echo "SOURCE_FINGERPRINT: ${SOURCE_FINGERPRINT}"
+  echo "SOURCE_STRUCTURE_FINGERPRINT: ${SOURCE_STRUCTURE_FINGERPRINT}"
+  echo "SOURCE_CONTENT_FINGERPRINT: ${SOURCE_CONTENT_FINGERPRINT}"
+  echo "BACKUP_RESTORE_EXECUTION_PATH: POSTGRESQL_16_CONTAINER_NATIVE"
+  echo "PROD_BACKUP_SCRIPT: NOT_EXECUTED"
+  echo "PROD_RESTORE_SCRIPT: NOT_EXECUTED"
+  echo "OPERATIONAL_SCRIPT_GATE: BLOCKED"
 } >"${EVIDENCE_DIR}/backup-metadata.txt"
 
 restore_backup_to_database() {
@@ -682,9 +707,16 @@ enter_stage "recovery-restore"
 if ! restore_backup_to_database "${RECOVERY_DATABASE}" "recovery-restore"; then
   blocked "BLOCKED_RECOVERY_RESTORE_FAILED"
 fi
-capture_fingerprint "${RECOVERY_DATABASE}" "${EVIDENCE_DIR}/recovery-fingerprint.txt"
-RECOVERY_FINGERPRINT="$(sha256_file "${EVIDENCE_DIR}/recovery-fingerprint.txt")"
-if [ "${RECOVERY_FINGERPRINT}" != "${SOURCE_FINGERPRINT}" ]; then
+capture_structure_fingerprint \
+  "${RECOVERY_DATABASE}" "${EVIDENCE_DIR}/recovery-structure-fingerprint.txt"
+capture_content_fingerprint \
+  "${RECOVERY_DATABASE}" "FULL" "${EVIDENCE_DIR}/recovery-content-fingerprint.txt"
+RECOVERY_STRUCTURE_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/recovery-structure-fingerprint.txt")"
+RECOVERY_CONTENT_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/recovery-content-fingerprint.txt")"
+if [ "${RECOVERY_STRUCTURE_FINGERPRINT}" != "${SOURCE_STRUCTURE_FINGERPRINT}" ] \
+  || [ "${RECOVERY_CONTENT_FINGERPRINT}" != "${SOURCE_CONTENT_FINGERPRINT}" ]; then
   blocked "RESTORE_DATA_INTEGRITY_MISMATCH"
 fi
 capture_restore_verification "${RECOVERY_DATABASE}" "${TMP_DIR}/recovery-verification.txt"
@@ -708,12 +740,24 @@ enter_stage "rehearsal-restore"
 if ! restore_backup_to_database "${REHEARSAL_DATABASE}" "rehearsal-restore"; then
   blocked "BLOCKED_REHEARSAL_RESTORE_FAILED"
 fi
-capture_fingerprint "${REHEARSAL_DATABASE}" "${EVIDENCE_DIR}/rehearsal-fingerprint-before.txt"
-REHEARSAL_BEFORE_FINGERPRINT="$(sha256_file "${EVIDENCE_DIR}/rehearsal-fingerprint-before.txt")"
-if [ "${REHEARSAL_BEFORE_FINGERPRINT}" != "${SOURCE_FINGERPRINT}" ]; then
+capture_structure_fingerprint \
+  "${REHEARSAL_DATABASE}" "${EVIDENCE_DIR}/rehearsal-structure-fingerprint-before.txt"
+capture_content_fingerprint \
+  "${REHEARSAL_DATABASE}" "FULL" \
+  "${EVIDENCE_DIR}/rehearsal-content-fingerprint-before.txt"
+capture_content_fingerprint \
+  "${REHEARSAL_DATABASE}" "MIGRATION_STABLE" \
+  "${EVIDENCE_DIR}/rehearsal-stable-content-before.txt"
+REHEARSAL_BEFORE_STRUCTURE_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/rehearsal-structure-fingerprint-before.txt")"
+REHEARSAL_BEFORE_CONTENT_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/rehearsal-content-fingerprint-before.txt")"
+if [ "${REHEARSAL_BEFORE_STRUCTURE_FINGERPRINT}" != "${SOURCE_STRUCTURE_FINGERPRINT}" ] \
+  || [ "${REHEARSAL_BEFORE_CONTENT_FINGERPRINT}" != "${SOURCE_CONTENT_FINGERPRINT}" ]; then
   blocked "RESTORE_DATA_INTEGRITY_MISMATCH"
 fi
-capture_table_counts "${EVIDENCE_DIR}/source-fingerprint.txt" "${TMP_DIR}/source-table-counts.txt"
+capture_table_counts \
+  "${EVIDENCE_DIR}/source-structure-fingerprint.txt" "${TMP_DIR}/source-table-counts.txt"
 
 enter_stage "rehearsal-flyway"
 FLYWAY_ROWS_BEFORE="$(scalar_query "${REHEARSAL_DATABASE}" "SELECT COUNT(*) FROM flyway_schema_history WHERE success")"
@@ -734,30 +778,118 @@ if [ "${SOURCE_FLYWAY_VERSION}" = "6" ]; then
     blocked "BLOCKED_HISTORICAL_VALIDITY_REWRITE"
   fi
   MIGRATION_PATH="V6_TO_V7"
+  MIGRATION_NEW_VALIDITY_COLUMNS_STATUS="PASS_ALL_NULL"
 else
   if [ "$((FLYWAY_ROWS_AFTER - FLYWAY_ROWS_BEFORE))" -ne 0 ]; then
     blocked "BLOCKED_UNEXPECTED_MIGRATION_COUNT"
   fi
   MIGRATION_PATH="V7_VALIDATE_IDEMPOTENT"
+  MIGRATION_NEW_VALIDITY_COLUMNS_STATUS="NOT_APPLICABLE_SOURCE_ALREADY_V7"
 fi
 
-capture_fingerprint "${REHEARSAL_DATABASE}" "${EVIDENCE_DIR}/rehearsal-fingerprint-after.txt"
-capture_table_counts "${EVIDENCE_DIR}/rehearsal-fingerprint-after.txt" "${TMP_DIR}/rehearsal-table-counts.txt"
+capture_structure_fingerprint \
+  "${REHEARSAL_DATABASE}" "${EVIDENCE_DIR}/rehearsal-structure-fingerprint-after.txt"
+capture_content_fingerprint \
+  "${REHEARSAL_DATABASE}" "FULL" \
+  "${EVIDENCE_DIR}/rehearsal-content-fingerprint-after.txt"
+capture_content_fingerprint \
+  "${REHEARSAL_DATABASE}" "MIGRATION_STABLE" \
+  "${EVIDENCE_DIR}/rehearsal-stable-content-after.txt"
+capture_table_counts \
+  "${EVIDENCE_DIR}/rehearsal-structure-fingerprint-after.txt" \
+  "${TMP_DIR}/rehearsal-table-counts.txt"
 if ! cmp -s "${TMP_DIR}/source-table-counts.txt" "${TMP_DIR}/rehearsal-table-counts.txt"; then
   blocked "BLOCKED_POST_MIGRATION_BUSINESS_ROW_CHANGE"
 fi
-POST_MIGRATION_FINGERPRINT="$(sha256_file "${EVIDENCE_DIR}/rehearsal-fingerprint-after.txt")"
+if ! cmp -s "${EVIDENCE_DIR}/rehearsal-stable-content-before.txt" \
+  "${EVIDENCE_DIR}/rehearsal-stable-content-after.txt"; then
+  blocked "BLOCKED_POST_MIGRATION_STABLE_CONTENT_CHANGE"
+fi
+POST_MIGRATION_STRUCTURE_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/rehearsal-structure-fingerprint-after.txt")"
+POST_MIGRATION_CONTENT_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/rehearsal-content-fingerprint-after.txt")"
+MIGRATION_STABLE_CONTENT_FINGERPRINT="$(sha256_file \
+  "${EVIDENCE_DIR}/rehearsal-stable-content-after.txt")"
 docker_psql "${REHEARSAL_DATABASE}" -AtF '|' -c \
   "SELECT installed_rank,version,description,success,checksum FROM flyway_schema_history ORDER BY installed_rank" \
   >"${EVIDENCE_DIR}/flyway-after.txt"
 
 enter_stage "application-smoke"
-capture_table_counts "${EVIDENCE_DIR}/rehearsal-fingerprint-after.txt" "${TMP_DIR}/app-before-table-counts.txt"
+capture_content_fingerprint \
+  "${REHEARSAL_DATABASE}" "FULL" "${TMP_DIR}/app-content-before.txt"
+APPLICATION_DATABASE_ROLE="p3_app_readonly_$$_${RANDOM}"
+APPLICATION_DATABASE_PASSWORD="p3-readonly-$(openssl rand -hex 24 2>/dev/null \
+  || printf '%s-%s-%s' "$RANDOM" "$RANDOM" "$(date -u +%s)")"
+if ! run_bounded_with_input 60 "${ROOT_DIR}/scripts/p3-application-readonly-role.sql" \
+  docker exec -i \
+  --env "PGOPTIONS=-c statement_timeout=30000 -c lock_timeout=5000" \
+  "${CONTAINER_NAME}" psql \
+  --username="${USERNAME}" \
+  --dbname="${REHEARSAL_DATABASE}" \
+  --no-psqlrc \
+  --set="application_role=${APPLICATION_DATABASE_ROLE}" \
+  --set="application_password=${APPLICATION_DATABASE_PASSWORD}" \
+  --set="database_name=${REHEARSAL_DATABASE}" \
+  >"${TMP_DIR}/application-role-create.log" 2>&1; then
+  blocked "BLOCKED_APPLICATION_READONLY_ROLE_CREATE"
+fi
+APPLICATION_ROLE_CAPABILITIES="$(scalar_query "${REHEARSAL_DATABASE}" \
+  "SELECT rolsuper::int || '|' || rolcreatedb::int || '|' || rolcreaterole::int || '|' || rolinherit::int FROM pg_roles WHERE rolname='${APPLICATION_DATABASE_ROLE}'")"
+if [ "${APPLICATION_ROLE_CAPABILITIES}" != "0|0|0|0" ]; then
+  blocked "BLOCKED_APPLICATION_READONLY_ROLE_CAPABILITIES"
+fi
+if [ "$(scalar_query "${REHEARSAL_DATABASE}" \
+  "SELECT has_database_privilege('${APPLICATION_DATABASE_ROLE}','${REHEARSAL_DATABASE}','CONNECT') AND has_schema_privilege('${APPLICATION_DATABASE_ROLE}','public','USAGE') AND NOT has_schema_privilege('${APPLICATION_DATABASE_ROLE}','public','CREATE')")" != "t" ]; then
+  blocked "BLOCKED_APPLICATION_READONLY_ROLE_PRIVILEGES"
+fi
+if [ "$(scalar_query "${REHEARSAL_DATABASE}" \
+  "SELECT COUNT(*) FROM pg_database WHERE datallowconn AND has_database_privilege('${APPLICATION_DATABASE_ROLE}',datname,'CONNECT')")" != "1" ]; then
+  blocked "BLOCKED_APPLICATION_READONLY_ROLE_DATABASE_SCOPE"
+fi
+if [ "$(scalar_query "${REHEARSAL_DATABASE}" \
+  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND NOT has_table_privilege('${APPLICATION_DATABASE_ROLE}',format('%I.%I',table_schema,table_name),'SELECT')")" != "0" ]; then
+  blocked "BLOCKED_APPLICATION_READONLY_ROLE_SELECT_GRANTS"
+fi
+if [ "$(scalar_query "${REHEARSAL_DATABASE}" \
+  "SELECT COUNT(*) FROM information_schema.sequences WHERE sequence_schema='public' AND (NOT has_sequence_privilege('${APPLICATION_DATABASE_ROLE}',format('%I.%I',sequence_schema,sequence_name),'SELECT') OR has_sequence_privilege('${APPLICATION_DATABASE_ROLE}',format('%I.%I',sequence_schema,sequence_name),'USAGE'))")" != "0" ]; then
+  blocked "BLOCKED_APPLICATION_READONLY_ROLE_SEQUENCE_GRANTS"
+fi
+
+if run_bounded 30 docker exec \
+  --env "PGPASSWORD=${APPLICATION_DATABASE_PASSWORD}" \
+  "${CONTAINER_NAME}" psql \
+  --host=127.0.0.1 \
+  --port=5432 \
+  --username="${APPLICATION_DATABASE_ROLE}" \
+  --dbname="${REHEARSAL_DATABASE}" \
+  --no-psqlrc \
+  --set=VERBOSITY=verbose \
+  --command="UPDATE tm_asset_state SET state=state WHERE FALSE" \
+  >"${TMP_DIR}/application-write-probe.log" 2>"${TMP_DIR}/application-write-probe-error.log"; then
+  blocked "BLOCKED_APPLICATION_READONLY_WRITE_PROBE_ALLOWED"
+fi
+if ! grep -Eq '(25006|42501)' "${TMP_DIR}/application-write-probe-error.log"; then
+  blocked "BLOCKED_APPLICATION_READONLY_WRITE_PROBE_UNCLASSIFIED"
+fi
+{
+  echo "APPLICATION_DATABASE_ROLE: READ_ONLY"
+  echo "APPLICATION_DATABASE_ROLE_RANDOMIZED: YES"
+  echo "APPLICATION_ROLE_SUPERUSER: NO"
+  echo "APPLICATION_ROLE_CREATEDB: NO"
+  echo "APPLICATION_ROLE_CREATEROLE: NO"
+  echo "APPLICATION_ROLE_SCHEMA_CREATE: DENIED"
+  echo "READ_ONLY_ROLE_WRITE_PROBE: DENIED"
+  echo "READ_ONLY_ROLE_WRITE_PROBE_SQLSTATE: ACCEPTED_READ_ONLY_OR_PERMISSION_DENIAL"
+  echo "FLYWAY_DURING_APP_SMOKE: DISABLED"
+} >"${EVIDENCE_DIR}/application-database-role.txt"
+
 export SPRING_DATASOURCE_URL="jdbc:postgresql://${TARGET_HOST}:${TARGET_PORT}/${REHEARSAL_DATABASE}"
-export SPRING_DATASOURCE_USERNAME="${USERNAME}"
-export SPRING_DATASOURCE_PASSWORD="${DISPOSABLE_PASSWORD}"
+export SPRING_DATASOURCE_USERNAME="${APPLICATION_DATABASE_ROLE}"
+export SPRING_DATASOURCE_PASSWORD="${APPLICATION_DATABASE_PASSWORD}"
 export SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
-export SPRING_FLYWAY_ENABLED=true
+export SPRING_DATASOURCE_HIKARI_READ_ONLY=true
+export SPRING_FLYWAY_ENABLED=false
 export SPRING_SQL_INIT_MODE=never
 export APP_ADMIN_USERNAME=p3_controlled_admin
 export APP_ADMIN_PASSWORD="${DISPOSABLE_ADMIN_PASSWORD}"
@@ -927,9 +1059,15 @@ if [ "${DATASET_CLASS}" = "GENERATED_RELEASE_LIKE" ]; then
 fi
 
 stop_application
-capture_fingerprint "${REHEARSAL_DATABASE}" "${TMP_DIR}/app-after-fingerprint.txt"
-capture_table_counts "${TMP_DIR}/app-after-fingerprint.txt" "${TMP_DIR}/app-after-table-counts.txt"
-if ! cmp -s "${TMP_DIR}/app-before-table-counts.txt" "${TMP_DIR}/app-after-table-counts.txt"; then
+capture_structure_fingerprint \
+  "${REHEARSAL_DATABASE}" "${TMP_DIR}/app-structure-after.txt"
+capture_content_fingerprint \
+  "${REHEARSAL_DATABASE}" "FULL" "${TMP_DIR}/app-content-after.txt"
+if ! cmp -s "${EVIDENCE_DIR}/rehearsal-structure-fingerprint-after.txt" \
+  "${TMP_DIR}/app-structure-after.txt"; then
+  blocked "BLOCKED_UNEXPECTED_DATABASE_STRUCTURE_CHANGE"
+fi
+if ! cmp -s "${TMP_DIR}/app-content-before.txt" "${TMP_DIR}/app-content-after.txt"; then
   blocked "BLOCKED_UNEXPECTED_BUSINESS_WRITES"
 fi
 {
@@ -946,11 +1084,16 @@ fi
   echo "AI_PROVIDER_STATE: NOT_CALLED_OR_DISABLED"
   echo "SCHEDULERS: DISABLED"
   echo "EXTERNAL_PROVIDER_CALLS: DISABLED"
+  echo "APPLICATION_DATABASE_ROLE: READ_ONLY"
+  echo "READ_ONLY_ROLE_WRITE_PROBE: DENIED"
+  echo "FLYWAY_DURING_APP_SMOKE: DISABLED"
+  echo "APP_CONTENT_FINGERPRINT: MATCH"
   echo "UNEXPECTED_BUSINESS_WRITES: 0"
 } >"${EVIDENCE_DIR}/application-smoke.txt"
 
 {
-  echo "SOURCE_TO_RECOVERY_FINGERPRINT: MATCH"
+  echo "SOURCE_TO_RECOVERY_STRUCTURE_FINGERPRINT: MATCH"
+  echo "SOURCE_TO_RECOVERY_CONTENT: MATCH"
   echo "SOURCE_TO_RECOVERY_INVENTORY: MATCH"
   echo "RECOVERY_FLYWAY_VERSION: ${SOURCE_FLYWAY_VERSION}"
   echo "RECOVERY_DATABASE_RESTORE: PASS"
@@ -982,16 +1125,34 @@ EXECUTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "SOURCE_DATASET_STATUS: ${SOURCE_DATASET_SUCCESS_STATUS}"
   echo "SOURCE_FLYWAY_VERSION: ${SOURCE_FLYWAY_VERSION}"
   echo "SOURCE_INVENTORY_STATUS: ${SOURCE_INVENTORY_SUCCESS_STATUS}"
-  echo "SOURCE_FINGERPRINT: ${SOURCE_FINGERPRINT}"
+  echo "SOURCE_STRUCTURE_FINGERPRINT: ${SOURCE_STRUCTURE_FINGERPRINT}"
+  echo "SOURCE_CONTENT_FINGERPRINT: ${SOURCE_CONTENT_FINGERPRINT}"
+  echo "STRUCTURE_FINGERPRINT_STATUS: PASS"
+  echo "CONTENT_FINGERPRINT_STATUS: PASS"
   echo "BACKUP_STATUS: PASS"
   echo "BACKUP_SHA256: ${BACKUP_SHA256}"
+  echo "BACKUP_RESTORE_EXECUTION_PATH: POSTGRESQL_16_CONTAINER_NATIVE"
+  echo "PROD_BACKUP_SCRIPT: NOT_EXECUTED"
+  echo "PROD_RESTORE_SCRIPT: NOT_EXECUTED"
+  echo "OPERATIONAL_SCRIPT_GATE: BLOCKED"
   echo "RESTORE_STATUS: PASS"
-  echo "RESTORE_FINGERPRINT_MATCH: MATCH"
+  echo "SOURCE_TO_RECOVERY_STRUCTURE_FINGERPRINT: MATCH"
+  echo "SOURCE_TO_RECOVERY_CONTENT: MATCH"
   echo "MIGRATION_PATH: ${MIGRATION_PATH}"
   echo "MIGRATION_STATUS: PASS"
-  echo "POST_MIGRATION_FINGERPRINT: ${POST_MIGRATION_FINGERPRINT}"
+  echo "POST_MIGRATION_STRUCTURE_FINGERPRINT: ${POST_MIGRATION_STRUCTURE_FINGERPRINT}"
+  echo "POST_MIGRATION_CONTENT_FINGERPRINT: ${POST_MIGRATION_CONTENT_FINGERPRINT}"
+  echo "MIGRATION_STABLE_CONTENT_FINGERPRINT: ${MIGRATION_STABLE_CONTENT_FINGERPRINT}"
+  echo "PRE_TO_POST_MIGRATION_STABLE_CONTENT: MATCH"
+  echo "MIGRATION_NEW_VALIDITY_COLUMNS_ALL_NULL: ${MIGRATION_NEW_VALIDITY_COLUMNS_STATUS}"
   echo "HISTORICAL_TIME_RESULTS: PASS_READ_ONLY_AGGREGATE"
   echo "APPLICATION_SMOKE_STATUS: PASS"
+  echo "APPLICATION_DATABASE_ROLE: READ_ONLY"
+  echo "READ_ONLY_ROLE_WRITE_PROBE: DENIED"
+  echo "FLYWAY_DURING_APP_SMOKE: DISABLED"
+  echo "APP_CONTENT_FINGERPRINT: MATCH"
+  echo "ATTESTATION_UNIQUENESS_STATUS: PASS"
+  echo "ATTESTATION_VERSION_CROSSCHECK: PASS"
   echo "UNEXPECTED_BUSINESS_WRITES: 0"
   echo "RECOVERY_STATUS: ${RECOVERY_SUCCESS_STATUS}"
   echo "WRITER_CUTOVER_STATUS: MISSING_OPERATIONAL_EVIDENCE"
@@ -1009,13 +1170,20 @@ for evidence_file in \
   source-identity.txt \
   flyway-before.txt \
   flyway-after.txt \
-  source-fingerprint.txt \
+  source-structure-fingerprint.txt \
+  source-content-fingerprint.txt \
   source-inventory.txt \
   backup-metadata.txt \
   restore-verification.txt \
-  recovery-fingerprint.txt \
-  rehearsal-fingerprint-before.txt \
-  rehearsal-fingerprint-after.txt \
+  recovery-structure-fingerprint.txt \
+  recovery-content-fingerprint.txt \
+  rehearsal-structure-fingerprint-before.txt \
+  rehearsal-content-fingerprint-before.txt \
+  rehearsal-stable-content-before.txt \
+  rehearsal-structure-fingerprint-after.txt \
+  rehearsal-content-fingerprint-after.txt \
+  rehearsal-stable-content-after.txt \
+  application-database-role.txt \
   application-smoke.txt \
   cutover-register-summary.txt; do
   echo "$(sha256_file "${EVIDENCE_DIR}/${evidence_file}")  ${evidence_file}" \
