@@ -158,7 +158,7 @@ unset CONTROLLED_POSTGRESQL_KEEP_EVIDENCE_DATABASES || true
 CURRENT_STAGE="targeted-postgresql-tests"
 TARGETED_LOG="${TMP_DIR}/targeted-tests.log"
 if ! run_bounded 600 ./mvnw -q \
-  -Dtest=ControlledPostgreSqlFlywayV7EvidenceTest,ControlledPostgreSqlDashboardPlanValidityEvidenceTest,ControlledPostgreSqlFlywaySmokeTest,PostgreSqlFlywayMigrationSmokeTest \
+  -Dtest=ControlledPostgreSqlFlywayV7EvidenceTest,ControlledPostgreSqlDashboardPlanValidityEvidenceTest,ControlledPostgreSqlHistoricalTimeInventorySemanticsTest,ControlledPostgreSqlFlywaySmokeTest,PostgreSqlFlywayMigrationSmokeTest \
   test >"${TARGETED_LOG}" 2>&1; then
   echo "CONTROLLED_POSTGRESQL_TESTS: FAIL_OR_TIMEOUT"
   fail
@@ -167,6 +167,7 @@ fi
 report_files=(
   "target/surefire-reports/org.example.trademodel.postgresql.ControlledPostgreSqlFlywayV7EvidenceTest.txt"
   "target/surefire-reports/org.example.trademodel.service.impl.ControlledPostgreSqlDashboardPlanValidityEvidenceTest.txt"
+  "target/surefire-reports/org.example.trademodel.postgresql.ControlledPostgreSqlHistoricalTimeInventorySemanticsTest.txt"
   "target/surefire-reports/org.example.trademodel.postgresql.ControlledPostgreSqlFlywaySmokeTest.txt"
   "target/surefire-reports/org.example.trademodel.postgresql.PostgreSqlFlywayMigrationSmokeTest.txt"
 )
@@ -176,6 +177,43 @@ for report_file in "${report_files[@]}"; do
     fail
   fi
 done
+
+semantic_markers=(
+  "INVENTORY_FIELD_POLICY_STATUS: PASS_EXPLICIT_14_FIELDS"
+  "NORMAL_COOLDOWN_FALSE_POSITIVE_COUNT: 0"
+  "NORMAL_FUTURE_VALID_FROM_FALSE_POSITIVE_COUNT: 0"
+  "NORMAL_24H_EXPIRES_AT_MISMATCH_COUNT: 0"
+  "NORMAL_VALIDITY_STATES: NOT_ACTIVE=1,ACTIVE=1,EXPIRED=1"
+  "NORMAL_SESSION_TIMEZONE_CONSISTENCY: PASS"
+  "TRUE_FUTURE_EVENT_ANOMALY_COUNT: 1"
+  "AUDIT_ORDER_INVALID_COUNT: 1"
+  "SCHEDULE_ORDER_INVALID_COUNT: 1"
+  "VALIDITY_ORDER_INVALID_COUNT: 1"
+  "VALIDITY_PARTIAL_NULL_COUNT: 1"
+  "OFFSET_PATTERN_CANDIDATE_PLUS_8H_COUNT: 1"
+  "ANOMALY_SESSION_TIMEZONE_CONSISTENCY: PASS"
+)
+for semantic_marker in "${semantic_markers[@]}"; do
+  if ! grep -Fqx "${semantic_marker}" "${TARGETED_LOG}"; then
+    echo "HISTORICAL_INVENTORY_SEMANTIC_EVIDENCE: FAIL"
+    fail
+  fi
+done
+
+semantic_report="target/surefire-reports/org.example.trademodel.postgresql.ControlledPostgreSqlHistoricalTimeInventorySemanticsTest.txt"
+semantic_test_counts="$(sed -n -E \
+  's/^Tests run: ([0-9]+), Failures: ([0-9]+), Errors: ([0-9]+), Skipped: ([0-9]+).*/TESTS=\1,FAILURES=\2,ERRORS=\3,SKIPPED=\4/p' \
+  "${semantic_report}")"
+if [ "${semantic_test_counts}" != "TESTS=3,FAILURES=0,ERRORS=0,SKIPPED=0" ]; then
+  echo "HISTORICAL_INVENTORY_SEMANTIC_TEST_COUNT: FAIL"
+  fail
+fi
+{
+  printf '%s\n' "${semantic_markers[@]}"
+  echo "SESSION_TIMEZONES: UTC,Asia/Shanghai,America/New_York"
+  echo "${semantic_test_counts}"
+  echo "HISTORICAL_INVENTORY_SEMANTIC_FIXTURES: PASS_NOT_SKIPPED"
+} >"${EVIDENCE_DIR}/inventory-semantic-results.txt"
 
 CURRENT_STAGE="auxiliary-database-cleanup-check"
 auxiliary_count="$(docker exec "${CONTAINER_NAME}" psql -U "${USERNAME}" -d postgres -Atqc \
@@ -202,10 +240,16 @@ docker exec "${CONTAINER_NAME}" psql -U "${USERNAME}" -d "${DATABASE}" -AtF '|' 
   done
 } >"${EVIDENCE_DIR}/timezone-results.txt"
 
-docker exec -i "${CONTAINER_NAME}" psql -U "${USERNAME}" -d "${DATABASE}" --no-psqlrc \
+docker exec \
+  --env "PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=120000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000" \
+  -i "${CONTAINER_NAME}" psql -U "${USERNAME}" -d "${DATABASE}" --no-psqlrc \
   <"scripts/historical-time-basis-inventory.sql" >"${EVIDENCE_DIR}/historical-inventory.txt"
 inventory_field_count="$(grep -c '^FIELD_SUMMARY|' "${EVIDENCE_DIR}/historical-inventory.txt" || true)"
-if [ "${inventory_field_count}" != "13" ] \
+inventory_policy_count="$(grep -c '^FIELD_POLICY|' "${EVIDENCE_DIR}/historical-inventory.txt" || true)"
+if [ "${inventory_field_count}" != "14" ] \
+  || [ "${inventory_policy_count}" != "14" ] \
+  || grep -Eq 'VERIFIED_UTC|POST_CUTOVER_UTC|REFERENCE_MISMATCH|^OFFSET_PATTERN\|' \
+    "${EVIDENCE_DIR}/historical-inventory.txt" \
   || ! grep -Eq '^AGGREGATE_MD5\|[0-9a-f]{32}$' "${EVIDENCE_DIR}/historical-inventory.txt"; then
   echo "HISTORICAL_TIME_INVENTORY: FAIL"
   fail
@@ -337,6 +381,7 @@ fi
 CURRENT_STAGE="summary"
 EXECUTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 RUNNER_SHA256="$(sha256_file "scripts/controlled-postgresql-flyway-v7-evidence.sh")"
+INVENTORY_SEMANTIC_SHA256="$(sha256_file "${EVIDENCE_DIR}/inventory-semantic-results.txt")"
 {
   echo "CONTROLLED_POSTGRESQL_V7_RESULT: PASS"
   echo "EXECUTED_AT_UTC: ${EXECUTED_AT}"
@@ -349,12 +394,14 @@ RUNNER_SHA256="$(sha256_file "scripts/controlled-postgresql-flyway-v7-evidence.s
   echo "V6_TO_V7: PASS"
   echo "SESSION_TIMEZONES: PASS_NOT_SKIPPED"
   echo "POSTGRESQL_DASHBOARD_VALIDITY: PASS_NOT_SKIPPED"
+  echo "HISTORICAL_INVENTORY_SEMANTICS: PASS_NOT_SKIPPED"
   echo "MAPPER_COMPATIBILITY: PASS"
   echo "APPLICATION_SMOKE: PASS"
   echo "HISTORICAL_TIME_INVENTORY: PASS_READ_ONLY"
   echo "AUXILIARY_DATABASE_CLEANUP: PASS"
   echo "CONTAINER_CLEANUP: ${CONTAINER_CLEANUP}"
   echo "RUNNER_SHA256: ${RUNNER_SHA256}"
+  echo "INVENTORY_SEMANTIC_EVIDENCE_SHA256: ${INVENTORY_SEMANTIC_SHA256}"
   echo "PRODUCTION_READINESS: BLOCKED"
 } >"${EVIDENCE_DIR}/summary.txt"
 
@@ -364,6 +411,7 @@ for evidence_file in \
   flyway-history.txt \
   schema-types.txt \
   timezone-results.txt \
+  inventory-semantic-results.txt \
   application-smoke.txt \
   historical-inventory.txt; do
   echo "$(sha256_file "${EVIDENCE_DIR}/${evidence_file}")  ${evidence_file}" \

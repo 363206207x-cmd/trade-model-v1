@@ -1,8 +1,8 @@
-# PostgreSQL / Flyway V7 Controlled Evidence P1/P2
+# PostgreSQL / Flyway V7 Controlled Evidence P1/P2/P2.1
 
 ## Decision
 
-- Evidence package: `Controlled PostgreSQL and Flyway V7 Evidence P1/P2`
+- Evidence package: `Controlled PostgreSQL and Flyway V7 Evidence P1/P2/P2.1`
 - Base main commit: `ace5e560d35f214499a06d5478361318d371ee65`
 - Evidence branch: `codex/postgresql-flyway-v7-evidence-p1`
 - P2 starting commit: `90041938d955e66ac26d33dc577832ccc63b7ef1`
@@ -12,6 +12,7 @@
 - Session-timezone result: **PASS_NOT_SKIPPED**
 - PostgreSQL-backed Dashboard validity: **PASS_NOT_SKIPPED**
 - Historical inventory contract: **PASS_READ_ONLY**
+- Historical inventory nonempty semantics: **PASS_NOT_SKIPPED**
 - Application startup smoke: **PASS**
 - Disposable resource cleanup: **PASS**
 - Production deployment readiness: **BLOCKED**
@@ -65,14 +66,14 @@ container through an exit trap.
 
 ## Commands
 
-The P2 evidence was collected with one command:
+The P2.1 evidence was collected with one command:
 
 ```bash
 bash scripts/controlled-postgresql-flyway-v7-evidence.sh
 ```
 
 The script creates disposable process-only credentials, pins the PostgreSQL
-image digest, runs the four controlled PostgreSQL test classes with a
+image digest, runs the five controlled PostgreSQL test classes with a
 ten-minute bound, verifies zero skips, performs aggregate-only historical
 inventory, starts the application on port `18081`, and uses explicit false
 values for every scheduler, AI provider, market provider,
@@ -226,6 +227,46 @@ and `America/New_York`. Status, blocked reason, historical-plan validity, and
 The test fixture is transactional; no Dashboard evidence position or plan was
 committed.
 
+## Historical Inventory Field Semantics P2.1
+
+The original inventory treated every timestamp as though it were an event
+instant with the same future and reference-delta rules. P2.1 replaces that
+universal policy with a 14-field semantic catalog. The catalog explicitly
+distinguishes event/audit times, scheduled deadlines, canonical analysis time,
+lifecycle completion time, and validity interval endpoints. An inapplicable
+check is reported as `NOT_APPLICABLE`, not as a zero-result check.
+
+`ControlledPostgreSqlHistoricalTimeInventorySemanticsTest` inserted nonempty
+fixtures into disposable PostgreSQL and executed the same SQL query used by
+the operator inventory. All three session zones (`UTC`, `Asia/Shanghai`, and
+`America/New_York`) returned identical aggregate lines and fingerprints.
+
+Normal-fixture result:
+
+| Assertion | Result |
+| --- | ---: |
+| `cooldown_until = created_at + 15m` false positives | 0 |
+| future `valid_from` false positives | 0 |
+| 24-hour `expires_at` mismatch false positives | 0 |
+| validity states | `NOT_ACTIVE=1`, `ACTIVE=1`, `EXPIRED=1` |
+
+True-anomaly result:
+
+| Candidate/anomaly | Count |
+| --- | ---: |
+| `EVENT_FUTURE_OUTLIER` for event `created_at = asOf + 6m` | 1 |
+| `AUDIT_ORDER_INVALID` | 1 |
+| `SCHEDULE_ORDER_INVALID` | 1 |
+| `VALIDITY_ORDER_INVALID` | 1 |
+| `VALIDITY_PARTIAL_NULL` | 1 |
+| catalog-approved `+8h` `OFFSET_PATTERN_CANDIDATE` | 1 |
+
+The SQL emits candidate counts, ordering anomalies, durations, future-event
+candidates, and validity states. It does not declare individual rows
+`VERIFIED_UTC`, `POST_CUTOVER_UTC`, or `REFERENCE_MISMATCH`. Those conclusions
+require trustworthy reference, writer-attribution, or approved cutover
+evidence outside this aggregate inventory.
+
 ## Mapper and Service Compatibility
 
 The controlled PostgreSQL test performed real read/write calls through:
@@ -279,14 +320,15 @@ local Push Recheck dispatch configuration defaults.
 
 ## Reproducible Runner Evidence
 
-Final P2 execution:
+Final P2.1 execution:
 
-- Executed at: `2026-07-15T07:20:38Z`
+- Executed at: `2026-07-15T07:59:04Z`
 - PostgreSQL server: `16.14` (`server_version_num=160014`)
 - Architecture: `arm64`
 - Image tag: `postgres:16-alpine`
 - Image digest: `postgres@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc`
-- Runner SHA-256: `e23229562cdafacc9b960807a0c5297c23beed05cb5675633ba2b8dbadad8010`
+- Runner SHA-256: `2a5b11b600ae781e84882799d62e65c603326298d9602afcc1e9134658624dbf`
+- Inventory semantic evidence SHA-256: `e8ade5457c03fe86366de8954a84cdddf02c07623c5fcf9123a119faf32397a8`
 - Auxiliary database cleanup: **PASS**
 - Container cleanup: **PASS**, zero matching containers remained
 
@@ -296,23 +338,28 @@ Only this redacted manifest is versioned:
 
 | Runtime artifact | SHA-256 |
 | --- | --- |
-| `summary.txt` | `a8b98333e759083343d512f020816562a3164bf8b4564f83c398ea3b2a29e1b3` |
+| `summary.txt` | `c090f0c95cca65afb042a8c10d3da84e6efe3596b033477de680601256180c55` |
 | `flyway-history.txt` | `778b04453150dd2dc7bd12fc0d36b46a878d01f9e33849fffc54c32799a9edd4` |
 | `schema-types.txt` | `06faeab76bbbb86b5c2d9a84583a92390be8eb2857ee622d68b413ecf4db3175` |
-| `timezone-results.txt` | `98e668746b0c1049565c06911d7a2526c5da47252191495c1b37eab66b657ea0` |
+| `timezone-results.txt` | `017c323e8a914c5cf767c34b40b260726484fd9af14c43e74f48ba5b95f08292` |
+| `inventory-semantic-results.txt` | `e8ade5457c03fe86366de8954a84cdddf02c07623c5fcf9123a119faf32397a8` |
 | `application-smoke.txt` | `59ca39b7437a0a6e942c2fd1465440bb6e2ef6911732c6645bc32c0a615d38d2` |
-| `historical-inventory.txt` | `57df67d3e146d4c2142c0f76ce769d4e9680daab7f2de3b95f6b25c2937d5fa5` |
+| `historical-inventory.txt` | `3ebebe952af96e53ad0ac6c988f94988ca21b8bf9ca4338199dbf9915519fa51` |
 
-The disposable empty database produced 13 zero-row field summaries and
-aggregate MD5 `638dd7271f23a7dccf810d22507f88a2`. This proves the inventory
-query runs read-only and produces a bounded aggregate shape; it does not
-characterize a release or production dataset.
+The disposable empty database produced 14 field policies, 14 zero-row field
+summaries, and aggregate MD5 `7d76b5be314314117f5dbf118de3ad0c`.
+That empty run proves only that the inventory query executes read-only,
+produces the expected aggregate shape, and does not leak row-level business
+data. It does not prove classification correctness, absence of false
+positives, or release-dataset readiness. The separate nonempty semantic
+fixture is the P2.1 evidence for the tested classification behavior; it still
+does not characterize a real release dataset.
 
 ## Test Accounting
 
 Controlled PostgreSQL/Flyway targeted run:
 
-- Tests: `11`
+- Tests: `14`
 - Failures: `0`
 - Errors: `0`
 - Skipped: `0`
@@ -326,18 +373,19 @@ for this branch:
 - Errors: `0`
 - Skipped: `3`
 
-The controlled run itself had zero skips across all four PostgreSQL test
+The controlled run itself had zero skips across all five PostgreSQL test
 classes. The default full suite skipped the two legacy PostgreSQL smoke entry
 points and `CoinGlassControlledSmokeTest` because their external environments
 were not enabled. The class-gated V7 and Dashboard evidence tests report zero
 default-suite tests when their controlled env is absent; the digest-pinned
-runner separately executed their `4` and `5` tests with zero skips. Default
-suite skips or zero-count gates are not counted as PostgreSQL PASS evidence.
+runner separately executed the V7, Dashboard, and historical semantics classes
+with `4`, `5`, and `3` tests respectively and zero skips. Default-suite skips
+or zero-count gates are not counted as PostgreSQL PASS evidence.
 
 ## Historical Time Strategy
 
-The controlled evidence proves the current contracts for newly written data;
-it does not manufacture certainty for historical rows. The executable
+The controlled evidence proves the tested current contracts for newly written
+and fixture data; it does not manufacture certainty for historical rows. The executable
 classification, cutover, inventory, and decision contracts are in
 `docs/HISTORICAL_TIME_BASIS_STRATEGY.md`.
 
@@ -371,6 +419,5 @@ Production deployment cannot proceed from this evidence package alone.
 
 ## Next Task
 
-Reviewer P2 re-review of the PostgreSQL-backed Dashboard evidence, repeatable
-runner, and historical-time strategy. PR #1126 remains Draft and production
-readiness remains BLOCKED.
+Reviewer P2.1 re-review and PR #1126 merge-readiness decision. PR #1126 remains
+Draft and production readiness remains BLOCKED.

@@ -69,7 +69,8 @@ output_file="${TMP_DIR}/inventory.txt"
 error_file="${TMP_DIR}/inventory-error.txt"
 set +e
 PGPASSWORD="${HISTORICAL_TIME_INVENTORY_PASSWORD}" \
-PGOPTIONS="-c default_transaction_read_only=on" \
+PGCONNECT_TIMEOUT=10 \
+PGOPTIONS="-c default_transaction_read_only=on -c statement_timeout=120000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000" \
 psql \
   --host="${HISTORICAL_TIME_INVENTORY_HOST}" \
   --port="${HISTORICAL_TIME_INVENTORY_PORT}" \
@@ -81,6 +82,11 @@ inventory_status=$?
 set -e
 
 if [ "${inventory_status}" -ne 0 ]; then
+  if grep -Eiq '(statement timeout|lock timeout|idle-in-transaction timeout|canceling statement due to statement timeout)' \
+    "${error_file}"; then
+    echo "HISTORICAL_TIME_INVENTORY_RESULT: BLOCKED_INVENTORY_TIMEOUT"
+    exit 2
+  fi
   echo "HISTORICAL_TIME_INVENTORY_RESULT: FAIL_REDACTED"
   exit "${inventory_status}"
 fi

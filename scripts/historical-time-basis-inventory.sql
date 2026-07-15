@@ -5,66 +5,105 @@
 
 BEGIN TRANSACTION READ ONLY;
 
+-- INVENTORY_QUERY_BEGIN
 WITH inventory_clock AS (
-    SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AS as_of_utc
-), field_catalog(field_name) AS (
+    SELECT COALESCE(
+        NULLIF(current_setting('trade_model.inventory_as_of_utc', true), '')::TIMESTAMP WITHOUT TIME ZONE,
+        CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
+    ) AS as_of_utc
+), field_catalog(
+    field_name,
+    semantic_type,
+    future_check_mode,
+    relation_check_mode,
+    reference_field,
+    expected_ordering,
+    tolerance_contract,
+    offset_pattern_applicable
+) AS (
     VALUES
-        ('tm_monitor_alert.created_at'),
-        ('tm_monitor_alert.updated_at'),
-        ('tm_monitor_alert.cooldown_until'),
-        ('tm_analysis_run.analysis_time'),
-        ('tm_analysis_run.created_at'),
-        ('tm_analysis_run.started_at'),
-        ('tm_analysis_run.completed_at'),
-        ('tm_hot_reset_event.event_time'),
-        ('tm_hot_reset_event.create_time'),
-        ('tm_hot_reset_event.completed_at'),
-        ('tm_decision_result.create_time'),
-        ('tm_decision_result.valid_from'),
-        ('tm_decision_result.expires_at')
+        ('tm_monitor_alert.created_at', 'EVENT_INSTANT', 'AS_OF_PLUS_5_MINUTES',
+         'NOT_APPLICABLE', 'none', 'NONE', 'AS_OF_PLUS_5_MINUTES', false),
+        ('tm_monitor_alert.updated_at', 'AUDIT_UPDATE_TIME', 'AS_OF_PLUS_5_MINUTES',
+         'ORDERING_ONLY', 'tm_monitor_alert.created_at', 'OBSERVED_GTE_REFERENCE',
+         'AS_OF_PLUS_5_MINUTES_NO_MAX_DELTA', false),
+        ('tm_monitor_alert.cooldown_until', 'SCHEDULED_DEADLINE', 'NOT_APPLICABLE',
+         'ORDERING_AND_DURATION', 'tm_monitor_alert.created_at', 'OBSERVED_GTE_REFERENCE',
+         'CONFIG_DRIVEN_NO_ASSUMED_MAX', false),
+        ('tm_analysis_run.analysis_time', 'CANONICAL_ANALYSIS_TIME', 'NOT_APPLICABLE',
+         'DISTRIBUTION_ONLY', 'tm_analysis_run.created_at', 'NONE',
+         'NO_TIMEZONE_CLASSIFICATION', false),
+        ('tm_analysis_run.created_at', 'EVENT_INSTANT', 'AS_OF_PLUS_5_MINUTES',
+         'NEAR_SIMULTANEOUS_CANDIDATE', 'tm_analysis_run.started_at', 'NEAR_SIMULTANEOUS',
+         'WRITER_CREATED_NEAR_STARTED_REFERENCE', true),
+        ('tm_analysis_run.updated_at', 'AUDIT_UPDATE_TIME', 'AS_OF_PLUS_5_MINUTES',
+         'ORDERING_ONLY', 'tm_analysis_run.created_at', 'OBSERVED_GTE_REFERENCE',
+         'AS_OF_PLUS_5_MINUTES_NO_MAX_DELTA', false),
+        ('tm_analysis_run.started_at', 'EVENT_INSTANT', 'NOT_APPLICABLE',
+         'LIFECYCLE_ORDERING', 'tm_analysis_run.completed_at', 'OBSERVED_LTE_REFERENCE_WHEN_COMPLETE',
+         'COMPLETION_MAY_BE_NULL', false),
+        ('tm_analysis_run.completed_at', 'LIFECYCLE_COMPLETION_TIME', 'NOT_APPLICABLE',
+         'LIFECYCLE_ORDERING', 'tm_analysis_run.started_at', 'OBSERVED_GTE_REFERENCE',
+         'NO_ASSUMED_MAX_DELAY', false),
+        ('tm_hot_reset_event.event_time', 'EVENT_INSTANT', 'AS_OF_PLUS_5_MINUTES',
+         'DISTRIBUTION_ONLY', 'tm_hot_reset_event.create_time', 'MAY_PRECEDE_REFERENCE',
+         'NO_ASSUMED_MAX_DELAY', false),
+        ('tm_hot_reset_event.create_time', 'EVENT_INSTANT', 'AS_OF_PLUS_5_MINUTES',
+         'NOT_APPLICABLE', 'none', 'NONE', 'AS_OF_PLUS_5_MINUTES', false),
+        ('tm_hot_reset_event.completed_at', 'LIFECYCLE_COMPLETION_TIME', 'NOT_APPLICABLE',
+         'ORDERING_AND_DURATION', 'tm_hot_reset_event.create_time', 'OBSERVED_GTE_REFERENCE',
+         'NO_ASSUMED_MAX_DELAY', false),
+        ('tm_decision_result.create_time', 'EVENT_INSTANT', 'AS_OF_PLUS_5_MINUTES',
+         'NOT_APPLICABLE', 'none', 'NONE', 'AS_OF_PLUS_5_MINUTES', false),
+        ('tm_decision_result.valid_from', 'VALIDITY_START', 'NOT_APPLICABLE',
+         'VALIDITY_INTERVAL', 'tm_decision_result.expires_at', 'OBSERVED_LTE_REFERENCE',
+         'FUTURE_ALLOWED_NO_ASSUMED_HORIZON', false),
+        ('tm_decision_result.expires_at', 'VALIDITY_END', 'NOT_APPLICABLE',
+         'VALIDITY_INTERVAL', 'tm_decision_result.valid_from', 'OBSERVED_GTE_REFERENCE',
+         'FUTURE_ALLOWED_NO_ASSUMED_HORIZON', false)
 ), time_values(field_name, observed_time, reference_time) AS (
-    SELECT 'tm_monitor_alert.created_at', created_at, updated_at FROM tm_monitor_alert
+    SELECT 'tm_monitor_alert.created_at', created_at, NULL::TIMESTAMP FROM tm_monitor_alert
     UNION ALL SELECT 'tm_monitor_alert.updated_at', updated_at, created_at FROM tm_monitor_alert
     UNION ALL SELECT 'tm_monitor_alert.cooldown_until', cooldown_until, created_at FROM tm_monitor_alert
     UNION ALL SELECT 'tm_analysis_run.analysis_time', analysis_time, created_at FROM tm_analysis_run
-    UNION ALL SELECT 'tm_analysis_run.created_at', created_at, analysis_time FROM tm_analysis_run
-    UNION ALL SELECT 'tm_analysis_run.started_at', started_at, analysis_time FROM tm_analysis_run
-    UNION ALL SELECT 'tm_analysis_run.completed_at', completed_at, analysis_time FROM tm_analysis_run
+    UNION ALL SELECT 'tm_analysis_run.created_at', created_at, started_at FROM tm_analysis_run
+    UNION ALL SELECT 'tm_analysis_run.updated_at', updated_at, created_at FROM tm_analysis_run
+    UNION ALL SELECT 'tm_analysis_run.started_at', started_at, completed_at FROM tm_analysis_run
+    UNION ALL SELECT 'tm_analysis_run.completed_at', completed_at, started_at FROM tm_analysis_run
     UNION ALL SELECT 'tm_hot_reset_event.event_time', event_time, create_time FROM tm_hot_reset_event
-    UNION ALL SELECT 'tm_hot_reset_event.create_time', create_time, event_time FROM tm_hot_reset_event
-    UNION ALL SELECT 'tm_hot_reset_event.completed_at', completed_at, event_time FROM tm_hot_reset_event
+    UNION ALL SELECT 'tm_hot_reset_event.create_time', create_time, NULL::TIMESTAMP FROM tm_hot_reset_event
+    UNION ALL SELECT 'tm_hot_reset_event.completed_at', completed_at, create_time FROM tm_hot_reset_event
+    UNION ALL SELECT 'tm_decision_result.create_time', create_time, NULL::TIMESTAMP FROM tm_decision_result
     UNION ALL
-    SELECT 'tm_decision_result.create_time', d.create_time, r.analysis_time
-    FROM tm_decision_result d
-    LEFT JOIN tm_analysis_run r ON r.analysis_id = d.analysis_id
+    SELECT 'tm_decision_result.valid_from', valid_from AT TIME ZONE 'UTC', expires_at AT TIME ZONE 'UTC'
+    FROM tm_decision_result
     UNION ALL
-    SELECT 'tm_decision_result.valid_from', d.valid_from AT TIME ZONE 'UTC', d.create_time
-    FROM tm_decision_result d
-    UNION ALL
-    SELECT 'tm_decision_result.expires_at', d.expires_at AT TIME ZONE 'UTC', d.create_time
-    FROM tm_decision_result d
+    SELECT 'tm_decision_result.expires_at', expires_at AT TIME ZONE 'UTC', valid_from AT TIME ZONE 'UTC'
+    FROM tm_decision_result
 ), field_summary AS (
-    SELECT field_catalog.field_name,
-           COUNT(time_values.field_name) AS total_rows,
-           COUNT(time_values.field_name) FILTER (WHERE observed_time IS NULL) AS null_rows,
-           MIN(observed_time) AS earliest_time,
-           MAX(observed_time) AS latest_time,
+    SELECT catalog.field_name,
+           catalog.future_check_mode,
+           catalog.relation_check_mode,
+           COUNT(values.field_name) AS total_rows,
+           COUNT(values.field_name) FILTER (WHERE values.observed_time IS NULL) AS null_rows,
+           MIN(values.observed_time) AS earliest_time,
+           MAX(values.observed_time) AS latest_time,
            COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND observed_time > inventory_clock.as_of_utc + INTERVAL '5 minutes'
-           ) AS obvious_future_rows,
+               WHERE values.field_name IS NOT NULL
+                 AND catalog.future_check_mode = 'AS_OF_PLUS_5_MINUTES'
+                 AND values.observed_time IS NOT NULL
+                 AND values.observed_time > clock.as_of_utc + INTERVAL '5 minutes'
+           ) AS future_event_candidate_rows,
            COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL AND reference_time IS NULL
-           ) AS no_reference_rows,
-           COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND observed_time IS NOT NULL AND reference_time IS NOT NULL
-                 AND ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) > 43200
-           ) AS reference_mismatch_rows
-    FROM field_catalog
-    LEFT JOIN time_values USING (field_name)
-    CROSS JOIN inventory_clock
-    GROUP BY field_catalog.field_name
+               WHERE values.field_name IS NOT NULL
+                 AND catalog.relation_check_mode <> 'NOT_APPLICABLE'
+                 AND values.observed_time IS NOT NULL
+                 AND values.reference_time IS NULL
+           ) AS missing_reference_rows
+    FROM field_catalog catalog
+    LEFT JOIN time_values values USING (field_name)
+    CROSS JOIN inventory_clock clock
+    GROUP BY catalog.field_name, catalog.future_check_mode, catalog.relation_check_mode
 ), day_buckets AS (
     SELECT field_name, DATE_TRUNC('day', observed_time) AS bucket, COUNT(*) AS row_count
     FROM time_values
@@ -75,66 +114,161 @@ WITH inventory_clock AS (
     FROM time_values
     WHERE observed_time IS NOT NULL
     GROUP BY field_name, DATE_TRUNC('hour', observed_time)
-), offset_patterns AS (
-    SELECT field_catalog.field_name,
+), ordering_anomalies(anomaly_code, relation_name, anomaly_count) AS (
+    SELECT 'AUDIT_ORDER_INVALID', 'tm_monitor_alert.updated_at>=tm_monitor_alert.created_at', COUNT(*)
+    FROM tm_monitor_alert WHERE updated_at < created_at
+    UNION ALL
+    SELECT 'SCHEDULE_ORDER_INVALID', 'tm_monitor_alert.cooldown_until>=tm_monitor_alert.created_at', COUNT(*)
+    FROM tm_monitor_alert WHERE cooldown_until IS NOT NULL AND cooldown_until < created_at
+    UNION ALL
+    SELECT 'AUDIT_ORDER_INVALID', 'tm_analysis_run.updated_at>=tm_analysis_run.created_at', COUNT(*)
+    FROM tm_analysis_run WHERE updated_at < created_at
+    UNION ALL
+    SELECT 'ANALYSIS_LIFECYCLE_ORDER_INVALID', 'tm_analysis_run.started_at<=tm_analysis_run.completed_at', COUNT(*)
+    FROM tm_analysis_run
+    WHERE started_at IS NOT NULL AND completed_at IS NOT NULL AND started_at > completed_at
+    UNION ALL
+    SELECT 'HOT_RESET_LIFECYCLE_ORDER_INVALID', 'tm_hot_reset_event.create_time<=tm_hot_reset_event.completed_at', COUNT(*)
+    FROM tm_hot_reset_event
+    WHERE completed_at IS NOT NULL AND create_time > completed_at
+    UNION ALL
+    SELECT 'VALIDITY_ORDER_INVALID', 'tm_decision_result.valid_from<=tm_decision_result.expires_at', COUNT(*)
+    FROM tm_decision_result
+    WHERE valid_from IS NOT NULL AND expires_at IS NOT NULL AND valid_from > expires_at
+    UNION ALL
+    SELECT 'VALIDITY_PARTIAL_NULL', 'tm_decision_result.valid_from_and_expires_at_pair', COUNT(*)
+    FROM tm_decision_result
+    WHERE (valid_from IS NULL) <> (expires_at IS NULL)
+), duration_catalog(metric_name, duration_contract) AS (
+    VALUES
+        ('MONITOR_COOLDOWN', 'cooldown_until-created_at'),
+        ('ANALYSIS_CREATED_MINUS_CANONICAL', 'created_at-analysis_time_distribution_only'),
+        ('HOT_RESET_PROCESSING_DELAY', 'completed_at-create_time'),
+        ('DECISION_VALIDITY', 'expires_at-valid_from')
+), duration_values(metric_name, duration_seconds) AS (
+    SELECT 'MONITOR_COOLDOWN', EXTRACT(EPOCH FROM cooldown_until - created_at)
+    FROM tm_monitor_alert WHERE cooldown_until IS NOT NULL
+    UNION ALL
+    SELECT 'ANALYSIS_CREATED_MINUS_CANONICAL', EXTRACT(EPOCH FROM created_at - analysis_time)
+    FROM tm_analysis_run
+    UNION ALL
+    SELECT 'HOT_RESET_PROCESSING_DELAY', EXTRACT(EPOCH FROM completed_at - create_time)
+    FROM tm_hot_reset_event WHERE completed_at IS NOT NULL
+    UNION ALL
+    SELECT 'DECISION_VALIDITY', EXTRACT(EPOCH FROM expires_at - valid_from)
+    FROM tm_decision_result WHERE valid_from IS NOT NULL AND expires_at IS NOT NULL
+), duration_summary AS (
+    SELECT catalog.metric_name,
+           catalog.duration_contract,
+           COUNT(values.metric_name) AS measured_rows,
+           COUNT(values.metric_name) FILTER (WHERE values.duration_seconds < 0) AS negative_rows,
+           MIN(values.duration_seconds)::BIGINT AS min_seconds,
+           MAX(values.duration_seconds)::BIGINT AS max_seconds
+    FROM duration_catalog catalog
+    LEFT JOIN duration_values values USING (metric_name)
+    GROUP BY catalog.metric_name, catalog.duration_contract
+), duration_buckets AS (
+    SELECT metric_name,
+           CASE
+               WHEN duration_seconds < 0 THEN 'NEGATIVE'
+               WHEN duration_seconds = 0 THEN 'ZERO'
+               WHEN duration_seconds <= 300 THEN 'GT_0_LE_5M'
+               WHEN duration_seconds <= 1800 THEN 'GT_5M_LE_30M'
+               WHEN duration_seconds <= 3600 THEN 'GT_30M_LE_1H'
+               WHEN duration_seconds <= 14400 THEN 'GT_1H_LE_4H'
+               WHEN duration_seconds <= 43200 THEN 'GT_4H_LE_12H'
+               WHEN duration_seconds <= 86400 THEN 'GT_12H_LE_24H'
+               ELSE 'GT_24H'
+           END AS duration_bucket,
+           COUNT(*) AS row_count
+    FROM duration_values
+    GROUP BY metric_name,
+             CASE
+                 WHEN duration_seconds < 0 THEN 'NEGATIVE'
+                 WHEN duration_seconds = 0 THEN 'ZERO'
+                 WHEN duration_seconds <= 300 THEN 'GT_0_LE_5M'
+                 WHEN duration_seconds <= 1800 THEN 'GT_5M_LE_30M'
+                 WHEN duration_seconds <= 3600 THEN 'GT_30M_LE_1H'
+                 WHEN duration_seconds <= 14400 THEN 'GT_1H_LE_4H'
+                 WHEN duration_seconds <= 43200 THEN 'GT_4H_LE_12H'
+                 WHEN duration_seconds <= 86400 THEN 'GT_12H_LE_24H'
+                 ELSE 'GT_24H'
+             END
+), validity_state_catalog(validity_state) AS (
+    VALUES ('NOT_ACTIVE'), ('ACTIVE'), ('EXPIRED')
+), validity_state_values(validity_state) AS (
+    SELECT CASE
+               WHEN decision.valid_from > clock.as_of_utc AT TIME ZONE 'UTC' THEN 'NOT_ACTIVE'
+               WHEN decision.expires_at <= clock.as_of_utc AT TIME ZONE 'UTC' THEN 'EXPIRED'
+               ELSE 'ACTIVE'
+           END
+    FROM tm_decision_result decision
+    CROSS JOIN inventory_clock clock
+    WHERE decision.valid_from IS NOT NULL
+      AND decision.expires_at IS NOT NULL
+      AND decision.valid_from <= decision.expires_at
+), validity_states AS (
+    SELECT catalog.validity_state, COUNT(values.validity_state) AS row_count
+    FROM validity_state_catalog catalog
+    LEFT JOIN validity_state_values values USING (validity_state)
+    GROUP BY catalog.validity_state
+), validity_null_states AS (
+    SELECT COUNT(*) FILTER (WHERE valid_from IS NULL AND expires_at IS NULL) AS both_null_rows,
+           COUNT(*) FILTER (WHERE (valid_from IS NULL) <> (expires_at IS NULL)) AS partial_null_rows
+    FROM tm_decision_result
+), offset_pattern_candidates AS (
+    SELECT catalog.field_name,
+           catalog.reference_field,
            COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND EXTRACT(EPOCH FROM observed_time - reference_time) = 28800
+               WHERE values.observed_time IS NOT NULL AND values.reference_time IS NOT NULL
+                 AND EXTRACT(EPOCH FROM values.observed_time - values.reference_time) = 28800
            ) AS plus_8h_rows,
            COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND EXTRACT(EPOCH FROM observed_time - reference_time) = -28800
+               WHERE values.observed_time IS NOT NULL AND values.reference_time IS NOT NULL
+                 AND EXTRACT(EPOCH FROM values.observed_time - values.reference_time) = -28800
            ) AS minus_8h_rows,
            COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND EXTRACT(EPOCH FROM observed_time - reference_time) = 14400
+               WHERE values.observed_time IS NOT NULL AND values.reference_time IS NOT NULL
+                 AND EXTRACT(EPOCH FROM values.observed_time - values.reference_time) = 14400
            ) AS plus_4h_rows,
            COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND EXTRACT(EPOCH FROM observed_time - reference_time) = -14400
-           ) AS minus_4h_rows,
-           COUNT(*) FILTER (
-               WHERE time_values.field_name IS NOT NULL
-                 AND observed_time IS NOT NULL AND reference_time IS NOT NULL
-                 AND observed_time <> reference_time
-                 AND MOD(ABS(EXTRACT(EPOCH FROM observed_time - reference_time))::BIGINT, 3600) = 0
-           ) AS nonzero_whole_hour_rows
-    FROM field_catalog
-    LEFT JOIN time_values USING (field_name)
-    GROUP BY field_catalog.field_name
-), delta_buckets AS (
-    SELECT field_name,
-           CASE
-               WHEN reference_time IS NULL THEN 'NO_REFERENCE'
-               WHEN observed_time IS NULL THEN 'NULL_OBSERVED_TIME'
-               WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) < 60 THEN 'SAME_MINUTE'
-               WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) <= 3600 THEN 'LE_1H'
-               WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) <= 14400 THEN 'LE_4H'
-               WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) <= 43200 THEN 'LE_12H'
-               ELSE 'GT_12H'
-           END AS delta_bucket,
-           COUNT(*) AS row_count
-    FROM time_values
-    GROUP BY field_name,
-             CASE
-                 WHEN reference_time IS NULL THEN 'NO_REFERENCE'
-                 WHEN observed_time IS NULL THEN 'NULL_OBSERVED_TIME'
-                 WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) < 60 THEN 'SAME_MINUTE'
-                 WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) <= 3600 THEN 'LE_1H'
-                 WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) <= 14400 THEN 'LE_4H'
-                 WHEN ABS(EXTRACT(EPOCH FROM observed_time - reference_time)) <= 43200 THEN 'LE_12H'
-                 ELSE 'GT_12H'
-             END
+               WHERE values.observed_time IS NOT NULL AND values.reference_time IS NOT NULL
+                 AND EXTRACT(EPOCH FROM values.observed_time - values.reference_time) = -14400
+           ) AS minus_4h_rows
+    FROM field_catalog catalog
+    LEFT JOIN time_values values USING (field_name)
+    WHERE catalog.offset_pattern_applicable
+    GROUP BY catalog.field_name, catalog.reference_field
 ), output_lines AS (
-    SELECT 10 AS section_order, field_name AS sort_key,
+    SELECT 5 AS section_order, field_name AS sort_key,
+           'FIELD_POLICY|' || field_name
+             || '|semantic_type=' || semantic_type
+             || '|future_check_mode=' || future_check_mode
+             || '|relation_check_mode=' || relation_check_mode
+             || '|reference_field=' || reference_field
+             || '|expected_ordering=' || expected_ordering
+             || '|tolerance_contract=' || tolerance_contract
+             || '|offset_pattern_applicable=' || CASE WHEN offset_pattern_applicable THEN 'true' ELSE 'false' END
+             AS output_line
+    FROM field_catalog
+    UNION ALL
+    SELECT 10, field_name,
            'FIELD_SUMMARY|' || field_name
              || '|total=' || total_rows
              || '|null=' || null_rows
              || '|earliest=' || COALESCE(earliest_time::TEXT, 'none')
              || '|latest=' || COALESCE(latest_time::TEXT, 'none')
-             || '|future=' || obvious_future_rows
-             || '|no_reference=' || no_reference_rows
-             || '|reference_mismatch=' || reference_mismatch_rows AS output_line
+             || '|future_check=' || future_check_mode
+             || '|future_event_candidates=' || CASE
+                    WHEN future_check_mode = 'NOT_APPLICABLE' THEN 'NOT_APPLICABLE'
+                    ELSE future_event_candidate_rows::TEXT
+                END
+             || '|reference_check=' || relation_check_mode
+             || '|missing_reference=' || CASE
+                    WHEN relation_check_mode = 'NOT_APPLICABLE' THEN 'NOT_APPLICABLE'
+                    ELSE missing_reference_rows::TEXT
+                END
+             AS output_line
     FROM field_summary
     UNION ALL
     SELECT 20, field_name || bucket::TEXT,
@@ -146,17 +280,48 @@ WITH inventory_clock AS (
     FROM hour_buckets
     UNION ALL
     SELECT 40, field_name,
-           'OFFSET_PATTERN|' || field_name
+           'FUTURE_EVENT_CANDIDATE|EVENT_FUTURE_OUTLIER|field=' || field_name
+             || '|count=' || future_event_candidate_rows
+    FROM field_summary
+    WHERE future_check_mode = 'AS_OF_PLUS_5_MINUTES'
+    UNION ALL
+    SELECT 50, anomaly_code || relation_name,
+           'ORDERING_ANOMALY|' || anomaly_code || '|relation=' || relation_name || '|count=' || anomaly_count
+    FROM ordering_anomalies
+    UNION ALL
+    SELECT 60, metric_name,
+           'DURATION_SUMMARY|' || metric_name
+             || '|contract=' || duration_contract
+             || '|count=' || measured_rows
+             || '|negative=' || negative_rows
+             || '|min_seconds=' || COALESCE(min_seconds::TEXT, 'none')
+             || '|max_seconds=' || COALESCE(max_seconds::TEXT, 'none')
+    FROM duration_summary
+    UNION ALL
+    SELECT 70, metric_name || duration_bucket,
+           'DURATION_BUCKET|' || metric_name || '|bucket=' || duration_bucket || '|count=' || row_count
+    FROM duration_buckets
+    UNION ALL
+    SELECT 80, validity_state,
+           'VALIDITY_STATE|' || validity_state || '|count=' || row_count
+    FROM validity_states
+    UNION ALL
+    SELECT 85, 'BOTH_NULL',
+           'VALIDITY_NULL_STATE|BOTH_NULL|count=' || both_null_rows
+    FROM validity_null_states
+    UNION ALL
+    SELECT 85, 'PARTIAL_NULL',
+           'VALIDITY_NULL_STATE|PARTIAL_NULL|count=' || partial_null_rows
+    FROM validity_null_states
+    UNION ALL
+    SELECT 90, field_name,
+           'OFFSET_PATTERN_CANDIDATE|field=' || field_name
+             || '|reference=' || reference_field
              || '|plus_8h=' || plus_8h_rows
              || '|minus_8h=' || minus_8h_rows
              || '|plus_4h=' || plus_4h_rows
              || '|minus_4h=' || minus_4h_rows
-             || '|whole_hour_nonzero=' || nonzero_whole_hour_rows
-    FROM offset_patterns
-    UNION ALL
-    SELECT 50, field_name || delta_bucket,
-           'DELTA_BUCKET|' || field_name || '|bucket=' || delta_bucket || '|count=' || row_count
-    FROM delta_buckets
+    FROM offset_pattern_candidates
 ), fingerprint AS (
     SELECT MD5(STRING_AGG(output_line, E'\n' ORDER BY section_order, sort_key)) AS aggregate_hash
     FROM output_lines
@@ -167,5 +332,6 @@ UNION ALL
 SELECT 'AGGREGATE_MD5|' || aggregate_hash
 FROM fingerprint
 ORDER BY 1;
+-- INVENTORY_QUERY_END
 
 COMMIT;
