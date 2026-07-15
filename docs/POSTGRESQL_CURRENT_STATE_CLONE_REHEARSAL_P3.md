@@ -2,51 +2,61 @@
 
 ## Decision
 
-- Package: `Sanitized Release-Like Current-State Clone Inventory and Backup/Restore Rehearsal P3`
+- Package branch: `codex/postgresql-current-state-clone-rehearsal-p3`
 - Base merged-main commit: `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf`
-- Branch: `codex/postgresql-current-state-clone-rehearsal-p3`
-- Source dataset status: `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`
-- P3 database evidence status: `NOT_RUN`
-- Effective status: `DRAFT_BRANCH_NOT_MERGED`
+- Generated P3.1 rehearsal: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`
+- Source dataset status: `GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`
+- Final sanitized current-state clone gate: `BLOCKED_NOT_RUN`
+- P4 allowed: `NO`
 - Production readiness: `BLOCKED`
 
-The P3 harness and its offline safety contracts are implemented, but no
-sanitized release-like dump or sanitization attestation was present in the
-operator environment. The default runner stopped before Docker or database
-access. Harness tests are not current-state dataset evidence and are not
-reported as a P3 migration, backup, restore, or application-smoke pass.
+P3 now has an executed end-to-end generated-data rehearsal. That rehearsal
+proves the bounded harness, PostgreSQL 16 backup/restore, V6-to-V7 migration,
+aggregate inventory, and local application smoke against deterministic
+repository-generated data. It does **not** prove behavior against a sanctioned
+sanitized current-state clone and must not be called a completed final P3 gate.
 
-## Input Gate Result
+Detailed generated evidence is in
+`docs/P3_GENERATED_RELEASE_LIKE_FIXTURE_EVIDENCE.md`.
 
-The guarded default invocation was:
+## Two Dataset Classes
+
+The runner accepts two deliberately separate contracts:
+
+| Dataset class | Confirmation | Successful result | Final sanitized-clone gate |
+|---|---|---|---|
+| `GENERATED_RELEASE_LIKE` | `I_CONFIRM_GENERATED_NON_PRODUCTION_RELEASE_LIKE_DATASET` | `PASS_GENERATED_RELEASE_LIKE_REHEARSAL` | `BLOCKED_NOT_RUN` |
+| `SANITIZED_RELEASE_LIKE` | `I_CONFIRM_SANITIZED_NON_PRODUCTION_RELEASE_LIKE_DATASET` | `PASS_SANITIZED_RELEASE_LIKE_REHEARSAL` | pending evidence review |
+
+A generated attestation cannot be passed as a sanitized attestation. Neither
+class can set `P4_ALLOWED: YES`, and neither run claims production readiness.
+
+## Generated Fixture Path
+
+The deterministic generator is:
 
 ```bash
-bash scripts/controlled-current-state-clone-rehearsal-p3.sh
+bash scripts/generate-p3-release-like-fixture.sh
 ```
 
-It returned:
+It uses fixed seed `20260715`, the digest-pinned PostgreSQL 16.14 image,
+localhost port `55434`, and disposable database
+`trade_model_v1_p3_generated_source`. Flyway is stopped at V6 before fixture
+data is inserted. The ignored outputs are:
 
 ```text
-P3_SANITIZED_DUMP_FILE: MISSING
-P3_SANITIZATION_ATTESTATION_FILE: MISSING
-P3_DATASET_ID: MISSING
-P3_DATASET_CLASS: MISSING
-P3_CONFIRM: MISSING
-P3_LOCAL_DB_RECREATE_CONFIRM: MISSING
-SOURCE_DATASET_STATUS: BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP
-P3_RESULT: BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP
-DATABASE_ACCESS: NOT_ATTEMPTED
-DOCKER_ACTION: NOT_ATTEMPTED
-PRODUCTION_READINESS: BLOCKED
+.runtime/p3-input/generated-release-like-v6.dump
+.runtime/p3-input/generated-release-like.attestation
+.runtime/p3-input/generated-release-like.summary
 ```
 
-No production database was accessed. No database dump was created or read. No
-Docker container was started. No destructive database operation was run.
+The attestation states `DATA_SOURCE_CLASS=GENERATED_RELEASE_LIKE`, all real
+data inclusion fields are `NO`, and
+`SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO`.
 
-## Required Operator Input
+## Sanitized Input Gate
 
-P3 accepts a PostgreSQL custom-format dump only after all six variables are
-present:
+Final P3.2 requires a separately sanctioned custom-format dump and attestation:
 
 ```text
 P3_SANITIZED_DUMP_FILE
@@ -57,33 +67,15 @@ P3_CONFIRM=I_CONFIRM_SANITIZED_NON_PRODUCTION_RELEASE_LIKE_DATASET
 P3_LOCAL_DB_RECREATE_CONFIRM=I_UNDERSTAND_ONLY_LOCAL_P3_DATABASES_ARE_DROPPED
 ```
 
-The dump and attestation paths must be absolute and either outside the
-repository or under ignored `.runtime/p3-input/`. Their contents are never
-copied into Git. Dataset identifiers are hashed before evidence output.
-
-The attestation file uses a key/value contract and must contain:
-
-```text
-DATA_SOURCE_CLASS=SANITIZED_RELEASE_LIKE
-SANITIZATION_OWNER_OR_PROCESS=<non-secret process reference>
-GENERATED_AT_UTC=<timestamp>
-SOURCE_POSTGRESQL_VERSION=<version>
-SOURCE_FLYWAY_VERSION=<version>
-USER_IDENTIFIERS_REMOVED_OR_PSEUDONYMIZED=YES
-SECRETS_REMOVED=YES
-FREE_TEXT_CLEANED_OR_REPLACED=YES
-LOCAL_CONTROLLED_REHEARSAL_ALLOWED=YES
-NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE=YES
-```
-
-An attestation is a required human/process assertion. The aggregate candidate
-scan is an additional misuse guard; zero candidates does not prove that a
-dataset is free of every possible secret or personal identifier.
+Paths must be absolute and outside tracked repository content, or under the
+ignored `.runtime/p3-input/` directory. The attestation must confirm removal
+or pseudonymization of user identifiers, removal of secrets, replacement of
+free text, non-production provenance, and explicit local rehearsal approval.
+Aggregate candidate scans supplement but do not replace that attestation.
 
 ## Runner Safety Contract
 
-`scripts/controlled-current-state-clone-rehearsal-p3.sh` enforces these fixed
-targets:
+`scripts/controlled-current-state-clone-rehearsal-p3.sh` fixes these targets:
 
 | Item | Fixed value |
 |---|---|
@@ -94,16 +86,49 @@ targets:
 | Recovery DB | `trade_model_v1_p3_recovery` |
 | Evidence directory | ignored `.runtime/postgresql-p3-rehearsal/` |
 
-The runner rejects remote hosts, alternate ports, alternate database names,
-production-like indicators, relative input paths, incomplete attestations,
-non-custom dumps, and dumps containing database-creation entries. It uses
-bounded commands, a random local password, redacted logs, and an exit trap that
-stops the application and removes the disposable container on success or
-failure.
+It rejects remote hosts, alternate ports/database names, production-like
+indicators, relative input paths, mismatched class/confirmation/attestation,
+non-custom dumps, and database-creation entries. Every external command is
+bounded. The exit trap stops the local app and removes the container on
+success, failure, or interruption.
 
-It invokes the repository backup and restore contracts. Custom restore now
-uses `--no-owner`, `--no-acl`, and `--exit-on-error`. No role or ACL from the
-input dump is restored.
+SQL files are passed explicitly to background psql processes; an empty stdin
+cannot count as successful evidence. Backup and restore use `pg_dump` and
+`pg_restore` from the pinned PostgreSQL 16 container with `--no-owner`,
+`--no-acl`, and `--exit-on-error`. This avoids host PostgreSQL client/server
+version drift such as the PostgreSQL 18 `transaction_timeout` setup error
+against PostgreSQL 16.
+
+## Executed Generated Evidence
+
+The generated run completed on 2026-07-15 with:
+
+| Gate | Result |
+|---|---|
+| Source Flyway | V6 |
+| Source row counts | analysis=138, decision=120, plan=121, position=7, monitor=8, OHLCV=1200 |
+| Source fingerprint | `515192907bc261379d2b20e8c2389fc9d17f155f670965a8a0f4fa2dfea7a051` |
+| Repeated generation fingerprint | `MATCH` |
+| Controlled backup | `PASS` |
+| Backup SHA-256 | `eee90d3f00d50b949709d9d26695b0780bd7a4878d78d0fc8b4e680b70475958` |
+| Recovery restore | `PASS` |
+| Source/recovery fingerprint | `MATCH` |
+| Migration path | `V6_TO_V7` |
+| Migration | `PASS` |
+| Historical validity rewrites | `0` |
+| Historical-time inventory | `PASS_READ_ONLY_AGGREGATE` |
+| Application smoke | `PASS` |
+| Same-symbol A/B plan isolation | `PASS` |
+| Incomplete-plan fail-closed case | `PASS` |
+| Expired historical-plan fail-closed case | `PASS` |
+| Revalidation fail-closed case | `PASS` |
+| Post-migration fingerprint | `9dc3ccd45cdd947351bdd0d7f6c3a1ffe1e3091a60367a50ad3eb715b60964d9` |
+| Unexpected business writes | `0` |
+| Container cleanup | `PASS` |
+
+The V6 source validation targets V6 exactly, while the rehearsal migration
+targets V7. Pending V7 is therefore not confused with a V1-V6 checksum
+failure, and migration still must apply exactly one V7 row.
 
 ## Aggregate-Only Evidence Contract
 
@@ -113,97 +138,57 @@ The runner uses:
 - `scripts/current-state-clone-restore-verification.sql`
 - `scripts/historical-time-basis-inventory.sh`
 
-Permitted evidence includes table row counts, schema/index/constraint counts,
-sequence state, Flyway version/checksum/status, integrity anomaly counts,
-historical-time distributions, aggregate hashes, and PASS/BLOCKED markers.
+Evidence contains schema/table/index/constraint counts, sequence state,
+Flyway status/checksum, integrity anomaly counts, time distributions,
+aggregate hashes, and PASS/BLOCKED markers. It excludes business rows,
+identifiers, quantities, prices, reason text/JSON, credentials, URLs, and
+provider keys.
 
-The evidence must not contain row identifiers, position quantities or amounts,
-prices, source-reference values, reason JSON, free text, credentials, complete
-connection strings, or provider keys. Secret, PII, and production-reference
-candidate checks output counts only. Any nonzero candidate count blocks the
-rehearsal as `BLOCKED_SANITIZATION_ATTESTATION_MISMATCH`.
+The historical inventory is compatible with V6 and V7. It reports whether the
+two V7 validity columns exist and never invents values for V6 or legacy rows.
 
-## Future Controlled Execution Path
+## Application Smoke Contract
 
-Once the required sanitized input exists, one run performs this sequence:
+The app starts only against the disposable rehearsal DB. All schedulers, AI,
+market providers, external calls, Push, and provider escalation are disabled.
+The generated run checks:
 
-1. Validate the attestation, input location, SHA-256, and custom dump format.
-2. Start one digest-pinned local PostgreSQL container.
-3. Restore the input into the fixed source database.
-4. Verify DB identity, Flyway V6/V7 status, checksums, extensions, roles, FDW,
-   aggregate integrity, secret candidates, and historical-time inventory.
-5. Invoke `scripts/prod-backup.sh` and record the custom backup SHA-256.
-6. Invoke `scripts/prod-restore.sh` into the independent recovery database and
-   require exact aggregate fingerprint/inventory matches.
-7. Restore the same backup into the rehearsal database.
-8. Allow only V6-to-V7 or V7 validate/idempotent migrate. Any other source
-   version fails closed.
-9. Require unchanged business-table counts after migration.
-10. Start the app against rehearsal with every scheduler, AI provider, market
-    provider, Push, and external-call path disabled.
-11. Check health, Dashboard Home, Run Baseline, safety flags, and zero
-    unexpected business writes.
-12. Preserve recovery as the pre-migration copy and remove the local container.
+- health and Run Baseline;
+- Dashboard Home safety fields;
+- no-open-position and unique-position cases;
+- same-symbol multiple positions require explicit position selection;
+- exact BTC A and B source plan/analysis identities do not cross;
+- incomplete history remains fail-closed;
+- expired history remains in position-monitoring review and never becomes a
+  current executable suggestion;
+- revalidation-required history remains review-only;
+- no forbidden trading language; and
+- unchanged business-table counts after app startup and requests.
 
-The runner never performs a schema-history baseline, repair, historical-time
-shift, or production migration.
+## Tests
 
-## Current Evidence Matrix
+- `ControlledGeneratedReleaseLikeFixtureContractTest` locks seed, digest,
+  local target, row coverage, safety flags, aggregate checks, deterministic
+  fingerprinting, dump policy, cleanup, and ignored artifacts.
+- `ControlledGeneratedReleaseLikeFixtureFlywayTest` can create only the exact
+  local generated V6 database after explicit confirmation.
+- `ControlledCurrentStateCloneRehearsalP3ContractTest` proves generated and
+  sanitized classes cannot impersonate one another and never unlock P4.
+- `ControlledCurrentStateCloneFlywayActionTest` validates only the observed
+  V6/V7 source version and migrates only the exact rehearsal DB to V7.
 
-| Gate | Current result |
-|---|---|
-| Sanitized release-like dump | `MISSING` |
-| Sanitization attestation | `MISSING` |
-| Source read-only inventory | `NOT_RUN` |
-| Source fingerprint | `NOT_RUN` |
-| Controlled backup | `NOT_RUN` |
-| Recovery restore | `NOT_RUN` |
-| Source/recovery fingerprint | `NOT_RUN` |
-| V6-to-V7 or V7 idempotent migration | `NOT_RUN` |
-| Post-migration fingerprint | `NOT_RUN` |
-| Application readonly smoke | `NOT_RUN` |
-| Unexpected business writes | `NOT_MEASURED` |
-| Writer cutover | `MISSING_OPERATIONAL_EVIDENCE` |
-| Production readiness | `BLOCKED` |
-
-## Offline Contract Tests
-
-`ControlledCurrentStateCloneRehearsalP3ContractTest` verifies missing and
-invalid input blocks, exact localhost/database allowlists, explicit recreate
-confirmation, checksum/fingerprint requirements, cleanup traps, redaction,
-aggregate-only SQL, restore flags, and prohibited migration/production paths.
-
-`ControlledCurrentStateCloneFlywayActionTest` is environment-gated. It can
-validate only the three exact localhost P3 databases and migrate only the
-rehearsal database. With no controlled DB environment it is skipped; that skip
-is expected and is not PostgreSQL evidence.
-
-Authoring validation on this branch recorded `3539` tests, `0` failures, `0`
-errors, and `4` skips. The P3 contract class contributed `16` passing tests;
-the P3 Flyway action test contributed one of the four environment-gated skips.
-The other controlled PostgreSQL skips pre-existed this package. Workflow
-contract, YAML parse, shell syntax, and diff-whitespace checks passed. These
-results validate code/contracts only and do not change the blocked dataset
-evidence status.
-
-## Evidence Artifacts After A Real Run
-
-A successful controlled run would create ignored files under
-`.runtime/postgresql-p3-rehearsal/`, including `summary.txt`, input hashes,
-source identity, Flyway before/after, source/recovery/rehearsal fingerprints,
-backup metadata, restore verification, application smoke, cutover summary, and
-checksums. Dumps and attestations remain untracked.
-
-No such runtime evidence bundle exists for this blocked run.
+Environment-gated tests that do not receive an approved database remain
+skipped and are not reported as PostgreSQL evidence.
 
 ## Remaining Gates
 
-1. Provide an approved sanitized non-production release-like custom dump and
-   complete attestation outside Git.
-2. Execute P3 without skips and review the redacted evidence bundle.
-3. Record real writer deployment/cutover evidence; local code is insufficient.
-4. Complete controlled staging/server smoke, real secret-store injection,
-   credential rotation, HTTPS/proxy auth smoke, and release-owner approval.
+1. Acquire an approved, sanitized, non-production release-like current-state
+   custom dump and separate attestation.
+2. Run P3.2 under `SANITIZED_RELEASE_LIKE` and review its redacted bundle.
+3. Complete operational writer-cutover evidence; generated/local rows cannot
+   establish production deployment history.
+4. Complete controlled server, secret-store/rotation, HTTPS/proxy auth, and
+   release-owner gates.
 
-P4 must not start while P3 is blocked on missing input. Production deployment
-cannot proceed.
+Next package: **Sanctioned Sanitized Release-Like Clone Acquisition and P3
+Final Evidence P3.2**. Production deployment cannot proceed.

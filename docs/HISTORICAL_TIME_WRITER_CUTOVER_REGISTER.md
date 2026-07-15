@@ -41,9 +41,15 @@ rows remain unverified and must not be shifted automatically.
 
 ## P3 Status
 
-P3 input is currently `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`, so no
-release-like historical inventory or backup/restore evidence was collected.
-Even a future P3 PASS can only record local clone behavior; it cannot establish
-the production cutover fields above.
+P3.1 collected aggregate historical inventory and PostgreSQL 16
+backup/restore evidence from a deterministic generated dataset. The run is
+`PASS_GENERATED_RELEASE_LIKE_REHEARSAL`, with exact source/recovery inventory
+and fingerprint matches, but the source is
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`.
+
+Generated rows cannot establish any deployment time, operator, first
+verifiable production row, or release-owner approval in this register. Every
+writer therefore remains `MISSING_OPERATIONAL_EVIDENCE`. Final sanitized-clone
+P3.2 is `BLOCKED_NOT_RUN` and remains a separate gate.
 
 No production database was accessed and no historical row was modified.

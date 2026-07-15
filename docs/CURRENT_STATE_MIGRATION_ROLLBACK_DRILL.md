@@ -12,11 +12,14 @@ proved fresh V1-V7, V6-V7, three session timezones, Dashboard V7 validity,
 mapper compatibility, and fail-closed application smoke. This does not replace
 the current-state dataset backup/restore drill defined by this document.
 
-P3 addendum (2026-07-15): the guarded release-like clone runner, aggregate
-fingerprint/restore SQL, and offline safety tests now exist. The required
-sanitized custom dump and attestation were not present, so the actual P3 result
-is `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`. No Docker/database action,
-source inventory, backup, restore, migration, or application smoke was run.
+P3.1 addendum (2026-07-15): a deterministic generated release-like V6 dataset
+completed source inventory, container-native PostgreSQL 16 backup/restore,
+source/recovery fingerprint comparison, V6-to-V7 migration, aggregate
+historical-time inventory, and fail-closed application smoke. Its result is
+`PASS_GENERATED_RELEASE_LIKE_REHEARSAL`, but its dataset status is explicitly
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`. Final P3 remains
+`BLOCKED_NOT_RUN` until a separately sanctioned sanitized current-state clone
+is acquired and rehearsed.
 
 ## Scope
 
@@ -45,7 +48,8 @@ evidence bundle before any production deployment decision.
 | `docs/HISTORICAL_TIME_BASIS_STRATEGY.md` | Defines aggregate-only inventory, writer-specific cutovers, and fail-closed handling of unverified history. |
 | `scripts/prod-backup.sh` | Requires explicit PostgreSQL env vars and uses `pg_dump`; no DB URL or secrets are hardcoded. |
 | `scripts/prod-restore.sh` | Requires explicit restore env vars and confirmation; custom restore uses `--no-owner`, `--no-acl`, and `--exit-on-error`. |
-| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, bounded steps, aggregate-only evidence, and cleanup trap; currently blocked before Docker because the required sanitized input is missing. |
+| `scripts/generate-p3-release-like-fixture.sh` | Produces a fixed-seed V6 generated fixture, aggregate checks, custom dump, and generated-only attestation under ignored runtime storage. |
+| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, generated/sanitized class isolation, bounded container-native backup/restore, aggregate evidence, app smoke, and cleanup trap. Generated P3.1 passed; final sanitized P3.2 is not run. |
 | `scripts/prod-release-gate.sh` | Can require backup evidence, does not run restore automatically, and remains incomplete until restore and human evidence are recorded. |
 | `docs/PRODUCTION_READINESS_RUNBOOK.md` | Contains production migration policy, server skeleton, smoke commands, and restore troubleshooting; PDR-PF4 adds the explicit current-state/rollback drill shape. |
 
@@ -240,10 +244,14 @@ removed its auxiliary databases and container.
 - No production DB was accessed.
 - No destructive operation was run outside disposable controlled databases.
 - Fresh V1-V7 and V6-V7 controlled-local migration evidence is complete.
-- No backup or restore was executed against a current-state release dataset.
-- No production-like current-state migration rehearsal was executed.
-- P3 input remains `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`; harness
-  contract tests are not database evidence.
+- Generated P3.1 executed PostgreSQL 16 backup, clean restore, V6-to-V7
+  migration, and application smoke against deterministic synthetic data.
+- Its source/recovery aggregate fingerprints matched and unexpected business
+  writes were `0`.
+- This generated run is not a sanitized current-state release dataset and is
+  ineligible for the final sanitized-clone gate.
+- Final P3.2 remains `BLOCKED_NOT_RUN`; harness and generated evidence cannot
+  replace sanctioned sanitized-clone evidence.
 - Historical time cutovers remain unverified and no timestamp was shifted.
 - No Java business logic changed.
 - No schema.sql or Flyway SQL migration changed.
@@ -254,17 +262,17 @@ Production readiness remains BLOCKED.
 
 Production deployment cannot proceed.
 
-PDR-PF4 defines the remaining drill and evidence requirements. Disposable
-empty/fixture evidence does not prove production migration readiness until the
-current-state evidence bundle is completed in a safe staging/server-backed
-environment and reviewed by the human release gate owner.
+PDR-PF4 defines the remaining drill and evidence requirements. Generated P3.1
+proves that the local rehearsal machinery works, but it does not prove the
+shape or history of a sanctioned current-state clone. Production migration
+readiness remains blocked until P3.2 and the human release gates are complete.
 
 ## Next Remediation Recommendation
 
-Recommended next package: controlled current-state clone inventory,
-backup/restore rehearsal, and writer-specific historical-time cutover review.
-The local Docker availability blocker is closed for P1/P2; access to a
-sanctioned sanitized release-like dataset and human owners remains required.
+Recommended next package: **Sanctioned Sanitized Release-Like Clone
+Acquisition and P3 Final Evidence P3.2**. Access to an approved sanitized
+release-like dataset, writer cutover evidence, and human owners remains
+required. P4 is not allowed.
 
 ## Prohibited Items Preserved
 

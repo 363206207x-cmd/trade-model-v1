@@ -11,6 +11,20 @@ WITH inventory_clock AS (
         NULLIF(current_setting('trade_model.inventory_as_of_utc', true), '')::TIMESTAMP WITHOUT TIME ZONE,
         CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
     ) AS as_of_utc
+), decision_validity_values AS (
+    SELECT CASE WHEN to_jsonb(decision) ? 'valid_from'
+                THEN (to_jsonb(decision) ->> 'valid_from')::TIMESTAMP WITH TIME ZONE
+           END AS valid_from,
+           CASE WHEN to_jsonb(decision) ? 'expires_at'
+                THEN (to_jsonb(decision) ->> 'expires_at')::TIMESTAMP WITH TIME ZONE
+           END AS expires_at
+    FROM tm_decision_result decision
+), decision_validity_schema AS (
+    SELECT COUNT(*) AS available_column_count
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tm_decision_result'
+      AND column_name IN ('valid_from', 'expires_at')
 ), field_catalog(
     field_name,
     semantic_type,
@@ -76,10 +90,10 @@ WITH inventory_clock AS (
     UNION ALL SELECT 'tm_decision_result.create_time', create_time, NULL::TIMESTAMP FROM tm_decision_result
     UNION ALL
     SELECT 'tm_decision_result.valid_from', valid_from AT TIME ZONE 'UTC', expires_at AT TIME ZONE 'UTC'
-    FROM tm_decision_result
+    FROM decision_validity_values
     UNION ALL
     SELECT 'tm_decision_result.expires_at', expires_at AT TIME ZONE 'UTC', valid_from AT TIME ZONE 'UTC'
-    FROM tm_decision_result
+    FROM decision_validity_values
 ), field_summary AS (
     SELECT catalog.field_name,
            catalog.future_check_mode,
@@ -133,11 +147,11 @@ WITH inventory_clock AS (
     WHERE completed_at IS NOT NULL AND create_time > completed_at
     UNION ALL
     SELECT 'VALIDITY_ORDER_INVALID', 'tm_decision_result.valid_from<=tm_decision_result.expires_at', COUNT(*)
-    FROM tm_decision_result
+    FROM decision_validity_values
     WHERE valid_from IS NOT NULL AND expires_at IS NOT NULL AND valid_from > expires_at
     UNION ALL
     SELECT 'VALIDITY_PARTIAL_NULL', 'tm_decision_result.valid_from_and_expires_at_pair', COUNT(*)
-    FROM tm_decision_result
+    FROM decision_validity_values
     WHERE (valid_from IS NULL) <> (expires_at IS NULL)
 ), duration_catalog(metric_name, duration_contract) AS (
     VALUES
@@ -156,7 +170,7 @@ WITH inventory_clock AS (
     FROM tm_hot_reset_event WHERE completed_at IS NOT NULL
     UNION ALL
     SELECT 'DECISION_VALIDITY', EXTRACT(EPOCH FROM expires_at - valid_from)
-    FROM tm_decision_result WHERE valid_from IS NOT NULL AND expires_at IS NOT NULL
+    FROM decision_validity_values WHERE valid_from IS NOT NULL AND expires_at IS NOT NULL
 ), duration_summary AS (
     SELECT catalog.metric_name,
            catalog.duration_contract,
@@ -202,7 +216,7 @@ WITH inventory_clock AS (
                WHEN decision.expires_at <= clock.as_of_utc AT TIME ZONE 'UTC' THEN 'EXPIRED'
                ELSE 'ACTIVE'
            END
-    FROM tm_decision_result decision
+    FROM decision_validity_values decision
     CROSS JOIN inventory_clock clock
     WHERE decision.valid_from IS NOT NULL
       AND decision.expires_at IS NOT NULL
@@ -215,7 +229,7 @@ WITH inventory_clock AS (
 ), validity_null_states AS (
     SELECT COUNT(*) FILTER (WHERE valid_from IS NULL AND expires_at IS NULL) AS both_null_rows,
            COUNT(*) FILTER (WHERE (valid_from IS NULL) <> (expires_at IS NULL)) AS partial_null_rows
-    FROM tm_decision_result
+    FROM decision_validity_values
 ), offset_pattern_candidates AS (
     SELECT catalog.field_name,
            catalog.reference_field,
@@ -240,6 +254,11 @@ WITH inventory_clock AS (
     WHERE catalog.offset_pattern_applicable
     GROUP BY catalog.field_name, catalog.reference_field
 ), output_lines AS (
+    SELECT 1 AS section_order, 'DECISION_VALIDITY_COLUMNS' AS sort_key,
+           'SCHEMA_FIELD_STATUS|tm_decision_result.validity_columns|available_column_count='
+             || available_column_count AS output_line
+    FROM decision_validity_schema
+    UNION ALL
     SELECT 5 AS section_order, field_name AS sort_key,
            'FIELD_POLICY|' || field_name
              || '|semantic_type=' || semantic_type

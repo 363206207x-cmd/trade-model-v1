@@ -721,20 +721,26 @@ RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA bash scripts/prod-restor
 
 The restore script must only target a controlled recovery database until a separate production restore drill has been approved.
 
-## P3 Sanitized Current-State Clone Rehearsal
+## P3 Generated And Sanitized Current-State Clone Rehearsal
 
-P3 provides `scripts/controlled-current-state-clone-rehearsal-p3.sh` for a
-sanitized, non-production, release-like PostgreSQL custom dump. It fixes the
-target to digest-pinned localhost PostgreSQL on `127.0.0.1:55433` and the three
-database names `trade_model_v1_p3_source`, `trade_model_v1_p3_rehearsal`, and
-`trade_model_v1_p3_recovery`. It records only aggregate/redacted evidence under
-ignored `.runtime/postgresql-p3-rehearsal/`.
+P3 provides `scripts/generate-p3-release-like-fixture.sh` for deterministic
+generated P3.1 input and `scripts/controlled-current-state-clone-rehearsal-p3.sh`
+for generated or separately sanctioned sanitized custom dumps. The runner
+fixes the target to digest-pinned localhost PostgreSQL on `127.0.0.1:55433`
+and the three database names `trade_model_v1_p3_source`,
+`trade_model_v1_p3_rehearsal`, and `trade_model_v1_p3_recovery`. It records
+only aggregate/redacted evidence under ignored
+`.runtime/postgresql-p3-rehearsal/`.
 
-The current result is `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`. No source
-inventory, backup, recovery restore, migration, or application smoke was run;
-no Docker or database action was attempted. The runner must not be described as
-PASS until an approved dump and attestation are supplied and the real path
-completes without skips.
+P3.1 is `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`: source inventory,
+container-native PostgreSQL 16 backup/restore, source/recovery fingerprints,
+V6-to-V7 migration, historical inventory, app smoke, and cleanup passed with
+zero unexpected business writes. Its status is
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`.
+
+The final P3.2 sanitized-clone gate is `BLOCKED_NOT_RUN`. Generated evidence
+must not be described as a production clone, sanitized staging clone, writer
+cutover, final P3 completion, or permission to start P4.
 
 See `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md` and
 `docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. P4 staging evidence is not

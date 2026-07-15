@@ -1,6 +1,7 @@
 package org.example.trademodel.postgresql;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.flywaydb.core.api.output.ValidateResult;
 import org.junit.jupiter.api.Tag;
@@ -41,9 +42,12 @@ class ControlledCurrentStateCloneFlywayActionTest {
         assertThat(action).isIn("VALIDATE", "MIGRATE");
         assertThat(sourceVersion).isIn("6", "7");
 
+        MigrationVersion targetVersion = MigrationVersion.fromVersion(
+                "VALIDATE".equals(action) ? sourceVersion : "7");
         Flyway flyway = Flyway.configure()
                 .dataSource(jdbcUrl, username, password)
                 .locations("classpath:db/migration")
+                .target(targetVersion)
                 .baselineOnMigrate(false)
                 .cleanDisabled(true)
                 .load();

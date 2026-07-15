@@ -16,9 +16,17 @@ APP_PORT="18083"
 APP_PID=""
 CONTAINER_STARTED=0
 CONTAINER_CLEANUP="NOT_STARTED"
+EVIDENCE_DIR_PREPARED=0
 CURRENT_STAGE="input-preflight"
 FINAL_RESULT="BLOCKED"
 TMP_DIR=""
+DATASET_CLASS="${P3_DATASET_CLASS:-}"
+INVENTORY_DATABASE_CLASS="SANITIZED_REHEARSAL"
+SOURCE_DATASET_SUCCESS_STATUS="PASS_SANITIZED_RELEASE_LIKE_CLONE"
+SOURCE_INVENTORY_SUCCESS_STATUS="PASS_READ_ONLY_RELEASE_LIKE_CLONE"
+SUCCESS_RESULT="PASS_SANITIZED_RELEASE_LIKE_REHEARSAL"
+FINAL_SANITIZED_CLONE_GATE="EVIDENCE_COLLECTED_PENDING_REVIEW"
+RECOVERY_SUCCESS_STATUS="PASS_RESTORED_PRE_MIGRATION_STATE"
 
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then
@@ -57,34 +65,52 @@ blocked() {
   FINAL_RESULT="${result}"
   echo "P3_RESULT: ${result}"
   echo "FAILED_STAGE: ${CURRENT_STAGE}"
+  echo "P3_FINAL_SANITIZED_CLONE_GATE: BLOCKED_NOT_RUN"
+  echo "P4_ALLOWED: NO"
   echo "PRODUCTION_READINESS: BLOCKED"
   exit "${exit_code}"
+}
+
+enter_stage() {
+  CURRENT_STAGE="$1"
+  echo "P3_STAGE: ${CURRENT_STAGE}"
+}
+
+wait_for_bounded_pid() {
+  local command_pid="$1"
+  local timeout_seconds="$2"
+  local elapsed_ticks=0
+  local max_ticks=$((timeout_seconds * 10))
+  while kill -0 "${command_pid}" >/dev/null 2>&1 \
+    && [ "${elapsed_ticks}" -lt "${max_ticks}" ]; do
+    sleep 0.1
+    elapsed_ticks=$((elapsed_ticks + 1))
+  done
+  if kill -0 "${command_pid}" >/dev/null 2>&1; then
+    kill "${command_pid}" >/dev/null 2>&1 || true
+    wait "${command_pid}" >/dev/null 2>&1 || true
+    return 124
+  fi
+  set +e
+  wait "${command_pid}"
+  local command_status=$?
+  set -e
+  return "${command_status}"
 }
 
 run_bounded() {
   local timeout_seconds="$1"
   shift
-  local marker_file="${TMP_DIR}/bounded-timeout-$RANDOM"
   "$@" &
-  local command_pid=$!
-  (
-    sleep "${timeout_seconds}"
-    if kill -0 "${command_pid}" >/dev/null 2>&1; then
-      printf 'TIMEOUT\n' >"${marker_file}"
-      kill "${command_pid}" >/dev/null 2>&1 || true
-    fi
-  ) &
-  local watchdog_pid=$!
-  set +e
-  wait "${command_pid}"
-  local command_status=$?
-  set -e
-  kill "${watchdog_pid}" >/dev/null 2>&1 || true
-  wait "${watchdog_pid}" >/dev/null 2>&1 || true
-  if [ -f "${marker_file}" ]; then
-    return 124
-  fi
-  return "${command_status}"
+  wait_for_bounded_pid "$!" "${timeout_seconds}"
+}
+
+run_bounded_with_input() {
+  local timeout_seconds="$1"
+  local input_file="$2"
+  shift 2
+  "$@" <"${input_file}" &
+  wait_for_bounded_pid "$!" "${timeout_seconds}"
 }
 
 stop_application() {
@@ -121,11 +147,13 @@ cleanup() {
   if [ -n "${TMP_DIR}" ] && [ -d "${TMP_DIR}" ]; then
     rm -rf "${TMP_DIR}"
   fi
-  if [ "${status}" -ne 0 ] && [ -d "${EVIDENCE_DIR}" ]; then
+  if [ "${status}" -ne 0 ] && [ "${EVIDENCE_DIR_PREPARED}" -eq 1 ]; then
     {
       echo "P3_RESULT: ${FINAL_RESULT}"
       echo "FAILED_STAGE: ${CURRENT_STAGE}"
       echo "CONTAINER_CLEANUP: ${CONTAINER_CLEANUP}"
+      echo "P3_FINAL_SANITIZED_CLONE_GATE: BLOCKED_NOT_RUN"
+      echo "P4_ALLOWED: NO"
       echo "PRODUCTION_READINESS: BLOCKED"
     } >"${EVIDENCE_DIR}/summary.txt"
   fi
@@ -139,6 +167,7 @@ safe_prepare_evidence_dir() {
     "${ROOT_DIR}/.runtime/postgresql-p3-rehearsal")
       rm -rf "${EVIDENCE_DIR}"
       mkdir -p "${BACKUP_DIR}"
+      EVIDENCE_DIR_PREPARED=1
       ;;
     *) blocked "BLOCKED_UNSAFE_EVIDENCE_PATH" ;;
   esac
@@ -173,26 +202,27 @@ scalar_query() {
 capture_fingerprint() {
   local database="$1"
   local output_file="$2"
-  run_bounded 180 docker exec -i \
+  run_bounded_with_input 180 "${ROOT_DIR}/scripts/current-state-clone-fingerprint.sql" \
+    docker exec -i \
     --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
     "${CONTAINER_NAME}" psql \
     --username="${USERNAME}" \
     --dbname="${database}" \
     --no-psqlrc \
-    <"${ROOT_DIR}/scripts/current-state-clone-fingerprint.sql" \
     >"${output_file}"
 }
 
 capture_restore_verification() {
   local database="$1"
   local output_file="$2"
-  run_bounded 180 docker exec -i \
+  run_bounded_with_input 180 \
+    "${ROOT_DIR}/scripts/current-state-clone-restore-verification.sql" \
+    docker exec -i \
     --env "PGOPTIONS=-c statement_timeout=120000 -c lock_timeout=5000" \
     "${CONTAINER_NAME}" psql \
     --username="${USERNAME}" \
     --dbname="${database}" \
     --no-psqlrc \
-    <"${ROOT_DIR}/scripts/current-state-clone-restore-verification.sql" \
     >"${output_file}"
 }
 
@@ -200,6 +230,18 @@ verification_value() {
   local key="$1"
   local file="$2"
   awk -F '|' -v key="${key}" '$1 == key { print $2; exit }' "${file}"
+}
+
+json_string_field() {
+  local field_name="$1"
+  local file="$2"
+  local match
+  match="$(grep -Eo "\"${field_name}\":\"[A-Z0-9_]+\"" "${file}" | head -n 1 || true)"
+  if [ -z "${match}" ]; then
+    echo "MISSING"
+    return
+  fi
+  printf '%s\n' "${match}" | sed -E 's/^[^:]+:\"([^\"]+)\"$/\1/'
 }
 
 require_zero_verification() {
@@ -221,7 +263,7 @@ run_inventory() {
   HISTORICAL_TIME_INVENTORY_DATABASE="${database}" \
   HISTORICAL_TIME_INVENTORY_USERNAME="${USERNAME}" \
   HISTORICAL_TIME_INVENTORY_PASSWORD="${DISPOSABLE_PASSWORD}" \
-  HISTORICAL_TIME_INVENTORY_DATABASE_CLASS="SANITIZED_REHEARSAL" \
+  HISTORICAL_TIME_INVENTORY_DATABASE_CLASS="${INVENTORY_DATABASE_CLASS}" \
   HISTORICAL_TIME_INVENTORY_CONFIRM="I_CONFIRM_READ_ONLY_NON_PRODUCTION_DATABASE" \
     bash "${ROOT_DIR}/scripts/historical-time-basis-inventory.sh" >"${output_file}"
 }
@@ -266,6 +308,8 @@ if [ -z "${P3_SANITIZED_DUMP_FILE:-}" ]; then
   echo "P3_RESULT: BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP"
   echo "DATABASE_ACCESS: NOT_ATTEMPTED"
   echo "DOCKER_ACTION: NOT_ATTEMPTED"
+  echo "P3_FINAL_SANITIZED_CLONE_GATE: BLOCKED_NOT_RUN"
+  echo "P4_ALLOWED: NO"
   echo "PRODUCTION_READINESS: BLOCKED"
   exit 0
 fi
@@ -275,19 +319,35 @@ fi
 if [ -z "${P3_DATASET_ID:-}" ]; then
   blocked "BLOCKED_MISSING_DATASET_ID"
 fi
-if [ "${P3_DATASET_CLASS:-}" != "SANITIZED_RELEASE_LIKE" ]; then
-  blocked "BLOCKED_INVALID_DATASET_CLASS"
-fi
-if [ "${P3_CONFIRM:-}" != "I_CONFIRM_SANITIZED_NON_PRODUCTION_RELEASE_LIKE_DATASET" ]; then
-  blocked "BLOCKED_SANITIZED_DATASET_CONFIRMATION_REQUIRED"
-fi
+case "${DATASET_CLASS}" in
+  SANITIZED_RELEASE_LIKE)
+    if [ "${P3_CONFIRM:-}" != "I_CONFIRM_SANITIZED_NON_PRODUCTION_RELEASE_LIKE_DATASET" ]; then
+      blocked "BLOCKED_SANITIZED_DATASET_CONFIRMATION_REQUIRED"
+    fi
+    ;;
+  GENERATED_RELEASE_LIKE)
+    if [ "${P3_CONFIRM:-}" != "I_CONFIRM_GENERATED_NON_PRODUCTION_RELEASE_LIKE_DATASET" ]; then
+      blocked "BLOCKED_GENERATED_DATASET_CONFIRMATION_REQUIRED"
+    fi
+    INVENTORY_DATABASE_CLASS="GENERATED_REHEARSAL"
+    SOURCE_DATASET_SUCCESS_STATUS="GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE"
+    SOURCE_INVENTORY_SUCCESS_STATUS="PASS_READ_ONLY_GENERATED_RELEASE_LIKE"
+    SUCCESS_RESULT="PASS_GENERATED_RELEASE_LIKE_REHEARSAL"
+    FINAL_SANITIZED_CLONE_GATE="BLOCKED_NOT_RUN"
+    RECOVERY_SUCCESS_STATUS="PASS_PRE_MIGRATION_COPY"
+    ;;
+  *) blocked "BLOCKED_INVALID_DATASET_CLASS" ;;
+esac
 if [ "${P3_LOCAL_DB_RECREATE_CONFIRM:-}" != "I_UNDERSTAND_ONLY_LOCAL_P3_DATABASES_ARE_DROPPED" ]; then
   blocked "BLOCKED_LOCAL_RECREATE_CONFIRMATION_REQUIRED"
 fi
 if ! printf '%s' "${P3_DATASET_ID}" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$'; then
   blocked "BLOCKED_INVALID_DATASET_ID"
 fi
-if printf '%s' "${P3_DATASET_ID}" | grep -Eiq '(prod|production|live|primary|customer|client|host)'; then
+if printf '%s' "${P3_DATASET_ID}" \
+  | grep -Eiq '(prod|production|primary|customer|client|host)' \
+  || printf '%s' "${P3_DATASET_ID}" \
+    | grep -Eiq '(^|[._-])live([._-]|$)'; then
   blocked "BLOCKED_SENSITIVE_OR_PRODUCTION_LIKE_DATASET_ID"
 fi
 
@@ -349,7 +409,7 @@ for attestation_key in "${attestation_keys[@]}"; do
     blocked "BLOCKED_SANITIZATION_ATTESTATION_INCOMPLETE"
   fi
 done
-if ! grep -Eq '^DATA_SOURCE_CLASS=SANITIZED_RELEASE_LIKE$' "${ATTESTATION_FILE}" \
+if ! grep -Fqx "DATA_SOURCE_CLASS=${DATASET_CLASS}" "${ATTESTATION_FILE}" \
   || ! grep -Eq '^USER_IDENTIFIERS_REMOVED_OR_PSEUDONYMIZED=YES$' "${ATTESTATION_FILE}" \
   || ! grep -Eq '^SECRETS_REMOVED=YES$' "${ATTESTATION_FILE}" \
   || ! grep -Eq '^FREE_TEXT_CLEANED_OR_REPLACED=YES$' "${ATTESTATION_FILE}" \
@@ -357,19 +417,41 @@ if ! grep -Eq '^DATA_SOURCE_CLASS=SANITIZED_RELEASE_LIKE$' "${ATTESTATION_FILE}"
   || ! grep -Eq '^NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE=YES$' "${ATTESTATION_FILE}"; then
   blocked "BLOCKED_SANITIZATION_ATTESTATION_MISMATCH"
 fi
+if [ "${DATASET_CLASS}" = "GENERATED_RELEASE_LIKE" ]; then
+  generated_attestation_keys=(
+    FIXTURE_SEED
+    REAL_USER_DATA_INCLUDED
+    REAL_ACCOUNT_DATA_INCLUDED
+    REAL_MARKET_PROVIDER_DATA_INCLUDED
+    SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE
+  )
+  for attestation_key in "${generated_attestation_keys[@]}"; do
+    if ! grep -Eq "^${attestation_key}=[^[:space:]].*$" "${ATTESTATION_FILE}"; then
+      blocked "BLOCKED_GENERATED_ATTESTATION_INCOMPLETE"
+    fi
+  done
+  if ! grep -Eq '^FIXTURE_SEED=20260715$' "${ATTESTATION_FILE}" \
+    || ! grep -Eq '^REAL_USER_DATA_INCLUDED=NO$' "${ATTESTATION_FILE}" \
+    || ! grep -Eq '^REAL_ACCOUNT_DATA_INCLUDED=NO$' "${ATTESTATION_FILE}" \
+    || ! grep -Eq '^REAL_MARKET_PROVIDER_DATA_INCLUDED=NO$' "${ATTESTATION_FILE}" \
+    || ! grep -Eq '^SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO$' "${ATTESTATION_FILE}"; then
+    blocked "BLOCKED_GENERATED_ATTESTATION_MISMATCH"
+  fi
+fi
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/postgresql-p3-rehearsal.XXXXXX")"
-for command_name in docker pg_dump pg_restore psql curl java; do
+for command_name in docker pg_restore psql curl jq java; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     blocked "BLOCKED_REQUIRED_TOOL_MISSING"
   fi
 done
 
-CURRENT_STAGE="dump-format-validation"
+enter_stage "dump-format-validation"
 if ! run_bounded 120 pg_restore --list "${DUMP_FILE}" >"${TMP_DIR}/dump-list.txt" 2>"${TMP_DIR}/dump-list-error.txt"; then
   blocked "BLOCKED_INVALID_POSTGRESQL_CUSTOM_DUMP"
 fi
-if grep -Eiq '(DATABASE PROPERTIES|CREATE DATABASE)' "${TMP_DIR}/dump-list.txt"; then
+if grep -Eiq '(DATABASE PROPERTIES|CREATE DATABASE|; [0-9]+ [0-9]+ DATABASE )' \
+  "${TMP_DIR}/dump-list.txt"; then
   blocked "BLOCKED_DUMP_CONTAINS_DATABASE_CREATION"
 fi
 
@@ -377,7 +459,7 @@ DUMP_SHA256="$(sha256_file "${DUMP_FILE}")"
 ATTESTATION_SHA256="$(sha256_file "${ATTESTATION_FILE}")"
 DATASET_ID_SHA256="$(printf '%s' "${P3_DATASET_ID}" | sha256_text)"
 
-CURRENT_STAGE="docker-preflight"
+enter_stage "docker-preflight"
 if ! run_bounded 30 docker info >/dev/null 2>&1; then
   blocked "BLOCKED_DOCKER_DAEMON_UNAVAILABLE"
 fi
@@ -392,11 +474,12 @@ safe_prepare_evidence_dir
 cd "${ROOT_DIR}"
 
 {
-  echo "DATASET_CLASS: SANITIZED_RELEASE_LIKE"
+  echo "DATASET_CLASS: ${DATASET_CLASS}"
   echo "DATASET_ID_SHA256: ${DATASET_ID_SHA256}"
   echo "ATTESTATION_SHA256: ${ATTESTATION_SHA256}"
   echo "ATTESTATION_REQUIRED_FIELDS: PASS"
   echo "ATTESTATION_CONTENT: NOT_COPIED"
+  echo "FINAL_SANITIZED_CLONE_ELIGIBILITY: $([ "${DATASET_CLASS}" = "SANITIZED_RELEASE_LIKE" ] && echo PENDING_REVIEW || echo NO)"
 } >"${EVIDENCE_DIR}/input-attestation-summary.txt"
 {
   echo "DUMP_FORMAT: POSTGRESQL_CUSTOM"
@@ -405,10 +488,11 @@ cd "${ROOT_DIR}"
   echo "DUMP_PATH: REDACTED_NOT_RECORDED"
 } >"${EVIDENCE_DIR}/input-dump-metadata.txt"
 
-CURRENT_STAGE="container-start"
+enter_stage "container-start"
 DISPOSABLE_PASSWORD="p3-$(openssl rand -hex 24 2>/dev/null || printf '%s-%s-%s' "$RANDOM" "$RANDOM" "$(date -u +%s)")"
 DISPOSABLE_ADMIN_PASSWORD="p3-admin-$(openssl rand -hex 24 2>/dev/null || printf '%s-%s' "$RANDOM" "$(date -u +%s)")"
 if ! run_bounded 300 docker run \
+  --pull never \
   --name "${CONTAINER_NAME}" \
   --env "POSTGRES_DB=postgres" \
   --env "POSTGRES_USER=${USERNAME}" \
@@ -432,28 +516,32 @@ if [ "${ready}" -ne 1 ]; then
   blocked "BLOCKED_POSTGRESQL_READINESS_TIMEOUT"
 fi
 
-CURRENT_STAGE="local-database-create"
+enter_stage "local-database-create"
 for database_name in "${SOURCE_DATABASE}" "${REHEARSAL_DATABASE}" "${RECOVERY_DATABASE}"; do
   if ! run_bounded 30 docker exec "${CONTAINER_NAME}" createdb -U "${USERNAME}" "${database_name}"; then
     blocked "BLOCKED_LOCAL_DATABASE_CREATE_FAILED"
   fi
 done
 
-CURRENT_STAGE="source-restore"
-if ! run_bounded 600 env \
-  RESTORE_DATASOURCE_HOST="${TARGET_HOST}" \
-  RESTORE_DATASOURCE_PORT="${TARGET_PORT}" \
-  RESTORE_DATASOURCE_USERNAME="${USERNAME}" \
-  RESTORE_DATASOURCE_PASSWORD="${DISPOSABLE_PASSWORD}" \
-  RESTORE_DATASOURCE_DATABASE="${SOURCE_DATABASE}" \
-  RESTORE_BACKUP_FILE="${DUMP_FILE}" \
-  RESTORE_CONFIRM="I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA" \
-    bash "${ROOT_DIR}/scripts/prod-restore.sh" \
-      >"${TMP_DIR}/source-restore.log" 2>"${TMP_DIR}/source-restore-error.log"; then
+enter_stage "source-restore"
+if ! run_bounded 60 docker cp \
+  "${DUMP_FILE}" "${CONTAINER_NAME}:/tmp/p3-input.dump" >/dev/null 2>&1; then
+  blocked "BLOCKED_SOURCE_DUMP_COPY_FAILED"
+fi
+if ! run_bounded 600 docker exec "${CONTAINER_NAME}" pg_restore \
+  --username="${USERNAME}" \
+  --dbname="${SOURCE_DATABASE}" \
+  --clean \
+  --if-exists \
+  --no-owner \
+  --no-acl \
+  --exit-on-error \
+  /tmp/p3-input.dump \
+  >"${TMP_DIR}/source-restore.log" 2>"${TMP_DIR}/source-restore-error.log"; then
   blocked "BLOCKED_SOURCE_RESTORE_FAILED"
 fi
 
-CURRENT_STAGE="source-identity"
+enter_stage "source-identity"
 if [ "$(scalar_query "${SOURCE_DATABASE}" "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='flyway_schema_history'")" != "1" ]; then
   blocked "BLOCKED_MISSING_FLYWAY_HISTORY"
 fi
@@ -489,6 +577,7 @@ POSTGRESQL_VERSION="$(scalar_query "${SOURCE_DATABASE}" "SHOW server_version")"
 TABLE_COUNT="$(scalar_query "${SOURCE_DATABASE}" "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")"
 TM_TABLE_COUNT="$(scalar_query "${SOURCE_DATABASE}" "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name LIKE 'tm\\_%' ESCAPE '\\'")"
 {
+  echo "DATASET_CLASS: ${DATASET_CLASS}"
   echo "POSTGRESQL_VERSION: ${POSTGRESQL_VERSION}"
   echo "DATABASE_IDENTITY: LOCAL_P3_SOURCE"
   echo "CURRENT_USER_CLASS: LOCAL_P3_OPERATOR"
@@ -509,7 +598,7 @@ docker_psql "${SOURCE_DATABASE}" -AtF '|' -c \
   "SELECT installed_rank,version,description,success,checksum FROM flyway_schema_history ORDER BY installed_rank" \
   >"${EVIDENCE_DIR}/flyway-before.txt"
 
-CURRENT_STAGE="source-aggregate-validation"
+enter_stage "source-aggregate-validation"
 capture_fingerprint "${SOURCE_DATABASE}" "${EVIDENCE_DIR}/source-fingerprint.txt"
 capture_restore_verification "${SOURCE_DATABASE}" "${TMP_DIR}/source-verification.txt"
 for verification_key in \
@@ -538,21 +627,24 @@ fi
 SOURCE_FINGERPRINT="$(sha256_file "${EVIDENCE_DIR}/source-fingerprint.txt")"
 SOURCE_INVENTORY_FINGERPRINT="$(awk -F '|' '$1 == "AGGREGATE_MD5" {print $2; exit}' "${EVIDENCE_DIR}/source-inventory.txt")"
 
-CURRENT_STAGE="controlled-backup"
+enter_stage "controlled-backup"
 BACKUP_FILE="${BACKUP_DIR}/p3-current-state.dump"
 BACKUP_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-if ! run_bounded 600 env \
-  PROD_DATASOURCE_HOST="${TARGET_HOST}" \
-  PROD_DATASOURCE_PORT="${TARGET_PORT}" \
-  PROD_DATASOURCE_USERNAME="${USERNAME}" \
-  PROD_DATASOURCE_PASSWORD="${DISPOSABLE_PASSWORD}" \
-  PROD_DATASOURCE_DATABASE="${SOURCE_DATABASE}" \
-  BACKUP_DIR="${BACKUP_DIR}" \
-  BACKUP_FILE="${BACKUP_FILE}" \
-    bash "${ROOT_DIR}/scripts/prod-backup.sh" \
-      >"${TMP_DIR}/backup.log" 2>"${TMP_DIR}/backup-error.log"; then
+if ! run_bounded 600 docker exec "${CONTAINER_NAME}" pg_dump \
+  --username="${USERNAME}" \
+  --dbname="${SOURCE_DATABASE}" \
+  --format=custom \
+  --no-owner \
+  --no-acl \
+  --file=/tmp/p3-current-state.dump \
+  >"${TMP_DIR}/backup.log" 2>"${TMP_DIR}/backup-error.log"; then
   blocked "BLOCKED_CONTROLLED_BACKUP_FAILED"
 fi
+if ! run_bounded 60 docker cp \
+  "${CONTAINER_NAME}:/tmp/p3-current-state.dump" "${BACKUP_FILE}" >/dev/null 2>&1; then
+  blocked "BLOCKED_CONTROLLED_BACKUP_COPY_FAILED"
+fi
+chmod 600 "${BACKUP_FILE}"
 BACKUP_COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 BACKUP_SHA256="$(sha256_file "${BACKUP_FILE}")"
 if ! run_bounded 120 pg_restore --list "${BACKUP_FILE}" >/dev/null 2>&1; then
@@ -562,7 +654,7 @@ fi
   echo "BACKUP_STATUS: PASS"
   echo "BACKUP_STARTED_AT_UTC: ${BACKUP_STARTED_AT}"
   echo "BACKUP_COMPLETED_AT_UTC: ${BACKUP_COMPLETED_AT}"
-  echo "PG_DUMP_VERSION_CLASS: $(pg_dump --version | awk '{print $3}')"
+  echo "PG_DUMP_VERSION_CLASS: $(docker exec "${CONTAINER_NAME}" pg_dump --version | awk '{print $3}')_CONTAINER_NATIVE"
   echo "BACKUP_FORMAT: POSTGRESQL_CUSTOM"
   echo "BACKUP_FILE: p3-current-state.dump"
   echo "BACKUP_SIZE_BYTES: $(file_size_bytes "${BACKUP_FILE}")"
@@ -574,19 +666,19 @@ fi
 restore_backup_to_database() {
   local target_database="$1"
   local log_prefix="$2"
-  run_bounded 600 env \
-    RESTORE_DATASOURCE_HOST="${TARGET_HOST}" \
-    RESTORE_DATASOURCE_PORT="${TARGET_PORT}" \
-    RESTORE_DATASOURCE_USERNAME="${USERNAME}" \
-    RESTORE_DATASOURCE_PASSWORD="${DISPOSABLE_PASSWORD}" \
-    RESTORE_DATASOURCE_DATABASE="${target_database}" \
-    RESTORE_BACKUP_FILE="${BACKUP_FILE}" \
-    RESTORE_CONFIRM="I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA" \
-      bash "${ROOT_DIR}/scripts/prod-restore.sh" \
-      >"${TMP_DIR}/${log_prefix}.log" 2>"${TMP_DIR}/${log_prefix}-error.log"
+  run_bounded 600 docker exec "${CONTAINER_NAME}" pg_restore \
+    --username="${USERNAME}" \
+    --dbname="${target_database}" \
+    --clean \
+    --if-exists \
+    --no-owner \
+    --no-acl \
+    --exit-on-error \
+    /tmp/p3-current-state.dump \
+    >"${TMP_DIR}/${log_prefix}.log" 2>"${TMP_DIR}/${log_prefix}-error.log"
 }
 
-CURRENT_STAGE="recovery-restore"
+enter_stage "recovery-restore"
 if ! restore_backup_to_database "${RECOVERY_DATABASE}" "recovery-restore"; then
   blocked "BLOCKED_RECOVERY_RESTORE_FAILED"
 fi
@@ -612,7 +704,7 @@ if ! run_bounded 300 run_flyway_action "${RECOVERY_DATABASE}" "VALIDATE" \
   blocked "BLOCKED_RECOVERY_FLYWAY_VALIDATE_FAILURE"
 fi
 
-CURRENT_STAGE="rehearsal-restore"
+enter_stage "rehearsal-restore"
 if ! restore_backup_to_database "${REHEARSAL_DATABASE}" "rehearsal-restore"; then
   blocked "BLOCKED_REHEARSAL_RESTORE_FAILED"
 fi
@@ -623,7 +715,7 @@ if [ "${REHEARSAL_BEFORE_FINGERPRINT}" != "${SOURCE_FINGERPRINT}" ]; then
 fi
 capture_table_counts "${EVIDENCE_DIR}/source-fingerprint.txt" "${TMP_DIR}/source-table-counts.txt"
 
-CURRENT_STAGE="rehearsal-flyway"
+enter_stage "rehearsal-flyway"
 FLYWAY_ROWS_BEFORE="$(scalar_query "${REHEARSAL_DATABASE}" "SELECT COUNT(*) FROM flyway_schema_history WHERE success")"
 if ! run_bounded 600 run_flyway_action "${REHEARSAL_DATABASE}" "MIGRATE" \
   >"${TMP_DIR}/rehearsal-flyway.log" 2>&1; then
@@ -659,7 +751,7 @@ docker_psql "${REHEARSAL_DATABASE}" -AtF '|' -c \
   "SELECT installed_rank,version,description,success,checksum FROM flyway_schema_history ORDER BY installed_rank" \
   >"${EVIDENCE_DIR}/flyway-after.txt"
 
-CURRENT_STAGE="application-smoke"
+enter_stage "application-smoke"
 capture_table_counts "${EVIDENCE_DIR}/rehearsal-fingerprint-after.txt" "${TMP_DIR}/app-before-table-counts.txt"
 export SPRING_DATASOURCE_URL="jdbc:postgresql://${TARGET_HOST}:${TARGET_PORT}/${REHEARSAL_DATABASE}"
 export SPRING_DATASOURCE_USERNAME="${USERNAME}"
@@ -741,6 +833,98 @@ done
 if ! grep -Eq '"runStatus":"(NOT_CALLED|DISABLED)"' "${TMP_DIR}/dashboard-home.json"; then
   blocked "BLOCKED_AI_NOT_DISABLED"
 fi
+if [ "${DATASET_CLASS}" = "GENERATED_RELEASE_LIKE" ]; then
+  no_position_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-no-position.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=DOGEUSDT")"
+  unique_position_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-unique-position.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=ETHUSDT&positionId=1003")"
+  multi_position_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-multi-position.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=BTCUSDT")"
+  position_a_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-position-a.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=BTCUSDT&positionId=1001")"
+  position_b_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-position-b.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=BTCUSDT&positionId=1002")"
+  revalidation_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-revalidation.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=SOLUSDT&positionId=1004")"
+  expired_status="$(curl --config "${CURL_CONFIG}" \
+    --output "${TMP_DIR}/home-expired.json" --write-out '%{http_code}' \
+    "http://127.0.0.1:${APP_PORT}/api/dashboard/home?selectedSymbol=XRPUSDT&positionId=1006")"
+  for scenario_status in \
+    "${no_position_status}" "${unique_position_status}" "${multi_position_status}" \
+    "${position_a_status}" "${position_b_status}" "${revalidation_status}" \
+    "${expired_status}"; do
+    if [ "${scenario_status}" != "200" ]; then
+      blocked "BLOCKED_GENERATED_DASHBOARD_SCENARIO_HTTP"
+    fi
+  done
+  if ! grep -q '"positionSelectionStatus":"NO_POSITION"' "${TMP_DIR}/home-no-position.json" \
+    || ! grep -q '"positionSelectionStatus":"EXACT_POSITION_SELECTED"' "${TMP_DIR}/home-unique-position.json" \
+    || ! grep -q '"selectedPositionId":1003' "${TMP_DIR}/home-unique-position.json" \
+    || ! grep -q '"positionSelectionStatus":"POSITION_SELECTION_REQUIRED"' "${TMP_DIR}/home-multi-position.json"; then
+    echo "GENERATED_NO_POSITION_SELECTION_STATUS: $(json_string_field positionSelectionStatus "${TMP_DIR}/home-no-position.json")"
+    echo "GENERATED_UNIQUE_POSITION_SELECTION_STATUS: $(json_string_field positionSelectionStatus "${TMP_DIR}/home-unique-position.json")"
+    echo "GENERATED_MULTI_POSITION_SELECTION_STATUS: $(json_string_field positionSelectionStatus "${TMP_DIR}/home-multi-position.json")"
+    blocked "BLOCKED_GENERATED_DASHBOARD_SELECTION_CONTRACT"
+  fi
+  position_a_plan_id="$(jq -r '.data.executionSuggestion.sourceExecutionPlanId // "MISSING"' \
+    "${TMP_DIR}/home-position-a.json")"
+  position_a_analysis_id="$(jq -r '.data.executionSuggestion.sourceAnalysisId // "MISSING"' \
+    "${TMP_DIR}/home-position-a.json")"
+  position_b_plan_id="$(jq -r '.data.executionSuggestion.sourceExecutionPlanId // "MISSING"' \
+    "${TMP_DIR}/home-position-b.json")"
+  position_b_analysis_id="$(jq -r '.data.executionSuggestion.sourceAnalysisId // "MISSING"' \
+    "${TMP_DIR}/home-position-b.json")"
+  if [ "${position_a_plan_id}" != "P3P-BTCUSDT-001-A" ] \
+    || [ "${position_a_analysis_id}" != "P3A-BTCUSDT-001" ] \
+    || [ "${position_b_plan_id}" != "P3P-BTCUSDT-002-A" ] \
+    || [ "${position_b_analysis_id}" != "P3A-BTCUSDT-002" ]; then
+    echo "GENERATED_POSITION_A_PLAN_ID_MATCH: $([ "${position_a_plan_id}" = "P3P-BTCUSDT-001-A" ] && echo YES || echo NO)"
+    echo "GENERATED_POSITION_A_ANALYSIS_ID_MATCH: $([ "${position_a_analysis_id}" = "P3A-BTCUSDT-001" ] && echo YES || echo NO)"
+    echo "GENERATED_POSITION_B_PLAN_ID_MATCH: $([ "${position_b_plan_id}" = "P3P-BTCUSDT-002-A" ] && echo YES || echo NO)"
+    echo "GENERATED_POSITION_B_ANALYSIS_ID_MATCH: $([ "${position_b_analysis_id}" = "P3A-BTCUSDT-002" ] && echo YES || echo NO)"
+    blocked "BLOCKED_GENERATED_DASHBOARD_PLAN_ISOLATION"
+  fi
+  if ! grep -q '"originalPlanCurrentValidity":"REVALIDATION_REQUIRED"' \
+    "${TMP_DIR}/home-revalidation.json"; then
+    blocked "BLOCKED_GENERATED_DASHBOARD_REVALIDATION_CONTRACT"
+  fi
+  if ! grep -q '"originalPlanCurrentValidity":"PLAN_INCOMPLETE"' \
+    "${TMP_DIR}/home-unique-position.json"; then
+    blocked "BLOCKED_GENERATED_DASHBOARD_INCOMPLETE_PLAN_CONTRACT"
+  fi
+  expired_plan_identity="$(jq -r \
+    '.data.executionSuggestion.originalPlanIdentity // "MISSING"' \
+    "${TMP_DIR}/home-expired.json")"
+  expired_plan_validity="$(jq -r \
+    '.data.executionSuggestion.originalPlanCurrentValidity // "MISSING"' \
+    "${TMP_DIR}/home-expired.json")"
+  expired_suggestion_status="$(jq -r \
+    '.data.executionSuggestion.status // "MISSING"' \
+    "${TMP_DIR}/home-expired.json")"
+  expired_position_mode="$(jq -r \
+    '.data.executionSuggestion.positionMode // "MISSING"' \
+    "${TMP_DIR}/home-expired.json")"
+  if [ "${expired_plan_identity}" != "VERIFIED" ] \
+    || [ "${expired_plan_validity}" != "EXPIRED" ] \
+    || [ "${expired_suggestion_status}" != "POSITION_MONITORING" ] \
+    || [ "${expired_position_mode}" != "true" ]; then
+    echo "GENERATED_EXPIRED_PLAN_IDENTITY: ${expired_plan_identity}"
+    echo "GENERATED_EXPIRED_PLAN_VALIDITY: ${expired_plan_validity}"
+    echo "GENERATED_EXPIRED_SUGGESTION_STATUS: ${expired_suggestion_status}"
+    echo "GENERATED_EXPIRED_POSITION_MODE: ${expired_position_mode}"
+    blocked "BLOCKED_GENERATED_DASHBOARD_EXPIRED_PLAN_CONTRACT"
+  fi
+  if grep -Eiq '(order submitted|自动开仓|自动平仓|自动反手|自动下单)' \
+    "${TMP_DIR}"/home-*.json; then
+    blocked "BLOCKED_GENERATED_DASHBOARD_TRADING_SEMANTICS"
+  fi
+fi
 
 stop_application
 capture_fingerprint "${REHEARSAL_DATABASE}" "${TMP_DIR}/app-after-fingerprint.txt"
@@ -751,6 +935,13 @@ fi
 {
   echo "HEALTH: HTTP_200_UP"
   echo "DASHBOARD_HOME: HTTP_200_FAIL_CLOSED"
+  if [ "${DATASET_CLASS}" = "GENERATED_RELEASE_LIKE" ]; then
+    echo "GENERATED_DASHBOARD_SCENARIOS: PASS"
+    echo "MULTI_POSITION_PLAN_ISOLATION: PASS"
+    echo "INCOMPLETE_PLAN_FAIL_CLOSED: PASS"
+    echo "EXPIRED_HISTORICAL_PLAN_FAIL_CLOSED: PASS"
+    echo "REVALIDATION_PLAN_FAIL_CLOSED: PASS"
+  fi
   echo "RUN_BASELINE: HTTP_200"
   echo "AI_PROVIDER_STATE: NOT_CALLED_OR_DISABLED"
   echo "SCHEDULERS: DISABLED"
@@ -777,20 +968,20 @@ fi
   echo "DEPLOYMENT_STATUS: NOT_PROVEN"
 } >"${EVIDENCE_DIR}/cutover-register-summary.txt"
 
-CURRENT_STAGE="container-cleanup"
+enter_stage "container-cleanup"
 remove_container
 if [ "${CONTAINER_CLEANUP}" != "PASS" ]; then
   blocked "BLOCKED_CONTAINER_CLEANUP_FAILED"
 fi
 
-CURRENT_STAGE="summary"
+enter_stage "summary"
 EXECUTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 {
-  echo "P3_RESULT: PASS"
+  echo "P3_RESULT: ${SUCCESS_RESULT}"
   echo "EXECUTED_AT_UTC: ${EXECUTED_AT}"
-  echo "SOURCE_DATASET_STATUS: PASS_SANITIZED_RELEASE_LIKE_CLONE"
+  echo "SOURCE_DATASET_STATUS: ${SOURCE_DATASET_SUCCESS_STATUS}"
   echo "SOURCE_FLYWAY_VERSION: ${SOURCE_FLYWAY_VERSION}"
-  echo "SOURCE_INVENTORY_STATUS: PASS_READ_ONLY_RELEASE_LIKE_CLONE"
+  echo "SOURCE_INVENTORY_STATUS: ${SOURCE_INVENTORY_SUCCESS_STATUS}"
   echo "SOURCE_FINGERPRINT: ${SOURCE_FINGERPRINT}"
   echo "BACKUP_STATUS: PASS"
   echo "BACKUP_SHA256: ${BACKUP_SHA256}"
@@ -802,9 +993,11 @@ EXECUTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "HISTORICAL_TIME_RESULTS: PASS_READ_ONLY_AGGREGATE"
   echo "APPLICATION_SMOKE_STATUS: PASS"
   echo "UNEXPECTED_BUSINESS_WRITES: 0"
-  echo "RECOVERY_STATUS: PASS_RESTORED_PRE_MIGRATION_STATE"
+  echo "RECOVERY_STATUS: ${RECOVERY_SUCCESS_STATUS}"
   echo "WRITER_CUTOVER_STATUS: MISSING_OPERATIONAL_EVIDENCE"
   echo "CONTAINER_CLEANUP: ${CONTAINER_CLEANUP}"
+  echo "P3_FINAL_SANITIZED_CLONE_GATE: ${FINAL_SANITIZED_CLONE_GATE}"
+  echo "P4_ALLOWED: NO"
   echo "PRODUCTION_READINESS: BLOCKED"
 } >"${EVIDENCE_DIR}/summary.txt"
 
@@ -829,6 +1022,6 @@ for evidence_file in \
     >>"${EVIDENCE_DIR}/checksums.txt"
 done
 
-FINAL_RESULT="PASS"
+FINAL_RESULT="${SUCCESS_RESULT}"
 cat "${EVIDENCE_DIR}/summary.txt"
 echo "EVIDENCE_ARTIFACTS: .runtime/postgresql-p3-rehearsal"

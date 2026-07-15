@@ -129,6 +129,24 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
     }
 
     @Test
+    void generatedReleaseLikeDatasetIdIsNotMisclassifiedAsLive() throws Exception {
+        Map<String, String> environment = completeInputContract();
+        environment.put("P3_DATASET_ID", "p3-generated-release-like-20260715");
+        environment.put("P3_DATASET_CLASS", "GENERATED_RELEASE_LIKE");
+        environment.put("P3_CONFIRM", "I_CONFIRM_GENERATED_NON_PRODUCTION_RELEASE_LIKE_DATASET");
+        environment.put("P3_SANITIZATION_ATTESTATION_FILE",
+                validGeneratedAttestation().toString());
+        environment.put("P3_SANITIZED_DUMP_FILE", "relative.dump");
+
+        ScriptResult result = run(environment);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.output()).contains("P3_RESULT: BLOCKED_INVALID_DUMP_PATH");
+        assertThat(result.output()).doesNotContain(
+                "BLOCKED_SENSITIVE_OR_PRODUCTION_LIKE_DATASET_ID");
+    }
+
+    @Test
     void backupChecksumAndRestoreFingerprintComparisonAreMandatory() throws Exception {
         String script = Files.readString(RUNNER);
 
@@ -149,6 +167,9 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
                 "trap 'exit 143' TERM",
                 "docker rm -f \"${CONTAINER_NAME}\"",
                 "CONTAINER_CLEANUP=\"PASS\"",
+                "EVIDENCE_DIR_PREPARED=0",
+                "[ \"${EVIDENCE_DIR_PREPARED}\" -eq 1 ]",
+                "EVIDENCE_DIR_PREPARED=1",
                 "BLOCKED_CONTAINER_CLEANUP_FAILED");
     }
 
@@ -160,7 +181,9 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
                 "run_bounded 180 docker exec -i",
                 "run_bounded 300 docker run",
                 "run_bounded 600 run_flyway_action",
-                "run_bounded 600 env");
+                "run_bounded 600 docker exec",
+                "run_bounded_with_input 180",
+                "wait_for_bounded_pid");
     }
 
     @Test
@@ -198,8 +221,14 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
     @Test
     void restoreUsesOwnerAclAndErrorSafetyFlags() throws Exception {
         String restoreScript = Files.readString(Path.of("scripts/prod-restore.sh"));
+        String runner = Files.readString(RUNNER);
 
         assertThat(restoreScript).contains("--no-owner", "--no-acl", "--exit-on-error");
+        assertThat(runner).contains(
+                "docker exec \"${CONTAINER_NAME}\" pg_dump",
+                "docker exec \"${CONTAINER_NAME}\" pg_restore",
+                "--no-owner", "--no-acl", "--exit-on-error",
+                "_CONTAINER_NATIVE");
     }
 
     @Test
@@ -223,7 +252,132 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
         String wrapper = Files.readString(Path.of("scripts/historical-time-basis-inventory.sh"));
 
         assertThat(wrapper).contains("trade_model_v1_p3_source");
+        assertThat(wrapper).contains("GENERATED_REHEARSAL", "generated");
         assertThat(wrapper).contains("BLOCKED_PRODUCTION_INDICATOR");
+    }
+
+    @Test
+    void generatedClassRunsButDoesNotCloseSanitizedGate() throws Exception {
+        String script = Files.readString(RUNNER);
+
+        assertThat(script).contains(
+                "GENERATED_RELEASE_LIKE)",
+                "SOURCE_DATASET_SUCCESS_STATUS=\"GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE\"",
+                "SUCCESS_RESULT=\"PASS_GENERATED_RELEASE_LIKE_REHEARSAL\"",
+                "FINAL_SANITIZED_CLONE_GATE=\"BLOCKED_NOT_RUN\"",
+                "P3_FINAL_SANITIZED_CLONE_GATE: ${FINAL_SANITIZED_CLONE_GATE}");
+    }
+
+    @Test
+    void generatedClassNeverAllowsP4() throws Exception {
+        String script = Files.readString(RUNNER);
+
+        assertThat(script).contains("P4_ALLOWED: NO");
+        assertThat(script).doesNotContain("P4_ALLOWED: YES");
+    }
+
+    @Test
+    void generatedAttestationCannotBePassedAsSanitizedClone() throws Exception {
+        Map<String, String> environment = completeInputContract();
+        environment.put("P3_SANITIZATION_ATTESTATION_FILE",
+                validGeneratedAttestation().toString());
+
+        ScriptResult result = run(environment);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.output()).contains(
+                "P3_RESULT: BLOCKED_SANITIZATION_ATTESTATION_MISMATCH",
+                "P3_FINAL_SANITIZED_CLONE_GATE: BLOCKED_NOT_RUN",
+                "P4_ALLOWED: NO",
+                "PRODUCTION_READINESS: BLOCKED");
+    }
+
+    @Test
+    void sanitizedClassStillRequiresSanitizedConfirmation() throws Exception {
+        Map<String, String> environment = completeInputContract();
+        environment.put("P3_CONFIRM", "I_CONFIRM_GENERATED_NON_PRODUCTION_RELEASE_LIKE_DATASET");
+
+        ScriptResult result = run(environment);
+
+        assertThat(result.exitCode()).isEqualTo(2);
+        assertThat(result.output()).contains(
+                "P3_RESULT: BLOCKED_SANITIZED_DATASET_CONFIRMATION_REQUIRED");
+    }
+
+    @Test
+    void generatedEvidenceUsesDistinctResultLabels() throws Exception {
+        String script = Files.readString(RUNNER);
+
+        assertThat(script).contains(
+                "GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE",
+                "PASS_READ_ONLY_GENERATED_RELEASE_LIKE",
+                "PASS_GENERATED_RELEASE_LIKE_REHEARSAL");
+        assertThat(script).contains(
+                "SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO",
+                "P4_ALLOWED: NO",
+                "PRODUCTION_READINESS: BLOCKED");
+    }
+
+    @Test
+    void boundedSqlInputAndTimeoutDoNotUseOrphanWatchdogSleep() throws Exception {
+        String script = Files.readString(RUNNER);
+
+        assertThat(script).contains(
+                "run_bounded_with_input 180",
+                "\"$@\" <\"${input_file}\" &",
+                "wait_for_bounded_pid \"$!\" \"${timeout_seconds}\"",
+                "local max_ticks=$((timeout_seconds * 10))");
+        assertThat(script).doesNotContain("local watchdog_pid", "sleep \"${timeout_seconds}\"");
+    }
+
+    @Test
+    void sourceFlywayValidationTargetsObservedVersionAndMigrationTargetsV7() throws Exception {
+        String helper = Files.readString(Path.of(
+                "src/test/java/org/example/trademodel/postgresql/ControlledCurrentStateCloneFlywayActionTest.java"));
+
+        assertThat(helper).contains(
+                "\"VALIDATE\".equals(action) ? sourceVersion : \"7\"",
+                ".target(targetVersion)",
+                "migrationsExecuted").doesNotContain("ignoreMigrationPatterns");
+    }
+
+    @Test
+    void generatedDashboardSmokeUsesControllerContractAndExactPlanSourceFields() throws Exception {
+        String script = Files.readString(RUNNER);
+
+        assertThat(script).contains(
+                "/api/dashboard/home?selectedSymbol=BTCUSDT&positionId=1001",
+                "/api/dashboard/home?selectedSymbol=BTCUSDT&positionId=1002",
+                "/api/dashboard/home?selectedSymbol=ETHUSDT&positionId=1003",
+                "/api/dashboard/home?selectedSymbol=SOLUSDT&positionId=1004",
+                "/api/dashboard/home?selectedSymbol=XRPUSDT&positionId=1006",
+                ".data.executionSuggestion.sourceExecutionPlanId",
+                ".data.executionSuggestion.sourceAnalysisId",
+                "POSITION_SELECTION_REQUIRED",
+                "originalPlanCurrentValidity\":\"PLAN_INCOMPLETE",
+                "originalPlanCurrentValidity\":\"REVALIDATION_REQUIRED",
+                ".data.executionSuggestion.originalPlanCurrentValidity",
+                "expired_plan_validity",
+                "BLOCKED_GENERATED_DASHBOARD_EXPIRED_PLAN_CONTRACT",
+                "INCOMPLETE_PLAN_FAIL_CLOSED: PASS",
+                "EXPIRED_HISTORICAL_PLAN_FAIL_CLOSED: PASS",
+                "REVALIDATION_PLAN_FAIL_CLOSED: PASS");
+        assertThat(script).doesNotContain("/api/dashboard/home?symbol=");
+    }
+
+    @Test
+    void historicalInventorySupportsV6WithoutInventingV7ValidityValues() throws Exception {
+        String inventory = Files.readString(Path.of("scripts/historical-time-basis-inventory.sql"));
+
+        assertThat(inventory).contains(
+                "decision_validity_values AS",
+                "to_jsonb(decision) ? 'valid_from'",
+                "to_jsonb(decision) ? 'expires_at'",
+                "decision_validity_schema AS",
+                "SCHEMA_FIELD_STATUS|tm_decision_result.validity_columns");
+        assertThat(inventory).doesNotContain(
+                "FROM tm_decision_result WHERE valid_from IS NOT NULL",
+                "FROM tm_decision_result decision\n    CROSS JOIN inventory_clock");
     }
 
     private Map<String, String> completeInputContract() throws IOException {
@@ -256,6 +410,28 @@ class ControlledCurrentStateCloneRehearsalP3ContractTest {
                 LOCAL_CONTROLLED_REHEARSAL_ALLOWED=YES
                 NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE=YES
                 """.formatted(owner));
+        return attestation;
+    }
+
+    private Path validGeneratedAttestation() throws IOException {
+        Path attestation = tempDir.resolve("generated-attestation.txt");
+        Files.writeString(attestation, """
+                DATA_SOURCE_CLASS=GENERATED_RELEASE_LIKE
+                SANITIZATION_OWNER_OR_PROCESS=DETERMINISTIC_REPOSITORY_FIXTURE_GENERATOR
+                GENERATED_AT_UTC=2026-07-15T00:00:00Z
+                SOURCE_POSTGRESQL_VERSION=16.14
+                SOURCE_FLYWAY_VERSION=6
+                USER_IDENTIFIERS_REMOVED_OR_PSEUDONYMIZED=YES
+                SECRETS_REMOVED=YES
+                FREE_TEXT_CLEANED_OR_REPLACED=YES
+                LOCAL_CONTROLLED_REHEARSAL_ALLOWED=YES
+                NOT_PRODUCTION_AND_NOT_FOR_PRODUCTION_RESTORE=YES
+                FIXTURE_SEED=20260715
+                REAL_USER_DATA_INCLUDED=NO
+                REAL_ACCOUNT_DATA_INCLUDED=NO
+                REAL_MARKET_PROVIDER_DATA_INCLUDED=NO
+                SUITABLE_FOR_FINAL_SANITIZED_CLONE_GATE=NO
+                """);
         return attestation;
     }
 

@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P3 Sanitized Release-Like Current-State Clone Rehearsal"
-active_block_cn: "P3 脱敏发布数据副本盘点与备份恢复演练"
+active_block: "P3.1 Generated Release-Like Rehearsal PASS; P3.2 Sanitized Clone Final Gate"
+active_block_cn: "P3.1 生成式发布数据演练通过；P3.2 脱敏副本最终门禁"
 
-next_required_action: "Provide an approved sanitized release-like custom dump and attestation, then run the guarded P3 rehearsal; current input is missing."
-next_business_phase: "P4 controlled staging evidence only after P3 has real non-skipped evidence and is merged/effective"
+next_required_action: "Acquire an approved sanitized release-like custom dump and attestation, then run P3.2 final evidence; generated P3.1 cannot substitute for this gate."
+next_business_phase: "P4 controlled staging evidence only after sanitized P3.2 is non-skipped, reviewed, and merged/effective"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false while P3 is unmerged and BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP; production deployment remains blocked."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false while this PR is unmerged and P3.2 is BLOCKED_NOT_RUN; production deployment remains blocked."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "P3 Draft PR; number assigned by GitHub"
+current_pr: "Draft PR #1127"
 current_branch: "codex/postgresql-current-state-clone-rehearsal-p3"
-current_package_pr: "P3 Draft PR; number assigned by GitHub"
+current_package_pr: "Draft PR #1127"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -139,7 +139,7 @@ cg1_coinglass_v4_provider_status: "DONE/effective on merged main by PR #1112: of
 cg1_coinglass_v4_provider_effective: true
 biz1_derivatives_business_integration_status: "DONE/effective on merged main by PR #1113: cached derivatives evidence, bounded business integration, deterministic tests, no live call, no position mutation, and no trading"
 p2_1_postgresql_v7_evidence_status: "DONE/effective on merged main at c94c99dfa72843e558ac4ce87037bfe71bd5dfaf: disposable PostgreSQL V1-V7/V6-V7, three timezones, Dashboard validity, aggregate historical-time semantics, and fail-closed app smoke"
-p3_current_state_clone_rehearsal_status: "DRAFT_BRANCH_BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP; harness contract exists but no release-like source inventory, backup, restore, migration, or application-smoke evidence is claimed"
+p3_current_state_clone_rehearsal_status: "DRAFT_BRANCH_P3_1_PASS_GENERATED_RELEASE_LIKE_REHEARSAL; source/recovery fingerprint MATCH, V6_TO_V7 PASS, application smoke PASS, zero unexpected business writes; P3.2 final sanitized-clone gate BLOCKED_NOT_RUN"
 p3_current_state_clone_rehearsal_effective: false
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
@@ -181,8 +181,9 @@ notes:
   - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
   - "PDR-LIVE16 is DONE/effective on merged main by PR #1095: readiness remains BLOCKED and deployment decision remains DO NOT DEPLOY."
   - "PDR-LIVE17 is DONE/effective on merged main by PR #1096: provider policy evidence is recorded, but no missing provider is waived or treated as PASS."
-  - "Current allowed work is the guarded P3 local current-state clone harness, aggregate-only evidence SQL, offline safety tests, and status/evidence documentation."
-  - "P3 input is BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP; no Docker or database action was attempted and harness tests are not release-like dataset evidence."
+  - "Current allowed work is P3.1 generated-rehearsal evidence closure and the explicitly scoped acquisition/execution of P3.2 sanitized-clone final evidence."
+  - "P3.1 generated release-like rehearsal passed source inventory, container-native backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, application smoke, and zero unexpected business writes. It is not a sanitized clone."
+  - "P3.2 final sanitized-clone gate is BLOCKED_NOT_RUN; P4 is not allowed and generated evidence cannot be promoted to sanitized-clone evidence."
   - "Merged main c94c99dfa72843e558ac4ce87037bfe71bd5dfaf remains the effective P2.1 baseline until a P3 PR is merged."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."

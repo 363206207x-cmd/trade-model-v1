@@ -6,27 +6,32 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3 Sanitized Release-Like Current-State Clone Inventory and Backup/Restore Rehearsal
-Next Business Phase: P4 controlled staging evidence only after real non-skipped P3 evidence is merged/effective
-Next Business Phase Allowed: NO while P3 is unmerged and blocked on missing sanitized input; NO for production deployment
+Current Work Package: P3.1 Generated Release-Like Rehearsal closure; P3.2 Sanitized Clone Final Evidence remains
+Next Business Phase: P4 controlled staging evidence only after sanitized P3.2 evidence is reviewed and merged/effective
+Next Business Phase Allowed: NO while this PR is unmerged and P3.2 is BLOCKED_NOT_RUN; NO for production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## P3 Sanitized Release-Like Current-State Clone Rehearsal
+## P3 Generated And Sanitized Release-Like Rehearsal
 
 Merged main `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf` remains the effective P2.1
-PostgreSQL/Flyway V7 evidence baseline. The P3 branch adds only a guarded
-localhost clone runner, aggregate-only fingerprint/verification SQL, offline
-safety tests, and evidence/status documentation.
+PostgreSQL/Flyway V7 evidence baseline. The P3 branch adds a guarded localhost
+runner, deterministic generated V6 fixture, aggregate-only
+fingerprint/verification SQL, offline safety tests, and evidence/status
+documentation.
 
-Current P3 result: `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`.
+P3.1 result: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`.
 
-All required dump/attestation input variables were absent. The default runner
-stopped before Docker or database access, so no source inventory, backup,
-restore, migration, application smoke, or writer cutover is claimed. Harness
-tests do not count as release-like dataset evidence. P4 cannot start and
+The deterministic generated dataset completed source/recovery inventory and
+fingerprint matching, PostgreSQL 16 container-native backup/restore,
+V6-to-V7 migration, historical-time inventory, fail-closed application smoke,
+and zero unexpected business writes. Its source status is
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`; it does not establish writer
+cutover or final current-state evidence.
+
+P3.2 final sanitized-clone gate remains `BLOCKED_NOT_RUN`. P4 cannot start and
 production deployment cannot proceed.
 
 Details: `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`.

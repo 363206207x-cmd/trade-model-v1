@@ -40,7 +40,7 @@ WHERE schemaname = 'public' AND tablename LIKE 'tm\_%' ESCAPE '\'
 GROUP BY tablename
 ORDER BY tablename;
 
-SELECT 'CONSTRAINT_COUNT|' || c.relname || '|' || con.contype, COUNT(*)
+SELECT 'CONSTRAINT_COUNT|' || c.relname || '|' || con.contype::text, COUNT(*)
 FROM pg_constraint con
 JOIN pg_class c ON c.oid = con.conrelid
 JOIN pg_namespace n ON n.oid = c.relnamespace

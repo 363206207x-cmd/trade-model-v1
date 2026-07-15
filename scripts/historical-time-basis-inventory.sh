@@ -40,7 +40,7 @@ if [ "${HISTORICAL_TIME_INVENTORY_CONFIRM:-}" != "I_CONFIRM_READ_ONLY_NON_PRODUC
 fi
 
 case "${HISTORICAL_TIME_INVENTORY_DATABASE_CLASS}" in
-  RESTORE|STAGING_CLONE|SANITIZED_REHEARSAL|LOCAL_CONTROLLED) ;;
+  RESTORE|STAGING_CLONE|SANITIZED_REHEARSAL|GENERATED_REHEARSAL|LOCAL_CONTROLLED) ;;
   *)
     echo "HISTORICAL_TIME_INVENTORY_RESULT: BLOCKED_DATABASE_CLASS"
     exit 2
@@ -56,7 +56,7 @@ fi
 
 if [ "${HISTORICAL_TIME_INVENTORY_DATABASE}" != "trade_model_v1_p3_source" ] \
   && ! printf '%s' "${HISTORICAL_TIME_INVENTORY_DATABASE}" \
-    | grep -Eiq '(test|staging|rehearsal|restore|recovery|sanitized|clone|controlled)'; then
+    | grep -Eiq '(test|staging|rehearsal|restore|recovery|sanitized|generated|clone|controlled)'; then
   echo "HISTORICAL_TIME_INVENTORY_RESULT: BLOCKED_UNVERIFIED_DATABASE_NAME"
   exit 2
 fi
