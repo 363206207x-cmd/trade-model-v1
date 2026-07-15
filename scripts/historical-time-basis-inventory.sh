@@ -54,8 +54,9 @@ if printf '%s' "${target_lower}" | grep -E '(prod|production|live|primary|main)'
   exit 2
 fi
 
-if ! printf '%s' "${HISTORICAL_TIME_INVENTORY_DATABASE}" \
-  | grep -Eiq '(test|staging|rehearsal|restore|recovery|sanitized|clone|controlled)'; then
+if [ "${HISTORICAL_TIME_INVENTORY_DATABASE}" != "trade_model_v1_p3_source" ] \
+  && ! printf '%s' "${HISTORICAL_TIME_INVENTORY_DATABASE}" \
+    | grep -Eiq '(test|staging|rehearsal|restore|recovery|sanitized|clone|controlled)'; then
   echo "HISTORICAL_TIME_INVENTORY_RESULT: BLOCKED_UNVERIFIED_DATABASE_NAME"
   exit 2
 fi

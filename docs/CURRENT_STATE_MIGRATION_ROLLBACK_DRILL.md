@@ -12,6 +12,12 @@ proved fresh V1-V7, V6-V7, three session timezones, Dashboard V7 validity,
 mapper compatibility, and fail-closed application smoke. This does not replace
 the current-state dataset backup/restore drill defined by this document.
 
+P3 addendum (2026-07-15): the guarded release-like clone runner, aggregate
+fingerprint/restore SQL, and offline safety tests now exist. The required
+sanitized custom dump and attestation were not present, so the actual P3 result
+is `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`. No Docker/database action,
+source inventory, backup, restore, migration, or application smoke was run.
+
 ## Scope
 
 This package defines the safe process and evidence requirements for a current-state PostgreSQL migration and rollback rehearsal. It does not execute a real migration, access a production database, run destructive database operations, change business runtime behavior, or claim production readiness.
@@ -38,7 +44,8 @@ evidence bundle before any production deployment decision.
 | `scripts/controlled-postgresql-flyway-v7-evidence.sh` | Repeats digest-pinned disposable migration, timezone, Dashboard, mapper, inventory, and app smoke evidence. |
 | `docs/HISTORICAL_TIME_BASIS_STRATEGY.md` | Defines aggregate-only inventory, writer-specific cutovers, and fail-closed handling of unverified history. |
 | `scripts/prod-backup.sh` | Requires explicit PostgreSQL env vars and uses `pg_dump`; no DB URL or secrets are hardcoded. |
-| `scripts/prod-restore.sh` | Requires explicit restore env vars and refuses to run unless `RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA`. |
+| `scripts/prod-restore.sh` | Requires explicit restore env vars and confirmation; custom restore uses `--no-owner`, `--no-acl`, and `--exit-on-error`. |
+| `scripts/controlled-current-state-clone-rehearsal-p3.sh` | Fixed localhost/digest/database allowlists, bounded steps, aggregate-only evidence, and cleanup trap; currently blocked before Docker because the required sanitized input is missing. |
 | `scripts/prod-release-gate.sh` | Can require backup evidence, does not run restore automatically, and remains incomplete until restore and human evidence are recorded. |
 | `docs/PRODUCTION_READINESS_RUNBOOK.md` | Contains production migration policy, server skeleton, smoke commands, and restore troubleshooting; PDR-PF4 adds the explicit current-state/rollback drill shape. |
 
@@ -235,6 +242,8 @@ removed its auxiliary databases and container.
 - Fresh V1-V7 and V6-V7 controlled-local migration evidence is complete.
 - No backup or restore was executed against a current-state release dataset.
 - No production-like current-state migration rehearsal was executed.
+- P3 input remains `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`; harness
+  contract tests are not database evidence.
 - Historical time cutovers remain unverified and no timestamp was shifted.
 - No Java business logic changed.
 - No schema.sql or Flyway SQL migration changed.

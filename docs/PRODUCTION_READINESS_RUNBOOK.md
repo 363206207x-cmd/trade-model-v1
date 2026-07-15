@@ -686,6 +686,8 @@ PGPASSWORD="$RESTORE_DATASOURCE_PASSWORD" pg_restore \
   --clean \
   --if-exists \
   --no-owner \
+  --no-acl \
+  --exit-on-error \
   "backup/trade_model_v1_YYYYMMDD_HHMMSS.dump"
 ```
 
@@ -718,6 +720,25 @@ RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA bash scripts/prod-restor
 ```
 
 The restore script must only target a controlled recovery database until a separate production restore drill has been approved.
+
+## P3 Sanitized Current-State Clone Rehearsal
+
+P3 provides `scripts/controlled-current-state-clone-rehearsal-p3.sh` for a
+sanitized, non-production, release-like PostgreSQL custom dump. It fixes the
+target to digest-pinned localhost PostgreSQL on `127.0.0.1:55433` and the three
+database names `trade_model_v1_p3_source`, `trade_model_v1_p3_rehearsal`, and
+`trade_model_v1_p3_recovery`. It records only aggregate/redacted evidence under
+ignored `.runtime/postgresql-p3-rehearsal/`.
+
+The current result is `BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP`. No source
+inventory, backup, recovery restore, migration, or application smoke was run;
+no Docker or database action was attempted. The runner must not be described as
+PASS until an approved dump and attestation are supplied and the real path
+completes without skips.
+
+See `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md` and
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. P4 staging evidence is not
+allowed while this gate is blocked.
 
 ## Remaining Blockers
 

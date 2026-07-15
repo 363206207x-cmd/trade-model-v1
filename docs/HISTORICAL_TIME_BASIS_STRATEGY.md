@@ -200,6 +200,21 @@ Any future historical correction requires a separate PR and all of:
 Until those gates pass, original values remain unchanged and production
 readiness remains **BLOCKED**.
 
+## P3 Release-Like Clone Gate
+
+P3 adds a guarded localhost runner and aggregate-only source/recovery/rehearsal
+fingerprints. It also adds the writer register in
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. The required sanitized
+release-like custom dump and attestation were absent, so P3 is currently
+`BLOCKED_MISSING_SANITIZED_RELEASE_LIKE_DUMP` and no inventory query ran against
+a release-like dataset.
+
+The merged code references in the writer register are only `CODE_MERGED`.
+Actual deployment commit/time, startup log, restart/migration time, first
+verifiable row, operator, and approval remain
+`MISSING_OPERATIONAL_EVIDENCE`. Neither P2.1 fixtures nor a future local P3
+clone can establish a production writer cutover by themselves.
+
 ## Remaining Evidence
 
 Before a release decision, run the inventory against a sanctioned restore or
