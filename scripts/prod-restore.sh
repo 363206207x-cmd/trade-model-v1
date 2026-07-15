@@ -46,6 +46,8 @@ case "$RESTORE_BACKUP_FILE" in
       --clean \
       --if-exists \
       --no-owner \
+      --no-acl \
+      --exit-on-error \
       "$RESTORE_BACKUP_FILE"
     ;;
 esac

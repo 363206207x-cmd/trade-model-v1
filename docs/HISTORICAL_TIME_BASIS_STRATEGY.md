@@ -200,10 +200,31 @@ Any future historical correction requires a separate PR and all of:
 Until those gates pass, original values remain unchanged and production
 readiness remains **BLOCKED**.
 
+## P3 Release-Like Clone Gate
+
+P3 adds a guarded localhost runner and aggregate-only source/recovery/rehearsal
+fingerprints. It also adds the writer register in
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. P3.1 ran the inventory on a
+deterministic generated V6 dataset before migration and proved exact aggregate
+inventory/fingerprint matches after recovery restore. The inventory now
+reports V7 validity-column availability structurally, so a V6 source is
+audited without inventing `valid_from` or `expires_at` values.
+
+P3.1 is `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`, but the source is
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`. It cannot classify real history,
+close operational writer cutovers, or close the final sanitized-clone gate.
+P3.2 remains `BLOCKED_NOT_RUN`.
+
+The merged code references in the writer register are only `CODE_MERGED`.
+Actual deployment commit/time, startup log, restart/migration time, first
+verifiable row, operator, and approval remain
+`MISSING_OPERATIONAL_EVIDENCE`. Neither P2.1 fixtures nor the executed local
+generated P3.1 rehearsal can establish a production writer cutover.
+
 ## Remaining Evidence
 
-Before a release decision, run the inventory against a sanctioned restore or
-sanitized current-state clone, approve each writer cutover, review candidate
-samples against trustworthy references, complete backup/restore and
-current-state migration rehearsal, and obtain release-owner approval. No
-production database was accessed and no historical row was modified by P2.1.
+Before a release decision, run the inventory against a sanctioned sanitized
+current-state clone, approve each writer cutover, review candidate samples
+against trustworthy references, complete P3.2 backup/restore/current-state
+migration evidence, and obtain release-owner approval. No production database
+was accessed and no historical row was modified by P2.1 or P3.1.

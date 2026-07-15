@@ -686,6 +686,8 @@ PGPASSWORD="$RESTORE_DATASOURCE_PASSWORD" pg_restore \
   --clean \
   --if-exists \
   --no-owner \
+  --no-acl \
+  --exit-on-error \
   "backup/trade_model_v1_YYYYMMDD_HHMMSS.dump"
 ```
 
@@ -719,6 +721,42 @@ RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA bash scripts/prod-restor
 
 The restore script must only target a controlled recovery database until a separate production restore drill has been approved.
 
+## P3 Generated Rehearsal And Greenfield Provenance
+
+P3 provides `scripts/generate-p3-release-like-fixture.sh` for deterministic
+generated P3.1 input and retains
+`scripts/controlled-current-state-clone-rehearsal-p3.sh` for generated or a
+future separately sanctioned sanitized custom dump. The runner
+fixes the target to digest-pinned localhost PostgreSQL on `127.0.0.1:55433`
+and the three database names `trade_model_v1_p3_source`,
+`trade_model_v1_p3_rehearsal`, and `trade_model_v1_p3_recovery`. It records
+only aggregate/redacted evidence under ignored
+`.runtime/postgresql-p3-rehearsal/`.
+
+P3.1 is `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`: source inventory,
+container-native PostgreSQL 16 backup/restore, source/recovery fingerprints,
+V6-to-V7 migration, historical inventory, app smoke, and cleanup passed with
+zero unexpected business writes. Its status is
+`GENERATED_RELEASE_LIKE_NOT_SANITIZED_CLONE`.
+
+Approved decision `TMV1-GREENFIELD-20260715-001` selects
+`GREENFIELD_NEW_DATABASE`: no historical business data must be preserved, no
+existing formal business database exists, and the go-live initial state is
+`EMPTY`. Local H2, test fixtures, and generated PostgreSQL rows are not
+production history.
+
+The P3.2 sanitized-clone route and final gate are
+`NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`, not PASS. No sanitized clone
+will be sought or fabricated. The support code remains for recovery/incident
+use or a future separately approved migration mode. Generated evidence must
+not be described as existing-data migration, production history, writer
+cutover, permission to start P4, or production readiness.
+
+See `docs/GREENFIELD_DATABASE_PROVENANCE_DECISION.md`,
+`docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`, and
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. Greenfield P3-G is next only
+after PR #1127 is merged/effective. P4 remains blocked.
+
 ## Remaining Blockers
 
 - Flyway remains non-default for runtime startup; test-only Flyway smoke exists.
@@ -735,9 +773,10 @@ The restore script must only target a controlled recovery database until a separ
 
 ## Next Packages
 
-1. Actual release-owner decision capture after PDR-LIVE18, a controlled real-server PASS evidence run if infrastructure becomes available, or another explicitly scoped controlled secrets/access/provider evidence package.
-2. Controlled current-state migration + rollback drill in a safe non-production or production-like environment.
-3. Production release-gate status closure only after completed redacted evidence and explicit approval.
+1. After PR #1127 is merged/effective, Greenfield Production Database First-Boot, Backup/Restore and Read-Only Deployment Rehearsal P3-G.
+2. Controlled real-server, secrets/access/provider, and operational ownership evidence packages as explicitly approved.
+3. P4 only after the Greenfield P3-G gate and its prerequisite review are complete.
+4. Production release-gate status closure only after completed redacted evidence and explicit approval.
 
 ## Explicit Non-Scope
 

@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "BIZ-1 CoinGlass Derivatives Business Integration"
-active_block_cn: "BIZ-1 CoinGlass 衍生品业务集成"
+active_block: "Approved Greenfield provenance closure; Greenfield P3-G is next after PR #1127 is merged/effective"
+active_block_cn: "已批准全新空库数据来源收口；PR #1127 合并生效后进入 Greenfield P3-G"
 
-next_required_action: "Complete BIZ-1 deterministic validation and draft PR review; do not run live CoinGlass calls or relax production gates."
-next_business_phase: "Post-BIZ-1 alignment review only after this implementation is merged/effective"
+next_required_action: "Complete final Greenfield provenance review for Draft PR #1127; after merge/effective, start only the explicitly scoped Greenfield P3-G first-boot, backup/restore, and read-only rehearsal."
+next_business_phase: "Greenfield P3-G first-boot, backup/restore, and read-only deployment rehearsal after PR #1127 is merged/effective"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false until BIZ-1 is merged/effective; production deployment remains blocked."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false while Draft PR #1127 is unmerged. Sanitized-clone P3.2 is not applicable, P4 is blocked, and production deployment remains blocked."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "none"
-current_branch: "codex/biz1-coinglass-business-integration"
-current_package_pr: "none"
+current_pr: "Draft PR #1127"
+current_branch: "codex/postgresql-current-state-clone-rehearsal-p3"
+current_package_pr: "Draft PR #1127"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -137,7 +137,18 @@ p4_real_historical_fixture_replay_status: "BLOCKED_MISSING_REAL_FIXTURE on branc
 p4_real_historical_fixture_replay_effective: false
 cg1_coinglass_v4_provider_status: "DONE/effective on merged main by PR #1112: official v4 endpoint matrix, four isolated datasets, fail-closed normalized snapshot, and default-off live gate"
 cg1_coinglass_v4_provider_effective: true
-biz1_derivatives_business_integration_status: "IMPLEMENTED_PENDING_MERGE on branch: cached derivatives evidence, eight-score contribution, four-timeframe decision, state/push/recheck/plan/monitor/home adoption; live calls zero"
+biz1_derivatives_business_integration_status: "DONE/effective on merged main by PR #1113: cached derivatives evidence, bounded business integration, deterministic tests, no live call, no position mutation, and no trading"
+p2_1_postgresql_v7_evidence_status: "DONE/effective on merged main at c94c99dfa72843e558ac4ce87037bfe71bd5dfaf: disposable PostgreSQL V1-V7/V6-V7, three timezones, Dashboard validity, aggregate historical-time semantics, and fail-closed app smoke"
+p3_current_state_clone_rehearsal_status: "DRAFT_BRANCH_GREENFIELD_PROVENANCE_APPROVED; P3_HARNESS_AND_GENERATED_REHEARSAL PASS; P3_SANITIZED_CLONE NOT_APPLICABLE_BY_GREENFIELD_DECISION; Greenfield P3-G next only after PR effective"
+p3_current_state_clone_rehearsal_effective: false
+data_provenance_mode: "GREENFIELD_NEW_DATABASE"
+greenfield_decision_reference: "TMV1-GREENFIELD-20260715-001"
+p3_generated_rehearsal: "PASS"
+p3_sanitized_clone: "NOT_APPLICABLE_BY_GREENFIELD_DECISION"
+p3_2_sanitized_clone_route: "NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION"
+p3_final_sanitized_clone_gate: "NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION"
+greenfield_p3_g: "NEXT_ALLOWED_AFTER_PR_EFFECTIVE"
+p4_status: "BLOCKED"
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
 merged_main_matrix_done_required: true
@@ -178,8 +189,10 @@ notes:
   - "PDR-LIVE15 is DONE/effective on merged main by PR #1094: real-server smoke is SKIPPED_MISSING_CONTROLLED_SERVER and production readiness remains BLOCKED."
   - "PDR-LIVE16 is DONE/effective on merged main by PR #1095: readiness remains BLOCKED and deployment decision remains DO NOT DEPLOY."
   - "PDR-LIVE17 is DONE/effective on merged main by PR #1096: provider policy evidence is recorded, but no missing provider is waived or treated as PASS."
-  - "Current allowed work is BIZ-1 cache-only derivatives evidence, bounded score/decision/state/plan/monitor/internal-Push integration, deterministic tests, versioned rule defaults, and status-source updates."
-  - "CG-1 remains the judgment-free provider owner; BIZ-1 owns downstream interpretation, preserves 4h rule direction, and does not create or mutate UserPosition."
+  - "Decision TMV1-GREENFIELD-20260715-001 approves GREENFIELD_NEW_DATABASE with no historical business data to preserve, no existing formal business database, and an EMPTY go-live initial state."
+  - "P3.1 generated release-like rehearsal passed source inventory, container-native backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, application smoke, strict attestation parsing, and zero unexpected business writes. It proves the harness only and is not production history."
+  - "P3.2 sanitized-clone route and final gate are NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION, not PASS. Greenfield P3-G is next only after PR #1127 is merged/effective; P4 is blocked."
+  - "Merged main c94c99dfa72843e558ac4ce87037bfe71bd5dfaf remains the effective P2.1 baseline until a P3 PR is merged."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."
   - "P4 is BLOCKED_MISSING_REAL_FIXTURE; no real replay, provider validation, profitability, or production-readiness PASS is claimed."
