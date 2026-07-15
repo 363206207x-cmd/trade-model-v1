@@ -1,6 +1,7 @@
 package org.example.trademodel.mapper;
 
 import org.example.trademodel.TradeModelApplication;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,9 @@ class DecisionResultMapperLatestPlanIntegrationTest {
 
     @Autowired
     private DecisionResultMapper decisionResultMapper;
+
+    @Autowired
+    private ExecutionPlanMapper executionPlanMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -109,5 +113,72 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getEntryZone()).isEqualTo("sol-zone");
         assertThat(row.getInvalidCondition()).isEqualTo("decision-fallback-invalid");
         assertThat(row.getExecutionPlanSummary()).isEqualTo("2h | decision-fallback-invalid");
+    }
+
+    @Test
+    void analysisOnlyMultiplePlansDoNotResolveAndExactPlanIdStillReturnsA() {
+        jdbcTemplate.update(
+                "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score, trace_id) "
+                        + "VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?, ?)",
+                "ana-source-plan-it", "BTCUSDT", "1h", 90, "trace-source-plan-it");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, valid_period, invalid_condition, create_time) "
+                        + "VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)",
+                "dec-source-plan-it", "ana-source-plan-it", "BTCUSDT", "source-validity", "decision-invalid");
+        jdbcTemplate.update(
+                "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, entry_zone, stop_loss, take_profit_rules, "
+                        + "leverage_suggestion, position_suggestion, invalid_condition, create_time) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?, TIMESTAMP '2025-01-01 00:00:00')",
+                "plan-source-A", "ana-source-plan-it", "ADVISORY", "A-entry", "A-stop", "A-tp",
+                "A-leverage", "A-position", "A-invalid");
+        jdbcTemplate.update(
+                "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, entry_zone, stop_loss, take_profit_rules, "
+                        + "leverage_suggestion, position_suggestion, invalid_condition, create_time) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
+                "plan-latest-B", "ana-source-plan-it", "SEMI_STRUCTURED", "B-entry", "B-stop", "B-tp",
+                "B-leverage", "B-position", "B-invalid");
+
+        assertThat(executionPlanMapper.selectOnlyByAnalysisId("ana-source-plan-it")).isNull();
+
+        ExecutionPlanDO exactPlan = executionPlanMapper.selectByPlanId("plan-source-A");
+        assertThat(exactPlan).isNotNull();
+        assertThat(exactPlan.getPlanId()).isEqualTo("plan-source-A");
+        assertThat(exactPlan.getEntryZone()).isEqualTo("A-entry");
+
+        DecisionResultVO row = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
+                "ana-source-plan-it", "plan-source-A");
+
+        assertThat(row).isNotNull();
+        assertThat(row.getAnalysisId()).isEqualTo("ana-source-plan-it");
+        assertThat(row.getSymbol()).isEqualTo("BTCUSDT");
+        assertThat(row.getEntryZone()).isEqualTo("A-entry");
+        assertThat(row.getStopLoss()).isEqualTo("A-stop");
+        assertThat(row.getTakeProfitRules()).isEqualTo("A-tp");
+        assertThat(row.getEntryZone()).isNotEqualTo("B-entry");
+        assertThat(row.getInvalidCondition()).isEqualTo("A-invalid");
+    }
+
+    @Test
+    void countOpenSymbolsWithReverseSignal_recognizesStrongAndWeakDirectionFamilies() {
+        jdbcTemplate.update(
+                "INSERT INTO tm_real_position(position_id, symbol, position_side, position_status) VALUES (?,?,?,?)",
+                "position-strong-bear", "BTCUSDT", "LONG", "OPEN");
+        jdbcTemplate.update(
+                "INSERT INTO tm_real_position(position_id, symbol, position_side, position_status) VALUES (?,?,?,?)",
+                "position-weak-bull", "ETHUSDT", "SHORT", "OPEN");
+        jdbcTemplate.update(
+                "INSERT INTO tm_real_position(position_id, symbol, position_side, position_status) VALUES (?,?,?,?)",
+                "position-range", "SOLUSDT", "LONG", "OPEN");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
+                "decision-strong-bear", "analysis-strong-bear", "BTCUSDT", "STRONG_BEARISH");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
+                "decision-weak-bull", "analysis-weak-bull", "ETHUSDT", "WEAK_BULLISH");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
+                "decision-range", "analysis-range", "SOLUSDT", "RANGE");
+
+        assertThat(decisionResultMapper.countOpenSymbolsWithReverseSignal()).isEqualTo(2);
     }
 }

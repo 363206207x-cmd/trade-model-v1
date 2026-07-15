@@ -196,10 +196,11 @@ class ExecutionPlanSourceGateTest {
     void serviceExposesSourceGateResult() {
         ExecutionPlanVO plan = validPlanFromService();
 
-        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
         assertThat(plan.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
         assertThat(plan.getSourceGateComplete()).isTrue();
-        assertThat(plan.getMissingSourceReasons()).isEmpty();
+        assertThat(plan.getMissingSourceReasons()).containsExactly("executionBoundary");
+        assertThat(plan.getNotExecutableReason()).isEqualTo("PLAN_BOUNDARY_INCOMPLETE");
         assertThat(plan.getSourceCompletenessSummary()).contains("source gate VALID");
     }
 

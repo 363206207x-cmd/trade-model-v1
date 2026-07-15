@@ -9,6 +9,7 @@ import org.example.trademodel.dto.planboundary.SourceTraceBoundaryProducerResult
 import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
@@ -32,6 +33,7 @@ public class PlanServiceImpl implements PlanService {
     private static final String SOURCE_TRACE_BLOCKED = "SOURCE_TRACE_BLOCKED";
     private static final String SOURCE_TRACE_SAFE_FAIL_CLOSED = "SOURCE_TRACE_SAFE_FAIL_CLOSED_ONLY";
     private static final String MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED";
+    private static final String PLAN_BOUNDARY_INCOMPLETE = "PLAN_BOUNDARY_INCOMPLETE";
     private static final String RISK_ACTION_GUARD_MISSING = "RISK_ACTION_GUARD_MISSING";
     private static final String RISK_ACTION_GUARD_BACKEND_PENDING = "RISK_ACTION_GUARD_BACKEND_PENDING";
     private static final String LIQUIDITY_CONTEXT_MISSING = "LIQUIDITY_CONTEXT_MISSING";
@@ -62,6 +64,16 @@ public class PlanServiceImpl implements PlanService {
             List<ScoreItemVO> scoreList,
             MarketEnvironmentVO marketEnv,
             AssetAnalysisVO assetAnalysis,
+            SourceTraceDTO sourceTrace,
+            DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
+    ) {
+        ExecutionPlanVO plan = buildBaseExecutionPlan(decisionBundle, sourceTrace, riskActionGuardDisplay);
+        enforceBoundaryCompleteness(plan);
+        return plan;
+    }
+
+    private ExecutionPlanVO buildBaseExecutionPlan(
+            DecisionBundleVO decisionBundle,
             SourceTraceDTO sourceTrace,
             DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
     ) {
@@ -101,15 +113,9 @@ public class PlanServiceImpl implements PlanService {
             DashboardDetailResponseVO.RiskActionGuardDisplayVO riskActionGuardDisplay
     ) {
         SourceTraceDTO sourceTrace = boundaryResult == null ? null : boundaryResult.getSourceTrace();
-        ExecutionPlanVO plan = generateExecutionPlan(
-                decisionBundle,
-                scoreList,
-                marketEnv,
-                assetAnalysis,
-                sourceTrace,
-                riskActionGuardDisplay
-        );
+        ExecutionPlanVO plan = buildBaseExecutionPlan(decisionBundle, sourceTrace, riskActionGuardDisplay);
         applyBoundaryProducerResult(plan, boundaryResult, marketEnv);
+        enforceBoundaryCompleteness(plan);
         return plan;
     }
 
@@ -119,9 +125,7 @@ public class PlanServiceImpl implements PlanService {
     }
 
     private static String resolvePlanMode(ExecutionPlanVO plan, DecisionBundleVO decisionBundle) {
-        boolean hasConcreteExecutionFields = hasConcrete(plan.getEntryZone())
-                && hasConcrete(plan.getStopLoss())
-                && hasConcrete(plan.getTakeProfitRules());
+        boolean hasConcreteExecutionFields = ExecutionPlanReviewPolicy.hasCompleteBoundaries(plan);
         if (Boolean.TRUE.equals(decisionBundle.getIsWorthOpening()) && hasConcreteExecutionFields) {
             return ExecutionPlanVO.PLAN_MODE_SEMI_STRUCTURED;
         }
@@ -292,6 +296,34 @@ public class PlanServiceImpl implements PlanService {
         plan.setPlanMode(ExecutionPlanVO.PLAN_MODE_ADVISORY);
     }
 
+    private static void enforceBoundaryCompleteness(ExecutionPlanVO plan) {
+        if (plan == null || ExecutionPlanReviewPolicy.hasCompleteBoundaries(plan)) {
+            return;
+        }
+        String status = plan.getExecutionPlanStatus();
+        if (ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED.equalsIgnoreCase(status)
+                || "INVALID".equalsIgnoreCase(status)
+                || ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE.equalsIgnoreCase(status)) {
+            return;
+        }
+        plan.setExecutionPlanStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        if (!ExecutionPlanVO.READINESS_WATCH_ONLY.equalsIgnoreCase(plan.getReadinessStatus())) {
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_INCOMPLETE);
+        }
+        plan.setPlanMode(ExecutionPlanVO.PLAN_MODE_ADVISORY);
+        plan.setManualReviewRequired(true);
+        plan.setNotTradeInstruction(true);
+        plan.setNotExecutable(true);
+        plan.setNotAutoTrading(true);
+        plan.setNotOrderExecution(true);
+        plan.setNotUserPositionCreation(true);
+        if (plan.getNotExecutableReason() == null
+                || MANUAL_REVIEW_REQUIRED.equalsIgnoreCase(plan.getNotExecutableReason())) {
+            plan.setNotExecutableReason(PLAN_BOUNDARY_INCOMPLETE);
+        }
+        appendUnique(plan.getMissingSourceReasons(), List.of("executionBoundary"));
+    }
+
     private static boolean hasRequiredBoundaryEvidence(SourceTraceBoundaryProducerResult boundaryResult) {
         BoundaryEntryDTO entry = boundaryResult.getEntry();
         BoundaryStopDTO stop = boundaryResult.getStop();
@@ -409,14 +441,6 @@ public class PlanServiceImpl implements PlanService {
             return blockingReason;
         }
         return null;
-    }
-
-    private static boolean hasConcrete(String value) {
-        if (value == null) {
-            return false;
-        }
-        String trimmed = value.trim();
-        return !trimmed.isEmpty() && !PLACEHOLDER_NOT_AVAILABLE.equals(trimmed);
     }
 
     private static boolean isBlankStatic(String value) {

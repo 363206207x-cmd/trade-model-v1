@@ -6,17 +6,18 @@ public class DecisionContext {
     private String ruleMarketBias;
     private String ruleConfidenceLevel;
     /** 与本次 K 线多周期是否对齐一致（来自 DecisionEngineService 本 run 计算） */
-    private boolean multiTimeframeAligned = true;
+    private boolean multiTimeframeAligned;
     /** LOW / MEDIUM — 来自本 run 风险档位 */
     private String riskTier = "MEDIUM";
     /** 本 run 是否认为值得开仓 */
     private Boolean worthOpening;
     private boolean hasRuleBaseOutput = true;
-    private boolean gptConsistentWithRule = true;
-    private boolean geminiConsistentWithRule = true;
-    private boolean grokConsistentWithRule = true;
+    private boolean gptConsistentWithRule;
+    private boolean geminiConsistentWithRule;
+    private boolean grokConsistentWithRule;
     private Integer aiObjectionCount = 0;
-    private Integer aiSupportCount = 3;
+    private Integer aiSupportCount = 0;
+    private Integer aiSuccessfulProviderCount = 0;
     private Integer driverConflictScore;
     private Integer executionInstabilityScore;
     private Integer microstructureTrapScore;
@@ -127,6 +128,14 @@ public class DecisionContext {
 
     public void setAiSupportCount(Integer aiSupportCount) {
         this.aiSupportCount = aiSupportCount;
+    }
+
+    public Integer getAiSuccessfulProviderCount() {
+        return aiSuccessfulProviderCount;
+    }
+
+    public void setAiSuccessfulProviderCount(Integer aiSuccessfulProviderCount) {
+        this.aiSuccessfulProviderCount = aiSuccessfulProviderCount;
     }
 
     public Integer getDriverConflictScore() {

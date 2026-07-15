@@ -31,8 +31,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -100,8 +103,9 @@ class PushRecheckServiceImplTest {
 
     @Test
     void expired() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
         TmPushSnapshotDO s = baseSnap();
-        s.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        s.setExpiresAt(LocalDateTime.parse("2026-07-14T11:59:00"));
         when(pushSnapshotMapper.selectByPushId(2L)).thenReturn(s);
         RecheckResult r = service.recheck(2L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
@@ -109,6 +113,38 @@ class PushRecheckServiceImplTest {
         assertSafeReviewOnlyResult(r);
         verify(pushRecheckLogMapper).insert(any());
         verify(pushSnapshotMapper).updatePushStatus(2L, "RECHECK_EXPIRED");
+    }
+
+    @Test
+    void pushRecheckExpiresAtExactBoundary() {
+        LocalDateTime expiresAt = LocalDateTime.parse("2026-07-14T12:00:00");
+        TmPushSnapshotDO snapshot = baseSnap();
+        snapshot.setExpiresAt(expiresAt);
+        when(pushSnapshotMapper.selectByPushId(201L)).thenReturn(snapshot);
+        when(pushSnapshotMapper.selectByPushId(202L)).thenReturn(snapshot);
+        when(pushSnapshotMapper.selectByPushId(203L)).thenReturn(snapshot);
+
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T11:59:59Z"), ZoneOffset.UTC));
+        RecheckResult before = service.recheck(201L, new BigDecimal("100"));
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
+        RecheckResult equal = service.recheck(202L, new BigDecimal("100"));
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:01Z"), ZoneOffset.UTC));
+        RecheckResult after = service.recheck(203L, new BigDecimal("100"));
+
+        assertThat(before.getRecheckStatus()).isNotEqualTo(RecheckStatusEnum.EXPIRED);
+        assertThat(equal.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
+        assertThat(after.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> captor =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper, times(3)).insert(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(org.example.trademodel.entity.TmPushRecheckLogDO::getRecheckTime)
+                .containsExactly(
+                        LocalDateTime.parse("2026-07-14T11:59:59"),
+                        LocalDateTime.parse("2026-07-14T12:00:00"),
+                        LocalDateTime.parse("2026-07-14T12:00:01"));
+        assertThat(captor.getAllValues()).allSatisfy(log ->
+                assertThat(log.getCreateTime()).isEqualTo(log.getRecheckTime()));
     }
 
     @Test

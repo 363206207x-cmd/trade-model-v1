@@ -26,6 +26,7 @@ import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.Collections;
@@ -59,6 +61,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final RuleConfigContractService ruleConfigContractService;
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
+    private Clock clock = Clock.systemUTC();
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
                                   AccountRiskSnapshotMapper accountRiskSnapshotMapper,
@@ -91,6 +94,11 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
     }
 
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
+
     @Override
     public RecheckResult recheck(Long pushId, BigDecimal currentPrice) {
         return recheck(pushId, currentPrice, RecheckExecutionCommand.manual());
@@ -111,7 +119,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             return early;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = UtcLocalTimePolicy.now(clock);
         TmPushSnapshotDO snap = pushSnapshotMapper.selectByPushId(pushId);
 
         RecheckStatusEnum status;
@@ -132,7 +140,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.INVALIDATED;
             message = "复查配置不可用，仅供人工复核";
             failReasonJson = failJson("PUSH_RECHECK_CONFIG_NOT_READY", "push_recheck_config missing or invalid");
-        } else if (snap.getExpiresAt() != null && now.isAfter(snap.getExpiresAt())) {
+        } else if (snap.getExpiresAt() != null && !now.isBefore(snap.getExpiresAt())) {
             status = RecheckStatusEnum.EXPIRED;
             message = "推送已过期，不得作为当前交易依据";
             failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());

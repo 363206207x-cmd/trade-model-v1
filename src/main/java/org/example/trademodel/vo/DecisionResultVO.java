@@ -2,6 +2,7 @@ package org.example.trademodel.vo;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public class DecisionResultVO {
 
@@ -20,6 +21,8 @@ public class DecisionResultVO {
     private String aiRoleResults;
     private Boolean isAdopted;
     private String validPeriod;
+    private OffsetDateTime validFrom;
+    private OffsetDateTime expiresAt;
     private String invalidCondition;
     private String evidenceSummary;
     private String explanationJson;
@@ -183,6 +186,22 @@ public class DecisionResultVO {
 
     public void setValidPeriod(String validPeriod) {
         this.validPeriod = validPeriod;
+    }
+
+    public OffsetDateTime getValidFrom() {
+        return validFrom;
+    }
+
+    public void setValidFrom(OffsetDateTime validFrom) {
+        this.validFrom = validFrom;
+    }
+
+    public OffsetDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(OffsetDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public String getInvalidCondition() {

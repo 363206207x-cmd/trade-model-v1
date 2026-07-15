@@ -30,6 +30,27 @@ class ConfusedStateServiceImplTest {
     }
 
     @Test
+    void confusedScore0_isNeitherConfusedNorDirectionallyBlocked() {
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(null);
+
+        ConfusedResult result = service.calculateConfused("BTCUSDT", contextForScore(0, false));
+
+        assertThat(result.isShouldEnter()).isFalse();
+        assertThat(result.isDirectionalPushBlocked()).isFalse();
+    }
+
+    @Test
+    void confusedScore1_isConflictEvidenceButNotAStateOrDirectionalBlock() {
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(null);
+
+        ConfusedResult result = service.calculateConfused("BTCUSDT", contextForScore(1, false));
+
+        assertThat(result.getConfusedScore()).isEqualTo(1);
+        assertThat(result.isShouldEnter()).isFalse();
+        assertThat(result.isDirectionalPushBlocked()).isFalse();
+    }
+
+    @Test
     void confusedScore69_doesNotEnterConfused() {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(null);
 

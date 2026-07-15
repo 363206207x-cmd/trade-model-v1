@@ -36,6 +36,10 @@ public interface AssetStateMapper {
     @Select("SELECT COUNT(*) FROM tm_asset_state WHERE confused_score > 0")
     int countSymbolsWhereConfusedScorePositive();
 
+    /** Directional block count uses the formal confused policy threshold, not any non-zero score. */
+    @Select("SELECT COUNT(*) FROM tm_asset_state WHERE confused_score >= #{threshold}")
+    int countDirectionalPushBlocked(@Param("threshold") int threshold);
+
     /**
      * 全库最近一次 Hot Reset（按 hot_reset_time 最大）。无记录或时间为空时返回 null。
      */

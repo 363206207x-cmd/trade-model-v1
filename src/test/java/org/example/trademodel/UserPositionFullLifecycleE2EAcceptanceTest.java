@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -29,8 +30,10 @@ import java.util.stream.Collectors;
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -40,6 +43,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
@@ -65,16 +69,28 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
     private static final String ANALYSIS_ID = "analysis-p3-e2e-user-position";
 
     @Test
-    void manualUserPositionFlowsThroughMonitorCloseReviewAndRuleFeedbackWithoutExecutableSurfaces()
+    void activeMonitorAndClosedReviewUseSameSourceResolution()
             throws Exception {
         UserPositionMapper userPositionMapper = mock(UserPositionMapper.class);
         Map<Long, UserPositionDO> positions = new LinkedHashMap<>();
         wireUserPositionMapper(userPositionMapper, positions);
 
         ExecutionPlanMapper executionPlanMapper = mock(ExecutionPlanMapper.class);
+        AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         ExecutionPlanDO executionPlan = executionPlan();
         when(executionPlanMapper.selectByPlanId(PLAN_ID)).thenReturn(executionPlan);
-        when(executionPlanMapper.selectLatestByAnalysisId(ANALYSIS_ID)).thenReturn(executionPlan);
+        ExecutionPlanDO latestSiblingPlanB = executionPlan();
+        latestSiblingPlanB.setPlanId("plan-latest-sibling-B");
+        latestSiblingPlanB.setEntryZone("B-entry");
+        latestSiblingPlanB.setStopLoss("B-stop");
+        latestSiblingPlanB.setTakeProfitRules("B-tp");
+        lenient().when(executionPlanMapper.selectLatestByAnalysisId(ANALYSIS_ID))
+                .thenReturn(latestSiblingPlanB);
+        AnalysisRunDO analysisRun = new AnalysisRunDO();
+        analysisRun.setAnalysisId(ANALYSIS_ID);
+        analysisRun.setSymbol("BTCUSDT");
+        analysisRun.setTraceId("trace-" + ANALYSIS_ID);
+        when(analysisRunMapper.selectById(ANALYSIS_ID)).thenReturn(analysisRun);
 
         MarketQuoteClient marketQuoteClient = mock(MarketQuoteClient.class);
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
@@ -97,12 +113,14 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
                 scoreItemMapper,
                 decisionResultMapper,
                 new ObjectMapper(),
+                analysisRunMapper,
                 null);
         ReviewService reviewService = mock(ReviewService.class);
         ArgumentCaptor<WriteReviewResultReq> reviewCaptor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
         when(reviewService.saveOrUpdate(reviewCaptor.capture())).thenAnswer(invocation -> reviewState(invocation.getArgument(0)));
         UserPositionReviewAdapter reviewAdapter =
-                new DefaultUserPositionReviewAdapter(userPositionMapper, executionPlanMapper, monitorLogService, reviewService);
+                new DefaultUserPositionReviewAdapter(userPositionMapper, executionPlanMapper, analysisRunMapper,
+                        monitorLogService, reviewService);
 
         UserPositionVO opened = userPositionService.manualOpen(openPositionRequest());
 
@@ -155,6 +173,9 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(reviewSummary.getReviewStatus()).isEqualTo("REVIEW_SUMMARY_READY");
         assertThat(reviewSummary.getPositionStatus()).isEqualTo("CLOSED");
         assertThat(reviewSummary.getExecutionPlanId()).isEqualTo(PLAN_ID);
+        assertThat(reviewSummary.getExecutionPlanId()).isNotEqualTo("plan-latest-sibling-B");
+        assertThat(reviewSummary.getEntryZone()).isEqualTo("110");
+        assertThat(reviewSummary.getEntryZone()).isNotEqualTo("B-entry");
         assertThat(reviewSummary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_FOUND");
         assertThat(reviewSummary.getMonitorLogCount()).isEqualTo(1);
         assertThat(reviewSummary.getExecutionDeviationStatus()).isEqualTo("DEVIATED");
@@ -178,11 +199,17 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(reviewCaptor.getValue().getErrorType()).isEqualTo("PLAN_EXECUTION_MISMATCH");
 
         verify(userPositionMapper, times(1)).insert(any(UserPositionDO.class));
+        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
         assertNoForbiddenExecutableFields(
                 UserPositionVO.class,
                 PositionMonitorResultDTO.class,
                 UserPositionReviewSummaryDTO.class,
                 UserPositionReviewFeedbackResultDTO.class);
+    }
+
+    @Test
+    void exactPlanASurvivesMonitorCloseAndReviewWithoutPlanBSubstitution() throws Exception {
+        activeMonitorAndClosedReviewUseSameSourceResolution();
     }
 
     private static void wireUserPositionMapper(UserPositionMapper mapper, Map<Long, UserPositionDO> positions) {
@@ -225,7 +252,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         req.setStopLoss(new BigDecimal("90"));
         req.setTakeProfit(new BigDecimal("120"));
         req.setSourceType("MANUAL");
-        req.setSourceRefId(PLAN_ID);
+        req.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(PLAN_ID));
         return req;
     }
 

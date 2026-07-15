@@ -13,6 +13,7 @@ public class HotResetCommand {
     private String symbol;
     private String timeframe;
     private HotResetEventTypeEnum eventType;
+    /** UTC-naive event time when supplied by a caller; null delegates to the service UTC clock. */
     private LocalDateTime occurredAt;
     private String sourceType;
     private String sourceReference;

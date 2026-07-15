@@ -27,4 +27,12 @@ class ReviewCenterTemplateTest {
         assertThat(html).contains("暂无推送复盘记录");
         assertThat(html).contains("暂无规则反馈记录");
     }
+
+    @Test
+    void visibleDomContainsNoPositionSourceUnverified() throws Exception {
+        String html = Files.readString(REVIEW_TEMPLATE)
+                + Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
+
+        assertThat(html).doesNotContain("POSITION_SOURCE_UNVERIFIED");
+    }
 }

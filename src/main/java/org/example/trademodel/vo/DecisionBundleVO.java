@@ -5,6 +5,7 @@ import org.example.trademodel.enums.AssetStateEnum;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,8 +42,15 @@ public class DecisionBundleVO {
 
     /** 推送二次校验漂移基准：本 run 最后一根 1m 收盘价（与 K 线事实一致） */
     private BigDecimal pushTriggerPrice;
-    /** 推送计划过期时刻（本 run 决策时刻 + 固定 TTL） */
+    /**
+     * UTC-naive compatibility timestamp for {@code tm_push_snapshot.expires_at}.
+     * It must only be produced and consumed with {@link java.time.ZoneOffset#UTC}.
+     */
     private LocalDateTime pushExpiresAt;
+    /** 权威计划有效起点，始终携带 UTC 偏移。 */
+    private OffsetDateTime validFrom;
+    /** 权威计划过期时点，始终携带 UTC 偏移。 */
+    private OffsetDateTime expiresAt;
     /** 结构化失效：现价低于此价则 Recheck 判 INVALIDATION_HIT（看多场景） */
     private BigDecimal pushInvalidPriceBelow;
     /** 结构化失效：现价高于此价则 Recheck 判 INVALIDATION_HIT（看空场景） */
@@ -143,6 +151,22 @@ public class DecisionBundleVO {
 
     public void setPushExpiresAt(LocalDateTime pushExpiresAt) {
         this.pushExpiresAt = pushExpiresAt;
+    }
+
+    public OffsetDateTime getValidFrom() {
+        return validFrom;
+    }
+
+    public void setValidFrom(OffsetDateTime validFrom) {
+        this.validFrom = validFrom;
+    }
+
+    public OffsetDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(OffsetDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public BigDecimal getPushInvalidPriceBelow() {

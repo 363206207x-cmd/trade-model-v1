@@ -12,6 +12,9 @@ import org.example.trademodel.derivatives.DerivativesEvidenceItem;
 import org.example.trademodel.derivatives.DerivativesEvidenceType;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.providercall.AssetPriority;
@@ -23,12 +26,16 @@ import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
 import org.example.trademodel.localreal.LocalRealAssetReadinessState;
 import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
+import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PositionMonitorLogService;
@@ -37,7 +44,11 @@ import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -52,6 +63,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -60,6 +75,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class DashboardHomeServiceImpl implements DashboardHomeService {
@@ -87,6 +103,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             "EXPIRED"
     );
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
+    private static final int MIN_DATA_QUALITY_SCORE_FOR_PLAN = 60;
+    private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
+            "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*~\\s*"
+                    + "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$");
+    private static final DateTimeFormatter OFFSET_PLAN_TIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     private final DecisionService decisionService;
     private final MonitorService monitorService;
@@ -104,7 +125,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private AnalysisRunMapper analysisRunMapper;
+    private DecisionResultMapper decisionResultMapper;
+    private PositionPlanSourceResolver positionPlanSourceResolver;
     private LocalRealReadinessService localRealReadinessService;
+    private AssetStateMapper assetStateMapper;
+    private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -166,8 +191,26 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.localRealReadinessService = localRealReadinessService;
     }
 
+    @Autowired(required = false)
+    void setAssetStateMapper(AssetStateMapper assetStateMapper) {
+        this.assetStateMapper = assetStateMapper;
+    }
+
+    @Autowired(required = false)
+    void setOriginalPlanSources(DecisionResultMapper decisionResultMapper,
+                                ExecutionPlanMapper executionPlanMapper,
+                                AnalysisRunMapper analysisRunMapper) {
+        this.decisionResultMapper = decisionResultMapper;
+        this.analysisRunMapper = analysisRunMapper;
+        this.positionPlanSourceResolver = new PositionPlanSourceResolver(executionPlanMapper, analysisRunMapper);
+    }
+
+    void setPlanValidityClock(Clock planValidityClock) {
+        this.planValidityClock = planValidityClock != null ? planValidityClock : Clock.systemUTC();
+    }
+
     @Override
-    public DashboardHomeVO getHome(String selectedSymbol, Integer limit) {
+    public DashboardHomeVO getHome(String selectedSymbol, Integer limit, Long selectedPositionId) {
         int effectiveLimit = normalizeLimit(limit);
         LightSystemStatusVO systemStatus = safeSystemStatus();
         List<DecisionResultVO> decisions = safeDecisions(Math.max(effectiveLimit, DEFAULT_LIMIT));
@@ -192,16 +235,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
+        DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         DashboardHomeVO home = new DashboardHomeVO();
-        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness));
-        home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision));
+        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
+        home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(buildAssets(decisions, effectiveLimit));
-        home.setPositions(buildPositions(positions));
+        PositionRowsResult positionRowsResult = buildPositions(positions);
+        List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
+        home.setPositions(positionRows);
         home.setSelectedSymbol(normalizedSelected);
-        home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision));
-        home.setAiDecision(buildAiDecision(selectedDecision));
+        PositionSelectionResult positionSelection = resolveSelectedPosition(
+                positionRows, normalizedSelected, selectedPositionId);
+        DashboardHomeVO.PositionVO activePosition = positionSelection.selectedPosition();
+        home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
+        home.setPositionSelectionStatus(positionSelection.status().name());
+        home.setMatchingPositionCount(positionSelection.matchingPositionCount());
+        PositionPlanSourceResolver.Resolution activePositionSource = activePosition == null
+                ? null : positionRowsResult.trustedSources().get(activePosition.getPositionId());
+        ResolvedOriginalPlan resolvedOriginalPlan = resolveOriginalPlan(activePosition, activePositionSource);
+        home.setExecutionSuggestion(positionSelection.blocked()
+                ? buildPositionSelectionSuggestion(positionSelection)
+                : buildExecutionSuggestion(selectedDecision, activePosition, resolvedOriginalPlan));
+        home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
@@ -276,12 +333,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.HeaderVO buildHeader(LightSystemStatusVO systemStatus,
                                                  PositionSyncStatusVO positionSyncStatus,
                                                  ExternalContextSnapshot externalContext,
-                                                 ProviderReadinessVO providerReadiness) {
+                                                 ProviderReadinessVO providerReadiness,
+                                                 DashboardHomeVO.AiDecisionVO aiDecision) {
         DashboardHomeVO.HeaderVO header = new DashboardHomeVO.HeaderVO();
         header.setPageTitle("首页总览");
         header.setDataStatus(firstNonBlank(systemStatus != null ? systemStatus.getStatus() : null, "WAITING_SYNC"));
-        header.setAiStatus(firstNonBlank(providerReadiness != null ? providerReadiness.getAiProviderStatus() : null,
-                "WAITING_SYNC"));
+        String aiStatus = headerAiStatus(providerReadiness, aiDecision);
+        header.setAiStatus(aiStatus);
+        header.setAiStatusLabel(headerAiStatusLabel(aiStatus));
         header.setDataSourceText(dataSourceText(positionSyncStatus, externalContext, providerReadiness));
         if (localRealReadinessService != null) {
             header.setDataSourceText(localRealDataSourceText());
@@ -290,9 +349,44 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return header;
     }
 
+    private String headerAiStatus(ProviderReadinessVO providerReadiness,
+                                  DashboardHomeVO.AiDecisionVO aiDecision) {
+        String decisionStatus = trimToNull(aiDecision != null ? aiDecision.getRunStatus() : null);
+        String providerStatus = trimToNull(providerReadiness != null
+                ? providerReadiness.getAiProviderStatus() : null);
+        if (decisionStatus != null && !"NOT_CALLED".equalsIgnoreCase(decisionStatus)) {
+            return upper(decisionStatus);
+        }
+        if (providerStatus != null && switch (upper(providerStatus)) {
+            case "DISABLED", "NOT_CONFIGURED", "MODEL_UNAVAILABLE", "TIMEOUT", "FAILED",
+                    "BUDGET_BLOCKED", "RATE_LIMITED", "SUCCESS", "PARTIAL_SUCCESS" -> true;
+            default -> false;
+        }) {
+            return upper(providerStatus);
+        }
+        return decisionStatus != null ? upper(decisionStatus) : "NOT_CALLED";
+    }
+
+    private String headerAiStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "DISABLED" -> "已禁用";
+            case "NOT_CONFIGURED" -> "未配置";
+            case "MODEL_UNAVAILABLE" -> "模型不可用";
+            case "TIMEOUT" -> "调用超时";
+            case "FAILED", "INVALID_RESPONSE" -> "调用失败";
+            case "BUDGET_BLOCKED" -> "预算阻断";
+            case "RATE_LIMITED" -> "调用受限";
+            case "SUCCESS" -> "正常";
+            case "PARTIAL_SUCCESS" -> "部分可用";
+            case "NOT_CALLED", "STARTED" -> "未调用";
+            default -> "未知状态";
+        };
+    }
+
     private DashboardHomeVO.SystemStateVO buildSystemState(LightSystemStatusVO systemStatus,
                                                            List<DecisionResultVO> decisions,
-                                                           DecisionResultVO selectedDecision) {
+                                                           DecisionResultVO selectedDecision,
+                                                           DashboardHomeVO.AiDecisionVO aiDecision) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
         DecisionResultVO trendDecision = selectedDecision != null ? selectedDecision : firstDecision(decisions);
         state.setMarketTrend(card(
@@ -304,35 +398,40 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 statusForText(trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null),
                 null
         ));
-        String highestRisk = riskLevelFrom(decisions);
+        String selectedRisk = trendDecision != null ? trimToNull(trendDecision.getRiskLevel()) : null;
         state.setRiskLevel(card(
                 "riskLevel",
                 "风险等级",
-                highestRisk,
-                riskLabel(highestRisk),
-                "决策风险",
-                statusForText(highestRisk),
+                selectedRisk,
+                riskLabel(selectedRisk),
+                "选中资产决策风险",
+                statusForText(selectedRisk),
                 null
         ));
-        Integer averageDataQuality = averageDataQuality(decisions);
+        Integer selectedDataQuality = trendDecision != null ? trendDecision.getDataQualityScore() : null;
         state.setDataQuality(card(
                 "dataQuality",
                 "数据质量分",
-                averageDataQuality,
-                averageDataQuality != null ? String.valueOf(averageDataQuality) : null,
-                "摘要均值",
-                averageDataQuality != null ? "CONNECTED" : "WAITING_SYNC",
-                averageDataQuality
+                selectedDataQuality,
+                selectedDataQuality != null ? String.valueOf(selectedDataQuality) : null,
+                "选中资产分析快照",
+                selectedDataQuality != null ? "CONNECTED" : "WAITING_SYNC",
+                selectedDataQuality
         ));
-        AiConflictSummary conflict = aiConflictSummary(decisions);
+        DashboardHomeVO.ConsistencyVO consistency = aiDecision != null ? aiDecision.getConsistency() : null;
+        boolean aiApplicable = consistency != null && Boolean.TRUE.equals(consistency.getAiApplicable());
+        String conflictLevel = aiApplicable ? trimToNull(consistency.getLevel()) : null;
+        Integer conflictScore = aiApplicable ? consistency.getScore() : null;
         state.setAiConflict(card(
                 "aiConflict",
                 "AI 冲突等级",
-                conflict.level(),
-                conflict.level(),
-                "AI 冲突",
-                conflict.level() != null || conflict.score() != null ? "CONNECTED" : "WAITING_SYNC",
-                conflict.score()
+                conflictLevel,
+                aiApplicable ? consistency.getConsistencyLevel() : "不适用",
+                aiApplicable ? "AI 冲突" : "本轮未形成可裁决 AI 意见",
+                aiApplicable
+                        ? conflictLevel != null || conflictScore != null ? "CONNECTED" : "WAITING_SYNC"
+                        : "NOT_APPLICABLE",
+                conflictScore
         ));
         Integer pendingCount = systemStatus != null ? systemStatus.getPendingCount() : null;
         state.setPendingReview(card(
@@ -340,14 +439,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 "待复核机会",
                 pendingCount,
                 pendingCount != null && pendingCount > 0 ? String.valueOf(pendingCount) : "暂无",
-                "pendingCount",
+                "待复核数量",
                 pendingCount != null ? "CONNECTED" : "WAITING_SYNC",
                 pendingCount
         ));
-        Integer confusedCount = confusedCount(systemStatus, decisions);
+        Integer confusedCount = directionalBlockCount(systemStatus, decisions);
         state.setConfused(card(
                 "confused",
-                "Confused",
+                "冲突阻断",
                 confusedCount,
                 confusedCount != null ? String.valueOf(confusedCount) : null,
                 "当前积压",
@@ -364,7 +463,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         DashboardHomeVO.StatusCardVO hotReset = card(
                 "hotReset",
-                "Hot Reset",
+                "热重置",
                 Boolean.TRUE.equals(hotResetFired),
                 Boolean.TRUE.equals(hotResetFired) ? "已触发" : "未触发",
                 Boolean.TRUE.equals(hotResetFired) ? "最近一次" : "暂无",
@@ -447,10 +546,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setConfidenceLabel(confidenceLabel(decision.getConfidenceLevel()));
         asset.setRiskLevel(trimToNull(decision.getRiskLevel()));
         asset.setRiskLabel(riskLabel(decision.getRiskLevel()));
-        String assetState = recognizedAssetStateFromSnapshot(decision.getAssetStateSnapshot());
+        String assetState = authoritativeAssetState(normalizeSymbol(decision.getSymbol()),
+                decision.getAssetStateSnapshot());
         asset.setAssetState(assetState);
         asset.setAssetStateLabel(assetStateLabel(assetState));
         asset.setWorthOpening(decision.getIsWorthOpening());
+        asset.setCurrentConclusion(currentConclusion(decision, assetState));
         return asset;
     }
 
@@ -501,8 +602,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return asset;
     }
 
-    private List<DashboardHomeVO.PositionVO> buildPositions(List<UserPositionVO> positions) {
+    private PositionRowsResult buildPositions(List<UserPositionVO> positions) {
         List<DashboardHomeVO.PositionVO> rows = new ArrayList<>();
+        Map<Long, PositionPlanSourceResolver.Resolution> trustedSources = new LinkedHashMap<>();
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
             if (!isActiveManualPosition(position)) {
                 continue;
@@ -512,6 +614,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setPositionId(position.getId());
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
             row.setDirection(trimToNull(position.getSide()));
+            row.setDirectionLabel(positionDirectionLabel(position.getSide()));
             row.setEntryPrice(position.getEntryPrice());
             BigDecimal currentPrice = latestMonitorLog != null && positive(latestMonitorLog.getCurrentPrice())
                     ? latestMonitorLog.getCurrentPrice()
@@ -521,17 +624,45 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setLeverage(position.getLeverage());
             row.setPositionSize(position.getQuantity());
             row.setPositionStatus(trimToNull(position.getStatus()));
-            row.setMonitorConclusion(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null);
+            row.setPositionStatusLabel(positionStatusLabel(position.getStatus()));
+            row.setUserStopLoss(position.getStopLoss());
+            row.setUserTakeProfit(position.getTakeProfit());
+            row.setSystemSuggestedStopLoss(null);
+            row.setSystemSuggestedTakeProfit(null);
+            row.setMonitorConclusion(latestMonitorLog != null
+                    ? positionLogicStatusLabel(latestMonitorLog.getLogicStatus()) : null);
             row.setEntryLogicStatus(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : "WAITING_MONITOR");
+            row.setEntryLogicStatusLabel(positionLogicStatusLabel(row.getEntryLogicStatus()));
             row.setDirectionSupportStatus(directionSupportStatus(latestMonitorLog));
+            row.setDirectionSupportStatusLabel(directionSupportStatusLabel(row.getDirectionSupportStatus()));
             row.setReversalStatus(reversalStatus(latestMonitorLog));
-            row.setRiskLevel(latestMonitorLog != null ? trimToNull(latestMonitorLog.getRiskLevel()) : "WAITING_SYNC");
+            row.setReversalStatusLabel(reversalStatusLabel(row.getReversalStatus()));
+            row.setRiskLevel(latestMonitorLog != null ? trimToNull(latestMonitorLog.getRiskLevel()) : "WAITING_MONITOR");
+            row.setRiskLevelLabel(positionRiskLevelLabel(row.getRiskLevel()));
             row.setSuggestedManualAction(latestMonitorLog != null ? trimToNull(latestMonitorLog.getSuggestedAction()) : "MANUAL_REVIEW");
             row.setSuggestedManualActionText(suggestedActionText(row.getSuggestedManualAction(), latestMonitorLog));
             row.setUpdatedAt(position.getUpdatedAt());
+            row.setOpenedAt(position.getOpenedAt());
+            row.setLastMonitorAt(latestMonitorLog != null ? latestMonitorLog.getCreatedAt() : null);
+            row.setNextMonitorAt(null);
+            row.setSourceRefId(trimToNull(position.getSourceRefId()));
+            if (latestMonitorLog != null
+                    && positionPlanSourceResolver != null
+                    && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
+                PositionPlanSourceResolver.Resolution trustedSource = positionPlanSourceResolver
+                        .resolveTrustedMonitorSource(position.getId(), position.getAssetSymbol(),
+                                position.getSourceRefId(), latestMonitorLog.getAnalysisId(),
+                                latestMonitorLog.getExecutionPlanId());
+                if (trustedSource.verified()) {
+                    row.setSourceAnalysisId(trustedSource.analysisId());
+                    row.setSourceExecutionPlanId(trustedSource.executionPlanId());
+                    row.setSourceTraceId(trustedSource.sourceTraceId());
+                    trustedSources.put(position.getId(), trustedSource);
+                }
+            }
             rows.add(row);
         }
-        return rows;
+        return new PositionRowsResult(List.copyOf(rows), Map.copyOf(trustedSources));
     }
 
     private boolean isManualPosition(UserPositionVO position) {
@@ -635,30 +766,314 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
-    private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(DecisionResultVO decision) {
+    private ResolvedOriginalPlan resolveOriginalPlan(DashboardHomeVO.PositionVO position,
+                                                     PositionPlanSourceResolver.Resolution source) {
+        if (position == null) {
+            return ResolvedOriginalPlan.unverified("NO_ACTIVE_POSITION");
+        }
+        if (source == null || !source.verified()) {
+            clearUnverifiedOriginalPlanSource(position);
+            return ResolvedOriginalPlan.unverified("NO_VERIFIABLE_MONITOR_SOURCE");
+        }
+        if (decisionResultMapper == null) {
+            clearUnverifiedOriginalPlanSource(position);
+            return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_READ_MODEL_UNAVAILABLE");
+        }
+        try {
+            DecisionResultVO sourceDecision = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
+                    source.analysisId(), source.executionPlanId());
+            if (!validOriginalPlanDecision(position, sourceDecision, source.analysisId())) {
+                clearUnverifiedOriginalPlanSource(position);
+                return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_IDENTITY_UNVERIFIED");
+            }
+
+            position.setSourceAnalysisId(source.analysisId());
+            position.setSourceExecutionPlanId(source.executionPlanId());
+            position.setSourceTraceId(source.sourceTraceId());
+            return new ResolvedOriginalPlan("VERIFIED", source.executionPlan(), sourceDecision,
+                    source.analysisRun(), source.analysisId(), source.executionPlanId(),
+                    source.sourceTraceId(), null);
+        } catch (RuntimeException ignored) {
+            clearUnverifiedOriginalPlanSource(position);
+            return ResolvedOriginalPlan.unverified("ORIGINAL_PLAN_SOURCE_READ_FAILED");
+        }
+    }
+
+    private boolean validOriginalPlanDecision(DashboardHomeVO.PositionVO position,
+                                              DecisionResultVO decision,
+                                              String expectedAnalysisId) {
+        if (position == null || decision == null || expectedAnalysisId == null) {
+            return false;
+        }
+        if (!expectedAnalysisId.equals(trimToNull(decision.getAnalysisId()))) {
+            return false;
+        }
+        String positionSymbol = normalizeSymbol(position.getSymbol());
+        String decisionSymbol = normalizeSymbol(decision.getSymbol());
+        return positionSymbol != null && positionSymbol.equals(decisionSymbol);
+    }
+
+    private void clearUnverifiedOriginalPlanSource(DashboardHomeVO.PositionVO position) {
+        if (position == null) return;
+        position.setSourceAnalysisId(null);
+        position.setSourceExecutionPlanId(null);
+        position.setSourceTraceId(null);
+    }
+
+    private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(
+            DecisionResultVO selectedDecisionForNewOpportunity,
+            DashboardHomeVO.PositionVO activePosition,
+            ResolvedOriginalPlan resolvedOriginalPlan) {
         DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
-        if (decision == null) {
+        if (activePosition != null) {
+            suggestion.setStatus("POSITION_MONITORING");
+            suggestion.setStatusLabel("持仓监控");
+            suggestion.setPositionMode(true);
+            suggestion.setPositionMonitor(activePosition);
+            if (resolvedOriginalPlan == null || !resolvedOriginalPlan.verified()) {
+                suggestion.setOriginalPlanIdentity("UNVERIFIED");
+                suggestion.setOriginalPlanCurrentValidity("UNVERIFIED");
+                suggestion.setOriginalPlanLabel("暂无可关联的原执行计划");
+                return suggestion;
+            }
+
+            DecisionResultVO originalDecision = resolvedOriginalPlan.decision();
+            OriginalPlanPresentation presentation = originalPlanPresentation(resolvedOriginalPlan);
+            suggestion.setOriginalPlanIdentity("VERIFIED");
+            suggestion.setOriginalPlanCurrentValidity(presentation.status());
+            suggestion.setOriginalPlanLabel(presentation.label());
+            suggestion.setSourceAnalysisId(resolvedOriginalPlan.analysisId());
+            suggestion.setSourceExecutionPlanId(resolvedOriginalPlan.executionPlanId());
+            suggestion.setSourceTraceId(resolvedOriginalPlan.traceId());
+            populateOriginalPlan(suggestion, resolvedOriginalPlan.executionPlan(),
+                    originalDecision, presentation.validity());
             return suggestion;
         }
-        suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
+        DecisionResultVO decision = selectedDecisionForNewOpportunity;
+        if (decision == null) {
+            blockSuggestion(suggestion, "NO_COMPLETE_PLAN", "当前暂无完整执行计划", "暂无有效分析快照");
+            return suggestion;
+        }
+        suggestion.setSourceAnalysisId(trimToNull(decision.getAnalysisId()));
         String entryZone = trimPlanValue(decision.getEntryZone());
         String stopLoss = trimPlanValue(decision.getStopLoss());
         String takeProfitRules = trimPlanValue(decision.getTakeProfitRules());
         boolean boundaryComplete = entryZone != null && stopLoss != null && takeProfitRules != null;
 
         if (!AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe(decision.getTimeframe())) {
-            suggestion.setValidPeriod(AnalysisTimePolicy.unsupportedExecutionPlanTimeframeMessage());
+            blockSuggestion(suggestion, "UNSUPPORTED_TIMEFRAME", "当前暂无完整执行计划",
+                    AnalysisTimePolicy.unsupportedExecutionPlanTimeframeMessage());
+            return suggestion;
+        }
+        if (!hasText(decision.getAnalysisId())) {
+            blockSuggestion(suggestion, "ANALYSIS_SNAPSHOT_MISSING", "当前暂无完整执行计划",
+                    "分析快照不完整，暂不展示计划");
+            return suggestion;
+        }
+        if (decision.getDataQualityScore() == null
+                || decision.getDataQualityScore() < MIN_DATA_QUALITY_SCORE_FOR_PLAN) {
+            blockSuggestion(suggestion, "DATA_QUALITY_BLOCKED", "当前暂无完整执行计划",
+                    "数据质量不足，等待有效分析");
+            return suggestion;
+        }
+        String assetState = authoritativeAssetState(normalizeSymbol(decision.getSymbol()),
+                decision.getAssetStateSnapshot());
+        if (!planAllowedAssetState(assetState)) {
+            blockSuggestion(suggestion, "ASSET_STATE_BLOCKED", "当前暂无完整执行计划",
+                    "当前资产状态不允许形成新计划");
+            return suggestion;
+        }
+        SnapshotTraceStatus snapshotTraceStatus = executionSnapshotTraceStatus(decision);
+        if (snapshotTraceStatus == SnapshotTraceStatus.MISMATCH) {
+            blockSuggestion(suggestion, "STATE_SNAPSHOT_MISMATCH", "当前暂无完整执行计划",
+                    "状态已更新，原计划需重新分析");
+            return suggestion;
+        }
+        if (snapshotTraceStatus != SnapshotTraceStatus.MATCH) {
+            blockSuggestion(suggestion, "STATE_SNAPSHOT_UNVERIFIED", "当前暂无完整执行计划",
+                    "状态与计划关联信息不完整，需重新分析");
+            return suggestion;
+        }
+        if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) {
+            blockSuggestion(suggestion, "RISK_BLOCKED", "当前暂无完整执行计划",
+                    "风险门控未通过，等待人工复核");
+            return suggestion;
+        }
+        if ("CONFUSED".equals(assetState)
+                || decision.getConfusedScore() != null
+                && decision.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD) {
+            blockSuggestion(suggestion, "CONFLICT_BLOCKED", "当前暂无完整执行计划",
+                    "已进入冲突状态，等待人工复核");
+            return suggestion;
+        }
+        if (directionalPushBlocked(decision)) {
+            blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前暂无完整执行计划",
+                    "方向结论已阻断，等待重新分析");
+            return suggestion;
+        }
+        if (!Boolean.TRUE.equals(decision.getIsWorthOpening())) {
+            blockSuggestion(suggestion, "NOT_WORTH_OPENING", "当前暂无完整执行计划",
+                    "当前条件不足，暂不形成新计划");
+            return suggestion;
+        }
+        if (!boundaryComplete) {
+            blockSuggestion(suggestion, "BOUNDARY_INCOMPLETE", "当前暂无完整执行计划",
+                    BOUNDARY_INCOMPLETE_VALID_PERIOD);
+            return suggestion;
+        }
+        PlanValidity planValidity = resolvePlanValidity(decision);
+        if (planValidity.status() == PlanValidityStatus.INVALID) {
+            blockSuggestion(suggestion, "VALID_PERIOD_INVALID", "当前暂无完整执行计划",
+                    "有效期格式异常，等待重新分析");
+            return suggestion;
+        }
+        if (planValidity.status() == PlanValidityStatus.TIMEZONE_UNVERIFIED) {
+            blockSuggestion(suggestion, "LEGACY_TIMEZONE_UNVERIFIED", "当前暂无完整执行计划",
+                    "历史计划时区不可验证，需重新分析");
+            return suggestion;
+        }
+        if (planValidity.status() == PlanValidityStatus.NOT_ACTIVE) {
+            blockSuggestion(suggestion, "PLAN_NOT_ACTIVE", "当前暂无完整执行计划",
+                    "计划尚未进入有效期，等待重新分析");
+            return suggestion;
+        }
+        if (planValidity.status() == PlanValidityStatus.EXPIRED) {
+            blockSuggestion(suggestion, "PLAN_EXPIRED", "当前暂无完整执行计划",
+                    "计划已失效，等待重新分析");
             return suggestion;
         }
 
+        suggestion.setStatus("USABLE_REVIEW_PLAN");
+        suggestion.setStatusLabel("完整执行计划，仅供人工复核");
+        suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
         suggestion.setEntryZone(entryZone);
         suggestion.setStopLoss(stopLoss);
         suggestion.setTakeProfitRules(takeProfitRules);
-        suggestion.setLeverageSuggestion(trimToNull(decision.getLeverageSuggestion()));
+        suggestion.setLeverageSuggestion(planLeverageLabel(decision.getLeverageSuggestion()));
         suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
-        suggestion.setValidPeriod(boundaryComplete ? trimToNull(decision.getValidPeriod()) : BOUNDARY_INCOMPLETE_VALID_PERIOD);
-        suggestion.setInvalidCondition(boundaryComplete ? trimToNull(decision.getInvalidCondition()) : null);
+        suggestion.setValidPeriod(planValidityDisplay(decision, planValidity));
+        suggestion.setValidFrom(planValidity.validFrom());
+        suggestion.setExpiresAt(planValidity.expiresAt());
+        suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
         return suggestion;
+    }
+
+    private DashboardHomeVO.ExecutionSuggestionVO buildPositionSelectionSuggestion(
+            PositionSelectionResult selection) {
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
+        PositionSelectionStatus status = selection != null
+                ? selection.status() : PositionSelectionStatus.POSITION_NOT_FOUND;
+        suggestion.setStatus(status.name());
+        suggestion.setPositionMode(false);
+        suggestion.setOriginalPlanIdentity("UNVERIFIED");
+        suggestion.setOriginalPlanCurrentValidity("UNVERIFIED");
+        switch (status) {
+            case POSITION_SELECTION_REQUIRED -> {
+                suggestion.setStatusLabel("请选择具体持仓");
+                suggestion.setBlockedReason("当前标的存在多笔开放手动持仓");
+                suggestion.setOriginalPlanLabel("请选择具体持仓");
+            }
+            case POSITION_SYMBOL_MISMATCH -> {
+                suggestion.setStatusLabel("所选持仓与当前标的不匹配");
+                suggestion.setBlockedReason("请从当前标的的持仓列表重新选择");
+                suggestion.setOriginalPlanLabel("所选持仓与当前标的不匹配");
+            }
+            default -> {
+                suggestion.setStatusLabel("所选持仓不存在");
+                suggestion.setBlockedReason("请选择当前仍开放的手动持仓");
+                suggestion.setOriginalPlanLabel("所选持仓不存在");
+            }
+        }
+        return suggestion;
+    }
+
+    private OriginalPlanPresentation originalPlanPresentation(ResolvedOriginalPlan resolvedOriginalPlan) {
+        DecisionResultVO decision = resolvedOriginalPlan != null ? resolvedOriginalPlan.decision() : null;
+        ExecutionPlanDO executionPlan = resolvedOriginalPlan != null ? resolvedOriginalPlan.executionPlan() : null;
+        PlanValidity validity = resolvePlanValidity(decision);
+        if (executionPlan == null) {
+            return new OriginalPlanPresentation("PLAN_INCOMPLETE",
+                    "原计划边界不完整，仅用于历史复核", validity);
+        }
+        PersistedPlanState planState = ExecutionPlanReviewPolicy.persistedPlanState(executionPlan);
+        switch (planState) {
+            case INVALID:
+                return new OriginalPlanPresentation("PLAN_INVALID",
+                        "原计划已失效，仅用于历史复核", validity);
+            case BLOCKED:
+                return new OriginalPlanPresentation("PLAN_BLOCKED",
+                        "原计划已被门控阻断，仅用于历史复核", validity);
+            case REVALIDATION_REQUIRED:
+                String reason = revalidationReviewCopy(executionPlan);
+                String label = "原计划需要重新验证，仅用于历史复核";
+                return new OriginalPlanPresentation("REVALIDATION_REQUIRED",
+                        reason == null ? label : label + "：" + reason, validity);
+            case MISSING, INCOMPLETE, REVIEW_ONLY:
+                return new OriginalPlanPresentation("PLAN_INCOMPLETE",
+                        "原计划边界不完整，仅用于历史复核", validity);
+            case ACTIVE:
+                break;
+        }
+        SnapshotTraceStatus traceStatus = executionSnapshotTraceStatus(
+                decision, resolvedOriginalPlan.analysisRun());
+        if (traceStatus == SnapshotTraceStatus.MISMATCH) {
+            return new OriginalPlanPresentation("STATE_MISMATCH",
+                    "状态已更新，原计划不再作为当前执行依据", validity);
+        }
+        if (traceStatus == SnapshotTraceStatus.UNVERIFIED) {
+            return new OriginalPlanPresentation("STATE_UNVERIFIED",
+                    "原执行计划来源已确认，但当前状态关联不可验证", validity);
+        }
+        return switch (validity.status()) {
+            case ACTIVE -> new OriginalPlanPresentation("ACTIVE",
+                    "原执行计划，仅用于持仓复核和复盘对照", validity);
+            case EXPIRED -> new OriginalPlanPresentation("EXPIRED",
+                    "原计划已失效，仅用于历史复核", validity);
+            case TIMEZONE_UNVERIFIED -> new OriginalPlanPresentation("TIMEZONE_UNVERIFIED",
+                    "历史计划时区不可验证", validity);
+            case NOT_ACTIVE -> new OriginalPlanPresentation("NOT_ACTIVE",
+                    "原计划尚未进入有效期，仅用于历史复核", validity);
+            case INVALID -> new OriginalPlanPresentation("INVALID",
+                    "原计划有效期异常，仅用于历史复核", validity);
+        };
+    }
+
+    private String revalidationReviewCopy(ExecutionPlanDO executionPlan) {
+        String reason = trimToNull(executionPlan != null ? executionPlan.getRevalidationReason() : null);
+        String normalized = upper(reason);
+        if (normalized.contains("EXTREME_PRICE_MOVE")) return "极端价格波动触发重新验证";
+        if (normalized.contains("OI_COLLAPSE")) return "持仓量快速收缩触发重新验证";
+        if (normalized.contains("LIQUIDITY_DRAIN")) return "流动性快速下降触发重新验证";
+        if (normalized.contains("SYSTEMIC_SHOCK")) return "系统性冲击触发重新验证";
+        if (reason == null
+                && trimToNull(executionPlan != null ? executionPlan.getHotResetEventId() : null) != null) {
+            return "热重置已触发重新验证";
+        }
+        return "重验证原因已记录，等待人工复核";
+    }
+
+    private void populateOriginalPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                      ExecutionPlanDO executionPlan,
+                                      DecisionResultVO decision,
+                                      PlanValidity validity) {
+        if (suggestion == null || executionPlan == null || decision == null) return;
+        suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
+        suggestion.setEntryZone(trimPlanValue(executionPlan.getEntryZone()));
+        suggestion.setStopLoss(trimPlanValue(executionPlan.getStopLoss()));
+        suggestion.setTakeProfitRules(trimPlanValue(executionPlan.getTakeProfitRules()));
+        suggestion.setLeverageSuggestion(planLeverageLabel(executionPlan.getLeverageSuggestion()));
+        suggestion.setPositionSuggestion(trimToNull(executionPlan.getPositionSuggestion()));
+        suggestion.setValidPeriod(planValidityDisplay(decision, validity));
+        suggestion.setValidFrom(validity.validFrom());
+        suggestion.setExpiresAt(validity.expiresAt());
+        suggestion.setInvalidCondition(trimPlanValue(executionPlan.getInvalidCondition()));
+    }
+
+    private void blockSuggestion(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                 String status, String statusLabel, String reason) {
+        suggestion.setStatus(status);
+        suggestion.setStatusLabel(statusLabel);
+        suggestion.setBlockedReason(reason);
     }
 
     private DashboardHomeVO.AiDecisionVO buildAiDecision(DecisionResultVO decision) {
@@ -669,6 +1084,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         AiRoleResultsPayload payload = parsed.current() ? parsed.payload() : null;
         AiRoleResultsPayload.SynthesisPayload synthesis = payload != null ? payload.synthesis() : null;
         ai.setSchemaVersion(payload != null ? payload.schemaVersion() : null);
+        AiRoleStats roleStats = aiRoleStats(payload);
+        boolean aiApplicable = roleStats.adjudicative() > 0;
+        String runStatus = aiRunStatus(payload, roleStats.successful());
+        ai.setRunStatus(runStatus);
+        ai.setRunStatusLabel(aiRunStatusLabel(runStatus));
+        ai.setDecisionMode(payload != null ? trimToNull(payload.orchestrationMode()) : "RULE_ONLY_FALLBACK");
+        ai.setDecisionModeLabel(aiApplicable
+                ? "AI 辅助复核"
+                : roleStats.successful() > 0 ? "AI 复核无可裁决结论" : "仅规则判断");
         List<DashboardHomeVO.AiTabVO> tabs = new ArrayList<>();
         for (String role : AI_ROLES) {
             AiRoleResultsPayload.RolePayload rolePayload = payload != null ? payload.roles().get(role) : null;
@@ -676,13 +1100,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         ai.setTabs(tabs);
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
-        consistency.setLevel(decision != null ? trimToNull(decision.getAiConflictLevel()) : null);
-        consistency.setScore(decision != null ? decision.getAiConflictScore() : null);
-        consistency.setConfused(decision != null && decision.getConfusedScore() != null && decision.getConfusedScore() > 0);
+        consistency.setAiApplicable(aiApplicable);
+        consistency.setLevel(aiApplicable && decision != null
+                ? trimToNull(decision.getAiConflictLevel()) : null);
+        consistency.setScore(aiApplicable && decision != null ? decision.getAiConflictScore() : null);
+        consistency.setConfused(aiApplicable && synthesis != null && Boolean.TRUE.equals(synthesis.confused()));
+        consistency.setDirectionalPushBlocked(directionalPushBlocked(decision));
         consistency.setConsistencyScore(null);
-        consistency.setConsistencyLevel(null);
-        consistency.setConsistencySummary(null);
-        consistency.setDowngradeReason(synthesis != null ? trimToNull(synthesis.downgradeReason()) : null);
+        consistency.setConsistencyLevel(aiApplicable
+                ? aiConflictLevelLabel(decision != null ? decision.getAiConflictLevel() : null)
+                : "不适用");
+        consistency.setConsistencySummary(consistencySummary(roleStats));
+        consistency.setDowngradeReason(aiApplicable && synthesis != null
+                ? aiDowngradeReasonLabel(synthesis.downgradeReason()) : null);
         ai.setConsistency(consistency);
         return ai;
     }
@@ -694,6 +1124,24 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         tab.setRole(role);
         tab.setRoleLabel(roleLabel(role));
         if (rolePayload == null) {
+            tab.setRunStatus("NOT_CALLED");
+            tab.setRunStatusLabel("未调用");
+            tab.setResultAvailable(false);
+            tab.setStatusMessage(aiRoleStatusMessage("NOT_CALLED"));
+            return tab;
+        }
+        String callStatus = firstNonBlank(trimToNull(rolePayload.callStatus()), "NOT_CALLED");
+        tab.setRunStatus(callStatus);
+        tab.setRunStatusLabel(aiRunStatusLabel(callStatus));
+        boolean resultAvailable = "SUCCESS".equalsIgnoreCase(callStatus);
+        tab.setResultAvailable(resultAvailable);
+        tab.setStatusMessage(aiRoleStatusMessage(callStatus));
+        if (!resultAvailable) {
+            return tab;
+        }
+        tab.setStance(trimToNull(rolePayload.stance()));
+        if ("ABSTAIN".equalsIgnoreCase(rolePayload.stance())) {
+            tab.setReviewConclusion("证据不足，暂不判断");
             return tab;
         }
         switch (role) {
@@ -714,15 +1162,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         String finalRiskLevel = synthesis != null ? trimToNull(synthesis.finalRiskLevel()) : null;
         String finalPlanMode = synthesis != null ? trimToNull(synthesis.planModeAdjustment()) : null;
         String worthOpening = synthesis != null ? worthOpeningLabel(synthesis.worthOpening()) : null;
-        String finalConclusion = trimToNull(role.summary());
+        String finalConclusion = userFacingAiSummary(role.summary());
         List<String> coreSupportingEvidence = "SUPPORT".equals(role.stance())
-                ? role.reasonCodes()
+                ? aiReasonLabels(role.reasonCodes())
                 : List.of();
         List<String> coreCounterEvidence = "CHALLENGE".equals(role.stance())
-                ? role.reasonCodes()
+                ? aiReasonLabels(role.reasonCodes())
                 : List.of();
-        String decisionSummary = trimToNull(role.summary());
-        String downgradeReason = synthesis != null ? trimToNull(synthesis.downgradeReason()) : null;
+        String decisionSummary = userFacingAiSummary(role.summary());
+        String downgradeReason = synthesis != null ? aiDowngradeReasonLabel(synthesis.downgradeReason()) : null;
 
         tab.setFinalMarketBias(finalMarketBias);
         tab.setFinalConfidence(finalConfidence);
@@ -744,29 +1192,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private void populateConflictReviewRole(DashboardHomeVO.AiTabVO tab,
                                             AiRoleResultsPayload.RolePayload role) {
-        tab.setReviewVerdict(trimToNull(role.stance()));
+        tab.setReviewVerdict(aiStanceLabel(role.stance()));
         tab.setDetectedContradictions("CHALLENGE".equals(role.stance())
-                ? role.reasonCodes()
+                ? aiReasonLabels(role.reasonCodes())
                 : List.of());
         tab.setWeakEvidence(List.of());
         tab.setLogicGaps(List.of());
         tab.setDowngradeRecommendation(null);
         tab.setRiskAdjustmentSuggestion(null);
         tab.setManualReviewRequired(Boolean.TRUE.equals(role.manualReviewRequired()) ? "是" : null);
-        tab.setReviewConclusion(trimToNull(role.summary()));
+        tab.setReviewConclusion(userFacingAiSummary(role.summary()));
     }
 
     private void populateChallengeRole(DashboardHomeVO.AiTabVO tab,
                                        AiRoleResultsPayload.RolePayload role) {
-        tab.setChallengeThesis(trimToNull(role.summary()));
+        tab.setChallengeThesis(userFacingAiSummary(role.summary()));
         tab.setEventRisks(List.of());
         tab.setSentimentReversalRisks(List.of());
         tab.setMicrostructureTraps(List.of());
         tab.setLiquidityRisks(List.of());
         tab.setCounterEvidence("CHALLENGE".equals(role.stance())
-                ? role.reasonCodes()
+                ? aiReasonLabels(role.reasonCodes())
                 : List.of());
-        tab.setChallengeConclusion(trimToNull(role.summary()));
+        tab.setChallengeConclusion(userFacingAiSummary(role.summary()));
         tab.setReviewConclusion(tab.getChallengeConclusion());
     }
 
@@ -790,15 +1238,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int invalidated = 0;
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
         try {
-            waiting = Math.max(0, pushSnapshotMapper.countPendingRecheckBacklog());
+            LocalDateTime nowUtc = UtcLocalTimePolicy.now(planValidityClock);
+            waiting = Math.max(0, pushSnapshotMapper.countPendingRecheckBacklog(nowUtc));
             executable = safeCountPushStatuses(EXECUTABLE_PUSH_STATUSES);
             invalidated = safeCountPushStatuses(INVALIDATED_PUSH_STATUSES);
-            items.addAll(pushItems("CAPTURED", limit));
+            items.addAll(pushItems("CAPTURED", limit, nowUtc));
             if (items.size() < limit) {
-                items.addAll(pushItems("RECHECK_REVIEW_WAITING", limit - items.size()));
+                items.addAll(pushItems("RECHECK_REVIEW_WAITING", limit - items.size(), nowUtc));
             }
             if (items.size() < limit) {
-                items.addAll(pushItems("RECHECK_VALID_WAITING", limit - items.size()));
+                items.addAll(pushItems("RECHECK_VALID_WAITING", limit - items.size(), nowUtc));
             }
             readOk = true;
         } catch (RuntimeException ignored) {
@@ -836,12 +1285,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<DashboardHomeVO.PushItemVO> pushItems(String status, int limit) {
+    private List<DashboardHomeVO.PushItemVO> pushItems(String status, int limit, LocalDateTime nowUtc) {
         if (limit <= 0) {
             return List.of();
         }
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
-        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listPendingRecheck(status, limit);
+        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listPendingRecheck(status, nowUtc, limit);
         for (TmPushSnapshotDO row : rows == null ? List.<TmPushSnapshotDO>of() : rows) {
             if (row == null) {
                 continue;
@@ -885,7 +1334,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         diagnostics.setAiCall(hasText(selectedDecision != null ? selectedDecision.getAiRoleResults() : null) ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setPushRecheck(pushInboxContext.readOk() ? "CONNECTED" : "UNKNOWN");
         diagnostics.setTelegram("WAITING_SYNC");
-        diagnostics.setConfused(confusedCount(systemStatus, decisions) != null ? "CONNECTED" : "UNKNOWN");
+        diagnostics.setConfused(directionalBlockCount(systemStatus, decisions) != null ? "CONNECTED" : "UNKNOWN");
         diagnostics.setHotReset(systemStatus != null && systemStatus.getHotResetFired() != null ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setOpportunityLog("UNKNOWN");
         diagnostics.setReview("UNKNOWN");
@@ -1058,30 +1507,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return count > 0 ? Math.round((float) sum / count) : null;
     }
 
-    private AiConflictSummary aiConflictSummary(List<DecisionResultVO> decisions) {
-        String level = null;
-        Integer score = null;
-        if (decisions != null) {
-            for (DecisionResultVO decision : decisions) {
-                if (decision == null) {
-                    continue;
-                }
-                if (level == null && hasText(decision.getAiConflictLevel())) {
-                    level = decision.getAiConflictLevel();
-                }
-                if (decision.getAiConflictScore() != null && (score == null || decision.getAiConflictScore() > score)) {
-                    score = decision.getAiConflictScore();
-                    if (hasText(decision.getAiConflictLevel())) {
-                        level = decision.getAiConflictLevel();
-                    }
-                }
-            }
+    private Integer directionalBlockCount(LightSystemStatusVO systemStatus, List<DecisionResultVO> decisions) {
+        if (systemStatus == null) {
+            return null;
         }
-        return new AiConflictSummary(level, score);
-    }
-
-    private Integer confusedCount(LightSystemStatusVO systemStatus, List<DecisionResultVO> decisions) {
-        if (systemStatus != null && systemStatus.getConfusedCount() != null) {
+        if (systemStatus.getConfusedCount() != null) {
             return systemStatus.getConfusedCount();
         }
         if (decisions == null) {
@@ -1092,7 +1522,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         for (DecisionResultVO decision : decisions) {
             if (decision != null && decision.getConfusedScore() != null) {
                 sawField = true;
-                if (decision.getConfusedScore() > 0) {
+                if (decision.getConfusedScore() >= ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD) {
                     count++;
                 }
             }
@@ -1120,11 +1550,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private String localRealDataSourceText() {
         long ready = localRealReadinessService.readyAssetCount();
-        List<String> degraded = localRealReadinessService.assets().values().stream()
+        List<String> partiallyAvailable = localRealReadinessService.assets().values().stream()
                 .filter(item -> item.state() != LocalRealAssetReadinessState.READY)
                 .map(item -> item.symbol().replace("USDT", ""))
                 .toList();
-        String suffix = degraded.isEmpty() ? "" : " · degraded " + String.join(",", degraded);
+        String suffix = partiallyAvailable.isEmpty()
+                ? "" : " · 数据部分可用 " + String.join(",", partiallyAvailable);
         return "真实行情资产 " + ready + "/" + DEFAULT_SYMBOLS.size() + " · Kraken" + suffix;
     }
 
@@ -1173,6 +1604,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private String authoritativeAssetState(String symbol, String compatibilitySnapshot) {
+        if (assetStateMapper != null && hasText(symbol)) {
+            try {
+                AssetStateDO row = assetStateMapper.selectBySymbol(symbol);
+                String state = row != null && row.getState() != null
+                        ? recognizedAssetStateValue(row.getState().name()) : null;
+                if (state != null) return state;
+            } catch (RuntimeException ignored) {
+                // Compatibility snapshot is used only when the authoritative state read is unavailable.
+            }
+        }
+        return recognizedAssetStateFromSnapshot(compatibilitySnapshot);
+    }
+
     private String recognizedAssetStateValue(JsonNode node) {
         if (node == null || !node.isTextual()) {
             return null;
@@ -1180,6 +1625,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return switch (node.asText()) {
             case "OBSERVING", "CANDIDATE", "WAITING_TRIGGER", "TRIGGERED",
                     "HIGH_RISK", "INVALIDATED", "COOLING", "CONFUSED" -> node.asText();
+            default -> null;
+        };
+    }
+
+    private String recognizedAssetStateValue(String value) {
+        if (!hasText(value)) return null;
+        return switch (value.trim().toUpperCase(Locale.ROOT)) {
+            case "OBSERVING", "CANDIDATE", "WAITING_TRIGGER", "TRIGGERED",
+                    "HIGH_RISK", "INVALIDATED", "COOLING", "CONFUSED" -> value.trim().toUpperCase(Locale.ROOT);
             default -> null;
         };
     }
@@ -1193,8 +1647,381 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "HIGH_RISK" -> "高风险观察";
             case "INVALIDATED" -> "已失效";
             case "COOLING" -> "冷却";
-            case "CONFUSED" -> "Confused 阻断";
+            case "CONFUSED" -> "冲突状态";
             default -> null;
+        };
+    }
+
+    private String currentConclusion(DecisionResultVO decision, String assetState) {
+        if (decision == null) return "等待分析";
+        if (decision.getDataQualityScore() == null) return "等待数据质量同步";
+        if (decision.getDataQualityScore() < MIN_DATA_QUALITY_SCORE_FOR_PLAN) {
+            return "数据质量不足，暂不形成执行建议";
+        }
+        if ("CONFUSED".equals(assetState)) return "冲突状态，等待人工复核";
+        if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) return "风险较高，仅供人工复核";
+        if (Boolean.TRUE.equals(decision.getIsWorthOpening())) return "条件满足，等待人工确认";
+        return "当前条件不足，继续观察";
+    }
+
+    private PositionSelectionResult resolveSelectedPosition(List<DashboardHomeVO.PositionVO> positions,
+                                                            String symbol,
+                                                            Long selectedPositionId) {
+        String normalized = normalizeSymbol(symbol);
+        List<DashboardHomeVO.PositionVO> available = positions == null ? List.of() : positions;
+        List<DashboardHomeVO.PositionVO> matching = normalized == null ? List.of() : available.stream()
+                .filter(position -> normalized.equals(normalizeSymbol(position.getSymbol())))
+                .toList();
+
+        if (selectedPositionId != null) {
+            if (selectedPositionId <= 0) {
+                return PositionSelectionResult.blocked(
+                        PositionSelectionStatus.POSITION_NOT_FOUND, matching.size());
+            }
+            DashboardHomeVO.PositionVO selected = available.stream()
+                    .filter(position -> Objects.equals(position.getPositionId(), selectedPositionId))
+                    .findFirst()
+                    .orElse(null);
+            if (selected == null) {
+                return PositionSelectionResult.blocked(
+                        PositionSelectionStatus.POSITION_NOT_FOUND, matching.size());
+            }
+            if (normalized == null || !normalized.equals(normalizeSymbol(selected.getSymbol()))) {
+                return PositionSelectionResult.blocked(
+                        PositionSelectionStatus.POSITION_SYMBOL_MISMATCH, matching.size());
+            }
+            return new PositionSelectionResult(
+                    PositionSelectionStatus.EXACT_POSITION_SELECTED, selected, matching.size());
+        }
+        if (matching.isEmpty()) {
+            return new PositionSelectionResult(PositionSelectionStatus.NO_POSITION, null, 0);
+        }
+        if (matching.size() == 1) {
+            return new PositionSelectionResult(
+                    PositionSelectionStatus.UNIQUE_POSITION_SELECTED, matching.get(0), 1);
+        }
+        return PositionSelectionResult.blocked(
+                PositionSelectionStatus.POSITION_SELECTION_REQUIRED, matching.size());
+    }
+
+    private boolean planAllowedAssetState(String state) {
+        return "CANDIDATE".equals(state) || "WAITING_TRIGGER".equals(state) || "TRIGGERED".equals(state);
+    }
+
+    private boolean directionalPushBlocked(DecisionResultVO decision) {
+        if (decision == null) return false;
+        if (decision.getConfusedScore() != null
+                && decision.getConfusedScore() >= ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD) {
+            return true;
+        }
+        String snapshot = trimToNull(decision.getAssetStateSnapshot());
+        if (snapshot == null) return false;
+        try {
+            JsonNode root = objectMapper.readTree(snapshot);
+            return root != null && root.path("directionalPushBlocked").asBoolean(false);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private PlanValidity resolvePlanValidity(DecisionResultVO decision) {
+        if (decision == null) return PlanValidity.invalid();
+        OffsetDateTime structuredValidFrom = decision.getValidFrom();
+        OffsetDateTime structuredExpiresAt = decision.getExpiresAt();
+        if (structuredValidFrom != null || structuredExpiresAt != null) {
+            if (structuredValidFrom == null || structuredExpiresAt == null) return PlanValidity.invalid();
+            return evaluatePlanValidity(structuredValidFrom, structuredExpiresAt);
+        }
+
+        String value = trimToNull(decision.getValidPeriod());
+        if (value == null) return PlanValidity.invalid();
+        String normalized = upper(value);
+        if (normalized.contains("EXPIRED") || normalized.contains("INVALIDATED")
+                || value.contains("已失效") || value.contains("已过期")) {
+            return PlanValidity.expired();
+        }
+        if (LEGACY_VALID_PERIOD_RANGE.matcher(value).matches()) {
+            return PlanValidity.timezoneUnverified();
+        }
+        String[] range = value.split("\\s*~\\s*", -1);
+        if (range.length != 2) return PlanValidity.invalid();
+        try {
+            return evaluatePlanValidity(OffsetDateTime.parse(range[0]), OffsetDateTime.parse(range[1]));
+        } catch (DateTimeParseException ignored) {
+            return PlanValidity.invalid();
+        }
+    }
+
+    private PlanValidity evaluatePlanValidity(OffsetDateTime validFrom, OffsetDateTime expiresAt) {
+        if (validFrom == null || expiresAt == null
+                || !validFrom.toInstant().isBefore(expiresAt.toInstant())) {
+            return PlanValidity.invalid();
+        }
+        java.time.Instant now = planValidityClock.instant();
+        if (now.isBefore(validFrom.toInstant())) {
+            return new PlanValidity(PlanValidityStatus.NOT_ACTIVE, validFrom, expiresAt);
+        }
+        if (!now.isBefore(expiresAt.toInstant())) {
+            return new PlanValidity(PlanValidityStatus.EXPIRED, validFrom, expiresAt);
+        }
+        return new PlanValidity(PlanValidityStatus.ACTIVE, validFrom, expiresAt);
+    }
+
+    private String planValidityDisplay(DecisionResultVO decision, PlanValidity validity) {
+        if (validity.validFrom() != null && validity.expiresAt() != null) {
+            return OFFSET_PLAN_TIME_FORMAT.format(validity.validFrom())
+                    + " ~ " + OFFSET_PLAN_TIME_FORMAT.format(validity.expiresAt());
+        }
+        String display = trimToNull(decision != null ? decision.getValidPeriod() : null);
+        return display;
+    }
+
+    private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision) {
+        return executionSnapshotTraceStatus(decision, null);
+    }
+
+    private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision, AnalysisRunDO resolvedRun) {
+        if (decision == null || !hasText(decision.getAnalysisId()) || !hasText(decision.getSymbol())
+                || assetStateMapper == null || (resolvedRun == null && analysisRunMapper == null)) {
+            return SnapshotTraceStatus.UNVERIFIED;
+        }
+        try {
+            AssetStateDO state = assetStateMapper.selectBySymbol(normalizeSymbol(decision.getSymbol()));
+            AnalysisRunDO run = resolvedRun != null
+                    ? resolvedRun
+                    : analysisRunMapper.selectById(decision.getAnalysisId());
+            String stateTraceId = state != null ? trimToNull(state.getTraceId()) : null;
+            String decisionTraceId = run != null ? trimToNull(run.getTraceId()) : null;
+            if (stateTraceId == null || decisionTraceId == null) return SnapshotTraceStatus.UNVERIFIED;
+            return stateTraceId.equals(decisionTraceId) ? SnapshotTraceStatus.MATCH : SnapshotTraceStatus.MISMATCH;
+        } catch (RuntimeException ignored) {
+            return SnapshotTraceStatus.UNVERIFIED;
+        }
+    }
+
+    private enum SnapshotTraceStatus { MATCH, MISMATCH, UNVERIFIED }
+    private enum PlanValidityStatus { ACTIVE, NOT_ACTIVE, EXPIRED, INVALID, TIMEZONE_UNVERIFIED }
+    private record PlanValidity(PlanValidityStatus status, OffsetDateTime validFrom, OffsetDateTime expiresAt) {
+        private static PlanValidity invalid() {
+            return new PlanValidity(PlanValidityStatus.INVALID, null, null);
+        }
+
+        private static PlanValidity expired() {
+            return new PlanValidity(PlanValidityStatus.EXPIRED, null, null);
+        }
+
+        private static PlanValidity timezoneUnverified() {
+            return new PlanValidity(PlanValidityStatus.TIMEZONE_UNVERIFIED, null, null);
+        }
+    }
+
+    private String positionDirectionLabel(String direction) {
+        return switch (upper(direction)) {
+            case "LONG" -> "多头";
+            case "SHORT" -> "空头";
+            default -> "未知状态";
+        };
+    }
+
+    private String positionStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "OPEN" -> "持仓中";
+            case "PARTIALLY_CLOSED" -> "部分记录平仓";
+            case "CLOSED" -> "已记录平仓";
+            default -> "未知状态";
+        };
+    }
+
+    private String positionLogicStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "LOGIC_VALID" -> "入场逻辑仍成立";
+            case "LOGIC_WEAKENED" -> "入场逻辑减弱";
+            case "PLAN_INVALIDATED" -> "原计划已失效";
+            case "HIGH_RISK" -> "风险升高";
+            case "WAITING_MONITOR" -> "等待首次监控";
+            default -> "未知状态";
+        };
+    }
+
+    private String directionSupportStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "SUPPORTED" -> "当前方向仍获支持";
+            case "WEAKENED" -> "方向支持减弱";
+            case "NOT_SUPPORTED" -> "当前方向不再获支持";
+            case "RISK_BLOCKED" -> "方向结论受风险阻断";
+            case "WAITING_SYNC", "WAITING_MONITOR" -> "等待首次监控";
+            default -> "未知状态";
+        };
+    }
+
+    private String reversalStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "NO_REVERSAL_SIGNAL" -> "暂无反转信号";
+            case "MANUAL_REVIEW_REQUIRED" -> "需人工复核反转风险";
+            case "RISK_REVIEW" -> "需复核高风险变化";
+            case "WAITING_MONITOR" -> "等待首次监控";
+            default -> "未知状态";
+        };
+    }
+
+    private String positionRiskLevelLabel(String status) {
+        if ("WAITING_MONITOR".equals(upper(status))) return "等待首次监控";
+        String label = riskLabel(status);
+        return label != null ? label : "未知状态";
+    }
+
+    private AiRoleStats aiRoleStats(AiRoleResultsPayload payload) {
+        if (payload == null) return new AiRoleStats(0, 0, 0, 0);
+        int successful = 0;
+        int support = 0;
+        int challenge = 0;
+        int abstain = 0;
+        for (AiRoleResultsPayload.RolePayload role : payload.roles().values()) {
+            if (role == null || !"SUCCESS".equalsIgnoreCase(role.callStatus())) continue;
+            successful++;
+            switch (upper(role.stance())) {
+                case "SUPPORT" -> support++;
+                case "CHALLENGE" -> challenge++;
+                case "ABSTAIN" -> abstain++;
+                default -> {
+                }
+            }
+        }
+        return new AiRoleStats(successful, support, challenge, abstain);
+    }
+
+    private String consistencySummary(AiRoleStats stats) {
+        if (stats.adjudicative() > 0) {
+            return "基于本轮成功返回的 AI 角色形成一致性摘要";
+        }
+        if (stats.successful() > 0 && stats.abstain() == stats.successful()) {
+            return "AI 成功返回，但所有角色均因证据不足而弃权";
+        }
+        if (stats.successful() > 0) {
+            return "AI 成功返回，但未形成可裁决意见";
+        }
+        return "AI 未运行，本轮仅使用规则判断";
+    }
+
+    private String aiRunStatus(AiRoleResultsPayload payload, int successfulRoles) {
+        if (payload == null) return "NOT_CALLED";
+        if (successfulRoles >= AI_ROLES.size()) return "SUCCESS";
+        if (successfulRoles > 0) return "PARTIAL_SUCCESS";
+        List<String> statuses = payload.roles().values().stream()
+                .filter(Objects::nonNull)
+                .map(AiRoleResultsPayload.RolePayload::callStatus)
+                .filter(Objects::nonNull)
+                .map(this::upper)
+                .toList();
+        if (statuses.contains("BUDGET_BLOCKED")) return "BUDGET_BLOCKED";
+        if (statuses.contains("RATE_LIMITED")) return "RATE_LIMITED";
+        if (statuses.contains("TIMEOUT")) return "TIMEOUT";
+        if (statuses.contains("INVALID_RESPONSE")) return "INVALID_RESPONSE";
+        if (statuses.contains("FAILED")) return "FAILED";
+        if (statuses.contains("MODEL_UNAVAILABLE")) return "MODEL_UNAVAILABLE";
+        if (statuses.contains("NOT_CONFIGURED")) return "NOT_CONFIGURED";
+        if (statuses.contains("DISABLED")) return "DISABLED";
+        return "NOT_CALLED";
+    }
+
+    private String aiRunStatusLabel(String status) {
+        return switch (upper(status)) {
+            case "SUCCESS" -> "复核成功";
+            case "PARTIAL_SUCCESS" -> "部分角色复核成功";
+            case "SUPPORT" -> "成功支持";
+            case "CHALLENGE" -> "成功反对";
+            case "ABSTAIN" -> "成功弃权";
+            case "DISABLED" -> "已禁用";
+            case "TIMEOUT" -> "调用超时";
+            case "FAILED" -> "调用失败";
+            case "INVALID_RESPONSE" -> "返回内容无效";
+            case "BUDGET_BLOCKED" -> "预算阻断";
+            case "RATE_LIMITED" -> "调用受限";
+            case "MODEL_UNAVAILABLE" -> "模型不可用";
+            case "NOT_CONFIGURED" -> "未配置";
+            case "NOT_CALLED", "STARTED" -> "未调用";
+            default -> "未知状态";
+        };
+    }
+
+    private String aiConflictLevelLabel(String level) {
+        return switch (upper(level)) {
+            case "LEVEL_1_CONSISTENT" -> "无显著分歧";
+            case "LEVEL_2_LIGHT_DIVERGENCE", "LEVEL_2_REVIEW" -> "轻微分歧";
+            case "LEVEL_3_SIGNIFICANT_DIVERGENCE", "LEVEL_3_DIVERGENCE" -> "显著分歧";
+            case "LEVEL_4_EXTREME_DIVERGENCE" -> "极端分歧";
+            default -> "未知状态";
+        };
+    }
+
+    private String aiDowngradeReasonLabel(String reason) {
+        if (!hasText(reason)) return null;
+        return switch (upper(reason)) {
+            case "EVENT_WINDOW_REVIEW" -> "外部事件窗口需人工复核";
+            case "INSUFFICIENT_DATA" -> "证据不足，已降低结论强度";
+            case "CONFLICT_TOO_HIGH" -> "冲突程度较高，需人工复核";
+            case "GEMINI_CONTRADICTION_ONLY" -> "AI 发现证据冲突，需人工复核";
+            default -> "AI 复核建议人工检查";
+        };
+    }
+
+    private String aiStanceLabel(String stance) {
+        return switch (upper(stance)) {
+            case "SUPPORT" -> "支持规则结论";
+            case "CHALLENGE" -> "提出反对意见";
+            case "ABSTAIN" -> "证据不足，暂不判断";
+            default -> null;
+        };
+    }
+
+    private List<String> aiReasonLabels(List<String> reasons) {
+        if (reasons == null || reasons.isEmpty()) return List.of();
+        List<String> labels = new ArrayList<>();
+        for (String reason : reasons) {
+            String label = switch (upper(reason)) {
+                case "RULE_DIRECTION_ALIGNED" -> "规则方向与 AI 复核一致";
+                case "INSUFFICIENT_DATA" -> "证据不足";
+                case "GEMINI_CONTRADICTION_ONLY" -> "AI 发现证据冲突";
+                case "GROK_COUNTER_ONLY" -> "AI 提供反向证据";
+                case "CONFLICT_TOO_HIGH" -> "冲突程度较高";
+                default -> "AI 证据已记录，需人工复核";
+            };
+            if (!labels.contains(label)) labels.add(label);
+        }
+        return labels;
+    }
+
+    private String userFacingAiSummary(String summary) {
+        String value = trimToNull(summary);
+        if (value == null) return null;
+        return value.matches(".*\\p{IsHan}.*")
+                ? value
+                : "AI 复核结果已返回，等待人工复核";
+    }
+
+    private String aiRoleStatusMessage(String status) {
+        return switch (upper(status)) {
+            case "SUCCESS" -> "根据角色结果展示";
+            case "DISABLED" -> "AI 复核未启用";
+            case "NOT_CALLED", "STARTED" -> "本轮未调用该角色";
+            case "TIMEOUT" -> "AI 复核超时，本轮未采纳该角色";
+            case "FAILED" -> "AI 复核失败，本轮未采纳该角色";
+            case "INVALID_RESPONSE" -> "AI 返回内容无效，本轮未采纳";
+            case "NOT_CONFIGURED" -> "AI 模型未配置";
+            case "MODEL_UNAVAILABLE" -> "AI 模型不可用";
+            case "BUDGET_BLOCKED" -> "AI 预算门控阻断";
+            case "RATE_LIMITED" -> "AI 调用受限";
+            default -> "本轮未调用该角色";
+        };
+    }
+
+    private String planLeverageLabel(String leverageSuggestion) {
+        String value = trimToNull(leverageSuggestion);
+        if (value == null) return null;
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "low_leverage" -> "低杠杆，仅供人工复核";
+            case "moderate_leverage" -> "适中杠杆，仅供人工复核";
+            default -> value.matches("[A-Za-z_ ]+") ? "未知状态" : value;
         };
     }
 
@@ -1218,7 +2045,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "WEAK_BEARISH" -> "弱偏空";
             case "BEARISH" -> "偏空";
             case "STRONG_BEARISH" -> "强偏空";
-            case "WAIT" -> "等待";
+            case "WAIT" -> "观望";
             default -> null;
         };
     }
@@ -1240,7 +2067,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "HIGH" -> "高";
             case "MEDIUM" -> "中";
             case "LOW" -> "低";
-            default -> hasText(risk) ? risk : null;
+            default -> null;
         };
     }
 
@@ -1280,11 +2107,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private String trimPlanValue(String value) {
-        String trimmed = trimToNull(value);
-        if (trimmed == null || "暂无".equals(trimmed) || "—".equals(trimmed) || "待生成".equals(trimmed)) {
-            return null;
-        }
-        return trimmed;
+        return ExecutionPlanReviewPolicy.isConcreteBoundary(value) ? value.trim() : null;
     }
 
     private String firstNonBlank(String... values) {
@@ -1310,7 +2133,60 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return trimmed == null ? "" : trimmed.toUpperCase(Locale.ROOT);
     }
 
-    private record AiConflictSummary(String level, Integer score) {
+    private record AiRoleStats(int successful, int support, int challenge, int abstain) {
+        int adjudicative() {
+            return support + challenge;
+        }
+    }
+
+    private record PositionRowsResult(
+            List<DashboardHomeVO.PositionVO> rows,
+            Map<Long, PositionPlanSourceResolver.Resolution> trustedSources) {
+    }
+
+    private enum PositionSelectionStatus {
+        NO_POSITION,
+        UNIQUE_POSITION_SELECTED,
+        EXACT_POSITION_SELECTED,
+        POSITION_SELECTION_REQUIRED,
+        POSITION_NOT_FOUND,
+        POSITION_SYMBOL_MISMATCH
+    }
+
+    private record PositionSelectionResult(PositionSelectionStatus status,
+                                           DashboardHomeVO.PositionVO selectedPosition,
+                                           int matchingPositionCount) {
+        private boolean blocked() {
+            return status == PositionSelectionStatus.POSITION_SELECTION_REQUIRED
+                    || status == PositionSelectionStatus.POSITION_NOT_FOUND
+                    || status == PositionSelectionStatus.POSITION_SYMBOL_MISMATCH;
+        }
+
+        private static PositionSelectionResult blocked(PositionSelectionStatus status,
+                                                       int matchingPositionCount) {
+            return new PositionSelectionResult(status, null, matchingPositionCount);
+        }
+    }
+
+    private record ResolvedOriginalPlan(String identityStatus,
+                                        ExecutionPlanDO executionPlan,
+                                        DecisionResultVO decision,
+                                        AnalysisRunDO analysisRun,
+                                        String analysisId,
+                                        String executionPlanId,
+                                        String traceId,
+                                        String failureReason) {
+        private boolean verified() {
+            return "VERIFIED".equals(identityStatus);
+        }
+
+        private static ResolvedOriginalPlan unverified(String failureReason) {
+            return new ResolvedOriginalPlan("UNVERIFIED", null, null, null,
+                    null, null, null, failureReason);
+        }
+    }
+
+    private record OriginalPlanPresentation(String status, String label, PlanValidity validity) {
     }
 
     private record PushInboxContext(DashboardHomeVO.PushInboxVO pushInbox, boolean readOk) {

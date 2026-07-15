@@ -9,11 +9,19 @@ import org.example.trademodel.vo.ExecutionPlanVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -55,6 +63,37 @@ class PushSnapshotServiceTest {
         service.insertAuthoritativeSnapshot(run(), analysis(), decision, plan(), 10L);
 
         verify(pushSnapshotMapper).insert(any());
+    }
+
+    @Test
+    void decisionAndPushSnapshotShareSameExpiryInstant() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-13T12:00:00Z"), ZoneOffset.UTC));
+        DecisionBundleVO decision = decision(true);
+        decision.setExpiresAt(OffsetDateTime.parse("2026-07-14T20:00:00+08:00"));
+        decision.setPushExpiresAt(LocalDateTime.parse("2026-07-14T12:00:00"));
+        ArgumentCaptor<org.example.trademodel.entity.TmPushSnapshotDO> captor =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushSnapshotDO.class);
+
+        service.insertAuthoritativeSnapshot(run(), analysis(), decision, plan(), 10L);
+
+        verify(pushSnapshotMapper).insert(captor.capture());
+        assertThat(captor.getValue().getExpiresAt())
+                .isEqualTo(LocalDateTime.parse("2026-07-14T12:00:00"));
+        assertThat(captor.getValue().getPushCreateTime())
+                .isEqualTo(LocalDateTime.parse("2026-07-13T12:00:00"));
+    }
+
+    @Test
+    void inconsistentCompatibilityExpiryFailsClosed() {
+        DecisionBundleVO decision = decision(true);
+        decision.setExpiresAt(OffsetDateTime.parse("2026-07-14T12:00:00Z"));
+        decision.setPushExpiresAt(LocalDateTime.parse("2026-07-14T13:00:00"));
+
+        assertThatThrownBy(() -> service.insertAuthoritativeSnapshot(
+                run(), analysis(), decision, plan(), 10L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("UTC compatibility timestamp");
+        verify(pushSnapshotMapper, never()).insert(any());
     }
 
     private static AnalysisRunDO run() {

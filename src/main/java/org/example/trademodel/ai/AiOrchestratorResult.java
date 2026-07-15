@@ -13,9 +13,9 @@ public class AiOrchestratorResult {
     private int successfulProviderCount;
     private int failedProviderCount;
     private int fallbackProviderCount;
-    private boolean gptConsistentWithRule = true;
-    private boolean geminiConsistentWithRule = true;
-    private boolean grokConsistentWithRule = true;
+    private boolean gptConsistentWithRule;
+    private boolean geminiConsistentWithRule;
+    private boolean grokConsistentWithRule;
     private int aiObjectionCount;
     private int aiSupportCount;
     private int conflictContribution;

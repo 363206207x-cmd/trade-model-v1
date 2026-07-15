@@ -370,9 +370,9 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
         int timeout = 0;
         int failed = 0;
         boolean overallTimeoutObserved = false;
-        boolean gptConsistent = true;
-        boolean geminiConsistent = true;
-        boolean grokConsistent = true;
+        boolean gptConsistent = false;
+        boolean geminiConsistent = false;
+        boolean grokConsistent = false;
 
         for (AiProviderReviewResult providerResult : providerResults) {
             if (providerResult.successful()) {
@@ -399,6 +399,13 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
                 }
             } else if (providerResult.supportsRule()) {
                 support++;
+                if (providerResult.getRole() == AiProviderRole.GPT_RULE_REVIEW) {
+                    gptConsistent = true;
+                } else if (providerResult.getRole() == AiProviderRole.GEMINI_CONSISTENCY_REVIEW) {
+                    geminiConsistent = true;
+                } else if (providerResult.getRole() == AiProviderRole.GROK_ADVERSARIAL_CHALLENGE) {
+                    grokConsistent = true;
+                }
             }
             if (providerResult.getReasonCodes() != null) {
                 reasonCodes.addAll(providerResult.getReasonCodes());

@@ -8,6 +8,7 @@ import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.derivatives.DerivativesBusinessInput;
 import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -20,14 +21,18 @@ import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
+import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
 import org.example.trademodel.positionmonitor.PositionMonitorPolicy;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionMonitorService;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
@@ -53,7 +58,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final UserPositionMapper userPositionMapper;
     private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final UserPositionRiskAdapter userPositionRiskAdapter;
-    private final ExecutionPlanMapper executionPlanMapper;
+    private final PositionPlanSourceResolver positionPlanSourceResolver;
     private final PositionMonitorLogService positionMonitorLogService;
     private final EvidenceItemMapper evidenceItemMapper;
     private final ScoreItemMapper scoreItemMapper;
@@ -73,7 +78,23 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper) {
         this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
-                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper, objectMapper, null);
+                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper,
+                objectMapper, null, null);
+    }
+
+    public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
+                                      MarketPriceSnapshotService marketPriceSnapshotService,
+                                      UserPositionRiskAdapter userPositionRiskAdapter,
+                                      ExecutionPlanMapper executionPlanMapper,
+                                      PositionMonitorLogService positionMonitorLogService,
+                                      EvidenceItemMapper evidenceItemMapper,
+                                      ScoreItemMapper scoreItemMapper,
+                                      DecisionResultMapper decisionResultMapper,
+                                      ObjectMapper objectMapper,
+                                      ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
+        this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
+                positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper,
+                objectMapper, null, externalContextEvidenceBuilder);
     }
 
     @Autowired
@@ -86,11 +107,12 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       ScoreItemMapper scoreItemMapper,
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper,
+                                      AnalysisRunMapper analysisRunMapper,
                                       ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
         this.userPositionMapper = userPositionMapper;
         this.marketPriceSnapshotService = marketPriceSnapshotService;
         this.userPositionRiskAdapter = userPositionRiskAdapter;
-        this.executionPlanMapper = executionPlanMapper;
+        this.positionPlanSourceResolver = new PositionPlanSourceResolver(executionPlanMapper, analysisRunMapper);
         this.positionMonitorLogService = positionMonitorLogService;
         this.evidenceItemMapper = evidenceItemMapper;
         this.scoreItemMapper = scoreItemMapper;
@@ -226,17 +248,18 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             reasons.add("NEAR_TAKE_PROFIT");
         }
 
-        String planStatus = normalize(planContext.plan == null ? null : planContext.plan.getExecutionPlanStatus());
-        boolean planInvalidated = stopLossBreached
-                || "INVALID".equals(planStatus)
-                || "BLOCKED".equals(planStatus)
-                || planContext.sourceGateBlockedOrIncomplete;
+        boolean persistedPlanInvalidated = planContext.persistedPlanState == PersistedPlanState.INVALID
+                || planContext.persistedPlanState == PersistedPlanState.BLOCKED;
+        boolean planNeedsReview = planContext.persistedPlanState == PersistedPlanState.REVALIDATION_REQUIRED
+                || planContext.persistedPlanState == PersistedPlanState.INCOMPLETE
+                || planContext.persistedPlanState == PersistedPlanState.REVIEW_ONLY
+                || planContext.persistedPlanState == PersistedPlanState.MISSING;
+        boolean planInvalidated = stopLossBreached || persistedPlanInvalidated;
         boolean logicWeakened = planContext.missing
+                || planNeedsReview
                 || riskIncreased
                 || derivativesAssessment != null && derivativesAssessment.needsRevalidation()
                 || nearStopLoss
-                || "INCOMPLETE".equals(planStatus)
-                || "REVIEW_ONLY".equals(planStatus)
                 || missingStopLoss
                 || missingTakeProfit
                 || (externalHighRisk && !externalBlocked);
@@ -252,7 +275,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             suggestedAction = "RECHECK_PLAN";
         } else if (logicWeakened) {
             logicStatus = "LOGIC_WEAKENED";
-            suggestedAction = "MANUAL_REVIEW";
+            suggestedAction = planNeedsReview ? "RECHECK_PLAN" : "MANUAL_REVIEW";
         } else {
             logicStatus = "LOGIC_VALID";
             suggestedAction = nearTakeProfit ? "MANUAL_REVIEW" : "HOLD";
@@ -261,7 +284,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
         RecordPositionMonitorLogCommand command = new RecordPositionMonitorLogCommand();
         command.setPositionId(position.getId());
-        command.setAnalysisId(planContext.analysisId);
+        command.setAnalysisId(planContext.missing
+                ? PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID
+                : planContext.analysisId);
         command.setExecutionPlanId(planContext.executionPlanId);
         command.setCurrentPrice(currentPrice);
         command.setLogicStatus(logicStatus);
@@ -424,37 +449,49 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     }
 
     private PlanContext resolvePlanContext(UserPositionDO position, Set<String> reasons) {
-        String sourceRefId = optionalText(position.getSourceRefId());
-        if (sourceRefId == null) {
-            reasons.add("PLAN_CONTEXT_MISSING");
-            return PlanContext.missing("USER_POSITION_" + position.getId());
+        PositionPlanSourceResolver.Resolution resolution = positionPlanSourceResolver.resolveTypedReference(
+                position.getId(), position.getAssetSymbol(), position.getSourceRefId());
+        if (!resolution.verified()) {
+            return unverifiedPlanContext(reasons);
         }
-        ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(sourceRefId);
-        if (plan == null) {
-            plan = executionPlanMapper.selectLatestByAnalysisId(sourceRefId);
-        }
-        if (plan == null) {
-            reasons.add("PLAN_CONTEXT_MISSING");
-            return PlanContext.missing(sourceRefId);
-        }
-        String analysisId = optionalText(plan.getAnalysisId());
-        if (analysisId == null) {
-            analysisId = sourceRefId;
-        }
-        boolean sourceGateBlocked = !Boolean.TRUE.equals(plan.getSourceGateComplete())
-                || "BLOCKED".equals(normalize(plan.getSourceGateStatus()))
-                || "INVALID".equals(normalize(plan.getSourceGateStatus()))
-                || "INCOMPLETE".equals(normalize(plan.getSourceGateStatus()));
-        if (sourceGateBlocked) {
+        ExecutionPlanDO plan = resolution.executionPlan();
+        PersistedPlanState persistedPlanState = ExecutionPlanReviewPolicy.persistedPlanState(plan);
+        boolean boundaryComplete = ExecutionPlanReviewPolicy.hasCompleteBoundaries(plan);
+        String executionPlanStatus = normalize(plan.getExecutionPlanStatus());
+        String sourceGateStatus = normalize(plan.getSourceGateStatus());
+        boolean sourceGateComplete = Boolean.TRUE.equals(plan.getSourceGateComplete());
+        if (!sourceGateComplete || "INCOMPLETE".equals(sourceGateStatus)) {
             reasons.add("SOURCE_GATE_INCOMPLETE");
         }
-        String status = normalize(plan.getExecutionPlanStatus());
-        if ("INVALID".equals(status) || "BLOCKED".equals(status)) {
+        if (persistedPlanState == PersistedPlanState.INVALID
+                || persistedPlanState == PersistedPlanState.BLOCKED) {
             reasons.add("PLAN_INVALID");
-        } else if ("INCOMPLETE".equals(status) || "REVIEW_ONLY".equals(status)) {
+        } else if (persistedPlanState == PersistedPlanState.REVALIDATION_REQUIRED) {
+            reasons.add("PLAN_REVALIDATION_REQUIRED");
+        } else if (persistedPlanState == PersistedPlanState.INCOMPLETE
+                || persistedPlanState == PersistedPlanState.REVIEW_ONLY) {
             reasons.add("PLAN_REVIEW_REQUIRED");
         }
-        return new PlanContext(plan, analysisId, optionalText(plan.getPlanId()), false, sourceGateBlocked);
+        if (!boundaryComplete) {
+            reasons.add("PLAN_BOUNDARY_INCOMPLETE");
+        }
+        return new PlanContext(plan,
+                resolution.analysisId(),
+                resolution.executionPlanId(),
+                false,
+                Boolean.TRUE.equals(plan.getNeedsRevalidation()),
+                optionalText(plan.getRevalidationReason()),
+                boundaryComplete,
+                executionPlanStatus,
+                sourceGateStatus,
+                sourceGateComplete,
+                persistedPlanState);
+    }
+
+    private PlanContext unverifiedPlanContext(Set<String> reasons) {
+        reasons.add("PLAN_SOURCE_UNVERIFIED");
+        reasons.add("PLAN_CONTEXT_MISSING");
+        return PlanContext.missing();
     }
 
     private boolean riskIncreased(Long positionId, String currentRiskLevel) {
@@ -580,22 +617,41 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         private final String analysisId;
         private final String executionPlanId;
         private final boolean missing;
-        private final boolean sourceGateBlockedOrIncomplete;
+        private final boolean needsRevalidation;
+        private final String revalidationReason;
+        private final boolean planBoundaryComplete;
+        private final String executionPlanStatus;
+        private final String sourceGateStatus;
+        private final boolean sourceGateComplete;
+        private final PersistedPlanState persistedPlanState;
 
         private PlanContext(ExecutionPlanDO plan,
                             String analysisId,
                             String executionPlanId,
                             boolean missing,
-                            boolean sourceGateBlockedOrIncomplete) {
+                            boolean needsRevalidation,
+                            String revalidationReason,
+                            boolean planBoundaryComplete,
+                            String executionPlanStatus,
+                            String sourceGateStatus,
+                            boolean sourceGateComplete,
+                            PersistedPlanState persistedPlanState) {
             this.plan = plan;
             this.analysisId = analysisId;
             this.executionPlanId = executionPlanId;
             this.missing = missing;
-            this.sourceGateBlockedOrIncomplete = sourceGateBlockedOrIncomplete;
+            this.needsRevalidation = needsRevalidation;
+            this.revalidationReason = revalidationReason;
+            this.planBoundaryComplete = planBoundaryComplete;
+            this.executionPlanStatus = executionPlanStatus;
+            this.sourceGateStatus = sourceGateStatus;
+            this.sourceGateComplete = sourceGateComplete;
+            this.persistedPlanState = persistedPlanState;
         }
 
-        private static PlanContext missing(String analysisId) {
-            return new PlanContext(null, analysisId, null, true, false);
+        private static PlanContext missing() {
+            return new PlanContext(null, null, null, true, false, null,
+                    false, null, null, false, PersistedPlanState.MISSING);
         }
     }
 }

@@ -20,13 +20,14 @@ class DashboardLocalRealBindingContractTest {
     @Test
     void noUserPositionShowsExplicitEmptyState() throws Exception {
         String template = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
-        assertThat(template).contains("暂无手动录入持仓", "最新价", "数据状态", "证据数", "分析时间");
+        assertThat(template).contains("暂无手动录入持仓", "最新价", "数据状态");
     }
 
     @Test
-    void dashboardDisplaysProviderName() throws Exception {
+    void dashboardKeepsProviderDiagnosticsOutOfCompactAssetCard() throws Exception {
         String template = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
-        assertThat(template).contains("sourceProvider", "数据来源", "timeframeFreshness", "四周期新鲜度");
+        assertThat(template).contains("sourceProvider", "timeframeFreshness")
+                .doesNotContain("数据来源", "四周期新鲜度", "证据数", "分析时间");
     }
 
     @Test

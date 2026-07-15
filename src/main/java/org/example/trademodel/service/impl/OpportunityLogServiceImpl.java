@@ -583,10 +583,10 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
 
     private static String directionFromRuleBias(String marketBiasHierarchy) {
         String b = safe(marketBiasHierarchy).toUpperCase(Locale.ROOT);
-        if ("BULLISH".equals(b)) {
+        if (b.endsWith("BULLISH")) {
             return "LONG";
         }
-        if ("BEARISH".equals(b)) {
+        if (b.endsWith("BEARISH")) {
             return "SHORT";
         }
         return null;

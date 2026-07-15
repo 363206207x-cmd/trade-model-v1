@@ -171,6 +171,8 @@ CREATE TABLE IF NOT EXISTS tm_decision_result (
     ai_role_results TEXT,
     is_adopted BOOLEAN,
     valid_period VARCHAR(200),
+    valid_from TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
     invalid_condition TEXT,
     evidence_summary TEXT,
     explanation_json TEXT,

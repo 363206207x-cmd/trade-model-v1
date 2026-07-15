@@ -8,6 +8,9 @@ public class PositionMonitorLogDTO {
     private Long positionId;
     private String analysisId;
     private String executionPlanId;
+    private boolean sourceVerified;
+    private String sourceStatus;
+    private String sourceStatusLabel;
     private BigDecimal currentPrice;
     private String logicStatus;
     private String riskLevel;
@@ -37,6 +40,12 @@ public class PositionMonitorLogDTO {
     public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
     public String getExecutionPlanId() { return executionPlanId; }
     public void setExecutionPlanId(String executionPlanId) { this.executionPlanId = executionPlanId; }
+    public boolean isSourceVerified() { return sourceVerified; }
+    public void setSourceVerified(boolean sourceVerified) { this.sourceVerified = sourceVerified; }
+    public String getSourceStatus() { return sourceStatus; }
+    public void setSourceStatus(String sourceStatus) { this.sourceStatus = sourceStatus; }
+    public String getSourceStatusLabel() { return sourceStatusLabel; }
+    public void setSourceStatusLabel(String sourceStatusLabel) { this.sourceStatusLabel = sourceStatusLabel; }
     public BigDecimal getCurrentPrice() { return currentPrice; }
     public void setCurrentPrice(BigDecimal currentPrice) { this.currentPrice = currentPrice; }
     public String getLogicStatus() { return logicStatus; }

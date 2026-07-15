@@ -6,15 +6,17 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.MonitorAlertDO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
 public interface MonitorAlertMapper {
 
     @Insert("INSERT INTO tm_monitor_alert(id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
-            + "cooldown_until, suppress_reason, trace_id, rule_version, created_by, is_deleted, version_no) "
+            + "cooldown_until, suppress_reason, trace_id, rule_version, created_by, created_at, updated_at, is_deleted, version_no) "
             + "VALUES(#{id}, #{analysisId}, #{assetSymbol}, #{alertType}, #{alertLevel}, #{alertMessage}, #{status}, "
-            + "#{cooldownUntil}, #{suppressReason}, #{traceId}, #{ruleVersion}, #{createdBy}, COALESCE(#{isDeleted}, 0), COALESCE(#{versionNo}, 1))")
+            + "#{cooldownUntilUtc}, #{suppressReason}, #{traceId}, #{ruleVersion}, #{createdBy}, "
+            + "#{createdAtUtc}, #{updatedAtUtc}, COALESCE(#{isDeleted}, 0), COALESCE(#{versionNo}, 1))")
     int insert(MonitorAlertDO row);
 
     /** 判重：同一分析、同一告警类型是否已有未删除记录。 */
@@ -26,29 +28,26 @@ public interface MonitorAlertMapper {
      */
     @Select("SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = 'OPEN' "
-            + "AND created_at >= DATEADD('MINUTE', -#{cooldownMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
-            + "AND UPPER(TRIM(COALESCE(status, ''))) = 'OPEN' "
-            + "AND created_at >= CURRENT_TIMESTAMP - (#{cooldownMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
+            + "AND created_at >= #{windowStartInclusive} "
+            + "AND created_at <= #{asOfInclusive}")
     int countOpenInThrottleWindow(
             @Param("assetSymbol") String assetSymbol,
             @Param("alertType") String alertType,
-            @Param("cooldownMinutes") int cooldownMinutes);
+            @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+            @Param("asOfInclusive") LocalDateTime asOfInclusive);
 
     /**
      * 语义近似抑制：同一标的+同类告警在更长时间窗内出现过（无论 OPEN/SUPPRESSED），
      * 则本次可落 SUPPRESSED，减少短期同语义重复轰炸。
      */
     @Select("SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert WHERE is_deleted = 0 AND asset_symbol = #{assetSymbol} AND alert_type = #{alertType} "
-            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
+            + "AND created_at >= #{windowStartInclusive} "
+            + "AND created_at <= #{asOfInclusive}")
     int countAnyInSemanticWindow(
             @Param("assetSymbol") String assetSymbol,
             @Param("alertType") String alertType,
-            @Param("windowMinutes") int windowMinutes);
+            @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+            @Param("asOfInclusive") LocalDateTime asOfInclusive);
 
     /** 未删除记录按 created_at 倒序，最多 {@code limit} 条；时间列为格式化字符串。 */
     @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
@@ -88,26 +87,20 @@ public interface MonitorAlertMapper {
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert "
-            + "WHERE is_deleted = 0 "
-            + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
-    Integer countByStatusInWindow(@Param("status") String status, @Param("windowMinutes") int windowMinutes);
+            + "AND created_at >= #{windowStartInclusive} "
+            + "AND created_at <= #{asOfInclusive}")
+    Integer countByStatusInWindow(@Param("status") String status,
+                                  @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                                  @Param("asOfInclusive") LocalDateTime asOfInclusive);
 
     @Select("SELECT COUNT(*) FROM tm_monitor_alert "
             + "WHERE is_deleted = 0 "
             + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
             + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
-            + "AND created_at >= DATEADD('MINUTE', -#{windowMinutes}, CURRENT_TIMESTAMP)")
-    @Select(value = "SELECT COUNT(*) FROM tm_monitor_alert "
-            + "WHERE is_deleted = 0 "
-            + "AND UPPER(TRIM(COALESCE(status, ''))) = UPPER(TRIM(#{status})) "
-            + "AND UPPER(TRIM(COALESCE(alert_type, ''))) = UPPER(TRIM(#{alertType})) "
-            + "AND created_at >= CURRENT_TIMESTAMP - (#{windowMinutes} * INTERVAL '1 minute')",
-            databaseId = "postgresql")
+            + "AND created_at >= #{windowStartInclusive} "
+            + "AND created_at <= #{asOfInclusive}")
     Integer countByStatusAndTypeInWindow(@Param("status") String status,
                                          @Param("alertType") String alertType,
-                                         @Param("windowMinutes") int windowMinutes);
+                                         @Param("windowStartInclusive") LocalDateTime windowStartInclusive,
+                                         @Param("asOfInclusive") LocalDateTime asOfInclusive);
 }

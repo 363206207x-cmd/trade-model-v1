@@ -1,5 +1,9 @@
 package org.example.trademodel.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import java.time.LocalDateTime;
+
 public class MonitorAlertDO {
 
     private String id;
@@ -17,6 +21,12 @@ public class MonitorAlertDO {
     private String updatedBy;
     private String createdAt;
     private String updatedAt;
+    /** UTC-naive persistence value; display reads continue to use {@link #createdAt}. */
+    private LocalDateTime createdAtUtc;
+    /** UTC-naive persistence value; display reads continue to use {@link #updatedAt}. */
+    private LocalDateTime updatedAtUtc;
+    /** UTC-naive persistence value; display reads continue to use {@link #cooldownUntil}. */
+    private LocalDateTime cooldownUntilUtc;
     private Integer isDeleted;
     private Integer versionNo;
 
@@ -141,6 +151,33 @@ public class MonitorAlertDO {
 
     public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    @JsonIgnore
+    public LocalDateTime getCreatedAtUtc() {
+        return createdAtUtc;
+    }
+
+    public void setCreatedAtUtc(LocalDateTime createdAtUtc) {
+        this.createdAtUtc = createdAtUtc;
+    }
+
+    @JsonIgnore
+    public LocalDateTime getUpdatedAtUtc() {
+        return updatedAtUtc;
+    }
+
+    public void setUpdatedAtUtc(LocalDateTime updatedAtUtc) {
+        this.updatedAtUtc = updatedAtUtc;
+    }
+
+    @JsonIgnore
+    public LocalDateTime getCooldownUntilUtc() {
+        return cooldownUntilUtc;
+    }
+
+    public void setCooldownUntilUtc(LocalDateTime cooldownUntilUtc) {
+        this.cooldownUntilUtc = cooldownUntilUtc;
     }
 
     public Integer getIsDeleted() {

@@ -1,6 +1,7 @@
 package org.example.trademodel.stress;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
@@ -8,6 +9,7 @@ import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -19,6 +21,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
@@ -83,7 +86,7 @@ class V1HistoricalReplayValidationTest {
         assertResult(results, "HISTORICAL_STYLE_DOWNTREND_BREAKDOWN", "BEARISH", true, AssetStateEnum.CANDIDATE);
         assertResult(results, "CHOPPY_RANGE_NO_TRADE", "BEARISH", false, AssetStateEnum.OBSERVING);
         assertResult(results, "WICK_STOP_SWEEP", "BULLISH", false, AssetStateEnum.OBSERVING);
-        assertResult(results, "FAST_CRASH_REBOUND", "BULLISH", false, AssetStateEnum.CONFUSED);
+        assertResult(results, "FAST_CRASH_REBOUND", "BEARISH", false, AssetStateEnum.CONFUSED);
         assertResult(results, "SLOW_TREND_PULLBACK", "BULLISH", true, AssetStateEnum.WAITING_TRIGGER);
         assertResult(results, "HIGH_RISK_EVENT_WINDOW", "BULLISH", false, AssetStateEnum.HIGH_RISK);
 
@@ -192,7 +195,7 @@ class V1HistoricalReplayValidationTest {
 
         assertThat(decision.getMarketBiasHierarchy())
                 .as("formal 4h direction for %s", scenario.name())
-                .isEqualTo(scenario.direction());
+                .matches(actual -> directionFamily(actual).equals(directionFamily(scenario.direction())));
         assertThat(decision.getIsWorthOpening()).isEqualTo(scenario.opportunityExpected());
         assertThat(decision.getAssetState()).isEqualTo(scenario.state());
         assertThat(decision.getAssetStateSnapshot()).contains(FIXTURE_SOURCE);
@@ -223,6 +226,13 @@ class V1HistoricalReplayValidationTest {
         return result;
     }
 
+    private static String directionFamily(String marketBias) {
+        if (marketBias == null) return "";
+        if (marketBias.endsWith("BULLISH")) return "BULLISH";
+        if (marketBias.endsWith("BEARISH")) return "BEARISH";
+        return marketBias;
+    }
+
     private static List<ReplayScenario> replayScenarios() {
         return List.of(
                 ReplayScenario.valid("HISTORICAL_STYLE_UPTREND_BREAKOUT", "BTCUSDT", "BULLISH",
@@ -246,7 +256,7 @@ class V1HistoricalReplayValidationTest {
     private static void assertResult(List<ReplayResult> results, String name, String direction,
                                      boolean complete, AssetStateEnum state) {
         ReplayResult result = results.stream().filter(item -> name.equals(item.scenario().name())).findFirst().orElseThrow();
-        assertThat(result.decision().getMarketBiasHierarchy()).isEqualTo(direction);
+        assertThat(directionFamily(result.decision().getMarketBiasHierarchy())).isEqualTo(directionFamily(direction));
         assertThat(result.decision().getAssetState()).isEqualTo(state);
         assertThat(isCompletePlan(result.plan())).isEqualTo(complete);
     }
@@ -265,7 +275,7 @@ class V1HistoricalReplayValidationTest {
         BigDecimal close = last(scenario.fiveMinute()).close();
         BigDecimal low = scenario.fiveMinute().stream().map(ReplayCandle::low).min(BigDecimal::compareTo).orElseThrow();
         BigDecimal high = scenario.fiveMinute().stream().map(ReplayCandle::high).max(BigDecimal::compareTo).orElseThrow();
-        boolean bullish = "BULLISH".equals(decision.getMarketBiasHierarchy());
+        boolean bullish = "BULLISH".equals(directionFamily(decision.getMarketBiasHierarchy()));
         BigDecimal stop = bullish ? low : high;
         BigDecimal distance = close.subtract(stop).abs();
         BigDecimal target = bullish ? close.add(distance.multiply(new BigDecimal("2")))
@@ -477,6 +487,9 @@ class V1HistoricalReplayValidationTest {
         plan.setExecutionPlanStatus("VALID");
         plan.setSourceGateStatus("VALID");
         plan.setSourceGateComplete(true);
+        plan.setEntryZone("95-105");
+        plan.setStopLoss("90");
+        plan.setTakeProfitRules("120");
         plan.setManualReviewRequired(true);
         plan.setNotTradeInstruction(true);
         plan.setNotExecutable(true);
@@ -548,9 +561,9 @@ class V1HistoricalReplayValidationTest {
 
         private static ReplayScenario confused(String name, String symbol,
                                                List<ReplayCandle> oneMinute, List<ReplayCandle> fiveMinute) {
-            return new ReplayScenario(name, symbol, "BULLISH", false, false, AssetStateEnum.CONFUSED, 70, 65,
+            return new ReplayScenario(name, symbol, "BEARISH", false, false, AssetStateEnum.CONFUSED, 70, 65,
                     oneMinute, fiveMinute,
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, "BULLISH", "LOW", "HIGH",
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, "BEARISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),
                     new ConfusedResult(88, "OBSERVING", "CONFUSED", true, false, 0, true,
                             "fast crash and rebound conflict", "manual review block"), null);
@@ -600,6 +613,7 @@ class V1HistoricalReplayValidationTest {
         private final MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
         private final UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         private final ExecutionPlanMapper planMapper = mock(ExecutionPlanMapper.class);
+        private final AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         private final PositionMonitorLogService logService = mock(PositionMonitorLogService.class);
         private final PositionMonitorServiceImpl service;
         private final AtomicLong logIds = new AtomicLong(3000L);
@@ -615,16 +629,21 @@ class V1HistoricalReplayValidationTest {
                     org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient),
                     riskAdapter, planMapper, logService,
                     mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class), mock(DecisionResultMapper.class),
-                    new ObjectMapper(), null);
+                    new ObjectMapper(), analysisRunMapper, null);
         }
 
         private PositionMonitorResultDTO monitor(MonitorPoint point) {
             String planId = "plan-replay-" + point.name();
             when(positionMapper.selectById(point.id()))
-                    .thenReturn(paperPosition(point.id(), "OPEN", planId, point.stopLoss(), point.takeProfit()));
+                    .thenReturn(paperPosition(point.id(), "OPEN",
+                            PositionMonitorSourceContract.executionPlanReference(planId),
+                            point.stopLoss(), point.takeProfit()));
             when(quoteClient.fetch24hTicker(SYMBOL)).thenReturn(Optional.of(quote(point.currentPrice())));
             when(riskAdapter.currentRisk()).thenReturn(point.risk());
-            lenient().when(planMapper.selectByPlanId(planId)).thenReturn(monitorPlan(planId));
+            ExecutionPlanDO plan = monitorPlan(planId);
+            lenient().when(planMapper.selectByPlanId(planId)).thenReturn(plan);
+            lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
+                    .thenReturn(analysisRun(plan.getAnalysisId(), SYMBOL));
             return service.monitorUserPosition(point.id());
         }
 
@@ -637,5 +656,13 @@ class V1HistoricalReplayValidationTest {
             when(positionMapper.listOpenPositions()).thenReturn(List.of());
             return service.monitorOpenUserPositions();
         }
+    }
+
+    private static AnalysisRunDO analysisRun(String analysisId, String symbol) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTraceId("trace-" + analysisId);
+        return run;
     }
 }

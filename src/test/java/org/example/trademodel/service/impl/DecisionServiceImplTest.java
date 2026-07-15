@@ -17,17 +17,23 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -322,10 +328,10 @@ class DecisionServiceImplTest {
     void getLightSystemStatus_mapsMissedCountAndHotResetDefaults() {
         when(analysisRunMapper.countDistinctSymbols()).thenReturn(7);
         when(decisionResultMapper.selectLastDecisionTime()).thenReturn(null);
-        when(decisionResultMapper.countDecisionsToday()).thenReturn(0);
+        when(decisionResultMapper.countDecisionsInRange(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(0);
         when(missedOpportunityMapper.countByBizDate(any(LocalDate.class))).thenReturn(5);
-        when(assetStateMapper.countSymbolsWhereConfusedScorePositive()).thenReturn(3);
-        when(pushSnapshotMapper.countPendingRecheckBacklog()).thenReturn(11);
+        when(assetStateMapper.countDirectionalPushBlocked(85)).thenReturn(3);
+        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(11);
         when(decisionResultMapper.countOpenSymbolsWithReverseSignal()).thenReturn(2);
         when(assetStateService.findLatestHotResetSnapshot()).thenReturn(null);
 
@@ -336,6 +342,61 @@ class DecisionServiceImplTest {
         assertThat(vo.getPendingCount()).isEqualTo(11);
         assertThat(vo.getReverseSignalCount()).isEqualTo(2);
         assertThat(vo.getHotResetFired()).isFalse();
+    }
+
+    @Test
+    void lightSystemStatusUsesOneUtcDateForAllTodayMetrics() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T23:30:00Z"), ZoneOffset.UTC));
+
+        service.getLightSystemStatus();
+
+        verify(decisionResultMapper).countDecisionsInRange(
+                LocalDateTime.parse("2026-07-14T00:00:00"),
+                LocalDateTime.parse("2026-07-15T00:00:00"));
+        verify(missedOpportunityMapper).countByBizDate(LocalDate.parse("2026-07-14"));
+    }
+
+    @Test
+    void missedOpportunityBizDateIsTimezoneIndependent() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-14T23:30:00Z"), ZoneOffset.UTC));
+        TimeZone original = TimeZone.getDefault();
+
+        try {
+            for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                service.getLightSystemStatus();
+            }
+        } finally {
+            TimeZone.setDefault(original);
+        }
+
+        ArgumentCaptor<LocalDate> bizDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        verify(missedOpportunityMapper, times(3)).countByBizDate(bizDateCaptor.capture());
+        assertThat(bizDateCaptor.getAllValues()).containsOnly(LocalDate.parse("2026-07-14"));
+    }
+
+    @Test
+    void utcMidnightDecisionAndMissedMetricsStayOnSameDate() {
+        service.setClock(Clock.fixed(Instant.parse("2026-07-15T00:00:00Z"), ZoneOffset.UTC));
+        TimeZone original = TimeZone.getDefault();
+
+        try {
+            for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                service.getLightSystemStatus();
+            }
+        } finally {
+            TimeZone.setDefault(original);
+        }
+
+        ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDate> bizDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+        verify(decisionResultMapper, times(3)).countDecisionsInRange(startCaptor.capture(), endCaptor.capture());
+        verify(missedOpportunityMapper, times(3)).countByBizDate(bizDateCaptor.capture());
+        assertThat(startCaptor.getAllValues()).containsOnly(LocalDateTime.parse("2026-07-15T00:00:00"));
+        assertThat(endCaptor.getAllValues()).containsOnly(LocalDateTime.parse("2026-07-16T00:00:00"));
+        assertThat(bizDateCaptor.getAllValues()).containsOnly(LocalDate.parse("2026-07-15"));
     }
 
     private static UserPositionDO manualUserPosition(String symbol, String status, LocalDateTime openedAt) {

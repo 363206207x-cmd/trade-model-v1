@@ -10,14 +10,17 @@ import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.RunBaselineService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.KeyCountVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.RunBaselineVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +43,7 @@ public class RunBaselineServiceImpl implements RunBaselineService {
     private final AnalysisRunMapper analysisRunMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
     private final HotResetEventMapper hotResetEventMapper;
+    private Clock clock = Clock.systemUTC();
 
     public RunBaselineServiceImpl(SystemHealthService systemHealthService,
                                   PositionSyncService positionSyncService,
@@ -59,21 +63,28 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         this.hotResetEventMapper = hotResetEventMapper;
     }
 
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
+
     @Override
     public RunBaselineVO getRunBaseline(int windowMinutes) {
         long assembleStartMs = System.currentTimeMillis();
         int effectiveWindowMinutes = windowMinutes > 0 ? windowMinutes : DEFAULT_WINDOW_MINUTES;
+        LocalDateTime asOfUtc = UtcLocalTimePolicy.now(clock);
+        LocalDateTime windowStartUtc = asOfUtc.minusMinutes(effectiveWindowMinutes);
 
         RunBaselineVO vo = new RunBaselineVO();
-        vo.setGeneratedAt(LocalDateTime.now());
+        vo.setGeneratedAt(asOfUtc);
         vo.setWindowMinutes(effectiveWindowMinutes);
         vo.setSystemHealth(buildSystemHealthSnapshot());
         vo.setPositionSync(buildPositionSyncSnapshot());
         vo.setPerformance(buildPerformanceSummary(assembleStartMs));
-        vo.setAlertSummary(buildAlertSummary(effectiveWindowMinutes));
-        vo.setDataQualitySummary(buildDataQualitySummary(effectiveWindowMinutes));
-        vo.setRecheckSummary(buildRecheckSummary(effectiveWindowMinutes));
-        vo.setHotResetSummary(buildHotResetSummary(effectiveWindowMinutes));
+        vo.setAlertSummary(buildAlertSummary(windowStartUtc, asOfUtc));
+        vo.setDataQualitySummary(buildDataQualitySummary(windowStartUtc, asOfUtc));
+        vo.setRecheckSummary(buildRecheckSummary(windowStartUtc, asOfUtc));
+        vo.setHotResetSummary(buildHotResetSummary(windowStartUtc, asOfUtc));
         return vo;
     }
 
@@ -141,13 +152,16 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.AlertSummary buildAlertSummary(int windowMinutes) {
-        int openCount = safeCount(monitorAlertMapper.countByStatusInWindow("OPEN", windowMinutes));
-        int suppressedCount = safeCount(monitorAlertMapper.countByStatusInWindow("SUPPRESSED", windowMinutes));
+    private RunBaselineVO.AlertSummary buildAlertSummary(LocalDateTime windowStartUtc, LocalDateTime asOfUtc) {
+        int openCount = safeCount(monitorAlertMapper.countByStatusInWindow("OPEN", windowStartUtc, asOfUtc));
+        int suppressedCount = safeCount(monitorAlertMapper.countByStatusInWindow(
+                "SUPPRESSED", windowStartUtc, asOfUtc));
         int dataQualityOpenCount = safeCount(monitorAlertMapper.countByStatusAndTypeInWindow(
-                "OPEN", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, windowMinutes));
+                "OPEN", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
+                windowStartUtc, asOfUtc));
         int dataQualitySuppressedCount = safeCount(monitorAlertMapper.countByStatusAndTypeInWindow(
-                "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, windowMinutes));
+                "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
+                windowStartUtc, asOfUtc));
 
         RunBaselineVO.AlertSummary summary = new RunBaselineVO.AlertSummary();
         summary.setOpenCountWindow(openCount);
@@ -160,9 +174,12 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.DataQualitySummary buildDataQualitySummary(int windowMinutes) {
-        int totalRuns = safeCount(analysisRunMapper.countInWindow(windowMinutes));
-        int lowQualityRuns = safeCount(analysisRunMapper.countLowQualityInWindow(windowMinutes, DATA_QUALITY_THRESHOLD));
+    private RunBaselineVO.DataQualitySummary buildDataQualitySummary(
+            LocalDateTime windowStartUtc,
+            LocalDateTime asOfUtc) {
+        int totalRuns = safeCount(analysisRunMapper.countInWindow(windowStartUtc, asOfUtc));
+        int lowQualityRuns = safeCount(analysisRunMapper.countLowQualityInWindow(
+                windowStartUtc, asOfUtc, DATA_QUALITY_THRESHOLD));
 
         RunBaselineVO.DataQualitySummary summary = new RunBaselineVO.DataQualitySummary();
         summary.setAnalysisRunCountWindow(totalRuns);
@@ -172,12 +189,15 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.RecheckSummary buildRecheckSummary(int windowMinutes) {
+    private RunBaselineVO.RecheckSummary buildRecheckSummary(
+            LocalDateTime windowStartUtc,
+            LocalDateTime asOfUtc) {
         RunBaselineVO.RecheckSummary summary = new RunBaselineVO.RecheckSummary();
         LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
         int total = 0;
         for (RecheckStatusEnum statusEnum : RecheckStatusEnum.values()) {
-            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(statusEnum.name(), windowMinutes));
+            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(
+                    statusEnum.name(), windowStartUtc, asOfUtc));
             counts.put(statusEnum.name(), count);
             total += count;
         }
@@ -186,12 +206,14 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         return summary;
     }
 
-    private RunBaselineVO.HotResetSummary buildHotResetSummary(int windowMinutes) {
+    private RunBaselineVO.HotResetSummary buildHotResetSummary(
+            LocalDateTime windowStartUtc,
+            LocalDateTime asOfUtc) {
         RunBaselineVO.HotResetSummary summary = new RunBaselineVO.HotResetSummary();
-        summary.setEventCountWindow(safeCount(hotResetEventMapper.countInWindow(windowMinutes)));
+        summary.setEventCountWindow(safeCount(hotResetEventMapper.countInWindow(windowStartUtc, asOfUtc)));
 
         LinkedHashMap<String, Integer> triggerTypeCounts = new LinkedHashMap<>();
-        List<KeyCountVO> rows = hotResetEventMapper.selectTriggerTypeCountsInWindow(windowMinutes);
+        List<KeyCountVO> rows = hotResetEventMapper.selectTriggerTypeCountsInWindow(windowStartUtc, asOfUtc);
         if (rows != null) {
             for (KeyCountVO row : rows) {
                 if (row == null || row.getKey() == null || row.getKey().trim().isEmpty()) {

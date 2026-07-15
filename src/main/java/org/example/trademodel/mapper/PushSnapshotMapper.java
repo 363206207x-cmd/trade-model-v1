@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -39,8 +40,8 @@ public interface PushSnapshotMapper {
     @Select("SELECT COUNT(*) FROM tm_push_snapshot WHERE "
             + "(push_status = 'CAPTURED' OR push_status = 'RECHECK_REVIEW_WAITING' "
             + "OR push_status = 'RECHECK_VALID_WAITING') "
-            + "AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)")
-    int countPendingRecheckBacklog();
+            + "AND (expires_at IS NULL OR expires_at > #{nowUtc})")
+    int countPendingRecheckBacklog(@Param("nowUtc") LocalDateTime nowUtc);
 
     @Select({
             "<script>",
@@ -53,11 +54,12 @@ public interface PushSnapshotMapper {
 
     @Select("SELECT * FROM tm_push_snapshot " +
             "WHERE push_status = #{pushStatus} " +
-            "AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) " +
+            "AND (expires_at IS NULL OR expires_at > #{nowUtc}) " +
             "ORDER BY push_id ASC " +
             "LIMIT #{limit}")
     List<TmPushSnapshotDO> listPendingRecheck(
             @Param("pushStatus") String pushStatus,
+            @Param("nowUtc") LocalDateTime nowUtc,
             @Param("limit") int limit);
 
     /**
@@ -74,9 +76,9 @@ public interface PushSnapshotMapper {
             "  GROUP BY push_id " +
             ") r ON r.push_id = s.push_id " +
             "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB} OR s.push_status = #{statusC}) " +
-            "AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP) " +
+            "AND (s.expires_at IS NULL OR s.expires_at > #{nowUtc}) " +
             "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
-            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= DATEADD('MINUTE', -#{minRetryMinutes}, CURRENT_TIMESTAMP)) " +
+            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= DATEADD('MINUTE', -#{minRetryMinutes}, #{nowUtc})) " +
             "ORDER BY s.push_id ASC " +
             "LIMIT #{limit}")
     @Select(value = "SELECT s.* FROM tm_push_snapshot s " +
@@ -86,9 +88,9 @@ public interface PushSnapshotMapper {
             "  GROUP BY push_id " +
             ") r ON r.push_id = s.push_id " +
             "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB} OR s.push_status = #{statusC}) " +
-            "AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP) " +
+            "AND (s.expires_at IS NULL OR s.expires_at > #{nowUtc}) " +
             "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
-            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= CURRENT_TIMESTAMP - (#{minRetryMinutes} * INTERVAL '1 minute')) " +
+            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= #{nowUtc} - (#{minRetryMinutes} * INTERVAL '1 minute')) " +
             "ORDER BY s.push_id ASC " +
             "LIMIT #{limit}",
             databaseId = "postgresql")
@@ -98,6 +100,7 @@ public interface PushSnapshotMapper {
             @Param("statusC") String statusC,
             @Param("maxAttempts") int maxAttempts,
             @Param("minRetryMinutes") int minRetryMinutes,
+            @Param("nowUtc") LocalDateTime nowUtc,
             @Param("limit") int limit);
 
     @Update("UPDATE tm_push_snapshot SET push_status = #{pushStatus} WHERE push_id = #{pushId}")

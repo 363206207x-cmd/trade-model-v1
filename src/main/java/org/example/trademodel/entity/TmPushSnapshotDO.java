@@ -26,6 +26,7 @@ public class TmPushSnapshotDO {
     private Integer dataQualityScoreSnapshot;
     private Integer confusedScoreSnapshot;
     private Long accountRiskSnapshotId;
+    /** UTC-naive compatibility timestamp; produce and compare only through the shared UTC policy. */
     private LocalDateTime expiresAt;
     private String traceId;
     private LocalDateTime createTime;

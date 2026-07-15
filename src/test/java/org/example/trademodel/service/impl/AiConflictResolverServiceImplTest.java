@@ -33,6 +33,8 @@ class AiConflictResolverServiceImplTest {
     void minorConflictSingleAiObjectionCannotForceIndefiniteWaitingOrConfused() {
         DecisionContext context = baseContext();
         context.setGeminiConsistentWithRule(false);
+        context.setAiObjectionCount(1);
+        context.setAiSupportCount(2);
 
         AiConflictResult result = service.resolve(context);
 
@@ -50,6 +52,8 @@ class AiConflictResolverServiceImplTest {
         DecisionContext context = baseContext();
         context.setGeminiConsistentWithRule(false);
         context.setGrokConsistentWithRule(false);
+        context.setAiObjectionCount(2);
+        context.setAiSupportCount(1);
         context.setMultiTimeframeAligned(false);
         context.setRiskTier("MEDIUM");
         context.setWorthOpening(false);
@@ -70,6 +74,8 @@ class AiConflictResolverServiceImplTest {
         context.setGptConsistentWithRule(false);
         context.setGeminiConsistentWithRule(false);
         context.setGrokConsistentWithRule(false);
+        context.setAiObjectionCount(3);
+        context.setAiSupportCount(0);
         context.setMultiTimeframeAligned(false);
         context.setRiskTier("HIGH");
         context.setWorthOpening(false);
@@ -105,6 +111,8 @@ class AiConflictResolverServiceImplTest {
             } else {
                 context.setGrokConsistentWithRule(false);
             }
+            context.setAiObjectionCount(1);
+            context.setAiSupportCount(2);
 
             AiConflictResult result = service.resolve(context);
 
@@ -123,6 +131,35 @@ class AiConflictResolverServiceImplTest {
 
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(context.getWorthOpening()).isFalse();
+    }
+
+    @Test
+    void noSuccessfulAiRoleIsNotTreatedAsSupportOrConsistency() {
+        DecisionContext context = baseContext();
+        context.setAiSuccessfulProviderCount(0);
+        context.setAiSupportCount(0);
+        context.setAiObjectionCount(0);
+
+        AiConflictResult result = service.resolve(context);
+
+        assertThat(result.getLevel()).isNull();
+        assertThat(result.getPlanMode()).isNull();
+        assertThat(result.getAiConflictScore()).isZero();
+        assertThat(context.getAiSupportCount()).isZero();
+    }
+
+    @Test
+    void successfulAbstainIsNotTreatedAsSupport() {
+        DecisionContext context = baseContext();
+        context.setAiSuccessfulProviderCount(1);
+        context.setAiSupportCount(0);
+        context.setAiObjectionCount(0);
+
+        AiConflictResult result = service.resolve(context);
+
+        assertThat(result.getLevel()).isNull();
+        assertThat(result.getPlanMode()).isNull();
+        assertThat(context.getAiSupportCount()).isZero();
     }
 
     @Test
@@ -150,6 +187,9 @@ class AiConflictResolverServiceImplTest {
         context.setGptConsistentWithRule(true);
         context.setGeminiConsistentWithRule(true);
         context.setGrokConsistentWithRule(true);
+        context.setAiSuccessfulProviderCount(3);
+        context.setAiSupportCount(3);
+        context.setAiObjectionCount(0);
         context.setMultiTimeframeAligned(true);
         context.setRiskTier("LOW");
         context.setWorthOpening(true);

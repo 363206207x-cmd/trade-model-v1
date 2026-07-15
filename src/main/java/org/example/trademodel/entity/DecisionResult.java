@@ -2,6 +2,7 @@ package org.example.trademodel.entity;
 
 import jakarta.persistence.Column;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public class DecisionResult {
 
@@ -46,6 +47,12 @@ public class DecisionResult {
 
     @Column(name = "valid_period")
     private String validPeriod;
+
+    @Column(name = "valid_from")
+    private OffsetDateTime validFrom;
+
+    @Column(name = "expires_at")
+    private OffsetDateTime expiresAt;
 
     @Column(name = "invalid_condition")
     private String invalidCondition;
@@ -199,6 +206,22 @@ public class DecisionResult {
 
     public void setValidPeriod(String validPeriod) {
         this.validPeriod = validPeriod;
+    }
+
+    public OffsetDateTime getValidFrom() {
+        return validFrom;
+    }
+
+    public void setValidFrom(OffsetDateTime validFrom) {
+        this.validFrom = validFrom;
+    }
+
+    public OffsetDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(OffsetDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public String getInvalidCondition() {

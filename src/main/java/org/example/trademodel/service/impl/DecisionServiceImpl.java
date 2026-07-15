@@ -1,8 +1,11 @@
 package org.example.trademodel.service.impl;
 
-import java.time.LocalDate;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,10 +26,13 @@ import org.example.trademodel.mapper.MissedOpportunityMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.AssetStateService;
+import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.RuntimeMetricService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -45,6 +51,7 @@ public class DecisionServiceImpl implements DecisionService {
     private final PushSnapshotMapper pushSnapshotMapper;
     private final MissedOpportunityMapper missedOpportunityMapper;
     private final RuntimeMetricService runtimeMetricService;
+    private Clock clock = Clock.systemUTC();
 
     public DecisionServiceImpl(DecisionResultMapper decisionResultMapper, AnalysisRunMapper analysisRunMapper,
                                MarketPriceSnapshotService marketPriceSnapshotService, UserPositionMapper userPositionMapper,
@@ -62,6 +69,11 @@ public class DecisionServiceImpl implements DecisionService {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.missedOpportunityMapper = missedOpportunityMapper;
         this.runtimeMetricService = runtimeMetricService;
+    }
+
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Override
@@ -82,18 +94,23 @@ public class DecisionServiceImpl implements DecisionService {
         System.out.println("[PERF] db_last_decision_time=" + lastDecisionCostMs + " ms");
 
         long countTodayStart = System.currentTimeMillis();
-        vo.setTotalDecisionsToday(decisionResultMapper.countDecisionsToday());
+        LocalDate utcDate = clock.instant().atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDateTime startUtc = utcDate.atStartOfDay();
+        LocalDateTime endUtc = startUtc.plusDays(1);
+        vo.setTotalDecisionsToday(decisionResultMapper.countDecisionsInRange(startUtc, endUtc));
         long countTodayCostMs = System.currentTimeMillis() - countTodayStart;
         System.out.println("[PERF] db_count_decisions_today=" + countTodayCostMs + " ms");
 
         long missedStart = System.currentTimeMillis();
-        int missedToday = missedOpportunityMapper.countByBizDate(LocalDate.now());
+        int missedToday = missedOpportunityMapper.countByBizDate(utcDate);
         vo.setMissedValidOpportunityCount(missedToday);
         long missedCostMs = System.currentTimeMillis() - missedStart;
         System.out.println("[PERF] db_count_missed_opportunity_biz_date=" + missedCostMs + " ms");
 
-        vo.setConfusedCount(assetStateMapper.countSymbolsWhereConfusedScorePositive());
-        vo.setPendingCount(pushSnapshotMapper.countPendingRecheckBacklog());
+        vo.setConfusedCount(assetStateMapper.countDirectionalPushBlocked(
+                ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD));
+        vo.setPendingCount(pushSnapshotMapper.countPendingRecheckBacklog(
+                UtcLocalTimePolicy.now(clock)));
         vo.setReverseSignalCount(decisionResultMapper.countOpenSymbolsWithReverseSignal());
 
         // Dashboard 口径：展示 tm_asset_state 全库最近一次 hot_reset_time 对应的“当前行语义”。

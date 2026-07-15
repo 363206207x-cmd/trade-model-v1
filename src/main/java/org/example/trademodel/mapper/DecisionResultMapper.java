@@ -14,8 +14,8 @@ import java.util.List;
 @Mapper
 public interface DecisionResultMapper {
 
-    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, confused_score, asset_state_snapshot, create_time) " +
-            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
+    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, valid_from, expires_at, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, confused_score, asset_state_snapshot, create_time) " +
+            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{validFrom}, #{expiresAt}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
     int insert(DecisionResult decision);
 
     @Select("SELECT * FROM tm_decision_result ORDER BY create_time DESC LIMIT #{limit}")
@@ -29,6 +29,7 @@ public interface DecisionResultMapper {
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            d.valid_from AS validFrom, d.expires_at AS expiresAt,
             COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
@@ -62,6 +63,7 @@ public interface DecisionResultMapper {
             d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            d.valid_from AS validFrom, d.expires_at AS expiresAt,
             COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
@@ -88,11 +90,45 @@ public interface DecisionResultMapper {
             """)
     DecisionResultVO findLatestDecisionResultBySymbolJoined(@Param("normalizedSymbol") String normalizedSymbol);
 
+    @Select("""
+            SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
+            ar.timeframe AS timeframe,
+            d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,
+            d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,
+            d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,
+            d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
+            d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
+            d.valid_from AS validFrom, d.expires_at AS expiresAt,
+            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
+            d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
+            d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
+            p.recommended_action AS recommendedAction,
+            p.plan_mode AS planMode,
+            p.entry_zone AS entryZone,
+            p.stop_loss AS stopLoss,
+            p.take_profit_rules AS takeProfitRules,
+            p.leverage_suggestion AS leverageSuggestion,
+            p.position_suggestion AS positionSuggestion,
+            ar.data_quality_score AS dataQualityScore
+            FROM tm_decision_result d
+            INNER JOIN tm_execution_plan p
+              ON p.plan_id = #{planId} AND p.analysis_id = d.analysis_id
+            INNER JOIN tm_analysis_run ar ON ar.analysis_id = d.analysis_id
+            WHERE d.analysis_id = #{analysisId}
+            ORDER BY d.create_time DESC, d.decision_id DESC
+            LIMIT 1
+            """)
+    DecisionResultVO findByAnalysisIdAndPlanIdJoined(@Param("analysisId") String analysisId,
+                                                     @Param("planId") String planId);
+
     @Select("SELECT MAX(create_time) FROM tm_decision_result")
     LocalDateTime selectLastDecisionTime();
 
-    @Select("SELECT COUNT(*) FROM tm_decision_result WHERE CAST(create_time AS DATE) = CURRENT_DATE")
-    int countDecisionsToday();
+    @Select("SELECT COUNT(*) FROM tm_decision_result "
+            + "WHERE create_time >= #{startInclusive} AND create_time < #{endExclusive}")
+    int countDecisionsInRange(@Param("startInclusive") LocalDateTime startInclusive,
+                              @Param("endExclusive") LocalDateTime endExclusive);
 
     @Select("SELECT * FROM tm_decision_result WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
     DecisionResult selectLatestByAnalysisId(String analysisId);
@@ -104,7 +140,8 @@ public interface DecisionResultMapper {
             + "hot_reset_invalidated_at = #{invalidatedAt}, hot_reset_reason_code = #{reasonCode} "
             + "WHERE UPPER(TRIM(symbol)) = #{normalizedSymbol} "
             + "AND (hot_reset_invalidated IS NULL OR hot_reset_invalidated = FALSE) "
-            + "AND (is_worth_opening = TRUE OR market_bias_hierarchy IN ('BULLISH', 'BEARISH'))")
+            + "AND (is_worth_opening = TRUE OR UPPER(TRIM(market_bias_hierarchy)) IN "
+            + "('STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH'))")
     int markHotResetInvalidatedBySymbol(
             @Param("normalizedSymbol") String normalizedSymbol,
             @Param("eventId") String eventId,
@@ -113,7 +150,7 @@ public interface DecisionResultMapper {
 
     /**
      * OPEN 持仓（每 symbol 一条代表行，多条 OPEN 时按 position_id 取首条）与每 symbol 最新决策（create_time DESC，并列时 decision_id DESC）；
-     * 仅在最新 bias 为 BULLISH/BEARISH 且与 LONG/SHORT 反向时计入；按 symbol 去重计数。
+     * 仅在最新 bias 属于完整多空方向族且与 LONG/SHORT 反向时计入；按 symbol 去重计数。
      */
     @Select("""
             SELECT COUNT(*) FROM (
@@ -139,10 +176,9 @@ public interface DecisionResultMapper {
                 WHERE symbol IS NOT NULL AND TRIM(symbol) <> ''
               ) d ON d.sym = ps.sym AND d.rn = 1
               WHERE ps.rn = 1
-                AND UPPER(TRIM(d.bias_raw)) IN ('BULLISH', 'BEARISH')
                 AND (
-                  (ps.side = 'LONG' AND UPPER(TRIM(d.bias_raw)) = 'BEARISH')
-                  OR (ps.side = 'SHORT' AND UPPER(TRIM(d.bias_raw)) = 'BULLISH')
+                  (ps.side = 'LONG' AND UPPER(TRIM(d.bias_raw)) IN ('WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH'))
+                  OR (ps.side = 'SHORT' AND UPPER(TRIM(d.bias_raw)) IN ('STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH'))
                 )
             ) cnt
             """)

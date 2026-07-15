@@ -15,6 +15,7 @@ import org.example.trademodel.analysisrun.AnalysisRunCommand;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
@@ -25,6 +26,7 @@ import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -52,6 +54,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -75,6 +78,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Autowired
     private AnalysisRunMapper analysisRunMapper;
+    @Autowired
+    private AssetStateMapper assetStateMapper;
     @Autowired
     private EvidenceItemMapper evidenceItemMapper;
     @Autowired
@@ -117,6 +122,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                 "tm_persisted_ohlcv_bar",
                 "tm_ai_call_log",
                 "tm_user_position",
+                "tm_asset_state",
                 "tm_analysis_run")) {
             jdbcTemplate.update("DELETE FROM " + table);
         }
@@ -155,7 +161,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         String symbol = "BNBUSDT";
         AnalysisRunResult result = runAiContractAnalysis(symbol, "req-ai-home");
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
-        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("WAIT");
 
         clearInvocations(aiDecisionOrchestratorService);
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
@@ -165,13 +171,13 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
         DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
         DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
-        assertThat(gpt.getFinalMarketBias()).isEqualTo("BULLISH");
-        assertThat(gpt.getDecisionSummary()).isEqualTo("GPT persisted summary");
-        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("GPT_SUPPORT_ONLY");
-        assertThat(gemini.getReviewConclusion()).isEqualTo("Gemini persisted review");
-        assertThat(gemini.getDetectedContradictions()).containsExactly("GEMINI_CONTRADICTION_ONLY");
-        assertThat(grok.getChallengeThesis()).isEqualTo("Grok persisted challenge");
-        assertThat(grok.getCounterEvidence()).containsExactly("GROK_COUNTER_ONLY");
+        assertThat(gpt.getFinalMarketBias()).isEqualTo("WAIT");
+        assertThat(gpt.getDecisionSummary()).isEqualTo("AI 复核结果已返回，等待人工复核");
+        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("AI 证据已记录，需人工复核");
+        assertThat(gemini.getReviewConclusion()).isEqualTo("AI 复核结果已返回，等待人工复核");
+        assertThat(gemini.getDetectedContradictions()).containsExactly("AI 发现证据冲突");
+        assertThat(grok.getChallengeThesis()).isEqualTo("AI 复核结果已返回，等待人工复核");
+        assertThat(grok.getCounterEvidence()).containsExactly("AI 提供反向证据");
         assertThat(gemini.getReviewConclusion()).doesNotContain("GPT", "Grok");
         assertThat(grok.getChallengeThesis()).doesNotContain("GPT", "Gemini");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tm_user_position", Integer.class)).isZero();
@@ -185,8 +191,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
         AiRoleResultsPayload payload = aiRoleResultsCodec.parse(persisted.getAiRoleResults()).payload();
 
-        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("BULLISH");
-        assertThat(payload.synthesis().finalMarketBias()).isEqualTo("BULLISH");
+        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(payload.synthesis().finalMarketBias()).isEqualTo("WAIT");
         assertThat(payload.safety().ruleDirectionPreserved()).isTrue();
         assertThat(payload.safety().notStateMachineOverride()).isTrue();
         assertThat(payload.safety().notUserPositionCreation()).isTrue();
@@ -196,7 +202,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     @Test
-    void assemblerUsesFreshPersistedOhlcvToPersistBoundaryBackedPlanIntoDashboardHome() {
+    void assemblerAndDashboardBothFailClosedWhenDataQualityIsInsufficient() {
         long latestCloseMs = persistDecisionTimeframes(SYMBOL, true);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
@@ -207,10 +213,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
         assertThat(plan).isNotNull();
-        assertThat(plan.getEntryZone()).contains("入场区间").doesNotContain("暂无");
-        assertThat(plan.getStopLoss()).contains("止损参考").doesNotContain("暂无");
-        assertThat(plan.getTakeProfitRules()).contains("分批止盈").doesNotContain("暂无");
-        assertThat(plan.getInvalidCondition()).contains("失效条件").doesNotContain("decision invalidation fallback");
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo("INCOMPLETE");
+        assertThat(plan.getSourceGateComplete()).isFalse();
+        assertThat(plan.getEntryZone()).isEqualTo("暂无");
+        assertThat(plan.getStopLoss()).isEqualTo("暂无");
+        assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
+        assertThat(plan.getInvalidCondition()).isNull();
         assertThat(plan.getManualReviewRequired()).isTrue();
         assertThat(plan.getNotTradeInstruction()).isTrue();
         assertThat(plan.getNotExecutable()).isTrue();
@@ -219,11 +227,13 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getNotUserPositionCreation()).isTrue();
 
         DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
-        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BULLISH");
-        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo(plan.getEntryZone());
-        assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo(plan.getStopLoss());
-        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo(plan.getTakeProfitRules());
-        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isEqualTo(plan.getInvalidCondition());
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，等待有效分析");
+        assertThat(home.getExecutionSuggestion().getDirection()).isNull();
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
         assertThat(count("tm_user_position")).isZero();
         assertThat(count("tm_push_recheck_log")).isZero();
         assertThat(count("tm_ai_call_log")).isZero();
@@ -231,7 +241,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     @Test
-    void assemblerUsesFreshPersistedOhlcvForBearishBoundaryBackedPlan() {
+    void bearishAssemblerAndDashboardBothFailClosedWhenDataQualityIsInsufficient() {
         String symbol = "ETHUSDT";
         long latestCloseMs = persistDecisionTimeframes(symbol, false);
         String analysisTime = LocalDateTime.ofInstant(
@@ -243,17 +253,21 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
         assertThat(plan).isNotNull();
-        assertThat(plan.getEntryZone()).contains("入场区间").doesNotContain("暂无");
-        assertThat(plan.getStopLoss()).contains("止损参考").doesNotContain("暂无");
-        assertThat(plan.getTakeProfitRules()).contains("分批止盈").doesNotContain("暂无");
-        assertThat(plan.getInvalidCondition()).contains("失效条件");
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo("INCOMPLETE");
+        assertThat(plan.getSourceGateComplete()).isFalse();
+        assertThat(plan.getEntryZone()).isEqualTo("暂无");
+        assertThat(plan.getStopLoss()).isEqualTo("暂无");
+        assertThat(plan.getTakeProfitRules()).isEqualTo("暂无");
+        assertThat(plan.getInvalidCondition()).isNull();
 
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
-        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BEARISH");
-        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo(plan.getEntryZone());
-        assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo(plan.getStopLoss());
-        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo(plan.getTakeProfitRules());
-        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isEqualTo(plan.getInvalidCondition());
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，等待有效分析");
+        assertThat(home.getExecutionSuggestion().getDirection()).isNull();
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
+        assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
         assertThat(count("tm_user_position")).isZero();
     }
 
@@ -288,8 +302,10 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getInvalidCondition()).isNull();
 
         DashboardHomeVO home = dashboardHomeService.getHome("ADAUSDT", 6);
-        assertThat(home.getExecutionSuggestion().getValidPeriod())
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("UNSUPPORTED_TIMEFRAME");
+        assertThat(home.getExecutionSuggestion().getBlockedReason())
                 .isEqualTo("周期不支持，需使用 5m / 15m / 1h / 4h");
+        assertThat(home.getExecutionSuggestion().getValidPeriod()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
         assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
@@ -299,7 +315,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Test
     void persistedAnalysisDecisionAndExecutionPlanFlowIntoDashboardHomeExecutionSuggestion() {
-        persistControlledAnalysisDecisionAndPlan();
+        String validPeriod = persistControlledAnalysisDecisionAndPlan();
 
         assertThat(analysisRunMapper.selectById(ANALYSIS_ID)).isNotNull();
         assertThat(analysisRunMapper.selectEvidenceIdsByAnalysisId(ANALYSIS_ID)).containsExactly("ev-int-1");
@@ -317,7 +333,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(joined.getLeverageSuggestion()).isEqualTo("3x");
         assertThat(joined.getPositionSuggestion()).isEqualTo("10% account risk cap");
         assertThat(joined.getInvalidCondition()).isEqualTo("plan invalidation wins");
-        assertThat(joined.getExecutionPlanSummary()).isEqualTo("12h | plan invalidation wins");
+        assertThat(joined.getExecutionPlanSummary()).isEqualTo(validPeriod + " | plan invalidation wins");
 
         DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
 
@@ -328,7 +344,9 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isEqualTo("66000 / 68500 / 71000 USDT");
         assertThat(home.getExecutionSuggestion().getLeverageSuggestion()).isEqualTo("3x");
         assertThat(home.getExecutionSuggestion().getPositionSuggestion()).isEqualTo("10% account risk cap");
-        assertThat(home.getExecutionSuggestion().getValidPeriod()).isEqualTo("12h");
+        assertThat(home.getExecutionSuggestion().getValidPeriod()).isEqualTo(validPeriod);
+        assertThat(home.getExecutionSuggestion().getValidFrom()).isNotNull();
+        assertThat(home.getExecutionSuggestion().getExpiresAt()).isNotNull();
         assertThat(home.getExecutionSuggestion().getInvalidCondition()).isEqualTo("plan invalidation wins");
 
         assertThat(home.getPositions()).isEmpty();
@@ -480,8 +498,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                 .orElseThrow();
     }
 
-    private void persistControlledAnalysisDecisionAndPlan() {
+    private String persistControlledAnalysisDecisionAndPlan() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 2, 9, 30);
+        OffsetDateTime validityNow = OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
+        OffsetDateTime validFrom = validityNow.minusHours(1);
+        OffsetDateTime expiresAt = validityNow.plusHours(1);
+        String validPeriod = validFrom + " ~ " + expiresAt;
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(ANALYSIS_ID);
         run.setSymbol(SYMBOL);
@@ -506,6 +528,15 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         run.setUpdatedAt(now);
         run.setVersionNo(1);
         analysisRunMapper.insert(run);
+
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol(SYMBOL);
+        state.setState(org.example.trademodel.enums.AssetStateEnum.CANDIDATE);
+        state.setConfusedScore(8);
+        state.setConfusedLowStreak(0);
+        state.setLastUpdateTime(now);
+        state.setTraceId("trace-int-1");
+        assetStateMapper.mergeUpsertCore(state);
 
         EvidenceItemDO evidence = new EvidenceItemDO();
         evidence.setEvidenceId("ev-int-1");
@@ -552,7 +583,9 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                         "LEVEL_1_CONSISTENT", 12, "HIGH", "UNCHANGED",
                         "CONFIRM", false, null)));
         decision.setIsAdopted(null);
-        decision.setValidPeriod("12h");
+        decision.setValidPeriod(validPeriod);
+        decision.setValidFrom(validFrom);
+        decision.setExpiresAt(expiresAt);
         decision.setInvalidCondition("decision invalidation fallback");
         decision.setEvidenceSummary("controlled evidence summary");
         decision.setExplanationJson("{\"summary\":\"controlled\"}");
@@ -589,6 +622,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         plan.setNotUserPositionCreation(true);
         plan.setCreateTime(now.plusSeconds(2));
         executionPlanMapper.insert(plan);
+        return validPeriod;
     }
 
     private long persistDecisionTimeframes(String symbol, boolean bullish) {

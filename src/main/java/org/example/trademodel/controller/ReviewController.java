@@ -4,6 +4,7 @@ import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
 import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPolicy;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
@@ -129,7 +130,11 @@ public class ReviewController {
             @PathVariable Long positionId,
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
         try {
-            return ResponseEntity.ok(ApiResponse.success(positionMonitorLogService.listByPositionId(positionId, limit)));
+            java.util.List<PositionMonitorLogDTO> rows = positionMonitorLogService.listByPositionId(positionId, limit);
+            java.util.List<PositionMonitorLogDTO> safeRows = rows == null ? java.util.List.of() : rows.stream()
+                    .map(PositionMonitorLogSourceViewPolicy::sanitize)
+                    .toList();
+            return ResponseEntity.ok(ApiResponse.success(safeRows));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.badRequest(e.getMessage()));

@@ -14,6 +14,7 @@ import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.slf4j.Logger;
@@ -22,7 +23,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
@@ -46,6 +50,7 @@ public class DecisionEngineService {
     private final RuleConfigService ruleConfigService;
     private final AiDecisionOrchestratorService aiDecisionOrchestratorService;
     private final AiRoleResultsCodec aiRoleResultsCodec;
+    private Clock decisionClock = Clock.systemUTC();
 
     // ========= 最小规则键集合（仅限本阶段允许 keys） =========
     private static final String KEY_WORTH_OPENING_MIN_SCORE = "decision.worth_opening_min_score";
@@ -110,6 +115,11 @@ public class DecisionEngineService {
                 ? aiRoleResultsCodec
                 : new AiRoleResultsCodec(new ObjectMapper());
         logger.info("DecisionEngineService V3 (rule-layer direction + AI review-only orchestrator + real klines + multiTF) initialized successfully");
+    }
+
+    @Autowired(required = false)
+    void setDecisionClock(Clock decisionClock) {
+        this.decisionClock = decisionClock != null ? decisionClock : Clock.systemUTC();
     }
 
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId) {
@@ -178,23 +188,17 @@ public class DecisionEngineService {
             List<String[]> klines1h = ohlcvSnapshotSource.readClosedBars(symbol, "1h", 3, marketTraceId);
             List<String[]> klines4h = ohlcvSnapshotSource.readClosedBars(symbol, "4h", 3, marketTraceId);
 
-            // 最后一根 K 线判断涨跌（close > open = 看涨）
-            boolean isBullish5m = !klines5m.isEmpty() && 
-                Double.parseDouble(klines5m.get(klines5m.size()-1)[4]) > 
-                Double.parseDouble(klines5m.get(klines5m.size()-1)[1]);
-            boolean isBullish15m = bullish(klines15m);
-            boolean isBullish1h = bullish(klines1h);
-            boolean isBullish4h = bullish(klines4h);
-
-            int alignedWith4h = (isBullish5m == isBullish4h ? 1 : 0)
-                    + (isBullish15m == isBullish4h ? 1 : 0)
-                    + (isBullish1h == isBullish4h ? 1 : 0)
-                    + 1;
-            boolean multiTfConvergence = isBullish4h == isBullish1h && alignedWith4h >= 3;
+            String ruleMarketBias = MarketBiasPolicy.classify(klines5m, klines15m, klines1h, klines4h);
+            boolean isBullish5m = MarketBiasPolicy.direction(klines5m)
+                    == MarketBiasPolicy.WindowDirection.BULLISH;
+            boolean isBullish4h = MarketBiasPolicy.direction(klines4h)
+                    == MarketBiasPolicy.WindowDirection.BULLISH;
+            boolean multiTfConvergence = MarketBiasPolicy.converged(klines1h, klines4h, ruleMarketBias);
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
             // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================
-            int baseScore = isBullish4h ? 82 : 58;
+            int baseScore = MarketBiasPolicy.bullishFamily(ruleMarketBias)
+                    ? 82 : MarketBiasPolicy.bearishFamily(ruleMarketBias) ? 58 : 50;
             int eightScoreAdjustment = eightScoreComposite == null
                     ? 0
                     : Math.max(-eightScoreAdjustmentCap, Math.min(eightScoreAdjustmentCap,
@@ -202,14 +206,15 @@ public class DecisionEngineService {
                             * eightScoreAdjustmentFactorPercent / 100.0)));
             int finalScore = baseScore + convergenceScore + eightScoreAdjustment;
 
-            String ruleMarketBias = isBullish4h ? "BULLISH" : "BEARISH";
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
-            boolean worthOpening = finalScore >= worthOpeningMinScore && multiTfConvergence;
+            boolean hasUsableMarketStructure = !"WAIT".equals(ruleMarketBias) && !"RANGE".equals(ruleMarketBias);
+            boolean dataQualitySufficient = dataQualityScore != null
+                    && dataQualityScore >= MIN_DATA_QUALITY_SCORE_FOR_OPENING;
+            boolean decisionInputsSufficient = dataQualitySufficient && hasUsableMarketStructure;
+            boolean worthOpening = finalScore >= worthOpeningMinScore && multiTfConvergence
+                    && decisionInputsSufficient;
             if (trendStructureScore != null && trendStructureScore < MIN_TREND_STRUCTURE_SCORE_FOR_OPENING) {
-                worthOpening = false;
-            }
-            if (dataQualityScore != null && dataQualityScore < MIN_DATA_QUALITY_SCORE_FOR_OPENING) {
                 worthOpening = false;
             }
             boolean externalContextBlocked = isEffectiveExternalBlocked(externalContextInput);
@@ -221,7 +226,11 @@ public class DecisionEngineService {
                     || derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.DISABLED)) {
                 effectiveWorthOpening = false;
             }
-            String riskTier = finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM";
+            String riskTier = decisionInputsSufficient
+                    ? finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM"
+                    : "HIGH";
+            String userMarketBias = dataQualitySufficient ? ruleMarketBias : "WAIT";
+            String userConfidenceLevel = dataQualitySufficient ? confidenceLevel : "LOW";
 
             // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
             DecisionContext ctx = new DecisionContext();
@@ -262,6 +271,9 @@ public class DecisionEngineService {
             ctx.setGptConsistentWithRule(aiReview.isGptConsistentWithRule());
             ctx.setGeminiConsistentWithRule(aiReview.isGeminiConsistentWithRule());
             ctx.setGrokConsistentWithRule(aiReview.isGrokConsistentWithRule());
+            ctx.setAiSuccessfulProviderCount(aiReview.getSuccessfulProviderCount());
+            ctx.setAiSupportCount(aiReview.getAiSupportCount());
+            ctx.setAiObjectionCount(aiReview.getAiObjectionCount());
             ctx.setAiProviderConflictContribution(aiReview.getConflictContribution());
             ctx.setAiOrchestrationMode(aiReview.getOrchestrationMode().name());
             ctx.setAiOrchestrationSummary(aiReview.toSanitizedSummary());
@@ -274,6 +286,7 @@ public class DecisionEngineService {
             AssetStateEnum syntheticState = parseAssetState(confused.getNextState(),
                     effectiveWorthOpening ? AssetStateEnum.CANDIDATE : AssetStateEnum.OBSERVING);
             AssetStateEnum finalAssetState = failClosedExternalState(syntheticState, externalContextBlocked);
+            finalAssetState = failClosedDecisionInputState(finalAssetState, decisionInputsSufficient);
             finalAssetState = mergeDerivativesState(finalAssetState, derivativesAssessment);
             String snapshot = assetStateService.buildSnapshotAtDecision(
                     symbol,
@@ -286,7 +299,8 @@ public class DecisionEngineService {
                     multiTfConvergence);
 
             String riskLevelLabel;
-            if (confused.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD
+            if (!decisionInputsSufficient
+                    || confused.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD
                     || finalScore < highFinalScoreBelow
                     || externalContextBlocked
                     || derivativesAssessment != null && derivativesAssessment.isHighRisk()
@@ -309,7 +323,9 @@ public class DecisionEngineService {
 
             // Push 快照专用：使用正式 5m 主周期边界，不使用 1m 作为执行计划失效条件。
             BigDecimal pushTriggerPrice = null;
-            LocalDateTime pushExpiresAt = LocalDateTime.now().plusHours(24);
+            OffsetDateTime validFrom = OffsetDateTime.now(decisionClock).withOffsetSameInstant(ZoneOffset.UTC);
+            OffsetDateTime expiresAt = validFrom.plusHours(24);
+            LocalDateTime pushExpiresAt = UtcLocalTimePolicy.fromOffsetDateTime(expiresAt);
             BigDecimal pushInvalidPriceBelow = null;
             BigDecimal pushInvalidPriceAbove = null;
             String pushInvalidationSummary = null;
@@ -328,10 +344,10 @@ public class DecisionEngineService {
                         maxHigh = maxHigh == null ? high : maxHigh.max(high);
                     }
                 }
-                if ("BULLISH".equals(ruleMarketBias)) {
+                if (MarketBiasPolicy.bullishFamily(ruleMarketBias)) {
                     pushInvalidPriceBelow = minLow;
                     pushInvalidationSummary = "结构失效：当前价低于近端 5m 摆动低点";
-                } else {
+                } else if (MarketBiasPolicy.bearishFamily(ruleMarketBias)) {
                     pushInvalidPriceAbove = maxHigh;
                     pushInvalidationSummary = "结构失效：当前价高于近端 5m 摆动高点";
                 }
@@ -339,42 +355,48 @@ public class DecisionEngineService {
 
             // ==================== 4. 输出最终决策 ====================
             String conclusion = String.format(
-                    "规则层基础方向：%s | AI编排模式：%s | 总分 %d | 八项评分修正 %+d | 多TF收敛：%s | 外部上下文阻塞：%s",
+                    "规则层原始倾向：%s | 用户最终倾向：%s | AI编排模式：%s | 总分 %d | 八项评分修正 %+d | 多TF收敛：%s | 数据质量门控：%s | 外部上下文阻塞：%s",
                     ruleMarketBias,
+                    userMarketBias,
                     aiReview.getOrchestrationMode(),
                     finalScore,
                     eightScoreAdjustment,
                     multiTfConvergence ? "STRONG" : "WEAK",
+                    dataQualitySufficient ? "PASS" : "BLOCKED",
                     externalContextBlocked);
             DecisionBundleVO decision = new DecisionBundleVO();
             decision.setDecisionId(decisionId);
-            decision.setMarketBiasHierarchy(ruleMarketBias);
+            decision.setMarketBiasHierarchy(userMarketBias);
             decision.setTradeType("SPOT");
-            decision.setConfidenceLevel(conflict.getAdjustedConfidence() != null
-                    ? conflict.getAdjustedConfidence()
-                    : confidenceLevel);
+            String effectiveConfidence = decisionInputsSufficient
+                    ? conflict.getAdjustedConfidence() != null ? conflict.getAdjustedConfidence() : confidenceLevel
+                    : "LOW";
+            String effectiveAiPlanMode = decisionInputsSufficient
+                    && aiReview.getAiSupportCount() + aiReview.getAiObjectionCount() > 0
+                    ? conflict.getPlanMode() : null;
+            decision.setConfidenceLevel(effectiveConfidence);
             decision.setRiskLevel(riskLevelLabel);
             decision.setActionPriority(finalScore > actionPriorityHighMinScoreExclusive ? "HIGH" : "MEDIUM");
             decision.setConclusionSummary(conclusion);
             decision.setIsWorthOpening(effectiveWorthOpening && !confused.isDirectionalPushBlocked());
             decision.setMultiTfConvergence(multiTfLabel);
             AiRoleResultsPayload.SynthesisPayload aiSynthesis = new AiRoleResultsPayload.SynthesisPayload(
-                    ruleMarketBias,
-                    conflict.getAdjustedConfidence() != null ? conflict.getAdjustedConfidence() : confidenceLevel,
+                    userMarketBias,
+                    effectiveConfidence,
                     riskLevelLabel,
                     effectiveWorthOpening && !confused.isDirectionalPushBlocked(),
                     conflict.getLevel() != null ? conflict.getLevel().name() : null,
                     conflict.getAiConflictScore(),
                     conflict.getAdjustedConfidence(),
                     conflict.getRiskAdjustment(),
-                    conflict.getPlanMode(),
+                    effectiveAiPlanMode,
                     AssetStateEnum.CONFUSED.equals(finalAssetState) || confused.isDirectionalPushBlocked(),
                     firstAiDowngradeReason(aiReview));
             decision.setAiRoleResults(aiRoleResultsCodec.serialize(aiReview, ruleVersion, aiSynthesis));
             decision.setReviewReasons(reviewJson);
             decision.setAiConflictLevel(conflict.getLevel() != null ? conflict.getLevel().name() : null);
             decision.setAiConflictScore(conflict.getAiConflictScore());
-            decision.setAiPlanMode(conflict.getPlanMode());
+            decision.setAiPlanMode(effectiveAiPlanMode);
             decision.setConfusedScore(confused.getConfusedScore());
             decision.setConfusedLowStreak(confused.getConfusedLowStreak());
             decision.setDirectionalPushBlocked(confused.isDirectionalPushBlocked());
@@ -386,6 +408,8 @@ public class DecisionEngineService {
             decision.setMultiTimeframeAligned(multiTfConvergence);
             decision.setPushTriggerPrice(pushTriggerPrice);
             decision.setPushExpiresAt(pushExpiresAt);
+            decision.setValidFrom(validFrom);
+            decision.setExpiresAt(expiresAt);
             decision.setPushInvalidPriceBelow(pushInvalidPriceBelow);
             decision.setPushInvalidPriceAbove(pushInvalidPriceAbove);
             decision.setPushInvalidationSummary(pushInvalidationSummary);
@@ -404,7 +428,7 @@ public class DecisionEngineService {
             applyExternalContext(decision, externalContextInput);
 
             logger.info("[AI决策] 生成完成 → {} | ConfidenceLevel = {} | Score = {} | MultiTF = {} | Worth Open: {} | aiConflict={}/{} | confused={}",
-                    ruleMarketBias, decision.getConfidenceLevel(), finalScore, decision.getMultiTfConvergence(), decision.getIsWorthOpening(),
+                    userMarketBias, decision.getConfidenceLevel(), finalScore, decision.getMultiTfConvergence(), decision.getIsWorthOpening(),
                     decision.getAiConflictLevel(), decision.getAiConflictScore(), decision.getConfusedScore());
 
             return decision;
@@ -440,13 +464,6 @@ public class DecisionEngineService {
         return value < minimum || value > maximum ? defaultVal : value;
     }
 
-    private static boolean bullish(List<String[]> bars) {
-        if (bars == null || bars.isEmpty()) return false;
-        String[] last = bars.get(bars.size() - 1);
-        return last != null && last.length > 4
-                && new BigDecimal(last[4]).compareTo(new BigDecimal(last[1])) > 0;
-    }
-
     private static AssetStateEnum parseAssetState(String raw, AssetStateEnum fallback) {
         if (raw == null || raw.isBlank()) {
             return fallback;
@@ -469,6 +486,16 @@ public class DecisionEngineService {
             return syntheticState;
         }
         if (AssetStateEnum.CONFUSED.equals(syntheticState)
+                || AssetStateEnum.COOLING.equals(syntheticState)
+                || AssetStateEnum.INVALIDATED.equals(syntheticState)) {
+            return syntheticState;
+        }
+        return AssetStateEnum.HIGH_RISK;
+    }
+
+    private static AssetStateEnum failClosedDecisionInputState(AssetStateEnum syntheticState,
+                                                                boolean decisionInputsSufficient) {
+        if (decisionInputsSufficient || AssetStateEnum.CONFUSED.equals(syntheticState)
                 || AssetStateEnum.COOLING.equals(syntheticState)
                 || AssetStateEnum.INVALIDATED.equals(syntheticState)) {
             return syntheticState;
@@ -529,7 +556,7 @@ public class DecisionEngineService {
         facts.put("notExecutable", true);
         facts.put("ruleDirectionPreserved", true);
         request.setDecisionFacts(facts);
-        request.setRequestTime(LocalDateTime.now());
+        request.setRequestTime(utcLocalNow());
         try {
             return aiDecisionOrchestratorService.review(request);
         } catch (Exception e) {
@@ -539,14 +566,18 @@ public class DecisionEngineService {
         }
     }
 
-    private static AiOrchestratorResult ruleOnlyFallback(String analysisId, String traceId, String reasonCode) {
+    private AiOrchestratorResult ruleOnlyFallback(String analysisId, String traceId, String reasonCode) {
         AiOrchestratorResult result = new AiOrchestratorResult();
         result.setAnalysisId(analysisId);
         result.setTraceId(traceId);
         result.setOrchestrationMode(AiOrchestrationMode.RULE_ONLY_FALLBACK);
         result.setReasonCodes(List.of(reasonCode));
-        result.setCompletedAt(LocalDateTime.now());
+        result.setCompletedAt(utcLocalNow());
         return result;
+    }
+
+    private LocalDateTime utcLocalNow() {
+        return LocalDateTime.ofInstant(decisionClock.instant(), ZoneOffset.UTC);
     }
 
     private static String firstAiDowngradeReason(AiOrchestratorResult result) {

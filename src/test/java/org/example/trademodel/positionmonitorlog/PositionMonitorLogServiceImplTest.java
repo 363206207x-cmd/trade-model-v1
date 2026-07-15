@@ -4,6 +4,7 @@ import org.example.trademodel.entity.PositionMonitorLogDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.impl.PositionMonitorLogServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -95,6 +96,49 @@ class PositionMonitorLogServiceImplTest {
         assertSafetyFields(weakened);
         assertSafetyFields(invalidated);
         assertSafetyFields(highRisk);
+    }
+
+    @Test
+    void unverifiedMonitorLogDtoHidesInternalSentinel() {
+        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "OPEN"));
+        when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
+            PositionMonitorLogDO row = invocation.getArgument(0);
+            row.setLogId(203L);
+            return 1;
+        });
+        RecordPositionMonitorLogCommand command = command("LOGIC_WEAKENED", "LOW", "MANUAL_REVIEW");
+        command.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        command.setExecutionPlanId(null);
+
+        PositionMonitorLogDTO result = service.recordMonitorRun(command);
+
+        ArgumentCaptor<PositionMonitorLogDO> captor = ArgumentCaptor.forClass(PositionMonitorLogDO.class);
+        verify(positionMonitorLogMapper).insert(captor.capture());
+        assertThat(captor.getValue().getAnalysisId())
+                .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+        assertThat(captor.getValue().getExecutionPlanId()).isNull();
+        assertThat(result.getAnalysisId()).isNull();
+        assertThat(result.getExecutionPlanId()).isNull();
+        assertThat(result.isSourceVerified()).isFalse();
+        assertThat(result.getSourceStatus()).isEqualTo("UNVERIFIED");
+        assertThat(result.getSourceStatusLabel()).isEqualTo("来源不可验证");
+        assertThat(result.toString()).doesNotContain(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
+    }
+
+    @Test
+    void legacyNonSentinelMonitorRowIsNotAutomaticallyVerified() {
+        PositionMonitorLogDO row = logRow(204L, 7L, "analysis-verified", "LOGIC_VALID", "HOLD",
+                LocalDateTime.of(2026, 6, 22, 9, 0));
+        row.setExecutionPlanId("plan-verified");
+        when(positionMonitorLogMapper.selectById(204L)).thenReturn(row);
+
+        PositionMonitorLogDTO result = service.findById(204L);
+
+        assertThat(result.getAnalysisId()).isEqualTo("analysis-verified");
+        assertThat(result.getExecutionPlanId()).isEqualTo("plan-verified");
+        assertThat(result.isSourceVerified()).isFalse();
+        assertThat(result.getSourceStatus()).isEqualTo("PENDING_VERIFICATION");
+        assertThat(result.getSourceStatusLabel()).isEqualTo("来源待验证");
     }
 
     @Test

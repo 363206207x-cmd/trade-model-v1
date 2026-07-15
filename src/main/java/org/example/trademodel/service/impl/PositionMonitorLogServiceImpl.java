@@ -5,6 +5,7 @@ import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPolicy;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogicStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
@@ -146,7 +147,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         dto.setNotOrderExecution(true);
         dto.setNotAutoTrading(true);
         dto.setNotPositionMutation(true);
-        return dto;
+        return PositionMonitorLogSourceViewPolicy.sanitize(dto);
     }
 
     static int sanitizeLimit(Integer limit) {

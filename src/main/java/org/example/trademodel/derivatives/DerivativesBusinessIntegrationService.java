@@ -543,7 +543,7 @@ public class DerivativesBusinessIntegrationService {
 
     private static boolean validDirection(String direction) {
         String normalized = normalizeDirection(direction);
-        return "BULLISH".equals(normalized) || "BEARISH".equals(normalized);
+        return normalized.endsWith("BULLISH") || normalized.endsWith("BEARISH");
     }
 
     private static double clamp(double value, double min, double max) {
