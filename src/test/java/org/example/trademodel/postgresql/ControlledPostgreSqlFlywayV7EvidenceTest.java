@@ -39,6 +39,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.flywaydb.core.api.output.ValidateResult;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -99,6 +100,15 @@ class ControlledPostgreSqlFlywayV7EvidenceTest {
         target = new ControlledTarget(username, password);
         recreateDatabase(FRESH_DATABASE);
         recreateDatabase(UPGRADE_DATABASE);
+    }
+
+    @AfterAll
+    static void removeDisposableDatabases() throws Exception {
+        if (target == null || Boolean.parseBoolean(env("CONTROLLED_POSTGRESQL_KEEP_EVIDENCE_DATABASES"))) {
+            return;
+        }
+        dropDatabase(FRESH_DATABASE);
+        dropDatabase(UPGRADE_DATABASE);
     }
 
     @Test
@@ -342,6 +352,17 @@ class ControlledPostgreSqlFlywayV7EvidenceTest {
              Statement statement = connection.createStatement()) {
             statement.execute("DROP DATABASE IF EXISTS \"" + database + "\" WITH (FORCE)");
             statement.execute("CREATE DATABASE \"" + database + "\"");
+        }
+    }
+
+    private static void dropDatabase(String database) throws Exception {
+        assertThat(List.of(FRESH_DATABASE, UPGRADE_DATABASE)).contains(database);
+        try (Connection connection = DriverManager.getConnection(
+                BASE_URL + "postgres", target.username(), target.password());
+             Statement statement = connection.createStatement()) {
+            statement.execute("DROP DATABASE IF EXISTS \"" + database + "\" WITH (FORCE)");
+            assertThat(count(connection, "SELECT COUNT(*) FROM pg_database WHERE datname = '" + database + "'"))
+                    .isZero();
         }
     }
 

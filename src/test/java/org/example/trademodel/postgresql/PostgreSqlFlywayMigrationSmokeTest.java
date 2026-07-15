@@ -437,28 +437,35 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         LocalDateTime now = LocalDateTime.of(2026, 6, 28, 9, 0);
-        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            statement.setString(1, "BTCUSDT");
-            statement.setString(2, "LONG");
-            statement.setString(3, "OPEN");
-            statement.setBigDecimal(4, new BigDecimal("100.50"));
-            statement.setBigDecimal(5, new BigDecimal("0.25"));
-            statement.setBigDecimal(6, new BigDecimal("2"));
-            statement.setTimestamp(7, Timestamp.valueOf(now));
-            statement.setString(8, "MANUAL");
-            statement.setBoolean(9, true);
-            statement.setBoolean(10, true);
-            statement.setBoolean(11, true);
-            statement.setBoolean(12, true);
-            statement.setBoolean(13, true);
-            statement.setTimestamp(14, Timestamp.valueOf(now));
-            statement.setTimestamp(15, Timestamp.valueOf(now));
+        boolean previous = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+        try {
+            try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                statement.setString(1, "BTCUSDT");
+                statement.setString(2, "LONG");
+                statement.setString(3, "OPEN");
+                statement.setBigDecimal(4, new BigDecimal("100.50"));
+                statement.setBigDecimal(5, new BigDecimal("0.25"));
+                statement.setBigDecimal(6, new BigDecimal("2"));
+                statement.setTimestamp(7, Timestamp.valueOf(now));
+                statement.setString(8, "MANUAL");
+                statement.setBoolean(9, true);
+                statement.setBoolean(10, true);
+                statement.setBoolean(11, true);
+                statement.setBoolean(12, true);
+                statement.setBoolean(13, true);
+                statement.setTimestamp(14, Timestamp.valueOf(now));
+                statement.setTimestamp(15, Timestamp.valueOf(now));
 
-            assertThat(statement.executeUpdate()).isEqualTo(1);
-            try (ResultSet keys = statement.getGeneratedKeys()) {
-                assertThat(keys.next()).isTrue();
-                assertThat(keys.getLong(1)).isPositive();
+                assertThat(statement.executeUpdate()).isEqualTo(1);
+                try (ResultSet keys = statement.getGeneratedKeys()) {
+                    assertThat(keys.next()).isTrue();
+                    assertThat(keys.getLong(1)).isPositive();
+                }
             }
+        } finally {
+            connection.rollback();
+            connection.setAutoCommit(previous);
         }
     }
 

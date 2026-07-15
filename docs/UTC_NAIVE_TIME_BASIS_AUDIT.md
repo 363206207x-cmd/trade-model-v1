@@ -88,7 +88,14 @@ The same `nowUtc` is bound as `created_at` and `updated_at`; `cooldown_until` is
 
 `HotResetServiceImpl` also uses an injected UTC clock. One evaluation time is reused for null-`occurredAt` fallback, decision/plan invalidation, asset-state updates, event creation/completion, and the initial result. The legacy entry point leaves `occurredAt` empty so this same fallback contract applies instead of generating a JVM-local wall-clock value. A rebuild outcome takes one new UTC completion time when that later operation runs. Explicit command `occurredAt` values are required to be UTC-naive.
 
-The controlled PostgreSQL test is environment-gated and executes `SET TIME ZONE 'UTC'`, `SET TIME ZONE 'Asia/Shanghai'`, and `SET TIME ZONE 'America/New_York'` before the real Writer -> Mapper -> Run Baseline chain. On this local run the Docker CLI was present but the daemon/socket was unavailable, so that PostgreSQL test was **SKIPPED**, not reported as passed. H2 integration and fixed-clock unit evidence passed; the PostgreSQL session-timezone gate still needs an environment with Docker/Testcontainers.
+The controlled PostgreSQL test is environment-gated and executes `SET TIME
+ZONE 'UTC'`, `SET TIME ZONE 'Asia/Shanghai'`, and `SET TIME ZONE
+'America/New_York'` before the real Writer -> Mapper -> Run Baseline chain.
+The original Round 11 run was skipped because its Docker daemon/socket was
+unavailable. Subsequent P1/P2 evidence on 2026-07-15 ran all three PostgreSQL
+sessions as **PASS_NOT_SKIPPED** on disposable PostgreSQL 16.14. The historical
+skip remains an accurate record; the current controlled-local gate is recorded
+in `docs/POSTGRESQL_FLYWAY_V7_CONTROLLED_EVIDENCE.md`.
 
 ## 6. Boundary evidence
 
@@ -132,5 +139,7 @@ The five-point boundary fixture is executed for Monitor Alert, Analysis Run, low
 - No production database or migration was accessed.
 - No position, order, scheduler, external Push, Telegram, webhook, or email behavior changed.
 - The broader historical time basis of `analysis_time`, Monitor Alert timestamps, and Hot Reset `event_time` is not declared fully normalized by this fix.
-- PostgreSQL/Flyway V7 controlled execution is still not complete.
+- PostgreSQL/Flyway V7 controlled-local execution is complete; real release
+  dataset inventory, writer cutovers, backup/restore, and current-state
+  rehearsal remain incomplete. See `docs/HISTORICAL_TIME_BASIS_STRATEGY.md`.
 - Production readiness remains `BLOCKED`; production deployment cannot proceed.

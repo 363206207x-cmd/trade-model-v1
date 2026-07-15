@@ -19,7 +19,10 @@ Migration framework target: Flyway, SQL-first.
 Migration execution model: explicit manual pre-deploy migration.
 Rollback policy: forward-only migrations plus verified pre-migration backup and restore.
 
-PDR-PF3 status: empty PostgreSQL migration evidence is `BLOCKED_TIMEOUT` after an approximately 1h27m manually interrupted Docker/Testcontainers/PostgreSQL evidence run. Production Deployment Readiness remains `BLOCKED` until Docker-backed or server-backed migration evidence, current-state migration evidence, backup evidence, and restore evidence are complete.
+PDR-PF3 historical status: the first empty-PostgreSQL evidence attempt was
+`BLOCKED_TIMEOUT` after an approximately 1h27m manually interrupted
+Docker/Testcontainers run. That remains part of the audit history; it is no
+longer the current controlled-local result.
 
 
 PDR-PF4 status: current-state migration and rollback drill requirements are documented in `docs/CURRENT_STATE_MIGRATION_ROLLBACK_DRILL.md`. The drill documentation does not execute migrations, backups, restores, destructive DB operations, or production DB access.
@@ -27,6 +30,23 @@ PDR-PF4 status: current-state migration and rollback drill requirements are docu
 
 PDR-LIVE3 status: controlled external PostgreSQL Flyway smoke runner is available through `scripts/controlled-postgresql-flyway-smoke.sh` and `ControlledPostgreSqlFlywaySmokeTest`. It skips when controlled DB env is missing, requires explicit non-production and run confirmations, redacts connection values, and does not claim PASS until a disposable controlled PostgreSQL database is supplied.
 
-CALL-1B originally extended `PostgreSqlFlywayMigrationSmokeTest` through V5; the current contract verifies the full V1-V7 chain, including profile save/load, audit insertion, timestamp handling, rollback atomicity, and mapper-compatible reads. A run skipped because Docker/Testcontainers is unavailable is recorded as `SKIPPED_DOCKER_UNAVAILABLE`, not PASS. Production readiness remains `BLOCKED` independently of this bounded test.
+CALL-1B originally extended `PostgreSqlFlywayMigrationSmokeTest` through V5;
+the current contract verifies the full V1-V7 chain, including profile
+save/load, audit insertion, timestamp handling, rollback atomicity, and
+mapper-compatible reads. A run skipped because Docker/Testcontainers is
+unavailable is still recorded as `SKIPPED_DOCKER_UNAVAILABLE`, not PASS.
 
-The smoke contract now also checks the V6 rule defaults and the V7 offset-aware plan columns when Docker/Testcontainers is available. No controlled PostgreSQL V7 run is claimed by this change; production readiness remains `BLOCKED` until that migration evidence is collected separately.
+P1/P2 current controlled-local status: the digest-pinned
+`scripts/controlled-postgresql-flyway-v7-evidence.sh` run against disposable
+localhost PostgreSQL `16.14` completed with `PASS` on 2026-07-15. Fresh V1-V7,
+V6-V7, mapper compatibility, three PostgreSQL session timezones, the
+PostgreSQL-backed Dashboard validity chain, read-only historical inventory,
+and application smoke all completed as `PASS_NOT_SKIPPED`/`PASS`. The runner
+removed its auxiliary databases and container. See
+`docs/POSTGRESQL_FLYWAY_V7_CONTROLLED_EVIDENCE.md` and
+`docs/HISTORICAL_TIME_BASIS_STRATEGY.md`.
+
+Production readiness remains `BLOCKED`. The local disposable evidence does
+not prove migration of the real release dataset, production-like
+current-state backup/restore, historical-time cutovers, controlled server
+operation, or release-owner approval.

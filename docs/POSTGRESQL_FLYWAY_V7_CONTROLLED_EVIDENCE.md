@@ -1,15 +1,19 @@
-# PostgreSQL / Flyway V7 Controlled Evidence P1
+# PostgreSQL / Flyway V7 Controlled Evidence P1/P2
 
 ## Decision
 
-- Evidence package: `Controlled PostgreSQL and Flyway V7 Evidence P1`
+- Evidence package: `Controlled PostgreSQL and Flyway V7 Evidence P1/P2`
 - Base main commit: `ace5e560d35f214499a06d5478361318d371ee65`
 - Evidence branch: `codex/postgresql-flyway-v7-evidence-p1`
+- P2 starting commit: `90041938d955e66ac26d33dc577832ccc63b7ef1`
 - Environment: disposable localhost Docker PostgreSQL only
 - Fresh migration result: **PASS**
 - V6 to V7 upgrade result: **PASS**
 - Session-timezone result: **PASS_NOT_SKIPPED**
+- PostgreSQL-backed Dashboard validity: **PASS_NOT_SKIPPED**
+- Historical inventory contract: **PASS_READ_ONLY**
 - Application startup smoke: **PASS**
+- Disposable resource cleanup: **PASS**
 - Production deployment readiness: **BLOCKED**
 
 This package is controlled migration and compatibility evidence. It is not a
@@ -54,25 +58,25 @@ temporary test user, and creates only these dedicated databases:
 The test refuses production-like URL indicators. It never reads a secret file,
 calls a provider, sends a message, creates a real position, or executes an
 order. Database recreation is limited to those two disposable database names.
+Both auxiliary databases are deleted by default in `@AfterAll`; only the
+explicit `CONTROLLED_POSTGRESQL_KEEP_EVIDENCE_DATABASES=true` diagnostic flag
+may retain them temporarily. The runner always removes its disposable
+container through an exit trap.
 
 ## Commands
 
-The controlled test command used redacted process environment values:
+The P2 evidence was collected with one command:
 
 ```bash
-CONTROLLED_POSTGRESQL_JDBC_URL=jdbc:postgresql://127.0.0.1:55432/trade_model_v1_test \
-CONTROLLED_POSTGRESQL_USERNAME=trade_model_test \
-CONTROLLED_POSTGRESQL_PASSWORD='<redacted-disposable-value>' \
-CONTROLLED_POSTGRESQL_EVIDENCE_CONFIRM=I_CONFIRM_DISPOSABLE_NON_PRODUCTION_POSTGRESQL \
-CONTROLLED_POSTGRESQL_FLYWAY_RUN=I_UNDERSTAND_THIS_WRITES_SCHEMA_TO_CONTROLLED_DB \
-./mvnw -q \
-  -Dtest=ControlledPostgreSqlFlywayV7EvidenceTest,ControlledPostgreSqlFlywaySmokeTest,PostgreSqlFlywayMigrationSmokeTest \
-  test
+bash scripts/controlled-postgresql-flyway-v7-evidence.sh
 ```
 
-The application smoke used the `flyway-migration` Maven profile, the migrated
-fresh database, port `18081`, and explicit false values for every scheduler,
-AI provider, market provider, external-provider call, and external-send path.
+The script creates disposable process-only credentials, pins the PostgreSQL
+image digest, runs the four controlled PostgreSQL test classes with a
+ten-minute bound, verifies zero skips, performs aggregate-only historical
+inventory, starts the application on port `18081`, and uses explicit false
+values for every scheduler, AI provider, market provider,
+external-provider-call, and external-send path.
 
 ## Fresh V1 to V7
 
@@ -190,6 +194,38 @@ Reset, and Hot Reset trigger-type distribution, the real PostgreSQL result was:
 Analysis Runs, three low-quality Runs, three Rechecks, and three Hot Reset
 events for every session timezone. Future rows were excluded.
 
+## PostgreSQL-Backed Dashboard V7 Validity
+
+`ControlledPostgreSqlDashboardPlanValidityEvidenceTest` used a fixed clock and
+the real chain:
+
+```text
+PostgreSQL
+-> AnalysisRunMapper
+-> DecisionResultMapper
+-> ExecutionPlanMapper
+-> AssetStateMapper
+-> DashboardHomeServiceImpl
+-> DashboardHomeController
+-> serialized DashboardHomeVO
+```
+
+All five tests ran under real PostgreSQL and were not skipped:
+
+| Scenario | Observed result |
+| --- | --- |
+| `validFrom` one hour after `now` | `PLAN_NOT_ACTIVE`; plan boundaries hidden |
+| `now == expiresAt` | `PLAN_EXPIRED`; inclusive expiry boundary enforced |
+| one second before `expiresAt` | `USABLE_REVIEW_PLAN`; all manual-review and non-executable safety flags retained |
+| verified position Plan A already expired | `POSITION_MONITORING`, `VERIFIED`, `EXPIRED`; historical Plan A retained and newer Plan B excluded |
+| equivalent `+08:00`, `-04:00`, and `Z` values | identical persisted instants and Dashboard outcome |
+
+Each scenario executed with PostgreSQL session zones `UTC`, `Asia/Shanghai`,
+and `America/New_York`. Status, blocked reason, historical-plan validity, and
+`validFrom`/`expiresAt` instants were identical across all three sessions.
+The test fixture is transactional; no Dashboard evidence position or plan was
+committed.
+
 ## Mapper and Service Compatibility
 
 The controlled PostgreSQL test performed real read/write calls through:
@@ -241,11 +277,42 @@ found zero Analysis, Decision, Execution Plan, User Position, Monitor Alert,
 Push Snapshot, Push Recheck, and Hot Reset rows. Startup created only three
 local Push Recheck dispatch configuration defaults.
 
+## Reproducible Runner Evidence
+
+Final P2 execution:
+
+- Executed at: `2026-07-15T07:20:38Z`
+- PostgreSQL server: `16.14` (`server_version_num=160014`)
+- Architecture: `arm64`
+- Image tag: `postgres:16-alpine`
+- Image digest: `postgres@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc`
+- Runner SHA-256: `e23229562cdafacc9b960807a0c5297c23beed05cb5675633ba2b8dbadad8010`
+- Auxiliary database cleanup: **PASS**
+- Container cleanup: **PASS**, zero matching containers remained
+
+Runtime artifacts are written below the ignored
+`.runtime/postgresql-flyway-v7-evidence/` directory and are not committed.
+Only this redacted manifest is versioned:
+
+| Runtime artifact | SHA-256 |
+| --- | --- |
+| `summary.txt` | `a8b98333e759083343d512f020816562a3164bf8b4564f83c398ea3b2a29e1b3` |
+| `flyway-history.txt` | `778b04453150dd2dc7bd12fc0d36b46a878d01f9e33849fffc54c32799a9edd4` |
+| `schema-types.txt` | `06faeab76bbbb86b5c2d9a84583a92390be8eb2857ee622d68b413ecf4db3175` |
+| `timezone-results.txt` | `98e668746b0c1049565c06911d7a2526c5da47252191495c1b37eab66b657ea0` |
+| `application-smoke.txt` | `59ca39b7437a0a6e942c2fd1465440bb6e2ef6911732c6645bc32c0a615d38d2` |
+| `historical-inventory.txt` | `57df67d3e146d4c2142c0f76ce769d4e9680daab7f2de3b95f6b25c2937d5fa5` |
+
+The disposable empty database produced 13 zero-row field summaries and
+aggregate MD5 `638dd7271f23a7dccf810d22507f88a2`. This proves the inventory
+query runs read-only and produces a bounded aggregate shape; it does not
+characterize a release or production dataset.
+
 ## Test Accounting
 
 Controlled PostgreSQL/Flyway targeted run:
 
-- Tests: `6`
+- Tests: `11`
 - Failures: `0`
 - Errors: `0`
 - Skipped: `0`
@@ -254,20 +321,25 @@ Controlled PostgreSQL/Flyway targeted run:
 Full repository regression accounting is recorded by the final validation run
 for this branch:
 
-- Tests: `3526`
+- Tests: `3522`
 - Failures: `0`
 - Errors: `0`
-- Skipped: `1`
+- Skipped: `3`
 
-The single skipped test was the environment-gated
-`CoinGlassControlledSmokeTest`; no live CoinGlass call or key was enabled. All
-four PostgreSQL test classes ran with zero skips, including the six migration
-evidence tests listed above.
+The controlled run itself had zero skips across all four PostgreSQL test
+classes. The default full suite skipped the two legacy PostgreSQL smoke entry
+points and `CoinGlassControlledSmokeTest` because their external environments
+were not enabled. The class-gated V7 and Dashboard evidence tests report zero
+default-suite tests when their controlled env is absent; the digest-pinned
+runner separately executed their `4` and `5` tests with zero skips. Default
+suite skips or zero-count gates are not counted as PostgreSQL PASS evidence.
 
 ## Historical Time Strategy
 
 The controlled evidence proves the current contracts for newly written data;
-it does not manufacture certainty for historical rows.
+it does not manufacture certainty for historical rows. The executable
+classification, cutover, inventory, and decision contracts are in
+`docs/HISTORICAL_TIME_BASIS_STRATEGY.md`.
 
 - New Monitor Alert rows use explicit application UTC-naive `created_at`,
   `updated_at`, and `cooldown_until` values.
@@ -299,5 +371,6 @@ Production deployment cannot proceed from this evidence package alone.
 
 ## Next Task
 
-`PostgreSQL Evidence Review and Historical Time Strategy P2`
-（PostgreSQL 证据复审与历史时间策略 P2）
+Reviewer P2 re-review of the PostgreSQL-backed Dashboard evidence, repeatable
+runner, and historical-time strategy. PR #1126 remains Draft and production
+readiness remains BLOCKED.
