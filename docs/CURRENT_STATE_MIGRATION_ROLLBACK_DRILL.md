@@ -7,24 +7,36 @@ Current main commit reviewed: `954210a65b0705788930a968a8092fba7598fb9b`
 Production readiness: BLOCKED
 Production deployment: cannot proceed
 
+Current evidence addendum (2026-07-15): controlled localhost PostgreSQL P1/P2
+proved fresh V1-V7, V6-V7, three session timezones, Dashboard V7 validity,
+mapper compatibility, and fail-closed application smoke. This does not replace
+the current-state dataset backup/restore drill defined by this document.
+
 ## Scope
 
 This package defines the safe process and evidence requirements for a current-state PostgreSQL migration and rollback rehearsal. It does not execute a real migration, access a production database, run destructive database operations, change business runtime behavior, or claim production readiness.
 
 ## Relation To PDR-PF3 Timeout Evidence
 
-PDR-PF3 recorded empty PostgreSQL migration evidence as `BLOCKED_TIMEOUT` after an approximately 1h27m interrupted Docker/Testcontainers/PostgreSQL evidence run. It reviewed the Flyway SQL files but did not prove that V1/V2/V3 migrations complete against PostgreSQL.
+PDR-PF3 recorded empty PostgreSQL migration evidence as `BLOCKED_TIMEOUT`
+after an approximately 1h27m interrupted Docker/Testcontainers/PostgreSQL
+evidence run. That is retained as historical evidence.
 
-PDR-PF4 therefore does not rerun the long PostgreSQL smoke. It defines the next safe evidence path: rehearse migration from a current-main-like database state, prove backup and restore, define rollback decision points, and collect a redacted evidence bundle before any production deployment decision.
+Subsequent P1/P2 controlled evidence completed fresh V1-V7 and V6-V7 on
+disposable PostgreSQL 16.14 with no skipped PostgreSQL test. The still-open
+PF4 gate is narrower: rehearse migration from the actual sanitized
+current-main-like dataset, prove its backup and restore, resolve historical
+time-basis policy, define rollback decision points, and collect a redacted
+evidence bundle before any production deployment decision.
 
 ## Existing Assets Reviewed
 
 | Asset | Finding |
 |---|---|
-| `src/main/resources/db/migration/V1__baseline_schema_tables.sql` | PostgreSQL baseline table migration exists. |
-| `src/main/resources/db/migration/V2__baseline_schema_indexes.sql` | PostgreSQL baseline index migration exists. |
-| `src/main/resources/db/migration/V3__scheme_rule_config_defaults.sql` | PostgreSQL rule-config defaults migration exists. |
-| `src/main/resources/db/migration/README.md` | Records PostgreSQL/Flyway path and PDR-PF3 `BLOCKED_TIMEOUT`. |
+| `src/main/resources/db/migration/V1__baseline_schema_tables.sql` through `V7__decision_plan_offset_times.sql` | Current PostgreSQL Flyway chain is V1-V7; fresh and V6-V7 disposable runs passed. |
+| `src/main/resources/db/migration/README.md` | Records historical PF3 timeout and current P1/P2 controlled evidence without claiming production readiness. |
+| `scripts/controlled-postgresql-flyway-v7-evidence.sh` | Repeats digest-pinned disposable migration, timezone, Dashboard, mapper, inventory, and app smoke evidence. |
+| `docs/HISTORICAL_TIME_BASIS_STRATEGY.md` | Defines aggregate-only inventory, writer-specific cutovers, and fail-closed handling of unverified history. |
 | `scripts/prod-backup.sh` | Requires explicit PostgreSQL env vars and uses `pg_dump`; no DB URL or secrets are hardcoded. |
 | `scripts/prod-restore.sh` | Requires explicit restore env vars and refuses to run unless `RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA`. |
 | `scripts/prod-release-gate.sh` | Can require backup evidence, does not run restore automatically, and remains incomplete until restore and human evidence are recorded. |
@@ -43,7 +55,9 @@ All preconditions must be true before a real migration rehearsal or production-l
 7. No auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, or fake review records are enabled.
 8. A human rollback owner is assigned before the drill starts.
 9. A stop/go decision point is declared before Flyway migration runs.
-10. PDR-PF3 empty migration evidence is either resolved in a Docker-capable/server-backed environment or explicitly carried as a known blocker.
+10. P1/P2 controlled-local evidence is attached, while the distinct
+    current-state dataset, backup/restore, and historical cutover evidence is
+    either completed or explicitly carried as a blocker.
 
 ## Backup Plan
 
@@ -116,7 +130,8 @@ psql "$REHEARSAL_DATABASE_URL" -c "select count(*) from flyway_schema_history;" 
 2. Create and verify a pre-migration backup with `scripts/prod-backup.sh`.
 3. Restore the backup into a separate recovery database with `scripts/prod-restore.sh` and verify the restored state.
 4. Run Flyway migration only in the rehearsal environment, using the same migration path as production would use.
-5. Verify `flyway_schema_history` contains successful V1/V2/V3 rows.
+5. Verify `flyway_schema_history` contains successful V1-V7 rows with the
+   reviewed checksums.
 6. Run readonly app smoke against the migrated rehearsal database:
 
 ```bash
@@ -172,7 +187,7 @@ A complete PDR-PF4 evidence bundle must include:
 4. Backup command output, backup file metadata, and checksum.
 5. Restore drill command output against a recovery database.
 6. Post-restore sanity checks.
-7. Flyway migration command output and `flyway_schema_history` rows for V1/V2/V3.
+7. Flyway migration command output and `flyway_schema_history` rows for V1-V7.
 8. Post-migration table/index sanity checks.
 9. Readonly production-smoke output.
 10. Release-gate output, even if `INCOMPLETE`.
@@ -211,13 +226,16 @@ bash scripts/prod-release-gate.sh
 
 ## Local Package Evidence
 
-This PF4 package is planning/evidence-definition only.
+The original PF4 package was planning/evidence-definition only. Later P1/P2
+evidence executed Flyway only against disposable localhost databases and
+removed its auxiliary databases and container.
 
 - No production DB was accessed.
-- No destructive DB operation was run.
-- No long Docker/Testcontainers/PostgreSQL smoke was rerun.
-- No Flyway migration command was executed.
-- No backup or restore command was executed.
+- No destructive operation was run outside disposable controlled databases.
+- Fresh V1-V7 and V6-V7 controlled-local migration evidence is complete.
+- No backup or restore was executed against a current-state release dataset.
+- No production-like current-state migration rehearsal was executed.
+- Historical time cutovers remain unverified and no timestamp was shifted.
 - No Java business logic changed.
 - No schema.sql or Flyway SQL migration changed.
 
@@ -227,13 +245,17 @@ Production readiness remains BLOCKED.
 
 Production deployment cannot proceed.
 
-PDR-PF4 defines the drill and evidence requirements. It does not prove production migration readiness until the evidence bundle is completed in a safe staging/server-backed environment and reviewed by the human release gate owner.
+PDR-PF4 defines the remaining drill and evidence requirements. Disposable
+empty/fixture evidence does not prove production migration readiness until the
+current-state evidence bundle is completed in a safe staging/server-backed
+environment and reviewed by the human release gate owner.
 
 ## Next Remediation Recommendation
 
-Recommended next package: `PDR-PF5 Staging Migration Evidence Collection` or `PDR-PF5 Secrets and Access Hardening`, depending on whether a Docker-capable/server-backed PostgreSQL staging environment is available.
-
-If no safe PostgreSQL staging environment is available, first resolve Docker/Testcontainers/server-backed PostgreSQL access before attempting migration evidence again.
+Recommended next package: controlled current-state clone inventory,
+backup/restore rehearsal, and writer-specific historical-time cutover review.
+The local Docker availability blocker is closed for P1/P2; access to a
+sanctioned sanitized release-like dataset and human owners remains required.
 
 ## Prohibited Items Preserved
 
