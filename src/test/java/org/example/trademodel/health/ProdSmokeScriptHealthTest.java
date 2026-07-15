@@ -31,11 +31,16 @@ class ProdSmokeScriptHealthTest {
         String script = Files.readString(Path.of("scripts", "prod-smoke.sh"), StandardCharsets.UTF_8);
 
         assertThat(script).contains("SMOKE_ALLOW_EXTERNAL_CALLS=\"${SMOKE_ALLOW_EXTERNAL_CALLS:-false}\"");
+        assertThat(script).contains(
+                "SMOKE_PHASE=\"${SMOKE_PHASE:-FETCH_AND_VALIDATE}\"",
+                "SMOKE_RESPONSE_DIR=\"${SMOKE_RESPONSE_DIR:-}\"",
+                "FETCH|VALIDATE|FETCH_AND_VALIDATE");
         assertThat(script).contains("dashboard header.dataSourceText missing");
         assertThat(script).contains("marketDataProvider");
         assertThat(script).contains("aiProvider");
         assertThat(script).contains("externalContextProvider");
         assertThat(script).contains("providerReadiness");
+        assertThat(script).contains("\"NOT_CALLED\", \"DISABLED\"");
         assertThat(script).contains("provider status CONNECTED requires SMOKE_ALLOW_EXTERNAL_CALLS=true");
     }
 

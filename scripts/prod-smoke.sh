@@ -5,18 +5,38 @@ APP_URL="${APP_URL:-http://localhost:8081}"
 AUTH_USERNAME="${SMOKE_AUTH_USERNAME:-${APP_ADMIN_USERNAME:-}}"
 AUTH_PASSWORD="${SMOKE_AUTH_PASSWORD:-${APP_ADMIN_PASSWORD:-}}"
 SMOKE_ALLOW_EXTERNAL_CALLS="${SMOKE_ALLOW_EXTERNAL_CALLS:-false}"
+SMOKE_PHASE="${SMOKE_PHASE:-FETCH_AND_VALIDATE}"
+SMOKE_RESPONSE_DIR="${SMOKE_RESPONSE_DIR:-}"
 
-if [ -z "$AUTH_USERNAME" ] || [ -z "$AUTH_PASSWORD" ]; then
-  echo "FAIL smoke auth credentials missing; set APP_ADMIN_USERNAME/APP_ADMIN_PASSWORD or SMOKE_AUTH_USERNAME/SMOKE_AUTH_PASSWORD" >&2
+case "$SMOKE_PHASE" in
+  FETCH|VALIDATE|FETCH_AND_VALIDATE) ;;
+  *)
+    echo "FAIL unsupported SMOKE_PHASE" >&2
+    exit 1
+    ;;
+esac
+
+if [ -n "$SMOKE_RESPONSE_DIR" ]; then
+  if [ ! -d "$SMOKE_RESPONSE_DIR" ]; then
+    echo "FAIL smoke response directory missing" >&2
+    exit 1
+  fi
+  health_body="$SMOKE_RESPONSE_DIR/health.json"
+  liveness_body="$SMOKE_RESPONSE_DIR/liveness.json"
+  readiness_body="$SMOKE_RESPONSE_DIR/readiness.json"
+  dashboard_body="$SMOKE_RESPONSE_DIR/dashboard.json"
+  review_body="$SMOKE_RESPONSE_DIR/review.json"
+elif [ "$SMOKE_PHASE" = "FETCH_AND_VALIDATE" ]; then
+  health_body="$(mktemp)"
+  liveness_body="$(mktemp)"
+  readiness_body="$(mktemp)"
+  dashboard_body="$(mktemp)"
+  review_body="$(mktemp)"
+  trap 'rm -f "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body"' EXIT
+else
+  echo "FAIL split smoke phase requires SMOKE_RESPONSE_DIR" >&2
   exit 1
 fi
-
-health_body="$(mktemp)"
-liveness_body="$(mktemp)"
-readiness_body="$(mktemp)"
-dashboard_body="$(mktemp)"
-review_body="$(mktemp)"
-trap 'rm -f "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body"' EXIT
 
 request_public_json() {
   local path="$1"
@@ -40,11 +60,34 @@ request_authenticated_json() {
   fi
 }
 
-request_public_json "/actuator/health" "$health_body"
-request_public_json "/actuator/health/liveness" "$liveness_body"
-request_public_json "/actuator/health/readiness" "$readiness_body"
-request_authenticated_json "/api/dashboard/home" "$dashboard_body"
-request_authenticated_json "/api/review/center" "$review_body"
+if [ "$SMOKE_PHASE" != "VALIDATE" ]; then
+  if [ -z "$AUTH_USERNAME" ] || [ -z "$AUTH_PASSWORD" ]; then
+    echo "FAIL smoke auth credentials missing; set APP_ADMIN_USERNAME/APP_ADMIN_PASSWORD or SMOKE_AUTH_USERNAME/SMOKE_AUTH_PASSWORD" >&2
+    exit 1
+  fi
+  request_public_json "/actuator/health" "$health_body"
+  request_public_json "/actuator/health/liveness" "$liveness_body"
+  request_public_json "/actuator/health/readiness" "$readiness_body"
+  request_authenticated_json "/api/dashboard/home" "$dashboard_body"
+  request_authenticated_json "/api/review/center" "$review_body"
+fi
+
+if [ "$SMOKE_PHASE" = "FETCH" ]; then
+  echo "PASS production smoke response fetch"
+  exit 0
+fi
+
+for response_file in "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body"; do
+  if [ ! -f "$response_file" ]; then
+    echo "FAIL smoke response artifact missing" >&2
+    exit 1
+  fi
+done
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "FAIL python3 is required for smoke response validation" >&2
+  exit 1
+fi
 
 python3 - "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body" "$SMOKE_ALLOW_EXTERNAL_CALLS" <<'PY'
 import json
@@ -113,7 +156,10 @@ for key in ("marketDataProvider", "aiProvider", "externalContextProvider", "prov
     if key not in diagnostics:
         raise SystemExit(f"FAIL dashboard diagnostics.{key} missing")
 
-allowed_statuses = {"CONNECTED", "CONFIGURED", "NOT_CONFIGURED", "WAITING_SYNC", "FAIL_CLOSED", "UNKNOWN"}
+allowed_statuses = {
+    "CONNECTED", "CONFIGURED", "NOT_CONFIGURED", "WAITING_SYNC", "FAIL_CLOSED", "UNKNOWN",
+    "NOT_CALLED", "DISABLED",
+}
 provider_readiness = diagnostics.get("providerReadiness") or {}
 provider_statuses = [
     diagnostics.get("marketDataProvider"),

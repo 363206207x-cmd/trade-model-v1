@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM eclipse-temurin:17-jdk-jammy AS build
 
 WORKDIR /workspace
@@ -6,7 +7,9 @@ COPY .mvn .mvn
 COPY mvnw pom.xml ./
 COPY src src
 
-RUN chmod +x ./mvnw && ./mvnw -q -DskipTests package
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    chmod +x ./mvnw \
+    && ./mvnw -B -ntp -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-jre-jammy AS runtime
 

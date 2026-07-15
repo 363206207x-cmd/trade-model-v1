@@ -8,7 +8,7 @@
 - Historical business data must be preserved: `NO`
 - Existing business database exists: `NO`
 - Go-live database initial state: `EMPTY`
-- Decision package: Draft PR `#1127`
+- Decision package: PR `#1127`, merged/effective on main
 
 The approved release-owner/data-owner decision is internally consistent: the
 formal database starts empty, and no existing formal business database or
@@ -61,15 +61,33 @@ for recovery rehearsals, incident analysis, and a future separately approved
 data-migration mode. The current go-live path does not depend on historical
 data migration.
 
+## P3-G Controlled Rehearsal Result
+
+Merged main `72b5bc83f4d670d4adebc03f5fe28e0bb9bba535` made this provenance
+decision effective and allowed the separately scoped P3-G package to start.
+The P3-G branch records
+`PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL` for:
+
+- an empty disposable localhost PostgreSQL 16 database;
+- Fresh Flyway V1-V7 and zero-repeat migration;
+- an exact versioned seed allowlist with no runtime business rows;
+- repository `prod-backup.sh` and `prod-restore.sh` execution;
+- matching Primary/Recovery structure and full-content fingerprints; and
+- Primary, restart, and Recovery application smoke through separated read-only
+  application roles.
+
+This is branch-local evidence until its Draft PR is merged. It does not alter
+the approved data mode, prove server deployment, authorize P4, or change
+Production Deployment Readiness from `BLOCKED`. See
+`docs/GREENFIELD_POSTGRESQL_FIRST_BOOT_REHEARSAL_P3G.md`.
+
 ## Next Gate
 
-After PR `#1127` is merged and effective, the next allowed package is
-**Greenfield Production Database First-Boot, Backup/Restore and Read-Only
-Deployment Rehearsal P3-G**. That package must start from an empty controlled
-PostgreSQL database and produce its own bounded, redacted evidence. It is not
-P4 and is not production deployment.
+P3-G has run locally and now requires independent evidence review plus a Draft
+PR merge-readiness decision. An unmerged P3-G PR is not effective evidence.
+This package does not authorize P4 and is not production deployment.
 
-- `GREENFIELD_P3_G: NEXT_ALLOWED_AFTER_PR_EFFECTIVE`
+- `GREENFIELD_P3_G: PASS_LOCAL_CONTROLLED_PENDING_PR_EFFECTIVE`
 - `P4: BLOCKED`
 - `PRODUCTION_READINESS: BLOCKED`
 

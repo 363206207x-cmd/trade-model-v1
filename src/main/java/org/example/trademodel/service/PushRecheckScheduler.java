@@ -62,7 +62,12 @@ public class PushRecheckScheduler {
         this.dispatchConfigService = dispatchConfigService;
         this.schedulersEnabled = schedulersEnabled;
         this.pushRecheckSchedulerEnabled = pushRecheckSchedulerEnabled;
-        applyRuntimeConfig(dispatchConfigService.loadOrInit(defaultLimit, maxAttempts, minRetryMinutes));
+        this.defaultLimit = defaultLimit;
+        this.maxAttempts = maxAttempts;
+        this.minRetryMinutes = minRetryMinutes;
+        if (scheduledExecutionEnabled()) {
+            applyRuntimeConfig(dispatchConfigService.loadOrInit(defaultLimit, maxAttempts, minRetryMinutes));
+        }
     }
 
     @Autowired(required = false)

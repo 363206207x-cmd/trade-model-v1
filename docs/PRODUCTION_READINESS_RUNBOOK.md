@@ -754,8 +754,9 @@ cutover, permission to start P4, or production readiness.
 
 See `docs/GREENFIELD_DATABASE_PROVENANCE_DECISION.md`,
 `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`, and
-`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. Greenfield P3-G is next only
-after PR #1127 is merged/effective. P4 remains blocked.
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. PR #1127 is now
+merged/effective; the separately scoped P3-G branch has local controlled
+evidence pending review/merge. P4 remains blocked.
 
 ## Remaining Blockers
 
@@ -771,12 +772,46 @@ after PR #1127 is merged/effective. P4 remains blocked.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders and LIVE14 documents secret-store and rotation plans; no real secret-store injection or rotation drill exists.
 
+## Greenfield P3-G Local Rehearsal
+
+P3-G uses only disposable localhost resources and the exact confirmation
+`I_CONFIRM_LOCAL_GREENFIELD_EMPTY_DATABASE_REHEARSAL`. Its guarded runner:
+
+1. proves the database is empty before migration;
+2. applies and validates Flyway V1-V7 without baseline, repair, or clean;
+3. confirms repeat migrate applies zero migrations;
+4. separates migration, backup, recovery, and application roles;
+5. executes `prod-backup.sh` and `prod-restore.sh` in a digest-pinned
+   PostgreSQL 16 Ops container;
+6. compares Primary and Recovery structure, full content, Flyway history,
+   schema types, sequence state, and historical-time inventory;
+7. builds the application from an exact committed `git archive` context;
+8. runs the `prod` profile with a read-only database role against Primary,
+   Primary restart, and Recovery, with `prod-smoke.sh` fetching through a
+   digest-pinned client on the internal network and validating only transient
+   responses on the host; and
+9. keeps Flyway, schedulers, provider/AI calls, trading, and external sends
+   disabled throughout.
+
+The observed branch-local result is
+`PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL`. It is not a server smoke, Secret
+Store/rotation drill, live-provider result, production cutover, or release
+approval. Production Deployment Readiness remains `BLOCKED` and production
+deployment cannot proceed.
+
 ## Next Packages
 
-1. After PR #1127 is merged/effective, Greenfield Production Database First-Boot, Backup/Restore and Read-Only Deployment Rehearsal P3-G.
-2. Controlled real-server, secrets/access/provider, and operational ownership evidence packages as explicitly approved.
-3. P4 only after the Greenfield P3-G gate and its prerequisite review are complete.
-4. Production release-gate status closure only after completed redacted evidence and explicit approval.
+1. Review the P3-G evidence in
+   `docs/GREENFIELD_POSTGRESQL_FIRST_BOOT_REHEARSAL_P3G.md` and decide Draft PR
+   merge readiness.
+2. Merge the P3-G evidence package before treating its local result as
+   effective.
+3. Controlled real-server, secrets/access/provider, and operational ownership
+   evidence packages only as explicitly approved.
+4. Keep P4 blocked until a separately authorized gate follows completed P3-G
+   review; P3-G itself does not authorize P4.
+5. Production release-gate status closure only after completed redacted
+   evidence and explicit approval.
 
 ## Explicit Non-Scope
 

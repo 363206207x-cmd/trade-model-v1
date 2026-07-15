@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "Approved Greenfield provenance closure; Greenfield P3-G is next after PR #1127 is merged/effective"
-active_block_cn: "已批准全新空库数据来源收口；PR #1127 合并生效后进入 Greenfield P3-G"
+active_block: "Greenfield P3-G local first-boot, backup/restore, and read-only deployment rehearsal; branch evidence awaits Draft PR review/merge"
+active_block_cn: "Greenfield P3-G 本地首次启动、备份恢复与只读部署演练；分支证据等待 Draft PR 复审与合并"
 
-next_required_action: "Complete final Greenfield provenance review for Draft PR #1127; after merge/effective, start only the explicitly scoped Greenfield P3-G first-boot, backup/restore, and read-only rehearsal."
-next_business_phase: "Greenfield P3-G first-boot, backup/restore, and read-only deployment rehearsal after PR #1127 is merged/effective"
+next_required_action: "Review the Greenfield P3-G local evidence and decide Draft PR merge readiness; do not start P4 or production deployment."
+next_business_phase: "No further business phase while the Greenfield P3-G Draft PR is unmerged; next action is evidence review"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false while Draft PR #1127 is unmerged. Sanitized-clone P3.2 is not applicable, P4 is blocked, and production deployment remains blocked."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false while the P3-G Draft PR is unmerged. P3-G local evidence is not effective, P4 is blocked, and production deployment remains blocked."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "Draft PR #1127"
-current_branch: "codex/postgresql-current-state-clone-rehearsal-p3"
-current_package_pr: "Draft PR #1127"
+current_pr: "Draft PR for codex/greenfield-postgresql-first-boot-rehearsal-p3g (number derived by GitHub)"
+current_branch: "codex/greenfield-postgresql-first-boot-rehearsal-p3g"
+current_package_pr: "P3-G Draft PR pending merged-main effectiveness"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -139,15 +139,20 @@ cg1_coinglass_v4_provider_status: "DONE/effective on merged main by PR #1112: of
 cg1_coinglass_v4_provider_effective: true
 biz1_derivatives_business_integration_status: "DONE/effective on merged main by PR #1113: cached derivatives evidence, bounded business integration, deterministic tests, no live call, no position mutation, and no trading"
 p2_1_postgresql_v7_evidence_status: "DONE/effective on merged main at c94c99dfa72843e558ac4ce87037bfe71bd5dfaf: disposable PostgreSQL V1-V7/V6-V7, three timezones, Dashboard validity, aggregate historical-time semantics, and fail-closed app smoke"
-p3_current_state_clone_rehearsal_status: "DRAFT_BRANCH_GREENFIELD_PROVENANCE_APPROVED; P3_HARNESS_AND_GENERATED_REHEARSAL PASS; P3_SANITIZED_CLONE NOT_APPLICABLE_BY_GREENFIELD_DECISION; Greenfield P3-G next only after PR effective"
-p3_current_state_clone_rehearsal_effective: false
+p3_current_state_clone_rehearsal_status: "GREENFIELD_PROVENANCE_EFFECTIVE_ON_MERGED_MAIN; P3_HARNESS_AND_GENERATED_REHEARSAL PASS; P3_SANITIZED_CLONE NOT_APPLICABLE_BY_GREENFIELD_DECISION"
+p3_current_state_clone_rehearsal_effective: true
 data_provenance_mode: "GREENFIELD_NEW_DATABASE"
 greenfield_decision_reference: "TMV1-GREENFIELD-20260715-001"
 p3_generated_rehearsal: "PASS"
 p3_sanitized_clone: "NOT_APPLICABLE_BY_GREENFIELD_DECISION"
 p3_2_sanitized_clone_route: "NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION"
 p3_final_sanitized_clone_gate: "NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION"
-greenfield_p3_g: "NEXT_ALLOWED_AFTER_PR_EFFECTIVE"
+greenfield_p3_g: "PASS_LOCAL_CONTROLLED_PENDING_DRAFT_PR_EFFECTIVE"
+greenfield_p3_g_effective: false
+p3g_flyway_fresh_v1_v7: "PASS_LOCAL_CONTROLLED"
+p3g_flyway_repeat_migrate: "ZERO_MIGRATIONS"
+p3g_official_backup_restore: "PASS_LOCAL_CONTROLLED"
+p3g_readonly_application_smoke: "PASS_LOCAL_CONTROLLED"
 p4_status: "BLOCKED"
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
@@ -191,8 +196,10 @@ notes:
   - "PDR-LIVE17 is DONE/effective on merged main by PR #1096: provider policy evidence is recorded, but no missing provider is waived or treated as PASS."
   - "Decision TMV1-GREENFIELD-20260715-001 approves GREENFIELD_NEW_DATABASE with no historical business data to preserve, no existing formal business database, and an EMPTY go-live initial state."
   - "P3.1 generated release-like rehearsal passed source inventory, container-native backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, application smoke, strict attestation parsing, and zero unexpected business writes. It proves the harness only and is not production history."
-  - "P3.2 sanitized-clone route and final gate are NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION, not PASS. Greenfield P3-G is next only after PR #1127 is merged/effective; P4 is blocked."
-  - "Merged main c94c99dfa72843e558ac4ce87037bfe71bd5dfaf remains the effective P2.1 baseline until a P3 PR is merged."
+  - "P3.2 sanitized-clone route and final gate are NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION, not PASS. Merged main 72b5bc83f4d670d4adebc03f5fe28e0bb9bba535 makes the Greenfield provenance decision effective."
+  - "The P3-G branch records PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL for Fresh V1-V7, official backup/restore, full Primary/Recovery fingerprints, and read-only application smoke. It remains unmerged and is not effective."
+  - "P3-G is local evidence only, not server, secret-store, live-provider, P4, or production-deployment authorization."
+  - "Merged main 72b5bc83f4d670d4adebc03f5fe28e0bb9bba535 is the effective Greenfield provenance baseline; the P3-G branch remains pending review/merge."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."
   - "P4 is BLOCKED_MISSING_REAL_FIXTURE; no real replay, provider validation, profitability, or production-readiness PASS is claimed."

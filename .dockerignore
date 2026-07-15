@@ -1,7 +1,10 @@
 .git
 .gitignore
+.runtime
+.runtime/**
 .env
 .env.*
+*.env
 !.env.example
 target
 .m2
@@ -9,6 +12,9 @@ target
 logs
 tmp
 backups
+backups/**
+*.dump
+*.attestation
 *.log
 *.tmp
 *.swp

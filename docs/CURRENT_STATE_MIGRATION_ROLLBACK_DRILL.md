@@ -290,11 +290,27 @@ blocked pending a separate Greenfield P3-G empty-database first-boot,
 backup/restore, and read-only deployment rehearsal plus all human release
 gates.
 
+## P3-G Greenfield First-Boot And Recovery Evidence
+
+The P3-G branch executed the approved empty-database route in a disposable
+localhost PostgreSQL 16 environment. It started from an empty schema, applied
+Flyway V1-V7, applied zero migrations on repeat, restarted PostgreSQL, ran the
+repository's official backup and restore scripts, and compared Primary and
+Recovery with structure plus full-content fingerprints. The same exact-commit
+application image then completed Primary first boot, Primary restart, and
+Recovery read-only smoke without changing database content.
+
+This result is `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL`, not a production
+restore or server rehearsal. It does not replace real secret-store, host,
+proxy, monitoring, owner, and rollback-decision evidence. It remains pending
+Draft PR review/merge and cannot authorize P4.
+
+See `docs/GREENFIELD_POSTGRESQL_FIRST_BOOT_REHEARSAL_P3G.md`.
+
 ## Next Remediation Recommendation
 
-Recommended next package after PR #1127 is merged/effective: **Greenfield
-Production Database First-Boot, Backup/Restore and Read-Only Deployment
-Rehearsal P3-G**. The sanitized-clone route is stopped by the approved
+Recommended next action: **Reviewer Greenfield P3-G Evidence Review and PR
+Merge Readiness**. The sanitized-clone route remains stopped by the approved
 Greenfield decision. P4 is not allowed.
 
 ## Prohibited Items Preserved
