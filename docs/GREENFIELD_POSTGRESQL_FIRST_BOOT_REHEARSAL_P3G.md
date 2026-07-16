@@ -3,8 +3,8 @@
 Status: `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL` on the package branch;
 the package is not effective until its Draft PR is reviewed and merged.
 
-Evidence integrity closure: Reviewer Round 1 blockers are addressed on Draft
-PR #1128 and require Round 2 independent re-review before merge.
+Evidence integrity closure: Reviewer Round 2 blockers are addressed on Draft
+PR #1128 and require Round 3 independent re-review before merge.
 
 Production Deployment Readiness: `BLOCKED`
 
@@ -120,6 +120,9 @@ operational script is rewritten or bypassed.
 | Empty Dashboard/Review Center/Run Baseline | `PASS_FAIL_CLOSED` |
 | Empty asset cards | `PASS_FAIL_CLOSED`; no directional bias, opening signal, high confidence, fabricated price/evidence, or analysis timestamp |
 | Empty system state | `PASS_FAIL_CLOSED`; no directional trend, valid-quality claim, AI conflict result, pending review, or triggered Hot Reset |
+| Formal enum contract | `PASS_EXACT_FORMAL_VALUES`; no non-enum asset state or market bias is accepted |
+| Empty market-bias contract | `WAIT_OR_EMPTY_ONLY`; `RANGE`, `NEUTRAL`, and bullish/bearish families fail |
+| Asset JSON shape | `PASS_STRICT`; `assets` is an array and each placeholder has exactly four `NO_DATA` timeframe entries |
 | Fake asset conclusions / position-plan records | `NONE` / `NONE` |
 | Primary/recovery application content fingerprints | `MATCH` |
 | External network egress | blocked by internal Docker network |
@@ -150,6 +153,12 @@ empty-state validator required:
 - an empty asset list or only formal placeholder cards with no directional
   market bias, `worthOpening=true`, high confidence, fabricated price/score,
   non-zero evidence, analysis timestamp, connected source, or trading copy;
+- only the formal eight-value `MarketBiasEnum`, narrowed to `WAIT`, null, or an
+  empty value for Greenfield placeholders, and only null/empty `assetState`
+  rather than invented ninth-state values;
+- an actual JSON array for `assets`; each placeholder must use `DEFAULT_SLOT`
+  and an actual object containing exactly `5m`, `15m`, `1h`, and `4h`, all
+  marked `NO_DATA`, for `timeframeFreshness`;
 - fail-closed `marketTrend`, `riskLevel`, `dataQuality`, `aiConflict`,
   `pendingReview`, `confused`, and `hotReset` system cards;
 - no fabricated plan fields or asset conclusions;
@@ -197,4 +206,20 @@ The Round 1 regression suite proves:
    fixtures fail closed; safe placeholders and a completely empty asset list
    pass.
 
-Next task: Reviewer Greenfield P3-G Round 2 Re-review and PR Merge Readiness.
+## Reviewer Round 2 Evidence Integrity Closure
+
+The Round 2 regression suite additionally proves:
+
+1. The formal market-bias set is exactly the repository's eight values, while
+   Greenfield empty cards and system trend accept only `WAIT`, null, or empty.
+   `RANGE`, `NEUTRAL`, unknown values, and every bullish/bearish value fail.
+2. The formal asset-state set is exactly the repository's eight values, while
+   Greenfield placeholders accept only null or empty. `DATA_INSUFFICIENT`,
+   `ANALYZING`, unknown, `CANDIDATE`, and `TRIGGERED` fail.
+3. Falsey JSON values are not coerced: missing, null, object, string, numeric,
+   or boolean `assets` fail, and `timeframeFreshness` must be a real object
+   with the exact four no-data keys.
+4. Risk, labels, conclusions, card metadata, counter scores, and Hot Reset
+   fields cannot hide a market, risk, review, conflict, or trigger conclusion.
+
+Next task: Reviewer Greenfield P3-G Round 3 Re-review and PR Merge Readiness.

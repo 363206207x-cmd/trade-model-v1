@@ -93,6 +93,9 @@ class ControlledGreenfieldFirstBootRehearsalP3GContractTest {
                 "EMPTY_SYSTEM_STATE_FAIL_CLOSED: PASS",
                 "FAKE_ASSET_CONCLUSIONS: NONE",
                 "FAKE_POSITION_PLAN_RECORDS: NONE",
+                "ASSET_ENUM_CONTRACT: PASS_EXACT_FORMAL_VALUES",
+                "MARKET_BIAS_EMPTY_CONTRACT: WAIT_OR_EMPTY_ONLY",
+                "ASSET_JSON_SHAPE: PASS_STRICT",
                 "trade_model.inventory_as_of_utc=2026-07-15T00:00:00");
         assertThat(script).doesNotContain(
                 "flyway clean", "flyway repair", "flyway baseline",

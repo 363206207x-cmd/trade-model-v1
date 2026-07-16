@@ -35,7 +35,10 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                 "EMPTY_REVIEW_CENTER_FAIL_CLOSED: PASS",
                 "EMPTY_RUN_BASELINE_FAIL_CLOSED: PASS",
                 "FAKE_ASSET_CONCLUSIONS: NONE",
-                "FAKE_POSITION_PLAN_RECORDS: NONE");
+                "FAKE_POSITION_PLAN_RECORDS: NONE",
+                "ASSET_ENUM_CONTRACT: PASS_EXACT_FORMAL_VALUES",
+                "MARKET_BIAS_EMPTY_CONTRACT: WAIT_OR_EMPTY_ONLY",
+                "ASSET_JSON_SHAPE: PASS_STRICT");
     }
 
     @Test
@@ -212,7 +215,7 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
         ScriptResult result = runValidator(dashboard, validReview(), validBaseline());
 
         assertThat(result.exitCode()).isNotZero();
-        assertThat(result.output()).contains("directional marketBias");
+        assertThat(result.output()).contains("empty-database marketBias conclusion");
     }
 
     @Test
@@ -221,7 +224,7 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                 validReview(), validBaseline());
 
         assertThat(result.exitCode()).isNotZero();
-        assertThat(result.output()).contains("directional marketBias");
+        assertThat(result.output()).contains("empty-database marketBias conclusion");
     }
 
     @Test
@@ -239,7 +242,7 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                 validReview(), validBaseline());
 
         assertThat(result.exitCode()).isNotZero();
-        assertThat(result.output()).contains("unsupported confidenceLevel");
+        assertThat(result.output()).contains("confidence conclusion");
     }
 
     @Test
@@ -267,7 +270,7 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                 validReview(), validBaseline());
 
         assertThat(result.exitCode()).isNotZero();
-        assertThat(result.output()).contains("directional/trading conclusion");
+        assertThat(result.output()).contains("currentConclusion is not fail-closed");
     }
 
     @Test
@@ -276,7 +279,7 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                 validReview(), validBaseline());
 
         assertThat(result.exitCode()).isNotZero();
-        assertThat(result.output()).contains("unsafe assetState");
+        assertThat(result.output()).contains("not a formal AssetStateEnum value");
     }
 
     @Test
@@ -310,6 +313,329 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
 
         assertThat(result.exitCode()).isNotZero();
         assertThat(result.output()).contains("pendingReview is not zero");
+    }
+
+    @Test
+    void rangeAssetCardOnEmptyDatabaseFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("marketBias", "RANGE"),
+                "empty-database marketBias conclusion");
+    }
+
+    @Test
+    void neutralAssetCardOnEmptyDatabaseFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("marketBias", "NEUTRAL"),
+                "not a formal MarketBiasEnum value");
+    }
+
+    @Test
+    void rangeMarketBiasLabelOnEmptyAssetFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("marketBiasLabel", "震荡"),
+                "marketBiasLabel is not a no-conclusion label");
+    }
+
+    @Test
+    void rangeSystemMarketTrendOnEmptyDatabaseFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "marketTrend").put("value", "RANGE");
+
+        assertValidatorFails(dashboard, "systemState.marketTrend.value contains");
+    }
+
+    @Test
+    void unknownMarketBiasOnEmptyDatabaseFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("marketBias", "SIDEWAYS_UNKNOWN"),
+                "not a formal MarketBiasEnum value");
+    }
+
+    @Test
+    void waitMarketBiasPlaceholderPasses() throws Exception {
+        Map<String, Object> dashboard = dashboardWithAsset("marketBias", "WAIT");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> asset = (Map<String, Object>) ((List<?>) dashboard.get("assets")).get(0);
+        asset.put("marketBiasLabel", "观望");
+
+        assertValidatorPasses(dashboard, "MARKET_BIAS_EMPTY_CONTRACT: WAIT_OR_EMPTY_ONLY");
+    }
+
+    @Test
+    void nullMarketBiasPlaceholderPasses() throws Exception {
+        assertValidatorPasses(dashboardWithAsset("marketBias", null),
+                "MARKET_BIAS_EMPTY_CONTRACT: WAIT_OR_EMPTY_ONLY");
+    }
+
+    @Test
+    void dataInsufficientAssetStateFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("assetState", "DATA_INSUFFICIENT"),
+                "not a formal AssetStateEnum value");
+    }
+
+    @Test
+    void analyzingAssetStateFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("assetState", "ANALYZING"),
+                "not a formal AssetStateEnum value");
+    }
+
+    @Test
+    void unknownAssetStateFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("assetState", "UNKNOWN"),
+                "not a formal AssetStateEnum value");
+    }
+
+    @Test
+    void candidateAssetStateOnEmptyDatabaseFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("assetState", "CANDIDATE"),
+                "has non-empty assetState");
+    }
+
+    @Test
+    void triggeredAssetStateOnEmptyDatabaseFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("assetState", "TRIGGERED"),
+                "has non-empty assetState");
+    }
+
+    @Test
+    void nullAssetStatePlaceholderPasses() throws Exception {
+        assertValidatorPasses(dashboardWithAsset("assetState", null),
+                "ASSET_ENUM_CONTRACT: PASS_EXACT_FORMAL_VALUES");
+    }
+
+    @Test
+    void nullAssetsFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("assets", null);
+
+        assertValidatorFails(dashboard, "dashboard assets is not a list");
+    }
+
+    @Test
+    void objectAssetsFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("assets", Map.of());
+
+        assertValidatorFails(dashboard, "dashboard assets is not a list");
+    }
+
+    @Test
+    void stringAssetsFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("assets", "");
+
+        assertValidatorFails(dashboard, "dashboard assets is not a list");
+    }
+
+    @Test
+    void numericAssetsFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("assets", 0);
+
+        assertValidatorFails(dashboard, "dashboard assets is not a list");
+    }
+
+    @Test
+    void booleanAssetsFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("assets", false);
+
+        assertValidatorFails(dashboard, "dashboard assets is not a list");
+    }
+
+    @Test
+    void missingAssetsFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.remove("assets");
+
+        assertValidatorFails(dashboard, "dashboard assets is missing");
+    }
+
+    @Test
+    void actualEmptyAssetArrayPasses() throws Exception {
+        assertValidatorPasses(validDashboard(), "ASSET_JSON_SHAPE: PASS_STRICT");
+    }
+
+    @Test
+    void nullTimeframeFreshnessFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", null),
+                "timeframeFreshness is not an object");
+    }
+
+    @Test
+    void listTimeframeFreshnessFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", List.of()),
+                "timeframeFreshness is not an object");
+    }
+
+    @Test
+    void stringTimeframeFreshnessFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", ""),
+                "timeframeFreshness is not an object");
+    }
+
+    @Test
+    void numericTimeframeFreshnessFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", 0),
+                "timeframeFreshness is not an object");
+    }
+
+    @Test
+    void booleanTimeframeFreshnessFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", false),
+                "timeframeFreshness is not an object");
+    }
+
+    @Test
+    void missingTimeframeFreshnessFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        Map<String, Object> asset = safeEmptyAsset("BTCUSDT");
+        asset.remove("timeframeFreshness");
+        dashboard.put("assets", List.of(asset));
+
+        assertValidatorFails(dashboard, "timeframeFreshness is missing");
+    }
+
+    @Test
+    void extraTimeframeKeyFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", Map.of(
+                        "5m", "NO_DATA", "15m", "NO_DATA", "1h", "NO_DATA",
+                        "4h", "NO_DATA", "1d", "NO_DATA")),
+                "timeframeFreshness keys are not exact");
+    }
+
+    @Test
+    void freshTimeframeOnEmptyDatabaseFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("timeframeFreshness", Map.of(
+                        "5m", "FRESH", "15m", "NO_DATA", "1h", "NO_DATA", "4h", "NO_DATA")),
+                "reports fresh timeframe data");
+    }
+
+    @Test
+    void exactFourNoDataTimeframesPass() throws Exception {
+        assertValidatorPasses(dashboardWithAsset("timeframeFreshness", Map.of(
+                        "5m", "NO_DATA", "15m", "NO_DATA", "1h", "NO_DATA", "4h", "NO_DATA")),
+                "ASSET_JSON_SHAPE: PASS_STRICT");
+    }
+
+    @Test
+    void lowRiskConclusionOnEmptyAssetFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("riskLabel", "低风险"),
+                "riskLabel is not a no-conclusion label");
+    }
+
+    @Test
+    void rangeConclusionTextOnEmptyAssetFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("currentConclusion", "震荡"),
+                "currentConclusion is not fail-closed");
+    }
+
+    @Test
+    void candidateAssetStateLabelFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("assetStateLabel", "候选"),
+                "assetStateLabel is not a no-conclusion label");
+    }
+
+    @Test
+    void unknownSlotTypeFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("slotType", "PLACEHOLDER"),
+                "unsupported slotType");
+    }
+
+    @Test
+    void defaultSlotPasses() throws Exception {
+        assertValidatorPasses(dashboardWithAsset("slotType", "DEFAULT_SLOT"),
+                "ASSET_JSON_SHAPE: PASS_STRICT");
+    }
+
+    @Test
+    void configuredSourceProviderOnEmptyAssetFails() throws Exception {
+        assertValidatorFails(dashboardWithAsset("sourceProvider", "CONFIGURED"),
+                "reports a connected sourceProvider");
+    }
+
+    @Test
+    void configuredProviderReadinessWithoutConnectionPasses() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("diagnostics", Map.of(
+                "marketDataProvider", "CONFIGURED",
+                "aiProvider", "WAITING_SYNC",
+                "externalContextProvider", "WAITING_SYNC",
+                "providerReadiness", Map.of("providers", List.of(Map.of(
+                        "status", "CONFIGURED", "connected", false)))));
+
+        assertValidatorPasses(dashboard, "EMPTY_DASHBOARD_FAIL_CLOSED: PASS");
+    }
+
+    @Test
+    void connectedProviderReadinessFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        dashboard.put("diagnostics", Map.of(
+                "marketDataProvider", "CONFIGURED",
+                "aiProvider", "WAITING_SYNC",
+                "externalContextProvider", "WAITING_SYNC",
+                "providerReadiness", Map.of("providers", List.of(Map.of(
+                        "status", "CONFIGURED", "connected", true)))));
+
+        assertValidatorFails(dashboard, "claims a live connection");
+    }
+
+    @Test
+    void marketTrendRangeFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "marketTrend").put("valueLabel", "震荡");
+
+        assertValidatorFails(dashboard, "systemState.marketTrend.valueLabel contains");
+    }
+
+    @Test
+    void marketTrendMetaBullishFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "marketTrend").put("meta", Map.of("hidden", "BULLISH"));
+
+        assertValidatorFails(dashboard, "contains hidden meta evidence");
+    }
+
+    @Test
+    void pendingReviewScoreNonZeroFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "pendingReview").put("score", 1);
+
+        assertValidatorFails(dashboard, "systemState.pendingReview fabricated a score");
+    }
+
+    @Test
+    void confusedScoreNonZeroFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "confused").put("score", 1);
+
+        assertValidatorFails(dashboard, "systemState.confused fabricated a score");
+    }
+
+    @Test
+    void hotResetScoreNonZeroFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "hotReset").put("score", 1);
+
+        assertValidatorFails(dashboard, "systemState.hotReset fabricated a score");
+    }
+
+    @Test
+    void riskLevelLowOnEmptyDatabaseFails() throws Exception {
+        Map<String, Object> dashboard = validDashboard();
+        systemCard(dashboard, "riskLevel").put("value", "LOW");
+
+        assertValidatorFails(dashboard, "riskLevel reports an evidenced risk conclusion");
+    }
+
+    private void assertValidatorFails(Map<String, Object> dashboard, String expected) throws Exception {
+        ScriptResult result = runValidator(dashboard, validReview(), validBaseline());
+
+        assertThat(result.exitCode()).as(result.output()).isNotZero();
+        assertThat(result.output()).contains(expected);
+    }
+
+    private void assertValidatorPasses(Map<String, Object> dashboard, String expected) throws Exception {
+        ScriptResult result = runValidator(dashboard, validReview(), validBaseline());
+
+        assertThat(result.exitCode()).as(result.output()).isZero();
+        assertThat(result.output()).contains(expected);
     }
 
     private ScriptResult runValidator(Map<String, Object> dashboard,

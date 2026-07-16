@@ -12,11 +12,11 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "Greenfield P3-G evidence integrity closure on Draft PR #1128; Round 1 fixes await Round 2 re-review"
-active_block_cn: "Greenfield P3-G 证据完整性收口，Draft PR #1128 第一轮整改等待第二轮复审"
+active_block: "Greenfield P3-G evidence integrity closure on Draft PR #1128; Round 2 fixes await Round 3 re-review"
+active_block_cn: "Greenfield P3-G 证据完整性收口，Draft PR #1128 第二轮整改等待第三轮复审"
 
-next_required_action: "Perform Reviewer Greenfield P3-G Round 2 re-review on Draft PR #1128; do not start P4 or production deployment."
-next_business_phase: "No further business phase while Draft PR #1128 is unmerged; next action is Round 2 evidence re-review"
+next_required_action: "Perform Reviewer Greenfield P3-G Round 3 re-review on Draft PR #1128; do not start P4 or production deployment."
+next_business_phase: "No further business phase while Draft PR #1128 is unmerged; next action is Round 3 evidence re-review"
 next_business_phase_allowed: false
 compatibility_next_business_phase_allowed_note: "Compatibility field remains false while the P3-G Draft PR is unmerged. P3-G local evidence is not effective, P4 is blocked, and production deployment remains blocked."
 
@@ -24,7 +24,7 @@ production_deployment_readiness: "BLOCKED"
 
 current_pr: "#1128 Open / Draft / unmerged"
 current_branch: "codex/greenfield-postgresql-first-boot-rehearsal-p3g"
-current_package_pr: "#1128 P3-G Draft PR pending Round 2 re-review and merged-main effectiveness"
+current_package_pr: "#1128 P3-G Draft PR pending Round 3 re-review and merged-main effectiveness"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -198,6 +198,7 @@ notes:
   - "P3.1 generated release-like rehearsal passed source inventory, container-native backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, application smoke, strict attestation parsing, and zero unexpected business writes. It proves the harness only and is not production history."
   - "P3.2 sanitized-clone route and final gate are NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION, not PASS. Merged main 72b5bc83f4d670d4adebc03f5fe28e0bb9bba535 makes the Greenfield provenance decision effective."
   - "The P3-G branch records PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL for Fresh V1-V7, official backup/restore, full Primary/Recovery fingerprints, and read-only application smoke. It remains unmerged and is not effective."
+  - "P3-G Reviewer Round 2 closure enforces exact formal market-bias/asset-state values, WAIT-or-empty market bias, strict assets/timeframe JSON shapes, and field-level empty system semantics; Round 3 independent re-review remains required."
   - "P3-G is local evidence only, not server, secret-store, live-provider, P4, or production-deployment authorization."
   - "Merged main 72b5bc83f4d670d4adebc03f5fe28e0bb9bba535 is the effective Greenfield provenance baseline; the P3-G branch remains pending review/merge."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."

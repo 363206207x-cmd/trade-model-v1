@@ -792,7 +792,10 @@ P3-G uses only disposable localhost resources and the exact confirmation
    Primary restart, and Recovery, with `prod-smoke.sh` fetching through a
    digest-pinned client on the internal network and validating only transient
    responses on the host under the explicit local split-smoke confirmation;
-   it separately verifies empty asset cards and system-state cards fail closed;
+   it separately verifies empty asset cards and system-state cards fail closed,
+   restricts empty market bias to `WAIT`/empty, rejects non-enum asset states,
+   requires `assets` to be an actual array, and requires each placeholder's
+   `timeframeFreshness` to be an exact four-key `NO_DATA` object;
    and
 9. keeps Flyway, schedulers, provider/AI calls, trading, and external sends
    disabled throughout.
