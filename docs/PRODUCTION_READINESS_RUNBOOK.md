@@ -114,6 +114,8 @@ PDR-M6A adds a disciplined evidence framework for the human-run real-server acce
 
 - Evidence template: `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` records the required real-server outputs for Docker Compose config, PostgreSQL startup, Flyway migration, app prod startup, authenticated smoke, backup, restore, HTTPS/reverse-proxy/auth smoke, provider live smoke, and safety boundary checks.
 - Release gate runner: `scripts/prod-release-gate.sh` orchestrates safe checks only. It can run `docker compose config`, `scripts/prod-smoke.sh`, and an optional backup drill when explicitly enabled. It never runs restore automatically and never prints secrets.
+- Release gate smoke integrity: `scripts/prod-release-gate.sh` forces `SMOKE_PHASE=FETCH_AND_VALIDATE`, clears `SMOKE_RESPONSE_DIR`, and clears split-phase confirmation. Inherited split phases or canned response files cannot be counted as production server smoke.
+- Local split smoke boundary: `FETCH` and `VALIDATE` require `SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE`, an existing non-symlink response directory, and non-symlink JSON artifacts. Their output is labeled `LOCAL_CONTROLLED_SPLIT_ONLY`, not production release evidence.
 - Release gate status policy: the script outputs `PRODUCTION_RELEASE_GATE: PASS / FAIL / INCOMPLETE`, but defaults to `INCOMPLETE` when real-server evidence is missing. A script PASS alone is not enough to change readiness.
 - Environment contract: `.env.example` documents `RELEASE_GATE_REQUIRE_DOCKER`, `RELEASE_GATE_REQUIRE_BACKUP`, and `RELEASE_GATE_ALLOW_EXTERNAL_CALLS`; all default to conservative behavior.
 - Required human evidence: production readiness cannot advance unless the evidence template is completed with redacted server outputs and reviewed by the release gate owner.
@@ -754,8 +756,9 @@ cutover, permission to start P4, or production readiness.
 
 See `docs/GREENFIELD_DATABASE_PROVENANCE_DECISION.md`,
 `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`, and
-`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. Greenfield P3-G is next only
-after PR #1127 is merged/effective. P4 remains blocked.
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. PR #1127 is now
+merged/effective; the separately scoped P3-G branch has local controlled
+evidence pending review/merge. P4 remains blocked.
 
 ## Remaining Blockers
 
@@ -771,12 +774,51 @@ after PR #1127 is merged/effective. P4 remains blocked.
 - Deployment packaging is skeletal only and not release-gated.
 - Secrets contract exists as placeholders and LIVE14 documents secret-store and rotation plans; no real secret-store injection or rotation drill exists.
 
+## Greenfield P3-G Local Rehearsal
+
+P3-G uses only disposable localhost resources and the exact confirmation
+`I_CONFIRM_LOCAL_GREENFIELD_EMPTY_DATABASE_REHEARSAL`. Its guarded runner:
+
+1. proves the database is empty before migration;
+2. applies and validates Flyway V1-V7 without baseline, repair, or clean;
+3. confirms repeat migrate applies zero migrations;
+4. separates migration, backup, recovery, and application roles;
+5. executes `prod-backup.sh` and `prod-restore.sh` in a digest-pinned
+   PostgreSQL 16 Ops container;
+6. compares Primary and Recovery structure, full content, Flyway history,
+   schema types, sequence state, and historical-time inventory;
+7. builds the application from an exact committed `git archive` context;
+8. runs the `prod` profile with a read-only database role against Primary,
+   Primary restart, and Recovery, with `prod-smoke.sh` fetching through a
+   digest-pinned client on the internal network and validating only transient
+   responses on the host under the explicit local split-smoke confirmation;
+   it separately verifies empty asset cards and system-state cards fail closed,
+   restricts empty market bias to `WAIT`/empty, rejects non-enum asset states,
+   requires `assets` to be an actual array, and requires each placeholder's
+   `timeframeFreshness` to be an exact four-key `NO_DATA` object;
+   and
+9. keeps Flyway, schedulers, provider/AI calls, trading, and external sends
+   disabled throughout.
+
+The observed branch-local result is
+`PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL`. It is not a server smoke, Secret
+Store/rotation drill, live-provider result, production cutover, or release
+approval. Production Deployment Readiness remains `BLOCKED` and production
+deployment cannot proceed.
+
 ## Next Packages
 
-1. After PR #1127 is merged/effective, Greenfield Production Database First-Boot, Backup/Restore and Read-Only Deployment Rehearsal P3-G.
-2. Controlled real-server, secrets/access/provider, and operational ownership evidence packages as explicitly approved.
-3. P4 only after the Greenfield P3-G gate and its prerequisite review are complete.
-4. Production release-gate status closure only after completed redacted evidence and explicit approval.
+1. Review the P3-G evidence in
+   `docs/GREENFIELD_POSTGRESQL_FIRST_BOOT_REHEARSAL_P3G.md` and decide Draft PR
+   merge readiness.
+2. Merge the P3-G evidence package before treating its local result as
+   effective.
+3. Controlled real-server, secrets/access/provider, and operational ownership
+   evidence packages only as explicitly approved.
+4. Keep P4 blocked until a separately authorized gate follows completed P3-G
+   review; P3-G itself does not authorize P4.
+5. Production release-gate status closure only after completed redacted
+   evidence and explicit approval.
 
 ## Explicit Non-Scope
 

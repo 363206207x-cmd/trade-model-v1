@@ -60,6 +60,9 @@ run_smoke_check() {
   if SMOKE_AUTH_USERNAME="$AUTH_USERNAME" \
     SMOKE_AUTH_PASSWORD="$AUTH_PASSWORD" \
     SMOKE_ALLOW_EXTERNAL_CALLS="$RELEASE_GATE_ALLOW_EXTERNAL_CALLS" \
+    SMOKE_PHASE="FETCH_AND_VALIDATE" \
+    SMOKE_RESPONSE_DIR="" \
+    SMOKE_SPLIT_PHASE_CONFIRM="" \
     bash scripts/prod-smoke.sh; then
     echo "PASS production smoke"
   else

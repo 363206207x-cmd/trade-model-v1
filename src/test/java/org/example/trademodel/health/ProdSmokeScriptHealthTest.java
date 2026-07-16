@@ -31,11 +31,21 @@ class ProdSmokeScriptHealthTest {
         String script = Files.readString(Path.of("scripts", "prod-smoke.sh"), StandardCharsets.UTF_8);
 
         assertThat(script).contains("SMOKE_ALLOW_EXTERNAL_CALLS=\"${SMOKE_ALLOW_EXTERNAL_CALLS:-false}\"");
+        assertThat(script).contains(
+                "SMOKE_PHASE=\"${SMOKE_PHASE:-FETCH_AND_VALIDATE}\"",
+                "SMOKE_RESPONSE_DIR=\"${SMOKE_RESPONSE_DIR:-}\"",
+                "SMOKE_SPLIT_PHASE_CONFIRM=\"${SMOKE_SPLIT_PHASE_CONFIRM:-}\"",
+                "I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE",
+                "FETCH|VALIDATE|FETCH_AND_VALIDATE",
+                "existing non-symlink directory",
+                "artifact must not be a symlink",
+                "SMOKE_EVIDENCE_SCOPE: LOCAL_CONTROLLED_SPLIT_ONLY");
         assertThat(script).contains("dashboard header.dataSourceText missing");
         assertThat(script).contains("marketDataProvider");
         assertThat(script).contains("aiProvider");
         assertThat(script).contains("externalContextProvider");
         assertThat(script).contains("providerReadiness");
+        assertThat(script).contains("\"NOT_CALLED\", \"DISABLED\"");
         assertThat(script).contains("provider status CONNECTED requires SMOKE_ALLOW_EXTERNAL_CALLS=true");
     }
 
@@ -99,6 +109,10 @@ class ProdSmokeScriptHealthTest {
         String script = Files.readString(Path.of("scripts", "prod-release-gate.sh"), StandardCharsets.UTF_8);
 
         assertThat(script).contains("RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=\"${RELEASE_GATE_REQUIRE_PROVIDER_SMOKE:-false}\"");
+        assertThat(script).contains(
+                "SMOKE_PHASE=\"FETCH_AND_VALIDATE\"",
+                "SMOKE_RESPONSE_DIR=\"\"",
+                "SMOKE_SPLIT_PHASE_CONFIRM=\"\"");
         assertThat(script).contains("PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=\"true\"");
         assertThat(script).contains("provider live smoke not required by this script run");
         assertThat(script).contains("provider live smoke did not produce PASS");

@@ -40,16 +40,17 @@ The following do not count as completed:
 ## Current Active Block
 
 - Current merged main evidence includes PR #1125 Dashboard state-semantics closure and PR #1126 / commit `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf` controlled PostgreSQL V1-V7/V6-V7, three-session-timezone, Dashboard validity, aggregate historical-time semantics, and fail-closed app-smoke evidence. Earlier PDR/LIVE, business-stress, provider, and replay evidence remains historical context.
-- Current active block: approved Greenfield provenance closure in Draft PR `#1127`.
+- Current active block: Greenfield P3-G Evidence Integrity Closure Round 2 on Draft PR #1128; fixes await Round 3 independent re-review.
 - Current level: `LOCAL_ACCEPTANCE_FREEZE_DONE effective; PRODUCTION_DEPLOYMENT_READINESS blocked`
-- Capability movement from this P3 branch: none. The runner and tests are evidence tooling only and do not add trading, provider, scheduler, Push, or production deployment behavior.
+- Capability movement from this P3-G branch: controlled local operational evidence only. The runner and tests do not add trading, provider, scheduler, Push, or production deployment behavior.
 - Approved provenance decision: `TMV1-GREENFIELD-20260715-001` selects `GREENFIELD_NEW_DATABASE`, requires no historical business-data preservation, records no existing formal business database, and sets the go-live initial state to `EMPTY`.
 - Current P3.1 result: `PASS_GENERATED_RELEASE_LIKE_REHEARSAL`. The generated non-production V6 dataset completed source inventory, PostgreSQL 16 backup/restore, source/recovery fingerprint matching, V6-to-V7 migration, historical inventory, fail-closed app smoke, strict attestation parsing, and zero unexpected business writes. It proves `P3_HARNESS_AND_GENERATED_REHEARSAL: PASS`; it is not production history or existing-data migration evidence.
 - Current P3.2 result: `NOT_APPLICABLE_BY_APPROVED_GREENFIELD_DECISION`, not PASS. The sanitized-clone route is stopped; no dump search, acquisition, or fabricated sanitized clone is required.
-- Next phase: Greenfield P3-G becomes allowed only after PR #1127 is merged/effective. P4 remains blocked.
-- Effective-state rule: merged main at `c94c99dfa72843e558ac4ce87037bfe71bd5dfaf` remains the P2.1 effective baseline. This Draft branch does not count as completed state.
+- P3-G branch result: `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL`. Fresh Flyway V1-V7, zero-repeat migrate, exact migration seed allowlist, PostgreSQL restart, official backup/restore scripts, Primary/Recovery full fingerprints, separated read-only application roles, and empty-state application smokes passed in a disposable localhost environment. Round 1 locks the production release gate to current-server fetch-and-validate; Round 2 proves exact formal enums, `WAIT`/empty-only market bias, strict asset JSON types, exact no-data timeframes, and field-level empty conclusions.
+- Next action: Reviewer Greenfield P3-G Round 3 re-review and Draft PR #1128 merge-readiness decision. P4 remains blocked.
+- Effective-state rule: merged main at `72b5bc83f4d670d4adebc03f5fe28e0bb9bba535` is the effective Greenfield provenance baseline. This P3-G branch result does not count as completed state until merged.
 
-PDR-M7 is historical production-readiness evidence, not the only currently allowed work. Current allowed work is the Greenfield provenance closure and final review of Draft PR #1127. After it is merged/effective, only an explicitly scoped Greenfield P3-G package may begin. No production server, production DB, dump search or fabrication, live provider call, auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, P4 start, or production-ready claim is allowed.
+PDR-M7 is historical production-readiness evidence, not the only currently allowed work. Current allowed work is review and merge-readiness assessment of the P3-G Draft PR. No production server, production DB, dump search or fabrication, live provider call, auto-open, auto-close, auto-reverse, order execution, auto-trading, external push send, fake positions, fake review records, P4 start, or production-ready claim is allowed.
 
 ## Historical Runtime Slice Log
 

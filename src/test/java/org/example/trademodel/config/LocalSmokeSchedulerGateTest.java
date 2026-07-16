@@ -65,6 +65,7 @@ class LocalSmokeSchedulerGateTest {
                             any(), any(), any(), anyInt(), anyInt(), any(), anyInt());
                     verify(mocks.pushRecheckService, never()).recheck(
                             anyLong(), any(BigDecimal.class), any(RecheckExecutionCommand.class));
+                    verify(mocks.dispatchConfigService, never()).loadOrInit(anyInt(), anyInt(), anyInt());
                 });
     }
 
@@ -134,6 +135,7 @@ class LocalSmokeSchedulerGateTest {
                     assertThat(context).hasSingleBean(PositionSyncScheduler.class);
                     assertThat(context).hasSingleBean(MarketDataScheduler.class);
                     assertThat(context).hasSingleBean(WatchlistLowFrequencyScanScheduler.class);
+                    verify(mocks.dispatchConfigService, never()).loadOrInit(anyInt(), anyInt(), anyInt());
                 });
     }
 
@@ -166,6 +168,7 @@ class LocalSmokeSchedulerGateTest {
 
         runner(mocks).run(context -> {
             assertThat(context).hasSingleBean(PushRecheckScheduler.class);
+            verify(mocks.dispatchConfigService).loadOrInit(50, 3, 5);
             verify(mocks.positionSyncService, never()).syncPositions();
             verify(mocks.analysisSchedulerService, never()).runScheduledCycle();
             verify(mocks.pushRecheckService, never()).recheck(
