@@ -42,6 +42,7 @@ It is not production deployment. It does not access a production server, product
 | xAI / Grok provider smoke | SKIPPED_MISSING_SECRET | `docs/CONTROLLED_AI_PROVIDER_SMOKE_EVIDENCE_RUN.md` | Missing key means no provider call and no PASS evidence. |
 | External context / news / macro provider smoke | SKIPPED_MISSING_SECRET | `docs/CONTROLLED_PROVIDER_LIVE_SMOKE_EVIDENCE_RUN.md` | Missing keys/config and no live harness mean no PASS evidence. |
 | Real server smoke | SKIPPED_MISSING_CONTROLLED_SERVER | `docs/REAL_SERVER_SMOKE_EVIDENCE_GATE.md` | No controlled non-production endpoint was present; no server was contacted. |
+| P3-H disposable deployment integrity | PASS_LOCAL_DISPOSABLE | `docs/CONTROLLED_STAGING_READONLY_TLS_SECRETSTORE_P3H.md` | Exact rule/schema/privilege/input contracts passed in disposable local infrastructure only; no real staging server or Secret Store was accessed. |
 | Auth smoke through proxy | MISSING_EVIDENCE | `docs/HTTPS_REVERSE_PROXY_EVIDENCE_RUN.md` | Real proxy auth smoke has not run. |
 | Real secret-store injection | MISSING_EVIDENCE | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | Plan exists, but no actual store injection proof exists. |
 | Real rotation drill | MISSING_EVIDENCE | `docs/SECRETS_MANAGER_CREDENTIAL_ROTATION_EVIDENCE_RUN.md` | No credential rotation drill has run. |

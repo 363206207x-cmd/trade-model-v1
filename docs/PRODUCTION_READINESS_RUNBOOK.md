@@ -821,7 +821,8 @@ The repository now has explicit `INITIALIZE_GREENFIELD`,
 Initialization uses the deterministic empty-DB ->
 role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app
 health -> proxy health chain. Recovery requires a separate exact confirmation,
-a continuous checksum-valid V1-VN prefix or V7 pre-grant state, exact P3-H
+a continuous checksum-valid V1-VN prefix or V7 pre-grant state, exact
+versioned rule rows and normalized schema fingerprints, exact P3-H
 identity/objects, and zero business rows. Recovery and steady state validate
 core state before refreshing grants, then require the full read-only contract;
 neither requires an empty database or runs baseline, repair, or clean.
@@ -841,6 +842,12 @@ failed-start cleanup with persistent volumes retained, zero app/backup role
 memberships, exact SELECT-only default/Sequence ACLs, and post-reboot V2
 admin/database success with V1 denial.
 
+Round 4 local evidence additionally covers exact V1-V7 rule-default and schema
+contracts, fail-closed rule/schema mutation fixtures, effective SELECT-only
+table privileges, absence of PUBLIC and column-level writes, and strict
+pre-network grammar for staging hostname, SSH host, and SSH user. These remain
+disposable local template results, not authorized-server evidence.
+
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
 non-production Linux server, use full `FETCH_AND_VALIDATE` HTTPS smoke, restore
@@ -855,7 +862,7 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H Offline Harness Round 4 re-review, preserving the
+1. Complete Reviewer P3-H Offline Harness Round 5 re-review, preserving the
    distinction between local template PASS and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.

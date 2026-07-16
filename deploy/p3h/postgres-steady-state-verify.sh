@@ -126,6 +126,11 @@ schema_violation_count="$(${psql_primary} --command="
 [ "${schema_violation_count}" = "0" ] \
   || { echo "P3H_STEADY_STATE_VERIFY: BLOCKED_SCHEMA_STATE" >&2; exit 2; }
 
+if ! /p3h/postgres-versioned-contract-verify.sh 7 STEADY_STATE; then
+  echo "P3H_STEADY_STATE_VERIFY: BLOCKED_VERSIONED_CONTENT_CONTRACT" >&2
+  exit 2
+fi
+
 echo "P3H_CORE_STATE_VERIFY: PASS"
 if [ "${P3H_STEADY_VERIFY_SCOPE}" = "CORE_STATE_VERIFY" ]; then
   echo "P3H_STEADY_STATE_VERIFY: PASS"
@@ -139,17 +144,43 @@ role_membership_count="$(${psql_postgres} --command="
   FROM pg_auth_members m
   JOIN pg_roles member_role ON member_role.oid = m.member
   WHERE member_role.rolname IN ('p3h_app_readonly', 'p3h_backup_reader')")"
-unsafe_grants="$(${psql_primary} --command="
+effective_table_violation_count="$(${psql_primary} --command="
   SELECT count(*)
-  FROM information_schema.role_table_grants
-  WHERE grantee IN ('p3h_app_readonly', 'p3h_backup_reader')
-    AND privilege_type <> 'SELECT'")"
-missing_selects="$(${psql_primary} --command="
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  CROSS JOIN (VALUES ('p3h_app_readonly'), ('p3h_backup_reader')) checked_role(role_name)
+  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+    AND (
+      NOT has_table_privilege(checked_role.role_name, c.oid, 'SELECT')
+      OR has_table_privilege(checked_role.role_name, c.oid, 'INSERT')
+      OR has_table_privilege(checked_role.role_name, c.oid, 'UPDATE')
+      OR has_table_privilege(checked_role.role_name, c.oid, 'DELETE')
+      OR has_table_privilege(checked_role.role_name, c.oid, 'TRUNCATE')
+      OR has_table_privilege(checked_role.role_name, c.oid, 'REFERENCES')
+      OR has_table_privilege(checked_role.role_name, c.oid, 'TRIGGER')
+    )")"
+public_table_write_count="$(${psql_primary} --command="
   SELECT count(*)
-  FROM information_schema.tables
-  WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-    AND (NOT has_table_privilege('p3h_app_readonly', format('%I.%I', table_schema, table_name), 'SELECT')
-      OR NOT has_table_privilege('p3h_backup_reader', format('%I.%I', table_schema, table_name), 'SELECT'))")"
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  CROSS JOIN LATERAL aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+    AND acl.grantee = 0
+    AND acl.privilege_type IN (
+      'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+    )")"
+column_write_count="$(${psql_primary} --command="
+  SELECT count(*)
+  FROM pg_attribute attribute
+  JOIN pg_class c ON c.oid = attribute.attrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
+  LEFT JOIN pg_roles grantee_role ON grantee_role.oid = acl.grantee
+  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+    AND attribute.attnum > 0 AND NOT attribute.attisdropped
+    AND (acl.grantee = 0
+      OR grantee_role.rolname IN ('p3h_app_readonly', 'p3h_backup_reader'))
+    AND acl.privilege_type IN ('INSERT', 'UPDATE', 'REFERENCES')")"
 schema_contract="$(${psql_primary} --command="
   SELECT has_schema_privilege('p3h_app_readonly', 'public', 'USAGE')
      AND NOT has_schema_privilege('p3h_app_readonly', 'public', 'CREATE')
@@ -200,16 +231,27 @@ unsafe_sequence_count="$(${psql_primary} --command="
       OR has_sequence_privilege('p3h_backup_reader', c.oid, 'USAGE')
       OR has_sequence_privilege('p3h_backup_reader', c.oid, 'UPDATE')
     )")"
+public_sequence_write_count="$(${psql_primary} --command="
+  SELECT count(*)
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  CROSS JOIN LATERAL aclexplode(coalesce(c.relacl, acldefault('S', c.relowner))) acl
+  WHERE n.nspname = 'public' AND c.relkind = 'S'
+    AND acl.grantee = 0
+    AND acl.privilege_type IN ('USAGE', 'UPDATE')")"
 
 if [ "${role_membership_count}" != "0" ]; then
   echo "P3H_STEADY_STATE_VERIFY: BLOCKED_ROLE_MEMBERSHIP" >&2
   exit 2
 fi
-if [ "${unsafe_grants}" != "0" ] || [ "${missing_selects}" != "0" ] \
+if [ "${effective_table_violation_count}" != "0" ] \
+    || [ "${public_table_write_count}" != "0" ] \
+    || [ "${column_write_count}" != "0" ] \
     || [ "${schema_contract}" != "t" ] || [ "${database_contract}" != "t" ] \
     || [ "${required_default_selects}" != "4" ] \
     || [ "${unexpected_default_grants}" != "0" ] \
-    || [ "${unsafe_sequence_count}" != "0" ]; then
+    || [ "${unsafe_sequence_count}" != "0" ] \
+    || [ "${public_sequence_write_count}" != "0" ]; then
   echo "P3H_STEADY_STATE_VERIFY: BLOCKED_READONLY_CONTRACT" >&2
   exit 2
 fi
@@ -222,3 +264,6 @@ echo "P3H_ROLE_AND_GRANT_CONTRACT: PASS"
 echo "READONLY_ROLE_MEMBERSHIP_CONTRACT: PASS"
 echo "READONLY_DEFAULT_ACL_CONTRACT: PASS"
 echo "READONLY_SEQUENCE_PRIVILEGE_CONTRACT: PASS"
+echo "READONLY_EFFECTIVE_TABLE_PRIVILEGES: PASS"
+echo "READONLY_COLUMN_PRIVILEGES: PASS"
+echo "PUBLIC_WRITE_PRIVILEGES: NONE"

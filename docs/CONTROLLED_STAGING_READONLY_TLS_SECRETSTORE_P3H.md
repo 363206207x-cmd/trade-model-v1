@@ -58,6 +58,8 @@ HTTPS request was attempted.
 | Greenfield startup order | `PASS_LOCAL_DISPOSABLE`: PostgreSQL healthy -> empty preflight -> role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app healthy -> proxy healthy | `NOT_ATTEMPTED` |
 | Explicit lifecycle mode | `GUARD_PASS`: initialize, Greenfield recovery, and steady-state modes are explicit; recovery requires a separate confirmation and no mode is inferred from database contents | `NOT_ATTEMPTED` |
 | Partial initialization recovery | `PASS_LOCAL_DISPOSABLE`: V1-V3 continuous prefix recovered to V7; non-contiguous history, checksum mismatch, failed migration, unknown object, missing confirmation, and business-data drift fail closed | `NOT_ATTEMPTED` |
+| Versioned rule defaults | `PASS_LOCAL_DISPOSABLE`: V1/V2 require zero rows; V3/V4, V5, and V6/V7 require the exact authoritative full rows for ID, type, key, value, description, version, and enabled state | `NOT_ATTEMPTED` |
+| Versioned PostgreSQL schema | `PASS_LOCAL_DISPOSABLE`: normalized exact fingerprints cover V1-V7 recovery prefixes and exact V7 steady state, including relations, columns, constraints, indexes, sequences/dependencies, RLS/policies, triggers/routines, types, foreign objects, extensions, and owners | `NOT_ATTEMPTED` |
 | Persistent-volume restart | `PASS_LOCAL_DISPOSABLE`: first boot -> retained database volume -> steady-state restart -> reboot-like stop/start, with zero repeated migrations and matching content fingerprints | `NOT_ATTEMPTED` |
 | Active Secret version | `PASS_LOCAL_DISPOSABLE`: after reboot-like restart, V2 database/admin authentication succeeded and both V1 credentials were denied | `NOT_ATTEMPTED` |
 | Failed-start cleanup | `PASS_LOCAL_DISPOSABLE`: measured cleanup stopped/removed PostgreSQL and every project container, removed materialized tmpfs, and preserved Primary/Backup volumes plus source Secrets | `NOT_ATTEMPTED` |
@@ -77,6 +79,8 @@ HTTPS request was attempted.
 | TLS target and TLS 1.3 | `PASS_LOCAL_DISPOSABLE`; remote harness binds URL/host/port and fails TLS 1.3 when the client supports it but the server does not | `NOT_ATTEMPTED` |
 | Read-only application write probe | `DENIED_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
 | Read-only membership/default ACL/Sequence contract | `PASS_LOCAL_DISPOSABLE`: app/backup memberships reject, default ACLs are exact SELECT-only, Sequence USAGE/UPDATE and database CREATE/TEMP are denied | `NOT_ATTEMPTED` |
+| Effective table/PUBLIC/column privilege contract | `PASS_LOCAL_DISPOSABLE`: effective checks prove SELECT-only access; PUBLIC table/Sequence writes and app/backup/PUBLIC column writes are absent; injected privilege drift is rejected | `NOT_ATTEMPTED` |
+| Staging/SSH input grammar | `GUARD_PASS`: canonical staging DNS, SSH DNS/IPv4, and non-reserved POSIX user grammar are enforced after strict Attestation parsing and before archive or network access; injection fixtures fail closed | `NOT_ATTEMPTED` |
 | Secret values in inspect/process arguments | `ABSENT_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
 | Access-log redaction and rate limiting | template/contract prepared | `NOT_ATTEMPTED` |
 | Secret rotations | evidence validator prepared | `NOT_ATTEMPTED` |
@@ -97,7 +101,8 @@ lifecycle entrypoint and requires one explicit mode. `INITIALIZE_GREENFIELD`
 enforces strict empty-object inventory, role/database bootstrap, Flyway V1-V7,
 and grants. `RECOVER_GREENFIELD_INITIALIZATION` requires a distinct exact
 confirmation, validates a continuous checksum-valid V1-VN prefix or a V7
-pre-grant state, exact P3-H identity/objects, and zero business rows, then
+pre-grant state, exact versioned rule-default rows, an exact normalized schema
+fingerprint, P3-H identity/objects, and zero business rows, then
 continues to V7. Recovery and steady state both run `CORE_STATE_VERIFY`,
 refresh grants, then run `FULL_READONLY_STATE_VERIFY`. No mode runs Flyway
 baseline, repair, or clean. Recovery's pre-migrate Flyway validation ignores
@@ -135,9 +140,13 @@ then proves V1 admin HTTP 401/403 and V1 database connection denial.
 The app and backup roles are required to have zero `pg_auth_members` rows, so
 neither can `SET ROLE` to migration, recovery, bootstrap, or another user
 role. Read-only grant refresh first clears existing/default table and Sequence
-ACLs and then grants only SELECT. Full verification rejects non-SELECT default
-ACL entries, Sequence USAGE/UPDATE, table writes, schema CREATE, database
-CREATE/TEMP, missing SELECT, or any role membership.
+ACLs, PUBLIC table/Sequence ACLs, and app/backup/PUBLIC column-level write ACLs,
+then grants only SELECT. Full verification uses effective privilege checks and
+rejects non-SELECT default ACL entries, Sequence USAGE/UPDATE, PUBLIC writes,
+column INSERT/UPDATE/REFERENCES, table writes, schema CREATE, database
+CREATE/TEMP, missing SELECT, or any role membership. The application write
+probe disables session-default read-only mode first, so its denial independently
+proves the permission layer.
 
 Only `SYSTEMD_CREDENTIALS` is implemented for a future server run. The unit
 uses `LoadCredentialEncrypted=` and a bounded adapter; SOPS, Vault, and cloud
@@ -263,16 +272,43 @@ without USAGE/UPDATE, and denied database CREATE/TEMP. The reboot-like path
 rechecks all four credential outcomes: V2 admin/database succeed and V1
 admin/database are denied.
 
+## Round 4 Local Integrity Evidence
+
+The versioned rule contract compares every authoritative V3/V5/V6 default
+field in both directions. V1/V2 require an empty `tm_rule_config`; V3/V4 allow
+only V3 rows; V5 adds exactly V5 rows; V6/V7 add exactly V6 rows. Mutated
+value, key, type, version, enabled state, missing rows, unexpected rows, and V7
+provider/derivatives values all block recovery or steady start. Recovery does
+not overwrite an unknown rule value.
+
+The normalized PostgreSQL contract records stable V1-V7 fingerprints for
+complete relation and column shape, ordering/types/defaults/nullability,
+owners, constraints, indexes, sequences and dependencies, RLS/policies,
+triggers/routines, enum/domain types, foreign objects, and extensions. Recovery
+requires the exact applied prefix; core/full steady verification requires exact
+V7. Dropped unique/index/check objects, column type/null/default changes,
+extra/missing columns, and RLS drift are rejected in disposable PostgreSQL 16.
+
+Grant refresh removes PUBLIC table/Sequence privileges and column-level write
+privileges. Full verification checks effective privileges for both read-only
+roles and exact absence of PUBLIC and column writes. PUBLIC table
+INSERT/UPDATE, PUBLIC Sequence USAGE, app/backup column UPDATE, membership, and
+default-ACL drift fixtures all fail closed. Canonical staging DNS, SSH
+DNS/IPv4, and deployment-user grammar are enforced before network access;
+semicolon, newline, Nginx directive, SSH option/userinfo, whitespace, and
+leading-dash fixtures are rejected. A valid staging hostname is rendered into
+the Nginx template and passes `nginx -t` in the disposable smoke.
+
 ## Local Validation
 
-- P3-H contract suite: 106 tests, 0 failures, 0 errors; its single full Docker
+- P3-H contract suite: 130 tests, 0 failures, 0 errors; its single full Docker
   lifecycle test is skipped by default and is never represented as PASS when
   skipped.
 - Environment-gated P3-H Docker JUnit: `PASS` when explicitly enabled.
 - Disposable Compose template smoke:
   `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`.
 - Disposable resource cleanup: `PASS`.
-- Full Maven suite: 3,774 tests, 0 failures, 0 errors, 14 environment-gated
+- Full Maven suite: 3,801 tests, 0 failures, 0 errors, 14 environment-gated
   skips. No skipped test is represented as PASS.
 - Delivery, workflow-contract, state, YAML, and diff checks are recorded in
   the PR validation summary for the exact package head.
@@ -305,6 +341,6 @@ that script's path guard.
 `P3H_RESULT: NOT_COMPLETE`
 
 Production readiness remains `BLOCKED`; production deployment cannot
-proceed. The next task is **Reviewer P3-H Offline Harness Round 4 Re-review**.
+proceed. The next task is **Reviewer P3-H Offline Harness Round 5 Re-review**.
 Any later real execution requires a new explicit authorized input set and must
 preserve the no-secret-output contract.

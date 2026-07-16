@@ -29,7 +29,7 @@ fi
 
 if psql --host=postgres --username=p3h_app_readonly \
     --dbname=trade_model_v1_p3h_primary --no-psqlrc \
-    --command="UPDATE flyway_schema_history SET description=description WHERE false" \
+    --command="SET default_transaction_read_only=off; UPDATE flyway_schema_history SET description=description WHERE false" \
     >/dev/null 2>"${write_probe_log}"; then
   echo "P3H_APP_ROLE_PROBE: BLOCKED_WRITE_ALLOWED" >&2
   exit 2

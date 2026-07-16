@@ -153,48 +153,10 @@ ${psql_primary} --command="
   \$\$" >/dev/null \
   || { echo "P3H_GREENFIELD_RECOVERY_VERIFY: BLOCKED_BUSINESS_DATA" >&2; exit 2; }
 
-rule_config_violation_count="$(${psql_primary} --command="
-  WITH expected(rule_id, min_version) AS (VALUES
-    ('cfg-ai-conflict-level1-max',3), ('cfg-ai-conflict-level2-max',3),
-    ('cfg-ai-conflict-level3-max',3), ('cfg-ai-conflict-single-objection-max',3),
-    ('cfg-confused-enter-threshold',3), ('cfg-confused-exit-cycles',3),
-    ('cfg-confused-exit-threshold',3), ('cfg-confused-push-block-threshold',3),
-    ('cfg-hot-reset-liquidity-drain',3), ('cfg-hot-reset-oi-collapse',3),
-    ('cfg-hot-reset-price-move',3), ('cfg-hot-reset-systemic-severity',3),
-    ('cfg-missed-max-mae-ratio',3), ('cfg-missed-min-mfe-ratio',3),
-    ('cfg-missed-review-window-hours',3), ('cfg-push-recheck-confused-block',3),
-    ('cfg-push-recheck-confused-wait',3), ('cfg-push-recheck-drift-ratio',3),
-    ('cfg-push-recheck-exec-feas-wait',3),
-    ('cfg-provider-scan-data-quality',5), ('cfg-provider-scan-downgrade-cooldown',5),
-    ('cfg-provider-scan-emergency-confused',5), ('cfg-provider-scan-emergency-hold',5),
-    ('cfg-provider-scan-emergency-liquidation',5), ('cfg-provider-scan-emergency-price',5),
-    ('cfg-provider-scan-high-atr',5), ('cfg-provider-scan-high-funding',5),
-    ('cfg-provider-scan-high-hold',5), ('cfg-provider-scan-high-oi',5),
-    ('cfg-provider-scan-high-price',5), ('cfg-provider-scan-high-spread',5),
-    ('cfg-provider-scan-high-volume',5), ('cfg-provider-scan-near-boundary',5),
-    ('cfg-provider-scan-recovery-cycles',5), ('cfg-provider-scan-standard-confused',5),
-    ('cfg-deriv-eight-score-cap',6), ('cfg-deriv-eight-score-factor',6),
-    ('cfg-deriv-exchange-concentration',6), ('cfg-deriv-funding-negative',6),
-    ('cfg-deriv-funding-positive',6), ('cfg-deriv-high-risk-downgrade',6),
-    ('cfg-deriv-liquidation-15m',6), ('cfg-deriv-liquidation-5m',6),
-    ('cfg-deriv-liquidation-imbalance',6), ('cfg-deriv-long-crowding',6),
-    ('cfg-deriv-max-age',6), ('cfg-deriv-min-data-quality',6),
-    ('cfg-deriv-min-datasets',6), ('cfg-deriv-monitor-refresh',6),
-    ('cfg-deriv-oi-15m-strong',6), ('cfg-deriv-oi-15m-weak',6),
-    ('cfg-deriv-oi-5m-strong',6), ('cfg-deriv-oi-5m-weak',6),
-    ('cfg-deriv-partial-penalty',6), ('cfg-deriv-required-confirm',6),
-    ('cfg-deriv-score-cap',6), ('cfg-deriv-short-crowding',6),
-    ('cfg-deriv-stale-penalty',6), ('cfg-deriv-trend-score-cap',6)
-  ), expected_for_version AS (
-    SELECT rule_id FROM expected WHERE min_version <= ${applied_version}
-  ), differences AS (
-    (SELECT rule_id FROM expected_for_version EXCEPT SELECT rule_id FROM tm_rule_config)
-    UNION ALL
-    (SELECT rule_id FROM tm_rule_config EXCEPT SELECT rule_id FROM expected_for_version)
-  )
-  SELECT count(*) FROM differences")"
-[ "${rule_config_violation_count}" = "0" ] \
-  || { echo "P3H_GREENFIELD_RECOVERY_VERIFY: BLOCKED_RULE_DEFAULT_STATE" >&2; exit 2; }
+if ! /p3h/postgres-versioned-contract-verify.sh "${applied_version}" RECOVERY; then
+  echo "P3H_GREENFIELD_RECOVERY_VERIFY: BLOCKED_VERSIONED_CONTENT_CONTRACT" >&2
+  exit 2
+fi
 
 echo "P3H_GREENFIELD_RECOVERY_VERIFY: PASS"
 echo "P3H_RECOVERY_APPLIED_PREFIX: ${applied_versions}"

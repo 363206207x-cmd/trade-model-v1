@@ -18,8 +18,9 @@ Flyway V1-V7, read-only/default grants, tmpfs Secret materialization,
 application health, then proxy health. `RECOVER_GREENFIELD_INITIALIZATION`
 requires `I_CONFIRM_RECOVER_CONTROLLED_GREENFIELD_INITIALIZATION` and accepts
 only a checksum-valid continuous Flyway V1-VN prefix (or V7 before grants),
-the exact P3-H role/database identity, known migration objects, and zero
-business rows. It continues migrate to V7, runs core verification, refreshes
+the exact versioned rule-default rows and normalized PostgreSQL schema
+fingerprint, the exact P3-H role/database identity, known migration objects,
+and zero business rows. It continues migrate to V7, runs core verification, refreshes
 grants, and then runs full read-only verification. `STEADY_STATE_START` accepts
 only an already valid V7 database and uses the same core -> grants -> full
 sequence. Recovery pre-validates the applied prefix while ignoring only
@@ -35,9 +36,16 @@ database/backup volumes are preserved.
 
 The app and backup roles may not be members of any other role. Default table
 and Sequence ACLs are cleared before exact SELECT-only grants are applied;
-existing Sequence USAGE/UPDATE and database CREATE/TEMP privileges are denied
-and verified. A reboot-like local restart rechecks V2 database/admin success
+PUBLIC table/Sequence privileges and app/backup/PUBLIC column writes are
+cleared as well. Effective table permissions, Sequence USAGE/UPDATE, column
+writes, and database CREATE/TEMP privileges are denied and verified. A
+reboot-like local restart rechecks V2 database/admin success
 and V1 database/admin denial before active-version preservation is reported.
+
+The controlled runner validates strict server and Secret Store Attestations
+before accepting the staging DNS name, SSH DNS/IPv4 host, and non-reserved
+POSIX deployment user. All grammar checks complete before source upload,
+`ssh-keyscan`, or SSH access; raw values are never emitted as evidence.
 
 The active database/admin versions are explicit non-sensitive `V1|V2`
 settings. A separately confirmed database activation action changes the role

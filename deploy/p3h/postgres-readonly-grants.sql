@@ -43,15 +43,47 @@ REVOKE ALL ON SCHEMA public FROM p3h_backup_reader;
 GRANT USAGE ON SCHEMA public TO p3h_app_readonly;
 GRANT USAGE ON SCHEMA public TO p3h_backup_reader;
 
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM p3h_app_readonly;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM p3h_app_readonly;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM p3h_backup_reader;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM p3h_backup_reader;
+
+DO $$
+DECLARE
+    column_grant record;
+    grantee_sql text;
+BEGIN
+    FOR column_grant IN
+        SELECT DISTINCT table_schema, table_name, column_name, grantee
+        FROM information_schema.column_privileges
+        WHERE table_schema = 'public'
+          AND grantee IN ('p3h_app_readonly', 'p3h_backup_reader', 'PUBLIC')
+          AND privilege_type IN ('INSERT', 'UPDATE', 'REFERENCES')
+    LOOP
+        grantee_sql := CASE
+            WHEN column_grant.grantee = 'PUBLIC' THEN 'PUBLIC'
+            ELSE quote_ident(column_grant.grantee)
+        END;
+        EXECUTE format(
+            'REVOKE ALL PRIVILEGES (%I) ON TABLE %I.%I FROM %s',
+            column_grant.column_name, column_grant.table_schema,
+            column_grant.table_name, grantee_sql
+        );
+    END LOOP;
+END
+$$;
+
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO p3h_app_readonly;
 GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO p3h_app_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO p3h_backup_reader;
 GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO p3h_backup_reader;
 
+ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    REVOKE ALL ON TABLES FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    REVOKE ALL ON SEQUENCES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
     REVOKE ALL ON TABLES FROM p3h_app_readonly;
 ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public

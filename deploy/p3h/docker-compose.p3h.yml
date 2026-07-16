@@ -141,6 +141,9 @@ services:
       - postgres_admin_password
     volumes:
       - ./postgres-steady-state-verify.sh:/p3h/postgres-steady-state-verify.sh:ro
+      - ./postgres-versioned-contract-verify.sh:/p3h/postgres-versioned-contract-verify.sh:ro
+      - ./postgres-rule-defaults-verify.sql:/p3h/postgres-rule-defaults-verify.sql:ro
+      - ./postgres-schema-contract.sql:/p3h/postgres-schema-contract.sql:ro
     networks:
       - p3h_backend
     restart: "no"
@@ -156,6 +159,9 @@ services:
       - postgres_admin_password
     volumes:
       - ./postgres-greenfield-recovery-verify.sh:/p3h/postgres-greenfield-recovery-verify.sh:ro
+      - ./postgres-versioned-contract-verify.sh:/p3h/postgres-versioned-contract-verify.sh:ro
+      - ./postgres-rule-defaults-verify.sql:/p3h/postgres-rule-defaults-verify.sql:ro
+      - ./postgres-schema-contract.sql:/p3h/postgres-schema-contract.sql:ro
     networks:
       - p3h_backend
     restart: "no"

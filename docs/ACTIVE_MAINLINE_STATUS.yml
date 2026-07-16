@@ -15,8 +15,8 @@ existing_module_maturity: "PARTIAL"
 active_block: "P3-H offline harness and disposable local template smoke pass, but real staging is BLOCKED_MISSING_AUTHORIZED_INPUT; server and real-secret access were not attempted"
 active_block_cn: "P3-H 离线 Harness 与一次性本地模板 Smoke 已通过，但真实 Staging 因授权输入缺失而阻断；未尝试服务器或真实 Secret 访问"
 
-next_required_action: "Reviewer P3-H Offline Harness Round 4 re-review; do not start P4 or production deployment."
-next_business_phase: "Reviewer P3-H Offline Harness Round 4 Re-review"
+next_required_action: "Reviewer P3-H Offline Harness Round 5 re-review; do not start P4 or production deployment."
+next_business_phase: "Reviewer P3-H Offline Harness Round 5 Re-review"
 next_business_phase_allowed: false
 compatibility_next_business_phase_allowed_note: "Compatibility field remains false while the P3-H package is unmerged and controlled server inputs are missing. P4 and production deployment remain blocked."
 
@@ -24,7 +24,7 @@ production_deployment_readiness: "BLOCKED"
 
 current_pr: "#1129 Open / Draft / unmerged"
 current_branch: "codex/staging-readonly-tls-secrets-p3h"
-current_package_pr: "#1129 P3-H offline integrity closure with local disposable template PASS; real staging remains blocked"
+current_package_pr: "#1129 P3-H Round 4 exact rule/schema/privilege/input integrity closure with local disposable template PASS; real staging remains blocked"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -220,6 +220,7 @@ notes:
   - "P3-H Round 1 closes deterministic bootstrap, fixed non-root Secret materialization, implemented-backend, runtime-mount, strict-attestation, Host-header, TLS-target, and TLS-1.3 template gaps."
   - "P3-H Round 2 adds explicit initialize/steady modes, retained-volume and reboot-like restarts, V2 activation persistence, failed-start cleanup, strict object inventory, exact SSH line pinning, exact Git archive image builds, and systemd-only lifecycle ownership."
   - "P3-H Round 3 adds explicit confirmed partial-initialization recovery, core/full verification sequencing, measured zero-container failed-start cleanup, exact read-only membership/default-ACL/Sequence contracts, and post-reboot V2 admin/database success with V1 denial."
+  - "P3-H Round 4 adds exact versioned full-row rule defaults, exact normalized V1-V7 schema fingerprints, effective/PUBLIC/column read-only privilege closure, strict staging/SSH input grammar, and real disposable drift/injection rejection fixtures."
   - "P3-H offline harness is PASS and the actual disposable local Compose template smoke is PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE; this is not controlled-staging evidence."
   - "P3-H result remains NOT_COMPLETE with REAL_STAGING BLOCKED_MISSING_AUTHORIZED_INPUT, SERVER_ACCESS and SECRET_ACCESS NOT_ATTEMPTED; no server evidence is represented as PASS."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."

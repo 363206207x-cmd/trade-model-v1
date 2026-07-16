@@ -37,8 +37,11 @@ pinning, exact Git archive image attribution, and injected-failure cleanup.
 Round 3 adds confirmed partial-initialization recovery, core/full state
 verification, measured cleanup that stops PostgreSQL while preserving its
 volume, fail-closed role membership checks, exact default ACL/Sequence
-privileges, and post-reboot V2 admin/database success with V1 denial. This is local
-template evidence only. No authorized server or real Secret Store was
+privileges, and post-reboot V2 admin/database success with V1 denial. Round 4
+adds exact full-row rule defaults for every Flyway prefix, exact normalized
+V1-V7 schema fingerprints, effective/PUBLIC/column privilege denial, strict
+staging/SSH input grammar, and disposable mutation/injection rejection
+fixtures. This is local template evidence only. No authorized server or real Secret Store was
 accessed; `REAL_STAGING_STATUS` remains
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, P4 is not allowed, and Production
 Deployment Readiness remains `BLOCKED`.

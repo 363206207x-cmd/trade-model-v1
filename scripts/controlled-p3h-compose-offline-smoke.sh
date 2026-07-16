@@ -224,6 +224,44 @@ if "${ROOT_DIR}/scripts/p3h-filter-known-hosts.sh" \
   blocked "BLOCKED_SSH_ZERO_MATCH_ACCEPTED"
 fi
 
+expect_input_contract_rejection() {
+  local contract_type="$1"
+  local fixture_name="$2"
+  local fixture_value="$3"
+  if "${ROOT_DIR}/scripts/p3h-controlled-input-contract.sh" \
+      "${contract_type}" "${fixture_value}" >/dev/null 2>&1; then
+    blocked "BLOCKED_INPUT_CONTRACT_ACCEPTED_${fixture_name}"
+  fi
+}
+
+CURRENT_STAGE="controlled-input-injection-contract"
+"${ROOT_DIR}/scripts/p3h-controlled-input-contract.sh" \
+  STAGING_HOSTNAME stage.example.invalid >/dev/null \
+  || blocked "BLOCKED_CANONICAL_STAGING_HOSTNAME"
+"${ROOT_DIR}/scripts/p3h-controlled-input-contract.sh" \
+  SSH_HOST stage.example.invalid >/dev/null \
+  || blocked "BLOCKED_CANONICAL_SSH_HOST"
+"${ROOT_DIR}/scripts/p3h-controlled-input-contract.sh" \
+  SSH_USER p3h-deploy >/dev/null \
+  || blocked "BLOCKED_CANONICAL_SSH_USER"
+expect_input_contract_rejection STAGING_HOSTNAME HOSTNAME_SEMICOLON \
+  'stage.example.invalid;load_module'
+expect_input_contract_rejection STAGING_HOSTNAME HOSTNAME_NEWLINE \
+  $'stage.example.invalid\nserver_name injected.invalid'
+expect_input_contract_rejection STAGING_HOSTNAME HOSTNAME_NGINX_DIRECTIVE \
+  'stage.example.invalid{include=/tmp/x;}'
+expect_input_contract_rejection STAGING_HOSTNAME HOSTNAME_LEADING_DASH \
+  '-stage.example.invalid'
+expect_input_contract_rejection STAGING_HOSTNAME HOSTNAME_INVALID_LABEL \
+  'stage.-invalid.example'
+expect_input_contract_rejection SSH_HOST SSH_HOST_OPTION \
+  '-oProxyCommand=invalid'
+expect_input_contract_rejection SSH_HOST SSH_HOST_USERINFO \
+  'operator@stage.example.invalid'
+expect_input_contract_rejection SSH_USER SSH_USER_AT_SIGN 'p3h@deploy'
+expect_input_contract_rejection SSH_USER SSH_USER_WHITESPACE 'p3h deploy'
+expect_input_contract_rejection SSH_USER SSH_USER_OPTION '-oProxyCommand'
+
 CURRENT_STAGE="compose-config"
 run_bounded 60 compose config --quiet \
   || blocked "BLOCKED_COMPOSE_CONFIG"
@@ -307,6 +345,28 @@ expect_recovery_rejection() {
     || blocked "BLOCKED_RECOVERY_FIXTURE_ACCEPTED_${fixture_name}"
 }
 
+expect_recovery_contract_rejection() {
+  local fixture_name="$1"
+  set +e
+  compose run --rm --no-deps greenfield-recovery-verify >/dev/null 2>&1
+  local verify_status=$?
+  set -e
+  [ "${verify_status}" -ne 0 ] \
+    || blocked "BLOCKED_RECOVERY_CONTRACT_DRIFT_ACCEPTED_${fixture_name}"
+}
+
+reset_to_v3_recovery_fixture() {
+  run_bounded 180 compose --profile validation down --volumes --remove-orphans >/dev/null \
+    || blocked "BLOCKED_RECOVERY_V3_RESET"
+  start_postgres_for_recovery_fixture
+  compose run --rm --no-deps role-bootstrap >/dev/null \
+    || blocked "BLOCKED_RECOVERY_V3_ROLE_BOOTSTRAP"
+  compose run --rm --no-deps -e FLYWAY_TARGET=3 migrate >/dev/null \
+    || blocked "BLOCKED_RECOVERY_V3_MIGRATE"
+  [ "$(flyway_success_count)" = "3" ] \
+    || blocked "BLOCKED_RECOVERY_V3_VERSION"
+}
+
 restore_flyway_history_fixture() {
   start_postgres_for_recovery_fixture
   psql_admin trade_model_v1_p3h_primary "TRUNCATE TABLE flyway_schema_history" \
@@ -379,6 +439,139 @@ start_postgres_for_recovery_fixture
 psql_admin trade_model_v1_p3h_primary \
   "DROP TABLE public.p3h_unknown_business_object" \
   || blocked "BLOCKED_UNKNOWN_OBJECT_FIXTURE_CLEANUP"
+
+CURRENT_STAGE="versioned-rule-default-content-drift"
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_value='71' WHERE rule_id='cfg-ai-conflict-level3-max'" \
+  || blocked "BLOCKED_RULE_VALUE_FIXTURE_SETUP"
+expect_recovery_contract_rejection RULE_VALUE_MUTATION
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_value='70' WHERE rule_id='cfg-ai-conflict-level3-max'" \
+  || blocked "BLOCKED_RULE_VALUE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_key='hot_reset_config.mutated_price_move' WHERE rule_id='cfg-hot-reset-price-move'" \
+  || blocked "BLOCKED_RULE_KEY_FIXTURE_SETUP"
+expect_recovery_contract_rejection RULE_KEY_MUTATION
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_key='hot_reset_config.extreme_price_move_ratio_threshold' WHERE rule_id='cfg-hot-reset-price-move'" \
+  || blocked "BLOCKED_RULE_KEY_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_type='mutated_type' WHERE rule_id='cfg-hot-reset-oi-collapse'" \
+  || blocked "BLOCKED_RULE_TYPE_FIXTURE_SETUP"
+expect_recovery_contract_rejection RULE_TYPE_MUTATION
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_type='hot_reset_config' WHERE rule_id='cfg-hot-reset-oi-collapse'" \
+  || blocked "BLOCKED_RULE_TYPE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET version='v9.9' WHERE rule_id='cfg-confused-enter-threshold'" \
+  || blocked "BLOCKED_RULE_VERSION_FIXTURE_SETUP"
+expect_recovery_contract_rejection RULE_VERSION_MUTATION
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET version='v1.0' WHERE rule_id='cfg-confused-enter-threshold'" \
+  || blocked "BLOCKED_RULE_VERSION_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET enabled=false WHERE rule_id='cfg-hot-reset-systemic-severity'" \
+  || blocked "BLOCKED_RULE_ENABLED_FIXTURE_SETUP"
+expect_recovery_contract_rejection RULE_DISABLED_MUTATION
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET enabled=true WHERE rule_id='cfg-hot-reset-systemic-severity'" \
+  || blocked "BLOCKED_RULE_ENABLED_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary "
+  INSERT INTO tm_rule_config(rule_id, rule_type, rule_key, rule_value, description, version, enabled)
+  VALUES ('cfg-p3h-unexpected', 'p3h_fixture', 'p3h.fixture.unexpected', '1',
+          'P3-H controlled unexpected rule fixture', 'v1.0', true)" \
+  || blocked "BLOCKED_UNEXPECTED_RULE_FIXTURE_SETUP"
+expect_recovery_contract_rejection UNEXPECTED_RULE_ROW
+psql_admin trade_model_v1_p3h_primary \
+  "DELETE FROM tm_rule_config WHERE rule_id='cfg-p3h-unexpected'" \
+  || blocked "BLOCKED_UNEXPECTED_RULE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "DELETE FROM tm_rule_config WHERE rule_id='cfg-push-recheck-drift-ratio'" \
+  || blocked "BLOCKED_MISSING_RULE_FIXTURE_SETUP"
+expect_recovery_contract_rejection MISSING_RULE_ROW
+psql_admin trade_model_v1_p3h_primary "
+  INSERT INTO tm_rule_config(rule_id, rule_type, rule_key, rule_value, description, version, enabled)
+  VALUES ('cfg-push-recheck-drift-ratio', 'push_recheck_config',
+          'push_recheck_config.drift_ratio_threshold', '0.02',
+          'Push recheck drift ratio threshold', 'v1.0', true)" \
+  || blocked "BLOCKED_MISSING_RULE_FIXTURE_CLEANUP"
+
+CURRENT_STAGE="recovery-schema-contract-drift"
+psql_admin trade_model_v1_p3h_primary \
+  "DROP INDEX uk_tm_analysis_run_idempotency_key" \
+  || blocked "BLOCKED_DROP_UNIQUE_INDEX_FIXTURE_SETUP"
+expect_recovery_contract_rejection DROP_UNIQUE_INDEX
+psql_admin trade_model_v1_p3h_primary \
+  "CREATE UNIQUE INDEX uk_tm_analysis_run_idempotency_key ON tm_analysis_run(idempotency_key)" \
+  || blocked "BLOCKED_DROP_UNIQUE_INDEX_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_execution_plan DROP CONSTRAINT ck_tm_execution_plan_safety_flags" \
+  || blocked "BLOCKED_DROP_CHECK_FIXTURE_SETUP"
+expect_recovery_contract_rejection DROP_SAFETY_CHECK
+psql_admin trade_model_v1_p3h_primary "
+  ALTER TABLE tm_execution_plan ADD CONSTRAINT ck_tm_execution_plan_safety_flags CHECK (
+    manual_review_required = TRUE
+    AND not_trade_instruction = TRUE
+    AND not_executable = TRUE
+    AND not_auto_trading = TRUE
+    AND not_order_execution = TRUE
+    AND not_user_position_creation = TRUE
+  )" || blocked "BLOCKED_DROP_CHECK_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ALTER COLUMN rule_version TYPE varchar(64)" \
+  || blocked "BLOCKED_COLUMN_TYPE_FIXTURE_SETUP"
+expect_recovery_contract_rejection ALTER_COLUMN_TYPE
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ALTER COLUMN rule_version TYPE varchar(32)" \
+  || blocked "BLOCKED_COLUMN_TYPE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ALTER COLUMN symbol DROP NOT NULL" \
+  || blocked "BLOCKED_COLUMN_NULLABILITY_FIXTURE_SETUP"
+expect_recovery_contract_rejection ALTER_COLUMN_NULLABILITY
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ALTER COLUMN symbol SET NOT NULL" \
+  || blocked "BLOCKED_COLUMN_NULLABILITY_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ALTER COLUMN attempt_count SET DEFAULT 2" \
+  || blocked "BLOCKED_COLUMN_DEFAULT_FIXTURE_SETUP"
+expect_recovery_contract_rejection ALTER_COLUMN_DEFAULT
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ALTER COLUMN attempt_count SET DEFAULT 1" \
+  || blocked "BLOCKED_COLUMN_DEFAULT_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ADD COLUMN p3h_unexpected_column integer" \
+  || blocked "BLOCKED_EXTRA_COLUMN_FIXTURE_SETUP"
+expect_recovery_contract_rejection EXTRA_COLUMN
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run DROP COLUMN p3h_unexpected_column" \
+  || blocked "BLOCKED_EXTRA_COLUMN_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run ENABLE ROW LEVEL SECURITY" \
+  || blocked "BLOCKED_RLS_FIXTURE_SETUP"
+expect_recovery_contract_rejection ROW_LEVEL_SECURITY
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run DISABLE ROW LEVEL SECURITY" \
+  || blocked "BLOCKED_RLS_FIXTURE_CLEANUP"
+
+# A dropped migrated column cannot be recreated with the original catalog position.
+# Run it last, prove rejection, then rebuild the disposable V3 prefix exactly.
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_analysis_run DROP COLUMN error_message" \
+  || blocked "BLOCKED_MISSING_COLUMN_FIXTURE_SETUP"
+expect_recovery_contract_rejection MISSING_COLUMN
+reset_to_v3_recovery_fixture
 
 set +e
 recovery_output="$(run_bounded 360 \
@@ -629,6 +822,47 @@ exercise_failed_start_cleanup DURING_PROXY_HEALTH
 run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
   || blocked "BLOCKED_FINAL_STEADY_STATE_RECOVERY"
 
+CURRENT_STAGE="v7-rule-and-schema-drift"
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_value='61' WHERE rule_id='cfg-provider-scan-data-quality'" \
+  || blocked "BLOCKED_V7_PROVIDER_RULE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V7_PROVIDER_RULE_VALUE
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_value='60' WHERE rule_id='cfg-provider-scan-data-quality'" \
+  || blocked "BLOCKED_V7_PROVIDER_RULE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_value='59' WHERE rule_id='cfg-deriv-min-data-quality'" \
+  || blocked "BLOCKED_V7_DERIV_RULE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V7_DERIV_RULE_VALUE
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE tm_rule_config SET rule_value='60' WHERE rule_id='cfg-deriv-min-data-quality'" \
+  || blocked "BLOCKED_V7_DERIV_RULE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "DROP INDEX idx_tm_ai_call_log_status_time" \
+  || blocked "BLOCKED_V7_MISSING_INDEX_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V7_MISSING_INDEX
+psql_admin trade_model_v1_p3h_primary \
+  "CREATE INDEX idx_tm_ai_call_log_status_time ON tm_ai_call_log(call_status, started_at)" \
+  || blocked "BLOCKED_V7_MISSING_INDEX_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_decision_result ALTER COLUMN valid_from TYPE varchar(64)" \
+  || blocked "BLOCKED_V7_OFFSET_COLUMN_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V7_OFFSET_COLUMN_TYPE
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_decision_result ALTER COLUMN valid_from TYPE timestamp with time zone USING valid_from::timestamptz" \
+  || blocked "BLOCKED_V7_OFFSET_COLUMN_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_user_position ENABLE ROW LEVEL SECURITY" \
+  || blocked "BLOCKED_V7_RLS_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V7_ROW_LEVEL_SECURITY
+psql_admin trade_model_v1_p3h_primary \
+  "ALTER TABLE tm_user_position DISABLE ROW LEVEL SECURITY" \
+  || blocked "BLOCKED_V7_RLS_FIXTURE_CLEANUP"
+
 CURRENT_STAGE="readonly-role-membership-drift"
 psql_admin postgres "GRANT p3h_migration_owner TO p3h_app_readonly" \
   || blocked "BLOCKED_APP_MEMBERSHIP_FIXTURE_SETUP"
@@ -672,6 +906,64 @@ compose run --rm --no-deps steady-state-verify >/dev/null \
 compose --profile validation run --rm --no-deps \
   -e P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V2 app-role-probe >/dev/null \
   || blocked "BLOCKED_SET_ROLE_DENIAL_PROBE"
+
+CURRENT_STAGE="readonly-public-and-column-drift"
+psql_admin trade_model_v1_p3h_primary \
+  "GRANT UPDATE ON tm_rule_config TO PUBLIC" \
+  || blocked "BLOCKED_PUBLIC_UPDATE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection PUBLIC_EFFECTIVE_UPDATE
+psql_admin trade_model_v1_p3h_primary \
+  "REVOKE UPDATE ON tm_rule_config FROM PUBLIC" \
+  || blocked "BLOCKED_PUBLIC_UPDATE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "GRANT INSERT ON tm_rule_config TO PUBLIC" \
+  || blocked "BLOCKED_PUBLIC_INSERT_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection PUBLIC_INSERT
+psql_admin trade_model_v1_p3h_primary \
+  "REVOKE INSERT ON tm_rule_config FROM PUBLIC" \
+  || blocked "BLOCKED_PUBLIC_INSERT_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "GRANT UPDATE(rule_value) ON tm_rule_config TO p3h_app_readonly" \
+  || blocked "BLOCKED_APP_COLUMN_UPDATE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection APP_COLUMN_UPDATE
+psql_admin trade_model_v1_p3h_primary \
+  "REVOKE UPDATE(rule_value) ON tm_rule_config FROM p3h_app_readonly" \
+  || blocked "BLOCKED_APP_COLUMN_UPDATE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "GRANT UPDATE(rule_value) ON tm_rule_config TO p3h_backup_reader" \
+  || blocked "BLOCKED_BACKUP_COLUMN_UPDATE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection BACKUP_COLUMN_UPDATE
+psql_admin trade_model_v1_p3h_primary \
+  "REVOKE UPDATE(rule_value) ON tm_rule_config FROM p3h_backup_reader" \
+  || blocked "BLOCKED_BACKUP_COLUMN_UPDATE_FIXTURE_CLEANUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO PUBLIC" \
+  || blocked "BLOCKED_PUBLIC_SEQUENCE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection PUBLIC_SEQUENCE_USAGE
+psql_admin trade_model_v1_p3h_primary \
+  "REVOKE USAGE ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC" \
+  || blocked "BLOCKED_PUBLIC_SEQUENCE_FIXTURE_CLEANUP"
+
+# Prove the grant refresh normalizes all three indirect write paths together.
+psql_admin trade_model_v1_p3h_primary "
+  GRANT UPDATE ON tm_rule_config TO PUBLIC;
+  GRANT UPDATE(rule_value) ON tm_rule_config TO p3h_app_readonly;
+  GRANT UPDATE(rule_value) ON tm_rule_config TO p3h_backup_reader;
+  GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO PUBLIC" \
+  || blocked "BLOCKED_COMBINED_WRITE_DRIFT_FIXTURE_SETUP"
+P3H_READONLY_GRANTS_MODE=STEADY_STATE \
+  compose run --rm --no-deps readonly-grants >/dev/null \
+  || blocked "BLOCKED_PUBLIC_COLUMN_DRIFT_REPAIR"
+P3H_STEADY_VERIFY_SCOPE=FULL_READONLY_STATE_VERIFY \
+  compose run --rm --no-deps steady-state-verify >/dev/null \
+  || blocked "BLOCKED_PUBLIC_COLUMN_EXACT_CONTRACT"
+compose --profile validation run --rm --no-deps \
+  -e P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V2 app-role-probe >/dev/null \
+  || blocked "BLOCKED_EFFECTIVE_PERMISSION_WRITE_PROBE"
 
 CURRENT_STAGE="final-runtime-verification"
 if ! flyway_state="$(compose exec -T postgres psql --username=p3h_bootstrap \
@@ -748,6 +1040,10 @@ health_code="$(curl --silent --show-error --max-time 20 \
   "https://localhost:${P3H_HTTPS_HOST_PORT}/actuator/health")"
 [ "${health_code}" = "200" ] || blocked "BLOCKED_APPROVED_HOST_HEALTH"
 
+run_bounded 60 compose run --rm --no-deps \
+  -e P3H_STAGING_HOSTNAME=stage.example.invalid proxy nginx -t >/dev/null 2>&1 \
+  || blocked "BLOCKED_CANONICAL_STAGING_NGINX_RENDER"
+
 if openssl s_client -help 2>&1 | grep -q -- '-tls1_3'; then
   run_bounded 10 openssl s_client \
     -connect "localhost:${P3H_HTTPS_HOST_PORT}" -servername localhost \
@@ -781,6 +1077,19 @@ echo "FAILED_START_CLEANUP: PASS"
 echo "READONLY_ROLE_MEMBERSHIP_CONTRACT: PASS"
 echo "READONLY_DEFAULT_ACL_CONTRACT: PASS"
 echo "READONLY_SEQUENCE_PRIVILEGE_CONTRACT: PASS"
+echo "RULE_DEFAULT_CONTENT_CONTRACT: MATCH_EXACT_VERSIONED_ROWS"
+echo "RECOVERY_SCHEMA_CONTRACT: MATCH_EXACT_PREFIX"
+echo "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V7"
+echo "READONLY_EFFECTIVE_TABLE_PRIVILEGES: PASS"
+echo "READONLY_COLUMN_PRIVILEGES: PASS"
+echo "PUBLIC_WRITE_PRIVILEGES: NONE"
+echo "STAGING_HOSTNAME_CONTRACT: PASS_STRICT_DNS"
+echo "SSH_HOST_CONTRACT: PASS_STRICT"
+echo "SSH_USER_CONTRACT: PASS_STRICT"
+echo "RULE_MUTATION_FIXTURES: PASS"
+echo "SCHEMA_DRIFT_FIXTURES: PASS"
+echo "PRIVILEGE_DRIFT_FIXTURES: PASS"
+echo "INPUT_INJECTION_FIXTURES: PASS_BEFORE_NETWORK"
 echo "GREENFIELD_OBJECT_INVENTORY: PASS_STRICT"
 echo "SSH_KNOWN_HOSTS_FILTER: PASS_EXACT_PIN"
 echo "APP_IMAGE_SOURCE: PASS_EXACT_COMMITTED_GIT_ARCHIVE"

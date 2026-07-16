@@ -10,6 +10,8 @@ CURRENT_STAGE="input-presence"
 NETWORK_ACCESS_STARTED=0
 TMP_DIR=""
 
+source "${ROOT_DIR}/scripts/p3h-controlled-input-contract.sh"
+
 P4_ALLOWED="NO"
 PRODUCTION_READINESS="BLOCKED"
 
@@ -305,22 +307,6 @@ case "${P3H_SECRET_MOUNT_DIR}" in
   *'/../'*|*/..|*'/./'*) blocked "BLOCKED_PLAINTEXT_SECRET_DIRECTORY" ;;
 esac
 
-staging_hostname_lower="$(printf '%s' "${P3H_STAGING_HOSTNAME}" | tr '[:upper:]' '[:lower:]')"
-ssh_host_lower="$(printf '%s' "${P3H_SSH_HOST}" | tr '[:upper:]' '[:lower:]')"
-case "${staging_hostname_lower}" in
-  *prod*|*production*|*primary-live*) blocked "BLOCKED_PRODUCTION_INDICATOR" ;;
-esac
-case "${ssh_host_lower}" in
-  *prod*|*production*|*primary-live*) blocked "BLOCKED_PRODUCTION_INDICATOR" ;;
-esac
-
-if ! [[ "${P3H_SSH_PORT}" =~ ^[0-9]+$ ]] \
-    || [ "${P3H_SSH_PORT}" -lt 1 ] || [ "${P3H_SSH_PORT}" -gt 65535 ]; then
-  blocked "BLOCKED_INVALID_SSH_PORT"
-fi
-if [ "${P3H_SSH_USER}" = "root" ]; then
-  blocked "BLOCKED_ROOT_DEPLOYMENT_USER"
-fi
 case "${P3H_SSH_HOST_KEY_SHA256}" in
   SHA256:*) ;;
   *) blocked "BLOCKED_INVALID_SSH_HOST_KEY_PIN" ;;
@@ -348,8 +334,35 @@ if [ "${P3H_TLS_MODE}" = "INTERNAL_CA" ] \
   blocked "BLOCKED_INVALID_CA_BUNDLE"
 fi
 
-if ! attestation_is_strict "${P3H_SERVER_ATTESTATION_FILE}" "${server_attestation_keys[@]}" \
-    || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" ENVIRONMENT_CLASS CONTROLLED_STAGING \
+if ! attestation_is_strict "${P3H_SERVER_ATTESTATION_FILE}" "${server_attestation_keys[@]}"; then
+  blocked "BLOCKED_INVALID_STAGING_ATTESTATION"
+fi
+if ! attestation_is_strict "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" "${secret_attestation_keys[@]}"; then
+  blocked "BLOCKED_INVALID_SECRET_BACKEND_ATTESTATION"
+fi
+
+case "${P3H_STAGING_HOSTNAME}" in
+  *prod*|*production*|*primary-live*) blocked "BLOCKED_PRODUCTION_INDICATOR" ;;
+esac
+case "${P3H_SSH_HOST}" in
+  *prod*|*production*|*primary-live*) blocked "BLOCKED_PRODUCTION_INDICATOR" ;;
+esac
+
+if ! p3h_validate_staging_hostname "${P3H_STAGING_HOSTNAME}"; then
+  blocked "BLOCKED_INVALID_STAGING_HOSTNAME"
+fi
+if ! p3h_validate_ssh_host "${P3H_SSH_HOST}"; then
+  blocked "BLOCKED_INVALID_SSH_HOST"
+fi
+if ! p3h_validate_ssh_user "${P3H_SSH_USER}"; then
+  blocked "BLOCKED_INVALID_SSH_USER"
+fi
+if ! [[ "${P3H_SSH_PORT}" =~ ^[0-9]+$ ]] \
+    || [ "${P3H_SSH_PORT}" -lt 1 ] || [ "${P3H_SSH_PORT}" -gt 65535 ]; then
+  blocked "BLOCKED_INVALID_SSH_PORT"
+fi
+
+if ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" ENVIRONMENT_CLASS CONTROLLED_STAGING \
     || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" PRODUCTION_TRAFFIC NO \
     || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" PRODUCTION_DATABASE NO \
     || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" PRODUCTION_SECRETS NO \
@@ -361,8 +374,7 @@ if ! attestation_is_strict "${P3H_SERVER_ATTESTATION_FILE}" "${server_attestatio
   blocked "BLOCKED_INVALID_STAGING_ATTESTATION"
 fi
 
-if ! attestation_is_strict "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" "${secret_attestation_keys[@]}" \
-    || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" SECRET_BACKEND_CLASS "${P3H_SECRET_BACKEND}" \
+if ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" SECRET_BACKEND_CLASS "${P3H_SECRET_BACKEND}" \
     || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" AUTHORIZED_FOR_P3H YES \
     || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" PLAINTEXT_AT_REST NO \
     || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" SECRETS_VERSIONED_OR_ROTATABLE YES \
