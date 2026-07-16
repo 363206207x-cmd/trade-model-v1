@@ -6,18 +6,64 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: Greenfield P3-G Evidence Integrity Closure Round 2 on Draft PR #1128
-Next Business Phase: Reviewer Greenfield P3-G Round 3 Re-review and PR Merge Readiness; P4 remains blocked
-Next Business Phase Allowed: NO while the P3-G Draft PR is unmerged; NO for P4 and production deployment
+Current Work Package: Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H
+Next Business Phase: Reviewer P3-H Offline Harness Round 5 Re-review; P4 remains blocked
+Next Business Phase Allowed: NO while P3-H is unmerged and controlled staging inputs are missing; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
+## Controlled Staging P3-H
+
+Merged main `8f0640331e58e8b8b657c7db08e6d79b03d37a4f` makes P3-G
+effective. P3-H is now the active evidence package. Round 1 closes the offline
+template gaps for deterministic Greenfield bootstrap, four-role provisioning,
+fixed non-root Secret materialization, strict attestations, systemd
+credentials, runtime mount verification, Host-header rejection, TLS target
+binding, and TLS 1.3 behavior. Round 2 adds explicit Greenfield/steady-state
+modes, retained-volume and reboot-like restarts, Flyway checksum/V7 validation,
+V2 activation persistence, failed-start cleanup, strict object inventory,
+exact SSH-line pinning, exact committed Git archive builds, and systemd-only
+lifecycle ownership.
+
+Round 3 adds a separately confirmed `RECOVER_GREENFIELD_INITIALIZATION` path
+for checksum-valid continuous Flyway prefixes and V7 pre-grant states, with
+zero business rows and no unknown objects. It separates core state from full
+read-only verification, measures failed-start cleanup as zero project
+containers while preserving Primary/Backup volumes, rejects app/backup role
+memberships and unsafe default/Sequence ACLs, and re-proves V2 admin/database
+success plus V1 denial after the reboot-like restart.
+
+Round 4 adds exact full-row rule-default contracts for every Flyway prefix,
+normalized exact V1-V7 PostgreSQL schema fingerprints, effective/PUBLIC/column
+read-only privilege checks, and strict staging DNS/SSH host/deployment-user
+grammar. Disposable PostgreSQL 16 mutation fixtures prove rule, schema, and
+privilege drift is rejected; injection fixtures prove malformed inputs stop
+before source upload or network access.
+
+Every required controlled server and Secret Store input was absent. The
+default runner returned `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT` before any
+network or secret access. Separately, an explicitly enabled disposable local
+Compose run completed empty PostgreSQL, role bootstrap, Flyway V1-V7,
+retained-volume steady and reboot-like restarts with zero migrations and
+matching fingerprints, V2 persistence/V1 denial, injected-failure cleanup,
+read-only grants, non-root Config Tree, app/proxy health, Host/TLS checks,
+denied writes, leak checks, and cleanup as
+`PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`. `SERVER_ACCESS` and
+`SECRET_ACCESS` are `NOT_ATTEMPTED`; real staging remains
+`BLOCKED_MISSING_AUTHORIZED_INPUT`, and no real-server status is PASS.
+
+P3-H is not production deployment. P4 is not allowed, Production Deployment
+Readiness remains `BLOCKED`, and production deployment cannot proceed. See
+`docs/CONTROLLED_STAGING_READONLY_TLS_SECRETSTORE_P3H.md`.
+
+---
+
 ## Greenfield P3-G First-Boot Rehearsal
 
-Merged main `72b5bc83f4d670d4adebc03f5fe28e0bb9bba535` makes the approved
-Greenfield provenance decision effective. The P3-G package branch records
+Merged main `8f0640331e58e8b8b657c7db08e6d79b03d37a4f` makes the approved
+Greenfield provenance decision and P3-G evidence effective. P3-G records
 `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL` for a disposable localhost
 PostgreSQL 16 environment:
 
@@ -41,9 +87,8 @@ PostgreSQL 16 environment:
    non-enum asset states, requires real JSON array/object shapes, and validates
    the exact four no-data timeframes plus field-level no-conclusion semantics.
 
-This branch-local result is not effective until its Draft PR is reviewed and
-merged. It is not server deployment, secret-store, live-provider, or
-production-readiness evidence. P4 is not allowed. Details:
+This is local operational evidence, not server deployment, secret-store,
+live-provider, or production-readiness evidence. P4 is not allowed. Details:
 `docs/GREENFIELD_POSTGRESQL_FIRST_BOOT_REHEARSAL_P3G.md`.
 
 ---
@@ -80,9 +125,9 @@ clone will be created. The retained sanitized-clone support code remains
 available for recovery/incident use or a future separately approved migration
 mode.
 
-PR #1127 is merged/effective on main, so P3-G became the only allowed
-follow-up package. The P3-G branch now awaits evidence review and merge. P4
-cannot start and production deployment cannot proceed.
+PR #1127 and P3-G are merged/effective on main. P3-H is the current scoped
+follow-up package and is blocked before server access because its controlled
+inputs are missing. P4 cannot start and production deployment cannot proceed.
 
 Details: `docs/GREENFIELD_DATABASE_PROVENANCE_DECISION.md` and
 `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`.
@@ -782,14 +827,14 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 ## Current Allowed Work
 
-Only the following work is allowed under the current Greenfield P3-G closure:
+Only the following work is allowed under the current P3-H closure:
 
-1. Review the P3-G local empty-database, backup/restore, read-only role,
-   application smoke, and cleanup evidence.
-2. Update the current P3-G Draft PR metadata without treating it as effective.
-3. Retain existing P3/P3-G safety and recovery tooling.
+1. Perform Reviewer P3-H Offline Harness Round 5 re-review.
+2. Keep offline contract evidence distinct from real server execution.
+3. Retain existing P3/P3-G/P3-H safety and recovery tooling.
 4. Keep P4 and production deployment blocked.
-5. Production-readiness remediation only when explicitly scoped.
+5. Run a later controlled server package only with complete explicit
+   attestations and secret-safe inputs.
 
 PDR-M7 is the historical latest production-readiness package, not the only currently allowed work. Production deployment remains BLOCKED until a separate production release gate clears every required gate with PASS evidence.
 
@@ -1058,5 +1103,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: P3-G Draft PR pending GitHub-derived number and merge
+- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR; Round 4 exact integrity evidence pending Round 5 re-review and merge
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

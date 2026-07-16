@@ -22,6 +22,30 @@ Preflight validation was run from a clean branch created from the current `main`
 
 Important validation note: PostgreSQL Testcontainers smoke is designed to skip when Docker is unavailable. PDR-PF3 later recorded empty PostgreSQL migration evidence as BLOCKED_TIMEOUT after an approximately 1h27m interrupted run. Local production readiness still cannot claim real PostgreSQL migration evidence unless Docker-backed or server-backed migration evidence is supplied.
 
+### P3-H Current Addendum (2026-07-16)
+
+The P3-H offline harness now has deterministic Greenfield Bootstrap, role
+separation, fixed non-root Secret materialization, strict attestation,
+systemd-credential, runtime-mount, Host-header, TLS-target, and TLS 1.3
+contracts. An explicitly enabled disposable local Compose run completed as
+`PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`, including Flyway V1-V7, denied
+application writes, Secret non-exposure checks, and cleanup. Round 2 also
+proves explicit initialize/steady modes, retained-volume and reboot-like
+restarts with zero repeated migrations and matching fingerprints, V2 active
+Secret preservation with V1 denied, strict object inventory, exact SSH-line
+pinning, exact Git archive image attribution, and injected-failure cleanup.
+Round 3 adds confirmed partial-initialization recovery, core/full state
+verification, measured cleanup that stops PostgreSQL while preserving its
+volume, fail-closed role membership checks, exact default ACL/Sequence
+privileges, and post-reboot V2 admin/database success with V1 denial. Round 4
+adds exact full-row rule defaults for every Flyway prefix, exact normalized
+V1-V7 schema fingerprints, effective/PUBLIC/column privilege denial, strict
+staging/SSH input grammar, and disposable mutation/injection rejection
+fixtures. This is local template evidence only. No authorized server or real Secret Store was
+accessed; `REAL_STAGING_STATUS` remains
+`BLOCKED_MISSING_AUTHORIZED_INPUT`, P4 is not allowed, and Production
+Deployment Readiness remains `BLOCKED`.
+
 ## Production Readiness Decision
 
 Production readiness: BLOCKED.

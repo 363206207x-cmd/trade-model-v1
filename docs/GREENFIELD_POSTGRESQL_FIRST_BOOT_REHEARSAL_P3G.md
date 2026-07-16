@@ -1,10 +1,10 @@
 # Greenfield PostgreSQL First-Boot Rehearsal P3-G
 
-Status: `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL` on the package branch;
-the package is not effective until its Draft PR is reviewed and merged.
+Status: `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL`, effective on merged main
+`8f0640331e58e8b8b657c7db08e6d79b03d37a4f`.
 
-Evidence integrity closure: Reviewer Round 2 blockers are addressed on Draft
-PR #1128 and require Round 3 independent re-review before merge.
+Evidence integrity closure: Reviewer Rounds 1-3 and PR #1128 are merged. The
+result remains local controlled evidence, not staging or production evidence.
 
 Production Deployment Readiness: `BLOCKED`
 
@@ -222,4 +222,6 @@ The Round 2 regression suite additionally proves:
 4. Risk, labels, conclusions, card metadata, counter scores, and Hot Reset
    fields cannot hide a market, risk, review, conflict, or trigger conclusion.
 
-Next task: Reviewer Greenfield P3-G Round 3 Re-review and PR Merge Readiness.
+Next package: Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H.
+P3-H currently reports `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT`; it does not
+retroactively change the valid local P3-G result.

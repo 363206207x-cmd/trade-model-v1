@@ -4,6 +4,10 @@ This template is for the human-run real-server acceptance gate. It records evide
 
 Production Deployment Readiness remains `BLOCKED` until every required evidence section is completed, reviewed, and explicitly approved by the human release gate.
 
+Current P3-H package status: `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT`.
+No controlled server or Secret Store access was attempted. Do not mark any
+server section PASS from offline template/guard evidence.
+
 ## Evidence Metadata
 
 - Evidence date:
@@ -207,6 +211,10 @@ Required evidence:
 - HTTPS endpoint is reachable.
 - HTTP-to-HTTPS policy is documented.
 - Dashboard and review APIs require authentication.
+- Unauthenticated dashboard/review requests return 401 or the documented
+  authentication-denied status; they must never return 200.
+- A deliberately incorrect staging password is denied without printing the
+  password, Authorization header, or response body.
 - Password is not printed.
 - If HTTPS/reverse proxy is not implemented, this blocker remains open.
 

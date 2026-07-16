@@ -756,9 +756,9 @@ cutover, permission to start P4, or production readiness.
 
 See `docs/GREENFIELD_DATABASE_PROVENANCE_DECISION.md`,
 `docs/POSTGRESQL_CURRENT_STATE_CLONE_REHEARSAL_P3.md`, and
-`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. PR #1127 is now
-merged/effective; the separately scoped P3-G branch has local controlled
-evidence pending review/merge. P4 remains blocked.
+`docs/HISTORICAL_TIME_WRITER_CUTOVER_REGISTER.md`. PR #1127 and the separately
+scoped P3-G package are merged/effective on main. P3-G remains local controlled
+evidence and does not authorize P4. P4 remains blocked.
 
 ## Remaining Blockers
 
@@ -800,23 +800,75 @@ P3-G uses only disposable localhost resources and the exact confirmation
 9. keeps Flyway, schedulers, provider/AI calls, trading, and external sends
    disabled throughout.
 
-The observed branch-local result is
+The observed merged-main result is
 `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL`. It is not a server smoke, Secret
 Store/rotation drill, live-provider result, production cutover, or release
 approval. Production Deployment Readiness remains `BLOCKED` and production
 deployment cannot proceed.
 
+## Controlled Staging P3-H
+
+P3-H adds a safe-by-default non-production staging harness and deployment
+templates. Its offline harness is `PASS`, and the exact disposable local
+template completed as `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`. Its overall
+result remains `NOT_COMPLETE`: presence-only checks found none of the required
+server/Secret Store inputs, so real staging is
+`BLOCKED_MISSING_AUTHORIZED_INPUT`, while `SERVER_ACCESS` and `SECRET_ACCESS`
+are `NOT_ATTEMPTED`.
+
+The repository now has explicit `INITIALIZE_GREENFIELD`,
+`RECOVER_GREENFIELD_INITIALIZATION`, and `STEADY_STATE_START` modes.
+Initialization uses the deterministic empty-DB ->
+role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app
+health -> proxy health chain. Recovery requires a separate exact confirmation,
+a continuous checksum-valid V1-VN prefix or V7 pre-grant state, exact
+versioned rule rows and normalized schema fingerprints, exact P3-H
+identity/objects, and zero business rows. Recovery and steady state validate
+core state before refreshing grants, then require the full read-only contract;
+neither requires an empty database or runs baseline, repair, or clean.
+It also has strict attestation and canonical-file guards, an implemented
+`SYSTEMD_CREDENTIALS` adapter, effective runtime-mount verification, fixed
+non-root Config Tree materialization, pinned SSH identity, proxy-only ingress,
+internal networking, fixed Host routing, strict TLS target/TLS 1.3 checks,
+read-only application probing, rotation, backup/restore, reboot, redaction,
+and leak-scan contracts. Round 2 local evidence includes retained-volume and
+reboot-like restarts, zero repeated migrations, matching content fingerprints,
+V2 preservation/V1 denial, injected-failure cleanup, strict object inventory,
+exact SSH-line pinning, and exact Git archive image attribution. Local results
+prove the template only; they do not prove a server deployment or server reboot.
+Round 3 local evidence additionally covers V3-to-V7 recovery and V7 grant
+recovery, rejection of invalid recovery states, measured zero-container
+failed-start cleanup with persistent volumes retained, zero app/backup role
+memberships, exact SELECT-only default/Sequence ACLs, and post-reboot V2
+admin/database success with V1 denial.
+
+Round 4 local evidence additionally covers exact V1-V7 rule-default and schema
+contracts, fail-closed rule/schema mutation fixtures, effective SELECT-only
+table privileges, absence of PUBLIC and column-level writes, and strict
+pre-network grammar for staging hostname, SSH host, and SSH user. These remain
+disposable local template results, not authorized-server evidence.
+
+A future authorized run must provide the complete P3-H environment contract
+outside chat and GitHub. It must collect redacted evidence from one approved
+non-production Linux server, use full `FETCH_AND_VALIDATE` HTTPS smoke, restore
+only to an independent recovery database, complete real secret rotations and
+an explicitly authorized server reboot, and report zero secret leak
+candidates. Missing or invalid input remains a blocker; it is never a skipped
+PASS.
+
+See `docs/CONTROLLED_STAGING_READONLY_TLS_SECRETSTORE_P3H.md`. P4 remains
+`NO`, Production Deployment Readiness remains `BLOCKED`, and production
+deployment cannot proceed.
+
 ## Next Packages
 
-1. Review the P3-G evidence in
-   `docs/GREENFIELD_POSTGRESQL_FIRST_BOOT_REHEARSAL_P3G.md` and decide Draft PR
-   merge readiness.
-2. Merge the P3-G evidence package before treating its local result as
-   effective.
-3. Controlled real-server, secrets/access/provider, and operational ownership
-   evidence packages only as explicitly approved.
-4. Keep P4 blocked until a separately authorized gate follows completed P3-G
-   review; P3-G itself does not authorize P4.
+1. Complete Reviewer P3-H Offline Harness Round 5 re-review, preserving the
+   distinction between local template PASS and missing real-staging evidence.
+2. Obtain separately authorized controlled staging inputs before any real
+   P3-H execution; never send secret values through chat, GitHub, or docs.
+3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,
+   and leak-scan gates only after all attestations validate.
+4. Keep P4 blocked; neither P3-G nor an unexecuted P3-H package authorizes P4.
 5. Production release-gate status closure only after completed redacted
    evidence and explicit approval.
 
