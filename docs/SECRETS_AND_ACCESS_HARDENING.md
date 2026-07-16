@@ -196,3 +196,19 @@ If secrets manager / HTTPS / rate limiting implementation is prioritized first, 
 - no fake positions
 - no fake review records
 - no production-ready claim
+
+## P3-H Controlled Staging Update
+
+P3-H adds a runtime-file/Config Tree deployment contract without changing the
+production profile guard. Offline Spring tests prove that the four required
+files can populate datasource password, admin password, and nonfunctional
+Binance key/secret properties, and that a missing datasource password still
+fails closed. Actuator web exposure remains limited to `health`; `.env` and
+secret values are absent from the P3-H Compose environment and image context.
+
+This is not real Secret Store evidence. All controlled server and Secret Store
+inputs were missing, so no backend, mount, credential, certificate, rotation,
+server, or production secret was accessed. Real Secret Store injection,
+administrator/database credential rotation, TLS rotation/renewal, and
+server-side leak scanning remain `NOT_ATTEMPTED`. Production readiness remains
+`BLOCKED`.

@@ -1,0 +1,25 @@
+[Unit]
+Description=Trade Model controlled P3-H staging stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=p3h-deploy
+Group=p3h-deploy
+WorkingDirectory=/opt/trade-model-p3h/current
+Environment=P3H_APPLICATION_IMAGE_TAG=RENDER_EXACT_HEAD_PREFIX
+Environment=P3H_STAGING_HOSTNAME=RENDER_APPROVED_STAGING_HOSTNAME
+Environment=P3H_SECRET_MOUNT_DIR=/run/trade-model-p3h/secrets
+ExecStartPre=/usr/bin/test -d /run/trade-model-p3h/secrets
+ExecStart=/usr/bin/docker compose -f deploy/p3h/docker-compose.p3h.yml up -d postgres app proxy
+ExecStop=/usr/bin/docker compose -f deploy/p3h/docker-compose.p3h.yml down
+TimeoutStartSec=300
+TimeoutStopSec=120
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

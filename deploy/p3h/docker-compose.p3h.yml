@@ -1,0 +1,187 @@
+name: trade-model-p3h
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc
+    environment:
+      POSTGRES_DB: trade_model_v1_p3h_primary
+      POSTGRES_USER: p3h_bootstrap
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+      TZ: UTC
+    secrets:
+      - postgres_admin_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U p3h_bootstrap -d trade_model_v1_p3h_primary"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    networks:
+      - p3h_backend
+    volumes:
+      - p3h_postgresql:/var/lib/postgresql/data
+      - p3h_backups:/var/lib/trade-model-p3h/backups
+    restart: unless-stopped
+    logging: &bounded_logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  migrate:
+    image: flyway/flyway:10-alpine@sha256:94a81ca7db9a9f24fd8acd7463fa4560cb8f66aae2aa64485c27eb296f5851cf
+    profiles: ["migration"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/trade_model_v1_p3h_primary
+      FLYWAY_USER: p3h_migration_owner
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+      FLYWAY_CLEAN_DISABLED: "true"
+      FLYWAY_CONNECT_RETRIES: "60"
+    secrets:
+      - flyway_password
+    entrypoint: ["/bin/sh", "/p3h/flyway-secret-entrypoint.sh"]
+    volumes:
+      - ../../src/main/resources/db/migration:/flyway/sql:ro
+      - ./flyway-secret-entrypoint.sh:/p3h/flyway-secret-entrypoint.sh:ro
+    networks:
+      - p3h_backend
+    restart: "no"
+    logging: *bounded_logging
+
+  app:
+    image: trade-model-v1:p3h-${P3H_APPLICATION_IMAGE_TAG:?set non-secret exact-head image tag}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/config/
+      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_SQL_INIT_MODE: never
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trade_model_v1_p3h_primary
+      SPRING_DATASOURCE_USERNAME: p3h_app_readonly
+      SPRING_DATASOURCE_HIKARI_READ_ONLY: "true"
+      SERVER_PORT: "8081"
+      SERVER_ADDRESS: 0.0.0.0
+      TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND: "true"
+      TRADE_MODEL_PRODUCTION_SCHEDULER_POLICY: LOCKED_DOWN
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_PUSH_RECHECK: PROD_ALLOWED_EXPLICIT_OPT_IN
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_POSITION_SYNC: PROD_ALLOWED_EXPLICIT_OPT_IN
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_MARKET_DATA: PROD_ALLOWED_EXPLICIT_OPT_IN
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_OHLCV_INGESTION: PROD_ALLOWED_EXPLICIT_OPT_IN
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_WATCHLIST: LOCAL_ONLY
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_POSITION_MONITOR: PROD_ALLOWED_DEFAULT_OFF
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_ANALYSIS: PROD_ALLOWED_EXPLICIT_OPT_IN
+      TRADE_MODEL_PRODUCTION_SCHEDULER_APPROVAL_PROVIDER_SCAN: PROD_ALLOWED_DEFAULT_OFF
+      TRADE_MODEL_SCHEDULERS_ENABLED: "false"
+      TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_OHLCV_INGESTION_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_PROVIDER_SCAN_SCHEDULER_ENABLED: "false"
+      TRADE_MODEL_PROVIDER_CALL_ENABLED: "false"
+      TRADE_MODEL_PROFILE_ESCALATION_ENABLED: "false"
+      TRADE_MODEL_PROVIDER_AUTO_ESCALATION_ENABLED: "false"
+      TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED: "false"
+      TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED: "false"
+      TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED: "false"
+      TRADE_MODEL_COINGLASS_ENABLED: "false"
+      TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED: "false"
+      TRADE_MODEL_AI_ENABLED: "false"
+      TRADE_MODEL_AI_OPENAI_ENABLED: "false"
+      TRADE_MODEL_AI_GEMINI_ENABLED: "false"
+      TRADE_MODEL_AI_XAI_ENABLED: "false"
+      POSITION_PROVIDER_TYPE: BINANCE
+      APP_ADMIN_USERNAME: p3h_operator
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      TRADE_MODEL_SECURITY_RATE_LIMIT_ENABLED: "true"
+      TRADE_MODEL_SECURITY_RATE_LIMIT_RPM: "120"
+      TRADE_MODEL_SECURITY_RATE_LIMIT_WINDOW_MS: "60000"
+    secrets:
+      - source: app_database_password_v1
+        target: /run/secrets/config/spring.datasource.password
+      - source: app_admin_password_v1
+        target: /run/secrets/config/trade-model.auth.admin-password
+      - source: binance_nonfunctional_key
+        target: /run/secrets/config/binance.api.key
+      - source: binance_nonfunctional_secret
+        target: /run/secrets/config/binance.api.secret
+    expose:
+      - "8081"
+    networks:
+      - p3h_backend
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging: *bounded_logging
+
+  proxy:
+    image: nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591
+    depends_on:
+      - app
+    environment:
+      P3H_STAGING_HOSTNAME: ${P3H_STAGING_HOSTNAME:?set approved staging hostname}
+    secrets:
+      - source: tls_certificate
+        target: tls_certificate.pem
+      - source: tls_private_key
+        target: tls_private_key.pem
+    volumes:
+      - ./reverse-proxy.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "80:8080"
+      - "443:8443"
+    networks:
+      - p3h_edge
+      - p3h_backend
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+      - /var/run:rw,noexec,nosuid,size=8m
+      - /tmp:rw,noexec,nosuid,size=8m
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging: *bounded_logging
+
+networks:
+  p3h_edge:
+    name: p3h_edge
+  p3h_backend:
+    name: p3h_backend
+    internal: true
+
+volumes:
+  p3h_postgresql:
+    name: p3h_postgresql
+  p3h_backups:
+    name: p3h_backups
+
+secrets:
+  postgres_admin_password:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/postgres_admin_password
+  flyway_password:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/flyway_password
+  app_database_password_v1:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/app_database_password_v1
+  app_admin_password_v1:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/app_admin_password_v1
+  binance_nonfunctional_key:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/binance_nonfunctional_key
+  binance_nonfunctional_secret:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/binance_nonfunctional_secret
+  tls_certificate:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/tls_certificate
+  tls_private_key:
+    file: ${P3H_SECRET_MOUNT_DIR:?set approved runtime secret mount}/tls_private_key

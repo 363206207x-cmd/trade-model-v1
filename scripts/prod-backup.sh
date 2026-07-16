@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+umask 077
+
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 BACKUP_FILE="${BACKUP_FILE:-${BACKUP_DIR}/trade_model_v1_$(date +%Y%m%d_%H%M%S).dump}"
 
@@ -31,5 +33,7 @@ PGPASSWORD="$PROD_DATASOURCE_PASSWORD" pg_dump \
   --dbname="$PROD_DATASOURCE_DATABASE" \
   --format=custom \
   --file="$BACKUP_FILE"
+
+chmod 600 "$BACKUP_FILE"
 
 echo "PASS backup written to ${BACKUP_FILE}"
