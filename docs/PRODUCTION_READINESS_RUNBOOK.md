@@ -809,17 +809,22 @@ deployment cannot proceed.
 ## Controlled Staging P3-H
 
 P3-H adds a safe-by-default non-production staging harness and deployment
-templates. Its current result is
-`BLOCKED_MISSING_CONTROLLED_STAGING_INPUT`. Presence-only checks found none of
-the required server/Secret Store inputs, so `SERVER_ACCESS` and
-`SECRET_ACCESS` are `NOT_ATTEMPTED`.
+templates. Its offline harness is `PASS`, and the exact disposable local
+template completed as `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`. Its overall
+result remains `NOT_COMPLETE`: presence-only checks found none of the required
+server/Secret Store inputs, so real staging is
+`BLOCKED_MISSING_AUTHORIZED_INPUT`, while `SERVER_ACCESS` and `SECRET_ACCESS`
+are `NOT_ATTEMPTED`.
 
-The repository now has offline contracts for pinned SSH host identity,
-attestation allowlists, immutable image sources, proxy-only ingress, internal
-backend networking, Config Tree secret injection, read-only application
-configuration, verified TLS, HTTPS/auth/rate-limit smoke, official
-backup/restore, credential/TLS rotation, reboot, redaction, and leak scanning.
-These are harness/guard results only. They do not prove a server deployment.
+The repository now has a deterministic empty-DB -> role bootstrap -> Flyway
+V1-V7 -> grants -> Secret materialization -> app health -> proxy health chain.
+It also has strict attestation and canonical-file guards, an implemented
+`SYSTEMD_CREDENTIALS` adapter, effective runtime-mount verification, fixed
+non-root Config Tree materialization, pinned SSH identity, proxy-only ingress,
+internal networking, fixed Host routing, strict TLS target/TLS 1.3 checks,
+read-only application probing, rotation, backup/restore, reboot, redaction,
+and leak-scan contracts. Local results prove the template only; they do not
+prove a server deployment.
 
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
@@ -835,8 +840,8 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Review the P3-H offline guard package and its truthful
-   `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT` decision.
+1. Complete Reviewer P3-H Offline Harness Round 2 re-review, preserving the
+   distinction between local template PASS and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.
 3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,

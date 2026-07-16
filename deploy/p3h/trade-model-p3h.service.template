@@ -10,16 +10,32 @@ RemainAfterExit=yes
 User=p3h-deploy
 Group=p3h-deploy
 WorkingDirectory=/opt/trade-model-p3h/current
+RuntimeDirectory=trade-model-p3h
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=no
 Environment=P3H_APPLICATION_IMAGE_TAG=RENDER_EXACT_HEAD_PREFIX
 Environment=P3H_STAGING_HOSTNAME=RENDER_APPROVED_STAGING_HOSTNAME
-Environment=P3H_SECRET_MOUNT_DIR=/run/trade-model-p3h/secrets
-ExecStartPre=/usr/bin/test -d /run/trade-model-p3h/secrets
-ExecStart=/usr/bin/docker compose -f deploy/p3h/docker-compose.p3h.yml up -d postgres app proxy
-ExecStop=/usr/bin/docker compose -f deploy/p3h/docker-compose.p3h.yml down
-TimeoutStartSec=300
+Environment=P3H_SECRET_BACKEND=SYSTEMD_CREDENTIALS
+LoadCredentialEncrypted=postgres_admin_password:RENDER_CREDENTIAL_POSTGRES_ADMIN_PASSWORD
+LoadCredentialEncrypted=flyway_password:RENDER_CREDENTIAL_FLYWAY_PASSWORD
+LoadCredentialEncrypted=app_database_password_v1:RENDER_CREDENTIAL_APP_DATABASE_PASSWORD_V1
+LoadCredentialEncrypted=app_database_password_v2:RENDER_CREDENTIAL_APP_DATABASE_PASSWORD_V2
+LoadCredentialEncrypted=app_admin_password_v1:RENDER_CREDENTIAL_APP_ADMIN_PASSWORD_V1
+LoadCredentialEncrypted=app_admin_password_v2:RENDER_CREDENTIAL_APP_ADMIN_PASSWORD_V2
+LoadCredentialEncrypted=backup_reader_password:RENDER_CREDENTIAL_BACKUP_READER_PASSWORD
+LoadCredentialEncrypted=recovery_owner_password:RENDER_CREDENTIAL_RECOVERY_OWNER_PASSWORD
+LoadCredentialEncrypted=binance_nonfunctional_key:RENDER_CREDENTIAL_BINANCE_NONFUNCTIONAL_KEY
+LoadCredentialEncrypted=binance_nonfunctional_secret:RENDER_CREDENTIAL_BINANCE_NONFUNCTIONAL_SECRET
+LoadCredentialEncrypted=tls_certificate:RENDER_CREDENTIAL_TLS_CERTIFICATE
+LoadCredentialEncrypted=tls_private_key:RENDER_CREDENTIAL_TLS_PRIVATE_KEY
+ExecStart=/opt/trade-model-p3h/current/deploy/p3h/p3h-systemd-credentials-adapter.sh
+ExecStop=/opt/trade-model-p3h/current/deploy/p3h/p3h-compose-stop.sh
+TimeoutStartSec=360
 TimeoutStopSec=120
 NoNewPrivileges=yes
 PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
 
 [Install]
 WantedBy=multi-user.target

@@ -1,6 +1,12 @@
 # Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H
 
-Status: `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT`
+Status: `NOT_COMPLETE`
+
+Offline Harness: `PASS`
+
+Local Compose Template Smoke: `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`
+
+Real Staging: `BLOCKED_MISSING_AUTHORIZED_INPUT`
 
 Production Deployment Readiness: `BLOCKED`
 
@@ -16,9 +22,10 @@ P4 Allowed: `NO`
 - Environment requested by the package: explicitly authorized, non-production Linux staging only.
 
 P3-H is not production deployment. The package adds a fail-closed deployment
-harness, immutable deployment templates, and offline contract tests. It does
-not claim that a staging server, TLS endpoint, Secret Store, rotation drill,
-backup/restore drill, or reboot was exercised.
+harness, immutable deployment templates, offline contract tests, and an
+actual disposable localhost Compose smoke. It does not claim that an
+authorized staging server, real TLS endpoint, real Secret Store, rotation
+drill, server backup/restore drill, or reboot was exercised.
 
 ## Controlled Input Result
 
@@ -43,40 +50,64 @@ is not included in the 17-input default count. No SSH connection, host-key
 probe, remote command, server inventory, secret mount, database operation, or
 HTTPS request was attempted.
 
-## Offline Harness Evidence
+## Offline And Local Template Evidence
 
-| Contract | Offline result | Server evidence |
+| Contract | Repository/local result | Real-server evidence |
 | --- | --- | --- |
 | Missing input stops before access | `GUARD_PASS` | `NOT_ATTEMPTED` |
-| Staging and Secret Store attestations | strict parser and allowlist prepared | `NOT_VALIDATED_INPUT_MISSING` |
+| Greenfield startup order | `PASS_LOCAL_DISPOSABLE`: PostgreSQL healthy -> empty preflight -> role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app healthy -> proxy healthy | `NOT_ATTEMPTED` |
+| Role provisioning | `PASS_LOCAL_DISPOSABLE`: migration owner, read-only app, backup reader, recovery owner, Primary and Recovery | `NOT_ATTEMPTED` |
+| Staging and Secret Store attestations | `GUARD_PASS`: exact keys, one occurrence, nonempty/non-placeholder values, canonical external files | `NOT_VALIDATED_INPUT_MISSING` |
 | SSH key and pinned host-key policy | `GUARD_PASS` | `NOT_ATTEMPTED` |
 | Production-like target rejection | `GUARD_PASS` | `NOT_ATTEMPTED` |
-| Secret backend and `/run/` mount policy | `GUARD_PASS` | `NOT_ATTEMPTED` |
-| Spring Config Tree injection | `GUARD_PASS_OFFLINE` | `NOT_ATTEMPTED` |
+| Secret backend | `SYSTEMD_CREDENTIALS` adapter implemented; other advertised backends fail `BLOCKED_BACKEND_NOT_IMPLEMENTED` | `NOT_ATTEMPTED` |
+| `/run/` runtime mount policy | `GUARD_PASS`; requires `findmnt` proof of tmpfs/ramfs, read-only options and nonpersistent source | `NOT_ATTEMPTED` |
+| Spring Config Tree injection | `PASS_LOCAL_DISPOSABLE`: UID 10001 reads 0400 files from tmpfs; UID 10002 is denied | `NOT_ATTEMPTED` |
 | Missing Config Tree secret | `FAIL_CLOSED_OFFLINE` | `NOT_ATTEMPTED` |
 | Immutable image sources and exact Git archive | contract prepared | `NOT_BUILT_ON_SERVER` |
-| Internal backend network and proxy-only ports | `GUARD_PASS_OFFLINE` | `NOT_ATTEMPTED` |
+| Internal backend network and proxy-only ports | `PASS_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
 | Scheduler, AI, provider and external calls | template locked off | `NOT_ATTESTED_ON_SERVER` |
-| Verified TLS and HTTPS smoke | harness prepared | `NOT_ATTEMPTED` |
+| Host-header contract | `PASS_LOCAL_DISPOSABLE`: unknown HTTP rejected, unknown HTTPS SNI rejected, approved redirect target fixed, approved Host forwarded | `NOT_ATTEMPTED` |
+| TLS target and TLS 1.3 | `PASS_LOCAL_DISPOSABLE`; remote harness binds URL/host/port and fails TLS 1.3 when the client supports it but the server does not | `NOT_ATTEMPTED` |
+| Read-only application write probe | `DENIED_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
+| Secret values in inspect/process arguments | `ABSENT_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
 | Access-log redaction and rate limiting | template/contract prepared | `NOT_ATTEMPTED` |
 | Secret rotations | evidence validator prepared | `NOT_ATTEMPTED` |
 | Backup and recovery | documented against official scripts | `NOT_ATTEMPTED` |
 | Service/server reboot | reboot evidence contract prepared | `NOT_ATTEMPTED` |
 | Secret leak scan | fixture-level contract tested | `NOT_ATTEMPTED_ON_SERVER` |
 
-Offline `GUARD_PASS` means only that the repository contract fails closed. It
-must not be translated to a real-server PASS.
+Offline `GUARD_PASS` means only that the repository contract fails closed.
+`PASS_LOCAL_DISPOSABLE` means the exact template ran against generated local
+credentials and disposable local containers. Neither may be translated to a
+real-server PASS.
 
 ## Deployment Assets
 
 `deploy/p3h/docker-compose.p3h.yml` defines digest-pinned PostgreSQL 16,
-Flyway, application, and Nginx services. PostgreSQL and the application expose
-no host ports. The backend network is internal; only the reverse proxy
-publishes 80/443. The application runs read-only with Flyway and SQL init
-disabled, and all schedulers, AI, providers, and external-call switches off.
+Flyway, application, and Nginx services. Service-completion and health
+conditions enforce the complete Greenfield chain. PostgreSQL and the
+application expose no host ports. The backend network is internal; only the
+reverse proxy publishes 80/443. The application runs read-only with Flyway and
+SQL init disabled, and all schedulers, AI, providers, and external-call
+switches off.
 
-Secrets are file-mounted from the approved runtime directory. The application
-uses `configtree:/run/secrets/config/` for:
+The bootstrap creates `p3h_migration_owner`, `p3h_app_readonly`,
+`p3h_backup_reader`, and `p3h_recovery_owner`, plus the Primary and independent
+Recovery databases. No password is embedded in SQL, Compose, an environment
+declaration, an image, or a process argument; database tools receive their
+credentials from mounted Secret files at runtime.
+
+Only `SYSTEMD_CREDENTIALS` is implemented for a future server run. The unit
+uses `LoadCredentialEncrypted=` and a bounded adapter; SOPS, Vault, and cloud
+agent modes fail closed as not implemented. The adapter requires a systemd
+credential path under `/run/credentials/`; remote preflight separately proves
+the effective mount with `findmnt`.
+
+An isolated root materializer copies only application secrets into a Docker
+managed tmpfs volume, assigns fixed UID/GID 10001 and mode 0400, then exits.
+The non-root application mounts that volume read-only and uses
+`configtree:/run/secrets/config/` for:
 
 - `spring.datasource.password`;
 - `trade-model.auth.admin-password`;
@@ -100,9 +131,12 @@ Baseline, and `/api/**` require application authentication. A real evidence
 run must prove good credentials succeed, missing/bad credentials fail, health
 details remain hidden, and Authorization/Cookie values never enter logs.
 
-Current TLS, redirect, authenticated HTTPS smoke, negative-auth smoke, rate
-limit, certificate rotation/renewal, and proxy log evidence are all
-`NOT_ATTEMPTED` because no controlled server input was supplied.
+The disposable local template proved approved-host redirect and HTTPS health,
+unknown HTTP/HTTPS host rejection, and a TLS 1.3 handshake with a generated
+one-day localhost certificate. This is not certificate issuance or real
+staging endpoint evidence. Authenticated dashboard/review smoke, real rate
+limit evidence, certificate rotation/renewal, and server proxy-log evidence
+remain `NOT_ATTEMPTED`.
 
 ## Backup And Restore Plan
 
@@ -142,18 +176,21 @@ redacted evidence from one authorized non-production server:
 11. server-side secret leak candidate count of zero; and
 12. cleanup or approved owner-backed continued-running status.
 
-No item above is PASS in this package.
+No real-server item above is PASS in this package.
 
 ## Local Validation
 
-- P3-H contract tests: 30 tests, 0 failures, 0 errors, 0 skipped.
-- Full Maven suite: 3,698 tests, 0 failures, 0 errors, 13 environment-gated
-  skips.
-- The existing Docker/Testcontainers checks reported no available local
-  Docker daemon and remained skipped. They are not represented as PostgreSQL
-  or server PASS evidence.
-- Shell syntax, workflow contract, YAML parsing, and `git diff --check` passed.
-- The default P3-H runner again returned
+- P3-H contract suite: 60 tests, 0 failures, 0 errors; its single Docker test
+  is skipped by default.
+- Environment-gated P3-H Docker JUnit: `PASS` when explicitly enabled.
+- Disposable Compose template smoke:
+  `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`.
+- Disposable resource cleanup: `PASS`.
+- Full Maven suite: 3,728 tests, 0 failures, 0 errors, 14 environment-gated
+  skips. No skipped test is represented as PASS.
+- Delivery, workflow-contract, state, YAML, and diff checks are recorded in
+  the PR validation summary for the exact package head.
+- The default real-staging runner still returns
   `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT` before access.
 
 The canonical-path delivery check is performed against the exact committed
@@ -173,9 +210,15 @@ that script's path guard.
 
 ## Decision And Next Task
 
-`P3H_RESULT: BLOCKED_MISSING_CONTROLLED_STAGING_INPUT`
+`OFFLINE_HARNESS: PASS`
+
+`LOCAL_COMPOSE_TEMPLATE_SMOKE: PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`
+
+`REAL_STAGING_STATUS: BLOCKED_MISSING_AUTHORIZED_INPUT`
+
+`P3H_RESULT: NOT_COMPLETE`
 
 Production readiness remains `BLOCKED`; production deployment cannot
-proceed. The next task is **Reviewer Controlled Staging P3-H Evidence Review
-and PR Merge Readiness**. Any later real execution requires a new explicit
-authorized input set and must preserve the no-secret-output contract.
+proceed. The next task is **Reviewer P3-H Offline Harness Round 2 Re-review**.
+Any later real execution requires a new explicit authorized input set and must
+preserve the no-secret-output contract.

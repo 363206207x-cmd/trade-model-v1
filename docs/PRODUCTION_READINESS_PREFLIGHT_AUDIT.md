@@ -22,6 +22,19 @@ Preflight validation was run from a clean branch created from the current `main`
 
 Important validation note: PostgreSQL Testcontainers smoke is designed to skip when Docker is unavailable. PDR-PF3 later recorded empty PostgreSQL migration evidence as BLOCKED_TIMEOUT after an approximately 1h27m interrupted run. Local production readiness still cannot claim real PostgreSQL migration evidence unless Docker-backed or server-backed migration evidence is supplied.
 
+### P3-H Current Addendum (2026-07-16)
+
+The P3-H offline harness now has deterministic Greenfield Bootstrap, role
+separation, fixed non-root Secret materialization, strict attestation,
+systemd-credential, runtime-mount, Host-header, TLS-target, and TLS 1.3
+contracts. An explicitly enabled disposable local Compose run completed as
+`PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`, including Flyway V1-V7, denied
+application writes, Secret non-exposure checks, and cleanup. This is local
+template evidence only. No authorized server or real Secret Store was
+accessed; `REAL_STAGING_STATUS` remains
+`BLOCKED_MISSING_AUTHORIZED_INPUT`, P4 is not allowed, and Production
+Deployment Readiness remains `BLOCKED`.
+
 ## Production Readiness Decision
 
 Production readiness: BLOCKED.

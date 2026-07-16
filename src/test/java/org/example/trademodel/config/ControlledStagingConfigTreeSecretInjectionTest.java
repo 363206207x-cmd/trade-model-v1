@@ -67,11 +67,16 @@ class ControlledStagingConfigTreeSecretInjectionTest {
 
         assertThat(compose).contains(
                 "SPRING_CONFIG_IMPORT: configtree:/run/secrets/config/",
-                "target: /run/secrets/config/spring.datasource.password",
-                "target: /run/secrets/config/trade-model.auth.admin-password",
-                "target: /run/secrets/config/binance.api.key",
-                "target: /run/secrets/config/binance.api.secret",
+                "p3h_materialized_secrets",
+                "target: /run/secrets",
+                "read_only: true",
+                "SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver",
                 "MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health");
+        String materializer = Files.readString(Path.of("deploy/p3h/p3h-secret-materializer.sh"),
+                StandardCharsets.UTF_8);
+        assertThat(materializer).contains(
+                "spring.datasource.password", "trade-model.auth.admin-password",
+                "binance.api.key", "binance.api.secret", "chmod 400");
         assertThat(compose).doesNotContain(
                 "PROD_DATASOURCE_PASSWORD:", "APP_ADMIN_PASSWORD:",
                 "BINANCE_API_KEY:", "BINANCE_API_SECRET:", ".env");

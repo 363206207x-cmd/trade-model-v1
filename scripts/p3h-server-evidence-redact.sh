@@ -25,6 +25,8 @@ awk -F ': ' '
     allowed["TIME_SYNCHRONIZED"] = 1
     allowed["SECRET_BACKEND_CLASS"] = 1
     allowed["SECRET_MOUNT"] = 1
+    allowed["SECRET_MOUNT_RUNTIME_VERIFICATION"] = 1
+    allowed["SECRET_MOUNT_FILESYSTEM"] = 1
     allowed["SECRET_FILE_CONTRACT"] = 1
     allowed["SUDO_NONINTERACTIVE"] = 1
     allowed["AVAILABLE_DISK_KB"] = 1

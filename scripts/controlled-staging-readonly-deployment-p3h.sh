@@ -4,6 +4,7 @@ set -euo pipefail
 EXPECTED_CONFIRMATION="I_CONFIRM_AUTHORIZED_NON_PRODUCTION_STAGING_DEPLOYMENT"
 EXPECTED_REBOOT_CONFIRMATION="I_CONFIRM_CONTROLLED_STAGING_SERVER_REBOOT"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_REAL="$(realpath "${ROOT_DIR}")"
 EVIDENCE_DIR="${ROOT_DIR}/.runtime/p3h-staging-evidence"
 CURRENT_STAGE="input-presence"
 NETWORK_ACCESS_STARTED=0
@@ -122,16 +123,38 @@ blocked() {
   exit "${status}"
 }
 
-is_absolute_outside_repository_file() {
+canonical_secure_file() {
   local path="$1"
+  local permission_policy="$2"
+  local resolved owner_uid mode permissions
   case "${path}" in
     /*) ;;
     *) return 1 ;;
   esac
-  case "${path}" in
-    "${ROOT_DIR}"|"${ROOT_DIR}"/*) return 1 ;;
+  [ -f "${path}" ] && [ ! -L "${path}" ] || return 1
+  resolved="$(realpath "${path}" 2>/dev/null)" || return 1
+  [ "${resolved}" = "${path}" ] || return 1
+  case "${resolved}" in
+    "${ROOT_REAL}"|"${ROOT_REAL}"/*) return 1 ;;
   esac
-  [ -f "${path}" ] && [ ! -L "${path}" ]
+  owner_uid="$(portable_owner_uid "${path}")" || return 1
+  if [ "${owner_uid}" != "$(id -u)" ] && [ "${owner_uid}" != "0" ]; then
+    return 1
+  fi
+  mode="$(portable_mode "${path}")" || return 1
+  [[ "${mode}" =~ ^[0-7]{3,4}$ ]] || return 1
+  permissions=$((8#${mode}))
+  case "${permission_policy}" in
+    private)
+      (( (permissions & 0177) == 0 )) || return 1
+      ;;
+    nonwritable)
+      (( (permissions & 0022) == 0 )) || return 1
+      ;;
+    identity)
+      ;;
+    *) return 1 ;;
+  esac
 }
 
 portable_mode() {
@@ -140,6 +163,40 @@ portable_mode() {
     stat -f '%Lp' "${path}"
   else
     stat -c '%a' "${path}"
+  fi
+}
+
+portable_owner_uid() {
+  local path="$1"
+  if stat -f '%u' "${path}" >/dev/null 2>&1; then
+    stat -f '%u' "${path}"
+  else
+    stat -c '%u' "${path}"
+  fi
+}
+
+strict_non_placeholder_value() {
+  local value="$1"
+  [ -n "${value}" ] || return 1
+  [ "${value}" = "${value#${value%%[![:space:]]*}}" ] || return 1
+  [ "${value}" = "${value%${value##*[![:space:]]}}" ] || return 1
+  case "${value}" in
+    *'<'*|*'>'*) return 1 ;;
+  esac
+  if printf '%s' "${value}" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    return 1
+  fi
+  if printf '%s' "${value}" \
+      | LC_ALL=C grep -Eiq '(^|[^[:alnum:]])(TBD|UNKNOWN|PLACEHOLDER|FIXTURE)([^[:alnum:]]|$)'; then
+    return 1
+  fi
+}
+
+sha256_text() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{print $1}'
+  else
+    sha256sum | awk '{print $1}'
   fi
 }
 
@@ -168,6 +225,18 @@ attestation_has_only_keys() {
       *) return 1 ;;
     esac
   done <"${file}"
+}
+
+attestation_is_strict() {
+  local file="$1"
+  shift
+  local key value
+  attestation_has_only_keys "${file}" "$@" || return 1
+  for key in "$@"; do
+    [ "$(grep -c "^${key}=" "${file}" || true)" = "1" ] || return 1
+    value="$(attestation_value "${file}" "${key}")" || return 1
+    strict_non_placeholder_value "${value}" || return 1
+  done
 }
 
 require_attestation_value() {
@@ -210,8 +279,22 @@ case "${P3H_TLS_MODE}" in
 esac
 
 case "${P3H_SECRET_BACKEND}" in
-  SYSTEMD_CREDENTIALS|SOPS_AGE_TMPFS|VAULT_AGENT|CLOUD_SECRET_MANAGER_AGENT) ;;
+  SYSTEMD_CREDENTIALS) ;;
+  SOPS_AGE_TMPFS|VAULT_AGENT|CLOUD_SECRET_MANAGER_AGENT)
+    blocked "BLOCKED_BACKEND_NOT_IMPLEMENTED"
+    ;;
   *) blocked "BLOCKED_UNSUPPORTED_SECRET_BACKEND" ;;
+esac
+
+for owner_reference in "${P3H_RELEASE_OWNER_REFERENCE}" \
+    "${P3H_ROLLBACK_OWNER_REFERENCE}" "${P3H_INCIDENT_OWNER_REFERENCE}"; do
+  if ! strict_non_placeholder_value "${owner_reference}"; then
+    blocked "BLOCKED_INVALID_OWNER_REFERENCE"
+  fi
+done
+case "${P3H_KEEP_STAGING_RUNNING}" in
+  YES|NO) ;;
+  *) blocked "BLOCKED_INVALID_KEEP_RUNNING_POLICY" ;;
 esac
 
 case "${P3H_SECRET_MOUNT_DIR}" in
@@ -243,11 +326,11 @@ case "${P3H_SSH_HOST_KEY_SHA256}" in
   *) blocked "BLOCKED_INVALID_SSH_HOST_KEY_PIN" ;;
 esac
 
-if ! is_absolute_outside_repository_file "${P3H_SERVER_ATTESTATION_FILE}" \
-    || ! is_absolute_outside_repository_file "${P3H_SECRET_BACKEND_ATTESTATION_FILE}"; then
+if ! canonical_secure_file "${P3H_SERVER_ATTESTATION_FILE}" private \
+    || ! canonical_secure_file "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" private; then
   blocked "BLOCKED_INVALID_STAGING_ATTESTATION"
 fi
-if ! is_absolute_outside_repository_file "${P3H_SSH_IDENTITY_FILE}"; then
+if ! canonical_secure_file "${P3H_SSH_IDENTITY_FILE}" identity; then
   blocked "BLOCKED_INVALID_SSH_IDENTITY"
 fi
 
@@ -261,11 +344,11 @@ if (( (identity_permissions & 0177) != 0 )); then
 fi
 
 if [ "${P3H_TLS_MODE}" = "INTERNAL_CA" ] \
-    && ! is_absolute_outside_repository_file "${P3H_CA_BUNDLE_FILE}"; then
+    && ! canonical_secure_file "${P3H_CA_BUNDLE_FILE}" nonwritable; then
   blocked "BLOCKED_INVALID_CA_BUNDLE"
 fi
 
-if ! attestation_has_only_keys "${P3H_SERVER_ATTESTATION_FILE}" "${server_attestation_keys[@]}" \
+if ! attestation_is_strict "${P3H_SERVER_ATTESTATION_FILE}" "${server_attestation_keys[@]}" \
     || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" ENVIRONMENT_CLASS CONTROLLED_STAGING \
     || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" PRODUCTION_TRAFFIC NO \
     || ! require_attestation_value "${P3H_SERVER_ATTESTATION_FILE}" PRODUCTION_DATABASE NO \
@@ -278,7 +361,7 @@ if ! attestation_has_only_keys "${P3H_SERVER_ATTESTATION_FILE}" "${server_attest
   blocked "BLOCKED_INVALID_STAGING_ATTESTATION"
 fi
 
-if ! attestation_has_only_keys "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" "${secret_attestation_keys[@]}" \
+if ! attestation_is_strict "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" "${secret_attestation_keys[@]}" \
     || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" SECRET_BACKEND_CLASS "${P3H_SECRET_BACKEND}" \
     || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" AUTHORIZED_FOR_P3H YES \
     || ! require_attestation_value "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" PLAINTEXT_AT_REST NO \
@@ -288,8 +371,17 @@ if ! attestation_has_only_keys "${P3H_SECRET_BACKEND_ATTESTATION_FILE}" "${secre
   blocked "BLOCKED_INVALID_SECRET_BACKEND_ATTESTATION"
 fi
 
+{
+  printf 'RELEASE_OWNER_REFERENCE_SHA256: '
+  printf '%s' "${P3H_RELEASE_OWNER_REFERENCE}" | sha256_text
+  printf 'ROLLBACK_OWNER_REFERENCE_SHA256: '
+  printf '%s' "${P3H_ROLLBACK_OWNER_REFERENCE}" | sha256_text
+  printf 'INCIDENT_OWNER_REFERENCE_SHA256: '
+  printf '%s' "${P3H_INCIDENT_OWNER_REFERENCE}" | sha256_text
+} >"${EVIDENCE_DIR}/owner-reference-hashes.txt"
+
 CURRENT_STAGE="ssh-host-key-verification"
-for command_name in ssh ssh-keyscan ssh-keygen git sha256sum tar; do
+for command_name in ssh ssh-keyscan ssh-keygen git sha256sum tar realpath; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     if [ "${command_name}" = "sha256sum" ] && command -v shasum >/dev/null 2>&1; then
       continue

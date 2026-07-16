@@ -55,13 +55,13 @@ final class P3hContractTestSupport {
 
     static Map<String, String> completeLocalInputs(Path tempDir) throws IOException {
         Path identity = tempDir.resolve("identity");
-        Files.writeString(identity, "offline-contract-fixture", StandardCharsets.UTF_8);
+        Files.writeString(identity, "offline-contract-key-material", StandardCharsets.UTF_8);
         Files.setPosixFilePermissions(identity, Set.of(
                 PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
 
-        String hostKey = "SHA256:offlineP3hPinnedHostKeyFixture";
+        String hostKey = "SHA256:8JxvMtK5qV6jG9sZ1dR4pN7wC2fL0aY3hB6uE9iQkT0";
         String hostname = "stage.example.invalid";
-        Path serverAttestation = tempDir.resolve("server.attestation.fixture");
+        Path serverAttestation = tempDir.resolve("server.attestation");
         Files.writeString(serverAttestation, """
                 ENVIRONMENT_CLASS=CONTROLLED_STAGING
                 PRODUCTION_TRAFFIC=NO
@@ -72,38 +72,46 @@ final class P3hContractTestSupport {
                 LINUX_SERVER=YES
                 EXPECTED_SSH_HOST_KEY_SHA256=%s
                 EXPECTED_STAGING_HOSTNAME=%s
-                SERVER_OWNER_REFERENCE=OWNER-REF-FIXTURE
-                APPROVAL_REFERENCE=APPROVAL-REF-FIXTURE
+                SERVER_OWNER_REFERENCE=SRV-OWN-20260716-01
+                APPROVAL_REFERENCE=P3H-OFFLINE-20260716-01
                 """.formatted(hostKey, hostname), StandardCharsets.UTF_8);
+        Files.setPosixFilePermissions(serverAttestation, Set.of(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
 
-        Path secretAttestation = tempDir.resolve("secret.attestation.fixture");
+        Path secretAttestation = tempDir.resolve("secret.attestation");
         Files.writeString(secretAttestation, """
                 SECRET_BACKEND_CLASS=SYSTEMD_CREDENTIALS
-                BACKEND_VERSION=fixture-version
+                BACKEND_VERSION=systemd-255
                 AUTHORIZED_FOR_P3H=YES
                 PLAINTEXT_AT_REST=NO
                 SECRETS_VERSIONED_OR_ROTATABLE=YES
                 SECRET_MOUNT_IS_RUNTIME_ONLY=YES
-                SECRET_OWNER_REFERENCE=SECRET-OWNER-REF-FIXTURE
+                SECRET_OWNER_REFERENCE=SEC-OWN-20260716-01
                 ROTATION_ALLOWED=YES
                 """, StandardCharsets.UTF_8);
+        Files.setPosixFilePermissions(secretAttestation, Set.of(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
+
+        String identityPath = identity.toRealPath().toString();
+        String serverAttestationPath = serverAttestation.toRealPath().toString();
+        String secretAttestationPath = secretAttestation.toRealPath().toString();
 
         Map<String, String> inputs = new HashMap<>();
         inputs.put("P3H_CONFIRM", CONFIRMATION);
-        inputs.put("P3H_SERVER_ATTESTATION_FILE", serverAttestation.toAbsolutePath().toString());
-        inputs.put("P3H_SECRET_BACKEND_ATTESTATION_FILE", secretAttestation.toAbsolutePath().toString());
+        inputs.put("P3H_SERVER_ATTESTATION_FILE", serverAttestationPath);
+        inputs.put("P3H_SECRET_BACKEND_ATTESTATION_FILE", secretAttestationPath);
         inputs.put("P3H_SSH_HOST", "stage.example.invalid");
         inputs.put("P3H_SSH_PORT", "22");
         inputs.put("P3H_SSH_USER", "p3h-deploy");
-        inputs.put("P3H_SSH_IDENTITY_FILE", identity.toAbsolutePath().toString());
+        inputs.put("P3H_SSH_IDENTITY_FILE", identityPath);
         inputs.put("P3H_SSH_HOST_KEY_SHA256", hostKey);
         inputs.put("P3H_STAGING_HOSTNAME", hostname);
         inputs.put("P3H_TLS_MODE", "PUBLIC_CA");
         inputs.put("P3H_SECRET_BACKEND", "SYSTEMD_CREDENTIALS");
         inputs.put("P3H_SECRET_MOUNT_DIR", "/run/trade-model-p3h/secrets");
-        inputs.put("P3H_RELEASE_OWNER_REFERENCE", "RELEASE-OWNER-REF-FIXTURE");
-        inputs.put("P3H_ROLLBACK_OWNER_REFERENCE", "ROLLBACK-OWNER-REF-FIXTURE");
-        inputs.put("P3H_INCIDENT_OWNER_REFERENCE", "INCIDENT-OWNER-REF-FIXTURE");
+        inputs.put("P3H_RELEASE_OWNER_REFERENCE", "REL-OWN-20260716-01");
+        inputs.put("P3H_ROLLBACK_OWNER_REFERENCE", "RBK-OWN-20260716-01");
+        inputs.put("P3H_INCIDENT_OWNER_REFERENCE", "INC-OWN-20260716-01");
         inputs.put("P3H_REBOOT_CONFIRM", REBOOT_CONFIRMATION);
         inputs.put("P3H_KEEP_STAGING_RUNNING", "NO");
         return inputs;
