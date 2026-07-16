@@ -7,6 +7,8 @@ AUTH_PASSWORD="${SMOKE_AUTH_PASSWORD:-${APP_ADMIN_PASSWORD:-}}"
 SMOKE_ALLOW_EXTERNAL_CALLS="${SMOKE_ALLOW_EXTERNAL_CALLS:-false}"
 SMOKE_PHASE="${SMOKE_PHASE:-FETCH_AND_VALIDATE}"
 SMOKE_RESPONSE_DIR="${SMOKE_RESPONSE_DIR:-}"
+SMOKE_SPLIT_PHASE_CONFIRM="${SMOKE_SPLIT_PHASE_CONFIRM:-}"
+EXPECTED_SPLIT_PHASE_CONFIRM="I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE"
 
 case "$SMOKE_PHASE" in
   FETCH|VALIDATE|FETCH_AND_VALIDATE) ;;
@@ -16,9 +18,20 @@ case "$SMOKE_PHASE" in
     ;;
 esac
 
+if [ "$SMOKE_PHASE" = "FETCH" ] || [ "$SMOKE_PHASE" = "VALIDATE" ]; then
+  if [ "$SMOKE_SPLIT_PHASE_CONFIRM" != "$EXPECTED_SPLIT_PHASE_CONFIRM" ]; then
+    echo "FAIL split smoke phase requires explicit local-controlled confirmation" >&2
+    exit 1
+  fi
+  if [ -z "$SMOKE_RESPONSE_DIR" ]; then
+    echo "FAIL split smoke phase requires SMOKE_RESPONSE_DIR" >&2
+    exit 1
+  fi
+fi
+
 if [ -n "$SMOKE_RESPONSE_DIR" ]; then
-  if [ ! -d "$SMOKE_RESPONSE_DIR" ]; then
-    echo "FAIL smoke response directory missing" >&2
+  if [ ! -d "$SMOKE_RESPONSE_DIR" ] || [ -L "$SMOKE_RESPONSE_DIR" ]; then
+    echo "FAIL smoke response directory must be an existing non-symlink directory" >&2
     exit 1
   fi
   health_body="$SMOKE_RESPONSE_DIR/health.json"
@@ -37,6 +50,13 @@ else
   echo "FAIL split smoke phase requires SMOKE_RESPONSE_DIR" >&2
   exit 1
 fi
+
+for response_file in "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body"; do
+  if [ -L "$response_file" ]; then
+    echo "FAIL smoke response artifact must not be a symlink" >&2
+    exit 1
+  fi
+done
 
 request_public_json() {
   local path="$1"
@@ -73,12 +93,13 @@ if [ "$SMOKE_PHASE" != "VALIDATE" ]; then
 fi
 
 if [ "$SMOKE_PHASE" = "FETCH" ]; then
-  echo "PASS production smoke response fetch"
+  echo "PASS controlled local split smoke response fetch"
+  echo "SMOKE_EVIDENCE_SCOPE: LOCAL_CONTROLLED_SPLIT_ONLY"
   exit 0
 fi
 
 for response_file in "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body"; do
-  if [ ! -f "$response_file" ]; then
+  if [ ! -f "$response_file" ] || [ -L "$response_file" ]; then
     echo "FAIL smoke response artifact missing" >&2
     exit 1
   fi
@@ -89,11 +110,11 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-python3 - "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body" "$SMOKE_ALLOW_EXTERNAL_CALLS" <<'PY'
+python3 - "$health_body" "$liveness_body" "$readiness_body" "$dashboard_body" "$review_body" "$SMOKE_ALLOW_EXTERNAL_CALLS" "$SMOKE_PHASE" <<'PY'
 import json
 import sys
 
-health_path, liveness_path, readiness_path, dashboard_path, review_path, allow_external_calls = sys.argv[1:]
+health_path, liveness_path, readiness_path, dashboard_path, review_path, allow_external_calls, smoke_phase = sys.argv[1:]
 allow_external_calls = allow_external_calls.lower() == "true"
 
 def load_payload(path):
@@ -180,5 +201,9 @@ telegram_status = (dashboard.get("pushInbox") or {}).get("telegramStatus")
 if telegram_status == "CONNECTED":
     raise SystemExit("FAIL pushInbox.telegramStatus must not be CONNECTED without a verified source")
 
-print("PASS production smoke checks")
+if smoke_phase == "FETCH_AND_VALIDATE":
+    print("PASS production smoke checks")
+else:
+    print("PASS controlled local split smoke validation")
+    print("SMOKE_EVIDENCE_SCOPE: LOCAL_CONTROLLED_SPLIT_ONLY")
 PY

@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: Greenfield P3-G local first-boot, backup/restore, and read-only deployment rehearsal on branch codex/greenfield-postgresql-first-boot-rehearsal-p3g
-Next Business Phase: Reviewer Greenfield P3-G Evidence Review and PR Merge Readiness; P4 remains blocked
+Current Work Package: Greenfield P3-G Evidence Integrity Closure Round 1 on Draft PR #1128
+Next Business Phase: Reviewer Greenfield P3-G Round 2 Re-review and PR Merge Readiness; P4 remains blocked
 Next Business Phase Allowed: NO while the P3-G Draft PR is unmerged; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
@@ -34,6 +34,9 @@ PostgreSQL 16 environment:
    were denied and application reads did not change content fingerprints.
 6. All AI/provider external calls, schedulers, trading paths, and external
    sends remained disabled on an internal Docker network.
+7. Reviewer Round 1 closes the release-gate split-smoke inheritance bypass,
+   labels split smoke as local-only, and validates empty asset/system cards
+   against directional, opening, high-confidence, and Hot Reset false positives.
 
 This branch-local result is not effective until its Draft PR is reviewed and
 merged. It is not server deployment, secret-store, live-provider, or

@@ -88,7 +88,11 @@ class ControlledGreenfieldFirstBootRehearsalP3GContractTest {
                 "POST_MIGRATION_SEED_ALLOWLIST: tm_rule_config=${RULE_CONFIG_ROWS}",
                 ".HostConfig.PortBindings",
                 "APPLICATION_HOST_BIND_CONFIG: 127.0.0.1:18085",
-                "APPLICATION_PUBLIC_PORT_EFFECTIVE: NONE_INTERNAL_NETWORK",
+                "APPLICATION_HOST_EXPOSURE: LOOPBACK_ONLY",
+                "EMPTY_ASSET_CARDS_FAIL_CLOSED: PASS",
+                "EMPTY_SYSTEM_STATE_FAIL_CLOSED: PASS",
+                "FAKE_ASSET_CONCLUSIONS: NONE",
+                "FAKE_POSITION_PLAN_RECORDS: NONE",
                 "trade_model.inventory_as_of_utc=2026-07-15T00:00:00");
         assertThat(script).doesNotContain(
                 "flyway clean", "flyway repair", "flyway baseline",

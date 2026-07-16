@@ -34,7 +34,12 @@ class ProdSmokeScriptHealthTest {
         assertThat(script).contains(
                 "SMOKE_PHASE=\"${SMOKE_PHASE:-FETCH_AND_VALIDATE}\"",
                 "SMOKE_RESPONSE_DIR=\"${SMOKE_RESPONSE_DIR:-}\"",
-                "FETCH|VALIDATE|FETCH_AND_VALIDATE");
+                "SMOKE_SPLIT_PHASE_CONFIRM=\"${SMOKE_SPLIT_PHASE_CONFIRM:-}\"",
+                "I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE",
+                "FETCH|VALIDATE|FETCH_AND_VALIDATE",
+                "existing non-symlink directory",
+                "artifact must not be a symlink",
+                "SMOKE_EVIDENCE_SCOPE: LOCAL_CONTROLLED_SPLIT_ONLY");
         assertThat(script).contains("dashboard header.dataSourceText missing");
         assertThat(script).contains("marketDataProvider");
         assertThat(script).contains("aiProvider");
@@ -104,6 +109,10 @@ class ProdSmokeScriptHealthTest {
         String script = Files.readString(Path.of("scripts", "prod-release-gate.sh"), StandardCharsets.UTF_8);
 
         assertThat(script).contains("RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=\"${RELEASE_GATE_REQUIRE_PROVIDER_SMOKE:-false}\"");
+        assertThat(script).contains(
+                "SMOKE_PHASE=\"FETCH_AND_VALIDATE\"",
+                "SMOKE_RESPONSE_DIR=\"\"",
+                "SMOKE_SPLIT_PHASE_CONFIRM=\"\"");
         assertThat(script).contains("PROVIDER_SMOKE_ENABLE_EXTERNAL_CALLS=\"true\"");
         assertThat(script).contains("provider live smoke not required by this script run");
         assertThat(script).contains("provider live smoke did not produce PASS");

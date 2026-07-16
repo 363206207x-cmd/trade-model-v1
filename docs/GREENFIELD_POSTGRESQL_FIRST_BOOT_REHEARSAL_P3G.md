@@ -3,6 +3,9 @@
 Status: `PASS_LOCAL_CONTROLLED_GREENFIELD_REHEARSAL` on the package branch;
 the package is not effective until its Draft PR is reviewed and merged.
 
+Evidence integrity closure: Reviewer Round 1 blockers are addressed on Draft
+PR #1128 and require Round 2 independent re-review before merge.
+
 Production Deployment Readiness: `BLOCKED`
 
 P4 Allowed: `NO`
@@ -39,16 +42,26 @@ worktree, the wrong branch, or an unexpected base. Every bounded run uses
 unique containers, an internal Docker network, a named volume, random
 credentials, and cleanup traps for success, failure, `SIGINT`, and `SIGTERM`.
 
-Docker Desktop records the requested loopback-only binding for a container on
-an `--internal` network in `HostConfig.PortBindings`, but does not expose an
-effective public port. The runner verifies the configured
-`127.0.0.1:18085` boundary without weakening the internal-network policy.
+The application publishes only the loopback host endpoint
+`127.0.0.1:18085`. The runner records
+`APPLICATION_HOST_EXPOSURE: LOOPBACK_ONLY`; the internal Docker network blocks
+external egress but does not mean the loopback endpoint is absent.
 Application health and API requests come from a digest-pinned JDK Smoke client
 attached only to the same internal network. The official `prod-smoke.sh` uses
-its explicit `FETCH` phase there, then its unchanged Python safety validator
-runs on the host in `VALIDATE` phase over transient response files. The
-empty-state validator consumes those same temporary files. They are deleted
-on exit and are never copied into evidence.
+its explicit local-controlled `FETCH` phase there, then its Python safety
+validator runs on the host in local-controlled `VALIDATE` phase over transient
+response files. Both split phases require
+`I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE`, an existing non-symlink response
+directory, and non-symlink response artifacts. They emit only
+`LOCAL_CONTROLLED_SPLIT_ONLY` evidence and cannot be represented as production
+release smoke. The empty-state validator consumes those same temporary files.
+They are deleted on exit and are never copied into evidence.
+
+The production release gate explicitly overrides inherited smoke variables
+with `SMOKE_PHASE=FETCH_AND_VALIDATE`, an empty `SMOKE_RESPONSE_DIR`, and an
+empty split confirmation. Hostile inherited `FETCH`, `VALIDATE`, and canned
+response paths therefore cannot bypass a live fetch from the current
+`APP_URL` followed by validation.
 
 The Flyway action test runs offline in the same digest-pinned JDK image while
 sharing the PostgreSQL container network namespace and connecting only to
@@ -105,6 +118,9 @@ operational script is rewritten or bypassed.
 | Primary application restart | `PASS` |
 | Recovery application smoke | `PASS` |
 | Empty Dashboard/Review Center/Run Baseline | `PASS_FAIL_CLOSED` |
+| Empty asset cards | `PASS_FAIL_CLOSED`; no directional bias, opening signal, high confidence, fabricated price/evidence, or analysis timestamp |
+| Empty system state | `PASS_FAIL_CLOSED`; no directional trend, valid-quality claim, AI conflict result, pending review, or triggered Hot Reset |
+| Fake asset conclusions / position-plan records | `NONE` / `NONE` |
 | Primary/recovery application content fingerprints | `MATCH` |
 | External network egress | blocked by internal Docker network |
 | Compose config expansion | `PASS`; expanded config discarded |
@@ -131,6 +147,11 @@ empty-state validator required:
 
 - no positions, reviews, analyses, decisions, execution plans, monitor alerts,
   push records, or Hot Reset records;
+- an empty asset list or only formal placeholder cards with no directional
+  market bias, `worthOpening=true`, high confidence, fabricated price/score,
+  non-zero evidence, analysis timestamp, connected source, or trading copy;
+- fail-closed `marketTrend`, `riskLevel`, `dataQuality`, `aiConflict`,
+  `pendingReview`, `confused`, and `hotReset` system cards;
 - no fabricated plan fields or asset conclusions;
 - AI `DISABLED` or `NOT_CALLED`;
 - no provider or Telegram status reported as connected; and
@@ -161,4 +182,19 @@ boundary and `.dockerignore`.
 Decision: Production Deployment Readiness remains `BLOCKED`; production
 deployment cannot proceed.
 
-Next task: Reviewer Greenfield P3-G Evidence Review and PR Merge Readiness.
+## Reviewer Round 1 Evidence Integrity Closure
+
+The Round 1 regression suite proves:
+
+1. `prod-release-gate.sh` always runs current-server `FETCH_AND_VALIDATE`, even
+   with hostile inherited split-phase variables or canned response files.
+2. Split smoke is explicit local evidence only and rejects missing
+   confirmation, symlink directories, and symlink JSON artifacts.
+3. Bullish, bearish, opening-eligible, high-confidence, evidenced, timestamped,
+   directional-copy, and plan-ready empty asset fixtures fail closed. A fixture
+   with all six cards set to `BULLISH`, `worthOpening=true`, and `HIGH` fails.
+4. Directional system trend, non-zero pending review, and triggered Hot Reset
+   fixtures fail closed; safe placeholders and a completely empty asset list
+   pass.
+
+Next task: Reviewer Greenfield P3-G Round 2 Re-review and PR Merge Readiness.

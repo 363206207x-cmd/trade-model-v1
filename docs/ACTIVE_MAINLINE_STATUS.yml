@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "Greenfield P3-G local first-boot, backup/restore, and read-only deployment rehearsal; branch evidence awaits Draft PR review/merge"
-active_block_cn: "Greenfield P3-G 本地首次启动、备份恢复与只读部署演练；分支证据等待 Draft PR 复审与合并"
+active_block: "Greenfield P3-G evidence integrity closure on Draft PR #1128; Round 1 fixes await Round 2 re-review"
+active_block_cn: "Greenfield P3-G 证据完整性收口，Draft PR #1128 第一轮整改等待第二轮复审"
 
-next_required_action: "Review the Greenfield P3-G local evidence and decide Draft PR merge readiness; do not start P4 or production deployment."
-next_business_phase: "No further business phase while the Greenfield P3-G Draft PR is unmerged; next action is evidence review"
+next_required_action: "Perform Reviewer Greenfield P3-G Round 2 re-review on Draft PR #1128; do not start P4 or production deployment."
+next_business_phase: "No further business phase while Draft PR #1128 is unmerged; next action is Round 2 evidence re-review"
 next_business_phase_allowed: false
 compatibility_next_business_phase_allowed_note: "Compatibility field remains false while the P3-G Draft PR is unmerged. P3-G local evidence is not effective, P4 is blocked, and production deployment remains blocked."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "Draft PR for codex/greenfield-postgresql-first-boot-rehearsal-p3g (number derived by GitHub)"
+current_pr: "#1128 Open / Draft / unmerged"
 current_branch: "codex/greenfield-postgresql-first-boot-rehearsal-p3g"
-current_package_pr: "P3-G Draft PR pending merged-main effectiveness"
+current_package_pr: "#1128 P3-G Draft PR pending Round 2 re-review and merged-main effectiveness"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"

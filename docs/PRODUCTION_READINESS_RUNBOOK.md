@@ -114,6 +114,8 @@ PDR-M6A adds a disciplined evidence framework for the human-run real-server acce
 
 - Evidence template: `docs/PRODUCTION_ACCEPTANCE_EVIDENCE_TEMPLATE.md` records the required real-server outputs for Docker Compose config, PostgreSQL startup, Flyway migration, app prod startup, authenticated smoke, backup, restore, HTTPS/reverse-proxy/auth smoke, provider live smoke, and safety boundary checks.
 - Release gate runner: `scripts/prod-release-gate.sh` orchestrates safe checks only. It can run `docker compose config`, `scripts/prod-smoke.sh`, and an optional backup drill when explicitly enabled. It never runs restore automatically and never prints secrets.
+- Release gate smoke integrity: `scripts/prod-release-gate.sh` forces `SMOKE_PHASE=FETCH_AND_VALIDATE`, clears `SMOKE_RESPONSE_DIR`, and clears split-phase confirmation. Inherited split phases or canned response files cannot be counted as production server smoke.
+- Local split smoke boundary: `FETCH` and `VALIDATE` require `SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE`, an existing non-symlink response directory, and non-symlink JSON artifacts. Their output is labeled `LOCAL_CONTROLLED_SPLIT_ONLY`, not production release evidence.
 - Release gate status policy: the script outputs `PRODUCTION_RELEASE_GATE: PASS / FAIL / INCOMPLETE`, but defaults to `INCOMPLETE` when real-server evidence is missing. A script PASS alone is not enough to change readiness.
 - Environment contract: `.env.example` documents `RELEASE_GATE_REQUIRE_DOCKER`, `RELEASE_GATE_REQUIRE_BACKUP`, and `RELEASE_GATE_ALLOW_EXTERNAL_CALLS`; all default to conservative behavior.
 - Required human evidence: production readiness cannot advance unless the evidence template is completed with redacted server outputs and reviewed by the release gate owner.
@@ -789,7 +791,9 @@ P3-G uses only disposable localhost resources and the exact confirmation
 8. runs the `prod` profile with a read-only database role against Primary,
    Primary restart, and Recovery, with `prod-smoke.sh` fetching through a
    digest-pinned client on the internal network and validating only transient
-   responses on the host; and
+   responses on the host under the explicit local split-smoke confirmation;
+   it separately verifies empty asset cards and system-state cards fail closed;
+   and
 9. keeps Flyway, schedulers, provider/AI calls, trading, and external sends
    disabled throughout.
 

@@ -483,6 +483,7 @@ run_application_smoke() {
     --env "SMOKE_AUTH_PASSWORD=${APP_ADMIN_PASSWORD}" \
     --env "SMOKE_ALLOW_EXTERNAL_CALLS=false" \
     --env "SMOKE_RESPONSE_DIR=/smoke-output" \
+    --env "SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE" \
     "${FLYWAY_ACTION_JDK_IMAGE}" sleep infinity \
     >"${TMP_DIR}/smoke-${label}-container-id.txt"; then
     blocked "BLOCKED_SMOKE_CLIENT_START"
@@ -540,6 +541,7 @@ run_application_smoke() {
 
   if ! run_bounded 120 docker exec \
     --env "SMOKE_PHASE=FETCH" \
+    --env "SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE" \
     "${SMOKE_CONTAINER}" bash /repo/scripts/prod-smoke.sh \
     >"${TMP_DIR}/app-${label}-prod-smoke.txt" 2>&1; then
     write_redacted_log "${TMP_DIR}/app-${label}-prod-smoke.txt" \
@@ -549,6 +551,7 @@ run_application_smoke() {
   if ! run_bounded 120 env \
     "SMOKE_PHASE=VALIDATE" \
     "SMOKE_RESPONSE_DIR=${smoke_response_dir}" \
+    "SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE" \
     "SMOKE_ALLOW_EXTERNAL_CALLS=false" \
     bash "${ROOT_DIR}/scripts/prod-smoke.sh" \
     >>"${TMP_DIR}/app-${label}-prod-smoke.txt" 2>&1; then
@@ -576,7 +579,7 @@ run_application_smoke() {
     echo "APPLICATION_CONTAINER_RUNS_AS_ROOT: NO"
     echo "APPLICATION_NETWORK: INTERNAL_ONLY"
     echo "APPLICATION_HOST_BIND_CONFIG: 127.0.0.1:18085"
-    echo "APPLICATION_PUBLIC_PORT_EFFECTIVE: NONE_INTERNAL_NETWORK"
+    echo "APPLICATION_HOST_EXPOSURE: LOOPBACK_ONLY"
     echo "APPLICATION_MOUNTS: NONE"
     echo "SMOKE_CLIENT_PATH: INTERNAL_NETWORK_FIXED_DIGEST_CLIENT"
     echo "SMOKE_CLIENT_IMAGE: ${FLYWAY_ACTION_JDK_IMAGE}"
@@ -1234,6 +1237,10 @@ enter_stage "evidence-summary"
   echo "READ_ONLY_WRITE_PROBE: DENIED"
   echo "PRIMARY_FIRST_BOOT_SMOKE: PASS"
   echo "EMPTY_DASHBOARD_FAIL_CLOSED: PASS"
+  echo "EMPTY_ASSET_CARDS_FAIL_CLOSED: PASS"
+  echo "EMPTY_SYSTEM_STATE_FAIL_CLOSED: PASS"
+  echo "FAKE_ASSET_CONCLUSIONS: NONE"
+  echo "FAKE_POSITION_PLAN_RECORDS: NONE"
   echo "APPLICATION_RESTART_SMOKE: PASS"
   echo "RECOVERY_APPLICATION_SMOKE: PASS"
   echo "PRIMARY_APP_STRUCTURE_FINGERPRINT: MATCH"
