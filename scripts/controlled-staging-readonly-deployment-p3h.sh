@@ -421,14 +421,16 @@ fi
 } >"${EVIDENCE_DIR}/image-metadata.txt"
 
 CURRENT_STAGE="ssh-host-key-verification"
-known_hosts="${TMP_DIR}/known_hosts"
+known_hosts_candidates="${TMP_DIR}/known_hosts.candidates"
+known_hosts="${TMP_DIR}/known_hosts.approved"
 NETWORK_ACCESS_STARTED=1
 if ! run_bounded 20 ssh-keyscan -T 10 -p "${P3H_SSH_PORT}" \
-    "${P3H_SSH_HOST}" >"${known_hosts}" 2>/dev/null; then
+    "${P3H_SSH_HOST}" >"${known_hosts_candidates}" 2>/dev/null; then
   blocked "BLOCKED_SSH_HOST_KEY_UNAVAILABLE" "ATTEMPTED" "NOT_ATTEMPTED"
 fi
-actual_host_key="$(ssh-keygen -lf "${known_hosts}" -E sha256 | awk 'NR == 1 {print $2}')"
-if [ -z "${actual_host_key}" ] || [ "${actual_host_key}" != "${P3H_SSH_HOST_KEY_SHA256}" ]; then
+if ! "${ROOT_DIR}/scripts/p3h-filter-known-hosts.sh" \
+    "${known_hosts_candidates}" "${P3H_SSH_HOST_KEY_SHA256}" "${known_hosts}" \
+    >/dev/null; then
   blocked "BLOCKED_SSH_HOST_KEY_MISMATCH" "ATTEMPTED" "NOT_ATTEMPTED"
 fi
 

@@ -816,15 +816,23 @@ server/Secret Store inputs, so real staging is
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, while `SERVER_ACCESS` and `SECRET_ACCESS`
 are `NOT_ATTEMPTED`.
 
-The repository now has a deterministic empty-DB -> role bootstrap -> Flyway
-V1-V7 -> grants -> Secret materialization -> app health -> proxy health chain.
+The repository now has explicit `INITIALIZE_GREENFIELD` and
+`STEADY_STATE_START` modes. Initialization uses the deterministic empty-DB ->
+role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app
+health -> proxy health chain. Steady state validates Flyway checksums/V7/no
+failed migrations and role/grant state, refreshes grants, rematerializes the
+selected active V1/V2 versions, and starts app/proxy without requiring an
+empty database or running baseline, repair, or clean.
 It also has strict attestation and canonical-file guards, an implemented
 `SYSTEMD_CREDENTIALS` adapter, effective runtime-mount verification, fixed
 non-root Config Tree materialization, pinned SSH identity, proxy-only ingress,
 internal networking, fixed Host routing, strict TLS target/TLS 1.3 checks,
 read-only application probing, rotation, backup/restore, reboot, redaction,
-and leak-scan contracts. Local results prove the template only; they do not
-prove a server deployment.
+and leak-scan contracts. Round 2 local evidence includes retained-volume and
+reboot-like restarts, zero repeated migrations, matching content fingerprints,
+V2 preservation/V1 denial, injected-failure cleanup, strict object inventory,
+exact SSH-line pinning, and exact Git archive image attribution. Local results
+prove the template only; they do not prove a server deployment or server reboot.
 
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
@@ -840,7 +848,7 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H Offline Harness Round 2 re-review, preserving the
+1. Complete Reviewer P3-H Offline Harness Round 3 re-review, preserving the
    distinction between local template PASS and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.

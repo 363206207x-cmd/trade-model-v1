@@ -7,7 +7,13 @@ if [ ! -f "${admin_secret}" ] || [ -L "${admin_secret}" ] || [ ! -s "${admin_sec
   exit 2
 fi
 
-for secret_name in flyway_password app_database_password_v1 backup_reader_password recovery_owner_password; do
+case "${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:-}" in
+  V1) active_app_secret_name=app_database_password_v1 ;;
+  V2) active_app_secret_name=app_database_password_v2 ;;
+  *) echo "P3H_ROLE_BOOTSTRAP: BLOCKED_ACTIVE_SECRET_VERSION" >&2; exit 2 ;;
+esac
+
+for secret_name in flyway_password "${active_app_secret_name}" backup_reader_password recovery_owner_password; do
   secret_path="/run/secrets/${secret_name}"
   if [ ! -f "${secret_path}" ] || [ -L "${secret_path}" ] || [ ! -s "${secret_path}" ]; then
     echo "P3H_ROLE_BOOTSTRAP: BLOCKED_MISSING_SECRET" >&2
@@ -15,8 +21,12 @@ for secret_name in flyway_password app_database_password_v1 backup_reader_passwo
   fi
 done
 
+active_app_secret=/tmp/p3h_active_app_database_password
+cp "/run/secrets/${active_app_secret_name}" "${active_app_secret}"
+chmod 600 "${active_app_secret}"
+
 pgpass_file="$(mktemp)"
-trap 'rm -f "${pgpass_file}"' EXIT HUP INT TERM
+trap 'rm -f "${pgpass_file}" "${active_app_secret}"' EXIT HUP INT TERM
 chmod 600 "${pgpass_file}"
 printf 'postgres:5432:*:p3h_bootstrap:%s\n' "$(tr -d '\r\n' <"${admin_secret}")" >"${pgpass_file}"
 export PGPASSFILE="${pgpass_file}"
@@ -51,3 +61,4 @@ database_count="$(psql --host=postgres --username=p3h_bootstrap --dbname=postgre
 echo "P3H_ROLE_BOOTSTRAP: PASS"
 echo "P3H_ROLE_COUNT: ${role_count}"
 echo "P3H_DATABASE_COUNT: ${database_count}"
+echo "P3H_ACTIVE_APP_DATABASE_SECRET_VERSION: ${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION}"

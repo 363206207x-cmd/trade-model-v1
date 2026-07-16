@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
 \set migration_password `tr -d '\r\n' </run/secrets/flyway_password`
-\set app_password `tr -d '\r\n' </run/secrets/app_database_password_v1`
+\set app_password `tr -d '\r\n' </tmp/p3h_active_app_database_password`
 \set backup_password `tr -d '\r\n' </run/secrets/backup_reader_password`
 \set recovery_password `tr -d '\r\n' </run/secrets/recovery_owner_password`
 

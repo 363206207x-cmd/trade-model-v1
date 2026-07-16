@@ -5,12 +5,23 @@ readonly_target=/materialized
 app_uid=10001
 app_gid=10001
 
+case "${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:-}" in
+  V1) active_database_secret=app_database_password_v1 ;;
+  V2) active_database_secret=app_database_password_v2 ;;
+  *) echo "P3H_SECRET_MATERIALIZER: BLOCKED_DATABASE_SECRET_VERSION" >&2; exit 2 ;;
+esac
+case "${P3H_ACTIVE_APP_ADMIN_SECRET_VERSION:-}" in
+  V1) active_admin_secret=app_admin_password_v1 ;;
+  V2) active_admin_secret=app_admin_password_v2 ;;
+  *) echo "P3H_SECRET_MATERIALIZER: BLOCKED_ADMIN_SECRET_VERSION" >&2; exit 2 ;;
+esac
+
 if [ "$(readlink -f "${readonly_target}")" != "${readonly_target}" ]; then
   echo "P3H_SECRET_MATERIALIZER: BLOCKED_TARGET" >&2
   exit 2
 fi
 
-for secret_name in app_database_password_v1 app_admin_password_v1 \
+for secret_name in "${active_database_secret}" "${active_admin_secret}" \
     binance_nonfunctional_key binance_nonfunctional_secret; do
   secret_path="/run/secrets/${secret_name}"
   if [ ! -f "${secret_path}" ] || [ -L "${secret_path}" ] || [ ! -s "${secret_path}" ]; then
@@ -32,9 +43,9 @@ copy_secret() {
   chmod 400 "${target_path}"
 }
 
-copy_secret /run/secrets/app_database_password_v1 \
+copy_secret "/run/secrets/${active_database_secret}" \
   "${readonly_target}/config/spring.datasource.password"
-copy_secret /run/secrets/app_admin_password_v1 \
+copy_secret "/run/secrets/${active_admin_secret}" \
   "${readonly_target}/config/trade-model.auth.admin-password"
 copy_secret /run/secrets/binance_nonfunctional_key \
   "${readonly_target}/config/binance.api.key"
@@ -53,3 +64,5 @@ echo "P3H_SECRET_MATERIALIZER: PASS"
 echo "P3H_SECRET_TARGET_UID: ${app_uid}"
 echo "P3H_SECRET_TARGET_GID: ${app_gid}"
 echo "P3H_SECRET_TARGET_MODE: 0400"
+echo "P3H_ACTIVE_APP_DATABASE_SECRET_VERSION: ${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION}"
+echo "P3H_ACTIVE_APP_ADMIN_SECRET_VERSION: ${P3H_ACTIVE_APP_ADMIN_SECRET_VERSION}"

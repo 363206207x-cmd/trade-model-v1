@@ -1,7 +1,11 @@
 #!/bin/sh
 set -eu
 
-secret_file=/run/secrets/app_database_password_v1
+case "${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:-}" in
+  V1) secret_file=/run/secrets/app_database_password_v1 ;;
+  V2) secret_file=/run/secrets/app_database_password_v2 ;;
+  *) echo "P3H_APP_ROLE_PROBE: BLOCKED_ACTIVE_SECRET_VERSION" >&2; exit 2 ;;
+esac
 if [ ! -f "${secret_file}" ] || [ -L "${secret_file}" ] || [ ! -s "${secret_file}" ]; then
   echo "P3H_APP_ROLE_PROBE: BLOCKED_MISSING_SECRET" >&2
   exit 2

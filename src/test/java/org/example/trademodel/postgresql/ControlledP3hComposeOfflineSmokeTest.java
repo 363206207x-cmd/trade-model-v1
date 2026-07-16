@@ -31,6 +31,18 @@ class ControlledP3hComposeOfflineSmokeTest {
 
         assertThat(process.exitValue()).as("sanitized output: %s", output).isZero();
         assertThat(output).contains(
+                "FIRST_BOOT: PASS",
+                "STEADY_STATE_RESTART: PASS",
+                "REBOOT_LIKE_RESTART: PASS",
+                "DATABASE_VOLUME_PRESERVED: PASS",
+                "FLYWAY_REPEAT: ZERO_MIGRATIONS",
+                "CONTENT_FINGERPRINT: MATCH",
+                "ACTIVE_SECRET_VERSION_PRESERVED: PASS",
+                "OLD_SECRET_V1_POST_ROTATION: DENIED",
+                "FAILED_START_CLEANUP: PASS",
+                "GREENFIELD_OBJECT_INVENTORY: PASS_STRICT",
+                "SSH_KNOWN_HOSTS_FILTER: PASS_EXACT_PIN",
+                "APP_IMAGE_SOURCE: PASS_EXACT_COMMITTED_GIT_ARCHIVE",
                 "GREENFIELD_BOOTSTRAP_ORDER: PASS",
                 "ROLE_PROVISIONING_STATUS: PASS",
                 "DATABASE_PROVISIONING_STATUS: PASS_PRIMARY_AND_RECOVERY",

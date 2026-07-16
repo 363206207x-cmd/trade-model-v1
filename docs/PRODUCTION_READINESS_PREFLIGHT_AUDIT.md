@@ -29,7 +29,12 @@ separation, fixed non-root Secret materialization, strict attestation,
 systemd-credential, runtime-mount, Host-header, TLS-target, and TLS 1.3
 contracts. An explicitly enabled disposable local Compose run completed as
 `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`, including Flyway V1-V7, denied
-application writes, Secret non-exposure checks, and cleanup. This is local
+application writes, Secret non-exposure checks, and cleanup. Round 2 also
+proves explicit initialize/steady modes, retained-volume and reboot-like
+restarts with zero repeated migrations and matching fingerprints, V2 active
+Secret preservation with V1 denied, strict object inventory, exact SSH-line
+pinning, exact Git archive image attribution, and injected-failure cleanup.
+This is local
 template evidence only. No authorized server or real Secret Store was
 accessed; `REAL_STAGING_STATUS` remains
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, P4 is not allowed, and Production

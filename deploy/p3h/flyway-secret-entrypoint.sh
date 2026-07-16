@@ -9,4 +9,14 @@ fi
 
 FLYWAY_PASSWORD="$(cat "$secret_file")"
 export FLYWAY_PASSWORD
-exec /flyway/flyway -baselineOnMigrate=false -cleanDisabled=true migrate
+
+operation="${P3H_FLYWAY_OPERATION:-migrate}"
+case "${operation}" in
+  migrate|validate) ;;
+  *)
+    echo "P3H_FLYWAY_RESULT: BLOCKED_UNSAFE_OPERATION" >&2
+    exit 2
+    ;;
+esac
+
+exec /flyway/flyway -baselineOnMigrate=false -cleanDisabled=true "${operation}"

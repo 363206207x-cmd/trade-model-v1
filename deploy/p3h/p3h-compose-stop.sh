@@ -8,7 +8,7 @@ if [ -z "${P3H_SECRET_MOUNT_DIR:-}" ] && [ -n "${CREDENTIALS_DIRECTORY:-}" ]; th
   export P3H_SECRET_MOUNT_DIR="$(realpath "${CREDENTIALS_DIRECTORY}")"
 fi
 
-docker compose -f "${COMPOSE_FILE}" down
+docker compose -f "${COMPOSE_FILE}" down --remove-orphans
 
 project_name="${P3H_COMPOSE_PROJECT_NAME:-trade-model-p3h}"
 while IFS= read -r secret_volume; do
@@ -19,3 +19,5 @@ done < <(docker volume ls --quiet \
   --filter "label=com.docker.compose.volume=p3h_materialized_secrets")
 
 echo "P3H_COMPOSE_STOP: PASS"
+echo "DATABASE_VOLUME_PRESERVED: PASS"
+echo "MATERIALIZED_SECRET_VOLUME_REMOVED: PASS"

@@ -21,7 +21,7 @@ services:
     volumes:
       - p3h_postgresql:/var/lib/postgresql/data
       - p3h_backups:/var/lib/trade-model-p3h/backups
-    restart: unless-stopped
+    restart: "no"
     logging: &bounded_logging
       driver: json-file
       options:
@@ -53,8 +53,11 @@ services:
       - postgres_admin_password
       - flyway_password
       - app_database_password_v1
+      - app_database_password_v2
       - backup_reader_password
       - recovery_owner_password
+    environment:
+      P3H_ACTIVE_APP_DATABASE_SECRET_VERSION: ${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:?set V1 or V2}
     volumes:
       - ./postgres-role-bootstrap-entrypoint.sh:/p3h/postgres-role-bootstrap-entrypoint.sh:ro
       - ./postgres-role-bootstrap.sql:/p3h/postgres-role-bootstrap.sql:ro
@@ -91,11 +94,71 @@ services:
       migrate:
         condition: service_completed_successfully
     entrypoint: ["/bin/sh", "/p3h/postgres-readonly-grants-entrypoint.sh"]
+    environment:
+      P3H_READONLY_GRANTS_MODE: ${P3H_READONLY_GRANTS_MODE:-INITIALIZE}
     secrets:
       - postgres_admin_password
     volumes:
       - ./postgres-readonly-grants-entrypoint.sh:/p3h/postgres-readonly-grants-entrypoint.sh:ro
       - ./postgres-readonly-grants.sql:/p3h/postgres-readonly-grants.sql:ro
+    networks:
+      - p3h_backend
+    restart: "no"
+    logging: *bounded_logging
+
+  flyway-validate:
+    image: flyway/flyway:10-alpine@sha256:94a81ca7db9a9f24fd8acd7463fa4560cb8f66aae2aa64485c27eb296f5851cf
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/trade_model_v1_p3h_primary
+      FLYWAY_USER: p3h_migration_owner
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+      FLYWAY_CLEAN_DISABLED: "true"
+      FLYWAY_CONNECT_RETRIES: "30"
+      P3H_FLYWAY_OPERATION: validate
+    secrets:
+      - flyway_password
+    entrypoint: ["/bin/sh", "/p3h/flyway-secret-entrypoint.sh"]
+    volumes:
+      - ../../src/main/resources/db/migration:/flyway/sql:ro
+      - ./flyway-secret-entrypoint.sh:/p3h/flyway-secret-entrypoint.sh:ro
+    networks:
+      - p3h_backend
+    restart: "no"
+    logging: *bounded_logging
+
+  steady-state-verify:
+    image: postgres:16-alpine@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/p3h/postgres-steady-state-verify.sh"]
+    secrets:
+      - postgres_admin_password
+    volumes:
+      - ./postgres-steady-state-verify.sh:/p3h/postgres-steady-state-verify.sh:ro
+    networks:
+      - p3h_backend
+    restart: "no"
+    logging: *bounded_logging
+
+  app-database-secret-activate:
+    image: postgres:16-alpine@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      P3H_ACTIVE_APP_DATABASE_SECRET_VERSION: ${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:?set V1 or V2}
+      P3H_SECRET_VERSION_ACTIVATION_CONFIRM: ${P3H_SECRET_VERSION_ACTIVATION_CONFIRM:-}
+    entrypoint: ["/bin/sh", "/p3h/p3h-app-database-secret-activate.sh"]
+    secrets:
+      - postgres_admin_password
+      - app_database_password_v1
+      - app_database_password_v2
+    volumes:
+      - ./p3h-app-database-secret-activate.sh:/p3h/p3h-app-database-secret-activate.sh:ro
     networks:
       - p3h_backend
     restart: "no"
@@ -118,7 +181,7 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    restart: unless-stopped
+    restart: "no"
     logging: *bounded_logging
 
   secret-materializer:
@@ -132,9 +195,14 @@ services:
     entrypoint: ["/bin/sh", "/p3h/p3h-secret-materializer.sh"]
     secrets:
       - app_database_password_v1
+      - app_database_password_v2
       - app_admin_password_v1
+      - app_admin_password_v2
       - binance_nonfunctional_key
       - binance_nonfunctional_secret
+    environment:
+      P3H_ACTIVE_APP_DATABASE_SECRET_VERSION: ${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:?set V1 or V2}
+      P3H_ACTIVE_APP_ADMIN_SECRET_VERSION: ${P3H_ACTIVE_APP_ADMIN_SECRET_VERSION:?set V1 or V2}
     volumes:
       - ./p3h-secret-materializer.sh:/p3h/p3h-secret-materializer.sh:ro
       - type: volume
@@ -243,7 +311,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
-    restart: unless-stopped
+    restart: "no"
     logging: *bounded_logging
 
   proxy:
@@ -282,7 +350,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 5s
-    restart: unless-stopped
+    restart: "no"
     logging: *bounded_logging
 
   app-role-probe:
@@ -294,6 +362,9 @@ services:
     entrypoint: ["/bin/sh", "/p3h/p3h-app-readonly-probe.sh"]
     secrets:
       - app_database_password_v1
+      - app_database_password_v2
+    environment:
+      P3H_ACTIVE_APP_DATABASE_SECRET_VERSION: ${P3H_ACTIVE_APP_DATABASE_SECRET_VERSION:?set V1 or V2}
     volumes:
       - ./p3h-app-readonly-probe.sh:/p3h/p3h-app-readonly-probe.sh:ro
     networks:
