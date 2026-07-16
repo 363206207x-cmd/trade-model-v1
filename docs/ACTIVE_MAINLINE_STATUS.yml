@@ -22,9 +22,9 @@ compatibility_next_business_phase_allowed_note: "Compatibility field remains fal
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "P3-H Draft PR pending GitHub-derived number / unmerged"
+current_pr: "#1129 Open / Draft / unmerged"
 current_branch: "codex/staging-readonly-tls-secrets-p3h"
-current_package_pr: "P3-H offline harness and blocked-input evidence pending review and merged-main effectiveness"
+current_package_pr: "#1129 P3-H offline harness and blocked-input evidence pending review and merged-main effectiveness"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"

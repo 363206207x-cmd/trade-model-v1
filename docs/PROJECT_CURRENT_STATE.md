@@ -1078,5 +1078,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: P3-H Draft PR pending GitHub-derived number and merge
+- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR pending review and merge
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE
