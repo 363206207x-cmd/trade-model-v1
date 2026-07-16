@@ -4,6 +4,7 @@ set -euo pipefail
 EXPECTED_CONFIRMATION="I_CONFIRM_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE"
 EXPECTED_BRANCH="codex/staging-readonly-tls-secrets-p3h"
 GREENFIELD_CONFIRMATION="I_CONFIRM_EMPTY_GREENFIELD_INITIALIZATION"
+GREENFIELD_RECOVERY_CONFIRMATION="I_CONFIRM_RECOVER_CONTROLLED_GREENFIELD_INITIALIZATION"
 FAILURE_INJECTION_CONFIRMATION="I_CONFIRM_LOCAL_P3H_FAILURE_INJECTION"
 ROTATION_CONFIRMATION="I_CONFIRM_CONTROLLED_APP_DATABASE_SECRET_ROTATION"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -63,6 +64,13 @@ blocked() {
   echo "P4_ALLOWED: NO"
   echo "PRODUCTION_READINESS: BLOCKED"
   exit "${2:-2}"
+}
+
+print_sanitized_p3h_status_lines() {
+  printf '%s\n' "$1" \
+    | LC_ALL=C grep -E \
+      '^(P3H_[A-Z0-9_]+|FAILED_START_[A-Z0-9_]+|PROJECT_CONTAINER_COUNT|MATERIALIZED_SECRET_VOLUME|PRIMARY_DATABASE_VOLUME|BACKUP_VOLUME): [A-Z0-9_,.-]+$' \
+    || true
 }
 
 cleanup() {
@@ -167,10 +175,11 @@ P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V1
 P3H_ACTIVE_APP_ADMIN_SECRET_VERSION=V1
 P3H_START_MODE=INITIALIZE_GREENFIELD
 P3H_GREENFIELD_INITIALIZE_CONFIRM="${GREENFIELD_CONFIRMATION}"
+P3H_GREENFIELD_RECOVERY_CONFIRM=""
 export P3H_COMPOSE_PROJECT_NAME P3H_APPLICATION_IMAGE_TAG P3H_STAGING_HOSTNAME
 export P3H_SECRET_MOUNT_DIR P3H_HTTP_HOST_PORT P3H_HTTPS_HOST_PORT
 export P3H_ACTIVE_APP_DATABASE_SECRET_VERSION P3H_ACTIVE_APP_ADMIN_SECRET_VERSION
-export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM
+export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM P3H_GREENFIELD_RECOVERY_CONFIRM
 
 for secret_name in postgres_admin_password flyway_password \
     app_database_password_v1 app_database_password_v2 app_admin_password_v1 \
@@ -239,6 +248,12 @@ psql_admin() {
     --no-psqlrc --set=ON_ERROR_STOP=1 --command="${sql}" >/dev/null
 }
 
+flyway_success_count() {
+  compose exec -T postgres psql --username=p3h_bootstrap \
+    --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
+    --command="SELECT count(*) FROM flyway_schema_history WHERE success=true"
+}
+
 expect_greenfield_rejection() {
   local fixture_name="$1"
   local create_sql="$2"
@@ -276,6 +291,118 @@ expect_greenfield_rejection USER_SEQUENCE \
 compose run --rm --no-deps greenfield-preflight >/dev/null \
   || blocked "BLOCKED_GREENFIELD_CLEAN_RECHECK"
 
+start_postgres_for_recovery_fixture() {
+  run_bounded 120 compose up --detach --wait --wait-timeout 90 postgres >/dev/null \
+    || blocked "BLOCKED_RECOVERY_FIXTURE_POSTGRES_START"
+}
+
+expect_recovery_rejection() {
+  local fixture_name="$1"
+  set +e
+  local recovery_output
+  recovery_output="$(run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" 2>&1)"
+  local recovery_status=$?
+  set -e
+  [ "${recovery_status}" -ne 0 ] \
+    || blocked "BLOCKED_RECOVERY_FIXTURE_ACCEPTED_${fixture_name}"
+}
+
+restore_flyway_history_fixture() {
+  start_postgres_for_recovery_fixture
+  psql_admin trade_model_v1_p3h_primary "TRUNCATE TABLE flyway_schema_history" \
+    || blocked "BLOCKED_RECOVERY_HISTORY_TRUNCATE"
+  compose exec -T postgres psql --username=p3h_bootstrap \
+    --dbname=trade_model_v1_p3h_primary --no-psqlrc --set=ON_ERROR_STOP=1 \
+    <"${TEMP_ROOT}/flyway-v3-history.sql" >/dev/null \
+    || blocked "BLOCKED_RECOVERY_HISTORY_RESTORE"
+}
+
+CURRENT_STAGE="partial-initialization-recovery"
+compose run --rm --no-deps role-bootstrap >/dev/null \
+  || blocked "BLOCKED_PARTIAL_RECOVERY_ROLE_BOOTSTRAP"
+compose run --rm --no-deps -e FLYWAY_TARGET=3 migrate >/dev/null \
+  || blocked "BLOCKED_PARTIAL_RECOVERY_V3_SETUP"
+[ "$(flyway_success_count)" = "3" ] \
+  || blocked "BLOCKED_PARTIAL_RECOVERY_V3_NOT_REACHED"
+
+P3H_START_MODE=RECOVER_GREENFIELD_INITIALIZATION
+P3H_GREENFIELD_INITIALIZE_CONFIRM=""
+P3H_GREENFIELD_RECOVERY_CONFIRM=""
+export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM P3H_GREENFIELD_RECOVERY_CONFIRM
+set +e
+recovery_confirmation_output="$(run_bounded 30 \
+  "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" 2>&1)"
+recovery_confirmation_status=$?
+set -e
+[ "${recovery_confirmation_status}" -ne 0 ] \
+  && printf '%s' "${recovery_confirmation_output}" \
+    | grep -q 'BLOCKED_GREENFIELD_RECOVERY_CONFIRMATION' \
+  || blocked "BLOCKED_RECOVERY_CONFIRMATION_NOT_REQUIRED"
+
+P3H_GREENFIELD_RECOVERY_CONFIRM="${GREENFIELD_RECOVERY_CONFIRMATION}"
+export P3H_GREENFIELD_RECOVERY_CONFIRM
+compose exec -T postgres pg_dump --username=p3h_bootstrap \
+  --dbname=trade_model_v1_p3h_primary --table=public.flyway_schema_history \
+  --data-only --column-inserts --no-owner --no-privileges \
+  >"${TEMP_ROOT}/flyway-v3-history.sql" \
+  || blocked "BLOCKED_RECOVERY_HISTORY_BACKUP"
+
+psql_admin trade_model_v1_p3h_primary \
+  "DELETE FROM flyway_schema_history WHERE version='2'" \
+  || blocked "BLOCKED_NONCONTIGUOUS_FIXTURE_SETUP"
+expect_recovery_rejection NONCONTIGUOUS_FLYWAY_HISTORY
+restore_flyway_history_fixture
+
+psql_admin trade_model_v1_p3h_primary \
+  "UPDATE flyway_schema_history SET checksum=checksum+1 WHERE version='3'" \
+  || blocked "BLOCKED_CHECKSUM_FIXTURE_SETUP"
+expect_recovery_rejection CHECKSUM_MISMATCH
+restore_flyway_history_fixture
+
+psql_admin trade_model_v1_p3h_primary "
+  INSERT INTO flyway_schema_history(
+    installed_rank, version, description, type, script, checksum,
+    installed_by, execution_time, success
+  )
+  SELECT max(installed_rank)+1, '3.1', 'controlled failed fixture', 'SQL',
+         'V3_1__controlled_failed_fixture.sql', NULL, 'p3h_migration_owner', 0, false
+  FROM flyway_schema_history" \
+  || blocked "BLOCKED_FAILED_MIGRATION_FIXTURE_SETUP"
+expect_recovery_rejection FAILED_MIGRATION
+restore_flyway_history_fixture
+
+psql_admin trade_model_v1_p3h_primary \
+  "CREATE TABLE public.p3h_unknown_business_object(id integer)" \
+  || blocked "BLOCKED_UNKNOWN_OBJECT_FIXTURE_SETUP"
+expect_recovery_rejection UNKNOWN_BUSINESS_OBJECT
+start_postgres_for_recovery_fixture
+psql_admin trade_model_v1_p3h_primary \
+  "DROP TABLE public.p3h_unknown_business_object" \
+  || blocked "BLOCKED_UNKNOWN_OBJECT_FIXTURE_CLEANUP"
+
+set +e
+recovery_output="$(run_bounded 360 \
+  "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" 2>&1)"
+recovery_status=$?
+set -e
+if [ "${recovery_status}" -ne 0 ]; then
+  print_sanitized_p3h_status_lines "${recovery_output}"
+  blocked "BLOCKED_PARTIAL_INITIALIZATION_RECOVERY"
+fi
+printf '%s' "${recovery_output}" | grep -q 'PARTIAL_INITIALIZATION_RECOVERY: PASS' \
+  || blocked "BLOCKED_PARTIAL_INITIALIZATION_RECOVERY_EVIDENCE"
+printf '%s' "${recovery_output}" | grep -q 'RECOVERED_READONLY_CONTRACT: PASS' \
+  || blocked "BLOCKED_PARTIAL_INITIALIZATION_READONLY_RECOVERY"
+[ "$(flyway_success_count)" = "7" ] \
+  || blocked "BLOCKED_PARTIAL_INITIALIZATION_FINAL_VERSION"
+
+run_bounded 180 compose --profile validation down --volumes --remove-orphans >/dev/null \
+  || blocked "BLOCKED_PARTIAL_RECOVERY_FIXTURE_RESET"
+P3H_START_MODE=INITIALIZE_GREENFIELD
+P3H_GREENFIELD_INITIALIZE_CONFIRM="${GREENFIELD_CONFIRMATION}"
+P3H_GREENFIELD_RECOVERY_CONFIRM=""
+export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM P3H_GREENFIELD_RECOVERY_CONFIRM
+
 database_fingerprint() {
   {
     compose exec -T postgres psql --username=p3h_bootstrap \
@@ -299,18 +426,44 @@ database_fingerprint() {
   } | sha256_stream
 }
 
-flyway_success_count() {
-  compose exec -T postgres psql --username=p3h_bootstrap \
-    --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
-    --command="SELECT count(*) FROM flyway_schema_history WHERE success=true"
-}
-
 CURRENT_STAGE="first-boot"
 run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
   || blocked "BLOCKED_FIRST_BOOT"
 first_flyway_count="$(flyway_success_count)"
 [ "${first_flyway_count}" = "7" ] || blocked "BLOCKED_FIRST_BOOT_FLYWAY"
 first_fingerprint="$(database_fingerprint)"
+
+CURRENT_STAGE="post-migration-readonly-grant-recovery"
+run_bounded 120 "${ROOT_DIR}/deploy/p3h/p3h-compose-stop.sh" >/dev/null \
+  || blocked "BLOCKED_POST_MIGRATION_GRANT_FIXTURE_STOP"
+start_postgres_for_recovery_fixture
+psql_admin trade_model_v1_p3h_primary "
+  REVOKE ALL ON ALL TABLES IN SCHEMA public FROM p3h_app_readonly;
+  REVOKE ALL ON ALL TABLES IN SCHEMA public FROM p3h_backup_reader;
+  ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    REVOKE ALL ON TABLES FROM p3h_app_readonly;
+  ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    REVOKE ALL ON TABLES FROM p3h_backup_reader" \
+  || blocked "BLOCKED_POST_MIGRATION_GRANT_FIXTURE_SETUP"
+P3H_START_MODE=RECOVER_GREENFIELD_INITIALIZATION
+P3H_GREENFIELD_INITIALIZE_CONFIRM=""
+P3H_GREENFIELD_RECOVERY_CONFIRM="${GREENFIELD_RECOVERY_CONFIRMATION}"
+export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM P3H_GREENFIELD_RECOVERY_CONFIRM
+set +e
+grant_recovery_output="$(run_bounded 360 \
+  "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" 2>&1)"
+grant_recovery_status=$?
+set -e
+if [ "${grant_recovery_status}" -ne 0 ]; then
+  print_sanitized_p3h_status_lines "${grant_recovery_output}"
+  blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY"
+fi
+printf '%s' "${grant_recovery_output}" | grep -q 'RECOVERED_READONLY_CONTRACT: PASS' \
+  || blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY_EVIDENCE"
+[ "$(flyway_success_count)" = "${first_flyway_count}" ] \
+  || blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY_RERAN_MIGRATIONS"
+[ "$(database_fingerprint)" = "${first_fingerprint}" ] \
+  || blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY_FINGERPRINT"
 
 CURRENT_STAGE="v2-secret-activation"
 P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V2
@@ -330,7 +483,8 @@ primary_volume="$(docker volume ls --quiet \
 [ -n "${primary_volume}" ] || blocked "BLOCKED_PRIMARY_VOLUME_NOT_PRESERVED"
 P3H_START_MODE=STEADY_STATE_START
 P3H_GREENFIELD_INITIALIZE_CONFIRM=""
-export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM
+P3H_GREENFIELD_RECOVERY_CONFIRM=""
+export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM P3H_GREENFIELD_RECOVERY_CONFIRM
 run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
   || blocked "BLOCKED_STEADY_STATE_RESTART"
 [ "$(flyway_success_count)" = "${first_flyway_count}" ] \
@@ -384,10 +538,22 @@ run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
 reboot_fingerprint="$(database_fingerprint)"
 [ "${reboot_fingerprint}" = "${first_fingerprint}" ] \
   || blocked "BLOCKED_REBOOT_LIKE_FINGERPRINT_MISMATCH"
+compose --profile validation run --rm --no-deps \
+  -e P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V2 app-role-probe >/dev/null \
+  || blocked "BLOCKED_REBOOT_V2_DATABASE_SECRET_REJECTED"
 if compose --profile validation run --rm --no-deps \
     -e P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V1 app-role-probe >/dev/null 2>&1; then
   blocked "BLOCKED_REBOOT_REACTIVATED_V1_DATABASE_SECRET"
 fi
+reboot_new_admin_status="$(curl_auth_status "${SECRET_DIR}/app_admin_password_v2" \
+  "${TEMP_ROOT}/curl-admin-v2-after-reboot.conf")"
+reboot_old_admin_status="$(curl_auth_status "${SECRET_DIR}/app_admin_password_v1" \
+  "${TEMP_ROOT}/curl-admin-v1-after-reboot.conf")"
+[ "${reboot_new_admin_status}" = "200" ] \
+  || blocked "BLOCKED_REBOOT_V2_ADMIN_SECRET_REJECTED"
+case "${reboot_old_admin_status}" in 401|403) ;; *)
+  blocked "BLOCKED_REBOOT_REACTIVATED_V1_ADMIN_SECRET" ;;
+esac
 
 materialized_volume_exists() {
   docker volume ls --quiet \
@@ -411,9 +577,16 @@ exercise_failed_start_cleanup() {
     || blocked "BLOCKED_FAILED_START_SECRET_CLEANUP"
   printf '%s' "${failure_output}" | grep -q 'FAILED_START_PARTIAL_STACK_CLEANUP: PASS' \
     || blocked "BLOCKED_FAILED_START_PARTIAL_CLEANUP"
-  if compose ps --status running --services \
-      | grep -Eq '^(app|proxy|secret-volume-holder)$'; then
-    blocked "BLOCKED_FAILED_START_PARTIAL_STACK_RUNNING"
+  printf '%s' "${failure_output}" | grep -q 'FAILED_START_DATABASE_PROCESS: STOPPED' \
+    || blocked "BLOCKED_FAILED_START_DATABASE_PROCESS"
+  printf '%s' "${failure_output}" | grep -q 'PROJECT_CONTAINER_COUNT: 0' \
+    || blocked "BLOCKED_FAILED_START_CONTAINER_COUNT_EVIDENCE"
+  printf '%s' "${failure_output}" | grep -q 'MATERIALIZED_SECRET_VOLUME: ABSENT' \
+    || blocked "BLOCKED_FAILED_START_SECRET_VOLUME_EVIDENCE"
+  printf '%s' "${failure_output}" | grep -q 'PRIMARY_DATABASE_VOLUME: PRESENT' \
+    || blocked "BLOCKED_FAILED_START_PRIMARY_VOLUME_EVIDENCE"
+  if compose ps --all --quiet | grep -q .; then
+    blocked "BLOCKED_FAILED_START_PROJECT_CONTAINER_RETAINED"
   fi
   if materialized_volume_exists; then
     blocked "BLOCKED_FAILED_START_SECRET_VOLUME_RETAINED"
@@ -423,11 +596,30 @@ exercise_failed_start_cleanup() {
     --filter "label=com.docker.compose.volume=p3h_postgresql")"
   [ -n "${primary_volume}" ] \
     || blocked "BLOCKED_FAILED_START_PRIMARY_VOLUME_DELETED"
-  for source_secret in app_database_password_v1 app_database_password_v2 \
-      app_admin_password_v1 app_admin_password_v2; do
+  backup_volume="$(docker volume ls --quiet \
+    --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+    --filter "label=com.docker.compose.volume=p3h_backups")"
+  [ -n "${backup_volume}" ] \
+    || blocked "BLOCKED_FAILED_START_BACKUP_VOLUME_DELETED"
+  for source_secret in postgres_admin_password flyway_password \
+      app_database_password_v1 app_database_password_v2 \
+      app_admin_password_v1 app_admin_password_v2 backup_reader_password \
+      recovery_owner_password binance_nonfunctional_key \
+      binance_nonfunctional_secret tls_certificate tls_private_key; do
     [ -s "${SECRET_DIR}/${source_secret}" ] \
       || blocked "BLOCKED_FAILED_START_SOURCE_SECRET_DELETED"
   done
+}
+
+expect_full_readonly_verify_rejection() {
+  local fixture_name="$1"
+  set +e
+  P3H_STEADY_VERIFY_SCOPE=FULL_READONLY_STATE_VERIFY \
+    compose run --rm --no-deps steady-state-verify >/dev/null 2>&1
+  local verify_status=$?
+  set -e
+  [ "${verify_status}" -ne 0 ] \
+    || blocked "BLOCKED_READONLY_DRIFT_ACCEPTED_${fixture_name}"
 }
 
 CURRENT_STAGE="failed-start-cleanup"
@@ -436,6 +628,50 @@ exercise_failed_start_cleanup AFTER_APP_START
 exercise_failed_start_cleanup DURING_PROXY_HEALTH
 run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
   || blocked "BLOCKED_FINAL_STEADY_STATE_RECOVERY"
+
+CURRENT_STAGE="readonly-role-membership-drift"
+psql_admin postgres "GRANT p3h_migration_owner TO p3h_app_readonly" \
+  || blocked "BLOCKED_APP_MEMBERSHIP_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection APP_ROLE_MEMBERSHIP
+set +e
+P3H_READONLY_GRANTS_MODE=STEADY_STATE \
+  compose run --rm --no-deps readonly-grants >/dev/null 2>&1
+membership_grant_refresh_status=$?
+set -e
+[ "${membership_grant_refresh_status}" -ne 0 ] \
+  || blocked "BLOCKED_APP_MEMBERSHIP_AUTO_ACCEPTED"
+psql_admin postgres "REVOKE p3h_migration_owner FROM p3h_app_readonly" \
+  || blocked "BLOCKED_APP_MEMBERSHIP_FIXTURE_CLEANUP"
+
+psql_admin postgres "GRANT p3h_recovery_owner TO p3h_backup_reader" \
+  || blocked "BLOCKED_BACKUP_MEMBERSHIP_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection BACKUP_ROLE_MEMBERSHIP
+psql_admin postgres "REVOKE p3h_recovery_owner FROM p3h_backup_reader" \
+  || blocked "BLOCKED_BACKUP_MEMBERSHIP_FIXTURE_CLEANUP"
+
+CURRENT_STAGE="readonly-default-acl-and-sequence-drift"
+psql_admin trade_model_v1_p3h_primary "
+  ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    GRANT INSERT, UPDATE ON TABLES TO p3h_app_readonly;
+  ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    GRANT INSERT ON TABLES TO p3h_backup_reader;
+  ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
+    GRANT USAGE, UPDATE ON SEQUENCES TO p3h_app_readonly;
+  GRANT USAGE, UPDATE ON ALL SEQUENCES IN SCHEMA public TO p3h_app_readonly;
+  GRANT TEMPORARY ON DATABASE trade_model_v1_p3h_primary TO p3h_backup_reader" \
+  || blocked "BLOCKED_READONLY_ACL_DRIFT_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection DEFAULT_ACL_SEQUENCE_AND_DATABASE
+P3H_READONLY_GRANTS_MODE=STEADY_STATE
+export P3H_READONLY_GRANTS_MODE
+compose run --rm --no-deps readonly-grants >/dev/null \
+  || blocked "BLOCKED_READONLY_ACL_DRIFT_REPAIR"
+P3H_STEADY_VERIFY_SCOPE=FULL_READONLY_STATE_VERIFY
+export P3H_STEADY_VERIFY_SCOPE
+compose run --rm --no-deps steady-state-verify >/dev/null \
+  || blocked "BLOCKED_READONLY_ACL_EXACT_CONTRACT"
+compose --profile validation run --rm --no-deps \
+  -e P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V2 app-role-probe >/dev/null \
+  || blocked "BLOCKED_SET_ROLE_DENIAL_PROBE"
 
 CURRENT_STAGE="final-runtime-verification"
 if ! flyway_state="$(compose exec -T postgres psql --username=p3h_bootstrap \
@@ -524,16 +760,27 @@ else
 fi
 
 echo "FIRST_BOOT: PASS"
+echo "PARTIAL_INITIALIZATION_RECOVERY: PASS"
+echo "RECOVERY_CONFIRMATION_STATUS: REQUIRED_AND_PROVEN"
+echo "RECOVERED_FLYWAY_VERSION: 7"
+echo "RECOVERED_READONLY_CONTRACT: PASS"
 echo "STEADY_STATE_RESTART: PASS"
 echo "REBOOT_LIKE_RESTART: PASS"
 echo "DATABASE_VOLUME_PRESERVED: PASS"
+echo "PRIMARY_DATABASE_VOLUME: PRESENT"
 echo "FLYWAY_REPEAT: ZERO_MIGRATIONS"
 echo "CONTENT_FINGERPRINT: MATCH"
 echo "ACTIVE_SECRET_VERSION_PRESERVED: PASS"
 echo "ACTIVE_APP_DATABASE_SECRET_VERSION: V2"
 echo "ACTIVE_APP_ADMIN_SECRET_VERSION: V2"
 echo "OLD_SECRET_V1_POST_ROTATION: DENIED"
+echo "ADMIN_SECRET_VERSION_AFTER_REBOOT: V2_ACTIVE_V1_DENIED"
+echo "DATABASE_SECRET_VERSION_AFTER_REBOOT: V2_ACTIVE_V1_DENIED"
+echo "FAILED_START_DATABASE_PROCESS: STOPPED"
 echo "FAILED_START_CLEANUP: PASS"
+echo "READONLY_ROLE_MEMBERSHIP_CONTRACT: PASS"
+echo "READONLY_DEFAULT_ACL_CONTRACT: PASS"
+echo "READONLY_SEQUENCE_PRIVILEGE_CONTRACT: PASS"
 echo "GREENFIELD_OBJECT_INVENTORY: PASS_STRICT"
 echo "SSH_KNOWN_HOSTS_FILTER: PASS_EXACT_PIN"
 echo "APP_IMAGE_SOURCE: PASS_EXACT_COMMITTED_GIT_ARCHIVE"

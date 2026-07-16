@@ -34,7 +34,10 @@ proves explicit initialize/steady modes, retained-volume and reboot-like
 restarts with zero repeated migrations and matching fingerprints, V2 active
 Secret preservation with V1 denied, strict object inventory, exact SSH-line
 pinning, exact Git archive image attribution, and injected-failure cleanup.
-This is local
+Round 3 adds confirmed partial-initialization recovery, core/full state
+verification, measured cleanup that stops PostgreSQL while preserving its
+volume, fail-closed role membership checks, exact default ACL/Sequence
+privileges, and post-reboot V2 admin/database success with V1 denial. This is local
 template evidence only. No authorized server or real Secret Store was
 accessed; `REAL_STAGING_STATUS` remains
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, P4 is not allowed, and Production

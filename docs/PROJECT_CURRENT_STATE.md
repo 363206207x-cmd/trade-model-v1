@@ -7,7 +7,7 @@ Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Current Work Package: Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H
-Next Business Phase: Reviewer P3-H Offline Harness Round 3 Re-review; P4 remains blocked
+Next Business Phase: Reviewer P3-H Offline Harness Round 4 Re-review; P4 remains blocked
 Next Business Phase Allowed: NO while P3-H is unmerged and controlled staging inputs are missing; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
@@ -26,6 +26,14 @@ modes, retained-volume and reboot-like restarts, Flyway checksum/V7 validation,
 V2 activation persistence, failed-start cleanup, strict object inventory,
 exact SSH-line pinning, exact committed Git archive builds, and systemd-only
 lifecycle ownership.
+
+Round 3 adds a separately confirmed `RECOVER_GREENFIELD_INITIALIZATION` path
+for checksum-valid continuous Flyway prefixes and V7 pre-grant states, with
+zero business rows and no unknown objects. It separates core state from full
+read-only verification, measures failed-start cleanup as zero project
+containers while preserving Primary/Backup volumes, rejects app/backup role
+memberships and unsafe default/Sequence ACLs, and re-proves V2 admin/database
+success plus V1 denial after the reboot-like restart.
 
 Every required controlled server and Secret Store input was absent. The
 default runner returned `BLOCKED_MISSING_CONTROLLED_STAGING_INPUT` before any
@@ -814,7 +822,7 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 Only the following work is allowed under the current P3-H closure:
 
-1. Perform Reviewer P3-H Offline Harness Round 3 re-review.
+1. Perform Reviewer P3-H Offline Harness Round 4 re-review.
 2. Keep offline contract evidence distinct from real server execution.
 3. Retain existing P3/P3-G/P3-H safety and recovery tooling.
 4. Keep P4 and production deployment blocked.
@@ -1088,5 +1096,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR; offline/local template evidence pending Round 3 re-review and merge
+- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR; offline/local template evidence pending Round 4 re-review and merge
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

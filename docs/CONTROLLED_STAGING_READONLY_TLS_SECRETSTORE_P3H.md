@@ -56,10 +56,11 @@ HTTPS request was attempted.
 | --- | --- | --- |
 | Missing input stops before access | `GUARD_PASS` | `NOT_ATTEMPTED` |
 | Greenfield startup order | `PASS_LOCAL_DISPOSABLE`: PostgreSQL healthy -> empty preflight -> role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app healthy -> proxy healthy | `NOT_ATTEMPTED` |
-| Explicit lifecycle mode | `GUARD_PASS`: `INITIALIZE_GREENFIELD` requires confirmation; `STEADY_STATE_START` validates an existing V7 database and never guesses from database contents | `NOT_ATTEMPTED` |
+| Explicit lifecycle mode | `GUARD_PASS`: initialize, Greenfield recovery, and steady-state modes are explicit; recovery requires a separate confirmation and no mode is inferred from database contents | `NOT_ATTEMPTED` |
+| Partial initialization recovery | `PASS_LOCAL_DISPOSABLE`: V1-V3 continuous prefix recovered to V7; non-contiguous history, checksum mismatch, failed migration, unknown object, missing confirmation, and business-data drift fail closed | `NOT_ATTEMPTED` |
 | Persistent-volume restart | `PASS_LOCAL_DISPOSABLE`: first boot -> retained database volume -> steady-state restart -> reboot-like stop/start, with zero repeated migrations and matching content fingerprints | `NOT_ATTEMPTED` |
-| Active Secret version | `PASS_LOCAL_DISPOSABLE`: V2 remained active across both restarts; database/admin V1 remained denied | `NOT_ATTEMPTED` |
-| Failed-start cleanup | `PASS_LOCAL_DISPOSABLE`: injected failures after Secret materialization, app start, and proxy health removed partial services and materialized tmpfs while preserving source Secrets and PostgreSQL volume | `NOT_ATTEMPTED` |
+| Active Secret version | `PASS_LOCAL_DISPOSABLE`: after reboot-like restart, V2 database/admin authentication succeeded and both V1 credentials were denied | `NOT_ATTEMPTED` |
+| Failed-start cleanup | `PASS_LOCAL_DISPOSABLE`: measured cleanup stopped/removed PostgreSQL and every project container, removed materialized tmpfs, and preserved Primary/Backup volumes plus source Secrets | `NOT_ATTEMPTED` |
 | Strict Greenfield inventory | `PASS_LOCAL_DISPOSABLE`: clean database accepted; function, non-public table, foreign server/FDW, extension, and sequence fixtures rejected | `NOT_ATTEMPTED` |
 | Role provisioning | `PASS_LOCAL_DISPOSABLE`: migration owner, read-only app, backup reader, recovery owner, Primary and Recovery | `NOT_ATTEMPTED` |
 | Staging and Secret Store attestations | `GUARD_PASS`: exact keys, one occurrence, nonempty/non-placeholder values, canonical external files | `NOT_VALIDATED_INPUT_MISSING` |
@@ -75,6 +76,7 @@ HTTPS request was attempted.
 | Host-header contract | `PASS_LOCAL_DISPOSABLE`: unknown HTTP rejected, unknown HTTPS SNI rejected, approved redirect target fixed, approved Host forwarded | `NOT_ATTEMPTED` |
 | TLS target and TLS 1.3 | `PASS_LOCAL_DISPOSABLE`; remote harness binds URL/host/port and fails TLS 1.3 when the client supports it but the server does not | `NOT_ATTEMPTED` |
 | Read-only application write probe | `DENIED_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
+| Read-only membership/default ACL/Sequence contract | `PASS_LOCAL_DISPOSABLE`: app/backup memberships reject, default ACLs are exact SELECT-only, Sequence USAGE/UPDATE and database CREATE/TEMP are denied | `NOT_ATTEMPTED` |
 | Secret values in inspect/process arguments | `ABSENT_LOCAL_DISPOSABLE` | `NOT_ATTEMPTED` |
 | Access-log redaction and rate limiting | template/contract prepared | `NOT_ATTEMPTED` |
 | Secret rotations | evidence validator prepared | `NOT_ATTEMPTED` |
@@ -93,10 +95,15 @@ real-server PASS.
 Flyway, application, and Nginx services. `p3h-compose-start.sh` is the only
 lifecycle entrypoint and requires one explicit mode. `INITIALIZE_GREENFIELD`
 enforces strict empty-object inventory, role/database bootstrap, Flyway V1-V7,
-and grants. `STEADY_STATE_START` runs Flyway checksum validation, proves V7 and
-zero failed migrations, validates role/database/read-only/default-grant state,
-refreshes the already-verified grants, and then rematerializes active Secrets.
-It never runs Flyway baseline, repair, or clean. PostgreSQL and the
+and grants. `RECOVER_GREENFIELD_INITIALIZATION` requires a distinct exact
+confirmation, validates a continuous checksum-valid V1-VN prefix or a V7
+pre-grant state, exact P3-H identity/objects, and zero business rows, then
+continues to V7. Recovery and steady state both run `CORE_STATE_VERIFY`,
+refresh grants, then run `FULL_READONLY_STATE_VERIFY`. No mode runs Flyway
+baseline, repair, or clean. Recovery's pre-migrate Flyway validation ignores
+only pending migrations (`*:pending`), while applied checksum, failed,
+missing, and future states remain fail-closed; post-migrate validation is
+strict. PostgreSQL and the
 application expose no host ports. The backend network is internal; only the
 reverse proxy publishes 80/443. The application runs read-only with Flyway and
 SQL init disabled, and all schedulers, AI, providers, and external-call
@@ -104,10 +111,12 @@ switches off.
 
 All long-running Compose services use `restart: "no"`; systemd is the sole
 lifecycle owner, so Docker daemon auto-restart cannot bypass migration,
-Secret, app-health, or proxy-health ordering. A failed start removes App,
-Proxy, Secret Holder, one-shot containers, and the materialized tmpfs volume.
-It does not remove source Secret files or the PostgreSQL volume. Deleting the
-database volume remains a separate explicit disposable-environment action.
+Secret, app-health, or proxy-health ordering. A failed start stops and removes
+PostgreSQL and every project container plus the materialized tmpfs volume.
+Cleanup PASS requires measured zero project containers, absent materialized
+volume, and present Primary/Backup volumes. It does not remove source Secret
+files or persistent database/backup volumes. Deleting persistent volumes
+remains a separate explicit disposable-environment action.
 
 The bootstrap creates `p3h_migration_owner`, `p3h_app_readonly`,
 `p3h_backup_reader`, and `p3h_recovery_owner`, plus the Primary and independent
@@ -119,7 +128,16 @@ Active application database/admin Secret versions are selected only by the
 non-sensitive `P3H_ACTIVE_APP_DATABASE_SECRET_VERSION` and
 `P3H_ACTIVE_APP_ADMIN_SECRET_VERSION` values (`V1` or `V2`). Rotation updates
 the database role through a separately confirmed one-shot action. Restart
-does not select V1 implicitly and does not reactivate an old credential.
+does not select V1 implicitly and does not reactivate an old credential. The
+reboot-like local path proves V2 admin HTTP 200 and V2 database connection,
+then proves V1 admin HTTP 401/403 and V1 database connection denial.
+
+The app and backup roles are required to have zero `pg_auth_members` rows, so
+neither can `SET ROLE` to migration, recovery, bootstrap, or another user
+role. Read-only grant refresh first clears existing/default table and Sequence
+ACLs and then grants only SELECT. Full verification rejects non-SELECT default
+ACL entries, Sequence USAGE/UPDATE, table writes, schema CREATE, database
+CREATE/TEMP, missing SELECT, or any role membership.
 
 Only `SYSTEMD_CREDENTIALS` is implemented for a future server run. The unit
 uses `LoadCredentialEncrypted=` and a bounded adapter; SOPS, Vault, and cloud
@@ -225,16 +243,36 @@ The same disposable PostgreSQL volume then completed:
 This sequence did not restart the host Docker daemon and is explicitly a
 reboot-like local simulation, not physical/VM reboot evidence.
 
+## Round 3 Local Integrity Evidence
+
+The disposable runner now also exercises an explicitly confirmed Greenfield
+initialization recovery. A real V1-V3 prefix is validated and continued to V7;
+a V7 state with missing read-only grants is repaired only after core state
+verification. Recovery rejects a missing confirmation, non-contiguous Flyway
+history, checksum mismatch, failed migration, unknown business object, unknown
+rule default, or any business row. It never calls Flyway baseline, repair, or
+clean. The pre-migrate Flyway validation ignores only `*:pending`; the
+post-migrate validation remains strict.
+
+Failure injection is measured after cleanup: every project container,
+including PostgreSQL, must be absent; the materialized Secret volume must be
+absent; and Primary/Backup volumes must remain. Cleanup command or inspection
+failure cannot emit PASS. Read-only drift fixtures prove app/backup membership
+rejection, denied `SET ROLE`, exact SELECT-only default ACLs, Sequence SELECT
+without USAGE/UPDATE, and denied database CREATE/TEMP. The reboot-like path
+rechecks all four credential outcomes: V2 admin/database succeed and V1
+admin/database are denied.
+
 ## Local Validation
 
-- P3-H contract suite: 80 tests, 0 failures, 0 errors; its single full Docker
+- P3-H contract suite: 106 tests, 0 failures, 0 errors; its single full Docker
   lifecycle test is skipped by default and is never represented as PASS when
   skipped.
 - Environment-gated P3-H Docker JUnit: `PASS` when explicitly enabled.
 - Disposable Compose template smoke:
   `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`.
 - Disposable resource cleanup: `PASS`.
-- Full Maven suite: 3,751 tests, 0 failures, 0 errors, 14 environment-gated
+- Full Maven suite: 3,774 tests, 0 failures, 0 errors, 14 environment-gated
   skips. No skipped test is represented as PASS.
 - Delivery, workflow-contract, state, YAML, and diff checks are recorded in
   the PR validation summary for the exact package head.
@@ -267,6 +305,6 @@ that script's path guard.
 `P3H_RESULT: NOT_COMPLETE`
 
 Production readiness remains `BLOCKED`; production deployment cannot
-proceed. The next task is **Reviewer P3-H Offline Harness Round 3 Re-review**.
+proceed. The next task is **Reviewer P3-H Offline Harness Round 4 Re-review**.
 Any later real execution requires a new explicit authorized input set and must
 preserve the no-secret-output contract.

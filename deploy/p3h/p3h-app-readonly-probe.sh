@@ -13,8 +13,9 @@ fi
 
 pgpass_file="$(mktemp)"
 write_probe_log="$(mktemp)"
-trap 'rm -f "${pgpass_file}" "${write_probe_log}"' EXIT HUP INT TERM
-chmod 600 "${pgpass_file}" "${write_probe_log}"
+set_role_probe_log="$(mktemp)"
+trap 'rm -f "${pgpass_file}" "${write_probe_log}" "${set_role_probe_log}"' EXIT HUP INT TERM
+chmod 600 "${pgpass_file}" "${write_probe_log}" "${set_role_probe_log}"
 printf 'postgres:5432:*:p3h_app_readonly:%s\n' "$(tr -d '\r\n' <"${secret_file}")" >"${pgpass_file}"
 export PGPASSFILE="${pgpass_file}"
 
@@ -34,6 +35,15 @@ if psql --host=postgres --username=p3h_app_readonly \
   exit 2
 fi
 
+if psql --host=postgres --username=p3h_app_readonly \
+    --dbname=trade_model_v1_p3h_primary --no-psqlrc \
+    --command="SET ROLE p3h_migration_owner" \
+    >/dev/null 2>"${set_role_probe_log}"; then
+  echo "P3H_APP_ROLE_PROBE: BLOCKED_SET_ROLE_ALLOWED" >&2
+  exit 2
+fi
+
 echo "APPLICATION_DATABASE_ROLE: READ_ONLY"
 echo "READ_ONLY_WRITE_PROBE: DENIED"
+echo "SET_ROLE_TO_MIGRATION_OWNER: DENIED"
 echo "P3H_APP_ROLE_PROBE: PASS"

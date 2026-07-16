@@ -816,13 +816,15 @@ server/Secret Store inputs, so real staging is
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, while `SERVER_ACCESS` and `SECRET_ACCESS`
 are `NOT_ATTEMPTED`.
 
-The repository now has explicit `INITIALIZE_GREENFIELD` and
-`STEADY_STATE_START` modes. Initialization uses the deterministic empty-DB ->
+The repository now has explicit `INITIALIZE_GREENFIELD`,
+`RECOVER_GREENFIELD_INITIALIZATION`, and `STEADY_STATE_START` modes.
+Initialization uses the deterministic empty-DB ->
 role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app
-health -> proxy health chain. Steady state validates Flyway checksums/V7/no
-failed migrations and role/grant state, refreshes grants, rematerializes the
-selected active V1/V2 versions, and starts app/proxy without requiring an
-empty database or running baseline, repair, or clean.
+health -> proxy health chain. Recovery requires a separate exact confirmation,
+a continuous checksum-valid V1-VN prefix or V7 pre-grant state, exact P3-H
+identity/objects, and zero business rows. Recovery and steady state validate
+core state before refreshing grants, then require the full read-only contract;
+neither requires an empty database or runs baseline, repair, or clean.
 It also has strict attestation and canonical-file guards, an implemented
 `SYSTEMD_CREDENTIALS` adapter, effective runtime-mount verification, fixed
 non-root Config Tree materialization, pinned SSH identity, proxy-only ingress,
@@ -833,6 +835,11 @@ reboot-like restarts, zero repeated migrations, matching content fingerprints,
 V2 preservation/V1 denial, injected-failure cleanup, strict object inventory,
 exact SSH-line pinning, and exact Git archive image attribution. Local results
 prove the template only; they do not prove a server deployment or server reboot.
+Round 3 local evidence additionally covers V3-to-V7 recovery and V7 grant
+recovery, rejection of invalid recovery states, measured zero-container
+failed-start cleanup with persistent volumes retained, zero app/backup role
+memberships, exact SELECT-only default/Sequence ACLs, and post-reboot V2
+admin/database success with V1 denial.
 
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
@@ -848,7 +855,7 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H Offline Harness Round 3 re-review, preserving the
+1. Complete Reviewer P3-H Offline Harness Round 4 re-review, preserving the
    distinction between local template PASS and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.

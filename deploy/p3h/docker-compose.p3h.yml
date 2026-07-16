@@ -135,10 +135,27 @@ services:
       postgres:
         condition: service_healthy
     entrypoint: ["/bin/sh", "/p3h/postgres-steady-state-verify.sh"]
+    environment:
+      P3H_STEADY_VERIFY_SCOPE: ${P3H_STEADY_VERIFY_SCOPE:-FULL_READONLY_STATE_VERIFY}
     secrets:
       - postgres_admin_password
     volumes:
       - ./postgres-steady-state-verify.sh:/p3h/postgres-steady-state-verify.sh:ro
+    networks:
+      - p3h_backend
+    restart: "no"
+    logging: *bounded_logging
+
+  greenfield-recovery-verify:
+    image: postgres:16-alpine@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/p3h/postgres-greenfield-recovery-verify.sh"]
+    secrets:
+      - postgres_admin_password
+    volumes:
+      - ./postgres-greenfield-recovery-verify.sh:/p3h/postgres-greenfield-recovery-verify.sh:ro
     networks:
       - p3h_backend
     restart: "no"

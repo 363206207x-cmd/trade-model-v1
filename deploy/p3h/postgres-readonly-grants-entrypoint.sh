@@ -14,7 +14,8 @@ printf 'postgres:5432:*:p3h_bootstrap:%s\n' "$(tr -d '\r\n' <"${admin_secret}")"
 export PGPASSFILE="${pgpass_file}"
 
 psql --host=postgres --username=p3h_bootstrap --dbname=trade_model_v1_p3h_primary \
-  --no-psqlrc --file=/p3h/postgres-readonly-grants.sql >/dev/null
+  --no-psqlrc --set=ON_ERROR_STOP=1 \
+  --file=/p3h/postgres-readonly-grants.sql >/dev/null
 
 case "${P3H_READONLY_GRANTS_MODE:-}" in
   INITIALIZE)
@@ -22,6 +23,9 @@ case "${P3H_READONLY_GRANTS_MODE:-}" in
     ;;
   STEADY_STATE)
     echo "P3H_READONLY_GRANTS_REFRESH: PASS"
+    ;;
+  RECOVERY)
+    echo "P3H_READONLY_GRANTS_RECOVERY: PASS"
     ;;
   *)
     echo "P3H_READONLY_GRANTS: BLOCKED_MODE" >&2

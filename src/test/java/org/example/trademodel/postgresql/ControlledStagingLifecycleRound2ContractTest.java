@@ -69,7 +69,7 @@ class ControlledStagingLifecycleRound2ContractTest {
     @Test
     void failureAfterAppStartCleansPartialStack() throws Exception {
         assertThat(startScript()).contains(
-                "AFTER_APP_START", "stop proxy app secret-volume-holder",
+                "AFTER_APP_START", "--profile validation down --remove-orphans",
                 "FAILED_START_PARTIAL_STACK_CLEANUP: PASS");
         assertThat(runner()).contains("exercise_failed_start_cleanup AFTER_APP_START");
     }
@@ -97,7 +97,8 @@ class ControlledStagingLifecycleRound2ContractTest {
 
         assertThat(compose).doesNotContain("restart: unless-stopped", "restart: always");
         assertThat(compose).contains("restart: \"no\"");
-        assertThat(unit).contains("P3H_START_MODE=RENDER_INITIALIZE_GREENFIELD_OR_STEADY_STATE_START");
+        assertThat(unit).contains(
+                "P3H_START_MODE=RENDER_INITIALIZE_GREENFIELD_RECOVER_GREENFIELD_OR_STEADY_STATE_START");
     }
 
     @Test
