@@ -351,7 +351,7 @@ database_secret_probe() {
 auth_code() {
   local version="$1"
   local secret_file="${CREDENTIALS}/app_admin_password_${version,,}"
-  local config_file
+  local config_file code curl_status
   config_file="$(mktemp /run/p3h-lab-auth.XXXXXX)"
   chmod 600 "${config_file}"
   {
@@ -362,9 +362,61 @@ auth_code() {
     echo "resolve = \"${HOSTNAME}:443:127.0.0.1\""
     printf 'user = "p3h_operator:%s"\n' "$(tr -d '\r\n' <"${secret_file}")"
   } >"${config_file}"
-  curl --config "${config_file}" --output /dev/null --write-out '%{http_code}' \
-    "https://${HOSTNAME}/api/dashboard/home"
+  set +e
+  code="$(curl --config "${config_file}" --output /dev/null --write-out '%{http_code}' \
+    "https://${HOSTNAME}/api/dashboard/home" 2>/dev/null)"
+  curl_status=$?
+  set -e
   rm -f "${config_file}"
+  if [ "${curl_status}" -ne 0 ]; then
+    echo TRANSPORT
+  else
+    echo "${code}"
+  fi
+}
+
+auth_code_category() {
+  case "$1" in
+    200) echo HTTP_200 ;;
+    401) echo HTTP_401 ;;
+    403) echo HTTP_403 ;;
+    429) echo HTTP_429 ;;
+    TRANSPORT) echo TRANSPORT ;;
+    1??) echo HTTP_1XX ;;
+    2??) echo HTTP_2XX ;;
+    3??) echo HTTP_3XX ;;
+    4??) echo HTTP_4XX ;;
+    5??) echo HTTP_5XX ;;
+    *) echo UNKNOWN ;;
+  esac
+}
+
+await_auth_expectation() {
+  local version="$1"
+  local expectation="$2"
+  local code=UNKNOWN
+  local attempt
+  for attempt in $(seq 1 16); do
+    code="$(auth_code "${version}")"
+    case "${expectation}:${code}" in
+      ACTIVE:200|DENIED:401|DENIED:403)
+        echo "${code}"
+        return 0
+        ;;
+    esac
+    case "${code}" in
+      429|TRANSPORT)
+        if [ "${attempt}" -lt 16 ]; then
+          sleep 2
+          continue
+        fi
+        ;;
+    esac
+    echo "${code}"
+    return 1
+  done
+  echo "${code}"
+  return 1
 }
 
 https_smoke() {
@@ -680,8 +732,16 @@ case "${ACTION}" in
     if database_secret_probe V2; then
       blocked BLOCKED_V2_DATABASE_PREACTIVATED
     fi
-    [ "$(auth_code v1)" = 200 ] || blocked BLOCKED_V1_ADMIN_PRECHECK
-    case "$(auth_code v2)" in 401|403) ;; *) blocked BLOCKED_V2_ADMIN_PREACTIVATED ;; esac
+    if admin_code="$(await_auth_expectation v1 ACTIVE)"; then
+      :
+    else
+      blocked "BLOCKED_V1_ADMIN_PRECHECK_$(auth_code_category "${admin_code}")"
+    fi
+    if admin_code="$(await_auth_expectation v2 DENIED)"; then
+      :
+    else
+      blocked "BLOCKED_V2_ADMIN_PREACTIVATED_$(auth_code_category "${admin_code}")"
+    fi
     tls_v1_serial="$(served_certificate_serial)"
     [ "${tls_v1_serial}" = "$(expected_certificate_serial v1)" ] \
       || blocked BLOCKED_TLS_V1_IDENTITY
@@ -701,8 +761,16 @@ case "${ACTION}" in
     if database_secret_probe V1; then
       blocked BLOCKED_V1_DATABASE_NOT_REVOKED
     fi
-    [ "$(auth_code v2)" = 200 ] || blocked BLOCKED_V2_ADMIN_ACTIVATION
-    case "$(auth_code v1)" in 401|403) ;; *) blocked BLOCKED_V1_ADMIN_NOT_REVOKED ;; esac
+    if admin_code="$(await_auth_expectation v2 ACTIVE)"; then
+      :
+    else
+      blocked "BLOCKED_V2_ADMIN_ACTIVATION_$(auth_code_category "${admin_code}")"
+    fi
+    if admin_code="$(await_auth_expectation v1 DENIED)"; then
+      :
+    else
+      blocked "BLOCKED_V1_ADMIN_NOT_REVOKED_$(auth_code_category "${admin_code}")"
+    fi
 
     CURRENT_REMOTE_STEP=TLS_CREDENTIAL_ACTIVATION
     sudo systemctl stop trade-model-p3h.service
@@ -747,8 +815,16 @@ case "${ACTION}" in
     if database_secret_probe V1; then
       blocked BLOCKED_V1_DATABASE_AFTER_REBOOT
     fi
-    [ "$(auth_code v2)" = 200 ] || blocked BLOCKED_V2_ADMIN_AFTER_REBOOT
-    case "$(auth_code v1)" in 401|403) ;; *) blocked BLOCKED_V1_ADMIN_AFTER_REBOOT ;; esac
+    if admin_code="$(await_auth_expectation v2 ACTIVE)"; then
+      :
+    else
+      blocked "BLOCKED_V2_ADMIN_AFTER_REBOOT_$(auth_code_category "${admin_code}")"
+    fi
+    if admin_code="$(await_auth_expectation v1 DENIED)"; then
+      :
+    else
+      blocked "BLOCKED_V1_ADMIN_AFTER_REBOOT_$(auth_code_category "${admin_code}")"
+    fi
     [ "$(served_certificate_serial)" = "$(expected_certificate_serial v2)" ] \
       || blocked BLOCKED_TLS_AFTER_REBOOT
     https_smoke V2 || blocked BLOCKED_HTTPS_AFTER_REBOOT

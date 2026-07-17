@@ -342,6 +342,27 @@ class ControlledStagingLocalLimaLabContractTest {
     }
 
     @Test
+    void adminCredentialProbeIsBoundedAndReportsOnlySanitizedStatusCategory() throws Exception {
+        String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+
+        assertThat(remote).contains(
+                "await_auth_expectation()",
+                "for attempt in $(seq 1 16)",
+                "if [ \"${attempt}\" -lt 16 ]",
+                "sleep 2",
+                "429|TRANSPORT)",
+                "auth_code_category()",
+                "HTTP_401", "HTTP_403", "HTTP_429", "HTTP_5XX",
+                "BLOCKED_V1_ADMIN_PRECHECK_$(auth_code_category",
+                "BLOCKED_V2_ADMIN_PREACTIVATED_$(auth_code_category");
+        assertThat(remote).contains(
+                "--output /dev/null --write-out '%{http_code}'",
+                "2>/dev/null");
+        assertThat(remote).doesNotContain(
+                "auth_response_body", "curl --verbose", "set -x");
+    }
+
+    @Test
     void cleanupCanDeleteOnlyExactLabResources() throws Exception {
         String destroy = read("scripts/p3h-lab-destroy.sh");
         String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
