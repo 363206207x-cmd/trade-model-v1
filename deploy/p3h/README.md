@@ -75,3 +75,10 @@ P4 remains disallowed and production readiness remains blocked.
 The disposable local runner can prove only
 `PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`. It is not authorized staging
 evidence. Real staging remains `BLOCKED_MISSING_AUTHORIZED_INPUT`.
+
+`scripts/controlled-staging-readonly-deployment-p3h-r1.sh` is a separate,
+review-pending remote execution path. Its `LOCAL_LIMA_LAB` target is bound to
+the exact disposable LAB1 VM and cannot claim external staging evidence. The
+`AUTHORIZED_EXTERNAL_STAGING` target delegates to the original guard and does
+not inherit any generated LAB1 input. See
+`docs/P3H_LOCAL_LINUX_VM_STAGING_LAB1.md`.

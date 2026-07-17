@@ -35,7 +35,8 @@ class ControlledStagingComposeTopologyTest {
         String compose = P3hContractTestSupport.read("deploy/p3h/docker-compose.p3h.yml");
 
         assertThat(compose).contains(
-                "postgres:16-alpine@sha256:", "flyway/flyway:10-alpine@sha256:",
+                "postgres:16-alpine@sha256:",
+                "flyway/flyway:12.11.0-alpine@sha256:6bf3a713f52c4d803a88501f8409dda2191e9ccba1454358a6de2c4cc65f71b0",
                 "nginx:1.27.4-alpine@sha256:", "POSTGRES_PASSWORD_FILE:",
                 "p3h_materialized_secrets", "type: tmpfs", "target: /run/secrets");
         assertThat(compose).doesNotContain(

@@ -1,0 +1,40 @@
+[Unit]
+Description=Trade Model P3-H LAB1 controlled stack
+Requires=docker.service p3h-lab-credential-seal.service
+After=docker.service p3h-lab-credential-seal.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=p3h-deploy
+Group=p3h-deploy
+SupplementaryGroups=docker
+WorkingDirectory=/opt/trade-model-p3h/current
+RuntimeDirectory=trade-model-p3h
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=no
+Environment=DOCKER_CONFIG=/run/trade-model-p3h/docker-config
+Environment=P3H_COMPOSE_PROJECT_NAME=trade-model-p3h-lab1
+Environment=P3H_APPLICATION_IMAGE_TAG=RENDER_EXACT_HEAD_PREFIX
+Environment=P3H_STAGING_HOSTNAME=trade-staging.lab.test
+Environment=P3H_SECRET_BACKEND=SYSTEMD_CREDENTIALS
+Environment=P3H_SECRET_MOUNT_DIR=/run/credentials/p3hlab1
+Environment=P3H_START_MODE=RENDER_START_MODE
+Environment=P3H_GREENFIELD_INITIALIZE_CONFIRM=RENDER_GREENFIELD_CONFIRMATION
+Environment=P3H_GREENFIELD_RECOVERY_CONFIRM=
+Environment=P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=RENDER_DATABASE_SECRET_VERSION
+Environment=P3H_ACTIVE_APP_ADMIN_SECRET_VERSION=RENDER_ADMIN_SECRET_VERSION
+Environment=P3H_HTTP_HOST_PORT=80
+Environment=P3H_HTTPS_HOST_PORT=443
+ExecStart=/opt/trade-model-p3h/current/deploy/p3h/p3h-compose-start.sh
+ExecStop=/opt/trade-model-p3h/current/deploy/p3h/p3h-compose-stop.sh
+TimeoutStartSec=3600
+TimeoutStopSec=180
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

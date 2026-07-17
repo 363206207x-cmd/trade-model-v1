@@ -16,8 +16,28 @@ require_env() {
 
 require_env PROD_DATASOURCE_HOST
 require_env PROD_DATASOURCE_USERNAME
-require_env PROD_DATASOURCE_PASSWORD
 require_env PROD_DATASOURCE_DATABASE
+
+password_file="${PROD_DATASOURCE_PASSWORD_FILE:-}"
+if [ -n "${password_file}" ]; then
+  if [ ! -f "${password_file}" ] || [ -L "${password_file}" ] || [ ! -s "${password_file}" ]; then
+    echo "Invalid PROD_DATASOURCE_PASSWORD_FILE" >&2
+    exit 1
+  fi
+  PGPASSFILE="$(mktemp)"
+  trap 'rm -f "${PGPASSFILE}"' EXIT HUP INT TERM
+  chmod 600 "${PGPASSFILE}"
+  printf '%s:%s:%s:%s:%s\n' \
+    "${PROD_DATASOURCE_HOST}" "${PROD_DATASOURCE_PORT:-5432}" \
+    "${PROD_DATASOURCE_DATABASE}" "${PROD_DATASOURCE_USERNAME}" \
+    "$(tr -d '\r\n' <"${password_file}")" >"${PGPASSFILE}"
+  export PGPASSFILE
+elif [ -n "${PROD_DATASOURCE_PASSWORD:-}" ]; then
+  export PGPASSWORD="${PROD_DATASOURCE_PASSWORD}"
+else
+  echo "Missing required password input: PROD_DATASOURCE_PASSWORD_FILE" >&2
+  exit 1
+fi
 
 if ! command -v pg_dump >/dev/null 2>&1; then
   echo "pg_dump is required for backup" >&2
@@ -26,7 +46,7 @@ fi
 
 mkdir -p "$BACKUP_DIR"
 
-PGPASSWORD="$PROD_DATASOURCE_PASSWORD" pg_dump \
+pg_dump \
   --host="$PROD_DATASOURCE_HOST" \
   --port="${PROD_DATASOURCE_PORT:-5432}" \
   --username="$PROD_DATASOURCE_USERNAME" \

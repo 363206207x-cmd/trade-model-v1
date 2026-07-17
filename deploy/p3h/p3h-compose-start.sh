@@ -7,6 +7,15 @@ GREENFIELD_CONFIRMATION=I_CONFIRM_EMPTY_GREENFIELD_INITIALIZATION
 GREENFIELD_RECOVERY_CONFIRMATION=I_CONFIRM_RECOVER_CONTROLLED_GREENFIELD_INITIALIZATION
 FAILURE_INJECTION_CONFIRMATION=I_CONFIRM_LOCAL_P3H_FAILURE_INJECTION
 P3H_CURRENT_STEP=PRECHECK
+P3H_COMPOSE_CONFIG_CHECK_ONLY="${P3H_COMPOSE_CONFIG_CHECK_ONLY:-false}"
+
+case "${P3H_COMPOSE_CONFIG_CHECK_ONLY}" in
+  true|false) ;;
+  *)
+    echo "P3H_COMPOSE_START: BLOCKED_CONFIG_CHECK_MODE"
+    exit 2
+    ;;
+esac
 
 required_nonsecret=(
   P3H_APPLICATION_IMAGE_TAG
@@ -56,10 +65,63 @@ if [ -n "${P3H_FAILURE_INJECTION_STAGE:-}" ] \
   exit 2
 fi
 
+if [ -n "${DOCKER_CONFIG:-}" ]; then
+  case "${DOCKER_CONFIG}" in
+    /*) ;;
+    *)
+      echo "P3H_COMPOSE_START: BLOCKED_DOCKER_CONFIG_SCOPE"
+      exit 2
+      ;;
+  esac
+  if [ -L "${DOCKER_CONFIG}" ] \
+      || ! install -d -m 0700 "${DOCKER_CONFIG}" \
+      || [ "$(stat -c '%a' "${DOCKER_CONFIG}" 2>/dev/null || stat -f '%Lp' "${DOCKER_CONFIG}")" != 700 ]; then
+    echo "P3H_COMPOSE_START: BLOCKED_DOCKER_CONFIG_DIRECTORY"
+    exit 2
+  fi
+fi
+
 compose=(docker compose -f "${COMPOSE_FILE}")
-if ! "${compose[@]}" config --quiet; then
-  echo "P3H_COMPOSE_START: BLOCKED_COMPOSE_CONFIG"
+compose_config_log="$(mktemp /tmp/p3h-compose-config.XXXXXX)"
+chmod 600 "${compose_config_log}"
+if ! "${compose[@]}" config --quiet >"${compose_config_log}" 2>&1; then
+  if grep -Eqi 'required variable .* is missing|must set|set .* or ' \
+      "${compose_config_log}"; then
+    compose_config_category=MISSING_REQUIRED_VARIABLE
+  elif grep -Eqi 'permission denied|operation not permitted' "${compose_config_log}"; then
+    if grep -Eqi '/run/credentials|secret.*permission denied|permission denied.*secret' \
+        "${compose_config_log}"; then
+      compose_config_category=SECRET_FILE_PERMISSION
+    elif grep -Eqi 'docker\.sock|docker daemon socket' "${compose_config_log}"; then
+      compose_config_category=DOCKER_SOCKET_PERMISSION
+    elif grep -Eqi '/home/|\.docker|docker config' "${compose_config_log}"; then
+      compose_config_category=DOCKER_CONFIG_PERMISSION
+    elif grep -Eqi '/opt/trade-model-p3h|current/deploy/p3h' \
+        "${compose_config_log}"; then
+      compose_config_category=RELEASE_FILE_PERMISSION
+    else
+      compose_config_category=FILE_PERMISSION
+    fi
+  elif grep -Eqi 'no such file or directory|does not exist|not found' \
+      "${compose_config_log}"; then
+    compose_config_category=MISSING_FILE
+  elif grep -Eqi 'cannot connect to the docker daemon|docker daemon is not running' \
+      "${compose_config_log}"; then
+    compose_config_category=DOCKER_UNAVAILABLE
+  elif grep -Eqi 'validating .* additional properties|services\..* must be|invalid compose|invalid interpolation' \
+      "${compose_config_log}"; then
+    compose_config_category=INVALID_SCHEMA
+  else
+    compose_config_category=UNKNOWN
+  fi
+  rm -f "${compose_config_log}"
+  echo "P3H_COMPOSE_START: BLOCKED_COMPOSE_CONFIG_${compose_config_category}"
   exit 2
+fi
+rm -f "${compose_config_log}"
+if [ "${P3H_COMPOSE_CONFIG_CHECK_ONLY}" = true ]; then
+  echo "P3H_COMPOSE_CONFIG_CHECK: PASS"
+  exit 0
 fi
 
 remove_materialized_secret_volume() {

@@ -17,6 +17,10 @@ class ControlledStagingBackupRestoreContractTest {
         assertThat(restore).contains(
                 "pg_restore", "--clean", "--if-exists", "--exit-on-error",
                 "I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA");
+        assertThat(backup).contains(
+                "PROD_DATASOURCE_PASSWORD_FILE", "PGPASSFILE", "chmod 600");
+        assertThat(restore).contains(
+                "RESTORE_DATASOURCE_PASSWORD_FILE", "PGPASSFILE", "chmod 600");
         assertThat(p3h).contains(
                 "scripts/prod-backup.sh", "scripts/prod-restore.sh",
                 "trade_model_v1_p3h_recovery", "BACKUP_DURATION_SECONDS",

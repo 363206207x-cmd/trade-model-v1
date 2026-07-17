@@ -1,0 +1,54 @@
+minimumLimaVersion: 2.0.0
+
+base:
+  - template:debian-12
+
+cpus: 4
+memory: 8GiB
+disk: 40GiB
+
+# The lab receives one exact git archive over pinned SSH. Host directories,
+# including the repository and local runtime/secret locations, are not mounted.
+mounts: []
+
+containerd:
+  system: false
+  user: false
+
+provision:
+  - mode: system
+    script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -q
+      apt-get install -y -q --no-install-recommends \
+        ca-certificates curl jq openssh-server openssl python3 sudo
+      install -m 0755 -d /etc/apt/keyrings
+      curl --fail --silent --show-error --location \
+        https://download.docker.com/linux/debian/gpg \
+        --output /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      . /etc/os-release
+      printf '%s\n' \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" \
+        >/etc/apt/sources.list.d/docker.list
+      apt-get update -q
+      apt-get install -y -q --no-install-recommends \
+        docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
+        docker-compose-plugin
+      timedatectl set-timezone UTC
+      timedatectl set-ntp true
+      systemctl enable --now docker.service ssh.service systemd-timesyncd.service
+
+probes:
+  - script: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      systemctl is-system-running --wait >/dev/null 2>&1 || true
+      systemctl is-active --quiet docker.service
+      systemctl is-active --quiet ssh.service
+      sudo docker info >/dev/null
+      sudo docker compose version >/dev/null
+      systemd-creds --help >/dev/null
+    hint: Inspect /var/log/cloud-init-output.log through the Lima console.
