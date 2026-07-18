@@ -20,12 +20,13 @@ TEMP_ROOT=""
 BOOTSTRAP_COMPLETE=0
 CURRENT_STAGE=precheck
 RUN_START_EPOCH="$(date +%s)"
-BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS=1200
+BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS=3600
+VM_BOOTSTRAP_TIMEOUT_SECONDS=1200
+GUEST_PROVISION_TIMEOUT_SECONDS=1800
+LIMA_INTERNAL_TIMEOUT=21m
 BOUNDED_PROCESS_RUNNER="${ROOT_DIR}/scripts/p3h-bounded-process.py"
-BOOTSTRAP_WATCHDOG_PID=""
 ACTIVE_BOUNDED_RUNNER_PID=""
-BOOTSTRAP_MAIN_PID="$$"
-BOOTSTRAP_TIMEOUT_MARKER="/private/tmp/trade-model-p3h-lab1-bootstrap-timeout.$$"
+SUPERVISOR_TIMEOUT_MARKER="${P3H_SUPERVISOR_TIMEOUT_MARKER:-}"
 
 blocked() {
   echo "P3H_LAB_BOOTSTRAP: $1"
@@ -41,10 +42,6 @@ cleanup() {
   set +e
   trap - EXIT
   trap - TERM INT
-  if [ -n "${BOOTSTRAP_WATCHDOG_PID}" ]; then
-    kill "${BOOTSTRAP_WATCHDOG_PID}" >/dev/null 2>&1 || true
-    wait "${BOOTSTRAP_WATCHDOG_PID}" >/dev/null 2>&1 || true
-  fi
   if [ -n "${ACTIVE_BOUNDED_RUNNER_PID}" ]; then
     kill -TERM "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
     wait "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
@@ -58,26 +55,13 @@ cleanup() {
     P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1 \
       bash "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" >/dev/null 2>&1 || true
   fi
-  rm -f "${BOOTSTRAP_TIMEOUT_MARKER}"
   exit "${exit_status}"
-}
-trap cleanup EXIT
-
-bootstrap_watchdog() {
-  while kill -0 "${BOOTSTRAP_MAIN_PID}" >/dev/null 2>&1; do
-    if [ $(( $(date +%s) - RUN_START_EPOCH )) \
-        -ge "${BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS}" ]; then
-      : >"${BOOTSTRAP_TIMEOUT_MARKER}"
-      kill -TERM "${BOOTSTRAP_MAIN_PID}" >/dev/null 2>&1 || true
-      return
-    fi
-    sleep 15
-  done
 }
 
 handle_bootstrap_termination() {
   trap - TERM INT
-  if [ -f "${BOOTSTRAP_TIMEOUT_MARKER}" ]; then
+  if [ -n "${SUPERVISOR_TIMEOUT_MARKER}" ] \
+      && [ -f "${SUPERVISOR_TIMEOUT_MARKER}" ]; then
     echo "P3H_LAB_BOOTSTRAP: BLOCKED_GLOBAL_TIMEOUT" >&2
   else
     echo "P3H_LAB_BOOTSTRAP: BLOCKED_OPERATOR_TERMINATION" >&2
@@ -87,7 +71,6 @@ handle_bootstrap_termination() {
   fi
   exit 143
 }
-trap handle_bootstrap_termination TERM INT
 
 report_error() {
   local exit_status=$?
@@ -135,8 +118,32 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 command -v python3 >/dev/null 2>&1 || blocked "BLOCKED_HOST_PYTHON_MISSING"
 [ -f "${BOUNDED_PROCESS_RUNNER}" ] || blocked "BLOCKED_BOUNDED_RUNNER_MISSING"
-bootstrap_watchdog &
-BOOTSTRAP_WATCHDOG_PID="$!"
+
+if [ "${P3H_COMPLETE_PROCESS_TREE_SUPERVISED:-}" != BOOTSTRAP ]; then
+  export P3H_COMPLETE_PROCESS_TREE_SUPERVISED=BOOTSTRAP
+  export P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1
+  export P3H_SUPERVISOR_TIMEOUT_MARKER="/private/tmp/trade-model-p3h-bootstrap-supervisor-timeout.$$"
+  rm -f "${P3H_SUPERVISOR_TIMEOUT_MARKER}"
+  set +e
+  python3 "${BOUNDED_PROCESS_RUNNER}" \
+    --timeout-seconds "${BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS}" \
+    --global-start-epoch "${RUN_START_EPOCH}" \
+    --global-timeout-seconds "${BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS}" \
+    --stage COMPLETE_BOOTSTRAP_PROCESS_TREE \
+    --operation-class COMPLETE_BOOTSTRAP_PROCESS_TREE \
+    --poll-seconds 5 --heartbeat-seconds 60 --term-grace-seconds 15 \
+    --timeout-marker "${P3H_SUPERVISOR_TIMEOUT_MARKER}" \
+    --cleanup-script "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" \
+    --cleanup-timeout-seconds 300 \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+  supervisor_status=$?
+  set -e
+  rm -f "${P3H_SUPERVISOR_TIMEOUT_MARKER}"
+  exit "${supervisor_status}"
+fi
+
+trap cleanup EXIT
+trap handle_bootstrap_termination TERM INT
 
 install_lima_from_official_release() {
   local version=2.1.4
@@ -229,25 +236,75 @@ ssh-keygen -q -t ed25519 -N '' -C p3h-lab1-disposable \
   -f "${identity_file}"
 chmod 600 "${identity_file}"
 
-CURRENT_STAGE=lima-start
-run_bounded 1200 VM_BOOTSTRAP LIMA_START \
+CURRENT_STAGE=minimal-vm-start
+run_bounded "${VM_BOOTSTRAP_TIMEOUT_SECONDS}" MINIMAL_VM_START LIMA_START \
   limactl start --name="${VM_NAME}" --tty=false --mount-none \
-  --progress --cpus=4 --memory=8 --disk=40 --timeout=15m "${TEMPLATE_FILE}" \
+  --progress --cpus=4 --memory=8 --disk=40 \
+  --timeout="${LIMA_INTERNAL_TIMEOUT}" "${TEMPLATE_FILE}" \
   || blocked "BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE"
 
-CURRENT_STAGE=guest-provision-copy
-limactl copy --backend=scp "${identity_file}.pub" \
-  "${VM_NAME}:/tmp/p3h-lab1-ed25519.pub"
-limactl copy --backend=scp "${PROVISION_FILE}" \
-  "${VM_NAME}:/tmp/p3h-lab-provision-linux.sh"
-CURRENT_STAGE=guest-provision
+CURRENT_STAGE=minimal-vm-console
+run_bounded 60 VM_CONSOLE_AVAILABLE LIMA_SHELL \
+  limactl shell "${VM_NAME}" \
+  sh -eu -c 'test "$(uname -s)" = Linux; systemctl --version >/dev/null' \
+  || blocked "BLOCKED_MINIMAL_VM_CONSOLE"
+echo "MINIMAL_VM_START: PASS"
+echo "VM_CONSOLE_AVAILABLE: PASS"
+
+CURRENT_STAGE=copy-dedicated-public-key
+run_bounded 120 COPY_DEDICATED_PUBLIC_KEY LIMA_COPY \
+  limactl copy --backend=scp "${identity_file}.pub" \
+  "${VM_NAME}:/tmp/p3h-lab1-ed25519.pub" \
+  || blocked "BLOCKED_DEDICATED_PUBLIC_KEY_COPY"
+run_bounded 120 COPY_GUEST_PROVISIONER LIMA_COPY \
+  limactl copy --backend=scp "${PROVISION_FILE}" \
+  "${VM_NAME}:/tmp/p3h-lab-provision-linux.sh" \
+  || blocked "BLOCKED_GUEST_PROVISION_COPY"
+
+CURRENT_STAGE=guest-package-and-docker-provision
 guest_provision_log="${TEMP_ROOT}/guest-provision.log"
-if ! run_bounded 600 VM_BOOTSTRAP GUEST_PROVISION \
-    limactl shell "${VM_NAME}" sudo bash /tmp/p3h-lab-provision-linux.sh \
-    >"${guest_provision_log}" 2>&1; then
-  sed -n '/^P3H_LAB_PROVISION:/p' "${guest_provision_log}" >&2
-  blocked "BLOCKED_GUEST_PROVISION"
+set +e
+run_bounded "${GUEST_PROVISION_TIMEOUT_SECONDS}" \
+  GUEST_PACKAGE_AND_DOCKER_PROVISION LIMA_SHELL \
+  limactl shell "${VM_NAME}" sudo bash /tmp/p3h-lab-provision-linux.sh \
+  >"${guest_provision_log}" 2>&1
+guest_provision_status=$?
+set -e
+guest_provision_stage="$(sed -n \
+  's/^P3H_LAB_PROVISION_STAGE: \([A-Z0-9_]*\)$/\1/p' \
+  "${guest_provision_log}" | tail -n 1)"
+guest_provision_elapsed="$(sed -n \
+  's/^P3H_LAB_PROVISION_ELAPSED_SECONDS: \([0-9][0-9]*\)$/\1/p' \
+  "${guest_provision_log}" | tail -n 1)"
+[ -n "${guest_provision_stage}" ] || guest_provision_stage=UNKNOWN
+[ -n "${guest_provision_elapsed}" ] || guest_provision_elapsed=UNKNOWN
+if [ "${guest_provision_status}" -ne 0 ]; then
+  guest_provision_reason="$(sed -n \
+    's/^P3H_LAB_PROVISION: \(BLOCKED_[A-Z0-9_]*\)$/\1/p' \
+    "${guest_provision_log}" | head -n 1)"
+  if [ "${guest_provision_status}" -eq 124 ] \
+      || [ "${guest_provision_status}" -eq 125 ]; then
+    guest_provision_reason=BLOCKED_GUEST_PROVISION_TIMEOUT
+  fi
+  case "${guest_provision_reason}" in
+    BLOCKED_GUEST_DNS|BLOCKED_GUEST_APT_UPDATE|BLOCKED_DOCKER_REPOSITORY|\
+    BLOCKED_DOCKER_PACKAGE_INSTALL|BLOCKED_DOCKER_DAEMON_START|\
+    BLOCKED_DOCKER_COMPOSE_MISSING|BLOCKED_GUEST_PROVISION_TIMEOUT|\
+    BLOCKED_HOST_IDENTITY|BLOCKED_DEPLOYMENT_USER|BLOCKED_SSH_POLICY|\
+    BLOCKED_UTC_AND_NTP|BLOCKED_NTP_NOT_SYNCHRONIZED|BLOCKED_FINAL_CONTRACT) ;;
+    *) guest_provision_reason=BLOCKED_GUEST_PROVISION_TIMEOUT ;;
+  esac
+  echo "GUEST_PACKAGE_AND_DOCKER_PROVISION: BLOCKED" >&2
+  echo "GUEST_PROVISION_FAILURE_CATEGORY: ${guest_provision_reason}" >&2
+  echo "GUEST_PROVISION_STAGE: ${guest_provision_stage}" >&2
+  echo "GUEST_PROVISION_ELAPSED_SECONDS: ${guest_provision_elapsed}" >&2
+  echo "GUEST_PROVISION_EXIT_CODE: ${guest_provision_status}" >&2
+  blocked "${guest_provision_reason}"
 fi
+echo "GUEST_PACKAGE_AND_DOCKER_PROVISION: PASS"
+echo "GUEST_PROVISION_STAGE: ${guest_provision_stage}"
+echo "GUEST_PROVISION_ELAPSED_SECONDS: ${guest_provision_elapsed}"
+echo "GUEST_PROVISION_EXIT_CODE: 0"
 
 CURRENT_STAGE=ssh-mapping
 ssh_port="$(limactl list "${VM_NAME}" --format '{{.SSHLocalPort}}')"

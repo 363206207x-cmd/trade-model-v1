@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 
 EXIT_STAGE_TIMEOUT = 124
@@ -26,6 +27,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--poll-seconds", type=int, default=15)
     parser.add_argument("--heartbeat-seconds", type=int, default=60)
     parser.add_argument("--term-grace-seconds", type=int, default=15)
+    parser.add_argument("--cleanup-script")
+    parser.add_argument("--cleanup-timeout-seconds", type=int, default=300)
+    parser.add_argument("--timeout-marker")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command and args.command[0] == "--":
@@ -38,6 +42,7 @@ def parse_args() -> argparse.Namespace:
         args.poll_seconds,
         args.heartbeat_seconds,
         args.term_grace_seconds,
+        args.cleanup_timeout_seconds,
     ):
         if value <= 0:
             parser.error("time values must be positive")
@@ -69,19 +74,21 @@ def process_group_exists(process_group_id: int) -> bool:
     return True
 
 
-def terminate_group(process: subprocess.Popen[bytes], grace_seconds: int) -> None:
+def terminate_group(process: subprocess.Popen[bytes], grace_seconds: int) -> bool:
+    """Terminate one exact process group and report whether KILL was required."""
     process_group_id = process.pid
     if not process_group_exists(process_group_id):
-        return
+        return False
     try:
         os.killpg(process_group_id, signal.SIGTERM)
     except (ProcessLookupError, PermissionError):
-        return
+        return False
     deadline = time.monotonic() + grace_seconds
     while process_group_exists(process_group_id) and time.monotonic() < deadline:
         process.poll()
         time.sleep(min(1, max(0.0, deadline - time.monotonic())))
-    if process_group_exists(process_group_id):
+    escalated = process_group_exists(process_group_id)
+    if escalated:
         try:
             os.killpg(process_group_id, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
@@ -90,6 +97,43 @@ def terminate_group(process: subprocess.Popen[bytes], grace_seconds: int) -> Non
         process.wait(timeout=grace_seconds)
     except subprocess.TimeoutExpired:
         pass
+    return escalated
+
+
+def run_cleanup(args: argparse.Namespace) -> bool:
+    """Run the exact caller-provided cleanup script in its own bounded group."""
+    if not args.cleanup_script:
+        return True
+    cleanup = subprocess.Popen(
+        ["bash", args.cleanup_script],
+        start_new_session=True,
+    )
+    try:
+        cleanup.wait(timeout=args.cleanup_timeout_seconds)
+    except subprocess.TimeoutExpired:
+        escalated = terminate_group(cleanup, args.term_grace_seconds)
+        print("SUPERVISOR_CLEANUP_STATUS: FAIL", file=sys.stderr, flush=True)
+        print("SUPERVISOR_CLEANUP_TIMEOUT: YES", file=sys.stderr, flush=True)
+        if escalated:
+            print("CLEANUP_TERM_ESCALATED_TO_KILL: YES", file=sys.stderr, flush=True)
+        return False
+    if cleanup.returncode != 0:
+        print("SUPERVISOR_CLEANUP_STATUS: FAIL", file=sys.stderr, flush=True)
+        return False
+    print("SUPERVISOR_CLEANUP_STATUS: PASS", file=sys.stderr, flush=True)
+    return True
+
+
+def write_timeout_marker(path_value: str | None) -> None:
+    if not path_value:
+        return
+    path = Path(path_value)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return
+    else:
+        os.close(descriptor)
 
 
 def main() -> int:
@@ -114,11 +158,20 @@ def main() -> int:
             return EXIT_SIGNALLED
         if global_elapsed >= args.global_timeout_seconds:
             emit_heartbeat(args, stage_elapsed, "GLOBAL_TIMEOUT")
-            terminate_group(process, args.term_grace_seconds)
+            write_timeout_marker(args.timeout_marker)
+            escalated = terminate_group(process, args.term_grace_seconds)
+            print("GLOBAL_TIMEOUT_TRIGGERED: YES", file=sys.stderr, flush=True)
+            if escalated:
+                print("TERM_ESCALATED_TO_KILL: YES", file=sys.stderr, flush=True)
+            run_cleanup(args)
             return EXIT_GLOBAL_TIMEOUT
         if stage_elapsed >= args.timeout_seconds:
             emit_heartbeat(args, stage_elapsed, "STAGE_TIMEOUT")
-            terminate_group(process, args.term_grace_seconds)
+            escalated = terminate_group(process, args.term_grace_seconds)
+            print("STAGE_TIMEOUT_TRIGGERED: YES", file=sys.stderr, flush=True)
+            if escalated:
+                print("TERM_ESCALATED_TO_KILL: YES", file=sys.stderr, flush=True)
+            run_cleanup(args)
             return EXIT_STAGE_TIMEOUT
         if stage_elapsed >= next_heartbeat:
             emit_heartbeat(args, stage_elapsed, "RUNNING")
@@ -131,7 +184,10 @@ def main() -> int:
         time.sleep(max(0.1, remaining))
 
     if interrupted:
+        run_cleanup(args)
         return EXIT_SIGNALLED
+    if process.returncode != 0:
+        run_cleanup(args)
     return process.returncode
 
 

@@ -27,12 +27,16 @@ RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400
 RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1
 RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=UNKNOWN
 NO_PROGRESS_TIMEOUT_SECONDS=900
+PROGRESS_PROBE_TIMEOUT_SECONDS=5
 POLL_INTERVAL_SECONDS=15
 HEARTBEAT_INTERVAL_SECONDS=60
 TERM_GRACE_SECONDS=15
 BOUNDED_DOCKER_FAILURE=UNKNOWN
 ACTIVE_DOCKER_PROCESS_GROUP=""
 CURRENT_REMOTE_STEP=PRECONDITION
+PROGRESS_FINGERPRINT=""
+PROGRESS_PROBE_STATUS=NOT_RUN
+PROGRESS_PROBE_OUTPUT=""
 
 blocked() {
   echo "P3H_REMOTE_STAGE: $1"
@@ -92,19 +96,65 @@ cleanup_active_docker_group() {
 }
 trap cleanup_active_docker_group EXIT
 
-docker_progress_fingerprint() {
+run_progress_probe() {
+  local timeout_category="$1"
+  local command_category="$2"
+  local probe_status
+  shift 2
+  if PROGRESS_PROBE_OUTPUT="$(timeout --signal=TERM --kill-after=2s \
+      "${PROGRESS_PROBE_TIMEOUT_SECONDS}s" "$@" 2>/dev/null)"; then
+    probe_status=0
+    PROGRESS_PROBE_STATUS=PASS
+    return 0
+  else
+    probe_status=$?
+  fi
+  case "${probe_status}" in
+    124|137) PROGRESS_PROBE_STATUS="${timeout_category}" ;;
+    *) PROGRESS_PROBE_STATUS="${command_category}" ;;
+  esac
+  PROGRESS_PROBE_OUTPUT=""
+  return 1
+}
+
+capture_docker_progress() {
   local target_image="$1"
   local image_id docker_usage buildkit_kb content_kb
-  image_id="$(docker image inspect "${target_image}" --format '{{.Id}}' 2>/dev/null || true)"
-  docker_usage="$(docker system df --format '{{.Type}}|{{.TotalCount}}|{{.Size}}' \
-    2>/dev/null | sha256sum | awk '{print $1}')"
-  buildkit_kb="$(sudo du -sk /var/lib/docker/buildkit 2>/dev/null \
-    | awk 'NR == 1 {print $1}')"
-  content_kb="$(sudo du -sk /var/lib/docker/containerd 2>/dev/null \
-    | awk 'NR == 1 {print $1}')"
-  printf '%s|%s|%s|%s\n' "${image_id:-NONE}" "${docker_usage:-NONE}" \
+
+  if run_progress_probe PROBE_TIMEOUT DOCKER_IMAGE_NOT_AVAILABLE \
+      docker image inspect "${target_image}" --format '{{.Id}}'; then
+    image_id="${PROGRESS_PROBE_OUTPUT:-NONE}"
+  elif [ "${PROGRESS_PROBE_STATUS}" = DOCKER_IMAGE_NOT_AVAILABLE ]; then
+    # A missing target image is expected while a build is in progress. Verify
+    # daemon health separately before treating this sample as valid.
+    if ! run_progress_probe PROBE_TIMEOUT DOCKER_DAEMON_UNAVAILABLE docker info; then
+      return 1
+    fi
+    image_id=NONE
+  else
+    return 1
+  fi
+
+  if ! run_progress_probe PROBE_TIMEOUT DOCKER_DAEMON_UNAVAILABLE \
+      docker system df --format '{{.Type}}|{{.TotalCount}}|{{.Size}}'; then
+    return 1
+  fi
+  docker_usage="$(printf '%s' "${PROGRESS_PROBE_OUTPUT}" | sha256sum | awk '{print $1}')"
+
+  run_progress_probe FILESYSTEM_PROBE_TIMEOUT FILESYSTEM_PROBE_TIMEOUT \
+    sudo du -sk /var/lib/docker/buildkit || return 1
+  buildkit_kb="$(printf '%s\n' "${PROGRESS_PROBE_OUTPUT}" | awk 'NR == 1 {print $1}')"
+  run_progress_probe FILESYSTEM_PROBE_TIMEOUT FILESYSTEM_PROBE_TIMEOUT \
+    sudo du -sk /var/lib/docker/containerd || return 1
+  content_kb="$(printf '%s\n' "${PROGRESS_PROBE_OUTPUT}" | awk 'NR == 1 {print $1}')"
+
+  PROGRESS_FINGERPRINT="$(printf '%s|%s|%s|%s\n' \
+    "${image_id:-NONE}" "${docker_usage:-NONE}" \
     "${buildkit_kb:-0}" "${content_kb:-0}" \
-    | sha256sum | awk '{print $1}'
+    | sha256sum | awk '{print $1}')"
+  PROGRESS_PROBE_STATUS=PASS
+  PROGRESS_PROBE_OUTPUT=""
+  return 0
 }
 
 run_docker_bounded() {
@@ -115,13 +165,20 @@ run_docker_bounded() {
   local output_file="$5"
   local operation_pid started now elapsed last_progress next_heartbeat
   local previous_fingerprint current_fingerprint process_state operation_status
+  local last_probe_status=NOT_RUN
   shift 5
 
   BOUNDED_DOCKER_FAILURE=UNKNOWN
   started="$(date +%s)"
   last_progress="${started}"
   next_heartbeat="${HEARTBEAT_INTERVAL_SECONDS}"
-  previous_fingerprint="$(docker_progress_fingerprint "${target_image}")"
+  previous_fingerprint=""
+  if capture_docker_progress "${target_image}"; then
+    previous_fingerprint="${PROGRESS_FINGERPRINT}"
+  else
+    last_probe_status="${PROGRESS_PROBE_STATUS}"
+    echo "P3H_PROGRESS_PROBE_STATUS: ${PROGRESS_PROBE_STATUS}"
+  fi
   setsid "$@" >"${output_file}" 2>&1 &
   operation_pid="$!"
   ACTIVE_DOCKER_PROCESS_GROUP="${operation_pid}"
@@ -139,12 +196,25 @@ run_docker_bounded() {
       ACTIVE_DOCKER_PROCESS_GROUP=""
       return 125
     fi
-    current_fingerprint="$(docker_progress_fingerprint "${target_image}")"
     process_state=RUNNING_NO_CHANGE
-    if [ "${current_fingerprint}" != "${previous_fingerprint}" ]; then
-      previous_fingerprint="${current_fingerprint}"
-      last_progress="${now}"
-      process_state=RUNNING_PROGRESS
+    if capture_docker_progress "${target_image}"; then
+      current_fingerprint="${PROGRESS_FINGERPRINT}"
+      if [ -n "${previous_fingerprint}" ] \
+          && [ "${current_fingerprint}" != "${previous_fingerprint}" ]; then
+        previous_fingerprint="${current_fingerprint}"
+        last_progress="${now}"
+        process_state=RUNNING_PROGRESS
+      elif [ -z "${previous_fingerprint}" ]; then
+        # Establishing a baseline after failed probes is not real progress.
+        previous_fingerprint="${current_fingerprint}"
+      fi
+      last_probe_status=PASS
+    else
+      process_state="RUNNING_${PROGRESS_PROBE_STATUS}"
+      if [ "${PROGRESS_PROBE_STATUS}" != "${last_probe_status}" ]; then
+        echo "P3H_PROGRESS_PROBE_STATUS: ${PROGRESS_PROBE_STATUS}"
+      fi
+      last_probe_status="${PROGRESS_PROBE_STATUS}"
     fi
     if [ "${elapsed}" -ge "${next_heartbeat}" ]; then
       emit_heartbeat "${stage}" "${elapsed}" "${process_state}" "${operation_class}"

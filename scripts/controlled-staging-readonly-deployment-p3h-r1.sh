@@ -13,13 +13,14 @@ EXPECTED_CONFIRMATION=I_CONFIRM_AUTHORIZED_NON_PRODUCTION_STAGING_DEPLOYMENT
 EXPECTED_REBOOT_CONFIRMATION=I_CONFIRM_CONTROLLED_STAGING_SERVER_REBOOT
 CURRENT_STAGE=target-class
 STAGE_START_EPOCH="$(date +%s)"
-RUN_START_EPOCH="${STAGE_START_EPOCH}"
+RUN_START_EPOCH="${P3H_R1_SUPERVISOR_START_EPOCH:-${STAGE_START_EPOCH}}"
 GLOBAL_TIMEOUT_SECONDS="${P3H_GLOBAL_TIMEOUT_SECONDS:-10800}"
 POLL_INTERVAL_SECONDS=15
 HEARTBEAT_INTERVAL_SECONDS=60
 TERM_GRACE_SECONDS=15
 ROTATION_REBOOT_TIMEOUT_SECONDS=1800
 BOUNDED_PROCESS_RUNNER="${ROOT_DIR}/scripts/p3h-bounded-process.py"
+SUPERVISOR_TIMEOUT_MARKER="${P3H_SUPERVISOR_TIMEOUT_MARKER:-}"
 TEMP_ROOT=""
 RAW_EVIDENCE=""
 SOURCE_HEAD=""
@@ -31,9 +32,6 @@ GLOBAL_TIMEOUT_TRIGGERED=NO
 NO_PROGRESS_TIMEOUT_TRIGGERED=NO
 REMOTE_FAILURE_REASON=""
 ACTIVE_BOUNDED_RUNNER_PID=""
-GLOBAL_WATCHDOG_PID=""
-GLOBAL_TIMEOUT_MARKER="/private/tmp/trade-model-p3h-global-timeout.$$"
-MAIN_PID="$$"
 
 stage_code() {
   printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
@@ -93,23 +91,11 @@ run_bounded_with_stdin() {
     "$@" <"${input_file}"
 }
 
-global_watchdog() {
-  local global_elapsed
-  while kill -0 "${MAIN_PID}" >/dev/null 2>&1; do
-    global_elapsed=$(( $(date +%s) - RUN_START_EPOCH ))
-    if [ "${global_elapsed}" -ge "${GLOBAL_TIMEOUT_SECONDS}" ]; then
-      : >"${GLOBAL_TIMEOUT_MARKER}"
-      kill -TERM "${MAIN_PID}" >/dev/null 2>&1 || true
-      return
-    fi
-    sleep "${POLL_INTERVAL_SECONDS}"
-  done
-}
-
 handle_termination() {
   trap - TERM INT
   TERMINAL_BLOCKED=1
-  if [ -f "${GLOBAL_TIMEOUT_MARKER}" ]; then
+  if [ -n "${SUPERVISOR_TIMEOUT_MARKER}" ] \
+      && [ -f "${SUPERVISOR_TIMEOUT_MARKER}" ]; then
     GLOBAL_TIMEOUT_TRIGGERED=YES
     BLOCKED_REASON=BLOCKED_GLOBAL_TIMEOUT_EXCEEDED
   else
@@ -190,10 +176,6 @@ cleanup() {
   local vm_cleanup=FAIL docker_cleanup=FAIL secret_cleanup=FAIL
   set +e
   trap - EXIT TERM INT
-  if [ -n "${GLOBAL_WATCHDOG_PID}" ]; then
-    kill "${GLOBAL_WATCHDOG_PID}" >/dev/null 2>&1 || true
-    wait "${GLOBAL_WATCHDOG_PID}" >/dev/null 2>&1 || true
-  fi
   if [ -n "${ACTIVE_BOUNDED_RUNNER_PID}" ]; then
     kill -TERM "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
     wait "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
@@ -218,7 +200,6 @@ cleanup() {
   if [ -n "${TEMP_ROOT}" ] && [ -d "${TEMP_ROOT}" ]; then
     rm -rf "${TEMP_ROOT}"
   fi
-  rm -f "${GLOBAL_TIMEOUT_MARKER}"
 
   if ! command -v limactl >/dev/null 2>&1 \
       || ! limactl list --quiet 2>/dev/null | grep -Fxq "${VM_NAME}"; then
@@ -259,8 +240,6 @@ cleanup() {
   fi
   exit "${exit_status}"
 }
-trap cleanup EXIT
-trap handle_termination INT TERM
 
 case "${P3H_TARGET_CLASS:-}" in
   AUTHORIZED_EXTERNAL_STAGING)
@@ -290,8 +269,46 @@ esac
   || blocked BLOCKED_INVALID_GLOBAL_TIMEOUT
 command -v python3 >/dev/null 2>&1 || blocked BLOCKED_HOST_PYTHON_MISSING
 [ -f "${BOUNDED_PROCESS_RUNNER}" ] || blocked BLOCKED_BOUNDED_RUNNER_MISSING
-global_watchdog &
-GLOBAL_WATCHDOG_PID="$!"
+
+if [ "${P3H_COMPLETE_PROCESS_TREE_SUPERVISED:-}" != R1 ]; then
+  export P3H_COMPLETE_PROCESS_TREE_SUPERVISED=R1
+  export P3H_R1_SUPERVISOR_START_EPOCH="${RUN_START_EPOCH}"
+  export P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1
+  export P3H_SUPERVISOR_TIMEOUT_MARKER="/private/tmp/trade-model-p3h-r1-supervisor-timeout.$$"
+  rm -f "${P3H_SUPERVISOR_TIMEOUT_MARKER}"
+  trap - EXIT TERM INT
+  set +e
+  python3 "${BOUNDED_PROCESS_RUNNER}" \
+    --timeout-seconds "${GLOBAL_TIMEOUT_SECONDS}" \
+    --global-start-epoch "${RUN_START_EPOCH}" \
+    --global-timeout-seconds "${GLOBAL_TIMEOUT_SECONDS}" \
+    --stage COMPLETE_R1_PROCESS_TREE \
+    --operation-class COMPLETE_R1_PROCESS_TREE \
+    --poll-seconds 5 --heartbeat-seconds 60 \
+    --term-grace-seconds "${TERM_GRACE_SECONDS}" \
+    --timeout-marker "${P3H_SUPERVISOR_TIMEOUT_MARKER}" \
+    --cleanup-script "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" \
+    --cleanup-timeout-seconds 300 \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+  supervisor_status=$?
+  set -e
+  rm -f "${P3H_SUPERVISOR_TIMEOUT_MARKER}"
+  if [ "${supervisor_status}" -eq 125 ]; then
+    echo "R1_RESULT: BLOCKED"
+    echo "BLOCKED_STAGE: COMPLETE_R1_PROCESS_TREE"
+    echo "BLOCKED_REASON: BLOCKED_GLOBAL_TIMEOUT_EXCEEDED"
+    echo "NO_PROGRESS_TIMEOUT_TRIGGERED: NO"
+    echo "RETRY_COUNT: 0"
+    echo "REAL_EXTERNAL_STAGING_STATUS: NOT_RUN"
+    echo "P3H_RESULT: NOT_COMPLETE"
+    echo "P4_ALLOWED: NO"
+    echo "PRODUCTION_READINESS: BLOCKED"
+  fi
+  exit "${supervisor_status}"
+fi
+
+trap cleanup EXIT
+trap handle_termination INT TERM
 
 set_stage local-lab-input
 [ -f "${LAB_MARKER}" ] && grep -Fxq P3H-LAB1-USER-AUTH-20260717 "${LAB_MARKER}" \

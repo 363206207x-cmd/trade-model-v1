@@ -33,13 +33,18 @@ class ControlledStagingLocalLimaLabContractTest {
     @Test
     void limaTemplateIsLinuxVmWithNoRepositoryMount() throws Exception {
         String template = read("deploy/p3h/lima/p3h-lab.yaml");
+        String provision = read("deploy/p3h/lima/p3h-lab-provision-linux.sh");
 
         assertThat(template).contains(
                 "template:debian-12", "cpus: 4", "memory: 8GiB",
                 "disk: 40GiB", "mounts: []", "systemctl", "systemd-creds",
+                "provision: []");
+        assertThat(template).doesNotContain(
+                "apt-get", "https://download.docker.com", "docker-compose-plugin");
+        assertThat(provision).contains(
                 "https://download.docker.com/linux/debian", "docker-compose-plugin",
                 "--no-install-recommends",
-                "sudo docker info", "sudo docker compose version");
+                "docker info", "docker compose version");
         assertThat(template).doesNotContain(".runtime", ".env", "dump", "backup");
     }
 
@@ -48,14 +53,18 @@ class ControlledStagingLocalLimaLabContractTest {
         String bootstrap = read("scripts/p3h-lab-bootstrap-macos.sh");
 
         assertThat(bootstrap).contains(
-                "BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS=1200",
-                "run_bounded 1200 VM_BOOTSTRAP LIMA_START",
-                "--timeout=15m",
+                "BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS=3600",
+                "VM_BOOTSTRAP_TIMEOUT_SECONDS=1200",
+                "GUEST_PROVISION_TIMEOUT_SECONDS=1800",
+                "LIMA_INTERNAL_TIMEOUT=21m",
+                "run_bounded \"${VM_BOOTSTRAP_TIMEOUT_SECONDS}\" MINIMAL_VM_START LIMA_START",
+                "--timeout=\"${LIMA_INTERNAL_TIMEOUT}\"",
                 "P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1",
                 "P3H-LAB1-USER-AUTH-20260717",
                 "BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE",
                 "P3H_LAB_BOOTSTRAP_FAILED_STAGE",
-                "sed -n '/^P3H_LAB_PROVISION:/p'");
+                "GUEST_PROVISION_FAILURE_CATEGORY:");
+        assertThat(bootstrap).doesNotContain("--timeout=15m");
     }
 
     @Test
@@ -404,8 +413,8 @@ class ControlledStagingLocalLimaLabContractTest {
                 "[ \"${GLOBAL_TIMEOUT_SECONDS}\" -le 10800 ]",
                 "POLL_INTERVAL_SECONDS=15",
                 "HEARTBEAT_INTERVAL_SECONDS=60",
-                "global_watchdog()",
-                "sleep \"${POLL_INTERVAL_SECONDS}\"",
+                "COMPLETE_R1_PROCESS_TREE",
+                "P3H_COMPLETE_PROCESS_TREE_SUPERVISED",
                 "run_remote_stage 2700 BUILD_APPLICATION_IMAGE",
                 "run_remote_stage 2400 PULL_RUNTIME_IMAGES",
                 "run_remote_stage 1800 INITIAL_DEPLOY",
@@ -421,6 +430,7 @@ class ControlledStagingLocalLimaLabContractTest {
                 "RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200",
                 "RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400",
                 "NO_PROGRESS_TIMEOUT_SECONDS=900",
+                "PROGRESS_PROBE_TIMEOUT_SECONDS=5",
                 "POLL_INTERVAL_SECONDS=15",
                 "HEARTBEAT_INTERVAL_SECONDS=60");
         assertThat(remote).contains(
@@ -455,12 +465,15 @@ class ControlledStagingLocalLimaLabContractTest {
         String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
 
         assertThat(remote).contains(
-                "docker_progress_fingerprint()",
+                "capture_docker_progress()",
+                "run_progress_probe()",
+                "timeout --signal=TERM --kill-after=2s",
                 "docker image inspect \"${target_image}\"",
                 "docker system df --format",
                 "/var/lib/docker/buildkit",
                 "/var/lib/docker/containerd",
                 "last_progress=\"${now}\"",
+                "Establishing a baseline after failed probes is not real progress",
                 "BOUNDED_DOCKER_FAILURE=NO_PROGRESS_TIMEOUT",
                 "terminate_process_group \"${operation_pid}\"",
                 "IMAGE_BUILD_MAX_ATTEMPTS=1",
@@ -589,11 +602,18 @@ class ControlledStagingLocalLimaLabContractTest {
         assertThat(destroy).contains(
                 "VM_NAME=trade-model-p3h-staging-lab",
                 "${HOME}/.local/share/trade-model-p3h-lab1",
-                "BLOCKED_UNOWNED_VM", "BLOCKED_UNOWNED_DIRECTORY");
+                "BLOCKED_UNOWNED_VM", "BLOCKED_UNOWNED_DIRECTORY",
+                "CLEANUP_TOTAL_TIMEOUT_SECONDS=300",
+                "LIMA_STOP_TIMEOUT_SECONDS=120",
+                "LIMA_DELETE_TIMEOUT_SECONDS=120",
+                "LAB_VM_CLEANUP: ${vm_cleanup}",
+                "RESOURCE_CLEANUP: FAIL");
         assertThat(remote).contains(
                 "label=com.docker.compose.project=${PROJECT}",
                 "/etc/credstore.encrypted/trade-model-p3h");
-        assertThat(destroy).doesNotContain("limactl delete --all", "${HOME}/.ssh");
+        assertThat(destroy).doesNotContain(
+                "limactl delete --all", "docker system prune", "pkill docker",
+                "killall docker", "${HOME}/.ssh");
     }
 
     @Test

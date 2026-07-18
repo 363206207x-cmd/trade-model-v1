@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/pgpass.sh
+source "${SCRIPT_DIR}/lib/pgpass.sh"
 
 require_env() {
   local name="$1"
@@ -16,17 +19,15 @@ require_env RESTORE_BACKUP_FILE
 
 password_file="${RESTORE_DATASOURCE_PASSWORD_FILE:-}"
 if [ -n "${password_file}" ]; then
-  if [ ! -f "${password_file}" ] || [ -L "${password_file}" ] || [ ! -s "${password_file}" ]; then
-    echo "Invalid RESTORE_DATASOURCE_PASSWORD_FILE" >&2
-    exit 1
-  fi
   PGPASSFILE="$(mktemp)"
   trap 'rm -f "${PGPASSFILE}"' EXIT HUP INT TERM
   chmod 600 "${PGPASSFILE}"
-  printf '%s:%s:%s:%s:%s\n' \
-    "${RESTORE_DATASOURCE_HOST}" "${RESTORE_DATASOURCE_PORT:-5432}" \
-    "${RESTORE_DATASOURCE_DATABASE}" "${RESTORE_DATASOURCE_USERNAME}" \
-    "$(tr -d '\r\n' <"${password_file}")" >"${PGPASSFILE}"
+  if ! write_pgpass_file "${password_file}" "${PGPASSFILE}" \
+      "${RESTORE_DATASOURCE_HOST}" "${RESTORE_DATASOURCE_PORT:-5432}" \
+      "${RESTORE_DATASOURCE_DATABASE}" "${RESTORE_DATASOURCE_USERNAME}"; then
+    echo "Invalid RESTORE_DATASOURCE_PASSWORD_FILE" >&2
+    exit 1
+  fi
   export PGPASSFILE
 elif [ -n "${RESTORE_DATASOURCE_PASSWORD:-}" ]; then
   export PGPASSWORD="${RESTORE_DATASOURCE_PASSWORD}"
