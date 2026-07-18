@@ -377,11 +377,14 @@ class ControlledStagingLocalLimaLabContractTest {
                 "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX",
                 "${SERVICE_RUNTIME}/p3h-lab-backup.XXXXXX",
                 "${SERVICE_RUNTIME}/p3h-lab-journal.XXXXXX",
-                "EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_SMOKE",
-                "EXPECTED_FAILURE_REASON=BLOCKED_BACKUP_RESTORE",
-                "EXPECTED_FAILURE_REASON=BLOCKED_TLS_CREDENTIAL_ACTIVATION",
-                "EXPECTED_FAILURE_REASON=BLOCKED_POST_ROTATION_SMOKE",
-                "EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_AFTER_REBOOT");
+                "run_checked_or_block()",
+                "trap - ERR",
+                "set -euo pipefail",
+                "run_checked_or_block BLOCKED_HTTPS_SMOKE https_smoke V1",
+                "run_checked_or_block BLOCKED_BACKUP_RESTORE backup_restore",
+                "run_checked_or_block BLOCKED_TLS_CREDENTIAL_ACTIVATION",
+                "run_checked_or_block BLOCKED_POST_ROTATION_SMOKE https_smoke V2",
+                "run_checked_or_block BLOCKED_HTTPS_AFTER_REBOOT https_smoke V2");
         assertThat(remote).doesNotContain(
                 "mktemp /run/p3h-lab-auth.",
                 "mktemp -d /run/p3h-lab-smoke.",

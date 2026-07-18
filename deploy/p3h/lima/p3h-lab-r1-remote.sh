@@ -18,7 +18,6 @@ IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=3600
 IMAGE_BUILD_MAX_ATTEMPTS=2
 IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
 CURRENT_REMOTE_STEP=PRECONDITION
-EXPECTED_FAILURE_REASON=""
 
 blocked() {
   echo "P3H_REMOTE_STAGE: $1"
@@ -32,13 +31,8 @@ blocked() {
 
 unexpected_failure() {
   local exit_status=$?
-  local reason
   trap - ERR
-  case "${EXPECTED_FAILURE_REASON}" in
-    BLOCKED_[A-Z0-9_]*) reason="${EXPECTED_FAILURE_REASON}" ;;
-    *) reason="BLOCKED_UNEXPECTED_${CURRENT_REMOTE_STEP}" ;;
-  esac
-  echo "P3H_REMOTE_STAGE: ${reason}"
+  echo "P3H_REMOTE_STAGE: BLOCKED_UNEXPECTED_${CURRENT_REMOTE_STEP}"
   echo "P3H_REMOTE_EXECUTION_IMPLEMENTATION: BLOCKED_LOCAL_VM"
   echo "REAL_EXTERNAL_STAGING_STATUS: NOT_RUN"
   echo "P3H_RESULT: BLOCKED_LOCAL_VM_EVIDENCE"
@@ -47,6 +41,23 @@ unexpected_failure() {
   exit "${exit_status}"
 }
 trap unexpected_failure ERR
+
+run_checked_or_block() {
+  local reason="$1"
+  local check_status
+  shift
+  set +e
+  (
+    trap - ERR
+    set -euo pipefail
+    "$@"
+  )
+  check_status=$?
+  set -e
+  if [ "${check_status}" -ne 0 ]; then
+    blocked "${reason}"
+  fi
+}
 
 case "${SOURCE_HEAD}" in
   ''|*[!0-9a-f]*) blocked BLOCKED_SOURCE_HEAD ;;
@@ -721,9 +732,7 @@ case "${ACTION}" in
     printf '%s\n' "${SOURCE_HEAD}" | sudo tee "${STATE_ROOT}/source-head" >/dev/null
     sudo chmod 0600 "${STATE_ROOT}/database-fingerprint" "${STATE_ROOT}/source-head"
     CURRENT_REMOTE_STEP=INITIAL_HTTPS_SMOKE
-    EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_SMOKE
-    https_smoke V1
-    EXPECTED_FAILURE_REASON=""
+    run_checked_or_block BLOCKED_HTTPS_SMOKE https_smoke V1
 
     CURRENT_REMOTE_STEP=STEADY_STATE_RESTART
     sudo systemctl stop trade-model-p3h.service
@@ -739,9 +748,7 @@ case "${ACTION}" in
       blocked "BLOCKED_STEADY_FINGERPRINT_$(fingerprint_failure_reason "${fingerprint_status}")"
     fi
     CURRENT_REMOTE_STEP=BACKUP_RESTORE
-    EXPECTED_FAILURE_REASON=BLOCKED_BACKUP_RESTORE
-    backup_restore
-    EXPECTED_FAILURE_REASON=""
+    run_checked_or_block BLOCKED_BACKUP_RESTORE backup_restore
 
     echo "P3H_REMOTE_STAGE: INITIAL_DEPLOY_PASS"
     echo "APP_IMAGE_REVISION: ${SOURCE_HEAD}"
@@ -816,9 +823,8 @@ case "${ACTION}" in
 
     CURRENT_REMOTE_STEP=TLS_CREDENTIAL_ACTIVATION
     sudo systemctl stop trade-model-p3h.service
-    EXPECTED_FAILURE_REASON=BLOCKED_TLS_CREDENTIAL_ACTIVATION
-    activate_tls_v2_credentials
-    EXPECTED_FAILURE_REASON=""
+    run_checked_or_block BLOCKED_TLS_CREDENTIAL_ACTIVATION \
+      activate_tls_v2_credentials
     CURRENT_REMOTE_STEP=TLS_ROTATION
     install_unit STEADY_STATE_START V2 V2 V2
     sudo systemctl start trade-model-p3h.service
@@ -827,9 +833,7 @@ case "${ACTION}" in
     [ "${tls_v2_serial}" = "$(expected_certificate_serial v2)" ] \
       || blocked BLOCKED_TLS_V2_IDENTITY
     [ "${tls_v2_serial}" != "${tls_v1_serial}" ] || blocked BLOCKED_TLS_NOT_ROTATED
-    EXPECTED_FAILURE_REASON=BLOCKED_POST_ROTATION_SMOKE
-    https_smoke V2
-    EXPECTED_FAILURE_REASON=""
+    run_checked_or_block BLOCKED_POST_ROTATION_SMOKE https_smoke V2
 
     echo "P3H_REMOTE_STAGE: ROTATION_PASS"
     echo "ADMIN_SECRET_ROTATION: PASS_V2_ACTIVE_V1_DENIED"
@@ -873,9 +877,7 @@ case "${ACTION}" in
     fi
     [ "$(served_certificate_serial)" = "$(expected_certificate_serial v2)" ] \
       || blocked BLOCKED_TLS_AFTER_REBOOT
-    EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_AFTER_REBOOT
-    https_smoke V2
-    EXPECTED_FAILURE_REASON=""
+    run_checked_or_block BLOCKED_HTTPS_AFTER_REBOOT https_smoke V2
 
     CURRENT_REMOTE_STEP=POST_REBOOT_LEAK_SCAN
     leak_log="$(mktemp "${SERVICE_RUNTIME}/p3h-lab-journal.XXXXXX")"
