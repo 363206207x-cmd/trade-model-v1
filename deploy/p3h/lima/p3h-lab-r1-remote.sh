@@ -263,11 +263,11 @@ build_application_image() {
     *)
       if grep -Eqi '429|too many requests|toomanyrequests|rate.?limit' "${build_log}"; then
         IMAGE_BUILD_FAILURE_CATEGORY=RATE_LIMIT
-      elif grep -Eqi 'tls handshake timeout|i/o timeout|timed out|connection reset|unexpected eof|temporary failure|failed to do request|dial tcp|network is unreachable|connection refused|no such host|unable to resolve|failed to fetch anonymous token|context deadline exceeded' "${build_log}"; then
+      elif grep -Eqi 'tls handshake timeout|i/o timeout|timed out|connection reset|connection reset by peer|connection timed out|read timed out|unexpected eof|premature eof|unexpected end of stream|remote host terminated|temporary failure|failed to do request|dial tcp|network is unreachable|connection refused|no such host|unable to resolve|failed to fetch anonymous token|failed to fetch oauth token|could not transfer artifact|transfer failed|status code: 5[0-9][0-9]|502 bad gateway|503 service unavailable|504 gateway timeout|context deadline exceeded' "${build_log}"; then
         IMAGE_BUILD_FAILURE_CATEGORY=NETWORK
       elif grep -Eqi 'no space left on device|disk quota exceeded' "${build_log}"; then
         IMAGE_BUILD_FAILURE_CATEGORY=STORAGE
-      elif grep -Eqi 'build failure|compilation error|failed to execute goal|there are test failures' "${build_log}"; then
+      elif grep -Eqi 'build failure|compilation failure|compilation error|cannot find symbol|failed to execute goal|there are test failures|non-resolvable parent pom|could not resolve dependencies' "${build_log}"; then
         IMAGE_BUILD_FAILURE_CATEGORY=MAVEN
       else
         IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
@@ -298,7 +298,7 @@ pull_runtime_image() {
     *)
       if grep -Eqi '429|too many requests|toomanyrequests|rate.?limit' "${pull_log}"; then
         RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=RATE_LIMIT
-      elif grep -Eqi 'tls handshake timeout|i/o timeout|timed out|connection reset|unexpected eof|temporary failure|failed to do request|dial tcp|network is unreachable|connection refused|no such host|unable to resolve|failed to fetch anonymous token|context deadline exceeded' "${pull_log}"; then
+      elif grep -Eqi 'tls handshake timeout|i/o timeout|timed out|connection reset|connection reset by peer|connection timed out|read timed out|unexpected eof|premature eof|unexpected end of stream|remote host terminated|temporary failure|failed to do request|dial tcp|network is unreachable|connection refused|no such host|unable to resolve|failed to fetch anonymous token|failed to fetch oauth token|status code: 5[0-9][0-9]|502 bad gateway|503 service unavailable|504 gateway timeout|context deadline exceeded' "${pull_log}"; then
         RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=NETWORK
       elif grep -Eqi 'no space left on device|disk quota exceeded' "${pull_log}"; then
         RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=STORAGE
