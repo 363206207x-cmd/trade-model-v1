@@ -433,6 +433,15 @@ class ControlledStagingLocalLimaLabContractTest {
                 "detail=UNAUTHENTICATED_API", "detail=HTTP_REDIRECT",
                 "detail=UNKNOWN_HOST_REJECTION", "detail=TLS_1_2",
                 "detail=TLS_1_3", "detail=RATE_LIMIT", "detail=TEMP_CLEANUP");
+        assertThat(remote).contains(
+                "HTTPS_SMOKE_STEP_FILE=\"${SERVICE_RUNTIME}/p3h-lab-https-smoke-step\"",
+                "mark_https_smoke_step()",
+                "mark_https_smoke_step HEALTH",
+                "mark_https_smoke_step TLS_1_3",
+                "mark_https_smoke_step RATE_LIMIT",
+                "detail=\"${recorded_step}_EXIT_${check_status}\"",
+                "UNKNOWN_EXIT_${check_status}",
+                "rm -f \"${HTTPS_SMOKE_STEP_FILE}\"");
         assertThat(remote).doesNotContain(
                 "mktemp /run/p3h-lab-auth.",
                 "mktemp -d /run/p3h-lab-smoke.",

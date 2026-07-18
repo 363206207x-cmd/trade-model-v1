@@ -7,6 +7,7 @@ ROOT=/opt/trade-model-p3h/current
 STATE_ROOT=/var/lib/trade-model-p3h-lab1
 CREDENTIALS=/run/credentials/p3hlab1
 SERVICE_RUNTIME=/run/trade-model-p3h
+HTTPS_SMOKE_STEP_FILE="${SERVICE_RUNTIME}/p3h-lab-https-smoke-step"
 UNIT_TEMPLATE="${ROOT}/deploy/p3h/lima/trade-model-p3h-lab.service.template"
 UNIT_PATH=/etc/systemd/system/trade-model-p3h.service
 PROJECT=trade-model-p3h-lab1
@@ -68,6 +69,16 @@ checked_failure_reason() {
   local base_reason="$1"
   local check_status="$2"
   local detail=""
+  local recorded_step=""
+  if [ -f "${HTTPS_SMOKE_STEP_FILE}" ] \
+      && [ ! -L "${HTTPS_SMOKE_STEP_FILE}" ]; then
+    IFS= read -r recorded_step <"${HTTPS_SMOKE_STEP_FILE}" || recorded_step=""
+  fi
+  rm -f "${HTTPS_SMOKE_STEP_FILE}" >/dev/null 2>&1 || true
+  case "${recorded_step}" in
+    RUNTIME_DIRECTORY|AUTH_CONFIG|HEALTH|LIVENESS|READINESS|DASHBOARD_FETCH|REVIEW_FETCH|PROD_SMOKE_CONTRACT|DASHBOARD_SAFETY|UNAUTHENTICATED_API|HTTP_REDIRECT|UNKNOWN_HOST_REJECTION|TLS_1_2|TLS_1_3|RATE_LIMIT|TEMP_CLEANUP) ;;
+    *) recorded_step="" ;;
+  esac
   case "${base_reason}:${check_status}" in
     BLOCKED_HTTPS_SMOKE:*|BLOCKED_POST_ROTATION_SMOKE:*|BLOCKED_HTTPS_AFTER_REBOOT:*)
       case "${check_status}" in
@@ -87,7 +98,13 @@ checked_failure_reason() {
         74) detail=TLS_1_3 ;;
         75) detail=RATE_LIMIT ;;
         76) detail=TEMP_CLEANUP ;;
-        *) detail=UNKNOWN ;;
+        *)
+          if [ -n "${recorded_step}" ]; then
+            detail="${recorded_step}_EXIT_${check_status}"
+          else
+            detail="UNKNOWN_EXIT_${check_status}"
+          fi
+          ;;
       esac
       ;;
   esac
@@ -96,6 +113,17 @@ checked_failure_reason() {
   else
     echo "${base_reason}"
   fi
+}
+
+mark_https_smoke_step() {
+  local step="$1"
+  case "${step}" in
+    RUNTIME_DIRECTORY|AUTH_CONFIG|HEALTH|LIVENESS|READINESS|DASHBOARD_FETCH|REVIEW_FETCH|PROD_SMOKE_CONTRACT|DASHBOARD_SAFETY|UNAUTHENTICATED_API|HTTP_REDIRECT|UNKNOWN_HOST_REJECTION|TLS_1_2|TLS_1_3|RATE_LIMIT|TEMP_CLEANUP) ;;
+    *) return 1 ;;
+  esac
+  [ ! -L "${HTTPS_SMOKE_STEP_FILE}" ] || return 1
+  printf '%s\n' "${step}" >"${HTTPS_SMOKE_STEP_FILE}" || return 1
+  chmod 600 "${HTTPS_SMOKE_STEP_FILE}" || return 1
 }
 
 case "${SOURCE_HEAD}" in
@@ -577,11 +605,13 @@ https_smoke() {
   local admin_version="$1"
   local response_dir config_file unauthenticated_code redirect_headers unknown_code rate_code
   [ -d "${SERVICE_RUNTIME}" ] && [ ! -L "${SERVICE_RUNTIME}" ] || return 61
+  mark_https_smoke_step RUNTIME_DIRECTORY || return 61
   response_dir="$(mktemp -d "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX")" \
     || return 61
   trap 'rm -rf "${response_dir}"' EXIT
   config_file="${response_dir}/curl-auth.conf"
   chmod 700 "${response_dir}" || return 61
+  mark_https_smoke_step AUTH_CONFIG || return 62
   if ! {
     echo 'silent'
     echo 'show-error'
@@ -595,34 +625,41 @@ https_smoke() {
   fi
   chmod 600 "${config_file}" || return 62
 
+  mark_https_smoke_step HEALTH || return 63
   curl --silent --show-error --max-time 20 \
     --cacert "${CREDENTIALS}/tls_ca_certificate" \
     --resolve "${HOSTNAME}:443:127.0.0.1" \
     "https://${HOSTNAME}/actuator/health" >"${response_dir}/health.json" \
     || return 63
+  mark_https_smoke_step LIVENESS || return 64
   curl --silent --show-error --max-time 20 \
     --cacert "${CREDENTIALS}/tls_ca_certificate" \
     --resolve "${HOSTNAME}:443:127.0.0.1" \
     "https://${HOSTNAME}/actuator/health/liveness" >"${response_dir}/liveness.json" \
     || return 64
+  mark_https_smoke_step READINESS || return 65
   curl --silent --show-error --max-time 20 \
     --cacert "${CREDENTIALS}/tls_ca_certificate" \
     --resolve "${HOSTNAME}:443:127.0.0.1" \
     "https://${HOSTNAME}/actuator/health/readiness" >"${response_dir}/readiness.json" \
     || return 65
+  mark_https_smoke_step DASHBOARD_FETCH || return 66
   curl --config "${config_file}" \
     "https://${HOSTNAME}/api/dashboard/home" >"${response_dir}/dashboard.json" \
     || return 66
+  mark_https_smoke_step REVIEW_FETCH || return 67
   curl --config "${config_file}" \
     "https://${HOSTNAME}/api/review/center" >"${response_dir}/review.json" \
     || return 67
 
+  mark_https_smoke_step PROD_SMOKE_CONTRACT || return 68
   SMOKE_PHASE=VALIDATE \
   SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE \
   SMOKE_RESPONSE_DIR="${response_dir}" \
   SMOKE_ALLOW_EXTERNAL_CALLS=false \
     bash "${ROOT}/scripts/prod-smoke.sh" >/dev/null || return 68
 
+  mark_https_smoke_step DASHBOARD_SAFETY || return 69
   python3 - "${response_dir}/dashboard.json" <<'PY' || return 69
 import json
 import sys
@@ -637,6 +674,7 @@ if safety.get("notAutoTrading") is not True or safety.get("notOrderExecution") i
     raise SystemExit(2)
 PY
 
+  mark_https_smoke_step UNAUTHENTICATED_API || return 70
   if ! unauthenticated_code="$(curl --silent --show-error --max-time 20 \
       --cacert "${CREDENTIALS}/tls_ca_certificate" \
       --resolve "${HOSTNAME}:443:127.0.0.1" --output /dev/null \
@@ -645,6 +683,7 @@ PY
   fi
   case "${unauthenticated_code}" in 401|403) ;; *) return 70 ;; esac
 
+  mark_https_smoke_step HTTP_REDIRECT || return 71
   redirect_headers="${response_dir}/redirect.headers"
   curl --silent --show-error --max-time 20 --output /dev/null \
     --dump-header "${redirect_headers}" -H "Host: ${HOSTNAME}" \
@@ -652,21 +691,25 @@ PY
   grep -Eiq "^Location: https://${HOSTNAME}/actuator/health\r?$" \
     "${redirect_headers}" || return 71
 
+  mark_https_smoke_step UNKNOWN_HOST_REJECTION || return 72
   unknown_code="$(curl --silent --max-time 10 --output /dev/null \
     --write-out '%{http_code}' -H 'Host: unapproved.invalid' \
     http://127.0.0.1/ || true)"
   [ "${unknown_code}" != 200 ] && [ "${unknown_code}" != 308 ] \
     || return 72
 
+  mark_https_smoke_step TLS_1_2 || return 73
   openssl s_client -connect 127.0.0.1:443 -servername "${HOSTNAME}" \
     -CAfile "${CREDENTIALS}/tls_ca_certificate" -verify_hostname "${HOSTNAME}" \
     -verify_return_error -tls1_2 </dev/null >/dev/null 2>&1 || return 73
+  mark_https_smoke_step TLS_1_3 || return 74
   if openssl s_client -help 2>&1 | grep -q -- -tls1_3; then
     openssl s_client -connect 127.0.0.1:443 -servername "${HOSTNAME}" \
       -CAfile "${CREDENTIALS}/tls_ca_certificate" -verify_hostname "${HOSTNAME}" \
       -verify_return_error -tls1_3 </dev/null >/dev/null 2>&1 || return 74
   fi
 
+  mark_https_smoke_step RATE_LIMIT || return 75
   : >"${response_dir}/rate-codes" || return 75
   for request_index in $(seq 1 140); do
     if ! rate_code="$(curl --config "${config_file}" --output /dev/null \
@@ -677,7 +720,9 @@ PY
     printf '%s\n' "${rate_code}" >>"${response_dir}/rate-codes" || return 75
   done
   grep -Fxq 429 "${response_dir}/rate-codes" || return 75
+  mark_https_smoke_step TEMP_CLEANUP || return 76
   rm -rf "${response_dir}" || return 76
+  rm -f "${HTTPS_SMOKE_STEP_FILE}" || return 76
   trap - EXIT
 }
 
