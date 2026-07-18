@@ -866,6 +866,17 @@ gate remained unrun. Cleanup passed, the authorized attempt was consumed, and
 no second attempt ran. This evidence does not change real staging, P4, or
 production readiness.
 
+Round 2 commit `1fc22e6c` introduces explicit byte-safe stdin transport and
+exact preflight, per-action, and final evidence parsers. The single authorized
+Round 2 run passed minimal VM startup, guest Docker provisioning, all 17 local
+inputs, and exact remote-preflight validation. It stopped before source upload
+at `EXACT_SOURCE_ARCHIVE` because macOS Bash 3.2 rejected expansion of an empty
+optional supervisor-stdin array under nounset. The local dispatch defect is now
+fixed and covered by an executable production-function regression, but no
+second run was made. Cleanup passed. No image-build, deployment, Flyway,
+backup/restore, rotation, reboot, external-staging, P4, or production-readiness
+PASS is inferred from that blocked run.
+
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
 non-production Linux server, use full `FETCH_AND_VALIDATE` HTTPS smoke, restore
@@ -880,9 +891,9 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H-LAB1 Round 2 Re-review, preserving the distinction
-   between guard PASS, bootstrap PASS, blocked remote preflight, local template
-   PASS, and missing real-staging evidence.
+1. Complete Reviewer P3-H-LAB1 Round 3 Re-review, preserving the distinction
+   between offline exact-contract PASS, bootstrap/preflight PASS, the blocked
+   pre-source-upload run, local template PASS, and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.
 3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,

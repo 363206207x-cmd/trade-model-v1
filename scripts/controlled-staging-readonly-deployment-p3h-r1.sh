@@ -52,15 +52,16 @@ blocked() {
 run_bounded_process() {
   local timeout_seconds="$1"
   local operation_class="$2"
-  local -a supervisor_stdin_args=()
+  local supervisor_stdin_file=""
+  local -a supervisor_command
   local bounded_status
   shift 2
   if [ "${1:-}" = --stdin-file ]; then
     [ "$#" -ge 2 ] || return 2
-    supervisor_stdin_args=(--stdin-file "$2")
+    supervisor_stdin_file="$2"
     shift 2
   fi
-  python3 "${BOUNDED_PROCESS_RUNNER}" \
+  supervisor_command=(python3 "${BOUNDED_PROCESS_RUNNER}" \
     --timeout-seconds "${timeout_seconds}" \
     --global-start-epoch "${RUN_START_EPOCH}" \
     --global-timeout-seconds "${GLOBAL_TIMEOUT_SECONDS}" \
@@ -68,9 +69,12 @@ run_bounded_process() {
     --operation-class "${operation_class}" \
     --poll-seconds "${POLL_INTERVAL_SECONDS}" \
     --heartbeat-seconds "${HEARTBEAT_INTERVAL_SECONDS}" \
-    --term-grace-seconds "${TERM_GRACE_SECONDS}" \
-    "${supervisor_stdin_args[@]}" \
-    -- "$@" &
+    --term-grace-seconds "${TERM_GRACE_SECONDS}")
+  if [ -n "${supervisor_stdin_file}" ]; then
+    supervisor_command+=(--stdin-file "${supervisor_stdin_file}")
+  fi
+  supervisor_command+=(-- "$@")
+  "${supervisor_command[@]}" &
   ACTIVE_BOUNDED_RUNNER_PID="$!"
   if wait "${ACTIVE_BOUNDED_RUNNER_PID}"; then
     ACTIVE_BOUNDED_RUNNER_PID=""

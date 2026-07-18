@@ -21,6 +21,9 @@ class P3hRemoteEvidenceTransportContractTest {
 
     private static final Path BOUNDED_RUNNER = Path.of("scripts/p3h-bounded-process.py")
             .toAbsolutePath();
+    private static final Path R1_RUNNER =
+            Path.of("scripts/controlled-staging-readonly-deployment-p3h-r1.sh")
+                    .toAbsolutePath();
     private static final String SOURCE_HEAD = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static final String ARCHIVE_SHA =
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -183,6 +186,43 @@ class P3hRemoteEvidenceTransportContractTest {
         assertThat(result.exitCode()).isEqualTo(124);
         long pid = Long.parseLong(Files.readString(childPid).trim());
         assertEventuallyStopped(pid);
+    }
+
+    @Test
+    void boundedRunnerShellFunctionsHandleOptionalStdinUnderNounset() throws Exception {
+        String productionScript = Files.readString(R1_RUNNER);
+        String runtimeStart = "\ncase \"${P3H_TARGET_CLASS:-}\" in\n";
+        int runtimeStartIndex = productionScript.indexOf(runtimeStart);
+        assertThat(runtimeStartIndex).isPositive();
+
+        Path stdin = write("shell-function-stdin", """
+                set -euo pipefail
+                test "$1" = arg1
+                printf '%s\n' 'WITH_STDIN_SUPERVISOR: PASS'
+                """);
+        Path harness = executable("bounded-shell-functions",
+                productionScript.substring(0, runtimeStartIndex) + """
+
+                        BOUNDED_PROCESS_RUNNER="$1"
+                        CURRENT_STAGE=optional-stdin-regression
+                        RUN_START_EPOCH="$(date +%s)"
+                        GLOBAL_TIMEOUT_SECONDS=30
+                        POLL_INTERVAL_SECONDS=1
+                        HEARTBEAT_INTERVAL_SECONDS=60
+                        TERM_GRACE_SECONDS=1
+                        run_bounded_process 5 NO_STDIN \
+                          bash -c 'printf "%s\\n" "NO_STDIN_SUPERVISOR: PASS"'
+                        run_bounded_with_stdin 5 WITH_STDIN "$2" bash -s -- arg1
+                        """);
+
+        ScriptResult result = finish(new ProcessBuilder(
+                "bash", harness.toString(), BOUNDED_RUNNER.toString(), stdin.toString())
+                .redirectErrorStream(true).start(), Duration.ofSeconds(15));
+
+        assertThat(result.exitCode()).as(result.output()).isZero();
+        assertThat(result.output()).contains(
+                "NO_STDIN_SUPERVISOR: PASS",
+                "WITH_STDIN_SUPERVISOR: PASS");
     }
 
     @Test

@@ -7,8 +7,8 @@ Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Current Work Package: P3-H-LAB1 Bounded Local Linux VM and Remote Execution Evidence
-Next Business Phase: Reviewer P3-H-LAB1 Round 2 Re-review; P4 remains blocked
-Next Business Phase Allowed: NO while PR #1130 is unmerged, LAB1 is blocked at remote preflight, and controlled staging inputs are missing; NO for P4 and production deployment
+Next Business Phase: Reviewer P3-H-LAB1 Round 3 Re-review; P4 remains blocked
+Next Business Phase Allowed: NO while PR #1130 is unmerged, the Round 2 1_OF_1 LAB run is blocked before source upload, and real staging is not run; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -78,6 +78,17 @@ all later deployment gates were not run. Exact cleanup again removed the LAB
 VM, LAB files, and dedicated NTP service. The authorized attempt is consumed,
 no second attempt ran, real external staging remains `NOT_RUN`, and P3-H
 remains `NOT_COMPLETE`.
+
+Round 2 commit `1fc22e6c` adds explicit byte-safe stdin transport and exact
+preflight, per-action, and final evidence contracts. Its one authorized run
+passed minimal VM startup, 1,212-second guest provisioning, `17_OF_17_READY`,
+and the exact remote-preflight validator. It then stopped at
+`EXACT_SOURCE_ARCHIVE` before upload because the first no-stdin bounded command
+hit a macOS Bash 3.2 empty optional-array/nounset defect. Cleanup passed. The
+dispatch defect is corrected and executable-tested offline, but the consumed
+authorization was not reused. Image build, deployment, Flyway, backup/restore,
+rotation, reboot, real staging, P4, and production readiness therefore remain
+unproven or blocked.
 
 ---
 
@@ -850,9 +861,9 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 Only the following work is allowed under the current P3-H-LAB1 closure:
 
-1. Perform Reviewer P3-H-LAB1 Round 2 Re-review.
-2. Keep bootstrap PASS distinct from the blocked R1 remote-preflight evidence
-   and from real server execution.
+1. Perform Reviewer P3-H-LAB1 Round 3 Re-review.
+2. Keep offline contract and bootstrap/preflight PASS distinct from the blocked
+   pre-source-upload R1 evidence and from real server execution.
 3. Retain existing P3/P3-G/P3-H safety and recovery tooling.
 4. Keep P4 and production deployment blocked.
 5. Run a later controlled server package only with complete explicit
@@ -1125,5 +1136,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; Round 1 bootstrap PASS and blocked remote-preflight evidence pending re-review
+- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; Round 2 exact contracts and truthful blocked pre-source-upload evidence pending Round 3 re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

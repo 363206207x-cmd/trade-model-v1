@@ -321,6 +321,90 @@ to bootstrap and its local input preparation. They do not promote remote
 preflight, deployment, Flyway, backup/restore, rotation, reboot, P3-H, P4, or
 production readiness.
 
+## Reviewer Round 2 Authorized Attempt
+
+Commit `1fc22e6c6c8b170353754fdd27a21969a3dd2f12` adds an explicit
+bounded-supervisor stdin-file contract and exact fail-closed parsers for remote
+preflight, every remote action, and the final evidence bundle. Executable
+fixtures prove byte-for-byte stdin transport, process-group timeout behavior,
+and rejection of missing, duplicate, unknown, malformed, control-character,
+and oversized evidence. No parser silently removes unknown evidence before
+claiming PASS.
+
+The one Round 2 authorized attempt started from zero LAB processes, VM, root,
+NTP job, containers, network, and volumes. Minimal VM startup passed in 60
+seconds. Guest package and Docker provisioning passed in 1,212 seconds, and
+bootstrap reached `17_OF_17_READY`. R1 started and advanced through the exact
+remote-preflight validator. It then failed before source archive upload because
+macOS Bash 3.2 treats expansion of an empty optional array as unbound under
+`set -u`. This affected the first bounded command that intentionally had no
+stdin file; it was a local supervisor dispatch defect, not a remote action
+failure.
+
+The defect was corrected offline by building one always-nonempty supervisor
+command array and conditionally appending `--stdin-file`. A production-function
+regression now executes both no-stdin and explicit-stdin calls under nounset.
+That correction was not used to rerun the LAB: the Round 2 authorization was
+already consumed, and no second attempt was made. Consequently no source
+upload, image build, runtime image pull, initial deployment, Flyway,
+backup/restore, rotation, or reboot result is represented as PASS.
+
+`ROUND2_REVIEWER_AUTHORIZED_ATTEMPT_USED: 1_OF_1`
+
+`SECOND_ATTEMPT: NO`
+
+`MINIMAL_VM_START: PASS`
+
+`GUEST_PACKAGE_AND_DOCKER_PROVISION: PASS`
+
+`GUEST_PROVISION_ELAPSED_SECONDS: 1212`
+
+`P3H_LAB_INPUT_STATUS: 17_OF_17_READY`
+
+`R1_PROCESS_STARTED: YES`
+
+`REMOTE_PREFLIGHT_RUNTIME_STATUS: PASS_EXACT_BEFORE_LOCAL_DISPATCH_BLOCK`
+
+`R1_RESULT: BLOCKED`
+
+`BLOCKED_STAGE: EXACT_SOURCE_ARCHIVE`
+
+`BLOCKED_REASON: BLOCKED_LOCAL_SUPERVISOR_OPTIONAL_STDIN_DISPATCH`
+
+`APPLICATION_IMAGE_BUILD: NOT_RUN`
+
+`INITIAL_DEPLOY: NOT_RUN`
+
+`BACKUP_RESTORE: NOT_RUN`
+
+`SECRET_ROTATION: NOT_RUN`
+
+`VM_REBOOT: NOT_RUN`
+
+`LAB_VM_CLEANUP: PASS`
+
+`LAB_DOCKER_CLEANUP: PASS`
+
+`LAB_SECRET_CLEANUP: PASS`
+
+`RESOURCE_CLEANUP: PASS`
+
+`RAW_LOGS_EXPOSED: NO`
+
+`REAL_EXTERNAL_STAGING_STATUS: NOT_RUN`
+
+`P3H_RESULT: NOT_COMPLETE`
+
+`P4_ALLOWED: NO`
+
+`PRODUCTION_READINESS: BLOCKED`
+
+Post-cleanup verification found zero R1 processes, no LAB VM, no LAB root, and
+no dedicated LAB NTP service. The local sanitized-evidence directory is not a
+runtime resource or secret store; inspection was limited to file names, sizes,
+and permissions and found only mode-0600 sanitized failure summaries and their
+SHA-256 files. No raw remote output was read or retained.
+
 ## Safety Boundary
 
 The application keeps providers, AI, schedulers, Push, Telegram, webhook,
