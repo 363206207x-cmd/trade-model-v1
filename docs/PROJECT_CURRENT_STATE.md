@@ -7,8 +7,8 @@ Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Current Work Package: P3-H-LAB1 Bounded Local Linux VM and Remote Execution Evidence
-Next Business Phase: Reviewer P3-H-LAB1 Timeout and Remote Execution Evidence Review; P4 remains blocked
-Next Business Phase Allowed: NO while PR #1130 is unmerged, LAB1 is blocked before R1, and controlled staging inputs are missing; NO for P4 and production deployment
+Next Business Phase: Reviewer P3-H-LAB1 Round 2 Re-review; P4 remains blocked
+Next Business Phase Allowed: NO while PR #1130 is unmerged, LAB1 is blocked at remote preflight, and controlled staging inputs are missing; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -66,11 +66,18 @@ independent stage limits, exact process-group TERM/KILL handling, bounded
 preflight, 60-second sanitized heartbeats, and a 15-minute Docker no-progress
 limit with no automatic retry.
 
-The one authorized clean attempt from commit `9223f8d6` was blocked during
-fresh Lima startup as `BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE` after about 15
-minutes. R1 never started; no deployment stage is PASS. Exact cleanup removed
-the LAB VM, LAB files, and dedicated NTP service. A second attempt was not run,
-real external staging remains `NOT_RUN`, and P3-H remains `NOT_COMPLETE`.
+The earlier clean attempt from commit `9223f8d6` was blocked during fresh Lima
+startup as `BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE`; it remains historical
+blocked evidence. Round 1 commit `4ee04d8c` separates the 20-minute minimal VM
+start from the 30-minute guest Docker provision, supervises complete process
+trees and cleanup, bounds progress probes, and safely escapes `.pgpass`. Its one
+newly authorized run passed both bootstrap stages and reached
+`17_OF_17_READY`. R1 started, then failed closed at `REMOTE_PREFLIGHT` because
+the sanitized evidence was unsafe or incomplete. Application image build and
+all later deployment gates were not run. Exact cleanup again removed the LAB
+VM, LAB files, and dedicated NTP service. The authorized attempt is consumed,
+no second attempt ran, real external staging remains `NOT_RUN`, and P3-H
+remains `NOT_COMPLETE`.
 
 ---
 
@@ -843,8 +850,9 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 Only the following work is allowed under the current P3-H-LAB1 closure:
 
-1. Perform Reviewer P3-H-LAB1 Timeout and Remote Execution Evidence Review.
-2. Keep the blocked VM bootstrap distinct from R1 or real server execution.
+1. Perform Reviewer P3-H-LAB1 Round 2 Re-review.
+2. Keep bootstrap PASS distinct from the blocked R1 remote-preflight evidence
+   and from real server execution.
 3. Retain existing P3/P3-G/P3-H safety and recovery tooling.
 4. Keep P4 and production deployment blocked.
 5. Run a later controlled server package only with complete explicit
@@ -1117,5 +1125,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; bounded execution and blocked bootstrap evidence pending review
+- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; Round 1 bootstrap PASS and blocked remote-preflight evidence pending re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

@@ -853,10 +853,18 @@ was explicitly aborted and classified at `APPLICATION_IMAGE_BUILD`; it is not
 a PASS. The hardened route enforces a 180-minute R1 ceiling, bounded stages,
 exact process-group TERM/KILL cleanup, 60-second sanitized heartbeats, build
 preflight, a 15-minute Docker no-progress limit, and zero automatic retries.
-The single clean attempt at commit `9223f8d6` stopped at the bounded Lima
+The earlier clean attempt at commit `9223f8d6` stopped at the bounded Lima
 startup limit with `BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE`. R1 did not start,
-cleanup passed, and no second attempt ran. This evidence does not change real
-staging, P4, or production readiness.
+cleanup passed, and it remains historical blocked evidence. Round 1 commit
+`4ee04d8c` separates minimal VM start from guest Docker provisioning, adds a
+complete-process-tree supervisor, hard-bounded cleanup and progress probes,
+and shared libpq `.pgpass` escaping. The one newly authorized run passed both
+bootstrap stages, reached `17_OF_17_READY`, and started R1. Sanitized
+remote-preflight evidence then failed closed as
+`BLOCKED_REMOTE_PREFLIGHT_EVIDENCE`; application image build and every later R1
+gate remained unrun. Cleanup passed, the authorized attempt was consumed, and
+no second attempt ran. This evidence does not change real staging, P4, or
+production readiness.
 
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
@@ -872,9 +880,9 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H-LAB1 Timeout and Remote Execution Evidence Review,
-   preserving the distinction between guard PASS, blocked bootstrap, local
-   template PASS, and missing real-staging evidence.
+1. Complete Reviewer P3-H-LAB1 Round 2 Re-review, preserving the distinction
+   between guard PASS, bootstrap PASS, blocked remote preflight, local template
+   PASS, and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.
 3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,

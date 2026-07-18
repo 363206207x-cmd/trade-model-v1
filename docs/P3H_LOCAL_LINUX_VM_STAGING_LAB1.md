@@ -33,8 +33,13 @@ The VM contract uses Lima's official Debian 12 template with 4 CPUs, 8 GiB
 memory, 40 GiB disk, and systemd. Rootful Docker Engine and Docker Compose v2
 come from Docker's official Debian repository. The VM also requires OpenSSH,
 UTC, and synchronized time.
-Bootstrap has a 20-minute hard bound and uses 15-second polling. Failure invokes
-ownership-checked LAB1 cleanup rather than leaving a partial VM.
+Bootstrap starts only the minimal Linux VM under a 20-minute bound. Lima's
+internal limit is 21 minutes, so it cannot preempt that external contract.
+Package and Docker installation then runs once in a separate, sanitized
+`GUEST_PACKAGE_AND_DOCKER_PROVISION` stage with a 30-minute bound. The complete
+bootstrap process tree has a 60-minute hard limit and uses 15-second polling.
+Failure invokes ownership-checked LAB1 cleanup rather than leaving a partial
+VM.
 Remote-stage failures preserve only an enumerated failure reason and a SHA-256
 of the repository-external sanitized failure summary; raw stage output remains
 temporary and is removed during cleanup.
@@ -53,8 +58,10 @@ waits at most 15 seconds, then sends KILL to that exact group. The runner polls
 every 15 seconds and emits a sanitized heartbeat every 60 seconds.
 
 Image construction and pulls fingerprint the target image, Docker storage,
-BuildKit storage, and containerd storage. Fifteen minutes without a fingerprint
-change returns `BLOCKED_NO_PROGRESS_TIMEOUT` and triggers scoped cleanup. The
+BuildKit storage, and containerd storage. Every progress probe has its own
+five-second TERM/KILL bound. Failed or timed-out probes never reset the progress
+clock. Fifteen minutes without a successful fingerprint change returns
+`BLOCKED_NO_PROGRESS_TIMEOUT` and triggers scoped cleanup. The
 temporary build output is deleted and is never emitted or preserved as
 evidence. Before image construction, a bounded preflight requires at least
 4096 MiB available memory, 15 GiB available disk, an active Docker daemon, DNS,
@@ -102,7 +109,9 @@ credential files. The credential holder and application service use
 `LoadCredentialEncrypted=`; runtime files are mounted by systemd under
 `/run/credentials`. Compose receives Secret file paths, never Secret values.
 Official backup and restore scripts support password-file input and create a
-private temporary `PGPASSFILE`; R1 does not place passwords in Docker
+private temporary `PGPASSFILE`. All five libpq fields escape colon and
+backslash, and password files reject empty, embedded CR/LF, symlink, directory,
+ownership, and permission violations. R1 does not place passwords in Docker
 environment values, command arguments, image layers, logs, or evidence.
 
 TLS verification uses the generated CA and the approved hostname. `curl -k`,
@@ -178,7 +187,7 @@ already destroyed the VM. No values are fabricated.
 
 `UNRELATED_RESOURCES_TOUCHED: NO`
 
-## Evidence Status
+## Historical Bounded Bootstrap Evidence
 
 The timeout and no-progress contract is implemented and its offline contract
 tests pass. Commit `9223f8d6a00935391cd1415944ae5b962f23c1b1` was then used
@@ -230,6 +239,87 @@ no LAB root, and no dedicated LAB NTP service. Because the VM was destroyed,
 its LAB-scoped containers, network, volumes, identity, certificates, generated
 credentials, and attestations are absent. No unrelated resource was selected
 for cleanup.
+
+## Reviewer Round 1 Authorized Attempt
+
+Commit `4ee04d8cc58026b5bd2b7a8fde058ed00e1c5557` contains the Round 1
+bootstrap, timeout, cleanup, progress-probe, and `.pgpass` integrity fixes. Its
+offline process-tree tests prove that a direct child and descendants are
+terminated at the global deadline, TERM escalates to KILL after a finite grace
+period, unrelated process groups are preserved, hanging cleanup is bounded,
+and hanging progress probes cannot suppress the no-progress or global limit.
+The exact Head passed local tests, workflow contract, Lima validation, GitHub
+CI, and the canonical-path delivery check. The isolated-worktree delivery check
+returned `WRONG_PROJECT_PATH` as expected; it is not represented as a second
+delivery PASS or failure.
+
+The one newly authorized clean run started from zero LAB processes, no LAB VM,
+no LAB root, no LAB NTP job, and no LAB containers, network, or volumes. Minimal
+VM startup passed. The independent package and Docker stage passed in 844
+seconds, and bootstrap reached `17_OF_17_READY`. R1 then started, but the
+sanitized remote-preflight evidence was classified
+`P3H_EVIDENCE_REDACTION: BLOCKED_UNSAFE_OR_INCOMPLETE`. The runner failed closed
+as `BLOCKED_REMOTE_PREFLIGHT_EVIDENCE` before application image construction.
+Raw preflight output was neither emitted nor retained, so no narrower reason is
+invented. No second attempt ran.
+
+`REVIEWER_AUTHORIZED_ATTEMPT_USED: 1_OF_1`
+
+`SECOND_ATTEMPT: NO`
+
+`MINIMAL_VM_START: PASS`
+
+`GUEST_PACKAGE_AND_DOCKER_PROVISION: PASS`
+
+`GUEST_PROVISION_ELAPSED_SECONDS: 844`
+
+`P3H_LAB_INPUT_STATUS: 17_OF_17_READY`
+
+`R1_PROCESS_STARTED: YES`
+
+`R1_RESULT: BLOCKED`
+
+`BLOCKED_STAGE: REMOTE_PREFLIGHT`
+
+`BLOCKED_REASON: BLOCKED_REMOTE_PREFLIGHT_EVIDENCE`
+
+`STAGE_ELAPSED_MINUTES: 1`
+
+`GLOBAL_ELAPSED_MINUTES: 1`
+
+`GLOBAL_TIMEOUT_TRIGGERED: NO`
+
+`NO_PROGRESS_TIMEOUT_TRIGGERED: NO`
+
+`APPLICATION_IMAGE_BUILD: NOT_RUN`
+
+`REMOTE_EXECUTION_STATUS: BLOCKED_REMOTE_PREFLIGHT_EVIDENCE`
+
+`VM_REBOOT: NOT_RUN`
+
+`LAB_VM_CLEANUP: PASS`
+
+`LAB_DOCKER_CLEANUP: PASS`
+
+`LAB_SECRET_CLEANUP: PASS`
+
+`RESOURCE_CLEANUP: PASS`
+
+`RAW_LOGS_EXPOSED: NO`
+
+`REAL_EXTERNAL_STAGING_STATUS: NOT_RUN`
+
+`P3H_RESULT: NOT_COMPLETE`
+
+`P4_ALLOWED: NO`
+
+`PRODUCTION_READINESS: BLOCKED`
+
+Post-cleanup verification again found zero R1/bootstrap processes, no LAB VM,
+no LAB root, and no dedicated LAB NTP service. The PASS labels above apply only
+to bootstrap and its local input preparation. They do not promote remote
+preflight, deployment, Flyway, backup/restore, rotation, reboot, P3-H, P4, or
+production readiness.
 
 ## Safety Boundary
 
