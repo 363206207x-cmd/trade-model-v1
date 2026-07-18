@@ -19,6 +19,13 @@ SEAL_UNIT="${ROOT_DIR}/deploy/p3h/lima/p3h-lab-credential-seal.service"
 TEMP_ROOT=""
 BOOTSTRAP_COMPLETE=0
 CURRENT_STAGE=precheck
+RUN_START_EPOCH="$(date +%s)"
+BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS=1200
+BOUNDED_PROCESS_RUNNER="${ROOT_DIR}/scripts/p3h-bounded-process.py"
+BOOTSTRAP_WATCHDOG_PID=""
+ACTIVE_BOUNDED_RUNNER_PID=""
+BOOTSTRAP_MAIN_PID="$$"
+BOOTSTRAP_TIMEOUT_MARKER="/private/tmp/trade-model-p3h-lab1-bootstrap-timeout.$$"
 
 blocked() {
   echo "P3H_LAB_BOOTSTRAP: $1"
@@ -31,7 +38,17 @@ blocked() {
 
 cleanup() {
   local exit_status=$?
+  set +e
   trap - EXIT
+  trap - TERM INT
+  if [ -n "${BOOTSTRAP_WATCHDOG_PID}" ]; then
+    kill "${BOOTSTRAP_WATCHDOG_PID}" >/dev/null 2>&1 || true
+    wait "${BOOTSTRAP_WATCHDOG_PID}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${ACTIVE_BOUNDED_RUNNER_PID}" ]; then
+    kill -TERM "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
+    wait "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
+  fi
   if [ -n "${TEMP_ROOT}" ] && [ -d "${TEMP_ROOT}" ]; then
     rm -rf "${TEMP_ROOT}"
   fi
@@ -41,9 +58,36 @@ cleanup() {
     P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1 \
       bash "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" >/dev/null 2>&1 || true
   fi
+  rm -f "${BOOTSTRAP_TIMEOUT_MARKER}"
   exit "${exit_status}"
 }
 trap cleanup EXIT
+
+bootstrap_watchdog() {
+  while kill -0 "${BOOTSTRAP_MAIN_PID}" >/dev/null 2>&1; do
+    if [ $(( $(date +%s) - RUN_START_EPOCH )) \
+        -ge "${BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS}" ]; then
+      : >"${BOOTSTRAP_TIMEOUT_MARKER}"
+      kill -TERM "${BOOTSTRAP_MAIN_PID}" >/dev/null 2>&1 || true
+      return
+    fi
+    sleep 15
+  done
+}
+
+handle_bootstrap_termination() {
+  trap - TERM INT
+  if [ -f "${BOOTSTRAP_TIMEOUT_MARKER}" ]; then
+    echo "P3H_LAB_BOOTSTRAP: BLOCKED_GLOBAL_TIMEOUT" >&2
+  else
+    echo "P3H_LAB_BOOTSTRAP: BLOCKED_OPERATOR_TERMINATION" >&2
+  fi
+  if [ -n "${ACTIVE_BOUNDED_RUNNER_PID}" ]; then
+    kill -TERM "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
+  fi
+  exit 143
+}
+trap handle_bootstrap_termination TERM INT
 
 report_error() {
   local exit_status=$?
@@ -52,28 +96,31 @@ report_error() {
 }
 trap report_error ERR
 
-wait_for_bounded_pid() {
-  local command_pid="$1"
-  local timeout_seconds="$2"
-  local elapsed=0
-  while kill -0 "${command_pid}" >/dev/null 2>&1 \
-      && [ "${elapsed}" -lt "${timeout_seconds}" ]; do
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
-  if kill -0 "${command_pid}" >/dev/null 2>&1; then
-    kill "${command_pid}" >/dev/null 2>&1 || true
-    wait "${command_pid}" >/dev/null 2>&1 || true
-    return 124
-  fi
-  wait "${command_pid}"
-}
-
 run_bounded() {
   local timeout_seconds="$1"
-  shift
-  "$@" &
-  wait_for_bounded_pid "$!" "${timeout_seconds}"
+  local stage="$2"
+  local operation_class="$3"
+  local bounded_status
+  shift 3
+  python3 "${BOUNDED_PROCESS_RUNNER}" \
+    --timeout-seconds "${timeout_seconds}" \
+    --global-start-epoch "${RUN_START_EPOCH}" \
+    --global-timeout-seconds "${BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS}" \
+    --stage "${stage}" \
+    --operation-class "${operation_class}" \
+    --poll-seconds 15 \
+    --heartbeat-seconds 60 \
+    --term-grace-seconds 15 \
+    -- "$@" &
+  ACTIVE_BOUNDED_RUNNER_PID="$!"
+  if wait "${ACTIVE_BOUNDED_RUNNER_PID}"; then
+    ACTIVE_BOUNDED_RUNNER_PID=""
+    return 0
+  else
+    bounded_status=$?
+  fi
+  ACTIVE_BOUNDED_RUNNER_PID=""
+  return "${bounded_status}"
 }
 
 if [ "${P3H_LAB_CONFIRM:-}" != "${EXPECTED_CONFIRMATION}" ]; then
@@ -87,6 +134,9 @@ if [ "$(uname -s)" != "Darwin" ]; then
   blocked "BLOCKED_HOST_OS_NOT_MACOS"
 fi
 command -v python3 >/dev/null 2>&1 || blocked "BLOCKED_HOST_PYTHON_MISSING"
+[ -f "${BOUNDED_PROCESS_RUNNER}" ] || blocked "BLOCKED_BOUNDED_RUNNER_MISSING"
+bootstrap_watchdog &
+BOOTSTRAP_WATCHDOG_PID="$!"
 
 install_lima_from_official_release() {
   local version=2.1.4
@@ -180,8 +230,9 @@ ssh-keygen -q -t ed25519 -N '' -C p3h-lab1-disposable \
 chmod 600 "${identity_file}"
 
 CURRENT_STAGE=lima-start
-run_bounded 5100 limactl start --name="${VM_NAME}" --tty=false --mount-none \
-  --progress --cpus=4 --memory=8 --disk=40 --timeout=75m "${TEMPLATE_FILE}" \
+run_bounded 1200 VM_BOOTSTRAP LIMA_START \
+  limactl start --name="${VM_NAME}" --tty=false --mount-none \
+  --progress --cpus=4 --memory=8 --disk=40 --timeout=15m "${TEMPLATE_FILE}" \
   || blocked "BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE"
 
 CURRENT_STAGE=guest-provision-copy
@@ -191,7 +242,8 @@ limactl copy --backend=scp "${PROVISION_FILE}" \
   "${VM_NAME}:/tmp/p3h-lab-provision-linux.sh"
 CURRENT_STAGE=guest-provision
 guest_provision_log="${TEMP_ROOT}/guest-provision.log"
-if ! limactl shell "${VM_NAME}" sudo bash /tmp/p3h-lab-provision-linux.sh \
+if ! run_bounded 600 VM_BOOTSTRAP GUEST_PROVISION \
+    limactl shell "${VM_NAME}" sudo bash /tmp/p3h-lab-provision-linux.sh \
     >"${guest_provision_log}" 2>&1; then
   sed -n '/^P3H_LAB_PROVISION:/p' "${guest_provision_log}" >&2
   blocked "BLOCKED_GUEST_PROVISION"

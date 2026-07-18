@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -47,8 +48,9 @@ class ControlledStagingLocalLimaLabContractTest {
         String bootstrap = read("scripts/p3h-lab-bootstrap-macos.sh");
 
         assertThat(bootstrap).contains(
-                "run_bounded 5100 limactl start",
-                "--timeout=75m",
+                "BOOTSTRAP_GLOBAL_TIMEOUT_SECONDS=1200",
+                "run_bounded 1200 VM_BOOTSTRAP LIMA_START",
+                "--timeout=15m",
                 "P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1",
                 "P3H-LAB1-USER-AUTH-20260717",
                 "BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE",
@@ -212,8 +214,9 @@ class ControlledStagingLocalLimaLabContractTest {
 
         assertThat(runner).contains(
                 "run_bounded_with_stdin()",
-                "\"$@\" <\"${input_file}\" &",
-                "run_bounded_with_stdin 180 \"${ROOT_DIR}/scripts/p3h-remote-preflight.sh\"",
+                "run_bounded_process \"${timeout_seconds}\" \"${operation_class}\"",
+                "run_bounded_with_stdin 180 REMOTE_PREFLIGHT",
+                "\"${ROOT_DIR}/scripts/p3h-remote-preflight.sh\"",
                 "BLOCKED_REMOTE_PREFLIGHT_EVIDENCE");
         assertThat(runner).doesNotContain(
                 "<\"${ROOT_DIR}/scripts/p3h-remote-preflight.sh\" >\"${remote_preflight}\"");
@@ -231,25 +234,27 @@ class ControlledStagingLocalLimaLabContractTest {
                 "P3H_REMOTE_FAILURE_REASON: ${reason}",
                 "SANITIZED_FAILURE_EVIDENCE_SHA256: ${failure_sha}",
                 "P3H_REMOTE_STAGE: BLOCKED_REMOTE_STAGE_TIMEOUT",
-                "run_remote_stage 12600 INITIAL_DEPLOY BLOCKED_INITIAL_DEPLOY");
+                "run_remote_stage 2700 BUILD_APPLICATION_IMAGE BLOCKED_APPLICATION_IMAGE_BUILD",
+                "run_remote_stage 2400 PULL_RUNTIME_IMAGES BLOCKED_RUNTIME_IMAGE_PULL",
+                "run_remote_stage 1800 INITIAL_DEPLOY BLOCKED_INITIAL_DEPLOY",
+                "run_remote_stage 1800 BACKUP_RESTORE BLOCKED_BACKUP_RESTORE");
         assertThat(runner).doesNotContain(
                 "cat \"${stage_output}\" >&2",
                 "tail \"${stage_output}\"");
         assertThat(remote).contains(
                 "trap unexpected_failure ERR",
                 "BLOCKED_UNEXPECTED_${CURRENT_REMOTE_STEP}",
-                "IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=3600",
-                "IMAGE_BUILD_MAX_ATTEMPTS=2",
+                "IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=2700",
+                "IMAGE_BUILD_MAX_ATTEMPTS=1",
                 "IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN",
-                "P3H_IMAGE_BUILD_RETRY: BOUNDED_CACHE_REUSE_${IMAGE_BUILD_FAILURE_CATEGORY}",
+                "P3H_IMAGE_BUILD_RETRY_COUNT: 0",
                 "could not transfer artifact",
                 "premature eof",
                 "status code: 5[0-9][0-9]",
                 "compilation failure",
                 "cannot find symbol",
-                "TIMEOUT|NETWORK|RATE_LIMIT",
-                "MAVEN|STORAGE|UNKNOWN",
-                "BLOCKED_IMAGE_BUILD_TIMEOUT",
+                "NO_PROGRESS_TIMEOUT_SECONDS=900",
+                "BLOCKED_IMAGE_BUILD_${IMAGE_BUILD_FAILURE_CATEGORY}",
                 "service_start_failure_reason()",
                 "$1 == \"P3H_COMPOSE_FAILED_STEP\"",
                 "$1 == \"P3H_COMPOSE_CURRENT_STEP\"",
@@ -287,6 +292,7 @@ class ControlledStagingLocalLimaLabContractTest {
         assertThat(remote).doesNotContain(
                 "IMAGE_BUILD_MAX_ATTEMPTS=3",
                 "while true",
+                "P3H_IMAGE_BUILD_RETRY: BOUNDED_CACHE_REUSE_",
                 "cat \"${build_log}\"",
                 "tail \"${build_log}\"",
                 "cat \"${journal_file}\"",
@@ -330,13 +336,15 @@ class ControlledStagingLocalLimaLabContractTest {
 
         assertThat(remote).contains(
                 "RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200",
-                "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=2",
+                "RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400",
+                "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1",
                 "pull_runtime_image()",
                 "ensure_runtime_images()",
                 "docker pull \"${image}\"",
                 "P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3",
                 "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}",
-                "CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH");
+                "CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH",
+                "P3H_IMAGE_BUILD_RETRY_COUNT: 0");
         assertThat(remote.indexOf("CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH"))
                 .isLessThan(remote.indexOf("CURRENT_REMOTE_STEP=INITIAL_UNIT_INSTALL"));
         assertThat(remote).contains(
@@ -346,6 +354,121 @@ class ControlledStagingLocalLimaLabContractTest {
         assertThat(remote).doesNotContain(
                 "cat \"${pull_log}\"",
                 "tail \"${pull_log}\"");
+    }
+
+    @Test
+    void boundedRunnerUsesIsolatedProcessGroupAndTermThenKill() throws Exception {
+        String boundedRunner = read("scripts/p3h-bounded-process.py");
+
+        assertThat(boundedRunner).contains(
+                "start_new_session=True",
+                "os.killpg(process_group_id, signal.SIGTERM)",
+                "os.killpg(process_group_id, signal.SIGKILL)",
+                "process_group_exists(process_group_id)",
+                "if args.poll_seconds > 15",
+                "P3H_LAB_STAGE:",
+                "STAGE_ELAPSED_SECONDS:",
+                "GLOBAL_ELAPSED_SECONDS:",
+                "PROCESS_STATE:",
+                "DOCKER_OPERATION_CLASS:");
+
+        ProcessBuilder builder = new ProcessBuilder(
+                "python3", "scripts/p3h-bounded-process.py",
+                "--timeout-seconds", "1",
+                "--global-start-epoch", String.valueOf(Instant.now().getEpochSecond()),
+                "--global-timeout-seconds", "60",
+                "--stage", "CONTRACT_TEST",
+                "--operation-class", "PROCESS_GROUP",
+                "--poll-seconds", "1",
+                "--heartbeat-seconds", "60",
+                "--term-grace-seconds", "1",
+                "--", "bash", "-c", "sleep 30 & wait");
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+
+        assertThat(process.waitFor(5, TimeUnit.SECONDS)).isTrue();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(process.exitValue()).isEqualTo(124);
+        assertThat(output).contains(
+                "P3H_LAB_STAGE: CONTRACT_TEST",
+                "PROCESS_STATE: STAGE_TIMEOUT");
+    }
+
+    @Test
+    void r1HasOneGlobalDeadlineAndIndependentStageBounds() throws Exception {
+        String runner = read("scripts/controlled-staging-readonly-deployment-p3h-r1.sh");
+        String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+
+        assertThat(runner).contains(
+                "GLOBAL_TIMEOUT_SECONDS=\"${P3H_GLOBAL_TIMEOUT_SECONDS:-10800}\"",
+                "[ \"${GLOBAL_TIMEOUT_SECONDS}\" -le 10800 ]",
+                "POLL_INTERVAL_SECONDS=15",
+                "HEARTBEAT_INTERVAL_SECONDS=60",
+                "global_watchdog()",
+                "sleep \"${POLL_INTERVAL_SECONDS}\"",
+                "run_remote_stage 2700 BUILD_APPLICATION_IMAGE",
+                "run_remote_stage 2400 PULL_RUNTIME_IMAGES",
+                "run_remote_stage 1800 INITIAL_DEPLOY",
+                "run_remote_stage 1800 BACKUP_RESTORE",
+                "ROTATION_REBOOT_TIMEOUT_SECONDS=1800",
+                "phase_remaining_seconds()",
+                "run_remote_stage \"${ROTATION_REBOOT_TIMEOUT_SECONDS}\" ROTATE",
+                "run_remote_stage \"${post_reboot_timeout_seconds}\" POST_REBOOT_VERIFY",
+                "GLOBAL_TIMEOUT_ENFORCED: PASS",
+                "NO_PROGRESS_TIMEOUT_ENFORCED: PASS");
+        assertThat(remote).contains(
+                "IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=2700",
+                "RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200",
+                "RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400",
+                "NO_PROGRESS_TIMEOUT_SECONDS=900",
+                "POLL_INTERVAL_SECONDS=15",
+                "HEARTBEAT_INTERVAL_SECONDS=60");
+        assertThat(remote).contains(
+                "R1_GLOBAL_TIMEOUT_SECONDS=\"${4:-10800}\"",
+                "BOUNDED_DOCKER_FAILURE=GLOBAL_TIMEOUT",
+                "terminate_process_group \"${operation_pid}\"");
+        assertThat(runner + remote).doesNotContain("sleep 30", "sleep 60", "sleep 300");
+    }
+
+    @Test
+    void imageBuildPreflightFailsClosedBeforeLongDockerWork() throws Exception {
+        String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+
+        assertThat(remote).contains(
+                "bounded_build_preflight()",
+                "MemAvailable:",
+                "[ \"${memory_mb}\" -ge 4096 ]",
+                "[ \"${root_disk_gb}\" -ge 15 ]",
+                "systemctl is-active --quiet docker.service",
+                "getent ahosts registry-1.docker.io",
+                "getent ahosts repo.maven.apache.org",
+                "--connect-timeout 5 --max-time 10 https://registry-1.docker.io/v2/",
+                "--connect-timeout 5 --max-time 10 https://repo.maven.apache.org/maven2/",
+                "REQUIRED_REGISTRY_CONNECTIVITY: PASS_BOUNDED",
+                "MAVEN_REPOSITORY_CONNECTIVITY: PASS_BOUNDED");
+        assertThat(remote.indexOf("bounded_build_preflight"))
+                .isLessThan(remote.indexOf("build_application_image \"${image}\""));
+    }
+
+    @Test
+    void dockerProgressMustChangeWithinFifteenMinutesAndNeverAutoRetries() throws Exception {
+        String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+
+        assertThat(remote).contains(
+                "docker_progress_fingerprint()",
+                "docker image inspect \"${target_image}\"",
+                "docker system df --format",
+                "/var/lib/docker/buildkit",
+                "/var/lib/docker/containerd",
+                "last_progress=\"${now}\"",
+                "BOUNDED_DOCKER_FAILURE=NO_PROGRESS_TIMEOUT",
+                "terminate_process_group \"${operation_pid}\"",
+                "IMAGE_BUILD_MAX_ATTEMPTS=1",
+                "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1",
+                "P3H_IMAGE_BUILD_RETRY_COUNT: 0");
+        assertThat(remote).doesNotContain(
+                "P3H_IMAGE_BUILD_RETRY: BOUNDED_CACHE_REUSE_",
+                "P3H_RUNTIME_IMAGE_PULL_RETRY:");
     }
 
     @Test

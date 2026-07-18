@@ -3,6 +3,8 @@ set -euo pipefail
 
 ACTION="${1:-}"
 SOURCE_HEAD="${2:-}"
+R1_START_EPOCH="${3:-$(date +%s)}"
+R1_GLOBAL_TIMEOUT_SECONDS="${4:-10800}"
 ROOT=/opt/trade-model-p3h/current
 STATE_ROOT=/var/lib/trade-model-p3h-lab1
 CREDENTIALS=/run/credentials/p3hlab1
@@ -17,12 +19,19 @@ FLYWAY_IMAGE='flyway/flyway:12.11.0-alpine@sha256:6bf3a713f52c4d803a88501f8409dd
 NGINX_IMAGE='nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591'
 GREENFIELD_CONFIRMATION=I_CONFIRM_EMPTY_GREENFIELD_INITIALIZATION
 ROTATION_CONFIRMATION=I_CONFIRM_CONTROLLED_APP_DATABASE_SECRET_ROTATION
-IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=3600
-IMAGE_BUILD_MAX_ATTEMPTS=2
+IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=2700
+IMAGE_BUILD_MAX_ATTEMPTS=1
 IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
 RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200
-RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=2
+RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400
+RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1
 RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=UNKNOWN
+NO_PROGRESS_TIMEOUT_SECONDS=900
+POLL_INTERVAL_SECONDS=15
+HEARTBEAT_INTERVAL_SECONDS=60
+TERM_GRACE_SECONDS=15
+BOUNDED_DOCKER_FAILURE=UNKNOWN
+ACTIVE_DOCKER_PROCESS_GROUP=""
 CURRENT_REMOTE_STEP=PRECONDITION
 
 blocked() {
@@ -47,6 +56,153 @@ unexpected_failure() {
   exit "${exit_status}"
 }
 trap unexpected_failure ERR
+
+emit_heartbeat() {
+  local stage="$1"
+  local stage_elapsed="$2"
+  local process_state="$3"
+  local operation_class="$4"
+  echo "P3H_LAB_STAGE: ${stage}"
+  echo "STAGE_ELAPSED_SECONDS: ${stage_elapsed}"
+  echo "GLOBAL_ELAPSED_SECONDS: $(( $(date +%s) - R1_START_EPOCH ))"
+  echo "PROCESS_STATE: ${process_state}"
+  echo "DOCKER_OPERATION_CLASS: ${operation_class}"
+}
+
+terminate_process_group() {
+  local process_group_leader="$1"
+  kill -TERM -- "-${process_group_leader}" >/dev/null 2>&1 || true
+  for _attempt in $(seq 1 "${TERM_GRACE_SECONDS}"); do
+    kill -0 -- "-${process_group_leader}" >/dev/null 2>&1 || break
+    sleep 1
+  done
+  if kill -0 -- "-${process_group_leader}" >/dev/null 2>&1; then
+    kill -KILL -- "-${process_group_leader}" >/dev/null 2>&1 || true
+  fi
+  wait "${process_group_leader}" >/dev/null 2>&1 || true
+}
+
+cleanup_active_docker_group() {
+  local exit_status=$?
+  trap - EXIT
+  if [ -n "${ACTIVE_DOCKER_PROCESS_GROUP}" ]; then
+    terminate_process_group "${ACTIVE_DOCKER_PROCESS_GROUP}"
+  fi
+  exit "${exit_status}"
+}
+trap cleanup_active_docker_group EXIT
+
+docker_progress_fingerprint() {
+  local target_image="$1"
+  local image_id docker_usage buildkit_kb content_kb
+  image_id="$(docker image inspect "${target_image}" --format '{{.Id}}' 2>/dev/null || true)"
+  docker_usage="$(docker system df --format '{{.Type}}|{{.TotalCount}}|{{.Size}}' \
+    2>/dev/null | sha256sum | awk '{print $1}')"
+  buildkit_kb="$(sudo du -sk /var/lib/docker/buildkit 2>/dev/null \
+    | awk 'NR == 1 {print $1}')"
+  content_kb="$(sudo du -sk /var/lib/docker/containerd 2>/dev/null \
+    | awk 'NR == 1 {print $1}')"
+  printf '%s|%s|%s|%s\n' "${image_id:-NONE}" "${docker_usage:-NONE}" \
+    "${buildkit_kb:-0}" "${content_kb:-0}" \
+    | sha256sum | awk '{print $1}'
+}
+
+run_docker_bounded() {
+  local stage="$1"
+  local operation_class="$2"
+  local timeout_seconds="$3"
+  local target_image="$4"
+  local output_file="$5"
+  local operation_pid started now elapsed last_progress next_heartbeat
+  local previous_fingerprint current_fingerprint process_state operation_status
+  shift 5
+
+  BOUNDED_DOCKER_FAILURE=UNKNOWN
+  started="$(date +%s)"
+  last_progress="${started}"
+  next_heartbeat="${HEARTBEAT_INTERVAL_SECONDS}"
+  previous_fingerprint="$(docker_progress_fingerprint "${target_image}")"
+  setsid "$@" >"${output_file}" 2>&1 &
+  operation_pid="$!"
+  ACTIVE_DOCKER_PROCESS_GROUP="${operation_pid}"
+
+  while kill -0 "${operation_pid}" >/dev/null 2>&1; do
+    sleep "${POLL_INTERVAL_SECONDS}"
+    if ! kill -0 "${operation_pid}" >/dev/null 2>&1; then
+      break
+    fi
+    now="$(date +%s)"
+    elapsed=$((now - started))
+    if [ $((now - R1_START_EPOCH)) -ge "${R1_GLOBAL_TIMEOUT_SECONDS}" ]; then
+      BOUNDED_DOCKER_FAILURE=GLOBAL_TIMEOUT
+      terminate_process_group "${operation_pid}"
+      ACTIVE_DOCKER_PROCESS_GROUP=""
+      return 125
+    fi
+    current_fingerprint="$(docker_progress_fingerprint "${target_image}")"
+    process_state=RUNNING_NO_CHANGE
+    if [ "${current_fingerprint}" != "${previous_fingerprint}" ]; then
+      previous_fingerprint="${current_fingerprint}"
+      last_progress="${now}"
+      process_state=RUNNING_PROGRESS
+    fi
+    if [ "${elapsed}" -ge "${next_heartbeat}" ]; then
+      emit_heartbeat "${stage}" "${elapsed}" "${process_state}" "${operation_class}"
+      next_heartbeat=$((next_heartbeat + HEARTBEAT_INTERVAL_SECONDS))
+    fi
+    if [ $((now - last_progress)) -ge "${NO_PROGRESS_TIMEOUT_SECONDS}" ]; then
+      BOUNDED_DOCKER_FAILURE=NO_PROGRESS_TIMEOUT
+      terminate_process_group "${operation_pid}"
+      ACTIVE_DOCKER_PROCESS_GROUP=""
+      return 126
+    fi
+    if [ "${elapsed}" -ge "${timeout_seconds}" ]; then
+      BOUNDED_DOCKER_FAILURE=STAGE_TIMEOUT
+      terminate_process_group "${operation_pid}"
+      ACTIVE_DOCKER_PROCESS_GROUP=""
+      return 124
+    fi
+  done
+
+  set +e
+  wait "${operation_pid}"
+  operation_status=$?
+  set -e
+  ACTIVE_DOCKER_PROCESS_GROUP=""
+  return "${operation_status}"
+}
+
+bounded_build_preflight() {
+  local memory_mb root_disk_gb docker_disk_gb registry_status maven_status
+  memory_mb="$(awk '/MemAvailable:/ {print int($2 / 1024); exit}' /proc/meminfo)"
+  root_disk_gb="$(df -Pk / | awk 'NR == 2 {print int($4 / 1024 / 1024)}')"
+  docker_disk_gb="$(df -Pk /var/lib/docker | awk 'NR == 2 {print int($4 / 1024 / 1024)}')"
+  echo "VM_AVAILABLE_MEMORY_MB: ${memory_mb}"
+  echo "VM_AVAILABLE_DISK_GB: ${root_disk_gb}"
+  [ "${memory_mb}" -ge 4096 ] || blocked BLOCKED_VM_AVAILABLE_MEMORY
+  [ "${root_disk_gb}" -ge 15 ] && [ "${docker_disk_gb}" -ge 15 ] \
+    || blocked BLOCKED_VM_AVAILABLE_DISK
+  systemctl is-active --quiet docker.service || blocked BLOCKED_DOCKER_DAEMON
+  command -v setsid >/dev/null 2>&1 || blocked BLOCKED_PROCESS_GROUP_SUPPORT
+  timeout --signal=TERM --kill-after=2s 10s \
+    getent ahosts registry-1.docker.io >/dev/null 2>&1 \
+    || blocked BLOCKED_DNS_RESOLUTION
+  timeout --signal=TERM --kill-after=2s 10s \
+    getent ahosts repo.maven.apache.org >/dev/null 2>&1 \
+    || blocked BLOCKED_DNS_RESOLUTION
+  registry_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+    --connect-timeout 5 --max-time 10 https://registry-1.docker.io/v2/ \
+    2>/dev/null || true)"
+  case "${registry_status}" in 200|401) ;; *) blocked BLOCKED_REGISTRY_CONNECTIVITY ;; esac
+  maven_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+    --connect-timeout 5 --max-time 10 https://repo.maven.apache.org/maven2/ \
+    2>/dev/null || true)"
+  case "${maven_status}" in 200|301|302) ;; *) blocked BLOCKED_MAVEN_CONNECTIVITY ;; esac
+  echo "DOCKER_DAEMON: ACTIVE"
+  echo "DNS_RESOLUTION: PASS"
+  echo "REQUIRED_REGISTRY_CONNECTIVITY: PASS_BOUNDED"
+  echo "MAVEN_REPOSITORY_CONNECTIVITY: PASS_BOUNDED"
+}
 
 run_checked_or_block() {
   local reason="$1"
@@ -130,6 +286,14 @@ case "${SOURCE_HEAD}" in
   ''|*[!0-9a-f]*) blocked BLOCKED_SOURCE_HEAD ;;
 esac
 [ "${#SOURCE_HEAD}" -eq 40 ] || blocked BLOCKED_SOURCE_HEAD
+case "${R1_GLOBAL_TIMEOUT_SECONDS}" in
+  ''|*[!0-9]*) blocked BLOCKED_GLOBAL_TIMEOUT_CONTRACT ;;
+esac
+[ "${R1_GLOBAL_TIMEOUT_SECONDS}" -gt 0 ] \
+  && [ "${R1_GLOBAL_TIMEOUT_SECONDS}" -le 10800 ] \
+  || blocked BLOCKED_GLOBAL_TIMEOUT_CONTRACT
+[ $(( $(date +%s) - R1_START_EPOCH )) -lt "${R1_GLOBAL_TIMEOUT_SECONDS}" ] \
+  || blocked BLOCKED_GLOBAL_TIMEOUT_EXCEEDED
 [ "$(id -un)" = p3h-deploy ] || blocked BLOCKED_DEPLOYMENT_USER
 [ "$(hostname -f)" = "${HOSTNAME}" ] || blocked BLOCKED_HOSTNAME
 expected_release="/opt/trade-model-p3h/releases/${SOURCE_HEAD}"
@@ -246,11 +410,10 @@ build_application_image() {
   local build_log build_status
   build_log="$(mktemp /tmp/p3h-image-build.XXXXXX)"
   chmod 600 "${build_log}"
-  if timeout --signal=TERM --kill-after=30s \
-      "${IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS}" \
+  if run_docker_bounded APPLICATION_IMAGE_BUILD APPLICATION_IMAGE_BUILD \
+      "${IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS}" "${image}" "${build_log}" \
       docker build --pull=false --file "${ROOT}/deploy/p3h/Dockerfile.p3h" \
-        --build-arg "VCS_REF=${SOURCE_HEAD}" --tag "${image}" "${ROOT}" \
-        >"${build_log}" 2>&1; then
+        --build-arg "VCS_REF=${SOURCE_HEAD}" --tag "${image}" "${ROOT}"; then
     IMAGE_BUILD_FAILURE_CATEGORY=NONE
     rm -f "${build_log}"
     return 0
@@ -260,6 +423,8 @@ build_application_image() {
 
   case "${build_status}" in
     124|137) IMAGE_BUILD_FAILURE_CATEGORY=TIMEOUT ;;
+    125) IMAGE_BUILD_FAILURE_CATEGORY=GLOBAL_TIMEOUT ;;
+    126) IMAGE_BUILD_FAILURE_CATEGORY=NO_PROGRESS_TIMEOUT ;;
     *)
       if grep -Eqi '429|too many requests|toomanyrequests|rate.?limit' "${build_log}"; then
         IMAGE_BUILD_FAILURE_CATEGORY=RATE_LIMIT
@@ -283,9 +448,9 @@ pull_runtime_image() {
   local pull_log pull_status
   pull_log="$(mktemp /tmp/p3h-runtime-image-pull.XXXXXX)"
   chmod 600 "${pull_log}"
-  if timeout --signal=TERM --kill-after=30s \
-      "${RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS}" \
-      docker pull "${image}" >"${pull_log}" 2>&1; then
+  if run_docker_bounded RUNTIME_IMAGE_PULL RUNTIME_IMAGE_PULL \
+      "${RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS}" "${image}" "${pull_log}" \
+      docker pull "${image}"; then
     RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=NONE
     rm -f "${pull_log}"
     return 0
@@ -295,6 +460,8 @@ pull_runtime_image() {
 
   case "${pull_status}" in
     124|137) RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=TIMEOUT ;;
+    125) RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=GLOBAL_TIMEOUT ;;
+    126) RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=NO_PROGRESS_TIMEOUT ;;
     *)
       if grep -Eqi '429|too many requests|toomanyrequests|rate.?limit' "${pull_log}"; then
         RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=RATE_LIMIT
@@ -312,28 +479,15 @@ pull_runtime_image() {
 }
 
 ensure_runtime_images() {
-  local image pull_attempt
+  local image pull_started pull_elapsed
+  pull_started="$(date +%s)"
   for image in "${POSTGRES_IMAGE}" "${FLYWAY_IMAGE}" "${NGINX_IMAGE}"; do
-    pull_attempt=1
-    while [ "${pull_attempt}" -le "${RUNTIME_IMAGE_PULL_MAX_ATTEMPTS}" ]; do
-      if pull_runtime_image "${image}"; then
-        break
-      fi
-      case "${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}" in
-        TIMEOUT|NETWORK|RATE_LIMIT) ;;
-        STORAGE|UNKNOWN)
-          blocked "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
-          ;;
-        *) blocked BLOCKED_RUNTIME_IMAGE_PULL_FAILURE ;;
-      esac
-      if [ "${pull_attempt}" -eq "${RUNTIME_IMAGE_PULL_MAX_ATTEMPTS}" ]; then
-        blocked "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
-      fi
-      echo "P3H_RUNTIME_IMAGE_PULL_RETRY: BOUNDED_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
-      pull_attempt=$((pull_attempt + 1))
-    done
-    [ "${pull_attempt}" -le "${RUNTIME_IMAGE_PULL_MAX_ATTEMPTS}" ] \
-      || blocked BLOCKED_RUNTIME_IMAGE_PULL_TIMEOUT
+    pull_elapsed=$(( $(date +%s) - pull_started ))
+    [ "${pull_elapsed}" -lt "${RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS}" ] \
+      || blocked BLOCKED_RUNTIME_IMAGE_PULL_ALL_TIMEOUT
+    if ! pull_runtime_image "${image}"; then
+      blocked "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
+    fi
   done
   echo 'P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3'
 }
@@ -841,46 +995,36 @@ activate_tls_v2_credentials() {
 }
 
 case "${ACTION}" in
-  INITIAL_DEPLOY)
+  BUILD_APPLICATION_IMAGE)
+    CURRENT_REMOTE_STEP=BOUNDED_BUILD_PREFLIGHT
+    bounded_build_preflight
     CURRENT_REMOTE_STEP=PREBUILD_COMPOSE_CONFIG
     validate_prebuild_compose_config
     CURRENT_REMOTE_STEP=PREBUILD_SYSTEMD_COMPOSE_CONFIG
     validate_systemd_sandbox_compose_config
     CURRENT_REMOTE_STEP=IMAGE_BUILD
     image="trade-model-v1:p3h-lab-${SOURCE_HEAD:0:12}"
-    image_build_attempt=1
-    while [ "${image_build_attempt}" -le "${IMAGE_BUILD_MAX_ATTEMPTS}" ]; do
-      if build_application_image "${image}" >/dev/null; then
-        break
-      else
-        image_build_status=$?
-      fi
-      case "${IMAGE_BUILD_FAILURE_CATEGORY}" in
-        TIMEOUT|NETWORK|RATE_LIMIT) ;;
-        MAVEN|STORAGE|UNKNOWN)
-          blocked "BLOCKED_IMAGE_BUILD_${IMAGE_BUILD_FAILURE_CATEGORY}"
-          ;;
-        *) blocked BLOCKED_IMAGE_BUILD_FAILURE ;;
-      esac
-      if [ "${image_build_attempt}" -eq "${IMAGE_BUILD_MAX_ATTEMPTS}" ]; then
-        blocked "BLOCKED_IMAGE_BUILD_${IMAGE_BUILD_FAILURE_CATEGORY}"
-      fi
-      echo "P3H_IMAGE_BUILD_RETRY: BOUNDED_CACHE_REUSE_${IMAGE_BUILD_FAILURE_CATEGORY}"
-      image_build_attempt=$((image_build_attempt + 1))
-      CURRENT_REMOTE_STEP=IMAGE_BUILD_RETRY
-    done
-    [ "${image_build_attempt}" -le "${IMAGE_BUILD_MAX_ATTEMPTS}" ] \
-      || blocked BLOCKED_IMAGE_BUILD_TIMEOUT
-    echo "P3H_IMAGE_BUILD_ATTEMPTS: ${image_build_attempt}"
+    if ! build_application_image "${image}"; then
+      blocked "BLOCKED_IMAGE_BUILD_${IMAGE_BUILD_FAILURE_CATEGORY}"
+    fi
+    echo "P3H_IMAGE_BUILD_ATTEMPTS: 1"
+    echo "P3H_IMAGE_BUILD_RETRY_COUNT: 0"
     revision="$(docker image inspect "${image}" \
       --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')"
     [ "${revision}" = "${SOURCE_HEAD}" ] || blocked BLOCKED_IMAGE_REVISION
     [ "$(docker image inspect "${image}" --format '{{.Config.User}}')" = app ] \
       || blocked BLOCKED_IMAGE_USER
+    echo "P3H_REMOTE_STAGE: APPLICATION_IMAGE_BUILD_PASS"
+    echo "APP_IMAGE_REVISION: ${SOURCE_HEAD}"
+    ;;
 
+  PULL_RUNTIME_IMAGES)
     CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH
     ensure_runtime_images
+    echo "P3H_REMOTE_STAGE: RUNTIME_IMAGE_PULL_PASS"
+    ;;
 
+  INITIAL_DEPLOY)
     CURRENT_REMOTE_STEP=INITIAL_UNIT_INSTALL
     install_unit INITIALIZE_GREENFIELD V1 V1 V1
     CURRENT_REMOTE_STEP=INITIAL_SERVICE_START
@@ -916,11 +1060,8 @@ case "${ACTION}" in
       fingerprint_status=$?
       blocked "BLOCKED_STEADY_FINGERPRINT_$(fingerprint_failure_reason "${fingerprint_status}")"
     fi
-    CURRENT_REMOTE_STEP=BACKUP_RESTORE
-    run_checked_or_block BLOCKED_BACKUP_RESTORE backup_restore
 
     echo "P3H_REMOTE_STAGE: INITIAL_DEPLOY_PASS"
-    echo "APP_IMAGE_REVISION: ${SOURCE_HEAD}"
     echo "STAGING_FLYWAY: PASS_V1_TO_V7"
     echo "FLYWAY_REPEAT: ZERO_MIGRATIONS"
     echo "APPLICATION_DATABASE_ROLE: READ_ONLY"
@@ -937,6 +1078,12 @@ case "${ACTION}" in
     echo "AUTHENTICATED_DASHBOARD: PASS"
     echo "EMPTY_DASHBOARD_FAIL_CLOSED: PASS"
     echo "RATE_LIMIT: PASS_429"
+    ;;
+
+  BACKUP_RESTORE)
+    CURRENT_REMOTE_STEP=BACKUP_RESTORE
+    run_checked_or_block BLOCKED_BACKUP_RESTORE backup_restore
+    echo "P3H_REMOTE_STAGE: BACKUP_RESTORE_PASS"
     echo "PROD_BACKUP_SCRIPT: PASS"
     echo "PROD_RESTORE_SCRIPT: PASS"
     echo "RESTORE_SCHEMA: MATCH"

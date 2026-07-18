@@ -33,8 +33,8 @@ The VM contract uses Lima's official Debian 12 template with 4 CPUs, 8 GiB
 memory, 40 GiB disk, and systemd. Rootful Docker Engine and Docker Compose v2
 come from Docker's official Debian repository. The VM also requires OpenSSH,
 UTC, and synchronized time.
-Bootstrap has an 85-minute outer bound and a 75-minute Lima provisioning bound;
-failure invokes ownership-checked LAB1 cleanup rather than leaving a partial VM.
+Bootstrap has a 20-minute hard bound and uses 15-second polling. Failure invokes
+ownership-checked LAB1 cleanup rather than leaving a partial VM.
 Remote-stage failures preserve only an enumerated failure reason and a SHA-256
 of the repository-external sanitized failure summary; raw stage output remains
 temporary and is removed during cleanup.
@@ -43,16 +43,22 @@ committed source is transferred as a `git archive` over pinned SSH, and its
 SHA-256 is recomputed before extraction and image construction.
 The `current` release link must resolve exactly to `releases/<exact-head>`;
 arbitrary or unversioned release paths fail closed.
-The initial remote deployment has a fixed 210-minute outer bound. Image
-construction permits at most two 60-minute attempts inside the same disposable
-VM so a timeout, transient network failure, or registry rate limit can reuse
-only the non-secret BuildKit and Maven download cache. Maven, storage, and
-unknown failures stop immediately; a second transient failure returns its
-enumerated `BLOCKED_IMAGE_BUILD_*` category, and an outer-stage timeout returns
-`BLOCKED_REMOTE_STAGE_TIMEOUT`. The temporary build output is deleted and is
-never emitted or preserved as evidence. There is no unbounded retry. This is
-necessary because a fresh VM must fetch pinned container layers and build the
-exact source archive. Before image construction, the same lifecycle script runs
+R1 has one 180-minute hard bound. Application image construction is limited to
+45 minutes, each pinned runtime-image pull to 20 minutes, all runtime-image
+pulls to 40 minutes, deployment and backup/restore to 30 minutes each, and the
+combined rotation, VM reboot, and post-reboot verification phase to 30 minutes.
+No operation is automatically retried. Docker
+operations run in a dedicated child process group; timeout handling sends TERM,
+waits at most 15 seconds, then sends KILL to that exact group. The runner polls
+every 15 seconds and emits a sanitized heartbeat every 60 seconds.
+
+Image construction and pulls fingerprint the target image, Docker storage,
+BuildKit storage, and containerd storage. Fifteen minutes without a fingerprint
+change returns `BLOCKED_NO_PROGRESS_TIMEOUT` and triggers scoped cleanup. The
+temporary build output is deleted and is never emitted or preserved as
+evidence. Before image construction, a bounded preflight requires at least
+4096 MiB available memory, 15 GiB available disk, an active Docker daemon, DNS,
+the required registry, and Maven Central. The same lifecycle script then runs
 a config-only Compose check directly and through a transient unit with the same
 systemd user/group and hardening properties. Neither check can start containers,
 and each emits only an enumerated category. A failed systemd start likewise exposes only the
@@ -137,13 +143,48 @@ The controlled run performs these fail-closed stages:
 Any stage failure prevents later PASS labels and invokes the same scoped
 cleanup. The redactor preserves only allowlisted status fields and hashes.
 
+## Hung Run Abort Evidence
+
+The pre-hardening run produced no final result and no failure summary. The task
+was explicitly classified as exceeding its acceptable global run contract and
+was aborted. Exact PID inspection confirmed that PID `82414` was the R1 runner;
+TERM stopped it within 15 seconds, so KILL was not used. Telemetry captured
+before cleanup showed the application unit inactive, no Java process, and one
+Docker client executing the exact revision-labeled application image build.
+The unique blocked stage is therefore `APPLICATION_IMAGE_BUILD`.
+
+The operator report classified elapsed time as greater than ten hours. The PID
+sample available in this resumed execution context showed `00:37:44`; both are
+retained rather than silently reconciling unlike observations. Neither is a
+PASS. VM-level Docker, memory, and disk snapshots requested after termination
+are `NOT_AVAILABLE_AFTER_FAIL_SAFE_CLEANUP` because the existing EXIT trap had
+already destroyed the VM. No values are fabricated.
+
+`R1_RESULT: BLOCKED_GLOBAL_TIMEOUT_EXCEEDED`
+
+`R1_PASS: NO`
+
+`CURRENT_BLOCKED_STAGE: APPLICATION_IMAGE_BUILD`
+
+`LAB_VM: ABSENT`
+
+`LAB_CONTAINER_COUNT: 0`
+
+`LAB_NETWORK_COUNT: 0`
+
+`LAB_VOLUME_COUNT: 0`
+
+`LAB_SECRET_FILES: ABSENT`
+
+`UNRELATED_RESOURCES_TOUCHED: NO`
+
 ## Evidence Status
 
-At the implementation checkpoint, contract tests are present and the mandatory
-non-skipped Lima run is pending. This section must be replaced with measured
-results before the draft PR can request evidence review.
+The timeout and no-progress contract is implemented and its offline contract
+tests pass. The single permitted clean rerun is pending from a newly created
+VM; no second retry is authorized.
 
-`P3H_LAB_RESULT: PENDING_NON_SKIPPED_RUN`
+`P3H_LAB_RESULT: PENDING_SINGLE_BOUNDED_RERUN`
 
 `REAL_EXTERNAL_STAGING_STATUS: NOT_RUN`
 

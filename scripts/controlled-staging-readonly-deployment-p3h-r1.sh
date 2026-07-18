@@ -12,53 +12,113 @@ EXPECTED_BRANCH=codex/p3h-local-vm-staging-lab1
 EXPECTED_CONFIRMATION=I_CONFIRM_AUTHORIZED_NON_PRODUCTION_STAGING_DEPLOYMENT
 EXPECTED_REBOOT_CONFIRMATION=I_CONFIRM_CONTROLLED_STAGING_SERVER_REBOOT
 CURRENT_STAGE=target-class
+STAGE_START_EPOCH="$(date +%s)"
+RUN_START_EPOCH="${STAGE_START_EPOCH}"
+GLOBAL_TIMEOUT_SECONDS="${P3H_GLOBAL_TIMEOUT_SECONDS:-10800}"
+POLL_INTERVAL_SECONDS=15
+HEARTBEAT_INTERVAL_SECONDS=60
+TERM_GRACE_SECONDS=15
+ROTATION_REBOOT_TIMEOUT_SECONDS=1800
+BOUNDED_PROCESS_RUNNER="${ROOT_DIR}/scripts/p3h-bounded-process.py"
 TEMP_ROOT=""
 RAW_EVIDENCE=""
 SOURCE_HEAD=""
 REMOTE_PREPARED=0
 CLEANUP_COMPLETE=0
+TERMINAL_BLOCKED=0
+BLOCKED_REASON=""
+GLOBAL_TIMEOUT_TRIGGERED=NO
+NO_PROGRESS_TIMEOUT_TRIGGERED=NO
+REMOTE_FAILURE_REASON=""
+ACTIVE_BOUNDED_RUNNER_PID=""
+GLOBAL_WATCHDOG_PID=""
+GLOBAL_TIMEOUT_MARKER="/private/tmp/trade-model-p3h-global-timeout.$$"
+MAIN_PID="$$"
+
+stage_code() {
+  printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
+set_stage() {
+  CURRENT_STAGE="$1"
+  STAGE_START_EPOCH="$(date +%s)"
+}
 
 blocked() {
-  echo "P3H_LAB_FAILED_STAGE: ${CURRENT_STAGE}"
-  echo "P3H_REMOTE_EXECUTION_IMPLEMENTATION: $1"
-  echo "REAL_EXTERNAL_STAGING_STATUS: NOT_RUN"
-  echo "P3H_RESULT: BLOCKED_LOCAL_VM_EVIDENCE"
-  echo "P4_ALLOWED: NO"
-  echo "PRODUCTION_READINESS: BLOCKED"
+  BLOCKED_REASON="$1"
+  TERMINAL_BLOCKED=1
   exit 2
 }
 
-wait_for_bounded_pid() {
-  local command_pid="$1"
-  local timeout_seconds="$2"
-  local elapsed=0
-  while kill -0 "${command_pid}" >/dev/null 2>&1 \
-      && [ "${elapsed}" -lt "${timeout_seconds}" ]; do
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
-  if kill -0 "${command_pid}" >/dev/null 2>&1; then
-    kill "${command_pid}" >/dev/null 2>&1 || true
-    wait "${command_pid}" >/dev/null 2>&1 || true
-    return 124
+run_bounded_process() {
+  local timeout_seconds="$1"
+  local operation_class="$2"
+  local bounded_status
+  shift 2
+  python3 "${BOUNDED_PROCESS_RUNNER}" \
+    --timeout-seconds "${timeout_seconds}" \
+    --global-start-epoch "${RUN_START_EPOCH}" \
+    --global-timeout-seconds "${GLOBAL_TIMEOUT_SECONDS}" \
+    --stage "$(stage_code "${CURRENT_STAGE}")" \
+    --operation-class "${operation_class}" \
+    --poll-seconds "${POLL_INTERVAL_SECONDS}" \
+    --heartbeat-seconds "${HEARTBEAT_INTERVAL_SECONDS}" \
+    --term-grace-seconds "${TERM_GRACE_SECONDS}" \
+    -- "$@" &
+  ACTIVE_BOUNDED_RUNNER_PID="$!"
+  if wait "${ACTIVE_BOUNDED_RUNNER_PID}"; then
+    ACTIVE_BOUNDED_RUNNER_PID=""
+    return 0
+  else
+    bounded_status=$?
   fi
-  wait "${command_pid}"
+  ACTIVE_BOUNDED_RUNNER_PID=""
+  return "${bounded_status}"
 }
 
 run_bounded() {
   local timeout_seconds="$1"
-  shift
-  "$@" &
-  wait_for_bounded_pid "$!" "${timeout_seconds}"
+  local operation_class="$2"
+  shift 2
+  run_bounded_process "${timeout_seconds}" "${operation_class}" "$@"
 }
 
 run_bounded_with_stdin() {
   local timeout_seconds="$1"
-  local input_file="$2"
-  shift 2
+  local operation_class="$2"
+  local input_file="$3"
+  shift 3
   [ -f "${input_file}" ] && [ ! -L "${input_file}" ] || return 2
-  "$@" <"${input_file}" &
-  wait_for_bounded_pid "$!" "${timeout_seconds}"
+  run_bounded_process "${timeout_seconds}" "${operation_class}" \
+    "$@" <"${input_file}"
+}
+
+global_watchdog() {
+  local global_elapsed
+  while kill -0 "${MAIN_PID}" >/dev/null 2>&1; do
+    global_elapsed=$(( $(date +%s) - RUN_START_EPOCH ))
+    if [ "${global_elapsed}" -ge "${GLOBAL_TIMEOUT_SECONDS}" ]; then
+      : >"${GLOBAL_TIMEOUT_MARKER}"
+      kill -TERM "${MAIN_PID}" >/dev/null 2>&1 || true
+      return
+    fi
+    sleep "${POLL_INTERVAL_SECONDS}"
+  done
+}
+
+handle_termination() {
+  trap - TERM INT
+  TERMINAL_BLOCKED=1
+  if [ -f "${GLOBAL_TIMEOUT_MARKER}" ]; then
+    GLOBAL_TIMEOUT_TRIGGERED=YES
+    BLOCKED_REASON=BLOCKED_GLOBAL_TIMEOUT_EXCEEDED
+  else
+    BLOCKED_REASON=BLOCKED_OPERATOR_TERMINATION
+  fi
+  if [ -n "${ACTIVE_BOUNDED_RUNNER_PID}" ]; then
+    kill -TERM "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
+  fi
+  exit 143
 }
 
 persist_remote_failure_evidence() {
@@ -72,6 +132,7 @@ persist_remote_failure_evidence() {
     }
   ' "${stage_output}")"
   [ -n "${reason}" ] || reason=BLOCKED_REMOTE_STAGE_NO_SAFE_DIAGNOSTIC
+  REMOTE_FAILURE_REASON="${reason}"
   evidence_dir="${EVIDENCE_ROOT}/${SOURCE_HEAD:0:12}"
   failure_file="${evidence_dir}/p3h-lab1-failure-summary.txt"
   mkdir -p "${evidence_dir}"
@@ -98,7 +159,11 @@ run_remote_stage() {
   local blocked_status="$3"
   local stage_output="${TEMP_ROOT}/remote-${action}.raw"
   local stage_status
-  if run_bounded "${timeout_seconds}" remote "${action}" "${SOURCE_HEAD}" \
+  if run_bounded "${timeout_seconds}" "${action}" \
+      ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
+      bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh \
+      "${action}" "${SOURCE_HEAD}" "${RUN_START_EPOCH}" \
+      "${GLOBAL_TIMEOUT_SECONDS}" \
       >"${stage_output}" 2>&1; then
     cat "${stage_output}" >>"${RAW_EVIDENCE}"
     return 0
@@ -108,17 +173,44 @@ run_remote_stage() {
   if [ "${stage_status}" -eq 124 ]; then
     printf '%s\n' 'P3H_REMOTE_STAGE: BLOCKED_REMOTE_STAGE_TIMEOUT' \
       >>"${stage_output}"
+  elif [ "${stage_status}" -eq 125 ]; then
+    GLOBAL_TIMEOUT_TRIGGERED=YES
+    printf '%s\n' 'P3H_REMOTE_STAGE: BLOCKED_GLOBAL_TIMEOUT_EXCEEDED' \
+      >>"${stage_output}"
   fi
+  grep -q 'P3H_REMOTE_STAGE: BLOCKED_.*NO_PROGRESS' "${stage_output}" \
+    && NO_PROGRESS_TIMEOUT_TRIGGERED=YES
   persist_remote_failure_evidence "${CURRENT_STAGE}" "${stage_output}"
-  blocked "${blocked_status}"
+  blocked "${REMOTE_FAILURE_REASON:-${blocked_status}}"
 }
 
 cleanup() {
   local exit_status=$?
+  local now_epoch stage_elapsed_minutes global_elapsed_minutes
+  local vm_cleanup=FAIL docker_cleanup=FAIL secret_cleanup=FAIL
   set +e
+  trap - EXIT TERM INT
+  if [ -n "${GLOBAL_WATCHDOG_PID}" ]; then
+    kill "${GLOBAL_WATCHDOG_PID}" >/dev/null 2>&1 || true
+    wait "${GLOBAL_WATCHDOG_PID}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${ACTIVE_BOUNDED_RUNNER_PID}" ]; then
+    kill -TERM "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
+    wait "${ACTIVE_BOUNDED_RUNNER_PID}" >/dev/null 2>&1 || true
+  fi
   if [ "${CLEANUP_COMPLETE}" -ne 1 ] && [ "${P3H_TARGET_CLASS:-}" = LOCAL_LIMA_LAB ]; then
-    if [ "${REMOTE_PREPARED}" -eq 1 ] && [ -n "${SOURCE_HEAD}" ]; then
-      remote CLEANUP "${SOURCE_HEAD}" >/dev/null 2>&1 || true
+    if [ "${REMOTE_PREPARED}" -eq 1 ] && [ -n "${SOURCE_HEAD}" ] \
+        && declare -F remote >/dev/null 2>&1; then
+      python3 "${BOUNDED_PROCESS_RUNNER}" \
+        --timeout-seconds 120 \
+        --global-start-epoch "$(date +%s)" \
+        --global-timeout-seconds 120 \
+        --stage RESOURCE_CLEANUP \
+        --operation-class REMOTE_LAB_CLEANUP \
+        --poll-seconds 15 --heartbeat-seconds 60 --term-grace-seconds 15 \
+        -- ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
+          bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh \
+          CLEANUP "${SOURCE_HEAD}" "$(date +%s)" 120 >/dev/null 2>&1 || true
     fi
     P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1 \
       bash "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" >/dev/null 2>&1 || true
@@ -126,11 +218,49 @@ cleanup() {
   if [ -n "${TEMP_ROOT}" ] && [ -d "${TEMP_ROOT}" ]; then
     rm -rf "${TEMP_ROOT}"
   fi
+  rm -f "${GLOBAL_TIMEOUT_MARKER}"
+
+  if ! command -v limactl >/dev/null 2>&1 \
+      || ! limactl list --quiet 2>/dev/null | grep -Fxq "${VM_NAME}"; then
+    vm_cleanup=PASS
+    docker_cleanup=PASS
+  fi
+  if [ ! -e "${LAB_ROOT}" ] \
+      && ! launchctl print "gui/${UID}/org.example.trademodel.p3h-lab1-ntp" \
+        >/dev/null 2>&1; then
+    secret_cleanup=PASS
+  fi
+
+  if [ "${TERMINAL_BLOCKED}" -eq 1 ]; then
+    now_epoch="$(date +%s)"
+    stage_elapsed_minutes=$(( (now_epoch - STAGE_START_EPOCH + 59) / 60 ))
+    global_elapsed_minutes=$(( (now_epoch - RUN_START_EPOCH + 59) / 60 ))
+    case "${BLOCKED_REASON}" in
+      *NO_PROGRESS*) NO_PROGRESS_TIMEOUT_TRIGGERED=YES ;;
+    esac
+    echo "P3H_LAB_FAILED_STAGE: ${CURRENT_STAGE}"
+    echo "P3H_REMOTE_EXECUTION_IMPLEMENTATION: ${BLOCKED_REASON:-BLOCKED_UNKNOWN}"
+    echo "R1_RESULT: BLOCKED"
+    echo "BLOCKED_STAGE: $(stage_code "${CURRENT_STAGE}")"
+    echo "BLOCKED_REASON: ${BLOCKED_REASON:-BLOCKED_UNKNOWN}"
+    echo "STAGE_ELAPSED_MINUTES: ${stage_elapsed_minutes}"
+    echo "GLOBAL_ELAPSED_MINUTES: ${global_elapsed_minutes}"
+    echo "GLOBAL_TIMEOUT_TRIGGERED: ${GLOBAL_TIMEOUT_TRIGGERED}"
+    echo "NO_PROGRESS_TIMEOUT_TRIGGERED: ${NO_PROGRESS_TIMEOUT_TRIGGERED}"
+    echo "LAB_VM_CLEANUP: ${vm_cleanup}"
+    echo "LAB_DOCKER_CLEANUP: ${docker_cleanup}"
+    echo "LAB_SECRET_CLEANUP: ${secret_cleanup}"
+    echo "RAW_LOGS_EXPOSED: NO"
+    echo "RETRY_COUNT: 0"
+    echo "REAL_EXTERNAL_STAGING_STATUS: NOT_RUN"
+    echo "P3H_RESULT: NOT_COMPLETE"
+    echo "P4_ALLOWED: NO"
+    echo "PRODUCTION_READINESS: BLOCKED"
+  fi
   exit "${exit_status}"
 }
 trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap handle_termination INT TERM
 
 case "${P3H_TARGET_CLASS:-}" in
   AUTHORIZED_EXTERNAL_STAGING)
@@ -152,7 +282,18 @@ case "${P3H_TARGET_CLASS:-}" in
   *) blocked BLOCKED_UNSUPPORTED_TARGET_CLASS ;;
 esac
 
-CURRENT_STAGE=local-lab-input
+case "${GLOBAL_TIMEOUT_SECONDS}" in
+  ''|*[!0-9]*) blocked BLOCKED_INVALID_GLOBAL_TIMEOUT ;;
+esac
+[ "${GLOBAL_TIMEOUT_SECONDS}" -gt 0 ] \
+  && [ "${GLOBAL_TIMEOUT_SECONDS}" -le 10800 ] \
+  || blocked BLOCKED_INVALID_GLOBAL_TIMEOUT
+command -v python3 >/dev/null 2>&1 || blocked BLOCKED_HOST_PYTHON_MISSING
+[ -f "${BOUNDED_PROCESS_RUNNER}" ] || blocked BLOCKED_BOUNDED_RUNNER_MISSING
+global_watchdog &
+GLOBAL_WATCHDOG_PID="$!"
+
+set_stage local-lab-input
 [ -f "${LAB_MARKER}" ] && grep -Fxq P3H-LAB1-USER-AUTH-20260717 "${LAB_MARKER}" \
   || blocked BLOCKED_LAB_OWNERSHIP
 [ -f "${INPUT_FILE}" ] && [ ! -L "${INPUT_FILE}" ] \
@@ -238,7 +379,7 @@ metadata_target="$(sed -n 's/^TARGET_CLASS=//p' "${METADATA_FILE}")"
 [ "${metadata_vm}" = "${VM_NAME}" ] && [ "${metadata_target}" = LOCAL_LIMA_LAB ] \
   || blocked BLOCKED_LAB_METADATA
 
-CURRENT_STAGE=exact-source
+set_stage exact-source
 SOURCE_HEAD="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
 current_branch="$(git -C "${ROOT_DIR}" branch --show-current)"
 [ "${current_branch}" = "${EXPECTED_BRANCH}" ] || blocked BLOCKED_SOURCE_BRANCH
@@ -293,12 +434,22 @@ scp_options=(
 
 remote() {
   ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
-    bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh "$@"
+  bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh "$@"
 }
 
-CURRENT_STAGE=remote-preflight
+phase_remaining_seconds() {
+  local phase_start_epoch="$1"
+  local phase_timeout_seconds="$2"
+  local remaining
+  remaining=$((phase_timeout_seconds - ($(date +%s) - phase_start_epoch)))
+  [ "${remaining}" -gt 0 ] || return 1
+  printf '%s\n' "${remaining}"
+}
+
+set_stage remote-preflight
 remote_preflight="${TEMP_ROOT}/remote-preflight.raw"
-run_bounded_with_stdin 180 "${ROOT_DIR}/scripts/p3h-remote-preflight.sh" \
+run_bounded_with_stdin 180 REMOTE_PREFLIGHT \
+  "${ROOT_DIR}/scripts/p3h-remote-preflight.sh" \
   ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
   bash -s -- "${P3H_STAGING_HOSTNAME}" "${P3H_SECRET_BACKEND}" \
   "${P3H_SECRET_MOUNT_DIR}" "${P3H_TLS_MODE}" \
@@ -310,7 +461,7 @@ if ! "${ROOT_DIR}/scripts/p3h-server-evidence-redact.sh" \
 fi
 cat "${TEMP_ROOT}/remote-preflight.sanitized" >>"${RAW_EVIDENCE}"
 
-CURRENT_STAGE=exact-source-archive
+set_stage exact-source-archive
 archive_file="${TEMP_ROOT}/trade-model-p3h-${SOURCE_HEAD}.tar"
 git -C "${ROOT_DIR}" archive --format=tar --output="${archive_file}" "${SOURCE_HEAD}"
 archive_context="${TEMP_ROOT}/archive-context"
@@ -321,7 +472,7 @@ bash "${ROOT_DIR}/scripts/check-docker-context-safety.sh" \
   || blocked BLOCKED_DOCKER_CONTEXT_SAFETY
 archive_sha="$(shasum -a 256 "${archive_file}" | awk '{print $1}')"
 remote_archive="/tmp/trade-model-p3h-${SOURCE_HEAD}.tar"
-run_bounded 180 scp "${scp_options[@]}" "${archive_file}" \
+run_bounded 180 SOURCE_ARCHIVE_UPLOAD scp "${scp_options[@]}" "${archive_file}" \
   "${P3H_SSH_USER}@${P3H_SSH_HOST}:${remote_archive}" >/dev/null
 remote_sha="$(ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
   sha256sum "${remote_archive}" | awk '{print $1}')"
@@ -340,13 +491,23 @@ ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
   rm -f "${remote_archive}"
 REMOTE_PREPARED=1
 
-CURRENT_STAGE=initial-deploy
-run_remote_stage 12600 INITIAL_DEPLOY BLOCKED_INITIAL_DEPLOY
+set_stage application-image-build
+run_remote_stage 2700 BUILD_APPLICATION_IMAGE BLOCKED_APPLICATION_IMAGE_BUILD
 
-CURRENT_STAGE=secret-and-tls-rotation
-run_remote_stage 900 ROTATE BLOCKED_ROTATION
+set_stage runtime-image-pull
+run_remote_stage 2400 PULL_RUNTIME_IMAGES BLOCKED_RUNTIME_IMAGE_PULL
 
-CURRENT_STAGE=actual-vm-reboot
+set_stage initial-deploy
+run_remote_stage 1800 INITIAL_DEPLOY BLOCKED_INITIAL_DEPLOY
+
+set_stage backup-restore
+run_remote_stage 1800 BACKUP_RESTORE BLOCKED_BACKUP_RESTORE
+
+set_stage secret-and-tls-rotation
+rotation_reboot_start_epoch="$(date +%s)"
+run_remote_stage "${ROTATION_REBOOT_TIMEOUT_SECONDS}" ROTATE BLOCKED_ROTATION
+
+set_stage actual-vm-reboot
 boot_id_before="$(ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
   cat /proc/sys/kernel/random/boot_id)"
 set +e
@@ -355,18 +516,24 @@ ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
 set -e
 
 went_down=0
-for attempt in $(seq 1 90); do
+for attempt in $(seq 1 4); do
+  phase_remaining_seconds "${rotation_reboot_start_epoch}" \
+    "${ROTATION_REBOOT_TIMEOUT_SECONDS}" >/dev/null \
+    || blocked BLOCKED_ROTATION_REBOOT_TIMEOUT
   if ! ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" true \
       >/dev/null 2>&1; then
     went_down=1
     break
   fi
-  sleep 1
+  sleep 15
 done
 [ "${went_down}" -eq 1 ] || blocked BLOCKED_VM_DID_NOT_REBOOT
 
 came_up=0
-for attempt in $(seq 1 300); do
+for attempt in $(seq 1 20); do
+  phase_remaining_seconds "${rotation_reboot_start_epoch}" \
+    "${ROTATION_REBOOT_TIMEOUT_SECONDS}" >/dev/null \
+    || blocked BLOCKED_ROTATION_REBOOT_TIMEOUT
   current_port="$(limactl list "${VM_NAME}" --format '{{.SSHLocalPort}}' 2>/dev/null || true)"
   if [ "${current_port}" = "${ssh_port}" ] \
       && ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" true \
@@ -374,7 +541,7 @@ for attempt in $(seq 1 300); do
     came_up=1
     break
   fi
-  sleep 1
+  sleep 15
 done
 [ "${came_up}" -eq 1 ] || blocked BLOCKED_VM_REBOOT_TIMEOUT
 
@@ -392,10 +559,15 @@ boot_id_after="$(ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
   cat /proc/sys/kernel/random/boot_id)"
 [ "${boot_id_after}" != "${boot_id_before}" ] || blocked BLOCKED_BOOT_ID_UNCHANGED
 
-CURRENT_STAGE=post-reboot-verification
-run_remote_stage 900 POST_REBOOT_VERIFY BLOCKED_POST_REBOOT_VERIFY
+set_stage post-reboot-verification
+if ! post_reboot_timeout_seconds="$(phase_remaining_seconds \
+    "${rotation_reboot_start_epoch}" "${ROTATION_REBOOT_TIMEOUT_SECONDS}")"; then
+  blocked BLOCKED_ROTATION_REBOOT_TIMEOUT
+fi
+run_remote_stage "${post_reboot_timeout_seconds}" POST_REBOOT_VERIFY \
+  BLOCKED_POST_REBOOT_VERIFY
 
-CURRENT_STAGE=evidence-redaction
+set_stage evidence-redaction
 evidence_dir="${EVIDENCE_ROOT}/${SOURCE_HEAD:0:12}"
 mkdir -p "${evidence_dir}"
 chmod 700 "${EVIDENCE_ROOT}" "${evidence_dir}"
@@ -406,15 +578,23 @@ summary_sha="$(shasum -a 256 "${summary_file}" | awk '{print $1}')"
 printf '%s\n' "${summary_sha}" >"${evidence_dir}/p3h-lab1-summary.sha256"
 chmod 600 "${summary_file}" "${evidence_dir}/p3h-lab1-summary.sha256"
 
-CURRENT_STAGE=resource-cleanup
-run_bounded 300 remote CLEANUP "${SOURCE_HEAD}" >/dev/null \
+set_stage resource-cleanup
+run_bounded 300 REMOTE_LAB_CLEANUP \
+  ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
+  bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh \
+  CLEANUP "${SOURCE_HEAD}" "$(date +%s)" 300 >/dev/null \
   || blocked BLOCKED_REMOTE_RESOURCE_CLEANUP
 P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1 \
   bash "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" >/dev/null \
   || blocked BLOCKED_VM_RESOURCE_CLEANUP
 CLEANUP_COMPLETE=1
+R1_TOTAL_DURATION_MINUTES=$(( ($(date +%s) - RUN_START_EPOCH + 59) / 60 ))
 
 echo "P3H_LAB_RESULT: PASS_LOCAL_DISPOSABLE_LINUX_VM_STAGING"
+echo "R1_RESULT: PASS_LOCAL_DISPOSABLE_LINUX_VM_STAGING"
+echo "R1_TOTAL_DURATION_MINUTES: ${R1_TOTAL_DURATION_MINUTES}"
+echo "GLOBAL_TIMEOUT_ENFORCED: PASS"
+echo "NO_PROGRESS_TIMEOUT_ENFORCED: PASS"
 echo "P3H_REMOTE_EXECUTION_IMPLEMENTATION: PASS_LOCAL_VM"
 echo "LINUX_VM: PASS"
 echo "SYSTEMD_CREDENTIALS: PASS"
