@@ -378,6 +378,7 @@ class ControlledStagingLocalLimaLabContractTest {
                 "${SERVICE_RUNTIME}/p3h-lab-backup.XXXXXX",
                 "${SERVICE_RUNTIME}/p3h-lab-journal.XXXXXX",
                 "run_checked_or_block()",
+                "checked_failure_reason()",
                 "trap - ERR",
                 "set -euo pipefail",
                 "run_checked_or_block BLOCKED_HTTPS_SMOKE https_smoke V1",
@@ -385,6 +386,14 @@ class ControlledStagingLocalLimaLabContractTest {
                 "run_checked_or_block BLOCKED_TLS_CREDENTIAL_ACTIVATION",
                 "run_checked_or_block BLOCKED_POST_ROTATION_SMOKE https_smoke V2",
                 "run_checked_or_block BLOCKED_HTTPS_AFTER_REBOOT https_smoke V2");
+        assertThat(remote).contains(
+                "detail=RUNTIME_DIRECTORY", "detail=AUTH_CONFIG",
+                "detail=HEALTH", "detail=LIVENESS", "detail=READINESS",
+                "detail=DASHBOARD_FETCH", "detail=REVIEW_FETCH",
+                "detail=PROD_SMOKE_CONTRACT", "detail=DASHBOARD_SAFETY",
+                "detail=UNAUTHENTICATED_API", "detail=HTTP_REDIRECT",
+                "detail=UNKNOWN_HOST_REJECTION", "detail=TLS_1_2",
+                "detail=TLS_1_3", "detail=RATE_LIMIT");
         assertThat(remote).doesNotContain(
                 "mktemp /run/p3h-lab-auth.",
                 "mktemp -d /run/p3h-lab-smoke.",

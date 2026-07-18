@@ -55,7 +55,40 @@ run_checked_or_block() {
   check_status=$?
   set -e
   if [ "${check_status}" -ne 0 ]; then
-    blocked "${reason}"
+    blocked "$(checked_failure_reason "${reason}" "${check_status}")"
+  fi
+}
+
+checked_failure_reason() {
+  local base_reason="$1"
+  local check_status="$2"
+  local detail=""
+  case "${base_reason}:${check_status}" in
+    BLOCKED_HTTPS_SMOKE:*|BLOCKED_POST_ROTATION_SMOKE:*|BLOCKED_HTTPS_AFTER_REBOOT:*)
+      case "${check_status}" in
+        61) detail=RUNTIME_DIRECTORY ;;
+        62) detail=AUTH_CONFIG ;;
+        63) detail=HEALTH ;;
+        64) detail=LIVENESS ;;
+        65) detail=READINESS ;;
+        66) detail=DASHBOARD_FETCH ;;
+        67) detail=REVIEW_FETCH ;;
+        68) detail=PROD_SMOKE_CONTRACT ;;
+        69) detail=DASHBOARD_SAFETY ;;
+        70) detail=UNAUTHENTICATED_API ;;
+        71) detail=HTTP_REDIRECT ;;
+        72) detail=UNKNOWN_HOST_REJECTION ;;
+        73) detail=TLS_1_2 ;;
+        74) detail=TLS_1_3 ;;
+        75) detail=RATE_LIMIT ;;
+        *) detail=UNKNOWN ;;
+      esac
+      ;;
+  esac
+  if [ -n "${detail}" ]; then
+    echo "${base_reason}_${detail}"
+  else
+    echo "${base_reason}"
   fi
 }
 
@@ -469,11 +502,13 @@ await_auth_expectation() {
 https_smoke() {
   local admin_version="$1"
   local response_dir config_file unauthenticated_code redirect_headers unknown_code
-  [ -d "${SERVICE_RUNTIME}" ] && [ ! -L "${SERVICE_RUNTIME}" ]
-  response_dir="$(mktemp -d "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX")"
+  [ -d "${SERVICE_RUNTIME}" ] && [ ! -L "${SERVICE_RUNTIME}" ] || return 61
+  response_dir="$(mktemp -d "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX")" \
+    || return 61
+  trap 'rm -rf "${response_dir}"' EXIT
   config_file="${response_dir}/curl-auth.conf"
-  chmod 700 "${response_dir}"
-  {
+  chmod 700 "${response_dir}" || return 61
+  if ! {
     echo 'silent'
     echo 'show-error'
     echo 'max-time = 20'
@@ -481,33 +516,40 @@ https_smoke() {
     echo "resolve = \"${HOSTNAME}:443:127.0.0.1\""
     printf 'user = "p3h_operator:%s"\n' \
       "$(tr -d '\r\n' <"${CREDENTIALS}/app_admin_password_${admin_version,,}")"
-  } >"${config_file}"
-  chmod 600 "${config_file}"
+  } >"${config_file}"; then
+    return 62
+  fi
+  chmod 600 "${config_file}" || return 62
 
   curl --silent --show-error --max-time 20 \
     --cacert "${CREDENTIALS}/tls_ca_certificate" \
     --resolve "${HOSTNAME}:443:127.0.0.1" \
-    "https://${HOSTNAME}/actuator/health" >"${response_dir}/health.json"
+    "https://${HOSTNAME}/actuator/health" >"${response_dir}/health.json" \
+    || return 63
   curl --silent --show-error --max-time 20 \
     --cacert "${CREDENTIALS}/tls_ca_certificate" \
     --resolve "${HOSTNAME}:443:127.0.0.1" \
-    "https://${HOSTNAME}/actuator/health/liveness" >"${response_dir}/liveness.json"
+    "https://${HOSTNAME}/actuator/health/liveness" >"${response_dir}/liveness.json" \
+    || return 64
   curl --silent --show-error --max-time 20 \
     --cacert "${CREDENTIALS}/tls_ca_certificate" \
     --resolve "${HOSTNAME}:443:127.0.0.1" \
-    "https://${HOSTNAME}/actuator/health/readiness" >"${response_dir}/readiness.json"
+    "https://${HOSTNAME}/actuator/health/readiness" >"${response_dir}/readiness.json" \
+    || return 65
   curl --config "${config_file}" \
-    "https://${HOSTNAME}/api/dashboard/home" >"${response_dir}/dashboard.json"
+    "https://${HOSTNAME}/api/dashboard/home" >"${response_dir}/dashboard.json" \
+    || return 66
   curl --config "${config_file}" \
-    "https://${HOSTNAME}/api/review/center" >"${response_dir}/review.json"
+    "https://${HOSTNAME}/api/review/center" >"${response_dir}/review.json" \
+    || return 67
 
   SMOKE_PHASE=VALIDATE \
   SMOKE_SPLIT_PHASE_CONFIRM=I_CONFIRM_LOCAL_CONTROLLED_SPLIT_SMOKE \
   SMOKE_RESPONSE_DIR="${response_dir}" \
   SMOKE_ALLOW_EXTERNAL_CALLS=false \
-    bash "${ROOT}/scripts/prod-smoke.sh" >/dev/null
+    bash "${ROOT}/scripts/prod-smoke.sh" >/dev/null || return 68
 
-  python3 - "${response_dir}/dashboard.json" <<'PY'
+  python3 - "${response_dir}/dashboard.json" <<'PY' || return 69
 import json
 import sys
 
@@ -521,30 +563,34 @@ if safety.get("notAutoTrading") is not True or safety.get("notOrderExecution") i
     raise SystemExit(2)
 PY
 
-  unauthenticated_code="$(curl --silent --show-error --max-time 20 \
-    --cacert "${CREDENTIALS}/tls_ca_certificate" \
-    --resolve "${HOSTNAME}:443:127.0.0.1" --output /dev/null \
-    --write-out '%{http_code}' "https://${HOSTNAME}/api/dashboard/home")"
-  case "${unauthenticated_code}" in 401|403) ;; *) return 1 ;; esac
+  if ! unauthenticated_code="$(curl --silent --show-error --max-time 20 \
+      --cacert "${CREDENTIALS}/tls_ca_certificate" \
+      --resolve "${HOSTNAME}:443:127.0.0.1" --output /dev/null \
+      --write-out '%{http_code}' "https://${HOSTNAME}/api/dashboard/home")"; then
+    return 70
+  fi
+  case "${unauthenticated_code}" in 401|403) ;; *) return 70 ;; esac
 
   redirect_headers="${response_dir}/redirect.headers"
   curl --silent --show-error --max-time 20 --output /dev/null \
     --dump-header "${redirect_headers}" -H "Host: ${HOSTNAME}" \
-    http://127.0.0.1/actuator/health
-  grep -Eiq "^Location: https://${HOSTNAME}/actuator/health\r?$" "${redirect_headers}"
+    http://127.0.0.1/actuator/health || return 71
+  grep -Eiq "^Location: https://${HOSTNAME}/actuator/health\r?$" \
+    "${redirect_headers}" || return 71
 
   unknown_code="$(curl --silent --max-time 10 --output /dev/null \
     --write-out '%{http_code}' -H 'Host: unapproved.invalid' \
     http://127.0.0.1/ || true)"
-  [ "${unknown_code}" != 200 ] && [ "${unknown_code}" != 308 ]
+  [ "${unknown_code}" != 200 ] && [ "${unknown_code}" != 308 ] \
+    || return 72
 
   openssl s_client -connect 127.0.0.1:443 -servername "${HOSTNAME}" \
     -CAfile "${CREDENTIALS}/tls_ca_certificate" -verify_hostname "${HOSTNAME}" \
-    -verify_return_error -tls1_2 </dev/null >/dev/null 2>&1
+    -verify_return_error -tls1_2 </dev/null >/dev/null 2>&1 || return 73
   if openssl s_client -help 2>&1 | grep -q -- -tls1_3; then
     openssl s_client -connect 127.0.0.1:443 -servername "${HOSTNAME}" \
       -CAfile "${CREDENTIALS}/tls_ca_certificate" -verify_hostname "${HOSTNAME}" \
-      -verify_return_error -tls1_3 </dev/null >/dev/null 2>&1
+      -verify_return_error -tls1_3 </dev/null >/dev/null 2>&1 || return 74
   fi
 
   : >"${response_dir}/rate-codes"
@@ -556,8 +602,9 @@ PY
     ) &
   done
   wait
-  grep -Fxq 429 "${response_dir}/rate-codes"
+  grep -Fxq 429 "${response_dir}/rate-codes" || return 75
   rm -rf "${response_dir}"
+  trap - EXIT
 }
 
 postgres_ops() {
