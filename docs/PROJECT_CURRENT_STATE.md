@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H
-Next Business Phase: Reviewer P3-H Offline Harness Round 5 Re-review; P4 remains blocked
-Next Business Phase Allowed: NO while P3-H is unmerged and controlled staging inputs are missing; NO for P4 and production deployment
+Current Work Package: P3-H-LAB1 Bounded Local Linux VM and Remote Execution Evidence
+Next Business Phase: Reviewer P3-H-LAB1 Timeout and Remote Execution Evidence Review; P4 remains blocked
+Next Business Phase Allowed: NO while PR #1130 is unmerged, LAB1 is blocked before R1, and controlled staging inputs are missing; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -57,6 +57,20 @@ denied writes, leak checks, and cleanup as
 P3-H is not production deployment. P4 is not allowed, Production Deployment
 Readiness remains `BLOCKED`, and production deployment cannot proceed. See
 `docs/CONTROLLED_STAGING_READONLY_TLS_SECRETSTORE_P3H.md`.
+
+Merged main `230528b0942737275a397323bcfff874541e2ea8` contains the P3-H
+offline harness. PR #1130 adds a separate local disposable Linux VM path and
+hardens it after the pre-hardening R1 had to be aborted at
+`APPLICATION_IMAGE_BUILD`. The hardened contract has a 180-minute R1 limit,
+independent stage limits, exact process-group TERM/KILL handling, bounded
+preflight, 60-second sanitized heartbeats, and a 15-minute Docker no-progress
+limit with no automatic retry.
+
+The one authorized clean attempt from commit `9223f8d6` was blocked during
+fresh Lima startup as `BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE` after about 15
+minutes. R1 never started; no deployment stage is PASS. Exact cleanup removed
+the LAB VM, LAB files, and dedicated NTP service. A second attempt was not run,
+real external staging remains `NOT_RUN`, and P3-H remains `NOT_COMPLETE`.
 
 ---
 
@@ -827,10 +841,10 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 ## Current Allowed Work
 
-Only the following work is allowed under the current P3-H closure:
+Only the following work is allowed under the current P3-H-LAB1 closure:
 
-1. Perform Reviewer P3-H Offline Harness Round 5 re-review.
-2. Keep offline contract evidence distinct from real server execution.
+1. Perform Reviewer P3-H-LAB1 Timeout and Remote Execution Evidence Review.
+2. Keep the blocked VM bootstrap distinct from R1 or real server execution.
 3. Retain existing P3/P3-G/P3-H safety and recovery tooling.
 4. Keep P4 and production deployment blocked.
 5. Run a later controlled server package only with complete explicit
@@ -1103,5 +1117,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR; Round 4 exact integrity evidence pending Round 5 re-review and merge
+- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; bounded execution and blocked bootstrap evidence pending review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

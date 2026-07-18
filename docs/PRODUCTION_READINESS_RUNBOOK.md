@@ -848,6 +848,16 @@ table privileges, absence of PUBLIC and column-level writes, and strict
 pre-network grammar for staging hostname, SSH host, and SSH user. These remain
 disposable local template results, not authorized-server evidence.
 
+P3-H-LAB1 adds a separate local disposable Lima VM route. Its pre-hardening R1
+was explicitly aborted and classified at `APPLICATION_IMAGE_BUILD`; it is not
+a PASS. The hardened route enforces a 180-minute R1 ceiling, bounded stages,
+exact process-group TERM/KILL cleanup, 60-second sanitized heartbeats, build
+preflight, a 15-minute Docker no-progress limit, and zero automatic retries.
+The single clean attempt at commit `9223f8d6` stopped at the bounded Lima
+startup limit with `BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE`. R1 did not start,
+cleanup passed, and no second attempt ran. This evidence does not change real
+staging, P4, or production readiness.
+
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
 non-production Linux server, use full `FETCH_AND_VALIDATE` HTTPS smoke, restore
@@ -862,8 +872,9 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H Offline Harness Round 5 re-review, preserving the
-   distinction between local template PASS and missing real-staging evidence.
+1. Complete Reviewer P3-H-LAB1 Timeout and Remote Execution Evidence Review,
+   preserving the distinction between guard PASS, blocked bootstrap, local
+   template PASS, and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.
 3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,

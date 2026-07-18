@@ -181,10 +181,40 @@ already destroyed the VM. No values are fabricated.
 ## Evidence Status
 
 The timeout and no-progress contract is implemented and its offline contract
-tests pass. The single permitted clean rerun is pending from a newly created
-VM; no second retry is authorized.
+tests pass. Commit `9223f8d6a00935391cd1415944ae5b962f23c1b1` was then used
+for the single permitted clean attempt. The attempt created a new Lima VM, but
+Lima did not complete startup before its own 15-minute bound and returned
+`BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE`. The R1 runner never started, and no
+deployment, Flyway, backup/restore, rotation, or reboot result is represented
+as PASS. A second attempt was not run.
 
-`P3H_LAB_RESULT: PENDING_SINGLE_BOUNDED_RERUN`
+`P3H_LAB_RESULT: BLOCKED_LOCAL_LAB_BOOTSTRAP`
+
+`R1_RESULT: BLOCKED`
+
+`R1_PROCESS_STARTED: NO`
+
+`BLOCKED_STAGE: VM_BOOTSTRAP`
+
+`BLOCKED_REASON: BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE`
+
+`STAGE_ELAPSED_MINUTES: 16`
+
+`GLOBAL_ELAPSED_MINUTES: 16`
+
+`GLOBAL_TIMEOUT_TRIGGERED: NO`
+
+`NO_PROGRESS_TIMEOUT_TRIGGERED: NO`
+
+`LAB_VM_CLEANUP: PASS`
+
+`LAB_DOCKER_CLEANUP: PASS`
+
+`LAB_SECRET_CLEANUP: PASS`
+
+`RAW_LOGS_EXPOSED: NO`
+
+`RETRY_COUNT: 0`
 
 `REAL_EXTERNAL_STAGING_STATUS: NOT_RUN`
 
@@ -193,6 +223,13 @@ VM; no second retry is authorized.
 `P4_ALLOWED: NO`
 
 `PRODUCTION_READINESS: BLOCKED`
+
+The elapsed values are rounded up from the last bounded heartbeat and terminal
+event. Cleanup verification found zero R1 or bootstrap processes, no LAB VM,
+no LAB root, and no dedicated LAB NTP service. Because the VM was destroyed,
+its LAB-scoped containers, network, volumes, identity, certificates, generated
+credentials, and attestations are absent. No unrelated resource was selected
+for cleanup.
 
 ## Safety Boundary
 
