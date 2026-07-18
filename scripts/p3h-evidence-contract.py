@@ -69,16 +69,29 @@ PREFLIGHT_RULES: list[tuple[str, Callable[[str], bool]]] = [
 ]
 
 
+ARTIFACT_BUILD_RULES: list[tuple[str, Callable[[str], bool]]] = [
+    ("P3H_ARTIFACT_BUILD", fixed("PASS_EXACT_HEAD")),
+    ("APP_ARTIFACT_SOURCE_HEAD", lambda value: bool(HEX_40.fullmatch(value))),
+    ("APP_JAR_SHA256", lambda value: bool(HEX_64.fullmatch(value))),
+    ("APP_JAR_SIZE_BYTES", positive_integer),
+    ("APP_ARTIFACT_ARCHIVE_SHA256", lambda value: bool(HEX_64.fullmatch(value))),
+]
+
+
 ACTION_RULES: dict[str, list[tuple[str, Callable[[str], bool]]]] = {
     "BUILD_APPLICATION_IMAGE": [
         ("P3H_REMOTE_STAGE", fixed("APPLICATION_IMAGE_BUILD_PASS")),
-        ("P3H_IMAGE_BUILD_ATTEMPTS", fixed("1")),
-        ("P3H_IMAGE_BUILD_RETRY_COUNT", fixed("0")),
+        ("APP_ARTIFACT_SOURCE_HEAD", lambda value: bool(HEX_40.fullmatch(value))),
+        ("APP_JAR_SHA256", lambda value: bool(HEX_64.fullmatch(value))),
+        ("APP_ARTIFACT_ARCHIVE_SHA256", lambda value: bool(HEX_64.fullmatch(value))),
+        ("APP_ARTIFACT_REMOTE_SHA256", fixed("MATCH")),
+        ("APP_JAR_REMOTE_SHA256", fixed("MATCH")),
+        ("P3H_RUNTIME_IMAGE_PREFETCH", fixed("PASS_4_OF_4")),
         ("APP_IMAGE_REVISION", lambda value: bool(HEX_40.fullmatch(value))),
-    ],
-    "PULL_RUNTIME_IMAGES": [
-        ("P3H_REMOTE_STAGE", fixed("RUNTIME_IMAGE_PULL_PASS")),
-        ("P3H_RUNTIME_IMAGE_PREFETCH", fixed("PASS_3_OF_3")),
+        ("APP_IMAGE_JAR_SHA256", lambda value: bool(HEX_64.fullmatch(value))),
+        ("APP_IMAGE_USER", fixed("NON_ROOT_10001")),
+        ("APP_IMAGE_JAR_CONTENT_SHA", fixed("MATCH")),
+        ("APPLICATION_IMAGE_BUILD_MODE", fixed("RUNTIME_ONLY_PREBUILT_JAR")),
     ],
     "INITIAL_DEPLOY": [
         ("P3H_REMOTE_STAGE", fixed("INITIAL_DEPLOY_PASS")),
@@ -146,7 +159,6 @@ ACTION_OPTIONAL_RULES: dict[str, Callable[[str], bool]] = {
     "DOCKER_DAEMON": fixed("ACTIVE"),
     "DNS_RESOLUTION": fixed("PASS"),
     "REQUIRED_REGISTRY_CONNECTIVITY": fixed("PASS_BOUNDED"),
-    "MAVEN_REPOSITORY_CONNECTIVITY": fixed("PASS_BOUNDED"),
 }
 
 
@@ -173,7 +185,6 @@ FINAL_UNIQUE_RULES: list[tuple[str, Callable[[str], bool]]] = (
 
 FINAL_STAGE_VALUES = [
     "APPLICATION_IMAGE_BUILD_PASS",
-    "RUNTIME_IMAGE_PULL_PASS",
     "INITIAL_DEPLOY_PASS",
     "BACKUP_RESTORE_PASS",
     "ROTATION_PASS",
@@ -184,18 +195,28 @@ FINAL_STAGE_VALUES = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--contract", choices=("preflight", "action", "final"), required=True)
+    parser.add_argument(
+        "--contract", choices=("preflight", "artifact", "action", "final"), required=True
+    )
     parser.add_argument("--action", choices=tuple(ACTION_RULES))
     parser.add_argument("--source-head")
+    parser.add_argument("--app-jar-sha256")
+    parser.add_argument("--app-artifact-archive-sha256")
     parser.add_argument("--input-file", required=True)
     parser.add_argument("--output-file", required=True)
     parser.add_argument("--status-key", required=True)
     args = parser.parse_args()
     if args.contract == "action" and not args.action:
         parser.error("action contract requires an action")
-    if args.contract in {"action", "final"}:
+    if args.contract in {"artifact", "action", "final"}:
         if not args.source_head or not HEX_40.fullmatch(args.source_head):
-            parser.error("action and final contracts require a source head")
+            parser.error("artifact, action, and final contracts require a source head")
+    if args.contract == "action" and args.action == "BUILD_APPLICATION_IMAGE":
+        if not args.app_jar_sha256 or not HEX_64.fullmatch(args.app_jar_sha256):
+            parser.error("build action requires an application JAR SHA-256")
+        if (not args.app_artifact_archive_sha256
+                or not HEX_64.fullmatch(args.app_artifact_archive_sha256)):
+            parser.error("build action requires an artifact archive SHA-256")
     return args
 
 
@@ -268,8 +289,23 @@ def validate_preflight(lines: list[tuple[str, str]]) -> list[tuple[str, str]]:
     return require_unique(grouped, PREFLIGHT_RULES)
 
 
+def validate_artifact(
+        lines: list[tuple[str, str]], source_head: str
+) -> list[tuple[str, str]]:
+    grouped = group_lines(lines)
+    allowed = {key for key, _validator in ARTIFACT_BUILD_RULES}
+    if set(grouped) - allowed:
+        raise ContractFailure("BLOCKED_UNKNOWN_KEY")
+    canonical = require_unique(grouped, ARTIFACT_BUILD_RULES)
+    if grouped["APP_ARTIFACT_SOURCE_HEAD"][0] != source_head:
+        raise ContractFailure("BLOCKED_INVALID_VALUE")
+    return canonical
+
+
 def validate_action(
-        lines: list[tuple[str, str]], action: str, source_head: str
+        lines: list[tuple[str, str]], action: str, source_head: str,
+        expected_jar_sha256: str | None,
+        expected_archive_sha256: str | None,
 ) -> list[tuple[str, str]]:
     grouped = group_lines(lines)
     required_rules = ACTION_RULES[action]
@@ -285,8 +321,15 @@ def validate_action(
         if any(not ACTION_OPTIONAL_RULES[key](value) for value in values):
             raise ContractFailure("BLOCKED_INVALID_VALUE")
     if action == "BUILD_APPLICATION_IMAGE":
-        revision = grouped["APP_IMAGE_REVISION"][0]
-        if revision != source_head:
+        if grouped["APP_ARTIFACT_SOURCE_HEAD"][0] != source_head:
+            raise ContractFailure("BLOCKED_INVALID_VALUE")
+        if grouped["APP_IMAGE_REVISION"][0] != source_head:
+            raise ContractFailure("BLOCKED_INVALID_VALUE")
+        if grouped["APP_JAR_SHA256"][0] != expected_jar_sha256:
+            raise ContractFailure("BLOCKED_INVALID_VALUE")
+        if grouped["APP_IMAGE_JAR_SHA256"][0] != expected_jar_sha256:
+            raise ContractFailure("BLOCKED_INVALID_VALUE")
+        if grouped["APP_ARTIFACT_ARCHIVE_SHA256"][0] != expected_archive_sha256:
             raise ContractFailure("BLOCKED_INVALID_VALUE")
     return canonical
 
@@ -313,7 +356,11 @@ def validate_final(
     values = dict(canonical)
     if values["SOURCE_ARCHIVE_SHA256"] != values["SOURCE_ARCHIVE_REMOTE_SHA256"]:
         raise ContractFailure("BLOCKED_INVALID_VALUE")
+    if values["APP_ARTIFACT_SOURCE_HEAD"] != source_head:
+        raise ContractFailure("BLOCKED_INVALID_VALUE")
     if values["APP_IMAGE_REVISION"] != source_head:
+        raise ContractFailure("BLOCKED_INVALID_VALUE")
+    if values["APP_JAR_SHA256"] != values["APP_IMAGE_JAR_SHA256"]:
         raise ContractFailure("BLOCKED_INVALID_VALUE")
 
     canonical_by_key = dict(canonical)
@@ -363,8 +410,16 @@ def main() -> int:
         lines = read_lines(Path(args.input_file))
         if args.contract == "preflight":
             canonical = validate_preflight(lines)
+        elif args.contract == "artifact":
+            canonical = validate_artifact(lines, args.source_head)
         elif args.contract == "action":
-            canonical = validate_action(lines, args.action, args.source_head)
+            canonical = validate_action(
+                lines,
+                args.action,
+                args.source_head,
+                args.app_jar_sha256,
+                args.app_artifact_archive_sha256,
+            )
         else:
             canonical = validate_final(lines, args.source_head)
         write_output(Path(args.output_file), canonical)

@@ -206,15 +206,24 @@ class ControlledStagingLocalLimaLabContractTest {
     void exactSourceArchiveMustMatchRemoteHashAndImageRevision() throws Exception {
         String runner = read("scripts/controlled-staging-readonly-deployment-p3h-r1.sh");
         String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+        String artifactBuilder = read("scripts/p3h-build-exact-application-artifact.sh");
+        String runtimeDockerfile = read("deploy/p3h/Dockerfile.runtime.p3h");
 
         assertThat(runner).contains(
                 "git -C \"${ROOT_DIR}\" archive", "archive_sha", "remote_sha",
                 "BLOCKED_REMOTE_ARCHIVE_SHA");
         assertThat(remote).contains(
                 "org.opencontainers.image.revision", "BLOCKED_IMAGE_REVISION",
+                "org.example.trademodel.app-jar-sha256",
+                "APP_IMAGE_JAR_CONTENT_SHA: MATCH",
                 "expected_release=\"/opt/trade-model-p3h/releases/${SOURCE_HEAD}\"",
                 "[ -L \"${ROOT}\" ]",
                 "[ \"$(readlink -f \"${ROOT}\")\" = \"${expected_release}\" ]");
+        assertThat(artifactBuilder).contains(
+                "git -C \"${ROOT_DIR}\" archive", "./mvnw -B -ntp -DskipTests package",
+                "APP_ARTIFACT_ARCHIVE_SHA256", "PASS_EXACT_HEAD");
+        assertThat(runtimeDockerfile).contains(
+                "ARG VCS_REF", "ARG APP_JAR_SHA256", "USER 10001:10001");
     }
 
     @Test
@@ -248,8 +257,7 @@ class ControlledStagingLocalLimaLabContractTest {
                 "P3H_REMOTE_FAILURE_REASON: ${reason}",
                 "SANITIZED_FAILURE_EVIDENCE_SHA256: ${failure_sha}",
                 "P3H_REMOTE_STAGE: BLOCKED_REMOTE_STAGE_TIMEOUT",
-                "run_remote_stage 2700 BUILD_APPLICATION_IMAGE BLOCKED_APPLICATION_IMAGE_BUILD",
-                "run_remote_stage 2400 PULL_RUNTIME_IMAGES BLOCKED_RUNTIME_IMAGE_PULL",
+                "run_remote_stage 3300 BUILD_APPLICATION_IMAGE BLOCKED_APPLICATION_IMAGE_BUILD",
                 "run_remote_stage 1800 INITIAL_DEPLOY BLOCKED_INITIAL_DEPLOY",
                 "run_remote_stage 1800 BACKUP_RESTORE BLOCKED_BACKUP_RESTORE");
         assertThat(runner).doesNotContain(
@@ -258,16 +266,12 @@ class ControlledStagingLocalLimaLabContractTest {
         assertThat(remote).contains(
                 "trap unexpected_failure ERR",
                 "BLOCKED_UNEXPECTED_${CURRENT_REMOTE_STEP}",
-                "IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=2700",
-                "IMAGE_BUILD_MAX_ATTEMPTS=1",
+                "RUNTIME_ONLY_IMAGE_BUILD_TIMEOUT_SECONDS=600",
                 "IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN",
-                "P3H_IMAGE_BUILD_RETRY_COUNT: 0",
                 "could not transfer artifact",
                 "premature eof",
                 "status code: 5[0-9][0-9]",
-                "compilation failure",
-                "cannot find symbol",
-                "NO_PROGRESS_TIMEOUT_SECONDS=900",
+                "NO_PROGRESS_TIMEOUT_SECONDS=300",
                 "BLOCKED_IMAGE_BUILD_${IMAGE_BUILD_FAILURE_CATEGORY}",
                 "service_start_failure_reason()",
                 "$1 == \"P3H_COMPOSE_FAILED_STEP\"",
@@ -304,7 +308,6 @@ class ControlledStagingLocalLimaLabContractTest {
                 "start_service_or_block INITIAL_SERVICE",
                 "start_service_or_block STEADY_SERVICE");
         assertThat(remote).doesNotContain(
-                "IMAGE_BUILD_MAX_ATTEMPTS=3",
                 "while true",
                 "P3H_IMAGE_BUILD_RETRY: BOUNDED_CACHE_REUSE_",
                 "cat \"${build_log}\"",
@@ -354,14 +357,17 @@ class ControlledStagingLocalLimaLabContractTest {
                 "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1",
                 "pull_runtime_image()",
                 "ensure_runtime_images()",
+                "pull_remaining=$((RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS - pull_elapsed))",
+                "pull_timeout_seconds=\"${pull_remaining}\"",
+                "pull_runtime_image \"${image}\" \"${pull_timeout_seconds}\"",
                 "docker pull \"${image}\"",
-                "P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3",
+                "P3H_RUNTIME_IMAGE_PREFETCH: PASS_4_OF_4",
                 "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}",
-                "CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH",
-                "P3H_IMAGE_BUILD_RETRY_COUNT: 0");
+                "CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH");
         assertThat(remote.indexOf("CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH"))
-                .isLessThan(remote.indexOf("CURRENT_REMOTE_STEP=INITIAL_UNIT_INSTALL"));
+                .isLessThan(remote.indexOf("CURRENT_REMOTE_STEP=IMAGE_BUILD"));
         assertThat(remote).contains(
+                "eclipse-temurin:17-jre-jammy@sha256:",
                 "postgres:16-alpine@sha256:",
                 "flyway/flyway:12.11.0-alpine@sha256:",
                 "nginx:1.27.4-alpine@sha256:");
@@ -420,8 +426,8 @@ class ControlledStagingLocalLimaLabContractTest {
                 "HEARTBEAT_INTERVAL_SECONDS=60",
                 "COMPLETE_R1_PROCESS_TREE",
                 "P3H_COMPLETE_PROCESS_TREE_SUPERVISED",
-                "run_remote_stage 2700 BUILD_APPLICATION_IMAGE",
-                "run_remote_stage 2400 PULL_RUNTIME_IMAGES",
+                "run_bounded 2100 APPLICATION_ARTIFACT_BUILD_ON_HOST",
+                "run_remote_stage 3300 BUILD_APPLICATION_IMAGE",
                 "run_remote_stage 1800 INITIAL_DEPLOY",
                 "run_remote_stage 1800 BACKUP_RESTORE",
                 "ROTATION_REBOOT_TIMEOUT_SECONDS=1800",
@@ -431,10 +437,10 @@ class ControlledStagingLocalLimaLabContractTest {
                 "GLOBAL_TIMEOUT_ENFORCED: PASS",
                 "NO_PROGRESS_TIMEOUT_ENFORCED: PASS");
         assertThat(remote).contains(
-                "IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=2700",
+                "RUNTIME_ONLY_IMAGE_BUILD_TIMEOUT_SECONDS=600",
                 "RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200",
                 "RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400",
-                "NO_PROGRESS_TIMEOUT_SECONDS=900",
+                "NO_PROGRESS_TIMEOUT_SECONDS=300",
                 "PROGRESS_PROBE_TIMEOUT_SECONDS=5",
                 "POLL_INTERVAL_SECONDS=15",
                 "HEARTBEAT_INTERVAL_SECONDS=60");
@@ -456,17 +462,15 @@ class ControlledStagingLocalLimaLabContractTest {
                 "[ \"${root_disk_gb}\" -ge 15 ]",
                 "systemctl is-active --quiet docker.service",
                 "getent ahosts registry-1.docker.io",
-                "getent ahosts repo.maven.apache.org",
                 "--connect-timeout 5 --max-time 10 https://registry-1.docker.io/v2/",
-                "--connect-timeout 5 --max-time 10 https://repo.maven.apache.org/maven2/",
-                "REQUIRED_REGISTRY_CONNECTIVITY: PASS_BOUNDED",
-                "MAVEN_REPOSITORY_CONNECTIVITY: PASS_BOUNDED");
-        assertThat(remote.indexOf("bounded_build_preflight"))
-                .isLessThan(remote.indexOf("build_application_image \"${image}\""));
+                "REQUIRED_REGISTRY_CONNECTIVITY: PASS_BOUNDED");
+        assertThat(remote).doesNotContain("repo.maven.apache.org", "./mvnw");
+        assertThat(remote.indexOf("CURRENT_REMOTE_STEP=BOUNDED_BUILD_PREFLIGHT"))
+                .isLessThan(remote.indexOf("CURRENT_REMOTE_STEP=IMAGE_BUILD"));
     }
 
     @Test
-    void dockerProgressMustChangeWithinFifteenMinutesAndNeverAutoRetries() throws Exception {
+    void dockerProgressUsesOutputGrowthAndHardTimeoutWithoutAutoRetries() throws Exception {
         String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
 
         assertThat(remote).contains(
@@ -477,13 +481,16 @@ class ControlledStagingLocalLimaLabContractTest {
                 "docker system df --format",
                 "/var/lib/docker/buildkit",
                 "/var/lib/docker/containerd",
+                "stat -c '%s|%Y' \"${output_file}\"",
+                "PROGRESS_OUTPUT_SIZE",
+                "PROGRESS_OUTPUT_MTIME",
+                "output_grew=1",
+                "BOUNDED_DOCKER_FAILURE=STAGE_TIMEOUT",
                 "last_progress=\"${now}\"",
                 "Establishing a baseline after failed probes is not real progress",
                 "BOUNDED_DOCKER_FAILURE=NO_PROGRESS_TIMEOUT",
                 "terminate_process_group \"${operation_pid}\"",
-                "IMAGE_BUILD_MAX_ATTEMPTS=1",
-                "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1",
-                "P3H_IMAGE_BUILD_RETRY_COUNT: 0");
+                "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1");
         assertThat(remote).doesNotContain(
                 "P3H_IMAGE_BUILD_RETRY: BOUNDED_CACHE_REUSE_",
                 "P3H_RUNTIME_IMAGE_PULL_RETRY:");

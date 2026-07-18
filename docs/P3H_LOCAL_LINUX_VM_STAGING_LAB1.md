@@ -45,27 +45,47 @@ of the repository-external sanitized failure summary; raw stage output remains
 temporary and is removed during cleanup.
 Repository and host runtime directories are not mounted into the VM. The exact
 committed source is transferred as a `git archive` over pinned SSH, and its
-SHA-256 is recomputed before extraction and image construction.
+SHA-256 is recomputed before extraction. The application is built separately on
+the controlled host by `scripts/p3h-build-exact-application-artifact.sh`. That
+builder rechecks the branch, local and remote Head, and clean worktree; creates a
+fresh 0700 directory from `git archive <exact-head>`; runs Java 17 Maven package
+under a 30-minute bounded supervisor; and never builds from the live worktree.
+Maven output remains in a temporary 0600 file and is never emitted as evidence.
+Exactly one executable Spring Boot JAR is accepted.
+
+The JAR is scanned for forbidden secret, identity, private-key, dump, and backup
+material. A three-file archive containing only `app.jar`,
+`Dockerfile.runtime.p3h`, and `artifact-metadata.txt` is then hashed and uploaded.
+The VM rechecks the archive file set, archive SHA-256, JAR SHA-256, metadata
+source Head, and JAR size before any image operation. The runtime Dockerfile is
+pinned to a JRE 17 digest, copies only `app.jar`, carries revision and JAR SHA
+labels, and runs as UID/GID 10001. It never installs Maven, downloads project
+dependencies, compiles Java, runs tests, or copies source.
 The `current` release link must resolve exactly to `releases/<exact-head>`;
 arbitrary or unversioned release paths fail closed.
-R1 has one 180-minute hard bound. Application image construction is limited to
-45 minutes, each pinned runtime-image pull to 20 minutes, all runtime-image
-pulls to 40 minutes, deployment and backup/restore to 30 minutes each, and the
+R1 has one 180-minute hard bound. Host artifact construction is limited to 30
+minutes. Each pinned runtime-image pull is limited to 20 minutes, all four pulls
+to 40 minutes, and the runtime-only application image build to 10 minutes.
+Deployment and backup/restore are limited to 30 minutes each, and the
 combined rotation, VM reboot, and post-reboot verification phase to 30 minutes.
 No operation is automatically retried. Docker
 operations run in a dedicated child process group; timeout handling sends TERM,
 waits at most 15 seconds, then sends KILL to that exact group. The runner polls
 every 15 seconds and emits a sanitized heartbeat every 60 seconds.
 
-Image construction and pulls fingerprint the target image, Docker storage,
-BuildKit storage, and containerd storage. Every progress probe has its own
-five-second TERM/KILL bound. Failed or timed-out probes never reset the progress
-clock. Fifteen minutes without a successful fingerprint change returns
-`BLOCKED_NO_PROGRESS_TIMEOUT` and triggers scoped cleanup. The
+Image construction and pulls fingerprint the target image, Docker daemon,
+Docker storage, BuildKit storage, containerd storage, and bounded output-file
+size and mtime. Every progress probe, including output `stat`, has its own
+five-second TERM/KILL bound. Output growth or a real runtime-state change resets
+the progress clock; mtime-only changes do not. Failed or timed-out probes never
+reset the clock. Five minutes without real progress returns
+`BLOCKED_NO_PROGRESS_TIMEOUT` and triggers scoped cleanup. Continuous output
+cannot bypass the stage hard timeout, which is evaluated first. The
 temporary build output is deleted and is never emitted or preserved as
 evidence. Before image construction, a bounded preflight requires at least
 4096 MiB available memory, 15 GiB available disk, an active Docker daemon, DNS,
-the required registry, and Maven Central. The same lifecycle script then runs
+and the required OCI registry. Target-VM access to Maven Central is not part of
+the deployment contract. The same lifecycle script then runs
 a config-only Compose check directly and through a transient unit with the same
 systemd user/group and hardening properties. Neither check can start containers,
 and each emits only an enumerated category. A failed systemd start likewise exposes only the
@@ -126,8 +146,10 @@ The controlled run performs these fail-closed stages:
    ownership.
 2. Match the console and network SSH host-key fingerprints.
 3. Run the merged remote host and runtime-secret preflight.
-4. Transfer and verify the exact source archive and build a revision-labeled,
-   non-root application image.
+4. Transfer and verify the exact source archive; build the exact-Head JAR on the
+   controlled host; upload and reverify the three-file application artifact;
+   prefetch the pinned JRE, PostgreSQL, Flyway, and Nginx images; and build a
+   revision/JAR-SHA-labeled non-root runtime-only application image.
 5. Start Greenfield PostgreSQL through systemd Credentials, create four scoped
    roles and two databases, migrate Flyway V1 through V7, and prove the
    application role is read-only.
@@ -404,6 +426,44 @@ no dedicated LAB NTP service. The local sanitized-evidence directory is not a
 runtime resource or secret store; inspection was limited to file names, sizes,
 and permissions and found only mode-0600 sanitized failure summaries and their
 SHA-256 files. No raw remote output was read or retained.
+
+## Reviewer Round 3 Authorized Attempt
+
+The one Round 3 attempt at exact Head
+`d4715356ea8ef45091f02772cc44f7bc37f43685` started from zero LAB resources.
+Minimal VM startup, guest Docker provisioning, all 17 inputs, remote preflight,
+source upload, and exact local/remote source archive SHA comparison completed.
+The target VM then entered the former cold-cache Docker/Maven application build.
+Its existing fingerprint did not observe growing build output, so the bounded
+no-progress gate stopped the stage after 16 minutes as
+`BLOCKED_IMAGE_BUILD_NO_PROGRESS_TIMEOUT`. No later runtime stage ran, no second
+attempt was made, raw logs were not exposed, and all LAB resources were removed.
+
+Round 4 replaces that cold target build with the artifact-first contract above
+and makes process-test output capture deterministic through a JUnit-managed 0600
+file. This is code and offline-contract closure only until the explicitly
+authorized final LAB1 attempt is executed. A planned or offline result is not a
+runtime PASS.
+
+`ROUND3_REVIEWER_AUTHORIZED_ATTEMPT_USED: 1_OF_1`
+
+`R1_RESULT: BLOCKED`
+
+`BLOCKED_STAGE: APPLICATION_IMAGE_BUILD`
+
+`BLOCKED_REASON: BLOCKED_IMAGE_BUILD_NO_PROGRESS_TIMEOUT`
+
+`FINAL_EVIDENCE_CONTRACT: NOT_REACHED`
+
+`RESOURCE_CLEANUP: PASS`
+
+`REAL_EXTERNAL_STAGING_STATUS: NOT_RUN`
+
+`P3H_RESULT: NOT_COMPLETE`
+
+`P4_ALLOWED: NO`
+
+`PRODUCTION_READINESS: BLOCKED`
 
 ## Safety Boundary
 

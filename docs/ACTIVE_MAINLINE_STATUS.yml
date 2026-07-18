@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P3-H-LAB1 Round 2 bootstrap and exact remote preflight passed, but the one authorized R1 stopped before source upload on a local Bash optional-stdin dispatch defect; the defect is fixed offline without rerun and real staging remains NOT_RUN"
-active_block_cn: "P3-H-LAB1 第二轮 bootstrap 与精确 remote preflight 已通过，但唯一授权 R1 在源码上传前因本地 Bash 可选 stdin 调度缺陷停止；该缺陷仅离线修复且未重跑，真实 Staging 仍未运行"
+active_block: "P3-H-LAB1 Round 3 reached exact source transfer, then stopped at APPLICATION_IMAGE_BUILD on a no-progress timeout; Round 4 replaces target-VM Maven with an exact-head prebuilt JAR and awaits its single final authorized LAB1 attempt"
+active_block_cn: "P3-H-LAB1 第三轮已完成精确源码传输，随后在 APPLICATION_IMAGE_BUILD 因无进度超时停止；第四轮以精确 Head 预构建 JAR 取代目标 VM Maven，并等待唯一一次最终授权 LAB1 运行"
 
-next_required_action: "Reviewer P3-H-LAB1 Round 3 re-review; do not rerun LAB1, start P4, or deploy production."
-next_business_phase: "Reviewer P3-H-LAB1 Round 3 Re-review"
+next_required_action: "Complete Round 4 offline gates, then use the single 1_OF_1 final LAB1 attempt; do not run a second attempt, start P4, or deploy production."
+next_business_phase: "P3-H-LAB1 Round 4 Final Authorized Attempt"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false while PR #1130 is unmerged, the Round 2 1_OF_1 run is blocked before source upload, and real controlled staging is not run. P4 and production deployment remain blocked."
+compatibility_next_business_phase_allowed_note: "Compatibility field remains false while PR #1130 is unmerged, Round 3 is blocked at application image build, and real controlled staging is not run. The one Round 4 LAB1 attempt is local evidence only; P4 and production deployment remain blocked."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "#1130 Open / Draft / unmerged"
 current_branch: "codex/p3h-local-vm-staging-lab1"
-current_package_pr: "#1130 P3-H-LAB1 Round 2 exact-evidence closure; bootstrap and exact preflight passed, R1 blocked before source upload, offline dispatch fix pending Round 3 review"
+current_package_pr: "#1130 P3-H-LAB1 Round 4 artifact-first exact-head JAR, runtime-only image, deterministic progress, and flaky-test closure; final local attempt pending"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -236,6 +236,8 @@ notes:
   - "The earlier clean LAB1 attempt at commit 9223f8d6 was BLOCKED_LIMA_START_TIMEOUT_OR_FAILURE before R1; it remains historical blocked evidence."
   - "The one newly authorized Round 1 attempt at commit 4ee04d8c passed minimal VM and guest Docker provisioning, reached 17_OF_17_READY, started R1, then failed closed at REMOTE_PREFLIGHT as BLOCKED_REMOTE_PREFLIGHT_EVIDENCE; cleanup passed and no second attempt ran."
   - "The one Round 2 authorized attempt at commit 1fc22e6c passed minimal VM and guest provisioning, reached 17_OF_17_READY, and passed exact remote-preflight validation, then stopped before source upload on a macOS Bash optional-stdin dispatch defect. Cleanup passed; the defect is fixed and executable-tested offline, no second attempt ran, and all later stages remain NOT_RUN."
+  - "The one Round 3 authorized attempt at commit d4715356 passed minimal VM, guest Docker provisioning, 17_OF_17_READY, exact remote preflight, source upload, and local/remote source SHA matching, then stopped at APPLICATION_IMAGE_BUILD as BLOCKED_IMAGE_BUILD_NO_PROGRESS_TIMEOUT. Cleanup passed and no second Round 3 attempt ran."
+  - "P3-H-LAB1 Round 4 builds one exact-head Java 17 JAR outside the target VM, transfers an exact three-file artifact, verifies archive/JAR/image attribution, prefetches four pinned runtime images, uses a non-root runtime-only image, and hardens output/progress and TERM/KILL test capture. It authorizes only one final local LAB1 attempt after all offline gates pass."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."
   - "P4 is BLOCKED_MISSING_REAL_FIXTURE; no real replay, provider validation, profitability, or production-readiness PASS is claimed."

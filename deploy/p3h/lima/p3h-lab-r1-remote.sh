@@ -5,6 +5,8 @@ ACTION="${1:-}"
 SOURCE_HEAD="${2:-}"
 R1_START_EPOCH="${3:-$(date +%s)}"
 R1_GLOBAL_TIMEOUT_SECONDS="${4:-10800}"
+EXPECTED_APP_JAR_SHA256="${5:-}"
+EXPECTED_APP_ARTIFACT_ARCHIVE_SHA256="${6:-}"
 ROOT=/opt/trade-model-p3h/current
 STATE_ROOT=/var/lib/trade-model-p3h-lab1
 CREDENTIALS=/run/credentials/p3hlab1
@@ -17,16 +19,16 @@ HOSTNAME=trade-staging.lab.test
 POSTGRES_IMAGE='postgres:16-alpine@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc'
 FLYWAY_IMAGE='flyway/flyway:12.11.0-alpine@sha256:6bf3a713f52c4d803a88501f8409dda2191e9ccba1454358a6de2c4cc65f71b0'
 NGINX_IMAGE='nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591'
+JRE_IMAGE='eclipse-temurin:17-jre-jammy@sha256:475d8e96b4b2bfe08999e5e854755c773af1581acdf959a4545d88f0696a2339'
 GREENFIELD_CONFIRMATION=I_CONFIRM_EMPTY_GREENFIELD_INITIALIZATION
 ROTATION_CONFIRMATION=I_CONFIRM_CONTROLLED_APP_DATABASE_SECRET_ROTATION
-IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=2700
-IMAGE_BUILD_MAX_ATTEMPTS=1
+RUNTIME_ONLY_IMAGE_BUILD_TIMEOUT_SECONDS=600
 IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
 RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200
 RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS=2400
 RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=1
 RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=UNKNOWN
-NO_PROGRESS_TIMEOUT_SECONDS=900
+NO_PROGRESS_TIMEOUT_SECONDS=300
 PROGRESS_PROBE_TIMEOUT_SECONDS=5
 POLL_INTERVAL_SECONDS=15
 HEARTBEAT_INTERVAL_SECONDS=60
@@ -35,8 +37,13 @@ BOUNDED_DOCKER_FAILURE=UNKNOWN
 ACTIVE_DOCKER_PROCESS_GROUP=""
 CURRENT_REMOTE_STEP=PRECONDITION
 PROGRESS_FINGERPRINT=""
+PROGRESS_RUNTIME_FINGERPRINT=""
+PROGRESS_OUTPUT_SIZE=0
+PROGRESS_OUTPUT_MTIME=0
 PROGRESS_PROBE_STATUS=NOT_RUN
 PROGRESS_PROBE_OUTPUT=""
+APP_ARTIFACT_CONTEXT=""
+APP_ARTIFACT_ARCHIVE="/tmp/p3h-application-artifact-${SOURCE_HEAD}.tar"
 
 blocked() {
   echo "P3H_REMOTE_STAGE: $1"
@@ -76,12 +83,21 @@ emit_heartbeat() {
 terminate_process_group() {
   local process_group_leader="$1"
   kill -TERM -- "-${process_group_leader}" >/dev/null 2>&1 || true
+  # The direct PID signal closes the short startup race before setsid creates
+  # the dedicated process group. Once established, the group signal owns all
+  # descendants; both paths remain bounded by the same grace period.
+  kill -TERM "${process_group_leader}" >/dev/null 2>&1 || true
   for _attempt in $(seq 1 "${TERM_GRACE_SECONDS}"); do
-    kill -0 -- "-${process_group_leader}" >/dev/null 2>&1 || break
+    if ! kill -0 "${process_group_leader}" >/dev/null 2>&1 \
+        && ! kill -0 -- "-${process_group_leader}" >/dev/null 2>&1; then
+      break
+    fi
     sleep 1
   done
-  if kill -0 -- "-${process_group_leader}" >/dev/null 2>&1; then
+  if kill -0 -- "-${process_group_leader}" >/dev/null 2>&1 \
+      || kill -0 "${process_group_leader}" >/dev/null 2>&1; then
     kill -KILL -- "-${process_group_leader}" >/dev/null 2>&1 || true
+    kill -KILL "${process_group_leader}" >/dev/null 2>&1 || true
   fi
   wait "${process_group_leader}" >/dev/null 2>&1 || true
 }
@@ -92,6 +108,10 @@ cleanup_active_docker_group() {
   if [ -n "${ACTIVE_DOCKER_PROCESS_GROUP}" ]; then
     terminate_process_group "${ACTIVE_DOCKER_PROCESS_GROUP}"
   fi
+  if [ -n "${APP_ARTIFACT_CONTEXT}" ] && [ -d "${APP_ARTIFACT_CONTEXT}" ]; then
+    rm -rf "${APP_ARTIFACT_CONTEXT}"
+  fi
+  rm -f "${APP_ARTIFACT_ARCHIVE}" >/dev/null 2>&1 || true
   exit "${exit_status}"
 }
 trap cleanup_active_docker_group EXIT
@@ -119,21 +139,25 @@ run_progress_probe() {
 
 capture_docker_progress() {
   local target_image="$1"
-  local image_id docker_usage buildkit_kb content_kb
+  local output_file="$2"
+  local image_id daemon_state docker_usage buildkit_kb content_kb
+  local output_metadata output_size output_mtime
 
   if run_progress_probe PROBE_TIMEOUT DOCKER_IMAGE_NOT_AVAILABLE \
       docker image inspect "${target_image}" --format '{{.Id}}'; then
     image_id="${PROGRESS_PROBE_OUTPUT:-NONE}"
   elif [ "${PROGRESS_PROBE_STATUS}" = DOCKER_IMAGE_NOT_AVAILABLE ]; then
-    # A missing target image is expected while a build is in progress. Verify
-    # daemon health separately before treating this sample as valid.
-    if ! run_progress_probe PROBE_TIMEOUT DOCKER_DAEMON_UNAVAILABLE docker info; then
-      return 1
-    fi
     image_id=NONE
   else
     return 1
   fi
+
+  if ! run_progress_probe PROBE_TIMEOUT DOCKER_DAEMON_UNAVAILABLE \
+      docker info --format '{{.ServerVersion}}|{{.Driver}}|{{.DockerRootDir}}'; then
+    return 1
+  fi
+  daemon_state="$(printf '%s' "${PROGRESS_PROBE_OUTPUT}" \
+    | sha256sum | awk '{print $1}')"
 
   if ! run_progress_probe PROBE_TIMEOUT DOCKER_DAEMON_UNAVAILABLE \
       docker system df --format '{{.Type}}|{{.TotalCount}}|{{.Size}}'; then
@@ -148,10 +172,26 @@ capture_docker_progress() {
     sudo du -sk /var/lib/docker/containerd || return 1
   content_kb="$(printf '%s\n' "${PROGRESS_PROBE_OUTPUT}" | awk 'NR == 1 {print $1}')"
 
-  PROGRESS_FINGERPRINT="$(printf '%s|%s|%s|%s\n' \
-    "${image_id:-NONE}" "${docker_usage:-NONE}" \
+  if ! run_progress_probe OUTPUT_FILE_STAT_TIMEOUT OUTPUT_FILE_STAT_FAILED \
+      stat -c '%s|%Y' "${output_file}"; then
+    return 1
+  fi
+  output_metadata="${PROGRESS_PROBE_OUTPUT}"
+  output_size="${output_metadata%%|*}"
+  output_mtime="${output_metadata#*|}"
+  case "${output_size}:${output_mtime}" in
+    *[!0-9:]*) PROGRESS_PROBE_STATUS=OUTPUT_FILE_STAT_FAILED; return 1 ;;
+  esac
+
+  PROGRESS_RUNTIME_FINGERPRINT="$(printf '%s|%s|%s|%s|%s\n' \
+    "${image_id:-NONE}" "${daemon_state:-NONE}" "${docker_usage:-NONE}" \
     "${buildkit_kb:-0}" "${content_kb:-0}" \
     | sha256sum | awk '{print $1}')"
+  PROGRESS_OUTPUT_SIZE="${output_size}"
+  PROGRESS_OUTPUT_MTIME="${output_mtime}"
+  PROGRESS_FINGERPRINT="$(printf '%s|%s|%s\n' \
+    "${PROGRESS_RUNTIME_FINGERPRINT}" "${PROGRESS_OUTPUT_SIZE}" \
+    "${PROGRESS_OUTPUT_MTIME}" | sha256sum | awk '{print $1}')"
   PROGRESS_PROBE_STATUS=PASS
   PROGRESS_PROBE_OUTPUT=""
   return 0
@@ -165,6 +205,8 @@ run_docker_bounded() {
   local output_file="$5"
   local operation_pid started now elapsed last_progress next_heartbeat
   local previous_fingerprint current_fingerprint process_state operation_status
+  local previous_runtime_fingerprint previous_output_size previous_output_mtime
+  local runtime_changed output_grew
   local last_probe_status=NOT_RUN
   shift 5
 
@@ -173,8 +215,14 @@ run_docker_bounded() {
   last_progress="${started}"
   next_heartbeat="${HEARTBEAT_INTERVAL_SECONDS}"
   previous_fingerprint=""
-  if capture_docker_progress "${target_image}"; then
+  previous_runtime_fingerprint=""
+  previous_output_size=0
+  previous_output_mtime=0
+  if capture_docker_progress "${target_image}" "${output_file}"; then
     previous_fingerprint="${PROGRESS_FINGERPRINT}"
+    previous_runtime_fingerprint="${PROGRESS_RUNTIME_FINGERPRINT}"
+    previous_output_size="${PROGRESS_OUTPUT_SIZE}"
+    previous_output_mtime="${PROGRESS_OUTPUT_MTIME}"
   else
     last_probe_status="${PROGRESS_PROBE_STATUS}"
     echo "P3H_PROGRESS_PROBE_STATUS: ${PROGRESS_PROBE_STATUS}"
@@ -182,6 +230,10 @@ run_docker_bounded() {
   setsid "$@" >"${output_file}" 2>&1 &
   operation_pid="$!"
   ACTIVE_DOCKER_PROCESS_GROUP="${operation_pid}"
+  # Initial bounded probes run before the operation exists. Their latency is
+  # part of the global/stage budget, but must not consume the operation's
+  # no-progress allowance before the process can produce output.
+  last_progress="$(date +%s)"
 
   while kill -0 "${operation_pid}" >/dev/null 2>&1; do
     sleep "${POLL_INTERVAL_SECONDS}"
@@ -196,11 +248,25 @@ run_docker_bounded() {
       ACTIVE_DOCKER_PROCESS_GROUP=""
       return 125
     fi
+    if [ "${elapsed}" -ge "${timeout_seconds}" ]; then
+      BOUNDED_DOCKER_FAILURE=STAGE_TIMEOUT
+      terminate_process_group "${operation_pid}"
+      ACTIVE_DOCKER_PROCESS_GROUP=""
+      return 124
+    fi
     process_state=RUNNING_NO_CHANGE
-    if capture_docker_progress "${target_image}"; then
+    if capture_docker_progress "${target_image}" "${output_file}"; then
       current_fingerprint="${PROGRESS_FINGERPRINT}"
-      if [ -n "${previous_fingerprint}" ] \
-          && [ "${current_fingerprint}" != "${previous_fingerprint}" ]; then
+      runtime_changed=0
+      output_grew=0
+      if [ -n "${previous_runtime_fingerprint}" ] \
+          && [ "${PROGRESS_RUNTIME_FINGERPRINT}" != "${previous_runtime_fingerprint}" ]; then
+        runtime_changed=1
+      fi
+      if [ "${PROGRESS_OUTPUT_SIZE}" -gt "${previous_output_size}" ]; then
+        output_grew=1
+      fi
+      if [ "${runtime_changed}" -eq 1 ] || [ "${output_grew}" -eq 1 ]; then
         previous_fingerprint="${current_fingerprint}"
         last_progress="${now}"
         process_state=RUNNING_PROGRESS
@@ -208,6 +274,9 @@ run_docker_bounded() {
         # Establishing a baseline after failed probes is not real progress.
         previous_fingerprint="${current_fingerprint}"
       fi
+      previous_runtime_fingerprint="${PROGRESS_RUNTIME_FINGERPRINT}"
+      previous_output_size="${PROGRESS_OUTPUT_SIZE}"
+      previous_output_mtime="${PROGRESS_OUTPUT_MTIME}"
       last_probe_status=PASS
     else
       process_state="RUNNING_${PROGRESS_PROBE_STATUS}"
@@ -226,12 +295,6 @@ run_docker_bounded() {
       ACTIVE_DOCKER_PROCESS_GROUP=""
       return 126
     fi
-    if [ "${elapsed}" -ge "${timeout_seconds}" ]; then
-      BOUNDED_DOCKER_FAILURE=STAGE_TIMEOUT
-      terminate_process_group "${operation_pid}"
-      ACTIVE_DOCKER_PROCESS_GROUP=""
-      return 124
-    fi
   done
 
   set +e
@@ -243,7 +306,7 @@ run_docker_bounded() {
 }
 
 bounded_build_preflight() {
-  local memory_mb root_disk_gb docker_disk_gb registry_status maven_status
+  local memory_mb root_disk_gb docker_disk_gb registry_status
   memory_mb="$(awk '/MemAvailable:/ {print int($2 / 1024); exit}' /proc/meminfo)"
   root_disk_gb="$(df -Pk / | awk 'NR == 2 {print int($4 / 1024 / 1024)}')"
   docker_disk_gb="$(df -Pk /var/lib/docker | awk 'NR == 2 {print int($4 / 1024 / 1024)}')"
@@ -257,21 +320,13 @@ bounded_build_preflight() {
   timeout --signal=TERM --kill-after=2s 10s \
     getent ahosts registry-1.docker.io >/dev/null 2>&1 \
     || blocked BLOCKED_DNS_RESOLUTION
-  timeout --signal=TERM --kill-after=2s 10s \
-    getent ahosts repo.maven.apache.org >/dev/null 2>&1 \
-    || blocked BLOCKED_DNS_RESOLUTION
   registry_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
     --connect-timeout 5 --max-time 10 https://registry-1.docker.io/v2/ \
     2>/dev/null || true)"
   case "${registry_status}" in 200|401) ;; *) blocked BLOCKED_REGISTRY_CONNECTIVITY ;; esac
-  maven_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-    --connect-timeout 5 --max-time 10 https://repo.maven.apache.org/maven2/ \
-    2>/dev/null || true)"
-  case "${maven_status}" in 200|301|302) ;; *) blocked BLOCKED_MAVEN_CONNECTIVITY ;; esac
   echo "DOCKER_DAEMON: ACTIVE"
   echo "DNS_RESOLUTION: PASS"
   echo "REQUIRED_REGISTRY_CONNECTIVITY: PASS_BOUNDED"
-  echo "MAVEN_REPOSITORY_CONNECTIVITY: PASS_BOUNDED"
 }
 
 run_checked_or_block() {
@@ -475,15 +530,96 @@ validate_systemd_sandbox_compose_config() {
   esac
 }
 
+verify_application_artifact() {
+  local actual_archive_sha listing expected_listing actual_listing
+  local metadata source_head_metadata jar_sha_metadata jar_size_metadata
+  local java_version_metadata maven_version_metadata actual_jar_sha actual_jar_size
+
+  case "${EXPECTED_APP_JAR_SHA256}" in
+    ''|*[!0-9a-f]*) blocked BLOCKED_APP_JAR_SHA256_CONTRACT ;;
+  esac
+  [ "${#EXPECTED_APP_JAR_SHA256}" -eq 64 ] \
+    || blocked BLOCKED_APP_JAR_SHA256_CONTRACT
+  case "${EXPECTED_APP_ARTIFACT_ARCHIVE_SHA256}" in
+    ''|*[!0-9a-f]*) blocked BLOCKED_APP_ARTIFACT_SHA256_CONTRACT ;;
+  esac
+  [ "${#EXPECTED_APP_ARTIFACT_ARCHIVE_SHA256}" -eq 64 ] \
+    || blocked BLOCKED_APP_ARTIFACT_SHA256_CONTRACT
+  [ -f "${APP_ARTIFACT_ARCHIVE}" ] && [ ! -L "${APP_ARTIFACT_ARCHIVE}" ] \
+    || blocked BLOCKED_APP_ARTIFACT_ARCHIVE
+
+  actual_archive_sha="$(sha256sum "${APP_ARTIFACT_ARCHIVE}" | awk '{print $1}')"
+  [ "${actual_archive_sha}" = "${EXPECTED_APP_ARTIFACT_ARCHIVE_SHA256}" ] \
+    || blocked BLOCKED_APP_ARTIFACT_REMOTE_SHA
+  listing="$(mktemp /tmp/p3h-artifact-listing.XXXXXX)"
+  expected_listing="$(mktemp /tmp/p3h-artifact-listing-expected.XXXXXX)"
+  chmod 600 "${listing}" "${expected_listing}"
+  tar -tf "${APP_ARTIFACT_ARCHIVE}" >"${listing}"
+  printf '%s\n' app.jar Dockerfile.runtime.p3h artifact-metadata.txt \
+    >"${expected_listing}"
+  cmp -s "${listing}" "${expected_listing}" \
+    || blocked BLOCKED_APP_ARTIFACT_FILE_SET
+  rm -f "${listing}" "${expected_listing}"
+
+  APP_ARTIFACT_CONTEXT="$(mktemp -d /tmp/p3h-application-artifact.XXXXXX)"
+  chmod 700 "${APP_ARTIFACT_CONTEXT}"
+  tar --no-same-owner --no-same-permissions -xf "${APP_ARTIFACT_ARCHIVE}" \
+    -C "${APP_ARTIFACT_CONTEXT}"
+  for approved_file in app.jar Dockerfile.runtime.p3h artifact-metadata.txt; do
+    [ -f "${APP_ARTIFACT_CONTEXT}/${approved_file}" ] \
+      && [ ! -L "${APP_ARTIFACT_CONTEXT}/${approved_file}" ] \
+      || blocked BLOCKED_APP_ARTIFACT_FILE_SET
+  done
+  [ "$(find "${APP_ARTIFACT_CONTEXT}" -mindepth 1 -maxdepth 1 -type f | wc -l \
+    | tr -d ' ')" -eq 3 ] || blocked BLOCKED_APP_ARTIFACT_FILE_SET
+
+  metadata="${APP_ARTIFACT_CONTEXT}/artifact-metadata.txt"
+  awk -F= '
+    NF != 2 { exit 1 }
+    $1 !~ /^(SOURCE_HEAD|APP_JAR_SHA256|APP_JAR_SIZE_BYTES|JAVA_VERSION|MAVEN_VERSION)$/ { exit 1 }
+    seen[$1]++
+    END {
+      if (seen["SOURCE_HEAD"] != 1 || seen["APP_JAR_SHA256"] != 1
+          || seen["APP_JAR_SIZE_BYTES"] != 1 || seen["JAVA_VERSION"] != 1
+          || seen["MAVEN_VERSION"] != 1) exit 1
+    }
+  ' "${metadata}" || blocked BLOCKED_APP_ARTIFACT_METADATA
+  source_head_metadata="$(sed -n 's/^SOURCE_HEAD=//p' "${metadata}")"
+  jar_sha_metadata="$(sed -n 's/^APP_JAR_SHA256=//p' "${metadata}")"
+  jar_size_metadata="$(sed -n 's/^APP_JAR_SIZE_BYTES=//p' "${metadata}")"
+  java_version_metadata="$(sed -n 's/^JAVA_VERSION=//p' "${metadata}")"
+  maven_version_metadata="$(sed -n 's/^MAVEN_VERSION=//p' "${metadata}")"
+  [ "${source_head_metadata}" = "${SOURCE_HEAD}" ] \
+    || blocked BLOCKED_APP_ARTIFACT_SOURCE_HEAD
+  [ "${jar_sha_metadata}" = "${EXPECTED_APP_JAR_SHA256}" ] \
+    || blocked BLOCKED_APP_JAR_METADATA_SHA
+  case "${jar_size_metadata}" in ''|*[!0-9]*) blocked BLOCKED_APP_JAR_METADATA ;; esac
+  case "${java_version_metadata}" in 17|17.*) ;; *) blocked BLOCKED_APP_JAR_METADATA ;; esac
+  case "${maven_version_metadata}" in
+    ''|*[!0-9A-Za-z._+-]*) blocked BLOCKED_APP_JAR_METADATA ;;
+  esac
+  actual_jar_sha="$(sha256sum "${APP_ARTIFACT_CONTEXT}/app.jar" | awk '{print $1}')"
+  actual_jar_size="$(stat -c '%s' "${APP_ARTIFACT_CONTEXT}/app.jar")"
+  [ "${actual_jar_sha}" = "${EXPECTED_APP_JAR_SHA256}" ] \
+    || blocked BLOCKED_APP_JAR_REMOTE_SHA
+  [ "${actual_jar_size}" = "${jar_size_metadata}" ] \
+    || blocked BLOCKED_APP_JAR_REMOTE_SIZE
+}
+
 build_application_image() {
   local image="$1"
+  local artifact_context="$2"
+  local app_jar_sha="$3"
   local build_log build_status
   build_log="$(mktemp /tmp/p3h-image-build.XXXXXX)"
   chmod 600 "${build_log}"
   if run_docker_bounded APPLICATION_IMAGE_BUILD APPLICATION_IMAGE_BUILD \
-      "${IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS}" "${image}" "${build_log}" \
-      docker build --pull=false --file "${ROOT}/deploy/p3h/Dockerfile.p3h" \
-        --build-arg "VCS_REF=${SOURCE_HEAD}" --tag "${image}" "${ROOT}"; then
+      "${RUNTIME_ONLY_IMAGE_BUILD_TIMEOUT_SECONDS}" "${image}" "${build_log}" \
+      docker build --pull=false \
+        --file "${artifact_context}/Dockerfile.runtime.p3h" \
+        --build-arg "VCS_REF=${SOURCE_HEAD}" \
+        --build-arg "APP_JAR_SHA256=${app_jar_sha}" \
+        --tag "${image}" "${artifact_context}"; then
     IMAGE_BUILD_FAILURE_CATEGORY=NONE
     rm -f "${build_log}"
     return 0
@@ -502,8 +638,6 @@ build_application_image() {
         IMAGE_BUILD_FAILURE_CATEGORY=NETWORK
       elif grep -Eqi 'no space left on device|disk quota exceeded' "${build_log}"; then
         IMAGE_BUILD_FAILURE_CATEGORY=STORAGE
-      elif grep -Eqi 'build failure|compilation failure|compilation error|cannot find symbol|failed to execute goal|there are test failures|non-resolvable parent pom|could not resolve dependencies' "${build_log}"; then
-        IMAGE_BUILD_FAILURE_CATEGORY=MAVEN
       else
         IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
       fi
@@ -515,11 +649,12 @@ build_application_image() {
 
 pull_runtime_image() {
   local image="$1"
+  local timeout_seconds="$2"
   local pull_log pull_status
   pull_log="$(mktemp /tmp/p3h-runtime-image-pull.XXXXXX)"
   chmod 600 "${pull_log}"
   if run_docker_bounded RUNTIME_IMAGE_PULL RUNTIME_IMAGE_PULL \
-      "${RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS}" "${image}" "${pull_log}" \
+      "${timeout_seconds}" "${image}" "${pull_log}" \
       docker pull "${image}"; then
     RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=NONE
     rm -f "${pull_log}"
@@ -549,17 +684,24 @@ pull_runtime_image() {
 }
 
 ensure_runtime_images() {
-  local image pull_started pull_elapsed
+  local image pull_started pull_elapsed pull_remaining pull_timeout_seconds
   pull_started="$(date +%s)"
-  for image in "${POSTGRES_IMAGE}" "${FLYWAY_IMAGE}" "${NGINX_IMAGE}"; do
+  for image in "${JRE_IMAGE}" "${POSTGRES_IMAGE}" "${FLYWAY_IMAGE}" "${NGINX_IMAGE}"; do
     pull_elapsed=$(( $(date +%s) - pull_started ))
-    [ "${pull_elapsed}" -lt "${RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS}" ] \
-      || blocked BLOCKED_RUNTIME_IMAGE_PULL_ALL_TIMEOUT
-    if ! pull_runtime_image "${image}"; then
+    pull_remaining=$((RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS - pull_elapsed))
+    [ "${pull_remaining}" -gt 0 ] || blocked BLOCKED_RUNTIME_IMAGE_PULL_ALL_TIMEOUT
+    pull_timeout_seconds="${RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS}"
+    if [ "${pull_remaining}" -lt "${pull_timeout_seconds}" ]; then
+      pull_timeout_seconds="${pull_remaining}"
+    fi
+    if ! pull_runtime_image "${image}" "${pull_timeout_seconds}"; then
       blocked "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
     fi
+    [ $(( $(date +%s) - pull_started )) \
+        -le "${RUNTIME_IMAGE_PULL_ALL_TIMEOUT_SECONDS}" ] \
+      || blocked BLOCKED_RUNTIME_IMAGE_PULL_ALL_TIMEOUT
   done
-  echo 'P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3'
+  echo 'P3H_RUNTIME_IMAGE_PREFETCH: PASS_4_OF_4'
 }
 
 install_unit() {
@@ -1068,30 +1210,44 @@ case "${ACTION}" in
   BUILD_APPLICATION_IMAGE)
     CURRENT_REMOTE_STEP=BOUNDED_BUILD_PREFLIGHT
     bounded_build_preflight
+    CURRENT_REMOTE_STEP=APPLICATION_ARTIFACT_SHA_VERIFY
+    verify_application_artifact
+    CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH
+    ensure_runtime_images
     CURRENT_REMOTE_STEP=PREBUILD_COMPOSE_CONFIG
     validate_prebuild_compose_config
     CURRENT_REMOTE_STEP=PREBUILD_SYSTEMD_COMPOSE_CONFIG
     validate_systemd_sandbox_compose_config
     CURRENT_REMOTE_STEP=IMAGE_BUILD
     image="trade-model-v1:p3h-lab-${SOURCE_HEAD:0:12}"
-    if ! build_application_image "${image}"; then
+    if ! build_application_image \
+        "${image}" "${APP_ARTIFACT_CONTEXT}" "${EXPECTED_APP_JAR_SHA256}"; then
       blocked "BLOCKED_IMAGE_BUILD_${IMAGE_BUILD_FAILURE_CATEGORY}"
     fi
-    echo "P3H_IMAGE_BUILD_ATTEMPTS: 1"
-    echo "P3H_IMAGE_BUILD_RETRY_COUNT: 0"
     revision="$(docker image inspect "${image}" \
       --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')"
     [ "${revision}" = "${SOURCE_HEAD}" ] || blocked BLOCKED_IMAGE_REVISION
-    [ "$(docker image inspect "${image}" --format '{{.Config.User}}')" = app ] \
-      || blocked BLOCKED_IMAGE_USER
+    image_jar_label="$(docker image inspect "${image}" \
+      --format '{{ index .Config.Labels "org.example.trademodel.app-jar-sha256" }}')"
+    [ "${image_jar_label}" = "${EXPECTED_APP_JAR_SHA256}" ] \
+      || blocked BLOCKED_IMAGE_JAR_SHA_LABEL
+    image_user="$(docker image inspect "${image}" --format '{{.Config.User}}')"
+    case "${image_user}" in 10001|10001:10001) ;; *) blocked BLOCKED_IMAGE_USER ;; esac
+    image_jar_content_sha="$(docker run --rm --network none --entrypoint sha256sum \
+      "${image}" /app/app.jar | awk 'NF >= 1 {print $1; exit}')"
+    [ "${image_jar_content_sha}" = "${EXPECTED_APP_JAR_SHA256}" ] \
+      || blocked BLOCKED_IMAGE_JAR_CONTENT_SHA
     echo "P3H_REMOTE_STAGE: APPLICATION_IMAGE_BUILD_PASS"
+    echo "APP_ARTIFACT_SOURCE_HEAD: ${SOURCE_HEAD}"
+    echo "APP_JAR_SHA256: ${EXPECTED_APP_JAR_SHA256}"
+    echo "APP_ARTIFACT_ARCHIVE_SHA256: ${EXPECTED_APP_ARTIFACT_ARCHIVE_SHA256}"
+    echo "APP_ARTIFACT_REMOTE_SHA256: MATCH"
+    echo "APP_JAR_REMOTE_SHA256: MATCH"
     echo "APP_IMAGE_REVISION: ${SOURCE_HEAD}"
-    ;;
-
-  PULL_RUNTIME_IMAGES)
-    CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH
-    ensure_runtime_images
-    echo "P3H_REMOTE_STAGE: RUNTIME_IMAGE_PULL_PASS"
+    echo "APP_IMAGE_JAR_SHA256: ${EXPECTED_APP_JAR_SHA256}"
+    echo "APP_IMAGE_USER: NON_ROOT_10001"
+    echo "APP_IMAGE_JAR_CONTENT_SHA: MATCH"
+    echo "APPLICATION_IMAGE_BUILD_MODE: RUNTIME_ONLY_PREBUILT_JAR"
     ;;
 
   INITIAL_DEPLOY)

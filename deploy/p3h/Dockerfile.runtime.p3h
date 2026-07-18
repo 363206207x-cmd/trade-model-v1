@@ -1,0 +1,20 @@
+FROM eclipse-temurin:17-jre-jammy@sha256:475d8e96b4b2bfe08999e5e854755c773af1581acdf959a4545d88f0696a2339
+
+ARG VCS_REF
+ARG APP_JAR_SHA256
+
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+LABEL org.example.trademodel.app-jar-sha256="${APP_JAR_SHA256}"
+
+WORKDIR /app
+
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid 10001 --home-dir /app app
+
+COPY --chown=10001:10001 app.jar /app/app.jar
+
+ENV SERVER_PORT=8081
+EXPOSE 8081
+
+USER 10001:10001
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

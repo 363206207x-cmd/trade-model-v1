@@ -21,6 +21,8 @@ TERM_GRACE_SECONDS=15
 ROTATION_REBOOT_TIMEOUT_SECONDS=1800
 BOUNDED_PROCESS_RUNNER="${ROOT_DIR}/scripts/p3h-bounded-process.py"
 REMOTE_ACTION_EVIDENCE_VALIDATOR="${ROOT_DIR}/scripts/p3h-remote-action-evidence-redact.sh"
+EVIDENCE_CONTRACT_VALIDATOR="${ROOT_DIR}/scripts/p3h-evidence-contract.py"
+APPLICATION_ARTIFACT_BUILDER="${ROOT_DIR}/scripts/p3h-build-exact-application-artifact.sh"
 SUPERVISOR_TIMEOUT_MARKER="${P3H_SUPERVISOR_TIMEOUT_MARKER:-}"
 TEMP_ROOT=""
 RAW_EVIDENCE=""
@@ -154,18 +156,35 @@ run_remote_stage() {
   local timeout_seconds="$1"
   local action="$2"
   local blocked_status="$3"
+  local expected_jar_sha256="${4:-}"
+  local expected_archive_sha256="${5:-}"
   local stage_output="${TEMP_ROOT}/remote-${action}.raw"
   local sanitized_output="${TEMP_ROOT}/remote-${action}.sanitized"
   local stage_status
-  if run_bounded "${timeout_seconds}" "${action}" \
+  if [ "${action}" = BUILD_APPLICATION_IMAGE ]; then
+    if run_bounded "${timeout_seconds}" "${action}" \
+        ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
+        bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh \
+        "${action}" "${SOURCE_HEAD}" "${RUN_START_EPOCH}" \
+        "${GLOBAL_TIMEOUT_SECONDS}" "${expected_jar_sha256}" \
+        "${expected_archive_sha256}" >"${stage_output}" 2>&1; then
+      stage_status=0
+    else
+      stage_status=$?
+    fi
+  elif run_bounded "${timeout_seconds}" "${action}" \
       ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
       bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh \
       "${action}" "${SOURCE_HEAD}" "${RUN_START_EPOCH}" \
-      "${GLOBAL_TIMEOUT_SECONDS}" \
-      >"${stage_output}" 2>&1; then
-    if "${REMOTE_ACTION_EVIDENCE_VALIDATOR}" \
-        "${action}" "${SOURCE_HEAD}" "${stage_output}" "${sanitized_output}" \
-        >/dev/null; then
+      "${GLOBAL_TIMEOUT_SECONDS}" >"${stage_output}" 2>&1; then
+    stage_status=0
+  else
+    stage_status=$?
+  fi
+  if [ "${stage_status}" -eq 0 ]; then
+    if "${REMOTE_ACTION_EVIDENCE_VALIDATOR}" "${action}" "${SOURCE_HEAD}" \
+        "${stage_output}" "${sanitized_output}" "${expected_jar_sha256}" \
+        "${expected_archive_sha256}" >/dev/null; then
       cat "${sanitized_output}" >>"${RAW_EVIDENCE}"
       return 0
     fi
@@ -173,8 +192,6 @@ run_remote_stage() {
       >>"${stage_output}"
     persist_remote_failure_evidence "${CURRENT_STAGE}" "${stage_output}"
     blocked "${REMOTE_FAILURE_REASON:-BLOCKED_REMOTE_ACTION_EVIDENCE_CONTRACT}"
-  else
-    stage_status=$?
   fi
   if [ "${stage_status}" -eq 124 ]; then
     printf '%s\n' 'P3H_REMOTE_STAGE: BLOCKED_REMOTE_STAGE_TIMEOUT' \
@@ -291,6 +308,10 @@ command -v python3 >/dev/null 2>&1 || blocked BLOCKED_HOST_PYTHON_MISSING
 [ -f "${BOUNDED_PROCESS_RUNNER}" ] || blocked BLOCKED_BOUNDED_RUNNER_MISSING
 [ -x "${REMOTE_ACTION_EVIDENCE_VALIDATOR}" ] \
   || blocked BLOCKED_REMOTE_ACTION_EVIDENCE_VALIDATOR_MISSING
+[ -x "${APPLICATION_ARTIFACT_BUILDER}" ] \
+  || blocked BLOCKED_APPLICATION_ARTIFACT_BUILDER_MISSING
+[ -f "${EVIDENCE_CONTRACT_VALIDATOR}" ] \
+  || blocked BLOCKED_EVIDENCE_CONTRACT_VALIDATOR_MISSING
 
 if [ "${P3H_COMPLETE_PROCESS_TREE_SUPERVISED:-}" != R1 ]; then
   export P3H_COMPLETE_PROCESS_TREE_SUPERVISED=R1
@@ -530,11 +551,52 @@ ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
   rm -f "${remote_archive}"
 REMOTE_PREPARED=1
 
-set_stage application-image-build
-run_remote_stage 2700 BUILD_APPLICATION_IMAGE BLOCKED_APPLICATION_IMAGE_BUILD
+set_stage application-artifact-build-on-host
+artifact_output_dir="${TEMP_ROOT}/application-artifact"
+artifact_build_raw="${TEMP_ROOT}/application-artifact-build.raw"
+artifact_build_sanitized="${TEMP_ROOT}/application-artifact-build.sanitized"
+artifact_supervisor_log="${TEMP_ROOT}/application-artifact-supervisor.log"
+: >"${artifact_build_raw}"
+: >"${artifact_supervisor_log}"
+chmod 600 "${artifact_build_raw}" "${artifact_supervisor_log}"
+if ! run_bounded 2100 APPLICATION_ARTIFACT_BUILD_ON_HOST \
+    env P3H_EXPECTED_HEAD="${SOURCE_HEAD}" \
+      P3H_ARTIFACT_BUILD_CONFIRM=I_CONFIRM_BUILD_EXACT_HEAD_APPLICATION_ARTIFACT \
+      P3H_ARTIFACT_OUTPUT_DIR="${artifact_output_dir}" \
+      bash "${APPLICATION_ARTIFACT_BUILDER}" \
+      >"${artifact_build_raw}" 2>"${artifact_supervisor_log}"; then
+  blocked BLOCKED_APPLICATION_ARTIFACT_BUILD
+fi
+if ! python3 "${EVIDENCE_CONTRACT_VALIDATOR}" \
+    --contract artifact --source-head "${SOURCE_HEAD}" \
+    --input-file "${artifact_build_raw}" \
+    --output-file "${artifact_build_sanitized}" \
+    --status-key P3H_ARTIFACT_BUILD_CONTRACT >/dev/null; then
+  blocked BLOCKED_APPLICATION_ARTIFACT_BUILD_CONTRACT
+fi
+echo 'APP_ARTIFACT_BUILD: PASS_EXACT_HEAD'
+app_jar_sha="$(awk -F ': ' '$1 == "APP_JAR_SHA256" {print $2}' \
+  "${artifact_build_sanitized}")"
+app_artifact_archive_sha="$(awk -F ': ' \
+  '$1 == "APP_ARTIFACT_ARCHIVE_SHA256" {print $2}' \
+  "${artifact_build_sanitized}")"
+artifact_archive="${artifact_output_dir}/p3h-application-artifact-${SOURCE_HEAD}.tar"
+[ -f "${artifact_archive}" ] && [ ! -L "${artifact_archive}" ] \
+  || blocked BLOCKED_APPLICATION_ARTIFACT_ARCHIVE
+local_artifact_sha="$(shasum -a 256 "${artifact_archive}" | awk '{print $1}')"
+[ "${local_artifact_sha}" = "${app_artifact_archive_sha}" ] \
+  || blocked BLOCKED_APPLICATION_ARTIFACT_LOCAL_SHA
 
-set_stage runtime-image-pull
-run_remote_stage 2400 PULL_RUNTIME_IMAGES BLOCKED_RUNTIME_IMAGE_PULL
+set_stage application-artifact-upload
+remote_artifact="/tmp/p3h-application-artifact-${SOURCE_HEAD}.tar"
+run_bounded 300 APPLICATION_ARTIFACT_UPLOAD scp "${scp_options[@]}" \
+  "${artifact_archive}" \
+  "${P3H_SSH_USER}@${P3H_SSH_HOST}:${remote_artifact}" >/dev/null \
+  || blocked BLOCKED_APPLICATION_ARTIFACT_UPLOAD
+
+set_stage application-image-build
+run_remote_stage 3300 BUILD_APPLICATION_IMAGE BLOCKED_APPLICATION_IMAGE_BUILD \
+  "${app_jar_sha}" "${app_artifact_archive_sha}"
 
 set_stage initial-deploy
 run_remote_stage 1800 INITIAL_DEPLOY BLOCKED_INITIAL_DEPLOY

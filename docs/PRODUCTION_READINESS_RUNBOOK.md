@@ -877,6 +877,24 @@ second run was made. Cleanup passed. No image-build, deployment, Flyway,
 backup/restore, rotation, reboot, external-staging, P4, or production-readiness
 PASS is inferred from that blocked run.
 
+The single Round 3 attempt at commit `d4715356` passed minimal VM startup,
+guest Docker provisioning, all 17 inputs, exact remote preflight, source upload,
+and local/remote source-archive SHA matching. The former target-VM Maven image
+build then stopped at `APPLICATION_IMAGE_BUILD` as
+`BLOCKED_IMAGE_BUILD_NO_PROGRESS_TIMEOUT`. Cleanup passed and no second Round 3
+attempt ran.
+
+Round 4 removes target-VM Maven from the accepted deployment path. The
+controlled host builds one Java 17 JAR from a fresh exact-head `git archive`
+under a 30-minute bound, emits no Maven log evidence, and uploads only the JAR,
+the pinned runtime Dockerfile, and non-sensitive metadata. The VM verifies the
+archive, JAR, source revision, image labels, image JAR content, and non-root UID;
+prefetches four pinned runtime images; and applies a 10-minute runtime-image
+build bound plus five-minute no-progress bound. Output-size growth can refresh
+progress, mtime-only changes cannot, and the stage hard timeout always wins.
+One final local LAB1 attempt is authorized only after every offline gate passes;
+it cannot prove external staging or permit P4.
+
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
 non-production Linux server, use full `FETCH_AND_VALIDATE` HTTPS smoke, restore
@@ -891,9 +909,10 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H-LAB1 Round 3 Re-review, preserving the distinction
-   between offline exact-contract PASS, bootstrap/preflight PASS, the blocked
-   pre-source-upload run, local template PASS, and missing real-staging evidence.
+1. Complete all Round 4 offline gates, then execute exactly one final authorized
+   local LAB1 attempt, preserving the distinction between offline exact-contract
+   PASS, artifact/bootstrap/preflight/source-transfer PASS, blocked historical
+   runs, local template evidence, and missing real-staging evidence.
 2. Obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.
 3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,

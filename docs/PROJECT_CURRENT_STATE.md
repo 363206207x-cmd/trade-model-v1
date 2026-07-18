@@ -7,8 +7,8 @@ Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Current Work Package: P3-H-LAB1 Bounded Local Linux VM and Remote Execution Evidence
-Next Business Phase: Reviewer P3-H-LAB1 Round 3 Re-review; P4 remains blocked
-Next Business Phase Allowed: NO while PR #1130 is unmerged, the Round 2 1_OF_1 LAB run is blocked before source upload, and real staging is not run; NO for P4 and production deployment
+Next Business Phase: P3-H-LAB1 Round 4 Final Authorized Attempt; P4 remains blocked
+Next Business Phase Allowed: NO while PR #1130 is unmerged, Round 3 is blocked at application image build, and real staging is not run; the one Round 4 local attempt does not allow P4 or production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -89,6 +89,25 @@ dispatch defect is corrected and executable-tested offline, but the consumed
 authorization was not reused. Image build, deployment, Flyway, backup/restore,
 rotation, reboot, real staging, P4, and production readiness therefore remain
 unproven or blocked.
+
+The single Round 3 attempt at commit `d4715356` passed minimal VM startup,
+guest Docker provisioning, all 17 inputs, exact remote preflight, source upload,
+and matching local/remote source-archive SHA-256. The former target-VM
+Docker/Maven build then stopped at `APPLICATION_IMAGE_BUILD` as
+`BLOCKED_IMAGE_BUILD_NO_PROGRESS_TIMEOUT`. Cleanup passed; no second Round 3
+attempt ran, and no later deployment gate is inferred as PASS.
+
+Round 4 replaces target-VM Maven compilation with an exact-head Java 17 JAR
+built from a fresh `git archive` on the controlled host. A three-file artifact
+is independently hashed and verified before four pinned runtime images are
+prefetched and a non-root runtime-only image is built. JAR, artifact, source
+revision, image-label, and image-content SHA contracts are exact and
+fail-closed. Build output growth is tracked without reading output into
+evidence; mtime-only changes cannot refresh progress, and stage hard timeout
+precedes no-progress classification. Process-test output uses a JUnit-managed
+0600 file and repeats the TERM/KILL path ten times. One final Round 4 local
+LAB1 attempt is allowed only after every offline gate passes; no second attempt
+is allowed.
 
 ---
 
@@ -861,9 +880,10 @@ Next recommendation after LIVE18: capture explicit release-owner decisions if av
 
 Only the following work is allowed under the current P3-H-LAB1 closure:
 
-1. Perform Reviewer P3-H-LAB1 Round 3 Re-review.
-2. Keep offline contract and bootstrap/preflight PASS distinct from the blocked
-   pre-source-upload R1 evidence and from real server execution.
+1. Complete all Round 4 offline gates, then execute exactly one final authorized
+   local LAB1 attempt.
+2. Keep offline contract, artifact, bootstrap/preflight, and source-transfer
+   PASS distinct from the blocked Round 3 image build and real server execution.
 3. Retain existing P3/P3-G/P3-H safety and recovery tooling.
 4. Keep P4 and production deployment blocked.
 5. Run a later controlled server package only with complete explicit
@@ -1136,5 +1156,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; Round 2 exact contracts and truthful blocked pre-source-upload evidence pending Round 3 re-review
+- CURRENT_PACKAGE_PR: #1130 P3-H-LAB1 Draft PR; truthful Round 3 image-build timeout plus Round 4 artifact-first/runtime-only closure pending one final local attempt
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

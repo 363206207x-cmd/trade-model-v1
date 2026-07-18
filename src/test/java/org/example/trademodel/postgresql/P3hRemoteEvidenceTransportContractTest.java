@@ -27,6 +27,10 @@ class P3hRemoteEvidenceTransportContractTest {
     private static final String SOURCE_HEAD = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static final String ARCHIVE_SHA =
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private static final String APP_JAR_SHA =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    private static final String APP_ARTIFACT_SHA =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
     @TempDir
     Path tempDir;
@@ -253,6 +257,25 @@ class P3hRemoteEvidenceTransportContractTest {
     }
 
     @Test
+    void exactHeadArtifactBuildEvidencePasses() throws Exception {
+        ScriptResult result = runArtifact(validArtifactBuild());
+
+        assertThat(result.exitCode()).as(result.output()).isZero();
+        assertThat(result.output()).contains("P3H_ARTIFACT_BUILD_CONTRACT: PASS_EXACT");
+    }
+
+    @Test
+    void artifactBuildEvidenceRejectsWrongHeadMissingOrUnknownFields() throws Exception {
+        assertThat(runArtifact(validArtifactBuild().replace(
+                "APP_ARTIFACT_SOURCE_HEAD: " + SOURCE_HEAD,
+                "APP_ARTIFACT_SOURCE_HEAD: " + "f".repeat(40))).exitCode()).isNotZero();
+        assertThat(runArtifact(validArtifactBuild().replace(
+                "APP_JAR_SIZE_BYTES: 1024\n", "")).exitCode()).isNotZero();
+        assertThat(runArtifact(validArtifactBuild() + "ABSOLUTE_PATH: hidden\n")
+                .exitCode()).isNotZero();
+    }
+
+    @Test
     void zeroExitWithoutCompletionMarkerFails() throws Exception {
         Process remote = new ProcessBuilder("bash", "-c", "exit 0").start();
         assertThat(remote.waitFor(5, TimeUnit.SECONDS)).isTrue();
@@ -297,8 +320,8 @@ class P3hRemoteEvidenceTransportContractTest {
     @Test
     void malformedEvidenceValueFails() throws Exception {
         assertThat(runAction("BUILD_APPLICATION_IMAGE",
-                validBuild().replace("P3H_IMAGE_BUILD_ATTEMPTS: 1",
-                        "P3H_IMAGE_BUILD_ATTEMPTS: one attempt")).exitCode()).isNotZero();
+                validBuild().replace("APP_IMAGE_USER: NON_ROOT_10001",
+                        "APP_IMAGE_USER: root")).exitCode()).isNotZero();
     }
 
     @Test
@@ -320,7 +343,6 @@ class P3hRemoteEvidenceTransportContractTest {
                 DOCKER_DAEMON: ACTIVE
                 DNS_RESOLUTION: PASS
                 REQUIRED_REGISTRY_CONNECTIVITY: PASS_BOUNDED
-                MAVEN_REPOSITORY_CONNECTIVITY: PASS_BOUNDED
                 """ + validBuild());
 
         assertThat(result.exitCode()).as(result.output()).isZero();
@@ -353,11 +375,6 @@ class P3hRemoteEvidenceTransportContractTest {
     @Test
     void validCleanupEvidencePasses() throws Exception {
         assertActionPasses("CLEANUP", validCleanup());
-    }
-
-    @Test
-    void validRuntimeImageEvidencePasses() throws Exception {
-        assertActionPasses("PULL_RUNTIME_IMAGES", validRuntimePull());
     }
 
     @Test
@@ -396,6 +413,9 @@ class P3hRemoteEvidenceTransportContractTest {
         assertThat(runFinal(complete.replace(
                 "SOURCE_ARCHIVE_REMOTE_SHA256: " + ARCHIVE_SHA,
                 "SOURCE_ARCHIVE_REMOTE_SHA256: " + "c".repeat(64))).exitCode()).isNotZero();
+        assertThat(runFinal(complete.replace(
+                "APP_IMAGE_JAR_SHA256: " + APP_JAR_SHA,
+                "APP_IMAGE_JAR_SHA256: " + "e".repeat(64))).exitCode()).isNotZero();
     }
 
     private void assertActionPasses(String action, String fixture) throws Exception {
@@ -427,9 +447,38 @@ class P3hRemoteEvidenceTransportContractTest {
         return runRedactor("scripts/p3h-server-evidence-redact.sh", fixture, List.of());
     }
 
+    private ScriptResult runArtifact(String fixture) throws Exception {
+        int current = sequence.incrementAndGet();
+        Path raw = write("raw-" + current, fixture);
+        Path sanitized = tempDir.resolve("sanitized-" + current);
+        List<String> command = List.of(
+                "python3", "scripts/p3h-evidence-contract.py",
+                "--contract", "artifact",
+                "--source-head", SOURCE_HEAD,
+                "--input-file", raw.toString(),
+                "--output-file", sanitized.toString(),
+                "--status-key", "P3H_ARTIFACT_BUILD_CONTRACT");
+        ScriptResult result = finish(
+                new ProcessBuilder(command).redirectErrorStream(true).start(),
+                Duration.ofSeconds(5));
+        return new ScriptResult(result.exitCode(), result.output(), sanitized);
+    }
+
     private ScriptResult runAction(String action, String fixture) throws Exception {
-        return runRedactor("scripts/p3h-remote-action-evidence-redact.sh", fixture,
-                List.of(action, SOURCE_HEAD));
+        int current = sequence.incrementAndGet();
+        Path raw = write("raw-" + current, fixture);
+        Path sanitized = tempDir.resolve("sanitized-" + current);
+        List<String> command = new ArrayList<>(List.of(
+                "bash", "scripts/p3h-remote-action-evidence-redact.sh",
+                action, SOURCE_HEAD, raw.toString(), sanitized.toString()));
+        if ("BUILD_APPLICATION_IMAGE".equals(action)) {
+            command.add(APP_JAR_SHA);
+            command.add(APP_ARTIFACT_SHA);
+        }
+        ScriptResult result = finish(
+                new ProcessBuilder(command).redirectErrorStream(true).start(),
+                Duration.ofSeconds(5));
+        return new ScriptResult(result.exitCode(), result.output(), sanitized);
     }
 
     private ScriptResult runFinal(String fixture) throws Exception {
@@ -482,20 +531,32 @@ class P3hRemoteEvidenceTransportContractTest {
                 """;
     }
 
+    private String validArtifactBuild() {
+        return """
+                P3H_ARTIFACT_BUILD: PASS_EXACT_HEAD
+                APP_ARTIFACT_SOURCE_HEAD: %s
+                APP_JAR_SHA256: %s
+                APP_JAR_SIZE_BYTES: 1024
+                APP_ARTIFACT_ARCHIVE_SHA256: %s
+                """.formatted(SOURCE_HEAD, APP_JAR_SHA, APP_ARTIFACT_SHA);
+    }
+
     private String validBuild() {
         return """
                 P3H_REMOTE_STAGE: APPLICATION_IMAGE_BUILD_PASS
-                P3H_IMAGE_BUILD_ATTEMPTS: 1
-                P3H_IMAGE_BUILD_RETRY_COUNT: 0
+                APP_ARTIFACT_SOURCE_HEAD: %s
+                APP_JAR_SHA256: %s
+                APP_ARTIFACT_ARCHIVE_SHA256: %s
+                APP_ARTIFACT_REMOTE_SHA256: MATCH
+                APP_JAR_REMOTE_SHA256: MATCH
+                P3H_RUNTIME_IMAGE_PREFETCH: PASS_4_OF_4
                 APP_IMAGE_REVISION: %s
-                """.formatted(SOURCE_HEAD);
-    }
-
-    private String validRuntimePull() {
-        return """
-                P3H_REMOTE_STAGE: RUNTIME_IMAGE_PULL_PASS
-                P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3
-                """;
+                APP_IMAGE_JAR_SHA256: %s
+                APP_IMAGE_USER: NON_ROOT_10001
+                APP_IMAGE_JAR_CONTENT_SHA: MATCH
+                APPLICATION_IMAGE_BUILD_MODE: RUNTIME_ONLY_PREBUILT_JAR
+                """.formatted(
+                SOURCE_HEAD, APP_JAR_SHA, APP_ARTIFACT_SHA, SOURCE_HEAD, APP_JAR_SHA);
     }
 
     private String validInitialDeploy() {
@@ -567,7 +628,6 @@ class P3hRemoteEvidenceTransportContractTest {
                 + "SOURCE_ARCHIVE_SHA256: " + ARCHIVE_SHA + "\n"
                 + "SOURCE_ARCHIVE_REMOTE_SHA256: " + ARCHIVE_SHA + "\n"
                 + validBuild()
-                + validRuntimePull()
                 + validInitialDeploy()
                 + validBackupRestore()
                 + validRotation()

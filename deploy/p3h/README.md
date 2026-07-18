@@ -62,9 +62,15 @@ read-only. Neither source nor materialized Secret data may enter a release,
 Docker image, persistent volume, evidence bundle, Git, logs, inspect output, or
 process arguments.
 
-Image references are immutable digests. The application image is built from an
-exact `git archive` using `Dockerfile.p3h` and must carry the exact source SHA in
-`org.opencontainers.image.revision`.
+Image references are immutable digests. The LAB1 path first builds one
+Spring Boot JAR from an exact `git archive` on the controlled host, then uploads
+a three-file artifact containing the JAR, `Dockerfile.runtime.p3h`, and a
+non-sensitive manifest. The target verifies the archive and JAR SHA-256 values,
+prefetches all pinned runtime images, and performs only a runtime-only image
+build. The image must carry both the exact source SHA in
+`org.opencontainers.image.revision` and the JAR SHA in
+`org.example.trademodel.app-jar-sha256`, and must run as UID/GID 10001. Target
+VM Maven downloads and source compilation are not an accepted LAB1 success path.
 
 `scripts/p3h-filter-known-hosts.sh` fingerprints each `ssh-keyscan` candidate
 line, requires exactly one approved match, and writes only that line to the
