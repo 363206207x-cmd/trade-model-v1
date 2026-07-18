@@ -220,15 +220,20 @@ class ControlledStagingLocalLimaLabContractTest {
     @Test
     void remotePreflightPreservesInputAcrossBoundedBackgroundExecution() throws Exception {
         String runner = read("scripts/controlled-staging-readonly-deployment-p3h-r1.sh");
+        String supervisor = read("scripts/p3h-bounded-process.py");
 
         assertThat(runner).contains(
                 "run_bounded_with_stdin()",
                 "run_bounded_process \"${timeout_seconds}\" \"${operation_class}\"",
+                "--stdin-file \"${input_file}\"",
                 "run_bounded_with_stdin 180 REMOTE_PREFLIGHT",
                 "\"${ROOT_DIR}/scripts/p3h-remote-preflight.sh\"",
                 "BLOCKED_REMOTE_PREFLIGHT_EVIDENCE");
-        assertThat(runner).doesNotContain(
-                "<\"${ROOT_DIR}/scripts/p3h-remote-preflight.sh\" >\"${remote_preflight}\"");
+        assertThat(supervisor).contains(
+                "parser.add_argument(\"--stdin-file\")",
+                "stdin=stdin_handle",
+                "start_new_session=True");
+        assertThat(runner).doesNotContain("$@\" <\"${input_file}\"");
     }
 
     @Test
@@ -617,27 +622,25 @@ class ControlledStagingLocalLimaLabContractTest {
     }
 
     @Test
-    void sanitizedEvidenceDropsUnknownLinesAndValues() throws Exception {
+    void sanitizedEvidenceRejectsUnknownLinesWithoutExposingValues() throws Exception {
         Path raw = tempDir.resolve("raw.txt");
         Path sanitized = tempDir.resolve("sanitized.txt");
         String secret = "do-not-expose-this-secret";
         Files.writeString(raw, """
-                STAGING_FLYWAY: PASS_V1_TO_V7
-                APPLICATION_DATABASE_ROLE: READ_ONLY
-                READ_ONLY_WRITE_PROBE: DENIED
-                SECRET_LEAK_CANDIDATE_COUNT: 0
-                P4_ALLOWED: NO
-                PRODUCTION_READINESS: BLOCKED
                 RAW_RESPONSE: %s
                 """.formatted(secret), StandardCharsets.UTF_8);
 
         Process process = new ProcessBuilder(
                 "bash", "scripts/p3h-lab-evidence-redact.sh",
-                raw.toString(), sanitized.toString()).redirectErrorStream(true).start();
+                raw.toString(), sanitized.toString(),
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                .redirectErrorStream(true).start();
         assertThat(process.waitFor(5, TimeUnit.SECONDS)).isTrue();
 
-        assertThat(process.exitValue()).isZero();
-        assertThat(Files.readString(sanitized)).doesNotContain(secret, "RAW_RESPONSE");
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(process.exitValue()).isNotZero();
+        assertThat(output).contains("BLOCKED_UNKNOWN_KEY").doesNotContain(secret);
+        assertThat(sanitized).doesNotExist();
     }
 
     @Test

@@ -20,6 +20,7 @@ HEARTBEAT_INTERVAL_SECONDS=60
 TERM_GRACE_SECONDS=15
 ROTATION_REBOOT_TIMEOUT_SECONDS=1800
 BOUNDED_PROCESS_RUNNER="${ROOT_DIR}/scripts/p3h-bounded-process.py"
+REMOTE_ACTION_EVIDENCE_VALIDATOR="${ROOT_DIR}/scripts/p3h-remote-action-evidence-redact.sh"
 SUPERVISOR_TIMEOUT_MARKER="${P3H_SUPERVISOR_TIMEOUT_MARKER:-}"
 TEMP_ROOT=""
 RAW_EVIDENCE=""
@@ -51,8 +52,14 @@ blocked() {
 run_bounded_process() {
   local timeout_seconds="$1"
   local operation_class="$2"
+  local -a supervisor_stdin_args=()
   local bounded_status
   shift 2
+  if [ "${1:-}" = --stdin-file ]; then
+    [ "$#" -ge 2 ] || return 2
+    supervisor_stdin_args=(--stdin-file "$2")
+    shift 2
+  fi
   python3 "${BOUNDED_PROCESS_RUNNER}" \
     --timeout-seconds "${timeout_seconds}" \
     --global-start-epoch "${RUN_START_EPOCH}" \
@@ -62,6 +69,7 @@ run_bounded_process() {
     --poll-seconds "${POLL_INTERVAL_SECONDS}" \
     --heartbeat-seconds "${HEARTBEAT_INTERVAL_SECONDS}" \
     --term-grace-seconds "${TERM_GRACE_SECONDS}" \
+    "${supervisor_stdin_args[@]}" \
     -- "$@" &
   ACTIVE_BOUNDED_RUNNER_PID="$!"
   if wait "${ACTIVE_BOUNDED_RUNNER_PID}"; then
@@ -86,9 +94,8 @@ run_bounded_with_stdin() {
   local operation_class="$2"
   local input_file="$3"
   shift 3
-  [ -f "${input_file}" ] && [ ! -L "${input_file}" ] || return 2
   run_bounded_process "${timeout_seconds}" "${operation_class}" \
-    "$@" <"${input_file}"
+    --stdin-file "${input_file}" "$@"
 }
 
 handle_termination() {
@@ -144,6 +151,7 @@ run_remote_stage() {
   local action="$2"
   local blocked_status="$3"
   local stage_output="${TEMP_ROOT}/remote-${action}.raw"
+  local sanitized_output="${TEMP_ROOT}/remote-${action}.sanitized"
   local stage_status
   if run_bounded "${timeout_seconds}" "${action}" \
       ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
@@ -151,8 +159,16 @@ run_remote_stage() {
       "${action}" "${SOURCE_HEAD}" "${RUN_START_EPOCH}" \
       "${GLOBAL_TIMEOUT_SECONDS}" \
       >"${stage_output}" 2>&1; then
-    cat "${stage_output}" >>"${RAW_EVIDENCE}"
-    return 0
+    if "${REMOTE_ACTION_EVIDENCE_VALIDATOR}" \
+        "${action}" "${SOURCE_HEAD}" "${stage_output}" "${sanitized_output}" \
+        >/dev/null; then
+      cat "${sanitized_output}" >>"${RAW_EVIDENCE}"
+      return 0
+    fi
+    printf '%s\n' 'P3H_REMOTE_STAGE: BLOCKED_REMOTE_ACTION_EVIDENCE_CONTRACT' \
+      >>"${stage_output}"
+    persist_remote_failure_evidence "${CURRENT_STAGE}" "${stage_output}"
+    blocked "${REMOTE_FAILURE_REASON:-BLOCKED_REMOTE_ACTION_EVIDENCE_CONTRACT}"
   else
     stage_status=$?
   fi
@@ -269,6 +285,8 @@ esac
   || blocked BLOCKED_INVALID_GLOBAL_TIMEOUT
 command -v python3 >/dev/null 2>&1 || blocked BLOCKED_HOST_PYTHON_MISSING
 [ -f "${BOUNDED_PROCESS_RUNNER}" ] || blocked BLOCKED_BOUNDED_RUNNER_MISSING
+[ -x "${REMOTE_ACTION_EVIDENCE_VALIDATOR}" ] \
+  || blocked BLOCKED_REMOTE_ACTION_EVIDENCE_VALIDATOR_MISSING
 
 if [ "${P3H_COMPLETE_PROCESS_TREE_SUPERVISED:-}" != R1 ]; then
   export P3H_COMPLETE_PROCESS_TREE_SUPERVISED=R1
@@ -584,27 +602,27 @@ fi
 run_remote_stage "${post_reboot_timeout_seconds}" POST_REBOOT_VERIFY \
   BLOCKED_POST_REBOOT_VERIFY
 
+set_stage resource-cleanup
+run_remote_stage 300 CLEANUP BLOCKED_REMOTE_RESOURCE_CLEANUP
+REMOTE_PREPARED=0
+P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1 \
+  bash "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" >/dev/null \
+  || blocked BLOCKED_VM_RESOURCE_CLEANUP
+CLEANUP_COMPLETE=1
+printf '%s\n' 'RESOURCE_CLEANUP: PASS' >>"${RAW_EVIDENCE}"
+
 set_stage evidence-redaction
 evidence_dir="${EVIDENCE_ROOT}/${SOURCE_HEAD:0:12}"
 mkdir -p "${evidence_dir}"
 chmod 700 "${EVIDENCE_ROOT}" "${evidence_dir}"
 summary_file="${evidence_dir}/p3h-lab1-summary.txt"
-"${ROOT_DIR}/scripts/p3h-lab-evidence-redact.sh" \
-  "${RAW_EVIDENCE}" "${summary_file}" >/dev/null
+if ! "${ROOT_DIR}/scripts/p3h-lab-evidence-redact.sh" \
+    "${RAW_EVIDENCE}" "${summary_file}" "${SOURCE_HEAD}" >/dev/null; then
+  blocked BLOCKED_EVIDENCE_CONTRACT
+fi
 summary_sha="$(shasum -a 256 "${summary_file}" | awk '{print $1}')"
 printf '%s\n' "${summary_sha}" >"${evidence_dir}/p3h-lab1-summary.sha256"
 chmod 600 "${summary_file}" "${evidence_dir}/p3h-lab1-summary.sha256"
-
-set_stage resource-cleanup
-run_bounded 300 REMOTE_LAB_CLEANUP \
-  ssh "${ssh_options[@]}" "${P3H_SSH_USER}@${P3H_SSH_HOST}" \
-  bash /opt/trade-model-p3h/current/deploy/p3h/lima/p3h-lab-r1-remote.sh \
-  CLEANUP "${SOURCE_HEAD}" "$(date +%s)" 300 >/dev/null \
-  || blocked BLOCKED_REMOTE_RESOURCE_CLEANUP
-P3H_LAB_DESTROY_CONFIRM=I_CONFIRM_DESTROY_LOCAL_P3H_LAB1 \
-  bash "${ROOT_DIR}/scripts/p3h-lab-destroy.sh" >/dev/null \
-  || blocked BLOCKED_VM_RESOURCE_CLEANUP
-CLEANUP_COMPLETE=1
 R1_TOTAL_DURATION_MINUTES=$(( ($(date +%s) - RUN_START_EPOCH + 59) / 60 ))
 
 echo "P3H_LAB_RESULT: PASS_LOCAL_DISPOSABLE_LINUX_VM_STAGING"
@@ -624,6 +642,7 @@ echo "SECRET_ROTATION: PASS"
 echo "VM_REBOOT: PASS"
 echo "SECRET_LEAK_CANDIDATE_COUNT: 0"
 echo "RESOURCE_CLEANUP: PASS"
+echo "FINAL_EVIDENCE_CONTRACT: PASS_EXACT"
 echo "SANITIZED_EVIDENCE_SHA256: ${summary_sha}"
 echo "REAL_EXTERNAL_STAGING_STATUS: NOT_RUN"
 echo "P3H_RESULT: PARTIAL_LOCAL_VM_EVIDENCE"
