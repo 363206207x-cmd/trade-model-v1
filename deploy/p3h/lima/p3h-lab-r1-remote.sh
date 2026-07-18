@@ -6,6 +6,7 @@ SOURCE_HEAD="${2:-}"
 ROOT=/opt/trade-model-p3h/current
 STATE_ROOT=/var/lib/trade-model-p3h-lab1
 CREDENTIALS=/run/credentials/p3hlab1
+SERVICE_RUNTIME=/run/trade-model-p3h
 UNIT_TEMPLATE="${ROOT}/deploy/p3h/lima/trade-model-p3h-lab.service.template"
 UNIT_PATH=/etc/systemd/system/trade-model-p3h.service
 PROJECT=trade-model-p3h-lab1
@@ -17,6 +18,7 @@ IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=3600
 IMAGE_BUILD_MAX_ATTEMPTS=2
 IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
 CURRENT_REMOTE_STEP=PRECONDITION
+EXPECTED_FAILURE_REASON=""
 
 blocked() {
   echo "P3H_REMOTE_STAGE: $1"
@@ -30,8 +32,13 @@ blocked() {
 
 unexpected_failure() {
   local exit_status=$?
+  local reason
   trap - ERR
-  echo "P3H_REMOTE_STAGE: BLOCKED_UNEXPECTED_${CURRENT_REMOTE_STEP}"
+  case "${EXPECTED_FAILURE_REASON}" in
+    BLOCKED_[A-Z0-9_]*) reason="${EXPECTED_FAILURE_REASON}" ;;
+    *) reason="BLOCKED_UNEXPECTED_${CURRENT_REMOTE_STEP}" ;;
+  esac
+  echo "P3H_REMOTE_STAGE: ${reason}"
   echo "P3H_REMOTE_EXECUTION_IMPLEMENTATION: BLOCKED_LOCAL_VM"
   echo "REAL_EXTERNAL_STAGING_STATUS: NOT_RUN"
   echo "P3H_RESULT: BLOCKED_LOCAL_VM_EVIDENCE"
@@ -352,16 +359,36 @@ auth_code() {
   local version="$1"
   local secret_file="${CREDENTIALS}/app_admin_password_${version,,}"
   local config_file code curl_status
-  config_file="$(mktemp /run/p3h-lab-auth.XXXXXX)"
-  chmod 600 "${config_file}"
-  {
+  if [ ! -f "${secret_file}" ] || [ -L "${secret_file}" ] || [ ! -r "${secret_file}" ]; then
+    echo TRANSPORT_CREDENTIAL_FILE
+    return 0
+  fi
+  if [ ! -d "${SERVICE_RUNTIME}" ] || [ -L "${SERVICE_RUNTIME}" ]; then
+    echo TRANSPORT_RUNTIME
+    return 0
+  fi
+  if ! config_file="$(mktemp "${SERVICE_RUNTIME}/p3h-lab-auth.XXXXXX")"; then
+    echo TRANSPORT_RUNTIME
+    return 0
+  fi
+  if ! chmod 600 "${config_file}"; then
+    rm -f "${config_file}"
+    echo TRANSPORT_RUNTIME
+    return 0
+  fi
+  if ! {
     echo 'silent'
     echo 'show-error'
-    echo 'max-time = 20'
+    echo 'connect-timeout = 2'
+    echo 'max-time = 5'
     echo "cacert = \"${CREDENTIALS}/tls_ca_certificate\""
     echo "resolve = \"${HOSTNAME}:443:127.0.0.1\""
     printf 'user = "p3h_operator:%s"\n' "$(tr -d '\r\n' <"${secret_file}")"
-  } >"${config_file}"
+  } >"${config_file}"; then
+    rm -f "${config_file}"
+    echo TRANSPORT_CONFIG
+    return 0
+  fi
   set +e
   code="$(curl --config "${config_file}" --output /dev/null --write-out '%{http_code}' \
     "https://${HOSTNAME}/api/dashboard/home" 2>/dev/null)"
@@ -369,7 +396,16 @@ auth_code() {
   set -e
   rm -f "${config_file}"
   if [ "${curl_status}" -ne 0 ]; then
-    echo TRANSPORT
+    case "${curl_status}" in
+      3|4) echo TRANSPORT_CONFIG ;;
+      5|6) echo TRANSPORT_DNS ;;
+      7) echo TRANSPORT_CONNECT ;;
+      28) echo TRANSPORT_TIMEOUT ;;
+      35|51|53|54|58|59|64|66) echo TRANSPORT_TLS ;;
+      60) echo TRANSPORT_CERTIFICATE ;;
+      77) echo TRANSPORT_CA_FILE ;;
+      *) echo TRANSPORT_OTHER ;;
+    esac
   else
     echo "${code}"
   fi
@@ -381,7 +417,7 @@ auth_code_category() {
     401) echo HTTP_401 ;;
     403) echo HTTP_403 ;;
     429) echo HTTP_429 ;;
-    TRANSPORT) echo TRANSPORT ;;
+    TRANSPORT_[A-Z0-9_]*) echo "$1" ;;
     1??) echo HTTP_1XX ;;
     2??) echo HTTP_2XX ;;
     3??) echo HTTP_3XX ;;
@@ -396,7 +432,7 @@ await_auth_expectation() {
   local expectation="$2"
   local code=UNKNOWN
   local attempt
-  for attempt in $(seq 1 16); do
+  for attempt in $(seq 1 8); do
     code="$(auth_code "${version}")"
     case "${expectation}:${code}" in
       ACTIVE:200|DENIED:401|DENIED:403)
@@ -405,8 +441,8 @@ await_auth_expectation() {
         ;;
     esac
     case "${code}" in
-      429|TRANSPORT)
-        if [ "${attempt}" -lt 16 ]; then
+      429|TRANSPORT_DNS|TRANSPORT_CONNECT|TRANSPORT_TIMEOUT)
+        if [ "${attempt}" -lt 8 ]; then
           sleep 2
           continue
         fi
@@ -422,7 +458,8 @@ await_auth_expectation() {
 https_smoke() {
   local admin_version="$1"
   local response_dir config_file unauthenticated_code redirect_headers unknown_code
-  response_dir="$(mktemp -d /run/p3h-lab-smoke.XXXXXX)"
+  [ -d "${SERVICE_RUNTIME}" ] && [ ! -L "${SERVICE_RUNTIME}" ]
+  response_dir="$(mktemp -d "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX")"
   config_file="${response_dir}/curl-auth.conf"
   chmod 700 "${response_dir}"
   {
@@ -543,7 +580,8 @@ capture_fingerprint() {
 
 backup_restore() {
   local temp_root primary_structure recovery_structure primary_content recovery_content
-  temp_root="$(mktemp -d /run/p3h-lab-backup.XXXXXX)"
+  [ -d "${SERVICE_RUNTIME}" ] && [ ! -L "${SERVICE_RUNTIME}" ]
+  temp_root="$(mktemp -d "${SERVICE_RUNTIME}/p3h-lab-backup.XXXXXX")"
   primary_structure="${temp_root}/primary-structure"
   recovery_structure="${temp_root}/recovery-structure"
   primary_content="${temp_root}/primary-content"
@@ -683,7 +721,9 @@ case "${ACTION}" in
     printf '%s\n' "${SOURCE_HEAD}" | sudo tee "${STATE_ROOT}/source-head" >/dev/null
     sudo chmod 0600 "${STATE_ROOT}/database-fingerprint" "${STATE_ROOT}/source-head"
     CURRENT_REMOTE_STEP=INITIAL_HTTPS_SMOKE
-    https_smoke V1 || blocked BLOCKED_HTTPS_SMOKE
+    EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_SMOKE
+    https_smoke V1
+    EXPECTED_FAILURE_REASON=""
 
     CURRENT_REMOTE_STEP=STEADY_STATE_RESTART
     sudo systemctl stop trade-model-p3h.service
@@ -699,7 +739,9 @@ case "${ACTION}" in
       blocked "BLOCKED_STEADY_FINGERPRINT_$(fingerprint_failure_reason "${fingerprint_status}")"
     fi
     CURRENT_REMOTE_STEP=BACKUP_RESTORE
-    backup_restore || blocked BLOCKED_BACKUP_RESTORE
+    EXPECTED_FAILURE_REASON=BLOCKED_BACKUP_RESTORE
+    backup_restore
+    EXPECTED_FAILURE_REASON=""
 
     echo "P3H_REMOTE_STAGE: INITIAL_DEPLOY_PASS"
     echo "APP_IMAGE_REVISION: ${SOURCE_HEAD}"
@@ -774,7 +816,9 @@ case "${ACTION}" in
 
     CURRENT_REMOTE_STEP=TLS_CREDENTIAL_ACTIVATION
     sudo systemctl stop trade-model-p3h.service
-    activate_tls_v2_credentials || blocked BLOCKED_TLS_CREDENTIAL_ACTIVATION
+    EXPECTED_FAILURE_REASON=BLOCKED_TLS_CREDENTIAL_ACTIVATION
+    activate_tls_v2_credentials
+    EXPECTED_FAILURE_REASON=""
     CURRENT_REMOTE_STEP=TLS_ROTATION
     install_unit STEADY_STATE_START V2 V2 V2
     sudo systemctl start trade-model-p3h.service
@@ -783,7 +827,9 @@ case "${ACTION}" in
     [ "${tls_v2_serial}" = "$(expected_certificate_serial v2)" ] \
       || blocked BLOCKED_TLS_V2_IDENTITY
     [ "${tls_v2_serial}" != "${tls_v1_serial}" ] || blocked BLOCKED_TLS_NOT_ROTATED
-    https_smoke V2 || blocked BLOCKED_POST_ROTATION_SMOKE
+    EXPECTED_FAILURE_REASON=BLOCKED_POST_ROTATION_SMOKE
+    https_smoke V2
+    EXPECTED_FAILURE_REASON=""
 
     echo "P3H_REMOTE_STAGE: ROTATION_PASS"
     echo "ADMIN_SECRET_ROTATION: PASS_V2_ACTIVE_V1_DENIED"
@@ -827,10 +873,12 @@ case "${ACTION}" in
     fi
     [ "$(served_certificate_serial)" = "$(expected_certificate_serial v2)" ] \
       || blocked BLOCKED_TLS_AFTER_REBOOT
-    https_smoke V2 || blocked BLOCKED_HTTPS_AFTER_REBOOT
+    EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_AFTER_REBOOT
+    https_smoke V2
+    EXPECTED_FAILURE_REASON=""
 
     CURRENT_REMOTE_STEP=POST_REBOOT_LEAK_SCAN
-    leak_log="$(mktemp /run/p3h-lab-journal.XXXXXX)"
+    leak_log="$(mktemp "${SERVICE_RUNTIME}/p3h-lab-journal.XXXXXX")"
     sudo journalctl -u trade-model-p3h.service --no-pager >"${leak_log}"
     bash "${ROOT}/scripts/p3h-secret-leak-check.sh" \
       "${CREDENTIALS}" "${ROOT}" "${leak_log}"

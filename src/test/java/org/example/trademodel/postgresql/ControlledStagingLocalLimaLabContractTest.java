@@ -347,19 +347,50 @@ class ControlledStagingLocalLimaLabContractTest {
 
         assertThat(remote).contains(
                 "await_auth_expectation()",
-                "for attempt in $(seq 1 16)",
-                "if [ \"${attempt}\" -lt 16 ]",
+                "for attempt in $(seq 1 8)",
+                "if [ \"${attempt}\" -lt 8 ]",
                 "sleep 2",
-                "429|TRANSPORT)",
+                "429|TRANSPORT_DNS|TRANSPORT_CONNECT|TRANSPORT_TIMEOUT)",
                 "auth_code_category()",
                 "HTTP_401", "HTTP_403", "HTTP_429", "HTTP_5XX",
+                "TRANSPORT_CONFIG", "TRANSPORT_CONNECT", "TRANSPORT_TIMEOUT",
+                "TRANSPORT_TLS", "TRANSPORT_CERTIFICATE", "TRANSPORT_CA_FILE",
+                "TRANSPORT_CREDENTIAL_FILE", "TRANSPORT_RUNTIME",
                 "BLOCKED_V1_ADMIN_PRECHECK_$(auth_code_category",
                 "BLOCKED_V2_ADMIN_PREACTIVATED_$(auth_code_category");
         assertThat(remote).contains(
                 "--output /dev/null --write-out '%{http_code}'",
-                "2>/dev/null");
+                "2>/dev/null",
+                "connect-timeout = 2",
+                "max-time = 5");
         assertThat(remote).doesNotContain(
                 "auth_response_body", "curl --verbose", "set -x");
+    }
+
+    @Test
+    void evidenceChecksUseOwnedRuntimeAndCannotMaskEarlierFailuresWithCleanup() throws Exception {
+        String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+
+        assertThat(remote).contains(
+                "SERVICE_RUNTIME=/run/trade-model-p3h",
+                "${SERVICE_RUNTIME}/p3h-lab-auth.XXXXXX",
+                "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX",
+                "${SERVICE_RUNTIME}/p3h-lab-backup.XXXXXX",
+                "${SERVICE_RUNTIME}/p3h-lab-journal.XXXXXX",
+                "EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_SMOKE",
+                "EXPECTED_FAILURE_REASON=BLOCKED_BACKUP_RESTORE",
+                "EXPECTED_FAILURE_REASON=BLOCKED_TLS_CREDENTIAL_ACTIVATION",
+                "EXPECTED_FAILURE_REASON=BLOCKED_POST_ROTATION_SMOKE",
+                "EXPECTED_FAILURE_REASON=BLOCKED_HTTPS_AFTER_REBOOT");
+        assertThat(remote).doesNotContain(
+                "mktemp /run/p3h-lab-auth.",
+                "mktemp -d /run/p3h-lab-smoke.",
+                "mktemp -d /run/p3h-lab-backup.",
+                "mktemp /run/p3h-lab-journal.",
+                "https_smoke V1 || blocked",
+                "https_smoke V2 || blocked",
+                "backup_restore || blocked",
+                "activate_tls_v2_credentials || blocked");
     }
 
     @Test
