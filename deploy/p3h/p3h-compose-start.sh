@@ -9,6 +9,18 @@ FAILURE_INJECTION_CONFIRMATION=I_CONFIRM_LOCAL_P3H_FAILURE_INJECTION
 P3H_CURRENT_STEP=PRECHECK
 P3H_COMPOSE_CONFIG_CHECK_ONLY="${P3H_COMPOSE_CONFIG_CHECK_ONLY:-false}"
 
+record_step() {
+  local step="$1"
+  case "${step}" in
+    ''|*[!A-Z0-9_]*)
+      echo "P3H_COMPOSE_START: BLOCKED_INVALID_STEP"
+      exit 2
+      ;;
+  esac
+  P3H_CURRENT_STEP="${step}"
+  echo "P3H_COMPOSE_CURRENT_STEP: ${step}"
+}
+
 case "${P3H_COMPOSE_CONFIG_CHECK_ONLY}" in
   true|false) ;;
   *)
@@ -233,78 +245,78 @@ run_full_readonly_state_verify() {
   "${compose[@]}" run --rm --no-deps steady-state-verify
 }
 
-P3H_CURRENT_STEP=POSTGRES_START
+record_step POSTGRES_START
 "${compose[@]}" up --detach --wait --wait-timeout 300 postgres
 
 case "${P3H_START_MODE}" in
   INITIALIZE_GREENFIELD)
     export P3H_READONLY_GRANTS_MODE=INITIALIZE
-    P3H_CURRENT_STEP=GREENFIELD_PREFLIGHT
+    record_step GREENFIELD_PREFLIGHT
     "${compose[@]}" run --rm --no-deps greenfield-preflight
-    P3H_CURRENT_STEP=ROLE_BOOTSTRAP
+    record_step ROLE_BOOTSTRAP
     "${compose[@]}" run --rm --no-deps role-bootstrap
-    P3H_CURRENT_STEP=FLYWAY_MIGRATE
+    record_step FLYWAY_MIGRATE
     "${compose[@]}" run --rm --no-deps migrate
-    P3H_CURRENT_STEP=FAILURE_INJECTION_AFTER_MIGRATION
+    record_step FAILURE_INJECTION_AFTER_MIGRATION
     inject_failure_if_requested AFTER_MIGRATION_BEFORE_READONLY_GRANTS
-    P3H_CURRENT_STEP=FLYWAY_VALIDATE
+    record_step FLYWAY_VALIDATE
     "${compose[@]}" run --rm --no-deps flyway-validate
-    P3H_CURRENT_STEP=CORE_STATE_VERIFY
+    record_step CORE_STATE_VERIFY
     run_core_state_verify
-    P3H_CURRENT_STEP=READONLY_GRANTS
+    record_step READONLY_GRANTS
     "${compose[@]}" run --rm --no-deps readonly-grants
-    P3H_CURRENT_STEP=FULL_READONLY_STATE_VERIFY
+    record_step FULL_READONLY_STATE_VERIFY
     run_full_readonly_state_verify
     ;;
   STEADY_STATE_START)
     export P3H_READONLY_GRANTS_MODE=STEADY_STATE
-    P3H_CURRENT_STEP=FLYWAY_VALIDATE
+    record_step FLYWAY_VALIDATE
     "${compose[@]}" run --rm --no-deps flyway-validate
-    P3H_CURRENT_STEP=CORE_STATE_VERIFY
+    record_step CORE_STATE_VERIFY
     run_core_state_verify
-    P3H_CURRENT_STEP=READONLY_GRANTS
+    record_step READONLY_GRANTS
     "${compose[@]}" run --rm --no-deps readonly-grants
-    P3H_CURRENT_STEP=FULL_READONLY_STATE_VERIFY
+    record_step FULL_READONLY_STATE_VERIFY
     run_full_readonly_state_verify
     ;;
   RECOVER_GREENFIELD_INITIALIZATION)
     export P3H_READONLY_GRANTS_MODE=RECOVERY
-    P3H_CURRENT_STEP=RECOVERY_FLYWAY_VALIDATE_BEFORE_MIGRATE
+    record_step RECOVERY_FLYWAY_VALIDATE_BEFORE_MIGRATE
     "${compose[@]}" run --rm --no-deps \
       -e 'FLYWAY_IGNORE_MIGRATION_PATTERNS=*:pending' flyway-validate
-    P3H_CURRENT_STEP=GREENFIELD_RECOVERY_VERIFY
+    record_step GREENFIELD_RECOVERY_VERIFY
     "${compose[@]}" run --rm --no-deps greenfield-recovery-verify
-    P3H_CURRENT_STEP=RECOVERY_FLYWAY_MIGRATE
+    record_step RECOVERY_FLYWAY_MIGRATE
     "${compose[@]}" run --rm --no-deps migrate
-    P3H_CURRENT_STEP=RECOVERY_FLYWAY_VALIDATE_AFTER_MIGRATE
+    record_step RECOVERY_FLYWAY_VALIDATE_AFTER_MIGRATE
     "${compose[@]}" run --rm --no-deps flyway-validate
-    P3H_CURRENT_STEP=RECOVERY_CORE_STATE_VERIFY
+    record_step RECOVERY_CORE_STATE_VERIFY
     run_core_state_verify
-    P3H_CURRENT_STEP=RECOVERY_READONLY_GRANTS
+    record_step RECOVERY_READONLY_GRANTS
     "${compose[@]}" run --rm --no-deps readonly-grants
-    P3H_CURRENT_STEP=RECOVERY_FULL_READONLY_STATE_VERIFY
+    record_step RECOVERY_FULL_READONLY_STATE_VERIFY
     run_full_readonly_state_verify
     ;;
 esac
 
-P3H_CURRENT_STEP=SECRET_VOLUME_HOLDER_START
+record_step SECRET_VOLUME_HOLDER_START
 "${compose[@]}" up --detach --no-deps secret-volume-holder
-P3H_CURRENT_STEP=SECRET_MATERIALIZATION
+record_step SECRET_MATERIALIZATION
 "${compose[@]}" run --rm --no-deps secret-materializer
-P3H_CURRENT_STEP=FAILURE_INJECTION_AFTER_SECRET_MATERIALIZATION
+record_step FAILURE_INJECTION_AFTER_SECRET_MATERIALIZATION
 inject_failure_if_requested AFTER_SECRET_MATERIALIZATION
 
-P3H_CURRENT_STEP=APP_START
+record_step APP_START
 "${compose[@]}" up --detach --no-deps --wait --wait-timeout 300 app
-P3H_CURRENT_STEP=FAILURE_INJECTION_AFTER_APP_START
+record_step FAILURE_INJECTION_AFTER_APP_START
 inject_failure_if_requested AFTER_APP_START
 
-P3H_CURRENT_STEP=PROXY_START
+record_step PROXY_START
 "${compose[@]}" up --detach --no-deps --wait --wait-timeout 300 proxy
-P3H_CURRENT_STEP=FAILURE_INJECTION_DURING_PROXY_HEALTH
+record_step FAILURE_INJECTION_DURING_PROXY_HEALTH
 inject_failure_if_requested DURING_PROXY_HEALTH
 
-P3H_CURRENT_STEP=APP_ROLE_PROBE
+record_step APP_ROLE_PROBE
 "${compose[@]}" --profile validation run --rm --no-deps app-role-probe
 
 trap - ERR

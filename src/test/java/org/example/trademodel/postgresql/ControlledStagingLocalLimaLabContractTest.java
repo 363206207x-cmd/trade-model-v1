@@ -247,6 +247,8 @@ class ControlledStagingLocalLimaLabContractTest {
                 "BLOCKED_IMAGE_BUILD_TIMEOUT",
                 "service_start_failure_reason()",
                 "$1 == \"P3H_COMPOSE_FAILED_STEP\"",
+                "$1 == \"P3H_COMPOSE_CURRENT_STEP\"",
+                "STEP_${current_step}_INCOMPLETE",
                 "$1 == \"P3H_COMPOSE_START\"",
                 "detail=ARCHITECTURE_MISMATCH",
                 "no (flyway )?database( plugin)? found to handle",
@@ -287,6 +289,12 @@ class ControlledStagingLocalLimaLabContractTest {
                 "row_to_json(t)",
                 "journalctl --unit=trade-model-p3h.service --boot --no-pager -o cat >&2");
         assertThat(composeStart).contains(
+                "record_step()",
+                "P3H_COMPOSE_CURRENT_STEP: ${step}",
+                "record_step POSTGRES_START",
+                "record_step FLYWAY_MIGRATE",
+                "record_step APP_START",
+                "record_step PROXY_START",
                 "P3H_COMPOSE_CONFIG_CHECK_ONLY:-false",
                 "P3H_COMPOSE_CONFIG_CHECK: PASS",
                 "BLOCKED_COMPOSE_CONFIG_${compose_config_category}",
@@ -309,6 +317,30 @@ class ControlledStagingLocalLimaLabContractTest {
                 "install -d -m 0700 \"${DOCKER_CONFIG}\"",
                 "BLOCKED_DOCKER_CONFIG_SCOPE",
                 "BLOCKED_DOCKER_CONFIG_DIRECTORY");
+    }
+
+    @Test
+    void runtimeImagesArePrefetchedByDigestBeforeSystemdStart() throws Exception {
+        String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
+
+        assertThat(remote).contains(
+                "RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200",
+                "RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=2",
+                "pull_runtime_image()",
+                "ensure_runtime_images()",
+                "docker pull \"${image}\"",
+                "P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3",
+                "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}",
+                "CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH");
+        assertThat(remote.indexOf("CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH"))
+                .isLessThan(remote.indexOf("CURRENT_REMOTE_STEP=INITIAL_UNIT_INSTALL"));
+        assertThat(remote).contains(
+                "postgres:16-alpine@sha256:",
+                "flyway/flyway:12.11.0-alpine@sha256:",
+                "nginx:1.27.4-alpine@sha256:");
+        assertThat(remote).doesNotContain(
+                "cat \"${pull_log}\"",
+                "tail \"${pull_log}\"");
     }
 
     @Test

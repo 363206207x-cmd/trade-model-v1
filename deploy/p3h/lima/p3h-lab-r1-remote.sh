@@ -12,11 +12,16 @@ UNIT_PATH=/etc/systemd/system/trade-model-p3h.service
 PROJECT=trade-model-p3h-lab1
 HOSTNAME=trade-staging.lab.test
 POSTGRES_IMAGE='postgres:16-alpine@sha256:fd1e8d0274f13f5a03a2673a207b28e14823c2f2efc3ca4bb4197c8a9f841bdc'
+FLYWAY_IMAGE='flyway/flyway:12.11.0-alpine@sha256:6bf3a713f52c4d803a88501f8409dda2191e9ccba1454358a6de2c4cc65f71b0'
+NGINX_IMAGE='nginx:1.27.4-alpine@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591'
 GREENFIELD_CONFIRMATION=I_CONFIRM_EMPTY_GREENFIELD_INITIALIZATION
 ROTATION_CONFIRMATION=I_CONFIRM_CONTROLLED_APP_DATABASE_SECRET_ROTATION
 IMAGE_BUILD_ATTEMPT_TIMEOUT_SECONDS=3600
 IMAGE_BUILD_MAX_ATTEMPTS=2
 IMAGE_BUILD_FAILURE_CATEGORY=UNKNOWN
+RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS=1200
+RUNTIME_IMAGE_PULL_MAX_ATTEMPTS=2
+RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=UNKNOWN
 CURRENT_REMOTE_STEP=PRECONDITION
 
 blocked() {
@@ -245,6 +250,66 @@ build_application_image() {
   return "${build_status}"
 }
 
+pull_runtime_image() {
+  local image="$1"
+  local pull_log pull_status
+  pull_log="$(mktemp /tmp/p3h-runtime-image-pull.XXXXXX)"
+  chmod 600 "${pull_log}"
+  if timeout --signal=TERM --kill-after=30s \
+      "${RUNTIME_IMAGE_PULL_ATTEMPT_TIMEOUT_SECONDS}" \
+      docker pull "${image}" >"${pull_log}" 2>&1; then
+    RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=NONE
+    rm -f "${pull_log}"
+    return 0
+  else
+    pull_status=$?
+  fi
+
+  case "${pull_status}" in
+    124|137) RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=TIMEOUT ;;
+    *)
+      if grep -Eqi '429|too many requests|toomanyrequests|rate.?limit' "${pull_log}"; then
+        RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=RATE_LIMIT
+      elif grep -Eqi 'tls handshake timeout|i/o timeout|timed out|connection reset|unexpected eof|temporary failure|failed to do request|dial tcp|network is unreachable|connection refused|no such host|unable to resolve|failed to fetch anonymous token|context deadline exceeded' "${pull_log}"; then
+        RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=NETWORK
+      elif grep -Eqi 'no space left on device|disk quota exceeded' "${pull_log}"; then
+        RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=STORAGE
+      else
+        RUNTIME_IMAGE_PULL_FAILURE_CATEGORY=UNKNOWN
+      fi
+      ;;
+  esac
+  rm -f "${pull_log}"
+  return "${pull_status}"
+}
+
+ensure_runtime_images() {
+  local image pull_attempt
+  for image in "${POSTGRES_IMAGE}" "${FLYWAY_IMAGE}" "${NGINX_IMAGE}"; do
+    pull_attempt=1
+    while [ "${pull_attempt}" -le "${RUNTIME_IMAGE_PULL_MAX_ATTEMPTS}" ]; do
+      if pull_runtime_image "${image}"; then
+        break
+      fi
+      case "${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}" in
+        TIMEOUT|NETWORK|RATE_LIMIT) ;;
+        STORAGE|UNKNOWN)
+          blocked "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
+          ;;
+        *) blocked BLOCKED_RUNTIME_IMAGE_PULL_FAILURE ;;
+      esac
+      if [ "${pull_attempt}" -eq "${RUNTIME_IMAGE_PULL_MAX_ATTEMPTS}" ]; then
+        blocked "BLOCKED_RUNTIME_IMAGE_PULL_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
+      fi
+      echo "P3H_RUNTIME_IMAGE_PULL_RETRY: BOUNDED_${RUNTIME_IMAGE_PULL_FAILURE_CATEGORY}"
+      pull_attempt=$((pull_attempt + 1))
+    done
+    [ "${pull_attempt}" -le "${RUNTIME_IMAGE_PULL_MAX_ATTEMPTS}" ] \
+      || blocked BLOCKED_RUNTIME_IMAGE_PULL_TIMEOUT
+  done
+  echo 'P3H_RUNTIME_IMAGE_PREFETCH: PASS_3_OF_3'
+}
+
 install_unit() {
   local start_mode="$1"
   local database_version="$2"
@@ -284,7 +349,7 @@ install_unit() {
 }
 
 service_start_failure_reason() {
-  local journal_file failed_step start_status detail
+  local journal_file failed_step current_step start_status detail
   journal_file="$(mktemp /tmp/p3h-service-journal.XXXXXX)"
   chmod 600 "${journal_file}"
   sudo journalctl --unit=trade-model-p3h.service --boot --no-pager -o cat \
@@ -294,6 +359,12 @@ service_start_failure_reason() {
         failed_step=$2
       }
       END { print failed_step }
+    ' "${journal_file}")"
+  current_step="$(awk -F ': ' '
+      $1 == "P3H_COMPOSE_CURRENT_STEP" && $2 ~ /^[A-Z0-9_]+$/ {
+        current_step=$2
+      }
+      END { print current_step }
     ' "${journal_file}")"
   start_status="$(awk -F ': ' '
       $1 == "P3H_COMPOSE_START" && $2 ~ /^(BLOCKED|FAIL)_[A-Z0-9_]+$/ {
@@ -335,6 +406,8 @@ service_start_failure_reason() {
     echo "STEP_${failed_step}"
   elif [ -n "${start_status}" ]; then
     echo "${start_status}"
+  elif [ -n "${current_step}" ]; then
+    echo "STEP_${current_step}_INCOMPLETE"
   else
     echo START
   fi
@@ -759,6 +832,9 @@ case "${ACTION}" in
     [ "${revision}" = "${SOURCE_HEAD}" ] || blocked BLOCKED_IMAGE_REVISION
     [ "$(docker image inspect "${image}" --format '{{.Config.User}}')" = app ] \
       || blocked BLOCKED_IMAGE_USER
+
+    CURRENT_REMOTE_STEP=RUNTIME_IMAGE_PREFETCH
+    ensure_runtime_images
 
     CURRENT_REMOTE_STEP=INITIAL_UNIT_INSTALL
     install_unit INITIALIZE_GREENFIELD V1 V1 V1
