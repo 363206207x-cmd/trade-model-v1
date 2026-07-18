@@ -13,14 +13,29 @@ import java.util.concurrent.TimeoutException;
 @Service
 public class ProviderCallCoordinator {
     private final ProviderCallProperties properties;
-    private final SnapshotCacheService cache;
-    private final ProviderSingleFlightGuard singleFlight;
-    private final ProviderRateBudgetManager budget;
+    private final ProviderSnapshotCache cache;
+    private final ProviderSingleFlightRegistry singleFlight;
+    private final ProviderRateBudget budget;
     private final ProviderCircuitBreaker circuitBreaker;
-    private final ProviderCallAuditLog auditLog;
+    private final ProviderCallAuditService auditLog;
+    private final ProviderConcurrencyGuard concurrencyGuard;
+    private final ProviderHealthRegistry healthRegistry;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
+    public ProviderCallCoordinator(ProviderCallProperties properties,
+                                   SnapshotCacheService cache,
+                                   ProviderSingleFlightGuard singleFlight,
+                                   ProviderRateBudgetManager budget,
+                                   ProviderCircuitBreaker circuitBreaker,
+                                   ProviderCallAuditLog auditLog,
+                                   ProviderConcurrencyGuard concurrencyGuard,
+                                   ProviderHealthRegistry healthRegistry) {
+        this(properties, cache, singleFlight, budget, circuitBreaker, auditLog,
+                concurrencyGuard, healthRegistry, Clock.systemUTC());
+    }
+
+    /** Compatibility constructor retained for focused unit tests and existing adapters. */
     public ProviderCallCoordinator(ProviderCallProperties properties,
                                    SnapshotCacheService cache,
                                    ProviderSingleFlightGuard singleFlight,
@@ -37,13 +52,28 @@ public class ProviderCallCoordinator {
                                    ProviderCircuitBreaker circuitBreaker,
                                    ProviderCallAuditLog auditLog,
                                    Clock clock) {
+        this(properties, cache, singleFlight, budget, circuitBreaker, auditLog,
+                new ProviderConcurrencyGuard(properties), new ProviderHealthRegistry(clock), clock);
+    }
+
+    public ProviderCallCoordinator(ProviderCallProperties properties,
+                                   ProviderSnapshotCache cache,
+                                   ProviderSingleFlightRegistry singleFlight,
+                                   ProviderRateBudget budget,
+                                   ProviderCircuitBreaker circuitBreaker,
+                                   ProviderCallAuditService auditLog,
+                                   ProviderConcurrencyGuard concurrencyGuard,
+                                   ProviderHealthRegistry healthRegistry,
+                                   Clock clock) {
         this.properties = properties;
         this.cache = cache;
         this.singleFlight = singleFlight;
         this.budget = budget;
         this.circuitBreaker = circuitBreaker;
         this.auditLog = auditLog;
-        this.clock = clock;
+        this.concurrencyGuard = concurrencyGuard;
+        this.healthRegistry = healthRegistry;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     public <T> ProviderCallResult<T> execute(ProviderCallRequest<T> request) {
@@ -68,7 +98,19 @@ public class ProviderCallCoordinator {
                 () -> { throw new IllegalStateException("read-only snapshot peek must not call provider"); });
         SnapshotCacheService.SnapshotLookup<T> lookup = cache.lookup(key, clock.instant(), freshTtl);
         if (lookup.fresh()) return cached(request, lookup, false);
-        if (lookup.staleReadable()) return cached(request, lookup, true);
+        if (lookup.staleReadable()) {
+            return singleFlight.inFlight(key)
+                    ? cached(request, lookup, true, SnapshotFreshnessStatus.REFRESHING)
+                    : cached(request, lookup, true);
+        }
+        if (singleFlight.inFlight(key)) {
+            Instant now = clock.instant();
+            ProviderSnapshotMetadata metadata = metadata(request, null, now, now,
+                    UnifiedSourceStatus.WAITING_SYNC, SnapshotFreshnessStatus.REFRESHING,
+                    false, false, "SNAPSHOT_REFRESH_IN_PROGRESS", List.of("SNAPSHOT_REFRESH_IN_PROGRESS"));
+            return audited(request, new ProviderCallResult<>(null, metadata,
+                    budget.state(key.provider(), circuitBreaker.state(key.provider()))));
+        }
         return failOrStale(request, lookup, UnifiedSourceStatus.WAITING_SYNC, "SNAPSHOT_NOT_CACHED");
     }
 
@@ -77,24 +119,38 @@ public class ProviderCallCoordinator {
             SnapshotCacheService.SnapshotLookup<T> stale) {
         String provider = request.key().provider();
         if (!properties.isEnabled() || !properties.isExternalCallsEnabled()) {
+            healthRegistry.recordFailure(provider, UnifiedSourceStatus.DISABLED, "PROVIDER_CALL_DISABLED");
             return failOrStale(request, stale, UnifiedSourceStatus.DISABLED, "PROVIDER_CALL_DISABLED");
         }
         if (!circuitBreaker.allowRequest(provider)) {
+            healthRegistry.recordFailure(provider, UnifiedSourceStatus.DEGRADED, "PROVIDER_CIRCUIT_OPEN");
             return failOrStale(request, stale, UnifiedSourceStatus.DEGRADED, "PROVIDER_CIRCUIT_OPEN");
         }
-        if (!budget.reserve(provider, request.priority())) {
-            return failOrStale(request, stale, UnifiedSourceStatus.DEGRADED, "PROVIDER_BUDGET_REJECTED");
-        }
-
         ProviderAdapterResponse<T> response;
-        try {
+        ProviderConcurrencyGuard.Lease lease = concurrencyGuard.tryAcquire(
+                request.key().datasetType(), request.priority());
+        if (lease == null) {
+            healthRegistry.recordFailure(provider, UnifiedSourceStatus.DEGRADED,
+                    "PROVIDER_CONCURRENCY_REJECTED");
+            return failOrStale(request, stale, UnifiedSourceStatus.DEGRADED,
+                    "PROVIDER_CONCURRENCY_REJECTED");
+        }
+        try (lease) {
+            if (!budget.reserve(request.key(), request.priority(), request.effectiveProfile())) {
+                healthRegistry.recordFailure(provider, UnifiedSourceStatus.DEGRADED,
+                        "PROVIDER_BUDGET_REJECTED");
+                return failOrStale(request, stale, UnifiedSourceStatus.DEGRADED,
+                        "PROVIDER_BUDGET_REJECTED");
+            }
             response = invokeBounded(request);
         } catch (RuntimeException failure) {
             circuitBreaker.recordFailure(provider);
+            healthRegistry.recordFailure(provider, UnifiedSourceStatus.ERROR, "PROVIDER_CALL_FAILED");
             return failOrStale(request, stale, UnifiedSourceStatus.ERROR, "PROVIDER_CALL_FAILED");
         }
         if (response != null && response.ready()) {
             circuitBreaker.recordSuccess(provider);
+            healthRegistry.recordSuccess(provider, UnifiedSourceStatus.READY);
             Instant fetchTime = clock.instant();
             ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
                     fetchTime.plus(request.freshTtl()), UnifiedSourceStatus.READY,
@@ -105,6 +161,7 @@ public class ProviderCallCoordinator {
         }
         if (response != null && response.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED) {
             circuitBreaker.recordSuccess(provider);
+            healthRegistry.recordSuccess(provider, UnifiedSourceStatus.EMPTY_CONFIRMED);
             Instant fetchTime = clock.instant();
             ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
                     fetchTime.plus(request.freshTtl()), UnifiedSourceStatus.EMPTY_CONFIRMED,
@@ -123,6 +180,8 @@ public class ProviderCallCoordinator {
         }
         circuitBreaker.recordFailure(provider);
         UnifiedSourceStatus sourceStatus = response == null ? UnifiedSourceStatus.ERROR : response.sourceStatus();
+        healthRegistry.recordFailure(provider,
+                sourceStatus == null ? UnifiedSourceStatus.ERROR : sourceStatus, reason);
         return failOrStale(request, stale, sourceStatus == null ? UnifiedSourceStatus.ERROR : sourceStatus, reason);
     }
 
@@ -176,9 +235,18 @@ public class ProviderCallCoordinator {
             ProviderCallRequest<T> request,
             SnapshotCacheService.SnapshotLookup<T> lookup,
             boolean fallback) {
+        return cached(request, lookup, fallback,
+                fallback ? SnapshotFreshnessStatus.STALE_READABLE : SnapshotFreshnessStatus.FRESH);
+    }
+
+    private <T> ProviderCallResult<T> cached(
+            ProviderCallRequest<T> request,
+            SnapshotCacheService.SnapshotLookup<T> lookup,
+            boolean fallback,
+            SnapshotFreshnessStatus freshness) {
         ProviderSnapshotMetadata metadata = lookup.metadata().asCacheHit(
-                fallback ? SnapshotFreshnessStatus.STALE : SnapshotFreshnessStatus.FRESH, fallback,
-                lookup.metadata().fetchTime().plus(request.freshTtl()));
+                freshness, fallback,
+                lookup.metadata().fetchTime().plus(request.freshTtl()), clock.instant());
         return audited(request, new ProviderCallResult<>(lookup.payload(), metadata,
                 budget.state(request.key().provider(), circuitBreaker.state(request.key().provider()))));
     }
@@ -191,7 +259,7 @@ public class ProviderCallCoordinator {
         if (stale != null && stale.staleReadable()) return cached(request, stale, true);
         Instant now = clock.instant();
         ProviderSnapshotMetadata metadata = metadata(request, null, now, now, status,
-                status == UnifiedSourceStatus.ERROR ? SnapshotFreshnessStatus.ERROR : SnapshotFreshnessStatus.UNAVAILABLE,
+                status == UnifiedSourceStatus.ERROR ? SnapshotFreshnessStatus.UNAVAILABLE : SnapshotFreshnessStatus.UNAVAILABLE,
                 false, false, reason, List.of(reason));
         return audited(request, new ProviderCallResult<>(null, metadata,
                 budget.state(request.key().provider(), circuitBreaker.state(request.key().provider()))));
@@ -209,16 +277,21 @@ public class ProviderCallCoordinator {
             String errorCode,
             List<String> reasons) {
         ProviderRequestKey key = request.key();
-        return new ProviderSnapshotMetadata(key.provider(), key.datasetType(), key.symbol(), key.timeframe(),
-                providerDataTime, fetchTime, expiresAt, sourceStatus, freshness, request.traceId(), key.canonical(),
-                cacheHit, fallback, errorCode, reasons);
+        Instant ageBasis = providerDataTime == null ? fetchTime : providerDataTime;
+        long ageSeconds = ageBasis == null || fetchTime == null || fetchTime.isBefore(ageBasis)
+                ? 0L : Duration.between(ageBasis, fetchTime).toSeconds();
+        return new ProviderSnapshotMetadata(key.provider(), key.datasetType(), key.canonicalInstrumentId(),
+                key.providerSymbol(), key.timeframe(), providerDataTime, fetchTime, expiresAt, ageSeconds,
+                sourceStatus, freshness, request.traceId(), key.canonical(), key.sourceVersion(), cacheHit,
+                fallback, errorCode, reasons);
     }
 
     private <T> ProviderCallResult<T> audited(ProviderCallRequest<T> request, ProviderCallResult<T> result) {
         ProviderSnapshotMetadata metadata = result.metadata();
         auditLog.record(new ProviderCallAuditEvent(request.traceId(), request.key().canonical(), request.priority(),
-                metadata.sourceStatus(), metadata.cacheHit(), metadata.fallbackUsed(), metadata.errorCode(),
-                clock.instant()));
+                request.baseProfile(), request.effectiveProfile(), request.profileReasonCodes(),
+                request.frequencyMatrixVersion(), metadata.sourceStatus(), metadata.cacheHit(),
+                metadata.fallbackUsed(), metadata.errorCode(), clock.instant()));
         return result;
     }
 }

@@ -416,7 +416,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         }
         try {
             ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.get(symbol,
-                    AssetPriority.P1_CORE, Duration.ofSeconds(15), "push-recheck-" + UUID.randomUUID());
+                    AssetPriority.P1_WATCHLIST, Duration.ofSeconds(15), "push-recheck-" + UUID.randomUUID());
             if (!MarketPriceSnapshotPolicy.isFresh(result)) {
                 String code = MarketPriceSnapshotPolicy.failureCode(result);
                 return PriceResolution.failed(failJson(code, "snapshot unavailable for symbol=" + symbol));
@@ -442,14 +442,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         }
         try {
             ProviderCallResult<DerivativesRiskSnapshot> result = derivativesSnapshotReadPort.readCached(
-                    snap.getSymbol(), AssetPriority.P1_CORE, Duration.ofSeconds(60),
+                    snap.getSymbol(), AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60),
                     snap.getTraceId() == null ? "push-recheck-derivatives" : snap.getTraceId());
             DerivativesRiskSnapshot payload = result == null ? null : result.payload();
             if (payload == null) {
                 return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "latest cached snapshot missing");
             }
             if (payload.sourceStatus() == UnifiedSourceStatus.STALE
-                    || payload.freshnessStatus() == SnapshotFreshnessStatus.STALE) {
+                    || payload.freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE) {
                 return DerivativesGuard.blocked("DERIVATIVES_STALE", "latest cached snapshot stale");
             }
             boolean oiReady = payload.openInterestUsd() != null

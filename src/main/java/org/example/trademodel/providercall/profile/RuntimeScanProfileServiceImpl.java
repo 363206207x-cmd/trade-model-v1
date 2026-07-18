@@ -51,15 +51,15 @@ public class RuntimeScanProfileServiceImpl implements RuntimeScanProfileService 
         ProfileTransitionResult transition = transitionService.current(normalized,
                 "runtime-profile-" + UUID.randomUUID());
         RuntimeScanProfile profile = item == null ? transition.effectiveProfile() : item.effectiveProfile();
-        AssetPriority priority = item == null ? AssetPriority.P3_POOL : item.effectivePriority();
+        AssetPriority priority = item == null ? AssetPriority.P3_DISCOVERY : item.effectivePriority();
         String reason = item == null ? transition.effectiveReason() : item.escalationReason();
         return new RuntimeScanProfileResponse(normalized, input.baseProfile(), profile, priority, reason,
                 transition.effectiveSince(), transition.nextDowngradeEligibleAt(),
                 properties.intervalSeconds(profile, priority, ProviderDatasetType.PRICE),
                 properties.intervalSeconds(profile, priority, ProviderDatasetType.DERIVATIVES),
-                refreshRegistry.get(normalized, ProviderDatasetType.PRICE),
-                refreshRegistry.get(normalized, ProviderDatasetType.DERIVATIVES),
-                budgetManager.state("BINANCE_PUBLIC", circuitBreaker.state("BINANCE_PUBLIC")));
+                refreshRegistry.findByProviderSymbol(normalized, ProviderDatasetType.PRICE),
+                refreshRegistry.findByProviderSymbol(normalized, ProviderDatasetType.DERIVATIVES),
+                budgetManager.state("BINANCE", circuitBreaker.state("BINANCE")));
     }
 
     private static String requiredSymbol(String symbol) {

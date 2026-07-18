@@ -79,7 +79,7 @@ public final class MarketPriceSnapshotTestSupport {
 
     public static ProviderCallResult<MarketPriceSnapshot> unavailable(String symbol, String code) {
         return new ProviderCallResult<>(null, metadata(symbol, Instant.now(), UnifiedSourceStatus.ERROR,
-                SnapshotFreshnessStatus.ERROR, code), budget());
+                SnapshotFreshnessStatus.UNAVAILABLE, code), budget());
     }
 
     private static ProviderSnapshotMetadata metadata(String symbol, Instant now, UnifiedSourceStatus status,

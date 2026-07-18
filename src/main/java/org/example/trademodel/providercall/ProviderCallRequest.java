@@ -1,12 +1,17 @@
 package org.example.trademodel.providercall;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
 public record ProviderCallRequest<T>(
         ProviderRequestKey key,
         AssetPriority priority,
+        UserScanProfile baseProfile,
+        RuntimeScanProfile effectiveProfile,
+        List<String> profileReasonCodes,
+        String frequencyMatrixVersion,
         Duration freshTtl,
         Duration staleTtl,
         Duration timeout,
@@ -22,12 +27,34 @@ public record ProviderCallRequest<T>(
                                Duration timeout,
                                String traceId,
                                Supplier<ProviderAdapterResponse<T>> adapterCall) {
-        this(key, priority, freshTtl, staleTtl, timeout, traceId, 2, 1, adapterCall);
+        this(key, priority, UserScanProfile.AUTO, RuntimeScanProfile.STANDARD,
+                List.of("CALLER_PROFILE_NOT_PROVIDED"), "UNKNOWN", freshTtl, staleTtl,
+                timeout, traceId, 2, 1, adapterCall);
+    }
+
+    public ProviderCallRequest(ProviderRequestKey key,
+                               AssetPriority priority,
+                               Duration freshTtl,
+                               Duration staleTtl,
+                               Duration timeout,
+                               String traceId,
+                               int maxRetry5xx,
+                               int maxRetryTimeout,
+                               Supplier<ProviderAdapterResponse<T>> adapterCall) {
+        this(key, priority, UserScanProfile.AUTO, RuntimeScanProfile.STANDARD,
+                List.of("CALLER_PROFILE_NOT_PROVIDED"), "UNKNOWN", freshTtl, staleTtl,
+                timeout, traceId, maxRetry5xx, maxRetryTimeout, adapterCall);
     }
 
     public ProviderCallRequest {
         key = Objects.requireNonNull(key, "key");
         priority = Objects.requireNonNull(priority, "priority");
+        baseProfile = baseProfile == null ? UserScanProfile.AUTO : baseProfile;
+        effectiveProfile = effectiveProfile == null ? RuntimeScanProfile.STANDARD : effectiveProfile;
+        profileReasonCodes = profileReasonCodes == null ? List.of() : List.copyOf(profileReasonCodes);
+        if (frequencyMatrixVersion == null || frequencyMatrixVersion.isBlank()) {
+            throw new IllegalArgumentException("frequencyMatrixVersion is required");
+        }
         freshTtl = positive(freshTtl, "freshTtl");
         staleTtl = positive(staleTtl, "staleTtl");
         timeout = positive(timeout, "timeout");

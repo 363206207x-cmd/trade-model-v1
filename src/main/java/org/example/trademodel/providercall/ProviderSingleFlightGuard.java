@@ -10,11 +10,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 @Service
-public class ProviderSingleFlightGuard {
+public class ProviderSingleFlightGuard implements ProviderSingleFlightRegistry {
     private final Map<ProviderRequestKey, CompletableFuture<?>> flights = new ConcurrentHashMap<>();
     private final AtomicInteger waitingCallers = new AtomicInteger();
 
     @SuppressWarnings("unchecked")
+    @Override
     public <T> T execute(ProviderRequestKey key, Supplier<T> ownerCall) {
         CompletableFuture<T> owned = new CompletableFuture<>();
         CompletableFuture<T> existing = (CompletableFuture<T>) flights.putIfAbsent(key, owned);
@@ -38,10 +39,17 @@ public class ProviderSingleFlightGuard {
         }
     }
 
+    @Override
+    public boolean inFlight(ProviderRequestKey key) {
+        return key != null && flights.containsKey(key);
+    }
+
+    @Override
     public int activeFlightCount() {
         return flights.size();
     }
 
+    @Override
     public int waitingCallerCount() {
         return waitingCallers.get();
     }

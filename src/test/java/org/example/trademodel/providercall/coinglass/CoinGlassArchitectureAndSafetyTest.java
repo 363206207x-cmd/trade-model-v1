@@ -8,10 +8,12 @@ import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderCircuitState;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.ProviderRateBudgetManager;
+import org.example.trademodel.providercall.ProviderCallTestFixtures;
 import org.example.trademodel.providercall.ProviderSnapshotMetadata;
 import org.example.trademodel.providercall.RuntimeScanProfile;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.UserScanProfile;
 import org.example.trademodel.providercall.scan.DefaultProviderDatasetRefreshPort;
 import org.example.trademodel.providercall.scan.ProviderRefreshStateRegistry;
 import org.example.trademodel.providercall.scan.ScanPlanItem;
@@ -56,7 +58,8 @@ class CoinGlassArchitectureAndSafetyTest {
         port.refresh(item(), ProviderDatasetType.PRICE);
 
         verify(derivativesService, never()).get(anyString(), any(), any(), anyString());
-        assertThat(registry.get("BTCUSDT", ProviderDatasetType.PRICE)).isNotNull();
+        assertThat(registry.get(ProviderCallTestFixtures.perpetual("BTCUSDT"),
+                ProviderDatasetType.PRICE)).isNotNull();
     }
 
     @Test
@@ -73,8 +76,8 @@ class CoinGlassArchitectureAndSafetyTest {
         ProviderRateBudgetManager manager = new ProviderRateBudgetManager(properties,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         manager.register("COINGLASS", 10);
-        for (int i = 0; i < 4; i++) assertThat(manager.reserve("COINGLASS", AssetPriority.P3_POOL)).isTrue();
-        assertThat(manager.reserve("COINGLASS", AssetPriority.P3_POOL)).isFalse();
+        for (int i = 0; i < 4; i++) assertThat(manager.reserve("COINGLASS", AssetPriority.P3_DISCOVERY)).isTrue();
+        assertThat(manager.reserve("COINGLASS", AssetPriority.P3_DISCOVERY)).isFalse();
         assertThat(manager.reserve("COINGLASS", AssetPriority.P0_POSITION)).isTrue();
         ProviderBudgetState state = manager.state("COINGLASS", ProviderCircuitState.CLOSED);
         assertThat(state.rejectedPriority()).isNull();
@@ -152,8 +155,9 @@ class CoinGlassArchitectureAndSafetyTest {
     }
 
     private static ScanPlanItem item() {
-        return new ScanPlanItem("BTCUSDT", AssetPriority.P0_POSITION, Set.of(), NOW, NOW, NOW, NOW, NOW,
-                RuntimeScanProfile.STANDARD, "test");
+        return new ScanPlanItem(ProviderCallTestFixtures.perpetual("BTCUSDT"), "BTCUSDT",
+                AssetPriority.P0_POSITION, Set.of(), NOW, NOW, NOW, NOW, NOW, UserScanProfile.AUTO,
+                RuntimeScanProfile.STANDARD, List.of("test"), "FM-TEST");
     }
 
     private static ProviderCallResult<MarketPriceSnapshot> priceResult() {

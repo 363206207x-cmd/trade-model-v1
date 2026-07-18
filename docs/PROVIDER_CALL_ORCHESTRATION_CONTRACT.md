@@ -30,21 +30,22 @@ Business Service
 
 - provider;
 - dataset type;
-- symbol;
+- canonical instrument identity;
+- provider-boundary symbol;
 - timeframe;
-- time bucket.
+- time bucket;
+- mapping/source version.
 
-Its canonical form is `PROVIDER|DATASET|SYMBOL|TIMEFRAME|BUCKET`. PRICE uses one stable `LATEST` key per symbol; cache lookup applies each consumer's freshness requirement, so a strict monitor cannot accept the looser age of a read model while all consumers still share one stored snapshot. Dataset types are intentionally separate: `PRICE`, `OHLCV`, aggregate `DERIVATIVES`, four `COINGLASS_*` datasets, `EXTERNAL_CONTEXT`, and `AI_REVIEW`.
+Its canonical form is `PROVIDER|DATASET|CANONICAL_INSTRUMENT|PROVIDER_SYMBOL|TIMEFRAME|BUCKET|SOURCE_VERSION`. The canonical identity keeps spot and perpetual contracts distinct while normalizing aliases such as `BTCUSDT`, `BTC-USDT`, and `BTC/USDT` through an explicit mapping. Unknown or ambiguous mappings fail closed. Cache lookup applies each consumer's freshness requirement, so a strict monitor cannot accept the looser age of a read model while all consumers still share one stored snapshot. Dataset types are intentionally separate: `PRICE`, `OHLCV`, aggregate `DERIVATIVES`, four `COINGLASS_*` datasets, `EXTERNAL_CONTEXT`, and `AI_REVIEW`.
 
 ## Cache and Freshness
 
 `SnapshotCacheService` stores a fresh deadline and a separate stale-readable deadline per request key. Lookups are typed as:
 
 - `FRESH`;
-- `STALE`;
-- `UNAVAILABLE`;
-- `ERROR`;
-- `REFRESH_IN_PROGRESS`.
+- `STALE_READABLE`;
+- `REFRESHING`;
+- `UNAVAILABLE`.
 
 Stale fallback is never returned as healthy: metadata changes to source status `STALE`, freshness `STALE`, `cacheHit=true`, and `fallbackUsed=true`. Missing/failed provider data cannot become low risk or a confirmed empty response.
 
@@ -56,7 +57,7 @@ Configured cadence provides independent TTL ownership for position/core/candidat
 
 ## Provider Budget
 
-`ProviderRateBudgetManager` maintains an independent fixed-minute budget per provider:
+`ProviderRateBudgetManager` maintains fixed-minute global and per-provider budgets plus a per-symbol minimum gap:
 
 - advertised RPM;
 - effective RPM (`advertised * internalBudgetRatio`);
@@ -66,7 +67,7 @@ Configured cadence provides independent TTL ownership for position/core/candidat
 - circuit state;
 - last rejected priority.
 
-Defaults are `internalBudgetRatio=0.80` and `emergencyReserveRatio=0.20`. CoinGlass has an environment-overridable advertised default of 300 RPM. Four isolated dataset requests share the actual provider/API-key quota and each request increments it; no key is present in the current environment. Lower priorities are rejected earlier: pool, candidate, core, then position. The P0 position tier can use the emergency reserve, and a depleted derivatives-provider budget does not consume the independent Binance price budget.
+Defaults are `internalBudgetRatio=0.80` and `emergencyReserveRatio=0.20`. CoinGlass has an environment-overridable advertised default of 300 RPM. Four isolated dataset requests share the actual provider/API-key quota and each request increments it; no key is present in the current environment. Lower priorities are rejected earlier: `P3_DISCOVERY`, `P1_WATCHLIST`, `P2_CANDIDATE`, then `P0_POSITION`. Emergency reserve is available only to a system-selected `EMERGENCY` profile; normal Discovery/Watchlist/Candidate calls cannot consume it. A depleted derivatives-provider budget does not consume the independent Binance price budget. Concurrency uses bounded admission with reserved higher-priority slots and explicit rejection rather than unbounded thread creation; AI has its own concurrent-call limit.
 
 ## Retry and Circuit Policy
 
@@ -115,11 +116,11 @@ Metadata includes provider, dataset, symbol/timeframe, provider data time, fetch
 Priorities are:
 
 1. `P0_POSITION`
-2. `P1_CORE`
-3. `P2_CANDIDATE`
-4. `P3_POOL`
+2. `P2_CANDIDATE`
+3. `P1_WATCHLIST`
+4. `P3_DISCOVERY`
 
-Duplicate symbols collapse to their highest priority. The resolver caps core assets at 6, candidates at 20, and the pool at 20. Only `OPEN` and `PARTIALLY_CLOSED` manual positions receive P0. A `CLOSED` position immediately loses the position floor.
+Duplicate canonical instruments collapse to their highest priority. The scan universe is the bounded union of active manual positions, replaceable manual watchlist entries, candidate assets, and a configured discovery universe. There is no permanent six-asset scan contract. Default watchlist/discovery entries are replaceable configuration, with independent caps. Only `OPEN` and `PARTIALLY_CLOSED` manual positions receive P0. A `CLOSED` position immediately loses the position floor.
 
 ## Manual Profiles and Position Safety Floor
 
@@ -135,6 +136,14 @@ Authenticated `GET/PUT /api/config/scan-profile` reads and updates:
 The settings reuse `tm_user_config`; profile changes are audited through `tm_rule_version_log`. Position/pool subprofiles cannot be `AUTO`. The response exposes effective profile/reason, cadence, and provider budget state.
 
 Authenticated `GET /api/config/scan-profile/runtime?symbol=BTCUSDT` exposes the configured/effective profile, priority, reason, transition timing, price/derivatives cadence, last refresh statuses, and budget state without triggering a provider call.
+
+P3-CALL1 additionally exposes the narrower Dashboard contract:
+
+- `GET /api/provider-call/base-profile`;
+- `PUT /api/provider-call/base-profile`;
+- `GET /api/provider-call/runtime-status`.
+
+It accepts only `AUTO`, `LOW`, `STANDARD`, and `HIGH`. `EMERGENCY` remains system-only. Reading or changing a profile does not call a provider.
 
 The matrix is configuration-bound. Position price intervals are 15s/10s/5s for LOW/STANDARD/HIGH and 3s for an affected EMERGENCY symbol. Derivatives retain their independent 120s/60s/60s cadence, with an emergency minimum refresh gap of 40s. Unaffected pool symbols are not elevated to EMERGENCY.
 
@@ -174,6 +183,8 @@ The following production switches default to `false`:
 - `trade-model.provider-call.external-calls-enabled`.
 - `trade-model.providers.coinglass.enabled`;
 - `trade-model.providers.coinglass.external-calls-enabled`.
+
+All newly introduced provider adapter interfaces are backed by NoCall implementations in this package. Startup, Dashboard reads, runtime-status reads, profile changes, tests, and fixture notification collection perform zero real provider, CoinGlass, AI, or external-message calls.
 
 `ProductionProfileSafetyGuard` requires coordinator enablement before any child feature and explicit external-call opt-in before the provider-scan scheduler. An active CoinGlass call additionally requires provider enablement, key presence, a valid HTTPS base URL, official `CG-API-KEY` authentication, and valid rate settings. Position Monitor remains default-off. The scheduler has bounded universe, due-dataset, priority, and overlap guards, and has no direction, plan, position, order, Push, or Telegram surface.
 

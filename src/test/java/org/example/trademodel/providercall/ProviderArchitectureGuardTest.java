@@ -15,16 +15,42 @@ class ProviderArchitectureGuardTest {
     void noBusinessServiceDirectlyDependsOnProviderAdapter() throws Exception {
         for (String relative : List.of(
                 "service/impl/DashboardHomeServiceImpl.java",
+                "service/impl/DecisionServiceImpl.java",
                 "service/DecisionEngineService.java",
                 "service/impl/PositionMonitorServiceImpl.java",
                 "service/impl/PushRecheckServiceImpl.java",
                 "service/impl/PlanServiceImpl.java",
-                "service/impl/OpportunityLogServiceImpl.java")) {
+                "service/impl/OpportunityLogServiceImpl.java",
+                "service/impl/ReviewCenterServiceImpl.java")) {
             String source = readIfPresent(MAIN.resolve(relative));
             assertThat(source)
                     .as(relative)
-                    .doesNotContain("market.client.impl", "CoinGlass", "Coinglass", "NewsApiProvider");
+                    .doesNotContain(
+                            "market.client.impl",
+                            "providercall.adapter",
+                            "RestTemplate",
+                            "WebClient",
+                            "CoinGlassV4Provider",
+                            "OpenAiProviderClient",
+                            "GeminiProviderClient",
+                            "XaiProviderClient",
+                            "TelegramBotClient",
+                            "TelegramSender");
         }
+    }
+
+    @Test
+    void dashboardUsesReadOnlySnapshotBoundary() throws Exception {
+        String source = readIfPresent(MAIN.resolve("service/impl/DashboardHomeServiceImpl.java"));
+        assertThat(source).contains("marketPriceSnapshotService.peek(")
+                .doesNotContain("marketPriceSnapshotService.get(", "ProviderSnapshotRefreshService");
+    }
+
+    @Test
+    void profileAndRuntimeStatusEndpointsCannotRefreshProviders() throws Exception {
+        String controller = readIfPresent(MAIN.resolve("controller/ProviderCallProfileController.java"));
+        assertThat(controller).contains("/api/provider-call")
+                .doesNotContain("ProviderSnapshotRefreshService", "ProviderCallCoordinator", "adapterCall");
     }
 
     @Test

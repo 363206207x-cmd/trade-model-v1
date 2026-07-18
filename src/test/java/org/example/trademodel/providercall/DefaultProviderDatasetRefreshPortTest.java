@@ -50,14 +50,16 @@ class DefaultProviderDatasetRefreshPortTest {
         when(derivativesService.get(anyString(), any(), any(), anyString()))
                 .thenReturn((ProviderCallResult) result(ProviderDatasetType.DERIVATIVES));
         port.refresh(item(), ProviderDatasetType.DERIVATIVES);
-        ProviderRefreshObservation out = registry.get("BTCUSDT", ProviderDatasetType.DERIVATIVES);
+        ProviderRefreshObservation out = registry.get(ProviderCallTestFixtures.perpetual("BTCUSDT"),
+                ProviderDatasetType.DERIVATIVES);
         verify(derivativesService).get(anyString(), any(), any(), anyString());
         assertThat(out.sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
     }
 
     @Test void routineScanDoesNotInvokeAi() {
         port.refresh(item(), ProviderDatasetType.AI_REVIEW);
-        assertThat(registry.get("BTCUSDT", ProviderDatasetType.AI_REVIEW).sourceStatus())
+        assertThat(registry.get(ProviderCallTestFixtures.perpetual("BTCUSDT"),
+                ProviderDatasetType.AI_REVIEW).sourceStatus())
                 .isEqualTo(UnifiedSourceStatus.DISABLED);
         verify(priceService, never()).get(anyString(), any(), any(), anyString());
     }
@@ -66,7 +68,8 @@ class DefaultProviderDatasetRefreshPortTest {
         when(priceService.get(anyString(), any(), any(), anyString())).thenReturn(result(ProviderDatasetType.PRICE));
         port.refresh(item(), ProviderDatasetType.PRICE);
         verify(priceService).get(anyString(), any(), any(), anyString());
-        assertThat(registry.get("BTCUSDT", ProviderDatasetType.PRICE).sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
+        assertThat(registry.get(ProviderCallTestFixtures.perpetual("BTCUSDT"),
+                ProviderDatasetType.PRICE).sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
     }
 
     @Test void ohlcvRefreshUsesAllFourPrimaryTimeframes() {
@@ -87,14 +90,16 @@ class DefaultProviderDatasetRefreshPortTest {
         port.refresh(item(), ProviderDatasetType.OHLCV);
 
         verify(ohlcvService, never()).refresh(anyString(), anyString(), anyInt(), any(), anyString());
-        assertThat(registry.get("BTCUSDT", ProviderDatasetType.OHLCV).reasonCode())
+        assertThat(registry.get(ProviderCallTestFixtures.perpetual("BTCUSDT"),
+                ProviderDatasetType.OHLCV).reasonCode())
                 .isEqualTo("NO_NEW_CLOSED_BAR_DUE");
     }
 
     private static ScanPlanItem item() {
         Instant now = Instant.now();
-        return new ScanPlanItem("BTCUSDT", AssetPriority.P0_POSITION, Set.of(), now, now, now, now, now,
-                RuntimeScanProfile.STANDARD, "test");
+        return new ScanPlanItem(ProviderCallTestFixtures.perpetual("BTCUSDT"), "BTCUSDT",
+                AssetPriority.P0_POSITION, Set.of(), now, now, now, now, now, UserScanProfile.AUTO,
+                RuntimeScanProfile.STANDARD, List.of("test"), "FM-TEST");
     }
 
     private static ProviderCallResult<MarketPriceSnapshot> result(ProviderDatasetType type) {

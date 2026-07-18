@@ -50,10 +50,17 @@ trade-model:
     internal-budget-ratio: 0.80
     emergency-reserve-ratio: 0.20
     event-refresh-min-gap-seconds: 40
-    max-core-assets: 6
+    per-symbol-minimum-gap-seconds: 1
+    max-watchlist-assets: 20
     max-candidate-assets: 20
-    max-pool-assets: 20
-    core-assets: ${TRADE_MODEL_PROVIDER_CORE_ASSETS:BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT}
+    max-discovery-assets: 20
+    max-concurrent-provider-calls: 8
+    max-concurrent-ai-calls: 3
+    max-queued-calls: 32
+    reserved-priority-slots: 2
+    global-advertised-requests-per-minute: 1500
+    notification:
+      opportunity-scope: WATCHLIST_AND_DISCOVERY
     scan-user-id: ${TRADE_MODEL_PROVIDER_SCAN_USER_ID:admin}
     failure-threshold: 3
     circuit-open-seconds: 60
@@ -64,23 +71,78 @@ trade-model:
       external-context-advertised-rpm: 60
     profiles:
       low:
-        price: { position-seconds: 15, core-seconds: 60, candidate-seconds: 120, pool-seconds: 900 }
-        derivatives: { position-seconds: 120, core-seconds: 120, candidate-seconds: 300, pool-seconds: 900 }
+        price: { position-seconds: 15, watchlist-seconds: 60, candidate-seconds: 120, discovery-seconds: 900 }
+        ohlcv: { position-seconds: 60, watchlist-seconds: 300, candidate-seconds: 300, discovery-seconds: 900 }
+        derivatives: { position-seconds: 120, watchlist-seconds: 120, candidate-seconds: 300, discovery-seconds: 900 }
+        external-context-seconds: 900
+        full-analysis-debounce-seconds: 300
+        ai-checkpoint-debounce-seconds: 300
       standard:
-        price: { position-seconds: 10, core-seconds: 30, candidate-seconds: 60, pool-seconds: 600 }
-        derivatives: { position-seconds: 60, core-seconds: 60, candidate-seconds: 120, pool-seconds: 600 }
+        price: { position-seconds: 10, watchlist-seconds: 30, candidate-seconds: 60, discovery-seconds: 600 }
+        ohlcv: { position-seconds: 60, watchlist-seconds: 180, candidate-seconds: 180, discovery-seconds: 600 }
+        derivatives: { position-seconds: 60, watchlist-seconds: 60, candidate-seconds: 120, discovery-seconds: 600 }
+        external-context-seconds: 600
+        full-analysis-debounce-seconds: 60
+        ai-checkpoint-debounce-seconds: 120
       high:
-        price: { position-seconds: 5, core-seconds: 15, candidate-seconds: 30, pool-seconds: 300 }
-        derivatives: { position-seconds: 60, core-seconds: 60, candidate-seconds: 60, pool-seconds: 300 }
-      emergency:
-        price: { position-seconds: 3, core-seconds: 5, candidate-seconds: 10, pool-seconds: 900 }
-        derivatives: { position-seconds: 40, core-seconds: 40, candidate-seconds: 40, pool-seconds: 900 }
+        price: { position-seconds: 5, watchlist-seconds: 15, candidate-seconds: 30, discovery-seconds: 300 }
+        ohlcv: { position-seconds: 60, watchlist-seconds: 120, candidate-seconds: 120, discovery-seconds: 300 }
+        derivatives: { position-seconds: 60, watchlist-seconds: 60, candidate-seconds: 60, discovery-seconds: 300 }
+        external-context-seconds: 300
         full-analysis-debounce-seconds: 20
+        ai-checkpoint-debounce-seconds: 60
+      emergency:
+        price: { position-seconds: 3, watchlist-seconds: 5, candidate-seconds: 10, discovery-seconds: 900 }
+        ohlcv: { position-seconds: 60, watchlist-seconds: 60, candidate-seconds: 60, discovery-seconds: 900 }
+        derivatives: { position-seconds: 40, watchlist-seconds: 40, candidate-seconds: 40, discovery-seconds: 900 }
+        external-context-seconds: 120
+        full-analysis-debounce-seconds: 20
+        ai-checkpoint-debounce-seconds: 60
     profile-transition:
       high-min-hold-seconds: 300
       emergency-min-hold-seconds: 120
       recovery-confirm-cycles: 2
       downgrade-cooldown-seconds: 300
+  watchlist:
+    max-assets: 20
+    venue: BINANCE
+    market-type: PERPETUAL
+    contract-type: LINEAR
+    symbols: ${TRADE_MODEL_WATCHLIST_SYMBOLS:BTC/USDT,ETH/USDT}
+  discovery:
+    enabled: ${TRADE_MODEL_DISCOVERY_ENABLED:true}
+    max-assets: 20
+    venue: BINANCE
+    market-type: PERPETUAL
+    contract-type: LINEAR
+    symbols: ${TRADE_MODEL_DISCOVERY_SYMBOLS:SOL/USDT,BNB/USDT,XRP/USDT}
+  candidate-promotion:
+    promotion-confirmation-cycles: 2
+    minimum-candidate-hold-seconds: 300
+    candidate-ttl-seconds: 3600
+    promotion-cooldown-seconds: 300
+    retrigger-cooldown-seconds: 900
+    degradation-confirmation-cycles: 2
+  instruments:
+    mappings:
+      - { provider: BINANCE, base-asset: BTC, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: BTCUSDT, source-version: BINANCE_SPOT_V1 }
+      - { provider: BINANCE, base-asset: BTC, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: BTCUSDT, source-version: BINANCE_USDM_V1 }
+      - { provider: COINGLASS, base-asset: BTC, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: BTCUSDT, source-version: COINGLASS_V4_V1 }
+      - { provider: BINANCE, base-asset: ETH, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: ETHUSDT, source-version: BINANCE_SPOT_V1 }
+      - { provider: BINANCE, base-asset: ETH, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: ETHUSDT, source-version: BINANCE_USDM_V1 }
+      - { provider: COINGLASS, base-asset: ETH, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: ETHUSDT, source-version: COINGLASS_V4_V1 }
+      - { provider: BINANCE, base-asset: SOL, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: SOLUSDT, source-version: BINANCE_SPOT_V1 }
+      - { provider: BINANCE, base-asset: SOL, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: SOLUSDT, source-version: BINANCE_USDM_V1 }
+      - { provider: COINGLASS, base-asset: SOL, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: SOLUSDT, source-version: COINGLASS_V4_V1 }
+      - { provider: BINANCE, base-asset: BNB, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: BNBUSDT, source-version: BINANCE_SPOT_V1 }
+      - { provider: BINANCE, base-asset: BNB, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: BNBUSDT, source-version: BINANCE_USDM_V1 }
+      - { provider: COINGLASS, base-asset: BNB, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: BNBUSDT, source-version: COINGLASS_V4_V1 }
+      - { provider: BINANCE, base-asset: XRP, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: XRPUSDT, source-version: BINANCE_SPOT_V1 }
+      - { provider: BINANCE, base-asset: XRP, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: XRPUSDT, source-version: BINANCE_USDM_V1 }
+      - { provider: COINGLASS, base-asset: XRP, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: XRPUSDT, source-version: COINGLASS_V4_V1 }
+      - { provider: BINANCE, base-asset: DOGE, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: DOGEUSDT, source-version: BINANCE_SPOT_V1 }
+      - { provider: BINANCE, base-asset: DOGE, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: DOGEUSDT, source-version: BINANCE_USDM_V1 }
+      - { provider: COINGLASS, base-asset: DOGE, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: DOGEUSDT, source-version: COINGLASS_V4_V1 }
   providers:
     coinglass:
       enabled: ${TRADE_MODEL_COINGLASS_ENABLED:false}

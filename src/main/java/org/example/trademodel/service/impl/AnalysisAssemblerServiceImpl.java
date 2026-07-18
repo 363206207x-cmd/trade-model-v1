@@ -389,7 +389,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         }
         ProviderCallResult<DerivativesRiskSnapshot> snapshotResult;
         try {
-            snapshotResult = derivativesSnapshotReadPort.readCached(context.getSymbol(), AssetPriority.P1_CORE,
+            snapshotResult = derivativesSnapshotReadPort.readCached(context.getSymbol(), AssetPriority.P1_WATCHLIST,
                     Duration.ofSeconds(60), context.getTraceId());
         } catch (RuntimeException failure) {
             snapshotResult = null;

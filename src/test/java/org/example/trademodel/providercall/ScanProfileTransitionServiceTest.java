@@ -64,7 +64,7 @@ class ScanProfileTransitionServiceTest {
         ProfileTransitionResult held = fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
                 ProfileTransitionSignal.recovery(), "trace-3");
         assertThat(held.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
-        assertThat(held.effectiveReason()).isEqualTo("HYSTERESIS_HOLD");
+        assertThat(held.effectiveReason()).isEqualTo("RECOVERY_HYSTERESIS");
     }
 
     @Test

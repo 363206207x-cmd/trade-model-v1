@@ -51,7 +51,7 @@ public class RealMarketEnvironmentService {
     public Optional<MarketEnvironmentVO> tryBuildFromRealQuote(String assetSymbol, String timeframe) {
         try {
             ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.get(assetSymbol,
-                    AssetPriority.P1_CORE, Duration.ofSeconds(30), "market-env-" + UUID.randomUUID());
+                    AssetPriority.P1_WATCHLIST, Duration.ofSeconds(30), "market-env-" + UUID.randomUUID());
             if (!MarketPriceSnapshotPolicy.isFresh(result)) {
                 log.info("[market-env] real quote unavailable, will fallback asset={}", assetSymbol);
                 return Optional.empty();
@@ -152,7 +152,7 @@ public class RealMarketEnvironmentService {
         }
         try {
             ProviderCallResult<MinimalDerivativesSnapshot> result = derivativesSnapshotService.get(assetSymbol,
-                    AssetPriority.P1_CORE, Duration.ofSeconds(60), "market-env-derivatives-" + UUID.randomUUID());
+                    AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "market-env-derivatives-" + UUID.randomUUID());
             MinimalDerivativesSnapshot snapshot = result == null ? null : result.payload();
             if (snapshot == null) return;
             if (snapshot.lastFundingRate() != null) {

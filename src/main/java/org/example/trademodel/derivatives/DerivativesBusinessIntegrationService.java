@@ -498,7 +498,7 @@ public class DerivativesBusinessIntegrationService {
 
     private static boolean isStale(DerivativesRiskSnapshot snapshot, int maxAgeSeconds) {
         if (snapshot.sourceStatus() == UnifiedSourceStatus.STALE
-                || snapshot.freshnessStatus() == SnapshotFreshnessStatus.STALE) return true;
+                || snapshot.freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE) return true;
         Instant dataTime = snapshot.providerDataTime();
         return dataTime != null && dataTime.plusSeconds(maxAgeSeconds).isBefore(Instant.now());
     }

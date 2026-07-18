@@ -52,8 +52,12 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
                               String traceId, Supplier<ProviderAdapterResponse<T>> call) {
         ProviderRequestKey key;
         try {
-            String normalized = symbolMapper.map(symbol).pairSymbol();
-            key = new ProviderRequestKey(PROVIDER, datasetType, normalized, timeframe, "LATEST");
+            CoinGlassSymbolMapper.CoinGlassSymbol mapped = symbolMapper.map(symbol);
+            long bucket = Math.max(1L, requestedFreshTtl == null ? properties.getFreshTtlSeconds()
+                    : requestedFreshTtl.toSeconds());
+            key = new ProviderRequestKey(PROVIDER, datasetType, mapped.canonicalInstrumentId(),
+                    mapped.pairSymbol(), timeframe, String.valueOf(clock.instant().getEpochSecond() / bucket),
+                    mapped.sourceVersion());
         } catch (IllegalArgumentException invalid) {
             return unavailable(symbol, traceId, UnifiedSourceStatus.ERROR, "COINGLASS_SYMBOL_UNSUPPORTED");
         }
@@ -80,8 +84,12 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
                               String traceId) {
         ProviderRequestKey key;
         try {
-            String normalized = symbolMapper.map(symbol).pairSymbol();
-            key = new ProviderRequestKey(PROVIDER, datasetType, normalized, timeframe, "LATEST");
+            CoinGlassSymbolMapper.CoinGlassSymbol mapped = symbolMapper.map(symbol);
+            long bucket = Math.max(1L, requestedFreshTtl == null ? properties.getFreshTtlSeconds()
+                    : requestedFreshTtl.toSeconds());
+            key = new ProviderRequestKey(PROVIDER, datasetType, mapped.canonicalInstrumentId(),
+                    mapped.pairSymbol(), timeframe, String.valueOf(clock.instant().getEpochSecond() / bucket),
+                    mapped.sourceVersion());
         } catch (IllegalArgumentException invalid) {
             return unavailable(symbol, traceId, UnifiedSourceStatus.ERROR, "COINGLASS_SYMBOL_UNSUPPORTED");
         }
@@ -93,19 +101,21 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
 
     private ProviderCallResult<T> unavailable(String symbol, String traceId,
                                                UnifiedSourceStatus status, String reason) {
-        String normalized = symbol == null || symbol.isBlank() ? "INVALID" : symbol.trim().toUpperCase();
-        ProviderRequestKey key = new ProviderRequestKey(PROVIDER, datasetType, normalized, timeframe, "LATEST");
-        return unavailable(key, traceId, status, reason);
+        Instant now = clock.instant();
+        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata(PROVIDER, datasetType,
+                symbol == null || symbol.isBlank() ? "INVALID" : symbol.trim().toUpperCase(), timeframe,
+                null, now, now, status, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
+                "UNMAPPED", false, false, reason, List.of(reason));
+        return new ProviderCallResult<>(null, metadata, null);
     }
 
     private ProviderCallResult<T> unavailable(ProviderRequestKey key, String traceId,
                                                UnifiedSourceStatus status, String reason) {
         Instant now = clock.instant();
-        SnapshotFreshnessStatus freshness = status == UnifiedSourceStatus.ERROR
-                ? SnapshotFreshnessStatus.ERROR : SnapshotFreshnessStatus.UNAVAILABLE;
-        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata(PROVIDER, datasetType, key.symbol(),
-                timeframe, null, now, now, status, freshness, traceId, key.canonical(), false, false,
-                reason, List.of(reason));
+        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata(PROVIDER, datasetType,
+                key.canonicalInstrumentId(), key.providerSymbol(), timeframe, null, now, now, 0L,
+                status, SnapshotFreshnessStatus.UNAVAILABLE, traceId, key.canonical(), key.sourceVersion(),
+                false, false, reason, List.of(reason));
         return new ProviderCallResult<>(null, metadata, null);
     }
 }

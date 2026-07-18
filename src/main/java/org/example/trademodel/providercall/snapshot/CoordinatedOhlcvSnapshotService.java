@@ -10,7 +10,11 @@ import org.example.trademodel.providercall.ProviderCallRequest;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.ProviderRequestKey;
+import org.example.trademodel.providercall.ProviderRequestKeyFactory;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.example.trademodel.service.PersistedOhlcvIngestionService;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.springframework.stereotype.Service;
@@ -24,22 +28,30 @@ public class CoordinatedOhlcvSnapshotService {
     private final ProviderCallCoordinator coordinator;
     private final PublicOhlcvProvider provider;
     private final PersistedOhlcvIngestionService authoritativeWriter;
+    private final ProviderSymbolMappingRegistry mappingRegistry;
+    private final ProviderRequestKeyFactory keyFactory;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
     public CoordinatedOhlcvSnapshotService(ProviderCallCoordinator coordinator,
                                            PublicOhlcvProvider provider,
-                                           PersistedOhlcvIngestionService authoritativeWriter) {
-        this(coordinator, provider, authoritativeWriter, Clock.systemUTC());
+                                           PersistedOhlcvIngestionService authoritativeWriter,
+                                           ProviderSymbolMappingRegistry mappingRegistry,
+                                           ProviderRequestKeyFactory keyFactory) {
+        this(coordinator, provider, authoritativeWriter, mappingRegistry, keyFactory, Clock.systemUTC());
     }
 
     public CoordinatedOhlcvSnapshotService(ProviderCallCoordinator coordinator,
                                            PublicOhlcvProvider provider,
                                            PersistedOhlcvIngestionService authoritativeWriter,
+                                           ProviderSymbolMappingRegistry mappingRegistry,
+                                           ProviderRequestKeyFactory keyFactory,
                                            Clock clock) {
         this.coordinator = coordinator;
         this.provider = provider;
         this.authoritativeWriter = authoritativeWriter;
+        this.mappingRegistry = mappingRegistry;
+        this.keyFactory = keyFactory;
         this.clock = clock;
     }
 
@@ -50,11 +62,12 @@ public class CoordinatedOhlcvSnapshotService {
             AssetPriority priority,
             String traceId) {
         Instant now = clock.instant();
-        ProviderRequestKey key = new ProviderRequestKey("BINANCE_PUBLIC", ProviderDatasetType.OHLCV,
-                symbol, timeframe, String.valueOf(now.getEpochSecond() / 60));
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.OHLCV,
+                mapping, timeframe, Duration.ofSeconds(60), now);
         return coordinator.execute(new ProviderCallRequest<>(key, priority, Duration.ofSeconds(60),
                 Duration.ofMinutes(10), Duration.ofSeconds(5), traceId,
-                () -> fetchAndPersist(symbol, timeframe, limit, traceId)));
+                () -> fetchAndPersist(mapping.providerSymbol(), timeframe, limit, traceId)));
     }
 
     private ProviderAdapterResponse<OhlcvIngestionResult> fetchAndPersist(

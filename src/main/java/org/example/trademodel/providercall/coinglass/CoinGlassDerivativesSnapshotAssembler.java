@@ -133,7 +133,7 @@ public class CoinGlassDerivativesSnapshotAssembler {
 
     private boolean isStale(ProviderSnapshotMetadata metadata) {
         if (metadata.sourceStatus() == UnifiedSourceStatus.STALE
-                || metadata.freshnessStatus() == SnapshotFreshnessStatus.STALE) return true;
+                || metadata.freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE) return true;
         if (metadata.providerDataTime() == null) return false;
         return metadata.providerDataTime().plus(Duration.ofSeconds(Math.max(1, properties.getFreshTtlSeconds())))
                 .isBefore(clock.instant());
@@ -156,8 +156,8 @@ public class CoinGlassDerivativesSnapshotAssembler {
 
     private static SnapshotFreshnessStatus aggregateFreshness(
             UnifiedSourceStatus status, boolean stale, int availableCount) {
-        if (stale) return SnapshotFreshnessStatus.STALE;
-        if (status == UnifiedSourceStatus.ERROR) return SnapshotFreshnessStatus.ERROR;
+        if (stale) return SnapshotFreshnessStatus.STALE_READABLE;
+        if (status == UnifiedSourceStatus.ERROR) return SnapshotFreshnessStatus.UNAVAILABLE;
         if (availableCount > 0) return SnapshotFreshnessStatus.FRESH;
         return SnapshotFreshnessStatus.UNAVAILABLE;
     }

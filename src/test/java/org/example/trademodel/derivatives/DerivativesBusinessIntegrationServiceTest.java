@@ -199,7 +199,7 @@ class DerivativesBusinessIntegrationServiceTest {
     @Test
     void derivativesStaleBlocksConfirmPush() {
         DerivativesRiskSnapshot stale = snapshot(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"), bd("1000"), bd("0.20"),
-                UnifiedSourceStatus.STALE, SnapshotFreshnessStatus.STALE, "COMPLETE",
+                UnifiedSourceStatus.STALE, SnapshotFreshnessStatus.STALE_READABLE, "COMPLETE",
                 List.of(OI, FUNDING, LIQUIDATION, LONG_SHORT), List.of(), List.of(), Instant.now().minusSeconds(600));
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"), all("BULLISH"), stale, true));
         assertThat(result.confirmEligible()).isFalse();

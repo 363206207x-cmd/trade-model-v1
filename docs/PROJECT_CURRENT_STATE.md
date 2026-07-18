@@ -6,18 +6,49 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H
-Next Business Phase: Reviewer P3-H Offline Harness Round 5 Re-review; P4 remains blocked
-Next Business Phase Allowed: NO while P3-H is unmerged and controlled staging inputs are missing; NO for P4 and production deployment
+Current Work Package: P3-CALL1 Unified Provider Orchestration, Adjustable Profiles and Opportunity Discovery Foundation
+Next Business Phase: P3-U1 Personal Login Page and Session Authentication, only after P3-CALL1 is reviewed and effective on merged main
+Next Business Phase Allowed: NO while P3-CALL1 is unmerged; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
+## P3-CALL1 Unified Provider Orchestration
+
+Merged main `230528b0942737275a397323bcfff874541e2ea8` is the exact P3-CALL1
+baseline. The package adds an offline, default-disabled coordination foundation:
+
+1. canonical spot/perpetual instrument identities and explicit provider symbol mappings;
+2. strict `P0_POSITION > P2_CANDIDATE > P1_WATCHLIST > P3_DISCOVERY` planning;
+3. replaceable watchlist, bounded configured discovery, and runtime auto-candidate stability;
+4. user `AUTO/LOW/STANDARD/HIGH` profiles plus per-asset system HIGH/EMERGENCY escalation;
+5. stable frequency-matrix versioning and independent dataset cadence;
+6. global/provider/symbol budgets, reserved emergency capacity, provider/AI concurrency, health, circuit, Retry-After, cache, and single flight;
+7. read-only snapshot query separated from controlled refresh;
+8. NoCall provider/AI adapters, AI checkpoint policy, notification eligibility/dedup, and no external send;
+9. authenticated profile/runtime-status APIs and a minimal Dashboard profile control.
+
+P3-CALL1 does not call Binance, CoinGlass, external context, or AI; it does not
+start a business scheduler, send Telegram/Push, create or mutate a position,
+create an order, or trade. Its runtime auto-candidate owner remains in-memory.
+Dynamic discovery, live adapters, Decision Cutoff Time, real AI, and Telegram
+delivery are explicitly deferred. Only merged main counts, so this branch is
+not effective until reviewed and merged.
+
+PR #1130 remains frozen `OPEN / DRAFT / UNMERGED` with no action. P4 is not
+allowed. Production Deployment Readiness remains `BLOCKED`.
+
+Details: `docs/PROVIDER_CALL_ORCHESTRATION_AUDIT.md` and the P3-CALL1 contract
+documents.
+
+---
+
 ## Controlled Staging P3-H
 
-Merged main `8f0640331e58e8b8b657c7db08e6d79b03d37a4f` makes P3-G
-effective. P3-H is now the active evidence package. Round 1 closes the offline
+Merged main `230528b0942737275a397323bcfff874541e2ea8` includes the reviewed
+P3-H offline Harness from PR #1129. The separate real-staging/lab PR #1130 is
+frozen and is not part of P3-CALL1. Round 1 closed the offline
 template gaps for deterministic Greenfield bootstrap, four-role provisioning,
 fixed non-root Secret materialization, strict attestations, systemd
 credentials, runtime mount verification, Host-header rejection, TLS target
@@ -54,7 +85,8 @@ denied writes, leak checks, and cleanup as
 `SECRET_ACCESS` are `NOT_ATTEMPTED`; real staging remains
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, and no real-server status is PASS.
 
-P3-H is not production deployment. P4 is not allowed, Production Deployment
+P3-H offline evidence is not production deployment and real staging remains
+blocked by missing authorized input. P4 is not allowed, Production Deployment
 Readiness remains `BLOCKED`, and production deployment cannot proceed. See
 `docs/CONTROLLED_STAGING_READONLY_TLS_SECRETSTORE_P3H.md`.
 

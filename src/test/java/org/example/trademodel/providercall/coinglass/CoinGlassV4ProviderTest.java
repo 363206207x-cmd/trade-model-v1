@@ -50,7 +50,7 @@ class CoinGlassV4ProviderTest {
         context.coinGlassProperties.setEnabled(false);
 
         ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-disabled");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-disabled");
 
         assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.DISABLED);
         assertThat(context.transport.calls).hasValue(0);
@@ -62,7 +62,7 @@ class CoinGlassV4ProviderTest {
         context.coinGlassProperties.setApiKey("");
 
         ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-no-key");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-no-key");
 
         assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
         assertThat(result.metadata().errorCode()).isEqualTo("COINGLASS_API_KEY_MISSING");
@@ -73,7 +73,7 @@ class CoinGlassV4ProviderTest {
     void apiKeyIsNeverLoggedOrSerialized() throws Exception {
         TestContext context = context("open-interest-success.json");
         String serialized = new ObjectMapper().writeValueAsString(context.coinGlassProperties);
-        context.oiService.get("BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-secret");
+        context.oiService.get("BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-secret");
 
         assertThat(serialized).doesNotContain("fixture-secret-key");
         assertThat(context.transport.lastUri.toString()).doesNotContain("fixture-secret-key");
@@ -151,7 +151,7 @@ class CoinGlassV4ProviderTest {
         TestContext context = context("open-interest-success.json");
 
         ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
-                "../BTC", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-invalid");
+                "../BTC", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-invalid");
 
         assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.ERROR);
         assertThat(result.metadata().errorCode()).isEqualTo("COINGLASS_SYMBOL_UNSUPPORTED");
@@ -205,9 +205,9 @@ class CoinGlassV4ProviderTest {
     void emptyDatasetStateUsesSharedCache() {
         TestContext context = context("empty-data.json");
         ProviderCallResult<CoinGlassOpenInterestSnapshot> first = context.oiService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-empty-cache");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-empty-cache");
         ProviderCallResult<CoinGlassOpenInterestSnapshot> second = context.oiService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-empty-cache");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-empty-cache");
         assertThat(first.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.EMPTY_CONFIRMED);
         assertThat(second.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.EMPTY_CONFIRMED);
         assertThat(second.metadata().cacheHit()).isTrue();
@@ -236,7 +236,7 @@ class CoinGlassV4ProviderTest {
                 "liquidation-success.json", "long-short-success.json");
 
         ProviderCallResult<DerivativesRiskSnapshot> result = context.derivativesService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-all");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-all");
 
         assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
         assertThat(result.payload().availableDatasets()).hasSize(4);
@@ -250,10 +250,10 @@ class CoinGlassV4ProviderTest {
                 "liquidation-success.json", "long-short-success.json");
 
         ProviderCallResult<DerivativesRiskSnapshot> result = context.derivativesService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-stale");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-stale");
 
         assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.STALE);
-        assertThat(result.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.STALE);
+        assertThat(result.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.STALE_READABLE);
     }
 
     @Test
@@ -268,7 +268,7 @@ class CoinGlassV4ProviderTest {
     void authenticationFailureDoesNotRetry() {
         TestContext context = context(response(401, "error-response.json", Map.of()));
         ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-auth");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-auth");
         assertThat(context.transport.calls).hasValue(1);
         assertThat(result.metadata().errorCode()).contains("AUTHENTICATION_FAILED");
     }
@@ -288,7 +288,7 @@ class CoinGlassV4ProviderTest {
     @Test
     void fiveHundredRetriesAreBounded() {
         TestContext context = context(response(500, "error-response.json", Map.of()));
-        context.oiService.get("BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-500");
+        context.oiService.get("BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-500");
         assertThat(context.transport.calls).hasValue(3);
     }
 
@@ -296,9 +296,10 @@ class CoinGlassV4ProviderTest {
     void timeoutRetryIsBounded() {
         TestContext context = context("open-interest-success.json");
         AtomicInteger calls = new AtomicInteger();
-        ProviderCallRequest<String> request = new ProviderCallRequest<>(new ProviderRequestKey("COINGLASS",
-                ProviderDatasetType.COINGLASS_OPEN_INTEREST, "BTCUSDT", "CURRENT", "TIMEOUT"),
-                AssetPriority.P1_CORE, Duration.ofSeconds(60), Duration.ofSeconds(180),
+        ProviderCallRequest<String> request = new ProviderCallRequest<>(
+                org.example.trademodel.providercall.ProviderCallTestFixtures.key("COINGLASS",
+                        ProviderDatasetType.COINGLASS_OPEN_INTEREST, "BTCUSDT", "CURRENT", "TIMEOUT"),
+                AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), Duration.ofSeconds(180),
                 Duration.ofMillis(20), "trace-timeout", () -> {
             calls.incrementAndGet();
             try {
@@ -318,9 +319,9 @@ class CoinGlassV4ProviderTest {
     @Test
     void sameSymbolDatasetUsesSharedCache() {
         TestContext context = context("open-interest-success.json");
-        context.oiService.get("BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-cache");
+        context.oiService.get("BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-cache");
         ProviderCallResult<CoinGlassOpenInterestSnapshot> second = context.oiService.get(
-                "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-cache");
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-cache");
         assertThat(context.transport.calls).hasValue(1);
         assertThat(second.metadata().cacheHit()).isTrue();
     }
@@ -332,9 +333,9 @@ class CoinGlassV4ProviderTest {
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             Future<?> first = executor.submit(() -> context.oiService.get(
-                    "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-flight"));
+                    "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-flight"));
             Future<?> second = executor.submit(() -> context.oiService.get(
-                    "BTCUSDT", AssetPriority.P1_CORE, Duration.ofSeconds(60), "trace-flight"));
+                    "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-flight"));
             first.get();
             second.get();
             assertThat(context.transport.calls).hasValue(1);
@@ -427,7 +428,7 @@ class CoinGlassV4ProviderTest {
     private static <T> ProviderCallResult<T> failed(
             ProviderDatasetType type, UnifiedSourceStatus status, String reason, String trace) {
         ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata("COINGLASS", type, "BTCUSDT", "1M",
-                null, NOW, NOW, status, SnapshotFreshnessStatus.ERROR, trace,
+                null, NOW, NOW, status, SnapshotFreshnessStatus.UNAVAILABLE, trace,
                 "fixture-key", false, false, reason, List.of(reason));
         return new ProviderCallResult<>(null, metadata, null);
     }

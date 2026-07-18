@@ -1,5 +1,6 @@
 package org.example.trademodel.providercall.scan;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
@@ -16,6 +17,7 @@ import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -29,25 +31,39 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     private final CoinGlassDerivativesSnapshotService derivativesService;
     private final ProviderCallProperties properties;
     private final ProviderRefreshStateRegistry registry;
+    private final Clock clock;
 
+    @Autowired
     public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
                                              CoordinatedOhlcvSnapshotService ohlcvService,
                                              PersistedOhlcvBarMapper ohlcvBarMapper,
                                              CoinGlassDerivativesSnapshotService derivativesService,
                                              ProviderCallProperties properties,
                                              ProviderRefreshStateRegistry registry) {
+        this(priceService, ohlcvService, ohlcvBarMapper, derivativesService, properties, registry,
+                Clock.systemUTC());
+    }
+
+    public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
+                                             CoordinatedOhlcvSnapshotService ohlcvService,
+                                             PersistedOhlcvBarMapper ohlcvBarMapper,
+                                             CoinGlassDerivativesSnapshotService derivativesService,
+                                             ProviderCallProperties properties,
+                                             ProviderRefreshStateRegistry registry,
+                                             Clock clock) {
         this.priceService = priceService;
         this.ohlcvService = ohlcvService;
         this.ohlcvBarMapper = ohlcvBarMapper;
         this.derivativesService = derivativesService;
         this.properties = properties;
         this.registry = registry;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     @Override
     public void refresh(ScanPlanItem item, ProviderDatasetType datasetType) {
         String traceId = "provider-scan-" + UUID.randomUUID();
-        Instant attemptedAt = Instant.now();
+        Instant attemptedAt = clock.instant();
         switch (datasetType) {
             case PRICE -> refreshPrice(item, traceId, attemptedAt);
             case OHLCV -> refreshOhlcv(item, traceId, attemptedAt);
@@ -67,14 +83,14 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
                 ProviderDatasetType.DERIVATIVES);
         ProviderCallResult<DerivativesRiskSnapshot> result = derivativesService.get(item.symbol(),
                 item.effectivePriority(), Duration.ofSeconds(Math.max(1, seconds)), traceId);
-        record(item.symbol(), ProviderDatasetType.DERIVATIVES, result, attemptedAt, traceId);
+        record(item, ProviderDatasetType.DERIVATIVES, result, attemptedAt, traceId);
     }
 
     private void refreshPrice(ScanPlanItem item, String traceId, Instant attemptedAt) {
         int seconds = properties.intervalSeconds(item.effectiveProfile(), item.effectivePriority(), ProviderDatasetType.PRICE);
         ProviderCallResult<MarketPriceSnapshot> result = priceService.get(item.symbol(), item.effectivePriority(),
                 Duration.ofSeconds(Math.max(1, seconds)), traceId);
-        record(item.symbol(), ProviderDatasetType.PRICE, result, attemptedAt, traceId);
+        record(item, ProviderDatasetType.PRICE, result, attemptedAt, traceId);
     }
 
     private void refreshOhlcv(ScanPlanItem item, String traceId, Instant attemptedAt) {
@@ -95,12 +111,13 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
             }
         }
         if (!due) {
-            registry.record(new ProviderRefreshObservation(item.symbol(), ProviderDatasetType.OHLCV,
+            registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                    ProviderDatasetType.OHLCV,
                     UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH, "NO_NEW_CLOSED_BAR_DUE",
                     attemptedAt, latestDataTime, traceId));
             return;
         }
-        record(item.symbol(), ProviderDatasetType.OHLCV, last, attemptedAt, traceId);
+        record(item, ProviderDatasetType.OHLCV, last, attemptedAt, traceId);
     }
 
     private OhlcvDueState dueState(String symbol, String timeframe, Instant now) {
@@ -129,18 +146,21 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
 
     private void unavailable(ScanPlanItem item, ProviderDatasetType datasetType, UnifiedSourceStatus status,
                              String reason, String traceId, Instant attemptedAt) {
-        registry.record(new ProviderRefreshObservation(item.symbol(), datasetType, status,
+        registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                datasetType, status,
                 SnapshotFreshnessStatus.UNAVAILABLE, reason, attemptedAt, null, traceId));
     }
 
-    private void record(String symbol, ProviderDatasetType datasetType, ProviderCallResult<?> result,
+    private void record(ScanPlanItem item, ProviderDatasetType datasetType, ProviderCallResult<?> result,
                         Instant attemptedAt, String traceId) {
         if (result == null || result.metadata() == null) {
-            registry.record(new ProviderRefreshObservation(symbol, datasetType, UnifiedSourceStatus.ERROR,
-                    SnapshotFreshnessStatus.ERROR, "PROVIDER_RESULT_MISSING", attemptedAt, null, traceId));
+            registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                    datasetType, UnifiedSourceStatus.ERROR,
+                    SnapshotFreshnessStatus.UNAVAILABLE, "PROVIDER_RESULT_MISSING", attemptedAt, null, traceId));
             return;
         }
-        registry.record(new ProviderRefreshObservation(symbol, datasetType, result.metadata().sourceStatus(),
+        registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                datasetType, result.metadata().sourceStatus(),
                 result.metadata().freshnessStatus(), result.metadata().errorCode(), attemptedAt,
                 result.metadata().providerDataTime(), result.metadata().traceId()));
     }

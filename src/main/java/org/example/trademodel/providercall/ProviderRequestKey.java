@@ -1,25 +1,36 @@
 package org.example.trademodel.providercall;
 
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+
 import java.util.Locale;
 import java.util.Objects;
 
 public record ProviderRequestKey(
         String provider,
         ProviderDatasetType datasetType,
-        String symbol,
+        CanonicalInstrumentId canonicalInstrumentId,
+        String providerSymbol,
         String timeframe,
-        String timeBucket
+        String timeBucket,
+        String sourceVersion
 ) {
     public ProviderRequestKey {
         provider = normalizeRequired(provider, "provider");
         datasetType = Objects.requireNonNull(datasetType, "datasetType");
-        symbol = normalizeRequired(symbol, "symbol");
+        canonicalInstrumentId = Objects.requireNonNull(canonicalInstrumentId, "canonicalInstrumentId");
+        providerSymbol = normalizeRequired(providerSymbol, "providerSymbol");
         timeframe = normalizeRequired(timeframe, "timeframe");
         timeBucket = normalizeRequired(timeBucket, "timeBucket");
+        sourceVersion = normalizeRequired(sourceVersion, "sourceVersion");
     }
 
     public String canonical() {
-        return String.join("|", provider, datasetType.name(), symbol, timeframe, timeBucket);
+        return String.join("|", provider, datasetType.name(), canonicalInstrumentId.canonical(),
+                providerSymbol, timeframe, timeBucket, sourceVersion);
+    }
+
+    public String symbol() {
+        return providerSymbol;
     }
 
     private static String normalizeRequired(String value, String field) {

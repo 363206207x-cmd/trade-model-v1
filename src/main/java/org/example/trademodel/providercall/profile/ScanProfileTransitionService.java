@@ -76,10 +76,10 @@ public class ScanProfileTransitionService {
                 state.since = now;
                 state.recoveryCycles = 0;
                 state.nextDowngradeEligibleAt = now.plusSeconds(thresholds.downgradeCooldownSeconds);
-                reason = "RECOVERY_CONFIRMED";
+                reason = "RECOVERY_HYSTERESIS";
                 changed = true;
             } else {
-                reason = "HYSTERESIS_HOLD";
+                reason = "RECOVERY_HYSTERESIS";
             }
         } else {
             state.recoveryCycles = 0;
@@ -113,26 +113,39 @@ public class ScanProfileTransitionService {
     private Requested requested(ProfileTransitionSignal signal, Thresholds t) {
         if (signal == null) return new Requested(RuntimeScanProfile.LOW, "NO_ESCALATION_SIGNAL", null);
         if (signal.hotReset()) return new Requested(RuntimeScanProfile.EMERGENCY, "HOT_RESET", "true");
-        if (atLeast(signal.priceMovement1m(), t.emergencyPriceMovement1m)
-                || atLeast(signal.liquidationSpike(), t.emergencyLiquidationSpike)
-                || atLeast(signal.confusedScore(), t.emergencyConfusedScore)) {
-            return new Requested(RuntimeScanProfile.EMERGENCY, "EXTREME_MARKET_SIGNAL", firstValue(
-                    signal.priceMovement1m(), signal.liquidationSpike(), signal.confusedScore()));
+        if (atLeast(signal.confusedScore(), t.emergencyConfusedScore)) {
+            return new Requested(RuntimeScanProfile.EMERGENCY, "CONFUSED", signal.confusedScore().toPlainString());
         }
-        if (signal.highImpactEvent() || signal.strongReversal()
-                || atLeast(signal.priceMovement1m(), t.highPriceMovement1m)
+        if (atLeast(signal.priceMovement1m(), t.emergencyPriceMovement1m)
+                || atLeast(signal.liquidationSpike(), t.emergencyLiquidationSpike)) {
+            return new Requested(RuntimeScanProfile.EMERGENCY, "VOLATILITY_SPIKE", firstValue(
+                    signal.priceMovement1m(), signal.liquidationSpike()));
+        }
+        if (signal.highImpactEvent()) {
+            return new Requested(RuntimeScanProfile.HIGH, "EXTERNAL_EVENT", "true");
+        }
+        if (signal.strongReversal()) {
+            return new Requested(RuntimeScanProfile.HIGH, "STRONG_REVERSAL", "true");
+        }
+        if (below(signal.nearStopDistance(), t.nearBoundaryDistance)) {
+            return new Requested(RuntimeScanProfile.HIGH, "NEAR_USER_STOP",
+                    signal.nearStopDistance().toPlainString());
+        }
+        if (below(signal.nearTargetDistance(), t.nearBoundaryDistance)) {
+            return new Requested(RuntimeScanProfile.HIGH, "NEAR_USER_TARGET",
+                    signal.nearTargetDistance().toPlainString());
+        }
+        if (atLeast(signal.priceMovement1m(), t.highPriceMovement1m)
                 || atLeast(signal.atrMultiple5m(), t.highAtrMultiple5m)
                 || atLeast(signal.volumeSpike(), t.highVolumeSpike)
                 || atLeast(signal.spreadSpike(), t.highSpreadSpike)
                 || atLeast(signal.openInterestChange(), t.highOpenInterestChange)
                 || atLeast(signal.fundingExtremity(), t.highFundingExtremity)
-                || below(signal.nearStopDistance(), t.nearBoundaryDistance)
-                || below(signal.nearTargetDistance(), t.nearBoundaryDistance)
                 || below(signal.dataQualityScore(), t.dataQualityDeteriorationScore)) {
-            return new Requested(RuntimeScanProfile.HIGH, "MATERIAL_RISK_SIGNAL", "threshold-crossed");
+            return new Requested(RuntimeScanProfile.HIGH, "HIGH_RISK", "threshold-crossed");
         }
         if (atLeast(signal.confusedScore(), t.standardConfusedScore)) {
-            return new Requested(RuntimeScanProfile.STANDARD, "CONFUSED_SCORE_ELEVATED",
+            return new Requested(RuntimeScanProfile.STANDARD, "CONFUSED",
                     signal.confusedScore().toPlainString());
         }
         return new Requested(RuntimeScanProfile.LOW, "RECOVERY_SIGNAL", null);

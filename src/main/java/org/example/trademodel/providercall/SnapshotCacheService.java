@@ -8,19 +8,22 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class SnapshotCacheService {
+public class SnapshotCacheService implements ProviderSnapshotCache {
     private final Map<ProviderRequestKey, CacheEntry<?>> entries = new ConcurrentHashMap<>();
 
+    @Override
     public <T> void put(ProviderRequestKey key, T payload, ProviderSnapshotMetadata metadata, Duration staleTtl) {
         entries.put(key, new CacheEntry<>(payload, metadata, metadata.expiresAt().plus(staleTtl)));
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public <T> SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now) {
         return lookup(key, now, null);
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public <T> SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now, Duration requestedFreshTtl) {
         CacheEntry<T> entry = (CacheEntry<T>) entries.get(key);
         if (entry == null) return SnapshotLookup.unavailable();
@@ -30,12 +33,13 @@ public class SnapshotCacheService {
             return new SnapshotLookup<>(entry.payload, entry.metadata, SnapshotFreshnessStatus.FRESH);
         }
         if (now.isBefore(entry.staleUntil)) {
-            return new SnapshotLookup<>(entry.payload, entry.metadata, SnapshotFreshnessStatus.STALE);
+            return new SnapshotLookup<>(entry.payload, entry.metadata, SnapshotFreshnessStatus.STALE_READABLE);
         }
         entries.remove(key, entry);
         return SnapshotLookup.unavailable();
     }
 
+    @Override
     public void clear() {
         entries.clear();
     }
@@ -47,6 +51,8 @@ public class SnapshotCacheService {
             return new SnapshotLookup<>(null, null, SnapshotFreshnessStatus.UNAVAILABLE);
         }
         public boolean fresh() { return freshness == SnapshotFreshnessStatus.FRESH && metadata != null; }
-        public boolean staleReadable() { return freshness == SnapshotFreshnessStatus.STALE && metadata != null; }
+        public boolean staleReadable() {
+            return freshness == SnapshotFreshnessStatus.STALE_READABLE && metadata != null;
+        }
     }
 }
