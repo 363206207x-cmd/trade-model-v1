@@ -338,7 +338,14 @@ class ControlledStagingLocalLimaLabContractTest {
         String remote = read("deploy/p3h/lima/p3h-lab-r1-remote.sh");
 
         assertThat(compose).contains("TRADE_MODEL_SECURITY_RATE_LIMIT_RPM: \"120\"");
-        assertThat(remote).contains("for request_index in $(seq 1 140)");
+        assertThat(remote).contains(
+                "for request_index in $(seq 1 140)",
+                "rate_code=\"$(curl --config",
+                "printf '%s\\n' \"${rate_code}\" >>\"${response_dir}/rate-codes\"",
+                "grep -Fxq 429 \"${response_dir}/rate-codes\" || return 75");
+        assertThat(remote).doesNotContain(
+                ">>\"${response_dir}/rate-codes\" 2>/dev/null || true",
+                "wait\n  grep -Fxq 429");
     }
 
     @Test
@@ -393,7 +400,7 @@ class ControlledStagingLocalLimaLabContractTest {
                 "detail=PROD_SMOKE_CONTRACT", "detail=DASHBOARD_SAFETY",
                 "detail=UNAUTHENTICATED_API", "detail=HTTP_REDIRECT",
                 "detail=UNKNOWN_HOST_REJECTION", "detail=TLS_1_2",
-                "detail=TLS_1_3", "detail=RATE_LIMIT");
+                "detail=TLS_1_3", "detail=RATE_LIMIT", "detail=TEMP_CLEANUP");
         assertThat(remote).doesNotContain(
                 "mktemp /run/p3h-lab-auth.",
                 "mktemp -d /run/p3h-lab-smoke.",

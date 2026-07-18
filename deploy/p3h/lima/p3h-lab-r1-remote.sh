@@ -81,6 +81,7 @@ checked_failure_reason() {
         73) detail=TLS_1_2 ;;
         74) detail=TLS_1_3 ;;
         75) detail=RATE_LIMIT ;;
+        76) detail=TEMP_CLEANUP ;;
         *) detail=UNKNOWN ;;
       esac
       ;;
@@ -501,7 +502,7 @@ await_auth_expectation() {
 
 https_smoke() {
   local admin_version="$1"
-  local response_dir config_file unauthenticated_code redirect_headers unknown_code
+  local response_dir config_file unauthenticated_code redirect_headers unknown_code rate_code
   [ -d "${SERVICE_RUNTIME}" ] && [ ! -L "${SERVICE_RUNTIME}" ] || return 61
   response_dir="$(mktemp -d "${SERVICE_RUNTIME}/p3h-lab-smoke.XXXXXX")" \
     || return 61
@@ -593,17 +594,17 @@ PY
       -verify_return_error -tls1_3 </dev/null >/dev/null 2>&1 || return 74
   fi
 
-  : >"${response_dir}/rate-codes"
+  : >"${response_dir}/rate-codes" || return 75
   for request_index in $(seq 1 140); do
-    (
-      curl --config "${config_file}" --output /dev/null --write-out '%{http_code}\n' \
-        "https://${HOSTNAME}/api/dashboard/home" \
-        >>"${response_dir}/rate-codes" 2>/dev/null || true
-    ) &
+    if ! rate_code="$(curl --config "${config_file}" --output /dev/null \
+        --write-out '%{http_code}' \
+        "https://${HOSTNAME}/api/dashboard/home" 2>/dev/null)"; then
+      return 75
+    fi
+    printf '%s\n' "${rate_code}" >>"${response_dir}/rate-codes" || return 75
   done
-  wait
   grep -Fxq 429 "${response_dir}/rate-codes" || return 75
-  rm -rf "${response_dir}"
+  rm -rf "${response_dir}" || return 76
   trap - EXIT
 }
 
