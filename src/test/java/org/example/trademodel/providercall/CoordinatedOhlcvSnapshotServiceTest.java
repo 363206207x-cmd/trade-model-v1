@@ -30,7 +30,7 @@ class CoordinatedOhlcvSnapshotServiceTest {
         properties.setExternalCallsEnabled(true);
         Clock clock = Clock.fixed(Instant.parse("2026-07-10T10:00:00Z"), ZoneOffset.UTC);
         ProviderRateBudgetManager budget = new ProviderRateBudgetManager(properties, clock);
-        budget.register("BINANCE_PUBLIC", 100);
+        budget.register("BINANCE", 100);
         ProviderCallCoordinator coordinator = new ProviderCallCoordinator(properties, new SnapshotCacheService(),
                 new ProviderSingleFlightGuard(), budget, new ProviderCircuitBreaker(3, 60, clock),
                 new ProviderCallAuditLog(), clock);
@@ -43,9 +43,11 @@ class CoordinatedOhlcvSnapshotServiceTest {
         when(writer.ingest(batch)).thenReturn(new OhlcvIngestionResult(OhlcvSourceState.READY,
                 OhlcvFreshnessStatus.FRESH, 1, 0, 0, List.of()));
 
+        var registry = ProviderCallTestFixtures.binanceRegistry("BTCUSDT");
         ProviderCallResult<OhlcvIngestionResult> result = new CoordinatedOhlcvSnapshotService(
-                coordinator, provider, writer, clock).refresh("BTCUSDT", "5m", 100,
-                AssetPriority.P1_CORE, "trace-1");
+                coordinator, provider, writer, registry, new ProviderRequestKeyFactory(registry), clock)
+                .refresh("BTCUSDT", "5m", 100,
+                AssetPriority.P1_WATCHLIST, "trace-1");
 
         assertThat(result.ready()).isTrue();
         verify(writer).ingest(batch);

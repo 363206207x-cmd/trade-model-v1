@@ -6,18 +6,142 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: Controlled Staging Read-Only TLS And Secret-Store Evidence P3-H
-Next Business Phase: Reviewer P3-H Offline Harness Round 5 Re-review; P4 remains blocked
-Next Business Phase Allowed: NO while P3-H is unmerged and controlled staging inputs are missing; NO for P4 and production deployment
+Current Work Package: P3-CALL1 Unified Provider Orchestration, Adjustable Profiles and Opportunity Discovery Foundation
+Next Business Phase: P3-U1 Personal Login Page and Session Authentication, only after P3-CALL1 is reviewed and effective on merged main
+Next Business Phase Allowed: NO while P3-CALL1 is unmerged; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
+## P3-CALL1 Unified Provider Orchestration
+
+Merged main `230528b0942737275a397323bcfff874541e2ea8` is the exact P3-CALL1
+baseline. The package adds an offline, default-disabled coordination foundation:
+
+1. canonical spot/perpetual instrument identities and explicit provider symbol mappings;
+2. strict `P0_POSITION > P2_CANDIDATE > P1_WATCHLIST > P3_DISCOVERY` planning;
+3. replaceable watchlist, bounded configured discovery, and runtime auto-candidate stability;
+4. user `AUTO/LOW/STANDARD/HIGH` profiles plus per-asset system HIGH/EMERGENCY escalation;
+5. stable frequency-matrix versioning and independent dataset cadence;
+6. global/provider/symbol budgets, reserved emergency capacity, provider/AI concurrency, health, circuit, Retry-After, cache, and single flight;
+7. read-only snapshot query separated from controlled refresh;
+8. NoCall provider/AI adapters, AI checkpoint policy, notification eligibility/dedup, and no external send;
+9. authenticated profile/runtime-status APIs and a minimal Dashboard profile control.
+
+P3-CALL1 does not call Binance, CoinGlass, external context, or AI; it does not
+start a business scheduler, send Telegram/Push, create or mutate a position,
+create an order, or trade. Its runtime auto-candidate owner remains in-memory.
+Dynamic discovery, live adapters, Decision Cutoff Time, real AI, and Telegram
+delivery are explicitly deferred. Only merged main counts, so this branch is
+not effective until reviewed and merged.
+
+PR #1130 remains frozen `OPEN / DRAFT / UNMERGED` with no action. P4 is not
+allowed. Production Deployment Readiness remains `BLOCKED`.
+
+PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
+`4730021827` requested five correctness fixes and Reviewer Round 2 review
+`4730247371` requested three focused corrections. Reviewer Round 3 review
+`4730325751` requested the HALF_OPEN probe lifecycle correction. Review comment
+`3610213592` then identified the snapshot-retention lookup-order gap, and review
+comment `3610342417` identified read-only plan mutation of runtime profile
+state. Review `4730635925` identified the transition-state publication
+boundary gap. Final review `4730817855` passed that exact Head, after which two
+new P2 threads identified optional-universe count resilience and
+audit-before-publication atomicity. Those fixes were followed by thread
+`PRRT_kwDOSc6fQc6SF53A`, which identified queued attempts being classified as
+remote timeouts before Adapter start. Review `4731186182` then identified that
+a cancelled queued control could remain in the bounded executor queue after its
+logical flight completed. Two later P2 threads identified owner caller metadata
+being returned to joined waiters and refreshed metadata expiry exceeding dataset
+retention. This branch records the three rounds plus the focused closures below,
+pending caller-rewrap and retention-expiry final re-review:
+
+1. physical provider work uses a dedicated bounded executor, and logical
+   timeout cannot release its concurrency lease or Single Flight before the
+   physical task actually ends;
+2. stable `ProviderSnapshotKey` identity is separate from consumer TTL and
+   refresh `timeBucket`, enabling cross-profile sharing, cross-bucket stale
+   fallback, and bounded retention;
+3. OHLCV minimum gaps include timeframe, so one due scan can independently
+   attempt `5m`, `15m`, `1h`, and `4h` without one timeframe blocking another;
+4. candidate confirmation uses `CandidateLogicIdentity`, while evidence hash
+   remains provenance and notification deduplication;
+5. SPOT and PERPETUAL identities remain exact end to end; unsupported
+   perpetual price/OHLCV fails `NOT_CONFIGURED` and never falls back to spot.
+6. caller wait timeout and interrupt cannot cancel, retry, or remove a shared
+   physical flight; only the owner-fixed physical timeout supervisor owns
+   attempt cancellation;
+7. local queue, budget, concurrency, minimum-gap, disabled, and not-configured
+   outcomes do not increment remote provider circuit failures or mark remote
+   health down; `429` applies Retry-After without opening the circuit;
+8. persisted OHLCV due-state reads bind provider and market type, so a recent
+   `SPOT` row cannot suppress `USDT_PERP` refresh or create false perpetual
+   `READY`; all four timeframe observations preserve market identity.
+9. every physical attempt owns an idempotent circuit permit; local rejection
+   releases a HALF_OPEN probe, `429`/auth settles remote reachability, remote
+   failure reopens, success closes, and waiter timeout cannot release the
+   owner's token. Completed fixture paths leave zero permanently claimed
+   HALF_OPEN probes.
+10. dataset retention is checked before caller freshness; a caller TTL or
+    metadata expiry cannot exceed `staleUntil`, the exact boundary is removed,
+    and shorter/longer consumers continue sharing the stable key only while the
+    dataset remains retained.
+11. `currentUniverse/currentPlan` are side-effect-free status paths, while
+    `evaluateUniverseForExecution/planForExecution` are Scheduler-only. A real
+    scan evaluates each relevant asset once, all due datasets reuse that
+    profile, and only real scan cycles advance recovery or write changed
+    transition audit. One hundred status reads leave state unchanged.
+12. `evaluate`, `current`, and `currentProfile` use the same service monitor.
+    A read cannot complete while a changed transition is paused inside audit,
+    and completed execution state is published as one coherent profile,
+    reason, effective time, downgrade time, and rule-version snapshot.
+    Thirty-two concurrent readers repeating 100 queries produce zero mixed
+    snapshots, state mutations, or additional audit rows.
+13. optional Watchlist and Discovery count failures are isolated to count `0`;
+    runtime-status remains readable and continues using the side-effect-free
+    current plan without Provider, AI, transition, or audit mutation.
+14. transition evaluation mutates a complete staged State copy, requires an
+    audit insert count of exactly one, and publishes only after audit success.
+    Audit exception, zero rows, or unexpected rows preserve the entire prior
+    State and stop Scheduler refresh before any dataset call.
+15. each Provider attempt uses atomic `QUEUED`, `LOCAL_ADMISSION`, and
+    `REMOTE_IN_FLIGHT` phases. Queue and pre-remote timeouts remain local,
+    cause zero remote health/circuit/retry/adapter effects, and a pure queue
+    timeout consumes zero attempt budget. `PROVIDER_TIMEOUT` is reserved for a
+    timeout after Adapter start wins the phase race.
+16. cancellation of a queued task removes its exact control from the bounded
+    executor queue before another admission can consume the slot. Twenty
+    repeated P3 queue timeouts leave zero queued controls and zero queue growth;
+    P0 reserved admission remains available. Running cancellation only requests
+    interruption and cannot remove another request's queued control.
+17. Shared Flight shares one physical request, retry, budget, circuit, health,
+    and cache-write lifecycle, while every waiter result is rebuilt from its own
+    cache lookup. Waiter trace, priority, profile, reason codes, frequency
+    version, TTL, metadata, and request audit are caller-owned; additional
+    Provider calls, budget reservations, circuit settlements, remote-health
+    mutations, and physical-attempt audits are zero.
+18. READY, `EMPTY_CONFIRMED`, cache-hit, stale-fallback, read-only peek, and
+    waiter metadata expiry use the earlier caller-TTL and dataset-retention
+    boundary. Long TTLs cannot outlive retention, short TTLs remain short, exact
+    boundaries are preserved, overflow falls back to retention, and a short
+    Owner expiry does not permanently cap a later caller.
+
+Each physical retry receives its own budget reservation and audit lifecycle.
+These are fixture-only branch results: real provider calls, real AI calls,
+Telegram sends, orders, and trading remain zero. Only reviewed merged main may
+make the package effective.
+
+Details: `docs/PROVIDER_CALL_ORCHESTRATION_AUDIT.md` and the P3-CALL1 contract
+documents.
+
+---
+
 ## Controlled Staging P3-H
 
-Merged main `8f0640331e58e8b8b657c7db08e6d79b03d37a4f` makes P3-G
-effective. P3-H is now the active evidence package. Round 1 closes the offline
+Merged main `230528b0942737275a397323bcfff874541e2ea8` includes the reviewed
+P3-H offline Harness from PR #1129. The separate real-staging/lab PR #1130 is
+frozen and is not part of P3-CALL1. Round 1 closed the offline
 template gaps for deterministic Greenfield bootstrap, four-role provisioning,
 fixed non-root Secret materialization, strict attestations, systemd
 credentials, runtime mount verification, Host-header rejection, TLS target
@@ -54,7 +178,8 @@ denied writes, leak checks, and cleanup as
 `SECRET_ACCESS` are `NOT_ATTEMPTED`; real staging remains
 `BLOCKED_MISSING_AUTHORIZED_INPUT`, and no real-server status is PASS.
 
-P3-H is not production deployment. P4 is not allowed, Production Deployment
+P3-H offline evidence is not production deployment and real staging remains
+blocked by missing authorized input. P4 is not allowed, Production Deployment
 Readiness remains `BLOCKED`, and production deployment cannot proceed. See
 `docs/CONTROLLED_STAGING_READONLY_TLS_SECRETSTORE_P3H.md`.
 
@@ -1103,5 +1228,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR; Round 4 exact integrity evidence pending Round 5 re-review and merge
+- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; caller rewrap and retention-expiry closure pending final re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

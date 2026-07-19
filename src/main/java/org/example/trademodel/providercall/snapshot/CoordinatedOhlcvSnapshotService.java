@@ -10,7 +10,14 @@ import org.example.trademodel.providercall.ProviderCallRequest;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.ProviderRequestKey;
+import org.example.trademodel.providercall.ProviderRequestKeyFactory;
+import org.example.trademodel.providercall.ProviderSnapshotMetadata;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.example.trademodel.service.PersistedOhlcvIngestionService;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.springframework.stereotype.Service;
@@ -24,22 +31,30 @@ public class CoordinatedOhlcvSnapshotService {
     private final ProviderCallCoordinator coordinator;
     private final PublicOhlcvProvider provider;
     private final PersistedOhlcvIngestionService authoritativeWriter;
+    private final ProviderSymbolMappingRegistry mappingRegistry;
+    private final ProviderRequestKeyFactory keyFactory;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
     public CoordinatedOhlcvSnapshotService(ProviderCallCoordinator coordinator,
                                            PublicOhlcvProvider provider,
-                                           PersistedOhlcvIngestionService authoritativeWriter) {
-        this(coordinator, provider, authoritativeWriter, Clock.systemUTC());
+                                           PersistedOhlcvIngestionService authoritativeWriter,
+                                           ProviderSymbolMappingRegistry mappingRegistry,
+                                           ProviderRequestKeyFactory keyFactory) {
+        this(coordinator, provider, authoritativeWriter, mappingRegistry, keyFactory, Clock.systemUTC());
     }
 
     public CoordinatedOhlcvSnapshotService(ProviderCallCoordinator coordinator,
                                            PublicOhlcvProvider provider,
                                            PersistedOhlcvIngestionService authoritativeWriter,
+                                           ProviderSymbolMappingRegistry mappingRegistry,
+                                           ProviderRequestKeyFactory keyFactory,
                                            Clock clock) {
         this.coordinator = coordinator;
         this.provider = provider;
         this.authoritativeWriter = authoritativeWriter;
+        this.mappingRegistry = mappingRegistry;
+        this.keyFactory = keyFactory;
         this.clock = clock;
     }
 
@@ -49,12 +64,51 @@ public class CoordinatedOhlcvSnapshotService {
             int limit,
             AssetPriority priority,
             String traceId) {
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        return refresh(mapping, timeframe, limit, priority, traceId);
+    }
+
+    public ProviderCallResult<OhlcvIngestionResult> refresh(
+            CanonicalInstrumentId canonicalInstrumentId,
+            String timeframe,
+            int limit,
+            AssetPriority priority,
+            String traceId) {
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        return refresh(mapping, timeframe, limit, priority, traceId);
+    }
+
+    private ProviderCallResult<OhlcvIngestionResult> refresh(
+            ProviderSymbolMapping mapping,
+            String timeframe,
+            int limit,
+            AssetPriority priority,
+            String traceId) {
         Instant now = clock.instant();
-        ProviderRequestKey key = new ProviderRequestKey("BINANCE_PUBLIC", ProviderDatasetType.OHLCV,
-                symbol, timeframe, String.valueOf(now.getEpochSecond() / 60));
+        if (mapping.canonicalInstrumentId().marketType() != MarketType.SPOT) {
+            return unavailable(mapping, timeframe, traceId, now,
+                    "PERPETUAL_OHLCV_PROVIDER_NOT_CONFIGURED");
+        }
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.OHLCV,
+                mapping, timeframe, Duration.ofSeconds(60), now);
         return coordinator.execute(new ProviderCallRequest<>(key, priority, Duration.ofSeconds(60),
                 Duration.ofMinutes(10), Duration.ofSeconds(5), traceId,
-                () -> fetchAndPersist(symbol, timeframe, limit, traceId)));
+                () -> fetchAndPersist(mapping.providerSymbol(), timeframe, limit, traceId)));
+    }
+
+    private ProviderCallResult<OhlcvIngestionResult> unavailable(
+            ProviderSymbolMapping mapping,
+            String timeframe,
+            String traceId,
+            Instant now,
+            String reason) {
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.OHLCV,
+                mapping, timeframe, Duration.ofSeconds(60), now);
+        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata("BINANCE", ProviderDatasetType.OHLCV,
+                mapping.canonicalInstrumentId(), mapping.providerSymbol(), timeframe, null, now, now, 0L,
+                UnifiedSourceStatus.NOT_CONFIGURED, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
+                key.canonical(), mapping.sourceVersion(), false, false, reason, java.util.List.of(reason));
+        return new ProviderCallResult<>(null, metadata, null);
     }
 
     private ProviderAdapterResponse<OhlcvIngestionResult> fetchAndPersist(

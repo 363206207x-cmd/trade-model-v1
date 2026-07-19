@@ -9,7 +9,11 @@ import org.example.trademodel.providercall.ProviderCallRequest;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.ProviderRequestKey;
+import org.example.trademodel.providercall.ProviderRequestKeyFactory;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,34 +27,42 @@ public class BinanceDerivativesSnapshotService {
     private final ProviderCallCoordinator coordinator;
     private final PerpFundingRateClient fundingClient;
     private final OpenInterestClient openInterestClient;
+    private final ProviderSymbolMappingRegistry mappingRegistry;
+    private final ProviderRequestKeyFactory keyFactory;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
     public BinanceDerivativesSnapshotService(ProviderCallCoordinator coordinator,
                                               PerpFundingRateClient fundingClient,
-                                              OpenInterestClient openInterestClient) {
-        this(coordinator, fundingClient, openInterestClient, Clock.systemUTC());
+                                              OpenInterestClient openInterestClient,
+                                              ProviderSymbolMappingRegistry mappingRegistry,
+                                              ProviderRequestKeyFactory keyFactory) {
+        this(coordinator, fundingClient, openInterestClient, mappingRegistry, keyFactory, Clock.systemUTC());
     }
 
     public BinanceDerivativesSnapshotService(ProviderCallCoordinator coordinator,
                                               PerpFundingRateClient fundingClient,
                                               OpenInterestClient openInterestClient,
+                                              ProviderSymbolMappingRegistry mappingRegistry,
+                                              ProviderRequestKeyFactory keyFactory,
                                               Clock clock) {
         this.coordinator = coordinator;
         this.fundingClient = fundingClient;
         this.openInterestClient = openInterestClient;
+        this.mappingRegistry = mappingRegistry;
+        this.keyFactory = keyFactory;
         this.clock = clock;
     }
 
     public ProviderCallResult<MinimalDerivativesSnapshot> get(String symbol, AssetPriority priority,
                                                                Duration freshTtl, String traceId) {
-        Instant now = clock.instant();
-        long bucket = Math.max(1, freshTtl.toSeconds());
-        ProviderRequestKey key = new ProviderRequestKey("BINANCE_USDM_MINIMAL", ProviderDatasetType.DERIVATIVES,
-                symbol, "GLOBAL", String.valueOf(now.getEpochSecond() / bucket));
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol,
+                MarketType.PERPETUAL);
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.DERIVATIVES,
+                mapping, "GLOBAL", freshTtl, clock.instant());
         ProviderCallResult<MinimalDerivativesSnapshot> result = coordinator.execute(new ProviderCallRequest<>(key,
                 priority, freshTtl, freshTtl.multipliedBy(4), Duration.ofSeconds(3), traceId,
-                () -> fetch(symbol)));
+                () -> fetch(mapping.providerSymbol())));
         if (result.payload() == null) return result;
         MinimalDerivativesSnapshot payload = result.payload();
         return new ProviderCallResult<>(new MinimalDerivativesSnapshot(payload.symbol(), payload.lastFundingRate(),

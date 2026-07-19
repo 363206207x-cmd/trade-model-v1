@@ -14,7 +14,6 @@ import org.example.trademodel.providercall.scan.ScanUniverseResolver;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
-import java.util.UUID;
 
 @Service
 public class RuntimeScanProfileServiceImpl implements RuntimeScanProfileService {
@@ -48,18 +47,17 @@ public class RuntimeScanProfileServiceImpl implements RuntimeScanProfileService 
         ScanUniverseInput input = universeSource.currentUniverse();
         ScanPlanItem item = resolver.resolve(input).stream()
                 .filter(candidate -> normalized.equals(candidate.symbol())).findFirst().orElse(null);
-        ProfileTransitionResult transition = transitionService.current(normalized,
-                "runtime-profile-" + UUID.randomUUID());
+        ProfileTransitionResult transition = transitionService.current(normalized, "runtime-profile-query");
         RuntimeScanProfile profile = item == null ? transition.effectiveProfile() : item.effectiveProfile();
-        AssetPriority priority = item == null ? AssetPriority.P3_POOL : item.effectivePriority();
+        AssetPriority priority = item == null ? AssetPriority.P3_DISCOVERY : item.effectivePriority();
         String reason = item == null ? transition.effectiveReason() : item.escalationReason();
         return new RuntimeScanProfileResponse(normalized, input.baseProfile(), profile, priority, reason,
                 transition.effectiveSince(), transition.nextDowngradeEligibleAt(),
                 properties.intervalSeconds(profile, priority, ProviderDatasetType.PRICE),
                 properties.intervalSeconds(profile, priority, ProviderDatasetType.DERIVATIVES),
-                refreshRegistry.get(normalized, ProviderDatasetType.PRICE),
-                refreshRegistry.get(normalized, ProviderDatasetType.DERIVATIVES),
-                budgetManager.state("BINANCE_PUBLIC", circuitBreaker.state("BINANCE_PUBLIC")));
+                item == null ? null : refreshRegistry.get(item.canonicalInstrumentId(), ProviderDatasetType.PRICE),
+                item == null ? null : refreshRegistry.get(item.canonicalInstrumentId(), ProviderDatasetType.DERIVATIVES),
+                budgetManager.state("BINANCE", circuitBreaker.state("BINANCE")));
     }
 
     private static String requiredSymbol(String symbol) {

@@ -54,7 +54,7 @@ class ProviderCallCoordinatorTest {
     void derivativesSnapshotIsNotRefetchedInsideFreshnessWindow() {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 10);
         AtomicInteger calls = new AtomicInteger();
-        ProviderCallRequest<String> request = request(key(ProviderDatasetType.DERIVATIVES), AssetPriority.P1_CORE,
+        ProviderCallRequest<String> request = request(key(ProviderDatasetType.DERIVATIVES), AssetPriority.P1_WATCHLIST,
                 () -> ProviderAdapterResponse.ready("oi", context.clock.instant()), calls);
 
         assertThat(context.coordinator.execute(request).payload()).isEqualTo("oi");
@@ -105,7 +105,7 @@ class ProviderCallCoordinatorTest {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 15);
         AtomicInteger calls = new AtomicInteger();
         ProviderRequestKey key = key(ProviderDatasetType.PRICE);
-        ProviderCallRequest<String> dashboard = request(key, AssetPriority.P1_CORE,
+        ProviderCallRequest<String> dashboard = request(key, AssetPriority.P1_WATCHLIST,
                 () -> ProviderAdapterResponse.ready("65000", context.clock.instant()), calls,
                 Duration.ofSeconds(15));
         ProviderCallRequest<String> highMonitor = request(key, AssetPriority.P0_POSITION,
@@ -135,8 +135,9 @@ class ProviderCallCoordinatorTest {
         ProviderRateBudgetManager manager = new ProviderRateBudgetManager(properties,
                 Clock.fixed(Instant.parse("2026-07-10T10:00:00Z"), ZoneOffset.UTC));
         manager.register("TEST", 10);
-        for (int i = 0; i < 8; i++) assertThat(manager.reserve("TEST", AssetPriority.P1_CORE)).isTrue();
-        assertThat(manager.reserve("TEST", AssetPriority.P1_CORE)).isFalse();
+        for (int i = 0; i < 5; i++) assertThat(manager.reserve("TEST", AssetPriority.P1_WATCHLIST)).isTrue();
+        assertThat(manager.reserve("TEST", AssetPriority.P1_WATCHLIST)).isFalse();
+        assertThat(manager.reserve("TEST", AssetPriority.P2_CANDIDATE)).isTrue();
         assertThat(manager.reserve("TEST", AssetPriority.P0_POSITION)).isTrue();
     }
 
@@ -146,8 +147,8 @@ class ProviderCallCoordinatorTest {
         ProviderRateBudgetManager manager = new ProviderRateBudgetManager(properties,
                 Clock.fixed(Instant.parse("2026-07-10T10:00:00Z"), ZoneOffset.UTC));
         manager.register("TEST", 10);
-        for (int i = 0; i < 4; i++) assertThat(manager.reserve("TEST", AssetPriority.P3_POOL)).isTrue();
-        assertThat(manager.reserve("TEST", AssetPriority.P3_POOL)).isFalse();
+        for (int i = 0; i < 4; i++) assertThat(manager.reserve("TEST", AssetPriority.P3_DISCOVERY)).isTrue();
+        assertThat(manager.reserve("TEST", AssetPriority.P3_DISCOVERY)).isFalse();
         assertThat(manager.reserve("TEST", AssetPriority.P2_CANDIDATE)).isTrue();
         assertThat(manager.reserve("TEST", AssetPriority.P0_POSITION)).isTrue();
     }
@@ -158,7 +159,7 @@ class ProviderCallCoordinatorTest {
         ProviderRateBudgetManager manager = new ProviderRateBudgetManager(properties,
                 Clock.fixed(Instant.parse("2026-07-10T10:00:00Z"), ZoneOffset.UTC));
         manager.register("COINGLASS", 5);
-        while (manager.reserve("COINGLASS", AssetPriority.P1_CORE)) { }
+        while (manager.reserve("COINGLASS", AssetPriority.P1_WATCHLIST)) { }
         manager.register("BINANCE_PUBLIC", 5);
         assertThat(manager.reserve("BINANCE_PUBLIC", AssetPriority.P0_POSITION)).isTrue();
     }
@@ -193,7 +194,7 @@ class ProviderCallCoordinatorTest {
 
         assertThat(stale.payload()).isEqualTo("65000");
         assertThat(stale.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.STALE);
-        assertThat(stale.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.STALE);
+        assertThat(stale.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.STALE_READABLE);
         assertThat(stale.metadata().fallbackUsed()).isTrue();
     }
 
@@ -202,7 +203,7 @@ class ProviderCallCoordinatorTest {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 10);
         context.properties.setExternalCallsEnabled(false);
         ProviderCallResult<String> result = context.coordinator.execute(request(key(ProviderDatasetType.DERIVATIVES),
-                AssetPriority.P1_CORE, () -> ProviderAdapterResponse.ready("not-called", context.clock.instant()),
+                AssetPriority.P1_WATCHLIST, () -> ProviderAdapterResponse.ready("not-called", context.clock.instant()),
                 new AtomicInteger()));
 
         assertThat(result.payload()).isNull();
@@ -219,7 +220,7 @@ class ProviderCallCoordinatorTest {
                 new AtomicInteger()));
 
         assertThat(result.payload()).isNull();
-        assertThat(result.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.ERROR);
+        assertThat(result.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.UNAVAILABLE);
         assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_FORBIDDEN");
     }
 
@@ -227,7 +228,7 @@ class ProviderCallCoordinatorTest {
     void eventRefreshUsesCacheInsideMinimumGap() {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 40);
         AtomicInteger calls = new AtomicInteger();
-        ProviderCallRequest<String> request = request(key(ProviderDatasetType.EXTERNAL_CONTEXT), AssetPriority.P1_CORE,
+        ProviderCallRequest<String> request = request(key(ProviderDatasetType.EXTERNAL_CONTEXT), AssetPriority.P1_WATCHLIST,
                 () -> ProviderAdapterResponse.ready("event", context.clock.instant()), calls, Duration.ofSeconds(40));
         context.coordinator.execute(request);
         context.clock.advance(Duration.ofSeconds(39));
@@ -251,7 +252,7 @@ class ProviderCallCoordinatorTest {
     }
 
     private static ProviderRequestKey key(ProviderDatasetType type) {
-        return new ProviderRequestKey("TEST", type, "BTCUSDT", "GLOBAL", "202607101000");
+        return ProviderCallTestFixtures.key("TEST", type, "BTCUSDT", "GLOBAL", "202607101000");
     }
 
     private static TestContext context(Instant now, int advertisedRpm) {

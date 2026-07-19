@@ -26,7 +26,7 @@ class CoinGlassControlledSmokeTest {
         Assumptions.assumeTrue("true".equalsIgnoreCase(System.getenv("TRADE_MODEL_COINGLASS_ENABLED")));
         Assumptions.assumeTrue(System.getenv("COINGLASS_API_KEY") != null
                 && !System.getenv("COINGLASS_API_KEY").isBlank());
-        ProviderCallResult<DerivativesRiskSnapshot> result = service.get("BTCUSDT", AssetPriority.P1_CORE,
+        ProviderCallResult<DerivativesRiskSnapshot> result = service.get("BTCUSDT", AssetPriority.P1_WATCHLIST,
                 Duration.ofSeconds(60), "controlled-coinglass-smoke");
         DerivativesRiskSnapshot payload = result.payload();
         int available = payload == null ? 0 : payload.availableDatasets().size();

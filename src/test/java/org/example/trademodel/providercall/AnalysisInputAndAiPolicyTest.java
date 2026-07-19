@@ -78,7 +78,7 @@ class AnalysisInputAndAiPolicyTest {
 
     private static ProviderSnapshotMetadata metadata(ProviderDatasetType type, String timeframe, String trace) {
         Instant now = Instant.parse("2026-07-10T10:00:00Z");
-        ProviderRequestKey key = new ProviderRequestKey("TEST", type, "BTCUSDT", timeframe, "bucket");
+        ProviderRequestKey key = ProviderCallTestFixtures.key("TEST", type, "BTCUSDT", timeframe, "bucket");
         return new ProviderSnapshotMetadata("TEST", type, "BTCUSDT", timeframe, now, now, now.plusSeconds(60),
                 UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH, trace, key.canonical(), false, false,
                 null, List.of());

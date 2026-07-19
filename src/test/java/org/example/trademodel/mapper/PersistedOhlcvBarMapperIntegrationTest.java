@@ -79,6 +79,30 @@ class PersistedOhlcvBarMapperIntegrationTest {
     }
 
     @Test
+    void selectLatestClosedWindowBySource_isolatesSpotAndPerpetualRows() {
+        insertBar("MARKETUSDT", "5m", 1_000L, 1_999L, "100.00", true, 0,
+                "spot-batch", "spot-trace", LocalDateTime.of(2026, 5, 17, 10, 0),
+                "BINANCE_PUBLIC", "SPOT");
+        insertBar("MARKETUSDT", "5m", 2_000L, 2_999L, "101.00", true, 0,
+                "perp-batch", "perp-trace", LocalDateTime.of(2026, 5, 17, 10, 1),
+                "BINANCE_PUBLIC", "USDT_PERP");
+
+        List<PersistedOhlcvBarDO> spot = persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                "MARKETUSDT", "5m", "BINANCE_PUBLIC", "SPOT", 1);
+        List<PersistedOhlcvBarDO> perpetual = persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                "MARKETUSDT", "5m", "BINANCE_PUBLIC", "USDT_PERP", 1);
+
+        assertThat(spot).singleElement().satisfies(row -> {
+            assertThat(row.getSourceTraceId()).isEqualTo("spot-trace");
+            assertThat(row.getProviderMarketType()).isEqualTo("SPOT");
+        });
+        assertThat(perpetual).singleElement().satisfies(row -> {
+            assertThat(row.getSourceTraceId()).isEqualTo("perp-trace");
+            assertThat(row.getProviderMarketType()).isEqualTo("USDT_PERP");
+        });
+    }
+
+    @Test
     void selectLatestIngestionBatch_returnsNewestNonDeletedBatchMetadata() {
         insertBar("SOLUSDT", "15m", 20_000L, 34_999L, "150.00", true, 0, "batch-older", "trace-old",
                 LocalDateTime.of(2026, 5, 17, 10, 0, 0));
@@ -137,6 +161,24 @@ class PersistedOhlcvBarMapperIntegrationTest {
             String sourceTraceId,
             LocalDateTime ingestedAt
     ) {
+        insertBar(symbol, timeframe, openTimeMs, closeTimeMs, openPrice, closed, isDeleted,
+                sourceBatchId, sourceTraceId, ingestedAt, "BINANCE", "SPOT");
+    }
+
+    private void insertBar(
+            String symbol,
+            String timeframe,
+            long openTimeMs,
+            long closeTimeMs,
+            String openPrice,
+            boolean closed,
+            int isDeleted,
+            String sourceBatchId,
+            String sourceTraceId,
+            LocalDateTime ingestedAt,
+            String provider,
+            String providerMarketType
+    ) {
         BigDecimal open = new BigDecimal(openPrice);
         jdbcTemplate.update(
                 "INSERT INTO tm_persisted_ohlcv_bar("
@@ -160,8 +202,8 @@ class PersistedOhlcvBarMapperIntegrationTest {
                 new BigDecimal("61.00"),
                 new BigDecimal("152500.00"),
                 closed,
-                "BINANCE",
-                "SPOT",
+                provider,
+                providerMarketType,
                 "persisted.ohlcv.fixture",
                 sourceBatchId,
                 sourceTraceId,

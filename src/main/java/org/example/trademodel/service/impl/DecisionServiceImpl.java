@@ -219,7 +219,7 @@ public class DecisionServiceImpl implements DecisionService {
         try {
             if (marketPriceSnapshotService == null) return null;
             ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.peek(symbol,
-                    AssetPriority.P1_CORE, Duration.ofSeconds(30), "decision-read-" + UUID.randomUUID());
+                    AssetPriority.P1_WATCHLIST, Duration.ofSeconds(30), "decision-read-" + UUID.randomUUID());
             return MarketPriceSnapshotPolicy.isFresh(result) ? result.payload() : null;
         } catch (Exception ignored) {
             return null;

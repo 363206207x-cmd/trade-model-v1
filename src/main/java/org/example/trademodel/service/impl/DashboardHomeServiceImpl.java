@@ -273,7 +273,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (derivativesSnapshotReadPort == null || derivativesBusinessIntegrationService == null) return summary;
         try {
             ProviderCallResult<DerivativesRiskSnapshot> result = derivativesSnapshotReadPort.readCached(
-                    symbol, AssetPriority.P1_CORE, Duration.ofSeconds(60), "dashboard-derivatives-" + UUID.randomUUID());
+                    symbol, AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "dashboard-derivatives-" + UUID.randomUUID());
             DerivativesRiskSnapshot snapshot = result == null ? null : result.payload();
             if (snapshot == null) {
                 summary.setStatus("未配置");

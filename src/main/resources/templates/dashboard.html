@@ -1242,6 +1242,100 @@
         .runtime-status-stack {
             display: none;
         }
+
+        .provider-profile-control {
+            display: grid;
+            grid-template-columns: minmax(150px, 0.8fr) minmax(140px, 0.8fr) minmax(190px, 1.2fr) auto;
+            gap: 12px;
+            align-items: end;
+            padding: 14px 16px;
+            margin: 12px 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            background: var(--bg-surface);
+        }
+
+        .provider-profile-field {
+            min-width: 0;
+        }
+
+        .provider-profile-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .provider-profile-value {
+            display: block;
+            min-height: 22px;
+            color: var(--text-primary);
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .provider-profile-select {
+            width: 100%;
+            min-height: 38px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 5px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            padding: 0 10px;
+        }
+
+        .provider-profile-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 38px;
+        }
+
+        .provider-profile-message {
+            min-width: 88px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .provider-profile-metrics {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(110px, 1fr));
+            gap: 8px 14px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .provider-profile-metric span {
+            display: block;
+        }
+
+        .provider-profile-metric .metric-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .provider-profile-metric .metric-value {
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        @media (max-width: 760px) {
+            .provider-profile-control {
+                grid-template-columns: 1fr;
+                align-items: stretch;
+            }
+
+            .provider-profile-actions {
+                justify-content: space-between;
+            }
+
+            .provider-profile-metrics {
+                grid-column: 1;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
         @media (max-width: 1600px) {
             .position-execution-row {
                 grid-template-columns: 1fr;
@@ -2807,6 +2901,37 @@
             </div>
         </div>
         <div class="tiles-row" id="tilesRow"></div>
+
+        <section class="provider-profile-control" id="providerProfileControl" aria-label="Provider 调用档位">
+            <div class="provider-profile-field">
+                <label class="provider-profile-label" for="providerBaseProfileSelect">调用基础档位</label>
+                <select class="provider-profile-select" id="providerBaseProfileSelect">
+                    <option value="AUTO">自动</option>
+                    <option value="LOW">低频</option>
+                    <option value="STANDARD">标准</option>
+                    <option value="HIGH">高频</option>
+                </select>
+            </div>
+            <div class="provider-profile-field">
+                <span class="provider-profile-label">当前实际档位</span>
+                <strong class="provider-profile-value" id="providerEffectiveProfileValue">等待同步</strong>
+            </div>
+            <div class="provider-profile-field">
+                <span class="provider-profile-label">升档原因</span>
+                <span class="provider-profile-value" id="providerEscalationReasonValue">暂无升档</span>
+            </div>
+            <div class="provider-profile-actions">
+                <button type="button" class="btn" id="providerProfileSaveButton">保存档位</button>
+                <span class="provider-profile-message" id="providerProfileMessage" role="status" aria-live="polite"></span>
+            </div>
+            <div class="provider-profile-metrics" aria-label="Provider 调用频率与状态">
+                <div class="provider-profile-metric"><span class="metric-label">持仓价格刷新</span><span class="metric-value" id="providerPositionPriceInterval">--</span></div>
+                <div class="provider-profile-metric"><span class="metric-label">关注资产刷新</span><span class="metric-value" id="providerWatchlistPriceInterval">--</span></div>
+                <div class="provider-profile-metric"><span class="metric-label">候选资产刷新</span><span class="metric-value" id="providerCandidatePriceInterval">--</span></div>
+                <div class="provider-profile-metric"><span class="metric-label">发现池扫描</span><span class="metric-value" id="providerDiscoveryInterval">--</span></div>
+                <div class="provider-profile-metric"><span class="metric-label">Provider 总体状态</span><span class="metric-value" id="providerOverallStatusValue">等待同步</span></div>
+            </div>
+        </section>
 
         <p class="dashboard-boundary-note">首页展示顺序仅供人工复核。</p>
 
@@ -6535,6 +6660,124 @@
             });
     }
 
+    var providerProfileState = {
+        savedProfile: "AUTO",
+        saving: false
+    };
+
+    function providerProfileLabel(profile) {
+        var labels = { AUTO: "自动", LOW: "低频", STANDARD: "标准", HIGH: "高频", EMERGENCY: "紧急" };
+        return labels[String(profile || "").toUpperCase()] || "未知档位";
+    }
+
+    function providerProfileRank(profile) {
+        var ranks = { LOW: 0, STANDARD: 1, HIGH: 2, EMERGENCY: 3 };
+        var key = String(profile || "").toUpperCase();
+        return Object.prototype.hasOwnProperty.call(ranks, key) ? ranks[key] : -1;
+    }
+
+    function formatRefreshSeconds(value) {
+        var seconds = Number(value);
+        return Number.isFinite(seconds) && seconds > 0 ? (seconds + " 秒") : "--";
+    }
+
+    function summarizeEffectiveProfiles(status) {
+        var values = Object.values(status && status.effectiveProfilesBySymbol || {});
+        if (!values.length) return "等待扫描计划";
+        var unique = Array.from(new Set(values.map(function (value) { return String(value || "").toUpperCase(); })));
+        unique.sort(function (left, right) { return providerProfileRank(right) - providerProfileRank(left); });
+        return unique.length === 1
+            ? providerProfileLabel(unique[0])
+            : ("按资产动态，最高为" + providerProfileLabel(unique[0]));
+    }
+
+    function summarizeEscalationReasons(status) {
+        var reasons = [];
+        Object.values(status && status.escalationReasons || {}).forEach(function (items) {
+            (Array.isArray(items) ? items : []).forEach(function (item) {
+                var key = String(item || "").trim();
+                if (key && reasons.indexOf(key) < 0) reasons.push(key);
+            });
+        });
+        return reasons.length ? reasons.slice(0, 3).join("、") : "暂无升档";
+    }
+
+    function summarizeProviderHealth(status) {
+        var snapshots = Object.values(status && status.providerStatuses || {});
+        if (!snapshots.length) return "等待同步";
+        var states = snapshots.map(function (item) { return String(item && item.sourceStatus || "WAITING_SYNC").toUpperCase(); });
+        if (states.some(function (value) { return value === "ERROR" || value === "DEGRADED"; })) return "部分来源异常";
+        if (states.some(function (value) { return value === "READY"; })) return "已有来源就绪";
+        if (states.every(function (value) { return value === "DISABLED" || value === "NOT_CONFIGURED" || value === "WAITING_SYNC"; })) {
+            return "外部调用未启用";
+        }
+        return "等待同步";
+    }
+
+    function renderProviderRuntimeStatus(status) {
+        if (!status) return;
+        var select = document.getElementById("providerBaseProfileSelect");
+        var profile = String(status.userBaseProfile || "AUTO").toUpperCase();
+        providerProfileState.savedProfile = profile;
+        if (select && !providerProfileState.saving) select.value = profile;
+        setText("providerEffectiveProfileValue", summarizeEffectiveProfiles(status));
+        setText("providerEscalationReasonValue", summarizeEscalationReasons(status));
+        setText("providerPositionPriceInterval", formatRefreshSeconds(status.positionPriceRefreshSeconds));
+        setText("providerWatchlistPriceInterval", formatRefreshSeconds(status.watchlistPriceRefreshSeconds));
+        setText("providerCandidatePriceInterval", formatRefreshSeconds(status.candidatePriceRefreshSeconds));
+        setText("providerDiscoveryInterval", formatRefreshSeconds(status.discoveryScanSeconds));
+        setText("providerOverallStatusValue", summarizeProviderHealth(status));
+    }
+
+    function fetchProviderRuntimeStatus() {
+        return fetch("/api/provider-call/runtime-status")
+            .then(function (response) { return response.ok ? response.json() : Promise.reject(response); })
+            .then(function (payload) {
+                var status = payload && payload.data ? payload.data : payload;
+                renderProviderRuntimeStatus(status);
+                return status;
+            })
+            .catch(function () {
+                setText("providerOverallStatusValue", "运行状态暂不可用");
+                return null;
+            });
+    }
+
+    function saveProviderBaseProfile() {
+        var select = document.getElementById("providerBaseProfileSelect");
+        var button = document.getElementById("providerProfileSaveButton");
+        if (!select || providerProfileState.saving) return;
+        var requested = String(select.value || "AUTO").toUpperCase();
+        var previous = providerProfileState.savedProfile;
+        providerProfileState.saving = true;
+        if (button) button.disabled = true;
+        setText("providerProfileMessage", "正在保存");
+        fetch("/api/provider-call/base-profile", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profile: requested, reason: "首页手动调整调用基础档位" })
+        }).then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (payload) {
+                if (!response.ok || (payload && payload.code && payload.code !== 200)) {
+                    throw new Error(payload && payload.msg ? payload.msg : "档位保存失败");
+                }
+                return payload;
+            });
+        }).then(function (payload) {
+            var result = payload && payload.data ? payload.data : {};
+            providerProfileState.savedProfile = String(result.profile || requested).toUpperCase();
+            select.value = providerProfileState.savedProfile;
+            setText("providerProfileMessage", "档位已生效");
+            return fetchProviderRuntimeStatus();
+        }).catch(function (failure) {
+            select.value = previous;
+            setText("providerProfileMessage", failure && failure.message ? failure.message : "档位保存失败");
+        }).finally(function () {
+            providerProfileState.saving = false;
+            if (button) button.disabled = false;
+        });
+    }
+
     function localRealFailureLabel(code) {
         var labels = {
             REAL_MARKET_ENVIRONMENT_REQUIRED: "真实行情环境尚未满足",
@@ -9366,6 +9609,7 @@
 
     function refreshDashboard() {
         fetchLocalRealPipelineStatus();
+        fetchProviderRuntimeStatus();
         return fetchDashboardHome()
             .then(function (home) {
                 requestDetailForSelectedSymbol();
@@ -10209,6 +10453,10 @@
         updateRecheckPreviewRuntimeStatusDisplay();
         updateReviewReplayRuntimeStatusDisplay();
         updateDataSourceHealthRuntimeStatusDisplay();
+        var providerProfileSaveButton = document.getElementById("providerProfileSaveButton");
+        if (providerProfileSaveButton) {
+            providerProfileSaveButton.addEventListener("click", saveProviderBaseProfile);
+        }
         wireNav();
         document.getElementById("lastUpdatedText").textContent = nowText();
         refreshDashboard();

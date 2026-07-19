@@ -343,7 +343,7 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(471L)).thenReturn(snap);
         when(derivativesSnapshotReadPort.readCached(any(), any(), any(), any()))
                 .thenReturn(new ProviderCallResult<>(derivatives(UnifiedSourceStatus.STALE,
-                        SnapshotFreshnessStatus.STALE, "COMPLETE"), null, null));
+                        SnapshotFreshnessStatus.STALE_READABLE, "COMPLETE"), null, null));
 
         RecheckResult result = service.recheck(471L, new BigDecimal("100"));
 

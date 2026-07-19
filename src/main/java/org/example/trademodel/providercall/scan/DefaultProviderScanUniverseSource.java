@@ -1,8 +1,8 @@
 package org.example.trademodel.providercall.scan;
 
 import org.example.trademodel.entity.AssetStateDO;
-import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.entity.UserConfigDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.AssetStateMapper;
@@ -13,18 +13,25 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.providercall.ProviderCallProperties;
 import org.example.trademodel.providercall.RuntimeScanProfile;
 import org.example.trademodel.providercall.UserScanProfile;
+import org.example.trademodel.providercall.candidate.AutoCandidateRegistry;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.example.trademodel.providercall.profile.ProfileTransitionResult;
 import org.example.trademodel.providercall.profile.ProfileTransitionSignal;
+import org.example.trademodel.providercall.profile.ProviderCallProfilePreferenceService;
 import org.example.trademodel.providercall.profile.ScanProfileTransitionService;
+import org.example.trademodel.providercall.universe.DiscoveryUniverseSource;
+import org.example.trademodel.providercall.universe.WatchlistAssetSource;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PushRecheckStatusContract;
-import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.service.UserConfigService;
 import org.example.trademodel.vo.DecisionResultVO;
-import org.example.trademodel.entity.UserConfigDO;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,16 +39,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSource {
-    private static final List<String> FALLBACK_CORE = List.of(
-            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
-    private static final Pattern SYMBOL = Pattern.compile("^[A-Z0-9]{3,20}USDT$");
-    private static final String WATCHLIST_RULE_KEY = "push.watchlist.symbols";
+    private static final String SCAN_PROVIDER = "BINANCE";
 
     private final ProviderCallProperties properties;
     private final UserPositionMapper userPositionMapper;
@@ -50,9 +53,35 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
     private final PushSnapshotMapper pushSnapshotMapper;
     private final PositionMonitorLogService monitorLogService;
     private final UserConfigService userConfigService;
-    private final RuleConfigService ruleConfigService;
     private final ScanProfileTransitionService transitionService;
     private final ProviderRefreshStateRegistry refreshRegistry;
+    private final WatchlistAssetSource watchlistSource;
+    private final DiscoveryUniverseSource discoverySource;
+    private final AutoCandidateRegistry autoCandidateRegistry;
+    private final ProviderSymbolMappingRegistry mappingRegistry;
+    private final ProviderCallProfilePreferenceService profilePreferenceService;
+    private final Clock clock;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DefaultProviderScanUniverseSource(ProviderCallProperties properties,
+                                             UserPositionMapper userPositionMapper,
+                                             AssetStateMapper assetStateMapper,
+                                             DecisionResultMapper decisionResultMapper,
+                                             PushSnapshotMapper pushSnapshotMapper,
+                                             PositionMonitorLogService monitorLogService,
+                                             UserConfigService userConfigService,
+                                             ScanProfileTransitionService transitionService,
+                                             ProviderRefreshStateRegistry refreshRegistry,
+                                             WatchlistAssetSource watchlistSource,
+                                             DiscoveryUniverseSource discoverySource,
+                                             AutoCandidateRegistry autoCandidateRegistry,
+                                             ProviderSymbolMappingRegistry mappingRegistry,
+                                             ProviderCallProfilePreferenceService profilePreferenceService) {
+        this(properties, userPositionMapper, assetStateMapper, decisionResultMapper, pushSnapshotMapper,
+                monitorLogService, userConfigService, transitionService, refreshRegistry, watchlistSource,
+                discoverySource, autoCandidateRegistry, mappingRegistry, profilePreferenceService,
+                Clock.systemUTC());
+    }
 
     public DefaultProviderScanUniverseSource(ProviderCallProperties properties,
                                              UserPositionMapper userPositionMapper,
@@ -61,9 +90,14 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
                                              PushSnapshotMapper pushSnapshotMapper,
                                              PositionMonitorLogService monitorLogService,
                                              UserConfigService userConfigService,
-                                             RuleConfigService ruleConfigService,
                                              ScanProfileTransitionService transitionService,
-                                             ProviderRefreshStateRegistry refreshRegistry) {
+                                             ProviderRefreshStateRegistry refreshRegistry,
+                                             WatchlistAssetSource watchlistSource,
+                                             DiscoveryUniverseSource discoverySource,
+                                             AutoCandidateRegistry autoCandidateRegistry,
+                                             ProviderSymbolMappingRegistry mappingRegistry,
+                                             ProviderCallProfilePreferenceService profilePreferenceService,
+                                             Clock clock) {
         this.properties = properties;
         this.userPositionMapper = userPositionMapper;
         this.assetStateMapper = assetStateMapper;
@@ -71,59 +105,125 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.monitorLogService = monitorLogService;
         this.userConfigService = userConfigService;
-        this.ruleConfigService = ruleConfigService;
         this.transitionService = transitionService;
         this.refreshRegistry = refreshRegistry;
+        this.watchlistSource = watchlistSource;
+        this.discoverySource = discoverySource;
+        this.autoCandidateRegistry = autoCandidateRegistry;
+        this.mappingRegistry = mappingRegistry;
+        this.profilePreferenceService = profilePreferenceService;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     @Override
     public ScanUniverseInput currentUniverse() {
+        UniverseSnapshot snapshot = collectSnapshot();
+        return toInput(snapshot, readOnlyTransitions(snapshot));
+    }
+
+    @Override
+    public ScanUniverseInput evaluateUniverseForExecution(String scanCycleTraceId) {
+        String safeTraceId = requiredTraceId(scanCycleTraceId);
+        UniverseSnapshot snapshot = collectSnapshot();
+        return toInput(snapshot, executionTransitions(snapshot, safeTraceId));
+    }
+
+    private UniverseSnapshot collectSnapshot() {
+        Instant asOf = clock.instant();
         UserConfigDO config = safeUserConfig();
-        UserScanProfile base = parseUserProfile(config == null ? null : config.getScanBaseProfile(), properties.getBaseProfile());
-        RuntimeScanProfile positionProfile = runtime(parseUserProfile(
-                config == null ? null : config.getScanPositionProfile(), UserScanProfile.LOW));
-        RuntimeScanProfile poolProfile = runtime(parseUserProfile(
-                config == null ? null : config.getScanPoolProfile(), UserScanProfile.LOW));
-        boolean auto = config == null || config.getScanAutoEscalationEnabled() == null
+        UserScanProfile base = profilePreferenceService.getBaseProfile();
+        boolean autoEscalation = config == null || config.getScanAutoEscalationEnabled() == null
                 ? properties.isAutoEscalationEnabled() : config.getScanAutoEscalationEnabled();
 
+        List<CanonicalInstrumentId> watchlist = safeWatchlist();
+        Set<CanonicalInstrumentId> watchlistSet = Set.copyOf(watchlist);
+        List<CanonicalInstrumentId> discovery = safeDiscovery();
         List<UserPositionDO> openPositions = safeOpenPositions();
         List<PositionScanAsset> positions = openPositions.stream()
-                .filter(DefaultProviderScanUniverseSource::validPosition)
-                .map(row -> new PositionScanAsset(normalize(row.getAssetSymbol()), row.getStatus())).toList();
-        List<AssetStateDO> candidateRows = safeCandidates();
-        Map<String, String> pushSignals = safePushEscalationSignals();
-        List<String> candidates = boundedCandidates(candidateRows, pushSignals.keySet());
+                .filter(DefaultProviderScanUniverseSource::validManualPosition)
+                .map(this::positionAsset)
+                .flatMap(Optional::stream)
+                .toList();
 
-        Map<String, RuntimeScanProfile> escalations = new LinkedHashMap<>();
-        Map<String, String> reasons = new LinkedHashMap<>();
-        if (auto && properties.isProfileEscalationEnabled()) {
-            Map<String, UserPositionDO> positionBySymbol = new LinkedHashMap<>();
-            openPositions.forEach(row -> positionBySymbol.putIfAbsent(normalize(row.getAssetSymbol()), row));
-            Map<String, AssetStateDO> stateBySymbol = new LinkedHashMap<>();
-            candidateRows.forEach(row -> stateBySymbol.putIfAbsent(normalize(row.getSymbol()), row));
-            Set<String> evaluated = new LinkedHashSet<>();
-            evaluated.addAll(positionBySymbol.keySet());
-            evaluated.addAll(stateBySymbol.keySet());
-            evaluated.addAll(pushSignals.keySet());
-            for (String symbol : evaluated) {
-                ProfileTransitionResult transition = transitionService.evaluate(symbol, base,
-                        signal(positionBySymbol.get(symbol), stateBySymbol.get(symbol), pushSignals.get(symbol)),
-                        "provider-universe-" + UUID.randomUUID());
-                escalations.put(symbol, transition.effectiveProfile());
-                reasons.put(symbol, transition.effectiveReason());
+        List<AssetStateDO> candidateRows = safeCandidates();
+        Map<CanonicalInstrumentId, String> pushSignals = safePushEscalationSignals();
+        LinkedHashSet<CanonicalInstrumentId> candidates = new LinkedHashSet<>();
+        candidateRows.stream().map(AssetStateDO::getSymbol).map(this::resolvePerpetual)
+                .flatMap(Optional::stream).filter(watchlistSet::contains).forEach(candidates::add);
+        pushSignals.keySet().stream().filter(watchlistSet::contains).forEach(candidates::add);
+        autoCandidateRegistry.activeAt(asOf).stream()
+                .map(AutoCandidateRegistry.AutoCandidateSnapshot::canonicalInstrumentId)
+                .forEach(candidates::add);
+
+        Map<CanonicalInstrumentId, UserPositionDO> positionByInstrument = new LinkedHashMap<>();
+        for (UserPositionDO row : openPositions) {
+            resolvePerpetual(row.getAssetSymbol()).ifPresent(id -> positionByInstrument.putIfAbsent(id, row));
+        }
+        Map<CanonicalInstrumentId, AssetStateDO> stateByInstrument = new LinkedHashMap<>();
+        for (AssetStateDO row : candidateRows) {
+            resolvePerpetual(row.getSymbol()).ifPresent(id -> stateByInstrument.putIfAbsent(id, row));
+        }
+        Set<CanonicalInstrumentId> transitionInstruments = new LinkedHashSet<>();
+        transitionInstruments.addAll(positionByInstrument.keySet());
+        transitionInstruments.addAll(stateByInstrument.keySet());
+        transitionInstruments.addAll(pushSignals.keySet());
+
+        boolean transitionsEnabled = autoEscalation && properties.isProfileEscalationEnabled();
+        return new UniverseSnapshot(watchlist, positions, List.copyOf(candidates), discovery, base,
+                transitionsEnabled, Map.copyOf(positionByInstrument), Map.copyOf(stateByInstrument),
+                pushSignals, Set.copyOf(transitionInstruments), refreshRegistry.lastAttempts(), asOf);
+    }
+
+    private TransitionView readOnlyTransitions(UniverseSnapshot snapshot) {
+        Map<CanonicalInstrumentId, RuntimeScanProfile> escalations = new LinkedHashMap<>();
+        Map<CanonicalInstrumentId, String> reasons = new LinkedHashMap<>();
+        if (snapshot.transitionsEnabled()) {
+            for (CanonicalInstrumentId instrument : snapshot.transitionInstruments()) {
+                String providerSymbol = mappingRegistry.resolve(SCAN_PROVIDER, instrument).providerSymbol();
+                ProfileTransitionResult transition = transitionService.current(
+                        providerSymbol, "provider-universe-read-only");
+                escalations.put(instrument, transition.effectiveProfile());
+                reasons.put(instrument, transition.effectiveReason());
             }
         }
+        return new TransitionView(escalations, reasons);
+    }
 
-        // Runtime events are symbol-scoped. A risk event on one asset must not raise every scanned asset.
-        return new ScanUniverseInput(coreAssets(), positions, candidates, poolAssets(), base, RuntimeScanProfile.LOW,
-                positionProfile, poolProfile, escalations, reasons, refreshRegistry.lastAttempts(), Instant.now());
+    private TransitionView executionTransitions(UniverseSnapshot snapshot, String scanCycleTraceId) {
+        Map<CanonicalInstrumentId, RuntimeScanProfile> escalations = new LinkedHashMap<>();
+        Map<CanonicalInstrumentId, String> reasons = new LinkedHashMap<>();
+        if (snapshot.transitionsEnabled()) {
+            for (CanonicalInstrumentId instrument : snapshot.transitionInstruments()) {
+                String providerSymbol = mappingRegistry.resolve(SCAN_PROVIDER, instrument).providerSymbol();
+                ProfileTransitionResult transition = transitionService.evaluate(providerSymbol, snapshot.base(),
+                        signal(snapshot.positionByInstrument().get(instrument),
+                                snapshot.stateByInstrument().get(instrument),
+                                snapshot.pushSignals().get(instrument)),
+                        scanCycleTraceId + ":" + instrument.canonical());
+                escalations.put(instrument, transition.effectiveProfile());
+                reasons.put(instrument, transition.effectiveReason());
+            }
+        }
+        return new TransitionView(escalations, reasons);
+    }
+
+    private static ScanUniverseInput toInput(UniverseSnapshot snapshot, TransitionView transitions) {
+        return new ScanUniverseInput(snapshot.watchlist(), snapshot.positions(), snapshot.candidates(),
+                snapshot.discovery(), snapshot.base(), RuntimeScanProfile.LOW, transitions.escalations(),
+                transitions.reasons(), snapshot.lastRefreshes(), snapshot.asOf());
+    }
+
+    private static String requiredTraceId(String traceId) {
+        if (traceId == null || traceId.isBlank()) {
+            throw new IllegalArgumentException("scanCycleTraceId is required");
+        }
+        return traceId.trim();
     }
 
     private ProfileTransitionSignal signal(UserPositionDO position, AssetStateDO state, String pushSignal) {
         PositionMonitorLogDTO log = latestLog(position);
-        String reason = log == null || log.getReason() == null ? "" : log.getReason().toUpperCase(Locale.ROOT);
-        String logic = log == null || log.getLogicStatus() == null ? "" : log.getLogicStatus().toUpperCase(Locale.ROOT);
+        String reason = upper(log == null ? null : log.getReason());
+        String logic = upper(log == null ? null : log.getLogicStatus());
         DecisionResultVO decision = state == null ? null : safeDecision(state.getSymbol());
         boolean highRisk = "HIGH".equalsIgnoreCase(log == null ? null : log.getRiskLevel())
                 || "HIGH_RISK".equals(logic) || "PLAN_INVALIDATED".equals(logic)
@@ -139,6 +239,30 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
                 highRisk || reason.contains("REVERS"),
                 decision == null || decision.getDataQualityScore() == null ? null
                         : BigDecimal.valueOf(decision.getDataQualityScore()));
+    }
+
+    private Optional<PositionScanAsset> positionAsset(UserPositionDO row) {
+        return resolvePerpetual(row.getAssetSymbol()).map(id -> new PositionScanAsset(id,
+                mappingRegistry.resolve(SCAN_PROVIDER, id).providerSymbol(), row.getStatus()));
+    }
+
+    private Optional<CanonicalInstrumentId> resolvePerpetual(String symbol) {
+        try {
+            ProviderSymbolMapping mapping = mappingRegistry.resolve(SCAN_PROVIDER, symbol, MarketType.PERPETUAL);
+            return Optional.of(mapping.canonicalInstrumentId());
+        } catch (RuntimeException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private List<CanonicalInstrumentId> safeWatchlist() {
+        try { return watchlistSource.currentWatchlist(); }
+        catch (RuntimeException ignored) { return List.of(); }
+    }
+
+    private List<CanonicalInstrumentId> safeDiscovery() {
+        try { return discoverySource.currentDiscoveryUniverse(); }
+        catch (RuntimeException ignored) { return List.of(); }
     }
 
     private PositionMonitorLogDTO latestLog(UserPositionDO position) {
@@ -165,40 +289,37 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
         try {
             List<UserPositionDO> rows = userPositionMapper.listOpenPositions();
             return rows == null ? List.of() : rows;
-        } catch (RuntimeException ignored) { return List.of(); }
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
     }
 
     private List<AssetStateDO> safeCandidates() {
         try {
             List<AssetStateDO> rows = assetStateMapper.listCandidateOrWaitingTrigger(properties.getMaxCandidateAssets());
             return rows == null ? List.of() : rows;
-        } catch (RuntimeException ignored) { return List.of(); }
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
     }
 
-    private Map<String, String> safePushEscalationSignals() {
+    private Map<CanonicalInstrumentId, String> safePushEscalationSignals() {
         try {
-            int limit = Math.max(1, properties.getMaxCoreAssets()
-                    + properties.getMaxCandidateAssets() + properties.getMaxPoolAssets());
+            int limit = Math.max(1, properties.getMaxWatchlistAssets()
+                    + properties.getMaxCandidateAssets() + properties.getMaxDiscoveryAssets());
             List<TmPushSnapshotDO> rows = pushSnapshotMapper.listRecent(limit);
             if (rows == null || rows.isEmpty()) return Map.of();
-            Map<String, String> signals = new LinkedHashMap<>();
+            Map<CanonicalInstrumentId, String> signals = new LinkedHashMap<>();
             for (TmPushSnapshotDO row : rows) {
-                String symbol = row == null ? null : normalize(row.getSymbol());
                 String status = row == null ? null
                         : PushRecheckStatusContract.canonicalizePushStatus(row.getPushStatus());
-                if (validSymbol(symbol) && isPushEscalation(status)) signals.putIfAbsent(symbol, status);
+                if (!isPushEscalation(status)) continue;
+                resolvePerpetual(row.getSymbol()).ifPresent(id -> signals.putIfAbsent(id, status));
             }
             return Map.copyOf(signals);
         } catch (RuntimeException ignored) {
             return Map.of();
         }
-    }
-
-    private List<String> boundedCandidates(List<AssetStateDO> states, Set<String> pushSymbols) {
-        List<String> combined = new ArrayList<>();
-        if (states != null) states.stream().map(AssetStateDO::getSymbol).forEach(combined::add);
-        if (pushSymbols != null) combined.addAll(pushSymbols);
-        return sanitize(combined, properties.getMaxCandidateAssets());
     }
 
     private static boolean isPushEscalation(String status) {
@@ -208,45 +329,37 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
                 || PushRecheckStatusContract.PUSH_STATUS_CONFUSED_BLOCKED.equals(status);
     }
 
-    private List<String> coreAssets() {
-        List<String> configured = sanitize(properties.getCoreAssets(), 6);
-        return configured.size() == 6 ? configured : FALLBACK_CORE;
+    private static boolean validManualPosition(UserPositionDO row) {
+        return row != null && "MANUAL".equalsIgnoreCase(row.getSourceType())
+                && ("OPEN".equalsIgnoreCase(row.getStatus())
+                || "PARTIALLY_CLOSED".equalsIgnoreCase(row.getStatus()));
     }
 
-    private List<String> poolAssets() {
-        try {
-            Map<String, RuleConfigDO> rules = ruleConfigService.getRuleConfigMap();
-            RuleConfigDO row = rules == null ? null : rules.get(WATCHLIST_RULE_KEY);
-            if (row == null || row.getRuleValue() == null) return List.of();
-            return sanitize(List.of(row.getRuleValue().split(",")), properties.getMaxPoolAssets());
-        } catch (RuntimeException ignored) { return List.of(); }
+    private static String normalize(String value) {
+        return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
     }
 
-    private static List<String> sanitize(List<String> values, int max) {
-        if (values == null || max <= 0) return List.of();
-        List<String> result = new ArrayList<>();
-        for (String value : values) {
-            String normalized = normalize(value);
-            if (validSymbol(normalized) && !result.contains(normalized)) result.add(normalized);
-            if (result.size() >= max) break;
-        }
-        return List.copyOf(result);
+    private static String upper(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
-    private static boolean validPosition(UserPositionDO row) {
-        return row != null && validSymbol(normalize(row.getAssetSymbol()))
-                && ("OPEN".equalsIgnoreCase(row.getStatus()) || "PARTIALLY_CLOSED".equalsIgnoreCase(row.getStatus()));
+    private record UniverseSnapshot(
+            List<CanonicalInstrumentId> watchlist,
+            List<PositionScanAsset> positions,
+            List<CanonicalInstrumentId> candidates,
+            List<CanonicalInstrumentId> discovery,
+            UserScanProfile base,
+            boolean transitionsEnabled,
+            Map<CanonicalInstrumentId, UserPositionDO> positionByInstrument,
+            Map<CanonicalInstrumentId, AssetStateDO> stateByInstrument,
+            Map<CanonicalInstrumentId, String> pushSignals,
+            Set<CanonicalInstrumentId> transitionInstruments,
+            Map<ScanUniverseInput.DatasetRefreshKey, Instant> lastRefreshes,
+            Instant asOf) {
     }
 
-    private static boolean validSymbol(String value) { return value != null && SYMBOL.matcher(value).matches(); }
-    private static String normalize(String value) { return value == null ? null : value.trim().toUpperCase(Locale.ROOT); }
-    private static RuntimeScanProfile runtime(UserScanProfile value) {
-        return value == null || value == UserScanProfile.AUTO ? RuntimeScanProfile.STANDARD
-                : RuntimeScanProfile.valueOf(value.name());
-    }
-    private static UserScanProfile parseUserProfile(String raw, UserScanProfile fallback) {
-        if (raw == null || raw.isBlank()) return fallback;
-        try { return UserScanProfile.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }
-        catch (IllegalArgumentException ignored) { return fallback; }
+    private record TransitionView(
+            Map<CanonicalInstrumentId, RuntimeScanProfile> escalations,
+            Map<CanonicalInstrumentId, String> reasons) {
     }
 }

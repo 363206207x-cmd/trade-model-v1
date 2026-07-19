@@ -46,93 +46,117 @@ public class ScanProfileTransitionService {
         String safeTrace = required(traceId, "traceId");
         Instant now = clock.instant();
         RuntimeScanProfile floor = userFloor(userProfile);
-        State state = states.computeIfAbsent(normalized, ignored -> new State(floor, now));
+        State published = states.get(normalized);
+        State staged = published == null ? new State(floor, now) : published.copy();
         Thresholds thresholds = thresholds();
         if (thresholds == null) {
-            RuntimeScanProfile kept = RuntimeScanProfile.max(state.profile, floor);
-            return result(normalized, state.profile, kept, "PROFILE_RULE_CONFIG_UNAVAILABLE", state.since,
-                    state.nextDowngradeEligibleAt, "UNKNOWN", false, safeTrace);
+            RuntimeScanProfile kept = RuntimeScanProfile.max(staged.profile, floor);
+            staged.recordEvaluation("PROFILE_RULE_CONFIG_UNAVAILABLE", "UNKNOWN", now);
+            states.put(normalized, staged);
+            return result(normalized, staged.profile, kept, "PROFILE_RULE_CONFIG_UNAVAILABLE", staged.since,
+                    staged.nextDowngradeEligibleAt, "UNKNOWN", false, safeTrace);
         }
 
         Requested requested = requested(signal, thresholds);
         RuntimeScanProfile target = RuntimeScanProfile.max(floor, requested.profile);
-        RuntimeScanProfile previous = state.profile;
+        RuntimeScanProfile previous = staged.profile;
         boolean changed = false;
         String reason = requested.reason;
-        if (target.rank() > state.profile.rank()) {
-            state.profile = target;
-            state.since = now;
-            state.recoveryCycles = 0;
-            state.nextDowngradeEligibleAt = now.plusSeconds(holdSeconds(target, thresholds));
+        if (target.rank() > staged.profile.rank()) {
+            staged.profile = target;
+            staged.since = now;
+            staged.recoveryCycles = 0;
+            staged.nextDowngradeEligibleAt = now.plusSeconds(holdSeconds(target, thresholds));
             changed = true;
-        } else if (target.rank() < state.profile.rank()) {
-            state.recoveryCycles++;
-            boolean holdComplete = state.nextDowngradeEligibleAt == null
-                    || !now.isBefore(state.nextDowngradeEligibleAt);
-            boolean cooldownComplete = state.lastTransitionAt == null
-                    || !now.isBefore(state.lastTransitionAt.plusSeconds(thresholds.downgradeCooldownSeconds));
-            if (holdComplete && cooldownComplete && state.recoveryCycles >= thresholds.recoveryConfirmCycles) {
-                state.profile = RuntimeScanProfile.max(floor, state.profile.oneLevelDown());
-                state.since = now;
-                state.recoveryCycles = 0;
-                state.nextDowngradeEligibleAt = now.plusSeconds(thresholds.downgradeCooldownSeconds);
-                reason = "RECOVERY_CONFIRMED";
+        } else if (target.rank() < staged.profile.rank()) {
+            staged.recoveryCycles++;
+            boolean holdComplete = staged.nextDowngradeEligibleAt == null
+                    || !now.isBefore(staged.nextDowngradeEligibleAt);
+            boolean cooldownComplete = staged.lastTransitionAt == null
+                    || !now.isBefore(staged.lastTransitionAt.plusSeconds(thresholds.downgradeCooldownSeconds));
+            if (holdComplete && cooldownComplete && staged.recoveryCycles >= thresholds.recoveryConfirmCycles) {
+                staged.profile = RuntimeScanProfile.max(floor, staged.profile.oneLevelDown());
+                staged.since = now;
+                staged.recoveryCycles = 0;
+                staged.nextDowngradeEligibleAt = now.plusSeconds(thresholds.downgradeCooldownSeconds);
+                reason = "RECOVERY_HYSTERESIS";
                 changed = true;
             } else {
-                reason = "HYSTERESIS_HOLD";
+                reason = "RECOVERY_HYSTERESIS";
             }
         } else {
-            state.recoveryCycles = 0;
+            staged.recoveryCycles = 0;
         }
+        staged.recordEvaluation(reason, thresholds.ruleVersion, now);
         if (changed) {
-            state.lastTransitionAt = now;
-            audit(normalized, previous, state.profile, reason, requested.triggerValue,
-                    thresholds.ruleVersion, state.nextDowngradeEligibleAt, safeTrace, now);
+            staged.lastTransitionAt = now;
+            audit(normalized, previous, staged.profile, reason, requested.triggerValue,
+                    thresholds.ruleVersion, staged.nextDowngradeEligibleAt, safeTrace, now);
         }
-        return result(normalized, previous, state.profile, reason, state.since,
-                state.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
+        states.put(normalized, staged);
+        return result(normalized, previous, staged.profile, reason, staged.since,
+                staged.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
     }
 
-    public RuntimeScanProfile currentProfile(String symbol) {
+    public synchronized RuntimeScanProfile currentProfile(String symbol) {
         if (symbol == null || symbol.isBlank()) return RuntimeScanProfile.LOW;
         State state = states.get(symbol.trim().toUpperCase());
         return state == null ? RuntimeScanProfile.LOW : state.profile;
     }
 
-    public ProfileTransitionResult current(String symbol, String traceId) {
+    public synchronized ProfileTransitionResult current(String symbol, String traceId) {
         String normalized = required(symbol, "symbol").toUpperCase();
+        String safeTrace = required(traceId, "traceId");
         State state = states.get(normalized);
         if (state == null) {
             return result(normalized, RuntimeScanProfile.LOW, RuntimeScanProfile.LOW,
-                    "NO_RUNTIME_ESCALATION", null, null, "UNKNOWN", false, required(traceId, "traceId"));
+                    "NO_RUNTIME_ESCALATION", null, null, "UNKNOWN", false, safeTrace);
         }
-        return result(normalized, state.profile, state.profile, "CURRENT_RUNTIME_STATE", state.since,
-                state.nextDowngradeEligibleAt, "RUNTIME", false, required(traceId, "traceId"));
+        RuntimeScanProfile profile = state.profile;
+        String reason = state.lastEffectiveReason == null ? "CURRENT_RUNTIME_STATE" : state.lastEffectiveReason;
+        Instant since = state.since;
+        Instant nextDowngradeEligibleAt = state.nextDowngradeEligibleAt;
+        String ruleVersion = state.lastRuleVersion == null ? "RUNTIME" : state.lastRuleVersion;
+        return result(normalized, profile, profile, reason, since,
+                nextDowngradeEligibleAt, ruleVersion, false, safeTrace);
     }
 
     private Requested requested(ProfileTransitionSignal signal, Thresholds t) {
         if (signal == null) return new Requested(RuntimeScanProfile.LOW, "NO_ESCALATION_SIGNAL", null);
         if (signal.hotReset()) return new Requested(RuntimeScanProfile.EMERGENCY, "HOT_RESET", "true");
-        if (atLeast(signal.priceMovement1m(), t.emergencyPriceMovement1m)
-                || atLeast(signal.liquidationSpike(), t.emergencyLiquidationSpike)
-                || atLeast(signal.confusedScore(), t.emergencyConfusedScore)) {
-            return new Requested(RuntimeScanProfile.EMERGENCY, "EXTREME_MARKET_SIGNAL", firstValue(
-                    signal.priceMovement1m(), signal.liquidationSpike(), signal.confusedScore()));
+        if (atLeast(signal.confusedScore(), t.emergencyConfusedScore)) {
+            return new Requested(RuntimeScanProfile.EMERGENCY, "CONFUSED", signal.confusedScore().toPlainString());
         }
-        if (signal.highImpactEvent() || signal.strongReversal()
-                || atLeast(signal.priceMovement1m(), t.highPriceMovement1m)
+        if (atLeast(signal.priceMovement1m(), t.emergencyPriceMovement1m)
+                || atLeast(signal.liquidationSpike(), t.emergencyLiquidationSpike)) {
+            return new Requested(RuntimeScanProfile.EMERGENCY, "VOLATILITY_SPIKE", firstValue(
+                    signal.priceMovement1m(), signal.liquidationSpike()));
+        }
+        if (signal.highImpactEvent()) {
+            return new Requested(RuntimeScanProfile.HIGH, "EXTERNAL_EVENT", "true");
+        }
+        if (signal.strongReversal()) {
+            return new Requested(RuntimeScanProfile.HIGH, "STRONG_REVERSAL", "true");
+        }
+        if (below(signal.nearStopDistance(), t.nearBoundaryDistance)) {
+            return new Requested(RuntimeScanProfile.HIGH, "NEAR_USER_STOP",
+                    signal.nearStopDistance().toPlainString());
+        }
+        if (below(signal.nearTargetDistance(), t.nearBoundaryDistance)) {
+            return new Requested(RuntimeScanProfile.HIGH, "NEAR_USER_TARGET",
+                    signal.nearTargetDistance().toPlainString());
+        }
+        if (atLeast(signal.priceMovement1m(), t.highPriceMovement1m)
                 || atLeast(signal.atrMultiple5m(), t.highAtrMultiple5m)
                 || atLeast(signal.volumeSpike(), t.highVolumeSpike)
                 || atLeast(signal.spreadSpike(), t.highSpreadSpike)
                 || atLeast(signal.openInterestChange(), t.highOpenInterestChange)
                 || atLeast(signal.fundingExtremity(), t.highFundingExtremity)
-                || below(signal.nearStopDistance(), t.nearBoundaryDistance)
-                || below(signal.nearTargetDistance(), t.nearBoundaryDistance)
                 || below(signal.dataQualityScore(), t.dataQualityDeteriorationScore)) {
-            return new Requested(RuntimeScanProfile.HIGH, "MATERIAL_RISK_SIGNAL", "threshold-crossed");
+            return new Requested(RuntimeScanProfile.HIGH, "HIGH_RISK", "threshold-crossed");
         }
         if (atLeast(signal.confusedScore(), t.standardConfusedScore)) {
-            return new Requested(RuntimeScanProfile.STANDARD, "CONFUSED_SCORE_ELEVATED",
+            return new Requested(RuntimeScanProfile.STANDARD, "CONFUSED",
                     signal.confusedScore().toPlainString());
         }
         return new Requested(RuntimeScanProfile.LOW, "RECOVERY_SIGNAL", null);
@@ -180,7 +204,10 @@ public class ScanProfileTransitionService {
         row.setUpdatedBy("provider-call-orchestrator");
         row.setIsDeleted(0);
         row.setVersionNo(1);
-        auditMapper.insert(row);
+        int inserted = auditMapper.insert(row);
+        if (inserted != 1) {
+            throw new IllegalStateException("profile transition audit insert count must be exactly 1");
+        }
     }
 
     private static int holdSeconds(RuntimeScanProfile profile, Thresholds t) {
@@ -241,7 +268,25 @@ public class ScanProfileTransitionService {
         private Instant since;
         private Instant nextDowngradeEligibleAt;
         private Instant lastTransitionAt;
+        private Instant lastEvaluatedAt;
+        private String lastEffectiveReason;
+        private String lastRuleVersion;
         private int recoveryCycles;
         private State(RuntimeScanProfile profile, Instant since) { this.profile = profile; this.since = since; }
+        private State copy() {
+            State copy = new State(profile, since);
+            copy.nextDowngradeEligibleAt = nextDowngradeEligibleAt;
+            copy.lastTransitionAt = lastTransitionAt;
+            copy.lastEvaluatedAt = lastEvaluatedAt;
+            copy.lastEffectiveReason = lastEffectiveReason;
+            copy.lastRuleVersion = lastRuleVersion;
+            copy.recoveryCycles = recoveryCycles;
+            return copy;
+        }
+        private void recordEvaluation(String reason, String ruleVersion, Instant evaluatedAt) {
+            this.lastEffectiveReason = reason;
+            this.lastRuleVersion = ruleVersion;
+            this.lastEvaluatedAt = evaluatedAt;
+        }
     }
 }

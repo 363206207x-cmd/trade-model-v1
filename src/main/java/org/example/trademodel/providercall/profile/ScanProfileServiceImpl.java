@@ -68,7 +68,13 @@ public class ScanProfileServiceImpl implements ScanProfileService {
 
     @Override
     public ScanProfileResponse update(String userId, ScanProfileUpdateRequest request) {
+        return update(userId, userId, request);
+    }
+
+    @Override
+    public ScanProfileResponse update(String userId, String actor, ScanProfileUpdateRequest request) {
         String operator = required(userId, "userId");
+        String auditActor = required(actor, "actor");
         if (request == null) throw new IllegalArgumentException("request is required");
         validateProfile(request.positionMonitorProfile(), "positionMonitorProfile");
         validateProfile(request.poolProfile(), "poolProfile");
@@ -79,6 +85,7 @@ public class ScanProfileServiceImpl implements ScanProfileService {
             throw new IllegalArgumentException("manualOverrideUntil must be within the next 30 days");
         }
         UserConfigDO row = userConfigService.getUserConfig(operator);
+        UserScanProfile previousBase = parse(row == null ? null : row.getScanBaseProfile(), properties.getBaseProfile());
         if (row == null) {
             row = new UserConfigDO();
             row.setUserId(operator);
@@ -92,7 +99,7 @@ public class ScanProfileServiceImpl implements ScanProfileService {
         row.setScanUpdateReason(request.updateReason().trim());
         row.setScanUpdatedAt(LocalDateTime.ofInstant(now, ZoneOffset.UTC));
         userConfigService.saveUserConfig(row);
-        audit(operator, request, now);
+        audit(operator, auditActor, previousBase, request, now);
         return response(request.baseProfile(), request.positionMonitorProfile(), request.poolProfile(),
                 request.autoEscalationEnabled(), now);
     }
@@ -103,28 +110,30 @@ public class ScanProfileServiceImpl implements ScanProfileService {
         return new ScanProfileResponse(base, position, pool, auto, effective,
                 base == UserScanProfile.AUTO ? "AUTO_BASE_STANDARD" : "MANUAL_BASE_PROFILE", since, null,
                 properties.intervalSeconds(runtime(position), AssetPriority.P0_POSITION, ProviderDatasetType.PRICE),
-                properties.intervalSeconds(effective, AssetPriority.P1_CORE, ProviderDatasetType.PRICE),
+                properties.intervalSeconds(effective, AssetPriority.P1_WATCHLIST, ProviderDatasetType.PRICE),
                 properties.intervalSeconds(effective, AssetPriority.P2_CANDIDATE, ProviderDatasetType.PRICE),
-                properties.intervalSeconds(runtime(pool), AssetPriority.P3_POOL, ProviderDatasetType.PRICE),
-                properties.intervalSeconds(effective, AssetPriority.P1_CORE, ProviderDatasetType.DERIVATIVES),
-                budgetManager.state("BINANCE_PUBLIC", ProviderCircuitState.CLOSED));
+                properties.intervalSeconds(runtime(pool), AssetPriority.P3_DISCOVERY, ProviderDatasetType.PRICE),
+                properties.intervalSeconds(effective, AssetPriority.P1_WATCHLIST, ProviderDatasetType.DERIVATIVES),
+                budgetManager.state("BINANCE", ProviderCircuitState.CLOSED));
     }
 
-    private void audit(String operator, ScanProfileUpdateRequest request, Instant now) {
+    private void audit(String configOwner, String actor, UserScanProfile previousBase,
+                       ScanProfileUpdateRequest request, Instant now) {
         RuleVersionLogDO row = new RuleVersionLogDO();
         row.setId(UUID.randomUUID().toString());
         row.setRuleVersion(ruleConfigService.resolveActiveRuleVersion());
         row.setChangeCategory("SCAN_PROFILE_CONFIG");
-        row.setChangeSummary("user=" + operator + ";baseProfile=" + request.baseProfile()
+        row.setChangeSummary("configOwner=" + configOwner + ";oldBaseProfile=" + previousBase
+                + ";newBaseProfile=" + request.baseProfile()
                 + ";positionProfile=" + request.positionMonitorProfile() + ";poolProfile=" + request.poolProfile());
         row.setChangeDetail("autoEscalationEnabled=" + request.autoEscalationEnabled()
                 + ";manualOverrideUntil=" + request.manualOverrideUntil()
                 + ";updateReason=" + request.updateReason().trim());
-        row.setOperator(operator);
+        row.setOperator(actor);
         row.setPublishTime(now.toString());
         row.setRollbackFlag("N");
-        row.setCreatedBy(operator);
-        row.setUpdatedBy(operator);
+        row.setCreatedBy(actor);
+        row.setUpdatedBy(actor);
         row.setIsDeleted(0);
         row.setVersionNo(1);
         auditMapper.insert(row);

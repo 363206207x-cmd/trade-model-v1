@@ -9,15 +9,19 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class ProviderRateBudgetManager {
+public class ProviderRateBudgetManager implements ProviderRateBudget {
+    private static final String GLOBAL = "__GLOBAL__";
+
     private final ProviderCallProperties properties;
     private final Clock clock;
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
     private final Map<String, Integer> advertised = new ConcurrentHashMap<>();
+    private final Map<String, Instant> lastSymbolReservations = new ConcurrentHashMap<>();
 
     @org.springframework.beans.factory.annotation.Autowired
     public ProviderRateBudgetManager(ProviderCallProperties properties) {
         this(properties, Clock.systemUTC());
+        register("BINANCE", properties.getProviderBudgets().getBinancePublicAdvertisedRpm());
         register("BINANCE_PUBLIC", properties.getProviderBudgets().getBinancePublicAdvertisedRpm());
         register("COINGLASS", properties.getProviderBudgets().getCoinglassAdvertisedRpm());
         register("AI", properties.getProviderBudgets().getAiAdvertisedRpm());
@@ -26,55 +30,140 @@ public class ProviderRateBudgetManager {
 
     public ProviderRateBudgetManager(ProviderCallProperties properties, Clock clock) {
         this.properties = properties;
-        this.clock = clock;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     public void register(String provider, int advertisedRpm) {
         advertised.put(normalize(provider), Math.max(1, advertisedRpm));
     }
 
+    @Override
+    public synchronized boolean reserve(ProviderRequestKey key,
+                                        AssetPriority priority,
+                                        RuntimeScanProfile profile) {
+        return reserveAttempt(key, priority, profile, false);
+    }
+
+    @Override
+    public synchronized boolean reserveAttempt(ProviderRequestKey key,
+                                               AssetPriority priority,
+                                               RuntimeScanProfile profile,
+                                               boolean retryAttempt) {
+        if (key == null) throw new IllegalArgumentException("provider request key is required");
+        if (priority == null) throw new IllegalArgumentException("asset priority is required");
+        if (profile == null) throw new IllegalArgumentException("runtime profile is required");
+        return reserveInternal(key.provider(), retryAttempt ? null : symbolGapKey(key), priority, profile);
+    }
+
+    /** Compatibility entry point for existing callers that do not yet carry a canonical request key. */
     public synchronized boolean reserve(String provider, AssetPriority priority) {
-        String key = normalize(provider);
-        int advertisedRpm = advertised.getOrDefault(key, 60);
-        int effective = effectiveRpm(advertisedRpm);
+        return reserveInternal(provider, null, priority, RuntimeScanProfile.STANDARD);
+    }
+
+    private boolean reserveInternal(String provider,
+                                    String symbolGapKey,
+                                    AssetPriority priority,
+                                    RuntimeScanProfile profile) {
+        String providerKey = normalize(provider);
         Instant now = clock.instant();
-        Window window = currentWindow(key, now);
-        if (window.retryAfter != null && now.isBefore(window.retryAfter)) {
-            window.rejectedPriority = priority;
+        Window providerWindow = currentWindow(providerKey, now);
+        Window globalWindow = currentWindow(GLOBAL, now);
+        if (providerWindow.retryAfter != null && now.isBefore(providerWindow.retryAfter)) {
+            reject(providerWindow, priority, "PROVIDER_SUSPENDED_RETRY_AFTER");
             return false;
         }
-        int priorityLimit = switch (priority) {
-            case P3_POOL -> Math.max(1, effective / 2);
-            case P2_CANDIDATE -> Math.max(1, (effective * 7) / 10);
-            case P1_CORE -> effective;
-            case P0_POSITION -> advertisedRpm;
-        };
-        if (window.usage >= priorityLimit) {
-            window.rejectedPriority = priority;
+
+        int minimumGapSeconds = profile == RuntimeScanProfile.EMERGENCY
+                ? Math.max(properties.getPerSymbolMinimumGapSeconds(), emergencyMinimumGap(providerKey))
+                : properties.getPerSymbolMinimumGapSeconds();
+        if (symbolGapKey != null) {
+            Instant previous = lastSymbolReservations.get(symbolGapKey);
+            if (previous != null && now.isBefore(previous.plusSeconds(minimumGapSeconds))) {
+                reject(providerWindow, priority, "PER_SYMBOL_MINIMUM_GAP");
+                return false;
+            }
+        }
+
+        int providerAdvertised = advertised.getOrDefault(providerKey, 60);
+        int globalAdvertised = properties.getGlobalAdvertisedRequestsPerMinute();
+        boolean emergency = profile == RuntimeScanProfile.EMERGENCY;
+        int providerLimit = emergency
+                ? emergencyLimit(providerAdvertised)
+                : priorityLimit(regularLimit(providerAdvertised), priority);
+        int globalLimit = emergency
+                ? emergencyLimit(globalAdvertised)
+                : priorityLimit(regularLimit(globalAdvertised), priority);
+        int providerUsage = emergency ? providerWindow.emergencyUsage : providerWindow.regularUsage;
+        int globalUsage = emergency ? globalWindow.emergencyUsage : globalWindow.regularUsage;
+        if (providerUsage >= providerLimit) {
+            reject(providerWindow, priority, emergency
+                    ? "PROVIDER_EMERGENCY_RESERVE_EXHAUSTED" : "PROVIDER_REGULAR_BUDGET_EXHAUSTED");
             return false;
         }
-        window.usage++;
-        window.rejectedPriority = null;
+        if (globalUsage >= globalLimit) {
+            reject(providerWindow, priority, emergency
+                    ? "GLOBAL_EMERGENCY_RESERVE_EXHAUSTED" : "GLOBAL_REGULAR_BUDGET_EXHAUSTED");
+            return false;
+        }
+
+        if (emergency) {
+            providerWindow.emergencyUsage++;
+            globalWindow.emergencyUsage++;
+        } else {
+            providerWindow.regularUsage++;
+            globalWindow.regularUsage++;
+        }
+        providerWindow.rejectedPriority = null;
+        providerWindow.lastRejectionReason = null;
+        if (symbolGapKey != null) lastSymbolReservations.put(symbolGapKey, now);
         return true;
     }
 
+    @Override
     public synchronized void applyRetryAfter(String provider, long seconds) {
-        Window window = currentWindow(normalize(provider), clock.instant());
-        window.retryAfter = clock.instant().plusSeconds(Math.max(1, seconds));
+        Instant now = clock.instant();
+        Window window = currentWindow(normalize(provider), now);
+        window.retryAfter = now.plusSeconds(Math.max(1, seconds));
     }
 
+    @Override
     public synchronized ProviderBudgetState state(String provider, ProviderCircuitState circuitState) {
         String key = normalize(provider);
         int advertisedRpm = advertised.getOrDefault(key, 60);
-        int effective = effectiveRpm(advertisedRpm);
+        int regularLimit = regularLimit(advertisedRpm);
+        int emergencyLimit = emergencyLimit(advertisedRpm);
         Window window = currentWindow(key, clock.instant());
-        return new ProviderBudgetState(key, advertisedRpm, effective,
-                properties.getInternalBudgetRatio(), properties.getEmergencyReserveRatio(), window.usage,
-                Math.max(0, advertisedRpm - window.usage), window.retryAfter, circuitState, window.rejectedPriority);
+        Window globalWindow = currentWindow(GLOBAL, clock.instant());
+        int usage = window.regularUsage + window.emergencyUsage;
+        int totalAvailable = regularLimit + emergencyLimit;
+        return new ProviderBudgetState(key, advertisedRpm, regularLimit,
+                properties.getInternalBudgetRatio(), properties.getEmergencyReserveRatio(), usage,
+                Math.max(0, totalAvailable - usage), window.retryAfter, circuitState, window.rejectedPriority,
+                window.regularUsage, window.emergencyUsage,
+                globalWindow.regularUsage + globalWindow.emergencyUsage, window.lastRejectionReason);
     }
 
-    private int effectiveRpm(int advertisedRpm) {
+    private int regularLimit(int advertisedRpm) {
         return Math.max(1, (int) Math.floor(advertisedRpm * properties.getInternalBudgetRatio()));
+    }
+
+    private int emergencyLimit(int advertisedRpm) {
+        return Math.max(1, (int) Math.floor(advertisedRpm * properties.getEmergencyReserveRatio()));
+    }
+
+    private static int priorityLimit(int regularLimit, AssetPriority priority) {
+        return switch (priority) {
+            case P3_DISCOVERY -> Math.max(1, regularLimit / 2);
+            case P1_WATCHLIST -> Math.max(1, (regularLimit * 7) / 10);
+            case P2_CANDIDATE -> Math.max(1, (regularLimit * 9) / 10);
+            case P0_POSITION -> regularLimit;
+        };
+    }
+
+    private int emergencyMinimumGap(String provider) {
+        return "COINGLASS".equals(provider)
+                ? properties.getEventRefreshMinGapSeconds()
+                : properties.getPerSymbolMinimumGapSeconds();
     }
 
     private Window currentWindow(String provider, Instant now) {
@@ -83,15 +172,31 @@ public class ProviderRateBudgetManager {
                 ? new Window(minute) : previous);
     }
 
+    private static void reject(Window window, AssetPriority priority, String reason) {
+        window.rejectedPriority = priority;
+        window.lastRejectionReason = reason;
+    }
+
+    private static String symbolGapKey(ProviderRequestKey key) {
+        return normalize(key.provider()) + "|" + key.datasetType() + "|"
+                + key.canonicalInstrumentId().canonical() + "|" + key.timeframe()
+                + "|" + key.sourceVersion();
+    }
+
     private static String normalize(String provider) {
         return provider == null ? "UNKNOWN" : provider.trim().toUpperCase(Locale.ROOT);
     }
 
     private static final class Window {
         private final long minute;
-        private int usage;
+        private int regularUsage;
+        private int emergencyUsage;
         private Instant retryAfter;
         private AssetPriority rejectedPriority;
-        private Window(long minute) { this.minute = minute; }
+        private String lastRejectionReason;
+
+        private Window(long minute) {
+            this.minute = minute;
+        }
     }
 }

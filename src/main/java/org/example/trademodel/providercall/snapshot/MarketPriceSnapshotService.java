@@ -4,12 +4,23 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderAdapterResponse;
+import org.example.trademodel.providercall.CoordinatedProviderSnapshotQueryService;
+import org.example.trademodel.providercall.CoordinatedProviderSnapshotRefreshService;
 import org.example.trademodel.providercall.ProviderCallCoordinator;
 import org.example.trademodel.providercall.ProviderCallRequest;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.ProviderRequestKey;
+import org.example.trademodel.providercall.ProviderRequestKeyFactory;
+import org.example.trademodel.providercall.ProviderSnapshotMetadata;
+import org.example.trademodel.providercall.ProviderSnapshotQueryService;
+import org.example.trademodel.providercall.ProviderSnapshotRefreshService;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,21 +31,46 @@ import java.util.Optional;
 
 @Service
 public class MarketPriceSnapshotService {
-    private final ProviderCallCoordinator coordinator;
+    private final ProviderSnapshotQueryService queryService;
+    private final ProviderSnapshotRefreshService refreshService;
     private final MarketQuoteClient marketQuoteClient;
+    private final ProviderSymbolMappingRegistry mappingRegistry;
+    private final ProviderRequestKeyFactory keyFactory;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public MarketPriceSnapshotService(ProviderCallCoordinator coordinator, MarketQuoteClient marketQuoteClient) {
-        this(coordinator, marketQuoteClient, Clock.systemUTC());
+    public MarketPriceSnapshotService(ProviderSnapshotQueryService queryService,
+                                      ProviderSnapshotRefreshService refreshService,
+                                      MarketQuoteClient marketQuoteClient,
+                                      ProviderSymbolMappingRegistry mappingRegistry,
+                                      ProviderRequestKeyFactory keyFactory) {
+        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory, Clock.systemUTC());
     }
 
+    /** Compatibility constructor for focused unit tests. */
     public MarketPriceSnapshotService(
             ProviderCallCoordinator coordinator,
             MarketQuoteClient marketQuoteClient,
+            ProviderSymbolMappingRegistry mappingRegistry,
+            ProviderRequestKeyFactory keyFactory,
             Clock clock) {
-        this.coordinator = coordinator;
+        this(new CoordinatedProviderSnapshotQueryService(coordinator),
+                new CoordinatedProviderSnapshotRefreshService(coordinator), marketQuoteClient,
+                mappingRegistry, keyFactory, clock);
+    }
+
+    public MarketPriceSnapshotService(
+            ProviderSnapshotQueryService queryService,
+            ProviderSnapshotRefreshService refreshService,
+            MarketQuoteClient marketQuoteClient,
+            ProviderSymbolMappingRegistry mappingRegistry,
+            ProviderRequestKeyFactory keyFactory,
+            Clock clock) {
+        this.queryService = queryService;
+        this.refreshService = refreshService;
         this.marketQuoteClient = marketQuoteClient;
+        this.mappingRegistry = mappingRegistry;
+        this.keyFactory = keyFactory;
         this.clock = clock;
     }
 
@@ -43,10 +79,32 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderRequestKey key = key(symbol);
-        ProviderCallResult<MarketPriceSnapshot> result = coordinator.execute(new ProviderCallRequest<>(key, priority, freshTtl,
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        return get(mapping, priority, freshTtl, traceId);
+    }
+
+    public ProviderCallResult<MarketPriceSnapshot> get(
+            CanonicalInstrumentId canonicalInstrumentId,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        return get(mapping, priority, freshTtl, traceId);
+    }
+
+    private ProviderCallResult<MarketPriceSnapshot> get(
+            ProviderSymbolMapping mapping,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        if (mapping.canonicalInstrumentId().marketType() != MarketType.SPOT) {
+            return unavailable(mapping, freshTtl, traceId, "PERPETUAL_PRICE_PROVIDER_NOT_CONFIGURED");
+        }
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.PRICE,
+                mapping, "GLOBAL", freshTtl, clock.instant());
+        ProviderCallResult<MarketPriceSnapshot> result = refreshService.refresh(new ProviderCallRequest<>(key, priority, freshTtl,
                 Duration.ofMinutes(2), Duration.ofSeconds(3), traceId,
-                () -> fetch(symbol, traceId, freshTtl)));
+                () -> fetch(mapping.providerSymbol())));
         if (result.payload() == null) return result;
         MarketPriceSnapshot enriched = new MarketPriceSnapshot(result.payload().symbol(), result.payload().lastPrice(),
                 result.payload().bidPrice(), result.payload().askPrice(), result.payload().spread(),
@@ -61,7 +119,30 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderCallResult<MarketPriceSnapshot> result = coordinator.peek(key(symbol), priority, freshTtl, traceId);
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        return peek(mapping, priority, freshTtl, traceId);
+    }
+
+    public ProviderCallResult<MarketPriceSnapshot> peek(
+            CanonicalInstrumentId canonicalInstrumentId,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        return peek(mapping, priority, freshTtl, traceId);
+    }
+
+    private ProviderCallResult<MarketPriceSnapshot> peek(
+            ProviderSymbolMapping mapping,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        if (mapping.canonicalInstrumentId().marketType() != MarketType.SPOT) {
+            return unavailable(mapping, freshTtl, traceId, "PERPETUAL_PRICE_PROVIDER_NOT_CONFIGURED");
+        }
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.PRICE,
+                mapping, "GLOBAL", freshTtl, clock.instant());
+        ProviderCallResult<MarketPriceSnapshot> result = queryService.query(key, priority, freshTtl, traceId);
         if (result.payload() == null) return result;
         MarketPriceSnapshot payload = result.payload();
         return new ProviderCallResult<>(new MarketPriceSnapshot(payload.symbol(), payload.lastPrice(),
@@ -70,7 +151,7 @@ public class MarketPriceSnapshotService {
                 payload.sourceFetchedAt(), result.metadata()), result.metadata(), result.budgetState());
     }
 
-    private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol, String traceId, Duration ttl) {
+    private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol) {
         Optional<MarketQuoteSnapshot> quote = marketQuoteClient.fetch24hTicker(symbol);
         if (quote.isEmpty()) {
             return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
@@ -90,12 +171,23 @@ public class MarketPriceSnapshotService {
         return ProviderAdapterResponse.ready(snapshot, fetchedAt);
     }
 
+    private ProviderCallResult<MarketPriceSnapshot> unavailable(
+            ProviderSymbolMapping mapping,
+            Duration freshTtl,
+            String traceId,
+            String reason) {
+        Instant now = clock.instant();
+        ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.PRICE,
+                mapping, "GLOBAL", freshTtl, now);
+        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata("BINANCE", ProviderDatasetType.PRICE,
+                mapping.canonicalInstrumentId(), mapping.providerSymbol(), "GLOBAL", null, now, now, 0L,
+                UnifiedSourceStatus.NOT_CONFIGURED, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
+                key.canonical(), mapping.sourceVersion(), false, false, reason, java.util.List.of(reason));
+        return new ProviderCallResult<>(null, metadata, null);
+    }
+
     private static boolean positive(BigDecimal value) {
         return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
-    private static ProviderRequestKey key(String symbol) {
-        return new ProviderRequestKey("BINANCE_PUBLIC", ProviderDatasetType.PRICE,
-                symbol, "GLOBAL", "LATEST");
-    }
 }

@@ -20,7 +20,7 @@ public final class MarketPriceSnapshotPolicy {
 
     public static boolean isStale(ProviderCallResult<MarketPriceSnapshot> result) {
         return hasPositivePrice(result) && result.metadata() != null
-                && result.metadata().freshnessStatus() == SnapshotFreshnessStatus.STALE;
+                && result.metadata().freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE;
     }
 
     public static String failureCode(ProviderCallResult<MarketPriceSnapshot> result) {

@@ -2,9 +2,9 @@ package org.example.trademodel.providercall;
 
 public enum AssetPriority {
     P0_POSITION(0),
-    P1_CORE(1),
-    P2_CANDIDATE(2),
-    P3_POOL(3);
+    P1_WATCHLIST(2),
+    P2_CANDIDATE(1),
+    P3_DISCOVERY(3);
 
     private final int rank;
 
