@@ -39,6 +39,28 @@ not effective until reviewed and merged.
 PR #1130 remains frozen `OPEN / DRAFT / UNMERGED` with no action. P4 is not
 allowed. Production Deployment Readiness remains `BLOCKED`.
 
+PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
+`4730021827` requested five correctness fixes; this branch now records their
+offline closure pending Reviewer Round 2:
+
+1. physical provider work uses a dedicated bounded executor, and logical
+   timeout cannot release its concurrency lease or Single Flight before the
+   physical task actually ends;
+2. stable `ProviderSnapshotKey` identity is separate from consumer TTL and
+   refresh `timeBucket`, enabling cross-profile sharing, cross-bucket stale
+   fallback, and bounded retention;
+3. OHLCV minimum gaps include timeframe, so one due scan can independently
+   attempt `5m`, `15m`, `1h`, and `4h` without one timeframe blocking another;
+4. candidate confirmation uses `CandidateLogicIdentity`, while evidence hash
+   remains provenance and notification deduplication;
+5. SPOT and PERPETUAL identities remain exact end to end; unsupported
+   perpetual price/OHLCV fails `NOT_CONFIGURED` and never falls back to spot.
+
+Each physical retry receives its own budget reservation and audit lifecycle.
+These are fixture-only branch results: real provider calls, real AI calls,
+Telegram sends, orders, and trading remain zero. Only reviewed merged main may
+make the package effective.
+
 Details: `docs/PROVIDER_CALL_ORCHESTRATION_AUDIT.md` and the P3-CALL1 contract
 documents.
 

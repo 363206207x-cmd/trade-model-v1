@@ -41,8 +41,11 @@ public class AutoCandidateRegistry {
 
     public record AutoCandidateSnapshot(
             CanonicalInstrumentId canonicalInstrumentId,
-            String evidenceHash,
+            CandidateLogicIdentity promotionIdentity,
+            String promotedEvidenceHash,
+            String latestEvidenceHash,
             Instant promotedAt,
+            Instant latestEvaluatedAt,
             Instant expiresAt,
             UserScanProfile baseProfile,
             RuntimeScanProfile effectiveProfile,
@@ -51,6 +54,10 @@ public class AutoCandidateRegistry {
     ) {
         public AutoCandidateSnapshot {
             profileReasonCodes = profileReasonCodes == null ? List.of() : List.copyOf(profileReasonCodes);
+        }
+
+        public String evidenceHash() {
+            return latestEvidenceHash;
         }
     }
 }

@@ -11,37 +11,46 @@ import java.util.function.Supplier;
 
 @Service
 public class ProviderSingleFlightGuard implements ProviderSingleFlightRegistry {
-    private final Map<ProviderRequestKey, CompletableFuture<?>> flights = new ConcurrentHashMap<>();
+    private final Map<ProviderSnapshotKey, ProviderRefreshFlight<?>> flights = new ConcurrentHashMap<>();
     private final AtomicInteger waitingCallers = new AtomicInteger();
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T execute(ProviderRequestKey key, Supplier<T> ownerCall) {
-        CompletableFuture<T> owned = new CompletableFuture<>();
-        CompletableFuture<T> existing = (CompletableFuture<T>) flights.putIfAbsent(key, owned);
-        if (existing != null) {
-            waitingCallers.incrementAndGet();
-            try {
-                return join(existing);
-            } finally {
-                waitingCallers.decrementAndGet();
-            }
+    public <T> ProviderSingleFlightRegistration<T> register(ProviderSnapshotKey key) {
+        if (key == null) throw new IllegalArgumentException("snapshot key is required");
+        ProviderRefreshFlight<T> candidate = new ProviderRefreshFlight<>();
+        ProviderRefreshFlight<T> existing = (ProviderRefreshFlight<T>) flights.putIfAbsent(key, candidate);
+        if (existing == null) {
+            candidate.completion().whenComplete((value, failure) -> flights.remove(key, candidate));
+            return new ProviderSingleFlightRegistration<>(candidate, true, () -> { });
         }
-        try {
-            T value = ownerCall.get();
-            owned.complete(value);
-            return value;
-        } catch (Throwable failure) {
-            owned.completeExceptionally(failure);
-            throw failure;
-        } finally {
-            flights.remove(key, owned);
+        waitingCallers.incrementAndGet();
+        return new ProviderSingleFlightRegistration<>(existing, false, waitingCallers::decrementAndGet);
+    }
+
+    @Override
+    public <T> T execute(ProviderRequestKey key, Supplier<T> ownerCall) {
+        ProviderSingleFlightRegistration<T> registration = register(key.snapshotKey());
+        try (registration) {
+            if (registration.owner()) {
+                try {
+                    registration.flight().completion().complete(ownerCall.get());
+                } catch (Throwable failure) {
+                    registration.flight().completion().completeExceptionally(failure);
+                }
+            }
+            return join(registration.flight().completion());
         }
     }
 
     @Override
-    public boolean inFlight(ProviderRequestKey key) {
+    public boolean inFlight(ProviderSnapshotKey key) {
         return key != null && flights.containsKey(key);
+    }
+
+    @Override
+    public boolean inFlight(ProviderRequestKey key) {
+        return key != null && inFlight(key.snapshotKey());
     }
 
     @Override

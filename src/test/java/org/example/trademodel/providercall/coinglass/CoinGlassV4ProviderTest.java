@@ -37,6 +37,7 @@ import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -313,6 +314,10 @@ class CoinGlassV4ProviderTest {
         ProviderCallResult<String> result = context.coordinator.execute(request);
 
         assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_TIMEOUT");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (calls.get() < 2 && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
         assertThat(calls).hasValue(2);
     }
 

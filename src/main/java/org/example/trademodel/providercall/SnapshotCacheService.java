@@ -9,22 +9,24 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class SnapshotCacheService implements ProviderSnapshotCache {
-    private final Map<ProviderRequestKey, CacheEntry<?>> entries = new ConcurrentHashMap<>();
+    private final Map<ProviderSnapshotKey, CacheEntry<?>> entries = new ConcurrentHashMap<>();
 
     @Override
-    public <T> void put(ProviderRequestKey key, T payload, ProviderSnapshotMetadata metadata, Duration staleTtl) {
-        entries.put(key, new CacheEntry<>(payload, metadata, metadata.expiresAt().plus(staleTtl)));
+    public <T> void put(ProviderSnapshotKey key, T payload, ProviderSnapshotMetadata metadata,
+                        Duration staleRetention) {
+        Instant staleUntil = metadata.fetchTime().plus(staleRetention);
+        entries.put(key, new CacheEntry<>(payload, metadata, staleUntil));
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now) {
+    public <T> SnapshotLookup<T> lookup(ProviderSnapshotKey key, Instant now) {
         return lookup(key, now, null);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now, Duration requestedFreshTtl) {
+    public <T> SnapshotLookup<T> lookup(ProviderSnapshotKey key, Instant now, Duration requestedFreshTtl) {
         CacheEntry<T> entry = (CacheEntry<T>) entries.get(key);
         if (entry == null) return SnapshotLookup.unavailable();
         Instant requestedExpiry = requestedFreshTtl == null || entry.metadata.fetchTime() == null
@@ -37,6 +39,19 @@ public class SnapshotCacheService implements ProviderSnapshotCache {
         }
         entries.remove(key, entry);
         return SnapshotLookup.unavailable();
+    }
+
+    @Override
+    public int entryCount() {
+        return entries.size();
+    }
+
+    @Override
+    public int purgeExpired(Instant now) {
+        if (now == null) throw new IllegalArgumentException("now is required");
+        int before = entries.size();
+        entries.entrySet().removeIf(entry -> !now.isBefore(entry.getValue().staleUntil));
+        return before - entries.size();
     }
 
     @Override

@@ -2,6 +2,11 @@ package org.example.trademodel.providercall.coinglass;
 
 import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.ProviderDatasetType;
+import org.example.trademodel.providercall.ProviderSnapshotMetadata;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +20,24 @@ public class CoinGlassDerivativesSnapshotService {
     private final CoinGlassLiquidationSnapshotService liquidationService;
     private final CoinGlassLongShortSnapshotService longShortService;
     private final CoinGlassDerivativesSnapshotAssembler assembler;
+    private final CoinGlassSymbolMapper symbolMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CoinGlassDerivativesSnapshotService(CoinGlassProperties properties,
+                                               CoinGlassOpenInterestSnapshotService openInterestService,
+                                               CoinGlassFundingSnapshotService fundingService,
+                                               CoinGlassLiquidationSnapshotService liquidationService,
+                                               CoinGlassLongShortSnapshotService longShortService,
+                                               CoinGlassDerivativesSnapshotAssembler assembler,
+                                               CoinGlassSymbolMapper symbolMapper) {
+        this.properties = properties;
+        this.openInterestService = openInterestService;
+        this.fundingService = fundingService;
+        this.liquidationService = liquidationService;
+        this.longShortService = longShortService;
+        this.assembler = assembler;
+        this.symbolMapper = symbolMapper;
+    }
 
     public CoinGlassDerivativesSnapshotService(CoinGlassProperties properties,
                                                CoinGlassOpenInterestSnapshotService openInterestService,
@@ -22,12 +45,8 @@ public class CoinGlassDerivativesSnapshotService {
                                                CoinGlassLiquidationSnapshotService liquidationService,
                                                CoinGlassLongShortSnapshotService longShortService,
                                                CoinGlassDerivativesSnapshotAssembler assembler) {
-        this.properties = properties;
-        this.openInterestService = openInterestService;
-        this.fundingService = fundingService;
-        this.liquidationService = liquidationService;
-        this.longShortService = longShortService;
-        this.assembler = assembler;
+        this(properties, openInterestService, fundingService, liquidationService, longShortService,
+                assembler, new CoinGlassSymbolMapper());
     }
 
     public ProviderCallResult<DerivativesRiskSnapshot> get(
@@ -43,6 +62,28 @@ public class CoinGlassDerivativesSnapshotService {
         ProviderCallResult<CoinGlassLongShortSnapshot> longShort =
                 longShortService.get(symbol, priority, ttl, traceId);
         return assembler.assemble(symbol, traceId, oi, funding, liquidation, longShort);
+    }
+
+    public ProviderCallResult<DerivativesRiskSnapshot> get(
+            CanonicalInstrumentId canonicalInstrumentId,
+            AssetPriority priority,
+            Duration freshTtl,
+            String traceId) {
+        try {
+            CoinGlassSymbolMapper.CoinGlassSymbol mapping = symbolMapper.map(canonicalInstrumentId);
+            return get(mapping.pairSymbol(), priority, freshTtl, traceId);
+        } catch (IllegalArgumentException invalid) {
+            java.time.Instant now = java.time.Instant.now();
+            String symbol = canonicalInstrumentId == null ? "UNMAPPED"
+                    : canonicalInstrumentId.baseAsset() + canonicalInstrumentId.quoteAsset();
+            ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata("COINGLASS",
+                    ProviderDatasetType.DERIVATIVES, canonicalInstrumentId, symbol, "GLOBAL", null,
+                    now, now, 0L, UnifiedSourceStatus.NOT_CONFIGURED,
+                    SnapshotFreshnessStatus.UNAVAILABLE, traceId, "UNMAPPED", "UNMAPPED",
+                    false, false, "DERIVATIVES_REQUIRE_PERPETUAL_INSTRUMENT",
+                    java.util.List.of("DERIVATIVES_REQUIRE_PERPETUAL_INSTRUMENT"));
+            return new ProviderCallResult<>(null, metadata, null);
+        }
     }
 
     /**

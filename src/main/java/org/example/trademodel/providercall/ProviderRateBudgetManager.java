@@ -41,10 +41,18 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
     public synchronized boolean reserve(ProviderRequestKey key,
                                         AssetPriority priority,
                                         RuntimeScanProfile profile) {
+        return reserveAttempt(key, priority, profile, false);
+    }
+
+    @Override
+    public synchronized boolean reserveAttempt(ProviderRequestKey key,
+                                               AssetPriority priority,
+                                               RuntimeScanProfile profile,
+                                               boolean retryAttempt) {
         if (key == null) throw new IllegalArgumentException("provider request key is required");
         if (priority == null) throw new IllegalArgumentException("asset priority is required");
         if (profile == null) throw new IllegalArgumentException("runtime profile is required");
-        return reserveInternal(key.provider(), symbolGapKey(key), priority, profile);
+        return reserveInternal(key.provider(), retryAttempt ? null : symbolGapKey(key), priority, profile);
     }
 
     /** Compatibility entry point for existing callers that do not yet carry a canonical request key. */
@@ -171,7 +179,8 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
 
     private static String symbolGapKey(ProviderRequestKey key) {
         return normalize(key.provider()) + "|" + key.datasetType() + "|"
-                + key.canonicalInstrumentId().canonical();
+                + key.canonicalInstrumentId().canonical() + "|" + key.timeframe()
+                + "|" + key.sourceVersion();
     }
 
     private static String normalize(String provider) {

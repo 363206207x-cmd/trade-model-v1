@@ -58,6 +58,64 @@ class ProviderBudgetConcurrencyAndSingleFlightTest {
     }
 
     @Test
+    void allFourOhlcvTimeframesCanRefreshInOneScan() {
+        ProviderCallProperties properties = new ProviderCallProperties();
+        properties.setPerSymbolMinimumGapSeconds(5);
+        ProviderRateBudgetManager budget = new ProviderRateBudgetManager(properties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        budget.register("TEST", 100);
+
+        for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
+            assertThat(budget.reserve(ohlcvKey(ProviderCallTestFixtures.perpetual("BTCUSDT"), timeframe),
+                    AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isTrue();
+        }
+        assertThat(budget.state("TEST", ProviderCircuitState.CLOSED).regularBudgetUsage()).isEqualTo(4);
+    }
+
+    @Test
+    void sameTimeframeDuplicateIsBlockedWithinMinimumGap() {
+        ProviderCallProperties properties = new ProviderCallProperties();
+        properties.setPerSymbolMinimumGapSeconds(5);
+        ProviderRateBudgetManager budget = new ProviderRateBudgetManager(properties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        budget.register("TEST", 100);
+        ProviderRequestKey first = ohlcvKey(ProviderCallTestFixtures.perpetual("BTCUSDT"), "5m");
+        ProviderRequestKey anotherBucket = new ProviderRequestKey("TEST", ProviderDatasetType.OHLCV,
+                first.canonicalInstrumentId(), "BTCUSDT", "5m", "ANOTHER", "TEST_V1");
+
+        assertThat(budget.reserve(first, AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isTrue();
+        assertThat(budget.reserve(anotherBucket, AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isFalse();
+    }
+
+    @Test
+    void differentTimeframesDoNotShareGapKey() {
+        ProviderCallProperties properties = new ProviderCallProperties();
+        properties.setPerSymbolMinimumGapSeconds(5);
+        ProviderRateBudgetManager budget = new ProviderRateBudgetManager(properties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        budget.register("TEST", 100);
+
+        assertThat(budget.reserve(ohlcvKey(ProviderCallTestFixtures.perpetual("BTCUSDT"), "5m"),
+                AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isTrue();
+        assertThat(budget.reserve(ohlcvKey(ProviderCallTestFixtures.perpetual("BTCUSDT"), "15m"),
+                AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isTrue();
+    }
+
+    @Test
+    void spotAndPerpetualDoNotShareGapKey() {
+        ProviderCallProperties properties = new ProviderCallProperties();
+        properties.setPerSymbolMinimumGapSeconds(5);
+        ProviderRateBudgetManager budget = new ProviderRateBudgetManager(properties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        budget.register("TEST", 100);
+
+        assertThat(budget.reserve(ohlcvKey(ProviderCallTestFixtures.spot("BTCUSDT"), "5m"),
+                AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isTrue();
+        assertThat(budget.reserve(ohlcvKey(ProviderCallTestFixtures.perpetual("BTCUSDT"), "5m"),
+                AssetPriority.P0_POSITION, RuntimeScanProfile.STANDARD)).isTrue();
+    }
+
+    @Test
     void emergencyReserveCannotBeConsumedByDiscovery() {
         ProviderCallProperties properties = new ProviderCallProperties();
         ProviderRateBudgetManager budget = new ProviderRateBudgetManager(properties, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -172,6 +230,13 @@ class ProviderBudgetConcurrencyAndSingleFlightTest {
     private static ProviderRequestKey key(String provider, String symbol, String bucket) {
         return new ProviderRequestKey(provider, ProviderDatasetType.PRICE,
                 ProviderCallTestFixtures.spot(symbol), symbol, "GLOBAL", bucket, provider + "_V1");
+    }
+
+    private static ProviderRequestKey ohlcvKey(
+            org.example.trademodel.providercall.instrument.CanonicalInstrumentId instrument,
+            String timeframe) {
+        return new ProviderRequestKey("TEST", ProviderDatasetType.OHLCV, instrument,
+                "BTCUSDT", timeframe, "SCAN", "TEST_V1");
     }
 
     private static void await(CountDownLatch latch) {

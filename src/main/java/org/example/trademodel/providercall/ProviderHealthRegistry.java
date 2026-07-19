@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ProviderHealthRegistry {
     private final Clock clock;
     private final Map<String, MutableHealth> states = new ConcurrentHashMap<>();
+    private final Map<ProviderSnapshotKey, MutableHealth> snapshotStates = new ConcurrentHashMap<>();
 
     public ProviderHealthRegistry() {
         this(Clock.systemUTC());
@@ -34,6 +35,28 @@ public class ProviderHealthRegistry {
         health.lastFailureAt = clock.instant();
         health.lastSourceStatus = sourceStatus;
         health.lastReasonCode = reasonCode;
+    }
+
+    public void recordSuccess(ProviderSnapshotKey key, UnifiedSourceStatus sourceStatus) {
+        recordSuccess(key.provider(), sourceStatus);
+        MutableHealth health = snapshotStates.computeIfAbsent(key, ignored -> new MutableHealth());
+        health.lastSuccessAt = clock.instant();
+        health.lastSourceStatus = sourceStatus;
+        health.lastReasonCode = null;
+    }
+
+    public void recordFailure(ProviderSnapshotKey key, UnifiedSourceStatus sourceStatus, String reasonCode) {
+        recordFailure(key.provider(), sourceStatus, reasonCode);
+        MutableHealth health = snapshotStates.computeIfAbsent(key, ignored -> new MutableHealth());
+        health.lastFailureAt = clock.instant();
+        health.lastSourceStatus = sourceStatus;
+        health.lastReasonCode = reasonCode;
+    }
+
+    public ProviderSnapshotHealthSnapshot get(ProviderSnapshotKey key) {
+        MutableHealth health = snapshotStates.computeIfAbsent(key, ignored -> new MutableHealth());
+        return new ProviderSnapshotHealthSnapshot(key, health.lastSourceStatus, health.lastSuccessAt,
+                health.lastFailureAt, health.lastReasonCode);
     }
 
     public ProviderHealthSnapshot get(String provider, ProviderCircuitState circuitState) {
@@ -68,6 +91,15 @@ public class ProviderHealthRegistry {
             String provider,
             UnifiedSourceStatus sourceStatus,
             ProviderCircuitState circuitState,
+            Instant lastSuccessAt,
+            Instant lastFailureAt,
+            String lastReasonCode
+    ) {
+    }
+
+    public record ProviderSnapshotHealthSnapshot(
+            ProviderSnapshotKey snapshotKey,
+            UnifiedSourceStatus sourceStatus,
             Instant lastSuccessAt,
             Instant lastFailureAt,
             String lastReasonCode

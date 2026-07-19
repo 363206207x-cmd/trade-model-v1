@@ -53,6 +53,20 @@ public class CandidatePromotionStabilityPolicy {
             return result(request, CandidatePromotionStatus.HARD_INVALIDATED, false, false,
                     List.of("HARD_RISK_OR_INVALIDATED"), now, null);
         }
+        CandidateLogicIdentity identity = request.logicIdentity();
+        if (identity.resetsPromotion()) {
+            registry.remove(request.canonicalInstrumentId());
+            pending.remove(request.canonicalInstrumentId());
+            degradationCycles.remove(request.canonicalInstrumentId());
+            if (active != null) lastExitAt.put(request.canonicalInstrumentId(), now);
+            return result(request, CandidatePromotionStatus.NOT_ELIGIBLE, false, false,
+                    List.of("CANDIDATE_LOGIC_STATE_RESETS_PROMOTION"), now, null);
+        }
+        if (active != null && !active.promotionIdentity().equals(identity)) {
+            registry.remove(request.canonicalInstrumentId());
+            degradationCycles.remove(request.canonicalInstrumentId());
+            active = null;
+        }
         if (active != null) return evaluateActive(request, active, now);
         if (!request.promotionConditionsSatisfied()) {
             pending.remove(request.canonicalInstrumentId());
@@ -65,17 +79,18 @@ public class CandidatePromotionStabilityPolicy {
                     List.of("RETRIGGER_COOLDOWN_ACTIVE"), now, null);
         }
         PendingState state = pending.compute(request.canonicalInstrumentId(), (ignored, previous) ->
-                previous == null || !previous.evidenceHash.equals(request.evidenceHash())
-                        ? new PendingState(request.evidenceHash(), 1)
-                        : new PendingState(previous.evidenceHash, previous.cycles + 1));
+                previous == null || !previous.identity.equals(identity)
+                        ? new PendingState(identity, request.evidenceHash(), 1)
+                        : new PendingState(previous.identity, request.evidenceHash(), previous.cycles + 1));
         if (state.cycles < properties.getPromotionConfirmationCycles()) {
             return result(request, CandidatePromotionStatus.WAITING_CONFIRMATION, false, false,
                     List.of("PROMOTION_CONFIRMATION_PENDING"), now, null);
         }
         Instant expiresAt = now.plusSeconds(properties.getCandidateTtlSeconds());
         registry.put(new AutoCandidateRegistry.AutoCandidateSnapshot(request.canonicalInstrumentId(),
-                request.evidenceHash(), now, expiresAt, request.baseProfile(), request.effectiveProfile(),
-                request.profileReasonCodes(), request.frequencyMatrixVersion()));
+                identity, request.evidenceHash(), request.evidenceHash(), now, now, expiresAt,
+                request.baseProfile(), request.effectiveProfile(), request.profileReasonCodes(),
+                request.frequencyMatrixVersion()));
         pending.remove(request.canonicalInstrumentId());
         degradationCycles.remove(request.canonicalInstrumentId());
         PromotionEvent previous = lastPromotionEvents.get(request.canonicalInstrumentId());
@@ -96,7 +111,11 @@ public class CandidatePromotionStabilityPolicy {
                                                      Instant now) {
         if (request.promotionConditionsSatisfied()) {
             degradationCycles.remove(request.canonicalInstrumentId());
-            boolean duplicateEvidence = active.evidenceHash().equals(request.evidenceHash());
+            boolean duplicateEvidence = active.latestEvidenceHash().equals(request.evidenceHash());
+            registry.put(new AutoCandidateRegistry.AutoCandidateSnapshot(active.canonicalInstrumentId(),
+                    active.promotionIdentity(), active.promotedEvidenceHash(), request.evidenceHash(),
+                    active.promotedAt(), now, active.expiresAt(), request.baseProfile(),
+                    request.effectiveProfile(), request.profileReasonCodes(), request.frequencyMatrixVersion()));
             return result(request, CandidatePromotionStatus.ACTIVE, true, false,
                     List.of(duplicateEvidence ? "SAME_EVIDENCE_NO_DUPLICATE_PROMOTION" : "CANDIDATE_REMAINS_ACTIVE"),
                     now, active.expiresAt());
@@ -129,6 +148,7 @@ public class CandidatePromotionStabilityPolicy {
         if (request.frequencyMatrixVersion() == null || request.frequencyMatrixVersion().isBlank()) {
             throw new IllegalArgumentException("frequencyMatrixVersion is required");
         }
+        request.logicIdentity();
     }
 
     private static CandidatePromotionResult result(CandidatePromotionRequest request,
@@ -143,7 +163,7 @@ public class CandidatePromotionStabilityPolicy {
                 request.profileReasonCodes(), request.frequencyMatrixVersion(), reasons, now, expiresAt);
     }
 
-    private record PendingState(String evidenceHash, int cycles) {
+    private record PendingState(CandidateLogicIdentity identity, String latestEvidenceHash, int cycles) {
     }
 
     private record PromotionEvent(String evidenceHash, Instant createdAt) {

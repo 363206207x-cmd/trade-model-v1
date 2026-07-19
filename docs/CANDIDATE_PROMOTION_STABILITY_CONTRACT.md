@@ -23,6 +23,21 @@ a candidate before the minimum hold and requires consecutive degradation
 confirmation. Hard risk, invalidation, cooling, or confused blocking exits
 immediately. TTL expiration exits at the boundary.
 
+Consecutive confirmation uses `CandidateLogicIdentity`, composed of canonical
+instrument, strategy version, rule version, direction family, candidate state,
+and trigger logic type. Normal price movement, a newly closed candle, a small
+same-direction score change, a profile change, a frequency-matrix change, or a
+new `evidenceHash` does not reset the cycle while that logic identity is stable.
+Direction, strategy, rule logic, trigger logic, or blocking state changes do
+reset it.
+
+`evidenceHash` remains evidence provenance and notification-dedup identity; it
+does not control promotion eligibility. An active snapshot keeps separate
+`promotionIdentity`, `promotedEvidenceHash`, `latestEvidenceHash`, `promotedAt`,
+`latestEvaluatedAt`, and `expiresAt`. Continuing supporting evidence updates the
+latest fields while preserving the original promotion time and default expiry,
+so routine evidence changes cannot extend TTL forever.
+
 The same `evidenceHash` cannot create a duplicate promotion event. Cooldown may
 allow the candidate state to be restored while suppressing a repeated
 notification event. Every result records status, reason codes, base/effective

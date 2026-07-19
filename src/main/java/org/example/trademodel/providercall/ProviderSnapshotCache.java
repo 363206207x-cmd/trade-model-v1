@@ -4,9 +4,11 @@ import java.time.Duration;
 import java.time.Instant;
 
 public interface ProviderSnapshotCache {
-    <T> void put(ProviderRequestKey key, T payload, ProviderSnapshotMetadata metadata, Duration staleTtl);
-    <T> SnapshotCacheService.SnapshotLookup<T> lookup(ProviderRequestKey key, Instant now);
+    <T> void put(ProviderSnapshotKey key, T payload, ProviderSnapshotMetadata metadata, Duration staleRetention);
+    <T> SnapshotCacheService.SnapshotLookup<T> lookup(ProviderSnapshotKey key, Instant now);
     <T> SnapshotCacheService.SnapshotLookup<T> lookup(
-            ProviderRequestKey key, Instant now, Duration requestedFreshTtl);
+            ProviderSnapshotKey key, Instant now, Duration requestedFreshTtl);
+    int entryCount();
+    int purgeExpired(Instant now);
     void clear();
 }

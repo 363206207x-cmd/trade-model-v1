@@ -16,8 +16,27 @@ public record ProviderRefreshObservation(
         String reasonCode,
         Instant attemptedAt,
         Instant providerDataTime,
-        String traceId
+        String traceId,
+        String timeframe
 ) {
+    public ProviderRefreshObservation(
+            CanonicalInstrumentId canonicalInstrumentId,
+            String providerSymbol,
+            ProviderDatasetType datasetType,
+            UnifiedSourceStatus sourceStatus,
+            SnapshotFreshnessStatus freshnessStatus,
+            String reasonCode,
+            Instant attemptedAt,
+            Instant providerDataTime,
+            String traceId) {
+        this(canonicalInstrumentId, providerSymbol, datasetType, sourceStatus, freshnessStatus,
+                reasonCode, attemptedAt, providerDataTime, traceId, "GLOBAL");
+    }
+
+    public ProviderRefreshObservation {
+        timeframe = timeframe == null || timeframe.isBlank() ? "GLOBAL" : timeframe;
+    }
+
     public String symbol() {
         return providerSymbol;
     }

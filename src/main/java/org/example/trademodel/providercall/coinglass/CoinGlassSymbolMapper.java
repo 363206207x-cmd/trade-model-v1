@@ -44,6 +44,23 @@ public class CoinGlassSymbolMapper {
         return new CoinGlassSymbol(normalized, base, canonical, "COINGLASS_MAPPING_V1");
     }
 
+    public CoinGlassSymbol map(CanonicalInstrumentId canonicalInstrumentId) {
+        if (canonicalInstrumentId == null
+                || canonicalInstrumentId.marketType() != MarketType.PERPETUAL
+                || canonicalInstrumentId.contractType() != ContractType.LINEAR) {
+            throw new IllegalArgumentException("CoinGlass derivatives require a linear perpetual instrument");
+        }
+        if (registry != null) {
+            ProviderSymbolMapping mapping = registry.resolve("COINGLASS", canonicalInstrumentId);
+            return new CoinGlassSymbol(mapping.providerSymbol(), canonicalInstrumentId.baseAsset(),
+                    mapping.canonicalInstrumentId(), mapping.sourceVersion());
+        }
+        String symbol = canonicalInstrumentId.baseAsset() + canonicalInstrumentId.quoteAsset();
+        if (!SUPPORTED.contains(symbol)) throw new IllegalArgumentException("unsupported CoinGlass symbol");
+        return new CoinGlassSymbol(symbol, canonicalInstrumentId.baseAsset(), canonicalInstrumentId,
+                "COINGLASS_MAPPING_V1");
+    }
+
     public record CoinGlassSymbol(String pairSymbol,
                                   String coinSymbol,
                                   CanonicalInstrumentId canonicalInstrumentId,

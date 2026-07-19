@@ -57,8 +57,8 @@ public class RuntimeScanProfileServiceImpl implements RuntimeScanProfileService 
                 transition.effectiveSince(), transition.nextDowngradeEligibleAt(),
                 properties.intervalSeconds(profile, priority, ProviderDatasetType.PRICE),
                 properties.intervalSeconds(profile, priority, ProviderDatasetType.DERIVATIVES),
-                refreshRegistry.findByProviderSymbol(normalized, ProviderDatasetType.PRICE),
-                refreshRegistry.findByProviderSymbol(normalized, ProviderDatasetType.DERIVATIVES),
+                item == null ? null : refreshRegistry.get(item.canonicalInstrumentId(), ProviderDatasetType.PRICE),
+                item == null ? null : refreshRegistry.get(item.canonicalInstrumentId(), ProviderDatasetType.DERIVATIVES),
                 budgetManager.state("BINANCE", circuitBreaker.state("BINANCE")));
     }
 

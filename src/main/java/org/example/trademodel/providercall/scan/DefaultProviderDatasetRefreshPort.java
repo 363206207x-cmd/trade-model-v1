@@ -81,20 +81,19 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     private void refreshDerivatives(ScanPlanItem item, String traceId, Instant attemptedAt) {
         int seconds = properties.intervalSeconds(item.effectiveProfile(), item.effectivePriority(),
                 ProviderDatasetType.DERIVATIVES);
-        ProviderCallResult<DerivativesRiskSnapshot> result = derivativesService.get(item.symbol(),
+        ProviderCallResult<DerivativesRiskSnapshot> result = derivativesService.get(item.canonicalInstrumentId(),
                 item.effectivePriority(), Duration.ofSeconds(Math.max(1, seconds)), traceId);
         record(item, ProviderDatasetType.DERIVATIVES, result, attemptedAt, traceId);
     }
 
     private void refreshPrice(ScanPlanItem item, String traceId, Instant attemptedAt) {
         int seconds = properties.intervalSeconds(item.effectiveProfile(), item.effectivePriority(), ProviderDatasetType.PRICE);
-        ProviderCallResult<MarketPriceSnapshot> result = priceService.get(item.symbol(), item.effectivePriority(),
+        ProviderCallResult<MarketPriceSnapshot> result = priceService.get(item.canonicalInstrumentId(), item.effectivePriority(),
                 Duration.ofSeconds(Math.max(1, seconds)), traceId);
         record(item, ProviderDatasetType.PRICE, result, attemptedAt, traceId);
     }
 
     private void refreshOhlcv(ScanPlanItem item, String traceId, Instant attemptedAt) {
-        ProviderCallResult<OhlcvIngestionResult> last = null;
         boolean due = false;
         Instant latestDataTime = null;
         for (String timeframe : PRIMARY_TIMEFRAMES) {
@@ -105,10 +104,9 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
             }
             if (!dueState.due()) continue;
             due = true;
-            last = ohlcvService.refresh(item.symbol(), timeframe, 100, item.effectivePriority(), traceId);
-            if (last == null || last.metadata() == null || last.metadata().sourceStatus() != UnifiedSourceStatus.READY) {
-                break;
-            }
+            ProviderCallResult<OhlcvIngestionResult> result = ohlcvService.refresh(
+                    item.canonicalInstrumentId(), timeframe, 100, item.effectivePriority(), traceId);
+            record(item, ProviderDatasetType.OHLCV, result, attemptedAt, traceId, timeframe);
         }
         if (!due) {
             registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
@@ -117,7 +115,6 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
                     attemptedAt, latestDataTime, traceId));
             return;
         }
-        record(item, ProviderDatasetType.OHLCV, last, attemptedAt, traceId);
     }
 
     private OhlcvDueState dueState(String symbol, String timeframe, Instant now) {
@@ -153,16 +150,22 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
 
     private void record(ScanPlanItem item, ProviderDatasetType datasetType, ProviderCallResult<?> result,
                         Instant attemptedAt, String traceId) {
+        record(item, datasetType, result, attemptedAt, traceId, "GLOBAL");
+    }
+
+    private void record(ScanPlanItem item, ProviderDatasetType datasetType, ProviderCallResult<?> result,
+                        Instant attemptedAt, String traceId, String timeframe) {
         if (result == null || result.metadata() == null) {
             registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
                     datasetType, UnifiedSourceStatus.ERROR,
-                    SnapshotFreshnessStatus.UNAVAILABLE, "PROVIDER_RESULT_MISSING", attemptedAt, null, traceId));
+                    SnapshotFreshnessStatus.UNAVAILABLE, "PROVIDER_RESULT_MISSING", attemptedAt, null, traceId,
+                    timeframe));
             return;
         }
         registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
                 datasetType, result.metadata().sourceStatus(),
                 result.metadata().freshnessStatus(), result.metadata().errorCode(), attemptedAt,
-                result.metadata().providerDataTime(), result.metadata().traceId()));
+                result.metadata().providerDataTime(), result.metadata().traceId(), timeframe));
     }
 
     private record OhlcvDueState(boolean due, Instant latestCloseTime) {
