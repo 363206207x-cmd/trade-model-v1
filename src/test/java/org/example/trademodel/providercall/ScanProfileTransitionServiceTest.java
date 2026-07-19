@@ -8,16 +8,26 @@ import org.example.trademodel.providercall.profile.ScanProfileTransitionService;
 import org.example.trademodel.service.RuleConfigService;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -203,6 +213,185 @@ class ScanProfileTransitionServiceTest {
         verifyNoInteractions(fixture.rules, fixture.mapper);
     }
 
+    @Test
+    void readMethodsUseSameSynchronizationBoundaryAsEvaluate() throws Exception {
+        assertThat(Modifier.isSynchronized(ScanProfileTransitionService.class.getDeclaredMethod(
+                "evaluate", String.class, UserScanProfile.class, ProfileTransitionSignal.class, String.class)
+                .getModifiers())).isTrue();
+        assertThat(Modifier.isSynchronized(ScanProfileTransitionService.class.getDeclaredMethod(
+                "current", String.class, String.class).getModifiers())).isTrue();
+        assertThat(Modifier.isSynchronized(ScanProfileTransitionService.class.getDeclaredMethod(
+                "currentProfile", String.class).getModifiers())).isTrue();
+    }
+
+    @Test
+    void currentCannotObservePartiallyCompletedTransition() throws Exception {
+        BlockingFixture fixture = blockingFixture();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ProfileTransitionResult> evaluation = pool.submit(() -> fixture.service.evaluate(
+                    "BTCUSDT", UserScanProfile.AUTO, highSignal(), "execution-high"));
+            assertThat(fixture.auditEntered.await(2, TimeUnit.SECONDS)).isTrue();
+
+            CountDownLatch readAttempted = new CountDownLatch(1);
+            Future<ProfileTransitionResult> current = pool.submit(() -> {
+                readAttempted.countDown();
+                return fixture.service.current("BTCUSDT", "read-during-transition");
+            });
+            assertThat(readAttempted.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> current.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            fixture.releaseAudit.countDown();
+            ProfileTransitionResult completed = evaluation.get(2, TimeUnit.SECONDS);
+            ProfileTransitionResult visible = current.get(2, TimeUnit.SECONDS);
+
+            assertThat(visible.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+            assertThat(visible.effectiveReason()).isEqualTo("HIGH_RISK");
+            assertThat(visible.effectiveSince()).isEqualTo(completed.effectiveSince());
+            assertThat(visible.nextDowngradeEligibleAt()).isEqualTo(completed.nextDowngradeEligibleAt());
+            assertThat(visible.ruleVersion()).isEqualTo("v-test");
+        } finally {
+            fixture.releaseAudit.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void currentProfileCannotReadDuringPartialTransition() throws Exception {
+        BlockingFixture fixture = blockingFixture();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ProfileTransitionResult> evaluation = pool.submit(() -> fixture.service.evaluate(
+                    "BTCUSDT", UserScanProfile.AUTO, highSignal(), "execution-high"));
+            assertThat(fixture.auditEntered.await(2, TimeUnit.SECONDS)).isTrue();
+
+            CountDownLatch readAttempted = new CountDownLatch(1);
+            Future<RuntimeScanProfile> currentProfile = pool.submit(() -> {
+                readAttempted.countDown();
+                return fixture.service.currentProfile("BTCUSDT");
+            });
+            assertThat(readAttempted.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> currentProfile.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            fixture.releaseAudit.countDown();
+            assertThat(evaluation.get(2, TimeUnit.SECONDS).effectiveProfile())
+                    .isEqualTo(RuntimeScanProfile.HIGH);
+            assertThat(currentProfile.get(2, TimeUnit.SECONDS)).isEqualTo(RuntimeScanProfile.HIGH);
+        } finally {
+            fixture.releaseAudit.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void completedExecutionStateIsVisibleToConcurrentReaders() throws Exception {
+        Fixture fixture = fixture();
+        ProfileTransitionResult completed = fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "execution-high");
+        ExecutorService readers = Executors.newFixedThreadPool(32);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int reader = 0; reader < 32; reader++) {
+                int readerId = reader;
+                futures.add(readers.submit(() -> {
+                    for (int query = 0; query < 100; query++) {
+                        ProfileTransitionResult visible = fixture.service.current(
+                                "BTCUSDT", "read-" + readerId + "-" + query);
+                        assertThat(visible.effectiveProfile()).isEqualTo(completed.effectiveProfile());
+                        assertThat(visible.effectiveReason()).isEqualTo(completed.effectiveReason());
+                        assertThat(visible.effectiveSince()).isEqualTo(completed.effectiveSince());
+                        assertThat(visible.nextDowngradeEligibleAt())
+                                .isEqualTo(completed.nextDowngradeEligibleAt());
+                        assertThat(visible.ruleVersion()).isEqualTo(completed.ruleVersion());
+                        assertThat(fixture.service.currentProfile("BTCUSDT"))
+                                .isEqualTo(completed.effectiveProfile());
+                    }
+                    return null;
+                }));
+            }
+            awaitAll(futures);
+            verify(fixture.mapper, times(1)).insert(any());
+        } finally {
+            readers.shutdownNow();
+        }
+    }
+
+    @Test
+    void concurrentReadOnlyQueriesRemainMutationFree() throws Exception {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, highSignal(), "execution-high");
+        ProfileTransitionResult before = fixture.service.current("BTCUSDT", "before-reads");
+        ExecutorService readers = Executors.newFixedThreadPool(16);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int reader = 0; reader < 16; reader++) {
+                int readerId = reader;
+                futures.add(readers.submit(() -> {
+                    for (int query = 0; query < 100; query++) {
+                        fixture.service.current("BTCUSDT", "read-" + readerId + "-" + query);
+                        fixture.service.currentProfile("BTCUSDT");
+                    }
+                    return null;
+                }));
+            }
+            awaitAll(futures);
+        } finally {
+            readers.shutdownNow();
+        }
+
+        ProfileTransitionResult after = fixture.service.current("BTCUSDT", "after-reads");
+        assertThat(after.effectiveProfile()).isEqualTo(before.effectiveProfile());
+        assertThat(after.effectiveReason()).isEqualTo(before.effectiveReason());
+        assertThat(after.effectiveSince()).isEqualTo(before.effectiveSince());
+        assertThat(after.nextDowngradeEligibleAt()).isEqualTo(before.nextDowngradeEligibleAt());
+        assertThat(after.ruleVersion()).isEqualTo(before.ruleVersion());
+        verify(fixture.mapper, times(1)).insert(any());
+
+        fixture.clock.advance(Duration.ofSeconds(301));
+        ProfileTransitionResult firstRecovery = fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, ProfileTransitionSignal.recovery(), "recovery-1");
+        ProfileTransitionResult secondRecovery = fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, ProfileTransitionSignal.recovery(), "recovery-2");
+        assertThat(firstRecovery.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(secondRecovery.effectiveProfile()).isEqualTo(RuntimeScanProfile.STANDARD);
+        verify(fixture.mapper, times(2)).insert(any());
+    }
+
+    @Test
+    void missingStateConcurrentReadsDoNotCreateState() throws Exception {
+        Fixture fixture = fixture();
+        ExecutorService readers = Executors.newFixedThreadPool(16);
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
+            for (int reader = 0; reader < 16; reader++) {
+                int readerId = reader;
+                futures.add(readers.submit(() -> {
+                    for (int query = 0; query < 100; query++) {
+                        ProfileTransitionResult current = fixture.service.current(
+                                "UNKNOWN", "read-" + readerId + "-" + query);
+                        assertThat(current.effectiveProfile()).isEqualTo(RuntimeScanProfile.LOW);
+                        assertThat(current.effectiveReason()).isEqualTo("NO_RUNTIME_ESCALATION");
+                        assertThat(fixture.service.currentProfile("UNKNOWN"))
+                                .isEqualTo(RuntimeScanProfile.LOW);
+                    }
+                    return null;
+                }));
+            }
+            awaitAll(futures);
+        } finally {
+            readers.shutdownNow();
+        }
+        verifyNoInteractions(fixture.rules, fixture.mapper);
+
+        ProfileTransitionResult firstExecution = fixture.service.evaluate(
+                "UNKNOWN", UserScanProfile.HIGH, ProfileTransitionSignal.recovery(), "first-execution");
+        assertThat(firstExecution.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(firstExecution.changed()).isFalse();
+        verifyNoInteractions(fixture.mapper);
+    }
+
     private static Fixture fixture() {
         RuleConfigService rules = mock(RuleConfigService.class);
         when(rules.getRuleConfigMap()).thenReturn(ruleMap());
@@ -211,6 +400,31 @@ class ScanProfileTransitionServiceTest {
         when(mapper.insert(any())).thenReturn(1);
         MutableClock clock = new MutableClock(Instant.parse("2026-07-10T10:00:00Z"));
         return new Fixture(new ScanProfileTransitionService(rules, mapper, clock), rules, mapper, clock);
+    }
+
+    private static BlockingFixture blockingFixture() {
+        RuleConfigService rules = mock(RuleConfigService.class);
+        when(rules.getRuleConfigMap()).thenReturn(ruleMap());
+        when(rules.resolveActiveRuleVersion()).thenReturn("v-test");
+        RuleVersionLogMapper mapper = mock(RuleVersionLogMapper.class);
+        CountDownLatch auditEntered = new CountDownLatch(1);
+        CountDownLatch releaseAudit = new CountDownLatch(1);
+        when(mapper.insert(any())).thenAnswer(ignored -> {
+            auditEntered.countDown();
+            if (!releaseAudit.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("timed out waiting to release transition audit");
+            }
+            return 1;
+        });
+        MutableClock clock = new MutableClock(Instant.parse("2026-07-10T10:00:00Z"));
+        return new BlockingFixture(new ScanProfileTransitionService(rules, mapper, clock),
+                mapper, auditEntered, releaseAudit);
+    }
+
+    private static void awaitAll(List<Future<Void>> futures) throws Exception {
+        for (Future<Void> future : futures) {
+            future.get(10, TimeUnit.SECONDS);
+        }
     }
 
     private static Map<String, RuleConfigDO> ruleMap() {
@@ -253,6 +467,9 @@ class ScanProfileTransitionServiceTest {
 
     private record Fixture(ScanProfileTransitionService service, RuleConfigService rules,
                            RuleVersionLogMapper mapper, MutableClock clock) {}
+
+    private record BlockingFixture(ScanProfileTransitionService service, RuleVersionLogMapper mapper,
+                                   CountDownLatch auditEntered, CountDownLatch releaseAudit) {}
 
     private static final class MutableClock extends Clock {
         private Instant instant;

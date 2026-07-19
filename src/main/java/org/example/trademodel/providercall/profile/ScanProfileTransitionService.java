@@ -95,23 +95,27 @@ public class ScanProfileTransitionService {
                 state.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
     }
 
-    public RuntimeScanProfile currentProfile(String symbol) {
+    public synchronized RuntimeScanProfile currentProfile(String symbol) {
         if (symbol == null || symbol.isBlank()) return RuntimeScanProfile.LOW;
         State state = states.get(symbol.trim().toUpperCase());
         return state == null ? RuntimeScanProfile.LOW : state.profile;
     }
 
-    public ProfileTransitionResult current(String symbol, String traceId) {
+    public synchronized ProfileTransitionResult current(String symbol, String traceId) {
         String normalized = required(symbol, "symbol").toUpperCase();
+        String safeTrace = required(traceId, "traceId");
         State state = states.get(normalized);
         if (state == null) {
             return result(normalized, RuntimeScanProfile.LOW, RuntimeScanProfile.LOW,
-                    "NO_RUNTIME_ESCALATION", null, null, "UNKNOWN", false, required(traceId, "traceId"));
+                    "NO_RUNTIME_ESCALATION", null, null, "UNKNOWN", false, safeTrace);
         }
+        RuntimeScanProfile profile = state.profile;
         String reason = state.lastEffectiveReason == null ? "CURRENT_RUNTIME_STATE" : state.lastEffectiveReason;
+        Instant since = state.since;
+        Instant nextDowngradeEligibleAt = state.nextDowngradeEligibleAt;
         String ruleVersion = state.lastRuleVersion == null ? "RUNTIME" : state.lastRuleVersion;
-        return result(normalized, state.profile, state.profile, reason, state.since,
-                state.nextDowngradeEligibleAt, ruleVersion, false, required(traceId, "traceId"));
+        return result(normalized, profile, profile, reason, since,
+                nextDowngradeEligibleAt, ruleVersion, false, safeTrace);
     }
 
     private Requested requested(ProfileTransitionSignal signal, Thresholds t) {

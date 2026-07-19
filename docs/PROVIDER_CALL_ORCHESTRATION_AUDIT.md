@@ -146,6 +146,36 @@ and step down to `STANDARD`. Only the actual rise and downgrade write audit
 rows. This remains branch-level offline evidence pending re-review and merge;
 no provider, AI, notification, order, or trading call was enabled.
 
+## Transition-State Publication Closure
+
+PR #1131 review `4730635925` identified that read-only transition queries did
+not share `evaluate()`'s synchronization boundary. The focused fix publishes
+the mutable transition state through the same service monitor:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Transition publication | `PASS_OFFLINE_PENDING_REVIEW` | `evaluate()`, `current()`, and `currentProfile()` are synchronized on the same service object. |
+| Partial evaluation visibility | `0` | A deterministic test blocks changed-transition audit while `evaluate()` holds the monitor; both read methods wait until the complete evaluation is published. |
+| Snapshot coherence | `PASS_OFFLINE_PENDING_REVIEW` | Profile, reason, effective time, next downgrade time, and rule version are copied and returned under one lock acquisition. |
+| Completed-state visibility | `PASS_OFFLINE_PENDING_REVIEW` | Thirty-two concurrent readers, each repeating 100 reads after execution completion, observe the same complete state. |
+| Read mutation | `0` | Concurrent reads do not create state, evaluate thresholds, advance recovery, change timing, or modify the profile. |
+| Read-only audit | `0` | Concurrent `current()` and `currentProfile()` calls add no transition audit rows. |
+
+```text
+TRANSITION_STATE_PUBLICATION: SAME_MONITOR_AS_EVALUATE
+READ_ONLY_STATE_VISIBILITY: COHERENT_AFTER_COMPLETED_EXECUTION
+MIXED_TRANSITION_SNAPSHOT_COUNT: 0
+CURRENT_METHOD_MUTATIONS: 0
+CURRENT_PROFILE_METHOD_MUTATIONS: 0
+READ_ONLY_TRANSITION_AUDIT_ROWS: 0
+```
+
+The lock protects transition evaluation, transition state, result snapshot,
+and the existing changed-transition audit boundary only. It does not include
+Provider HTTP work, cache/snapshot refresh, Dashboard rendering, AI,
+notifications, or trading. This is branch-level offline evidence pending final
+re-review and merge.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.
@@ -154,5 +184,6 @@ no provider, AI, notification, order, or trading call was enabled.
 - No notification was delivered.
 - No trading capability was added.
 - No live provider or AI call was made while closing Reviewer Rounds 1, 2, 3,
-  the snapshot-retention review comment, or the read-only plan review comment.
+  the snapshot-retention review comment, the read-only plan review comment, or
+  the transition-state publication review.
 - Production readiness remains `BLOCKED`.

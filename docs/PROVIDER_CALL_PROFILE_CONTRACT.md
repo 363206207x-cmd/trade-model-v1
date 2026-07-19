@@ -70,6 +70,25 @@ real Scheduler scan cycles only. `current()` preserves the last real
 evaluation reason for display without evaluating thresholds again. Transition
 audit is written only when an execution evaluation actually changes profile.
 
+Transition state uses one publication boundary: `evaluate()`, `current()`, and
+`currentProfile()` all acquire the same `ScanProfileTransitionService` monitor.
+The read methods either observe the state before an execution evaluation or a
+complete state after it; they cannot observe a mixed profile, reason, effective
+time, downgrade time, or rule version while an evaluation is in progress.
+`current()` copies the complete result snapshot while holding that monitor.
+Synchronization does not change read ownership: neither read method creates a
+missing state, evaluates rules, advances recovery, mutates timing, or writes
+transition audit.
+
+```text
+TRANSITION_STATE_PUBLICATION: SAME_MONITOR_AS_EVALUATE
+READ_ONLY_STATE_VISIBILITY: COHERENT_AFTER_COMPLETED_EXECUTION
+MIXED_TRANSITION_SNAPSHOT_COUNT: 0
+CURRENT_METHOD_MUTATIONS: 0
+CURRENT_PROFILE_METHOD_MUTATIONS: 0
+READ_ONLY_TRANSITION_AUDIT_ROWS: 0
+```
+
 ## API and Persistence
 
 - `GET /api/provider-call/base-profile`
@@ -82,7 +101,8 @@ migration is introduced. Runtime status exposes base/effective profiles,
 reasons, downgrade timing, cadence, budget, health, counts, and notification
 scope without scheduling a refresh.
 
-Branch evidence for this separation is offline and pending review. It does not
-prove live provider or production operation.
+Branch evidence for this separation and publication contract is offline and
+pending final re-review. It does not prove live provider or production
+operation.
 
 Production readiness remains `BLOCKED`.

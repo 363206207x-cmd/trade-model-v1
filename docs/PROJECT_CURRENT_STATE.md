@@ -45,8 +45,9 @@ PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
 `4730325751` requested the HALF_OPEN probe lifecycle correction. Review comment
 `3610213592` then identified the snapshot-retention lookup-order gap, and review
 comment `3610342417` identified read-only plan mutation of runtime profile
-state. This branch records the three rounds plus both focused closures, pending
-the read-only plan final re-review:
+state. Review `4730635925` identified the remaining transition-state
+publication boundary gap. This branch records the three rounds plus all three
+focused closures, pending the transition-state publication final re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -83,6 +84,12 @@ the read-only plan final re-review:
     scan evaluates each relevant asset once, all due datasets reuse that
     profile, and only real scan cycles advance recovery or write changed
     transition audit. One hundred status reads leave state unchanged.
+12. `evaluate`, `current`, and `currentProfile` use the same service monitor.
+    A read cannot complete while a changed transition is paused inside audit,
+    and completed execution state is published as one coherent profile,
+    reason, effective time, downgrade time, and rule-version snapshot.
+    Thirty-two concurrent readers repeating 100 queries produce zero mixed
+    snapshots, state mutations, or additional audit rows.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,
