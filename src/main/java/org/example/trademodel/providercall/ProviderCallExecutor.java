@@ -21,6 +21,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /** Owns every physical provider attempt; no provider adapter runs on the common pool. */
 @Service
@@ -72,7 +73,7 @@ public class ProviderCallExecutor implements AutoCloseable {
                 throw new RejectedExecutionException("PROVIDER_EXECUTOR_QUEUE_FULL", rejected);
             }
         }
-        return new TaskHandle<>(task);
+        return new TaskHandle<>(task, () -> cancelInterruptibly(task));
     }
 
     public ScheduledFuture<?> schedule(Runnable command, Duration delay) {
@@ -85,6 +86,14 @@ public class ProviderCallExecutor implements AutoCloseable {
         return new ExecutorState(executor.getMaximumPoolSize(), maxQueuedCalls,
                 executor.getActiveCount(), executor.getQueue().size(), executor.isShutdown(),
                 executor.isTerminated());
+    }
+
+    int actualQueuedTaskCount() {
+        return executor.getQueue().size();
+    }
+
+    int outstandingTaskCount() {
+        return outstandingTasks.size();
     }
 
     public boolean shutdownCleanly(Duration timeout) {
@@ -108,7 +117,25 @@ public class ProviderCallExecutor implements AutoCloseable {
     }
 
     private void cancelOutstandingTasks() {
-        outstandingTasks.forEach(PhysicalTask::cancelInterruptibly);
+        outstandingTasks.forEach(this::cancelInterruptibly);
+    }
+
+    private CancellationOutcome cancelInterruptibly(PhysicalTask<?> task) {
+        CancellationOutcome queuedOutcome = null;
+        synchronized (admissionLock) {
+            if (task.transitionToCancelledBeforeStart()) {
+                FutureTask<Void> control = task.control();
+                control.cancel(false);
+                queuedOutcome = executor.remove(control)
+                        ? CancellationOutcome.CANCELLED_AND_REMOVED_BEFORE_START
+                        : CancellationOutcome.CANCELLED_BEFORE_START_ALREADY_DEQUEUED;
+            }
+        }
+        if (queuedOutcome != null) {
+            task.completeCancelledBeforeStart("provider call cancelled before start");
+            return queuedOutcome;
+        }
+        return task.requestRunningCancellation();
     }
 
     @PreDestroy
@@ -147,23 +174,32 @@ public class ProviderCallExecutor implements AutoCloseable {
 
     public static final class TaskHandle<T> {
         private final PhysicalTask<T> task;
+        private final Supplier<CancellationOutcome> cancelAction;
 
-        private TaskHandle(PhysicalTask<T> task) {
+        private TaskHandle(PhysicalTask<T> task, Supplier<CancellationOutcome> cancelAction) {
             this.task = task;
+            this.cancelAction = cancelAction;
         }
 
         public CompletableFuture<T> completion() {
             return task.completion;
         }
 
-        public void cancelInterruptibly() {
-            task.cancelInterruptibly();
+        public CancellationOutcome cancelInterruptibly() {
+            return cancelAction.get();
         }
 
         public boolean physicallyFinished() {
-            return task.state.get() == TaskState.FINISHED
-                    || task.state.get() == TaskState.CANCELLED_BEFORE_START;
+            TaskState current = task.state.get();
+            return current == TaskState.FINISHED || current == TaskState.CANCELLED_BEFORE_START;
         }
+    }
+
+    public enum CancellationOutcome {
+        CANCELLED_AND_REMOVED_BEFORE_START,
+        CANCELLED_BEFORE_START_ALREADY_DEQUEUED,
+        INTERRUPT_REQUESTED_FOR_RUNNING_TASK,
+        ALREADY_FINISHED
     }
 
     private enum TaskState {
@@ -187,6 +223,10 @@ public class ProviderCallExecutor implements AutoCloseable {
             this.control = control;
         }
 
+        private FutureTask<Void> control() {
+            return control;
+        }
+
         @Override
         public void run() {
             if (!state.compareAndSet(TaskState.NEW, TaskState.RUNNING)) return;
@@ -199,18 +239,23 @@ public class ProviderCallExecutor implements AutoCloseable {
             }
         }
 
-        private void cancelInterruptibly() {
-            if (state.compareAndSet(TaskState.NEW, TaskState.CANCELLED_BEFORE_START)) {
-                completion.completeExceptionally(new CancellationException("provider call cancelled before start"));
-                control.cancel(false);
-                return;
-            }
-            if (state.get() == TaskState.RUNNING) control.cancel(true);
+        private boolean transitionToCancelledBeforeStart() {
+            return state.compareAndSet(TaskState.NEW, TaskState.CANCELLED_BEFORE_START);
+        }
+
+        private void completeCancelledBeforeStart(String reason) {
+            completion.completeExceptionally(new CancellationException(reason));
+        }
+
+        private CancellationOutcome requestRunningCancellation() {
+            if (state.get() != TaskState.RUNNING) return CancellationOutcome.ALREADY_FINISHED;
+            control.cancel(true);
+            return CancellationOutcome.INTERRUPT_REQUESTED_FOR_RUNNING_TASK;
         }
 
         private void cancelBeforeStart() {
-            if (state.compareAndSet(TaskState.NEW, TaskState.CANCELLED_BEFORE_START)) {
-                completion.completeExceptionally(new CancellationException("provider call rejected before start"));
+            if (transitionToCancelledBeforeStart()) {
+                completeCancelledBeforeStart("provider call rejected before start");
             }
         }
     }

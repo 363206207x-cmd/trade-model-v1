@@ -223,6 +223,8 @@ wins the compare-and-set race:
 | Remote timeout | `REMOTE_TRANSPORT` | `PROVIDER_TIMEOUT` is possible only after the adapter-start transition wins. Existing interruption, lease ownership, retry budget, health, and circuit tests remain passing. |
 | HALF_OPEN | `PASS_OFFLINE_PENDING_REVIEW` | A queue/pre-remote timeout releases the permit without a remote attempt, so a later recovery probe remains available. |
 | Race integrity | `PASS_100_ATOMIC_ITERATIONS` | Every controlled race yields either local timeout with zero adapter calls or remote timeout with exactly one adapter call; no mixed outcome is accepted. |
+| Cancelled queue control | `PASS_OFFLINE_PENDING_REVIEW` | A `NEW` task that wins cancellation is cancelled and its exact control is removed from the bounded work queue under the admission boundary; running tasks never remove queued neighbours. |
+| Repeated queue pressure | `PASS_20_TIMEOUTS` | With the worker still blocked, every completed queue timeout leaves `queuedCalls=0`, actual queue growth `0`, Single Flight cleared, and the P0 reserved slot available. |
 
 ```text
 ATTEMPT_PHASE_MODEL: QUEUED_LOCAL_ADMISSION_REMOTE_IN_FLIGHT
@@ -234,8 +236,13 @@ QUEUE_TIMEOUT_CIRCUIT_FAILURE_COUNT: 0
 QUEUE_TIMEOUT_RETRY_COUNT: 0
 QUEUE_TIMEOUT_ADAPTER_CALL_COUNT: 0
 QUEUE_TIMEOUT_BUDGET_ATTEMPTS: 0
+CANCELLED_BEFORE_START_QUEUE_REMOVAL: IMMEDIATE_EXACT_CONTROL_REMOVAL
+CANCELLED_QUEUE_SLOT_RECLAMATION: PASS
+REPEATED_QUEUE_TIMEOUT_QUEUE_GROWTH: 0
+P0_RESERVED_SLOT_AFTER_CANCELLED_P3: AVAILABLE
+SINGLE_FLIGHT_AND_EXECUTOR_QUEUE_CLEANUP: CONSISTENT
 PR_STATE: OPEN_DRAFT_UNMERGED
-NEXT_TASK: Reviewer P3-CALL1 Queued Attempt Classification Final Re-review
+NEXT_TASK: Reviewer P3-CALL1 Cancelled Queue Slot Reclamation Final Re-review
 ```
 
 These are offline branch results. No real Provider or AI call was made, and

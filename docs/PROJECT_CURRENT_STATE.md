@@ -50,9 +50,10 @@ boundary gap. Final review `4730817855` passed that exact Head, after which two
 new P2 threads identified optional-universe count resilience and
 audit-before-publication atomicity. Those fixes were followed by thread
 `PRRT_kwDOSc6fQc6SF53A`, which identified queued attempts being classified as
-remote timeouts before Adapter start. This branch records the three rounds plus
-the focused closures below, pending a queued-attempt classification final
-re-review:
+remote timeouts before Adapter start. Review `4731186182` then identified that
+a cancelled queued control could remain in the bounded executor queue after its
+logical flight completed. This branch records the three rounds plus the focused
+closures below, pending a cancelled queue-slot reclamation final re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -107,6 +108,11 @@ re-review:
     cause zero remote health/circuit/retry/adapter effects, and a pure queue
     timeout consumes zero attempt budget. `PROVIDER_TIMEOUT` is reserved for a
     timeout after Adapter start wins the phase race.
+16. cancellation of a queued task removes its exact control from the bounded
+    executor queue before another admission can consume the slot. Twenty
+    repeated P3 queue timeouts leave zero queued controls and zero queue growth;
+    P0 reserved admission remains available. Running cancellation only requests
+    interruption and cannot remove another request's queued control.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,
@@ -1209,5 +1215,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; queued-attempt timeout classification closure pending final re-review
+- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; cancelled queue-slot reclamation closure pending final re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

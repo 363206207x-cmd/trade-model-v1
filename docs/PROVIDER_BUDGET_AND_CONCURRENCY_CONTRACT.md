@@ -60,6 +60,16 @@ physical-attempt start audit. Only a timeout that wins after
 `REMOTE_IN_FLIGHT` may become `PROVIDER_TIMEOUT` and retain the existing remote
 transport, bounded retry, health, and circuit behavior.
 
+Cancellation of a still-`QUEUED` physical task is owned by
+`ProviderCallExecutor`. The task state first wins `NEW ->
+CANCELLED_BEFORE_START`; the executor then cancels and removes that exact
+control `FutureTask` from the bounded work queue inside the admission boundary.
+The logical completion is published after the lock is released. Consequently
+`queuedCalls` reflects the reclaimed slot immediately, repeated queue timeouts
+cannot accumulate dead controls, and reserved priority capacity remains
+available to a later `P0_POSITION` request. A running task receives only an
+interrupt request and never removes a neighbouring queued control.
+
 ## Single Flight and Failure
 
 One stable `ProviderSnapshotKey` has one owner lifecycle. Waiters with different
@@ -119,4 +129,9 @@ QUEUE_TIMEOUT_CIRCUIT_FAILURE_COUNT: 0
 QUEUE_TIMEOUT_RETRY_COUNT: 0
 QUEUE_TIMEOUT_ADAPTER_CALL_COUNT: 0
 QUEUE_TIMEOUT_BUDGET_ATTEMPTS: 0
+CANCELLED_BEFORE_START_QUEUE_REMOVAL: IMMEDIATE_EXACT_CONTROL_REMOVAL
+CANCELLED_QUEUE_SLOT_RECLAMATION: PASS
+REPEATED_QUEUE_TIMEOUT_QUEUE_GROWTH: 0
+P0_RESERVED_SLOT_AFTER_CANCELLED_P3: AVAILABLE
+SINGLE_FLIGHT_AND_EXECUTOR_QUEUE_CLEANUP: CONSISTENT
 ```

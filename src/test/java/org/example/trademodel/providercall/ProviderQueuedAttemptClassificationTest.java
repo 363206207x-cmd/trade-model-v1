@@ -157,6 +157,208 @@ class ProviderQueuedAttemptClassificationTest {
     }
 
     @Test
+    void cancelledQueuedTaskIsRemovedImmediately() throws Exception {
+        try (Harness harness = new Harness(new ProviderCallAuditLog(), 2, 1)) {
+            try (WorkerBlock worker = harness.occupyWorker()) {
+                int runningTaskCount = harness.executor.outstandingTaskCount();
+                AtomicInteger adapterCalls = new AtomicInteger();
+
+                ProviderCallResult<String> result = executeWithLongWaiter(harness, request(
+                        "BTCUSDT", "queue-remove", SHORT_TIMEOUT, 1, () -> {
+                            adapterCalls.incrementAndGet();
+                            return ProviderAdapterResponse.ready("must-not-run", NOW);
+                        }));
+
+                assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_EXECUTOR_QUEUE_TIMEOUT");
+                assertThat(adapterCalls).hasValue(0);
+                assertThat(harness.executor.state().queuedCalls()).isZero();
+                assertThat(harness.executor.actualQueuedTaskCount()).isZero();
+                assertThat(harness.singleFlight.activeFlightCount()).isZero();
+                awaitState(() -> harness.executor.outstandingTaskCount() == runningTaskCount);
+                assertThat(harness.executor.outstandingTaskCount()).isEqualTo(runningTaskCount);
+            }
+        }
+    }
+
+    @Test
+    void repeatedQueuedTimeoutsDoNotAccumulateCancelledFutureTasks() throws Exception {
+        try (Harness harness = new Harness(new ProviderCallAuditLog(), 2, 1)) {
+            try (WorkerBlock worker = harness.occupyWorker()) {
+                AtomicInteger adapterCalls = new AtomicInteger();
+
+                assertRepeatedDiscoveryTimeouts(harness, 20, adapterCalls);
+
+                assertThat(adapterCalls).hasValue(0);
+                assertThat(harness.executor.state().queuedCalls()).isZero();
+                assertThat(harness.executor.actualQueuedTaskCount()).isZero();
+                assertThat(harness.singleFlight.activeFlightCount()).isZero();
+                assertThat(harness.budget.attemptReservations).hasValue(0);
+                assertThat(harness.health.get("TEST", ProviderCircuitState.CLOSED).lastFailureAt()).isNull();
+                assertThat(harness.circuit.state("TEST")).isEqualTo(ProviderCircuitState.CLOSED);
+            }
+        }
+    }
+
+    @Test
+    void cancelledDiscoveryTimeoutReclaimsReservedPrioritySlot() throws Exception {
+        try (Harness harness = new Harness(new ProviderCallAuditLog(), 2, 1)) {
+            try (WorkerBlock worker = harness.occupyWorker()) {
+                ProviderCallResult<String> discovery = executeWithLongWaiter(harness, request(
+                        "ETHUSDT", "reserved-slot", AssetPriority.P3_DISCOVERY, SHORT_TIMEOUT, 1,
+                        () -> ProviderAdapterResponse.ready("must-not-run", NOW)));
+
+                assertThat(discovery.metadata().errorCode()).isEqualTo("PROVIDER_EXECUTOR_QUEUE_TIMEOUT");
+                assertThat(harness.executor.state().queuedCalls()).isZero();
+
+                ProviderCallExecutor.TaskHandle<String> position = harness.executor.submit(
+                        AssetPriority.P0_POSITION, () -> "position-refresh");
+                assertThat(harness.executor.state().queuedCalls()).isEqualTo(1);
+                assertThat(position.cancelInterruptibly()).isEqualTo(
+                        ProviderCallExecutor.CancellationOutcome.CANCELLED_AND_REMOVED_BEFORE_START);
+                assertThat(harness.executor.state().queuedCalls()).isZero();
+            }
+        }
+    }
+
+    @Test
+    void p0PositionAdmittedAfterRepeatedDiscoveryTimeouts() throws Exception {
+        try (Harness harness = new Harness(new ProviderCallAuditLog(), 2, 1)) {
+            try (WorkerBlock worker = harness.occupyWorker()) {
+                AtomicInteger adapterCalls = new AtomicInteger();
+                assertRepeatedDiscoveryTimeouts(harness, 5, adapterCalls);
+
+                ProviderCallExecutor.TaskHandle<String> position = harness.executor.submit(
+                        AssetPriority.P0_POSITION, () -> "position-refresh");
+
+                assertThat(adapterCalls).hasValue(0);
+                assertThat(harness.executor.state().queuedCalls()).isEqualTo(1);
+                assertThat(position.cancelInterruptibly()).isEqualTo(
+                        ProviderCallExecutor.CancellationOutcome.CANCELLED_AND_REMOVED_BEFORE_START);
+                assertThat(harness.executor.state().queuedCalls()).isZero();
+            }
+        }
+    }
+
+    @Test
+    void cancelBeforeStartRemovesOnlyMatchingControl() throws Exception {
+        ProviderCallExecutor executor = new ProviderCallExecutor(1, 3, 1);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            ProviderCallExecutor.TaskHandle<Void> running = executor.submit(AssetPriority.P0_POSITION, () -> {
+                entered.countDown();
+                awaitIgnoringInterrupt(release);
+                return null;
+            });
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            ProviderCallExecutor.TaskHandle<String> first = executor.submit(
+                    AssetPriority.P0_POSITION, () -> "first");
+            ProviderCallExecutor.TaskHandle<String> second = executor.submit(
+                    AssetPriority.P0_POSITION, () -> "second");
+            assertThat(executor.state().queuedCalls()).isEqualTo(2);
+
+            assertThat(first.cancelInterruptibly()).isEqualTo(
+                    ProviderCallExecutor.CancellationOutcome.CANCELLED_AND_REMOVED_BEFORE_START);
+            assertThat(first.completion()).isCompletedExceptionally();
+            assertThat(executor.state().queuedCalls()).isEqualTo(1);
+            assertThat(executor.actualQueuedTaskCount()).isEqualTo(1);
+
+            release.countDown();
+            running.completion().get(1, TimeUnit.SECONDS);
+            assertThat(second.completion().get(1, TimeUnit.SECONDS)).isEqualTo("second");
+        } finally {
+            release.countDown();
+            executor.close();
+        }
+    }
+
+    @Test
+    void runningTaskCancellationDoesNotRemoveQueuedNeighbour() throws Exception {
+        ProviderCallExecutor executor = new ProviderCallExecutor(1, 2, 1);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            ProviderCallExecutor.TaskHandle<String> running = executor.submit(AssetPriority.P0_POSITION, () -> {
+                entered.countDown();
+                awaitIgnoringInterrupt(release);
+                return "running";
+            });
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            ProviderCallExecutor.TaskHandle<String> queued = executor.submit(
+                    AssetPriority.P0_POSITION, () -> "queued");
+
+            assertThat(running.cancelInterruptibly()).isEqualTo(
+                    ProviderCallExecutor.CancellationOutcome.INTERRUPT_REQUESTED_FOR_RUNNING_TASK);
+            assertThat(executor.state().queuedCalls()).isEqualTo(1);
+            assertThat(executor.actualQueuedTaskCount()).isEqualTo(1);
+
+            release.countDown();
+            assertThat(running.completion().get(1, TimeUnit.SECONDS)).isEqualTo("running");
+            assertThat(queued.completion().get(1, TimeUnit.SECONDS)).isEqualTo("queued");
+        } finally {
+            release.countDown();
+            executor.close();
+        }
+    }
+
+    @Test
+    void queueMetricMatchesActualQueueAfterCancellation() throws Exception {
+        ProviderCallExecutor executor = new ProviderCallExecutor(1, 2, 1);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            executor.submit(AssetPriority.P0_POSITION, () -> {
+                entered.countDown();
+                awaitIgnoringInterrupt(release);
+                return null;
+            });
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            ProviderCallExecutor.TaskHandle<String> queued = executor.submit(
+                    AssetPriority.P0_POSITION, () -> "queued");
+            assertThat(executor.state().queuedCalls()).isEqualTo(executor.actualQueuedTaskCount()).isEqualTo(1);
+
+            assertThat(queued.cancelInterruptibly()).isEqualTo(
+                    ProviderCallExecutor.CancellationOutcome.CANCELLED_AND_REMOVED_BEFORE_START);
+
+            assertThat(executor.state().queuedCalls()).isEqualTo(executor.actualQueuedTaskCount()).isZero();
+        } finally {
+            release.countDown();
+            executor.close();
+        }
+    }
+
+    @Test
+    void shutdownCleanupRemovesCancelledQueuedTasks() throws Exception {
+        ProviderCallExecutor executor = new ProviderCallExecutor(1, 2, 1);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            executor.submit(AssetPriority.P0_POSITION, () -> {
+                entered.countDown();
+                release.await();
+                return null;
+            });
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            ProviderCallExecutor.TaskHandle<String> queued = executor.submit(
+                    AssetPriority.P0_POSITION, () -> "queued");
+            assertThat(executor.state().queuedCalls()).isEqualTo(1);
+
+            assertThat(executor.shutdownCleanly(Duration.ofMillis(25))).isFalse();
+            awaitState(() -> executor.state().terminated() && executor.outstandingTaskCount() == 0);
+
+            assertThat(queued.completion()).isCompletedExceptionally();
+            assertThat(executor.state().queuedCalls()).isZero();
+            assertThat(executor.actualQueuedTaskCount()).isZero();
+            assertThat(executor.outstandingTaskCount()).isZero();
+            assertThat(executor.state().shutdown()).isTrue();
+            assertThat(executor.state().terminated()).isTrue();
+        } finally {
+            release.countDown();
+            executor.close();
+        }
+    }
+
+    @Test
     void preRemoteTimeoutCannotCallAdapter() {
         BlockingAttemptStartAudit audit = new BlockingAttemptStartAudit();
         try (Harness harness = new Harness(audit)) {
@@ -197,6 +399,25 @@ class ProviderQueuedAttemptClassificationTest {
                 ownerRequest, Duration.ofSeconds(1)));
         owner.join();
         return result;
+    }
+
+    private static void assertRepeatedDiscoveryTimeouts(
+            Harness harness,
+            int count,
+            AtomicInteger adapterCalls) {
+        for (int index = 0; index < count; index++) {
+            ProviderCallResult<String> result = executeWithLongWaiter(harness, request(
+                    "QUEUE" + index + "USDT", "queue-reclaim-" + index,
+                    AssetPriority.P3_DISCOVERY, Duration.ofMillis(40), 1, () -> {
+                        adapterCalls.incrementAndGet();
+                        return ProviderAdapterResponse.ready("must-not-run", NOW);
+                    }));
+            assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_EXECUTOR_QUEUE_TIMEOUT");
+            assertThat(harness.executor.state().queuedCalls()).isZero();
+            assertThat(harness.executor.actualQueuedTaskCount()).isZero();
+            awaitState(() -> harness.singleFlight.activeFlightCount() == 0);
+            assertThat(harness.singleFlight.activeFlightCount()).isZero();
+        }
     }
 
     private static ProviderCallRequest<String> withTimeout(
@@ -264,9 +485,19 @@ class ProviderQueuedAttemptClassificationTest {
             Duration timeout,
             int maxRetryTimeout,
             Supplier<ProviderAdapterResponse<String>> adapter) {
+        return request(symbol, bucket, AssetPriority.P0_POSITION, timeout, maxRetryTimeout, adapter);
+    }
+
+    private static ProviderCallRequest<String> request(
+            String symbol,
+            String bucket,
+            AssetPriority priority,
+            Duration timeout,
+            int maxRetryTimeout,
+            Supplier<ProviderAdapterResponse<String>> adapter) {
         ProviderRequestKey key = new ProviderRequestKey("TEST", ProviderDatasetType.PRICE,
                 ProviderCallTestFixtures.spot(symbol), symbol, "GLOBAL", bucket, "TEST_V1");
-        return new ProviderCallRequest<>(key, AssetPriority.P0_POSITION, UserScanProfile.AUTO,
+        return new ProviderCallRequest<>(key, priority, UserScanProfile.AUTO,
                 RuntimeScanProfile.STANDARD, List.of("TEST"), "FM-TEST", Duration.ofSeconds(5),
                 Duration.ofMinutes(2), timeout, "trace-" + bucket, 0, maxRetryTimeout, adapter);
     }
@@ -310,18 +541,23 @@ class ProviderQueuedAttemptClassificationTest {
         private final ProviderCircuitBreaker circuit = new ProviderCircuitBreaker(1, 5, clock);
         private final ProviderSingleFlightGuard singleFlight = new ProviderSingleFlightGuard();
         private final ProviderHealthRegistry health = new ProviderHealthRegistry(clock);
-        private final ProviderCallExecutor executor = new ProviderCallExecutor(1, 8, 1);
+        private final ProviderCallExecutor executor;
         private final ProviderCallAuditService audit;
         private final ProviderCallCoordinator coordinator;
 
         private Harness(ProviderCallAuditService audit) {
+            this(audit, 8, 1);
+        }
+
+        private Harness(ProviderCallAuditService audit, int maxQueuedCalls, int reservedPrioritySlots) {
             this.audit = audit;
             ProviderCallProperties properties = new ProviderCallProperties();
             properties.setEnabled(true);
             properties.setExternalCallsEnabled(true);
             properties.setMaxConcurrentProviderCalls(1);
-            properties.setMaxQueuedCalls(8);
-            properties.setReservedPrioritySlots(0);
+            properties.setMaxQueuedCalls(maxQueuedCalls);
+            properties.setReservedPrioritySlots(reservedPrioritySlots);
+            executor = new ProviderCallExecutor(1, maxQueuedCalls, reservedPrioritySlots);
             coordinator = new ProviderCallCoordinator(properties, new SnapshotCacheService(), singleFlight,
                     budget, circuit, audit, new ProviderConcurrencyGuard(properties), health, executor,
                     new ProviderSnapshotRetentionPolicy(), clock);
