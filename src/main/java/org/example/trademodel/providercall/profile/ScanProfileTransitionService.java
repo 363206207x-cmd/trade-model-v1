@@ -50,6 +50,7 @@ public class ScanProfileTransitionService {
         Thresholds thresholds = thresholds();
         if (thresholds == null) {
             RuntimeScanProfile kept = RuntimeScanProfile.max(state.profile, floor);
+            state.recordEvaluation("PROFILE_RULE_CONFIG_UNAVAILABLE", "UNKNOWN", now);
             return result(normalized, state.profile, kept, "PROFILE_RULE_CONFIG_UNAVAILABLE", state.since,
                     state.nextDowngradeEligibleAt, "UNKNOWN", false, safeTrace);
         }
@@ -89,6 +90,7 @@ public class ScanProfileTransitionService {
             audit(normalized, previous, state.profile, reason, requested.triggerValue,
                     thresholds.ruleVersion, state.nextDowngradeEligibleAt, safeTrace, now);
         }
+        state.recordEvaluation(reason, thresholds.ruleVersion, now);
         return result(normalized, previous, state.profile, reason, state.since,
                 state.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
     }
@@ -106,8 +108,10 @@ public class ScanProfileTransitionService {
             return result(normalized, RuntimeScanProfile.LOW, RuntimeScanProfile.LOW,
                     "NO_RUNTIME_ESCALATION", null, null, "UNKNOWN", false, required(traceId, "traceId"));
         }
-        return result(normalized, state.profile, state.profile, "CURRENT_RUNTIME_STATE", state.since,
-                state.nextDowngradeEligibleAt, "RUNTIME", false, required(traceId, "traceId"));
+        String reason = state.lastEffectiveReason == null ? "CURRENT_RUNTIME_STATE" : state.lastEffectiveReason;
+        String ruleVersion = state.lastRuleVersion == null ? "RUNTIME" : state.lastRuleVersion;
+        return result(normalized, state.profile, state.profile, reason, state.since,
+                state.nextDowngradeEligibleAt, ruleVersion, false, required(traceId, "traceId"));
     }
 
     private Requested requested(ProfileTransitionSignal signal, Thresholds t) {
@@ -254,7 +258,15 @@ public class ScanProfileTransitionService {
         private Instant since;
         private Instant nextDowngradeEligibleAt;
         private Instant lastTransitionAt;
+        private Instant lastEvaluatedAt;
+        private String lastEffectiveReason;
+        private String lastRuleVersion;
         private int recoveryCycles;
         private State(RuntimeScanProfile profile, Instant since) { this.profile = profile; this.since = since; }
+        private void recordEvaluation(String reason, String ruleVersion, Instant evaluatedAt) {
+            this.lastEffectiveReason = reason;
+            this.lastRuleVersion = ruleVersion;
+            this.lastEvaluatedAt = evaluatedAt;
+        }
     }
 }

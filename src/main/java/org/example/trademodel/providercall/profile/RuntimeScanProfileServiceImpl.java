@@ -14,7 +14,6 @@ import org.example.trademodel.providercall.scan.ScanUniverseResolver;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
-import java.util.UUID;
 
 @Service
 public class RuntimeScanProfileServiceImpl implements RuntimeScanProfileService {
@@ -48,8 +47,7 @@ public class RuntimeScanProfileServiceImpl implements RuntimeScanProfileService 
         ScanUniverseInput input = universeSource.currentUniverse();
         ScanPlanItem item = resolver.resolve(input).stream()
                 .filter(candidate -> normalized.equals(candidate.symbol())).findFirst().orElse(null);
-        ProfileTransitionResult transition = transitionService.current(normalized,
-                "runtime-profile-" + UUID.randomUUID());
+        ProfileTransitionResult transition = transitionService.current(normalized, "runtime-profile-query");
         RuntimeScanProfile profile = item == null ? transition.effectiveProfile() : item.effectiveProfile();
         AssetPriority priority = item == null ? AssetPriority.P3_DISCOVERY : item.effectivePriority();
         String reason = item == null ? transition.effectiveReason() : item.escalationReason();

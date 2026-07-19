@@ -41,7 +41,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSource {
@@ -118,6 +117,18 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
 
     @Override
     public ScanUniverseInput currentUniverse() {
+        UniverseSnapshot snapshot = collectSnapshot();
+        return toInput(snapshot, readOnlyTransitions(snapshot));
+    }
+
+    @Override
+    public ScanUniverseInput evaluateUniverseForExecution(String scanCycleTraceId) {
+        String safeTraceId = requiredTraceId(scanCycleTraceId);
+        UniverseSnapshot snapshot = collectSnapshot();
+        return toInput(snapshot, executionTransitions(snapshot, safeTraceId));
+    }
+
+    private UniverseSnapshot collectSnapshot() {
         Instant asOf = clock.instant();
         UserConfigDO config = safeUserConfig();
         UserScanProfile base = profilePreferenceService.getBaseProfile();
@@ -144,33 +155,69 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
                 .map(AutoCandidateRegistry.AutoCandidateSnapshot::canonicalInstrumentId)
                 .forEach(candidates::add);
 
+        Map<CanonicalInstrumentId, UserPositionDO> positionByInstrument = new LinkedHashMap<>();
+        for (UserPositionDO row : openPositions) {
+            resolvePerpetual(row.getAssetSymbol()).ifPresent(id -> positionByInstrument.putIfAbsent(id, row));
+        }
+        Map<CanonicalInstrumentId, AssetStateDO> stateByInstrument = new LinkedHashMap<>();
+        for (AssetStateDO row : candidateRows) {
+            resolvePerpetual(row.getSymbol()).ifPresent(id -> stateByInstrument.putIfAbsent(id, row));
+        }
+        Set<CanonicalInstrumentId> transitionInstruments = new LinkedHashSet<>();
+        transitionInstruments.addAll(positionByInstrument.keySet());
+        transitionInstruments.addAll(stateByInstrument.keySet());
+        transitionInstruments.addAll(pushSignals.keySet());
+
+        boolean transitionsEnabled = autoEscalation && properties.isProfileEscalationEnabled();
+        return new UniverseSnapshot(watchlist, positions, List.copyOf(candidates), discovery, base,
+                transitionsEnabled, Map.copyOf(positionByInstrument), Map.copyOf(stateByInstrument),
+                pushSignals, Set.copyOf(transitionInstruments), refreshRegistry.lastAttempts(), asOf);
+    }
+
+    private TransitionView readOnlyTransitions(UniverseSnapshot snapshot) {
         Map<CanonicalInstrumentId, RuntimeScanProfile> escalations = new LinkedHashMap<>();
         Map<CanonicalInstrumentId, String> reasons = new LinkedHashMap<>();
-        if (autoEscalation && properties.isProfileEscalationEnabled()) {
-            Map<CanonicalInstrumentId, UserPositionDO> positionByInstrument = new LinkedHashMap<>();
-            for (UserPositionDO row : openPositions) {
-                resolvePerpetual(row.getAssetSymbol()).ifPresent(id -> positionByInstrument.putIfAbsent(id, row));
-            }
-            Map<CanonicalInstrumentId, AssetStateDO> stateByInstrument = new LinkedHashMap<>();
-            for (AssetStateDO row : candidateRows) {
-                resolvePerpetual(row.getSymbol()).ifPresent(id -> stateByInstrument.putIfAbsent(id, row));
-            }
-            Set<CanonicalInstrumentId> evaluated = new LinkedHashSet<>();
-            evaluated.addAll(positionByInstrument.keySet());
-            evaluated.addAll(stateByInstrument.keySet());
-            evaluated.addAll(pushSignals.keySet());
-            for (CanonicalInstrumentId instrument : evaluated) {
+        if (snapshot.transitionsEnabled()) {
+            for (CanonicalInstrumentId instrument : snapshot.transitionInstruments()) {
                 String providerSymbol = mappingRegistry.resolve(SCAN_PROVIDER, instrument).providerSymbol();
-                ProfileTransitionResult transition = transitionService.evaluate(providerSymbol, base,
-                        signal(positionByInstrument.get(instrument), stateByInstrument.get(instrument),
-                                pushSignals.get(instrument)),
-                        "provider-universe-" + UUID.randomUUID());
+                ProfileTransitionResult transition = transitionService.current(
+                        providerSymbol, "provider-universe-read-only");
                 escalations.put(instrument, transition.effectiveProfile());
                 reasons.put(instrument, transition.effectiveReason());
             }
         }
-        return new ScanUniverseInput(watchlist, positions, List.copyOf(candidates), discovery, base,
-                RuntimeScanProfile.LOW, escalations, reasons, refreshRegistry.lastAttempts(), asOf);
+        return new TransitionView(escalations, reasons);
+    }
+
+    private TransitionView executionTransitions(UniverseSnapshot snapshot, String scanCycleTraceId) {
+        Map<CanonicalInstrumentId, RuntimeScanProfile> escalations = new LinkedHashMap<>();
+        Map<CanonicalInstrumentId, String> reasons = new LinkedHashMap<>();
+        if (snapshot.transitionsEnabled()) {
+            for (CanonicalInstrumentId instrument : snapshot.transitionInstruments()) {
+                String providerSymbol = mappingRegistry.resolve(SCAN_PROVIDER, instrument).providerSymbol();
+                ProfileTransitionResult transition = transitionService.evaluate(providerSymbol, snapshot.base(),
+                        signal(snapshot.positionByInstrument().get(instrument),
+                                snapshot.stateByInstrument().get(instrument),
+                                snapshot.pushSignals().get(instrument)),
+                        scanCycleTraceId + ":" + instrument.canonical());
+                escalations.put(instrument, transition.effectiveProfile());
+                reasons.put(instrument, transition.effectiveReason());
+            }
+        }
+        return new TransitionView(escalations, reasons);
+    }
+
+    private static ScanUniverseInput toInput(UniverseSnapshot snapshot, TransitionView transitions) {
+        return new ScanUniverseInput(snapshot.watchlist(), snapshot.positions(), snapshot.candidates(),
+                snapshot.discovery(), snapshot.base(), RuntimeScanProfile.LOW, transitions.escalations(),
+                transitions.reasons(), snapshot.lastRefreshes(), snapshot.asOf());
+    }
+
+    private static String requiredTraceId(String traceId) {
+        if (traceId == null || traceId.isBlank()) {
+            throw new IllegalArgumentException("scanCycleTraceId is required");
+        }
+        return traceId.trim();
     }
 
     private ProfileTransitionSignal signal(UserPositionDO position, AssetStateDO state, String pushSignal) {
@@ -296,9 +343,23 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
-    private static UserScanProfile parseUserProfile(String raw, UserScanProfile fallback) {
-        if (raw == null || raw.isBlank()) return fallback;
-        try { return UserScanProfile.valueOf(raw.trim().toUpperCase(Locale.ROOT)); }
-        catch (IllegalArgumentException ignored) { return fallback; }
+    private record UniverseSnapshot(
+            List<CanonicalInstrumentId> watchlist,
+            List<PositionScanAsset> positions,
+            List<CanonicalInstrumentId> candidates,
+            List<CanonicalInstrumentId> discovery,
+            UserScanProfile base,
+            boolean transitionsEnabled,
+            Map<CanonicalInstrumentId, UserPositionDO> positionByInstrument,
+            Map<CanonicalInstrumentId, AssetStateDO> stateByInstrument,
+            Map<CanonicalInstrumentId, String> pushSignals,
+            Set<CanonicalInstrumentId> transitionInstruments,
+            Map<ScanUniverseInput.DatasetRefreshKey, Instant> lastRefreshes,
+            Instant asOf) {
+    }
+
+    private record TransitionView(
+            Map<CanonicalInstrumentId, RuntimeScanProfile> escalations,
+            Map<CanonicalInstrumentId, String> reasons) {
     }
 }

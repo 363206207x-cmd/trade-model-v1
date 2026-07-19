@@ -20,4 +20,10 @@ public class ProviderScanPlanServiceImpl implements ProviderScanPlanService {
         ScanUniverseInput input = source.currentUniverse();
         return input == null ? List.of() : resolver.resolve(input);
     }
+
+    @Override
+    public List<ScanPlanItem> planForExecution(String scanCycleTraceId) {
+        ScanUniverseInput input = source.evaluateUniverseForExecution(scanCycleTraceId);
+        return input == null ? List.of() : resolver.resolve(input);
+    }
 }

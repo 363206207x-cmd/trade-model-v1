@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ScanProfileTransitionServiceTest {
@@ -142,6 +143,66 @@ class ScanProfileTransitionServiceTest {
         verify(fixture.mapper).insert(any());
     }
 
+    @Test
+    void currentDoesNotMutateOrCreateMissingStateOrWriteAudit() {
+        Fixture fixture = fixture();
+
+        ProfileTransitionResult current = fixture.service.current("BTCUSDT", "read-1");
+        ProfileTransitionResult firstExecution = fixture.service.evaluate("BTCUSDT", UserScanProfile.HIGH,
+                ProfileTransitionSignal.recovery(), "execution-1");
+
+        assertThat(current.effectiveProfile()).isEqualTo(RuntimeScanProfile.LOW);
+        assertThat(current.effectiveReason()).isEqualTo("NO_RUNTIME_ESCALATION");
+        assertThat(firstExecution.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(firstExecution.changed()).isFalse();
+        verifyNoInteractions(fixture.mapper);
+    }
+
+    @Test
+    void currentReturnsLastExecutionReasonAndPreservesNextDowngradeEligibleAt() {
+        Fixture fixture = fixture();
+        ProfileTransitionResult execution = fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "execution-high");
+
+        ProfileTransitionResult current = fixture.service.current("BTCUSDT", "read-only");
+
+        assertThat(current.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(current.effectiveReason()).isEqualTo("HIGH_RISK");
+        assertThat(current.ruleVersion()).isEqualTo("v-test");
+        assertThat(current.nextDowngradeEligibleAt()).isEqualTo(execution.nextDowngradeEligibleAt());
+        assertThat(current.changed()).isFalse();
+        verify(fixture.mapper, times(1)).insert(any());
+    }
+
+    @Test
+    void oneHundredCurrentQueriesDoNotAdvanceRecoveryCycles() {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, highSignal(), "execution-high");
+        fixture.clock.advance(Duration.ofSeconds(301));
+
+        for (int index = 0; index < 100; index++) {
+            ProfileTransitionResult current = fixture.service.current("BTCUSDT", "read-" + index);
+            assertThat(current.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        }
+        ProfileTransitionResult firstRecovery = fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
+                ProfileTransitionSignal.recovery(), "execution-recovery-1");
+        ProfileTransitionResult secondRecovery = fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
+                ProfileTransitionSignal.recovery(), "execution-recovery-2");
+
+        assertThat(firstRecovery.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(secondRecovery.effectiveProfile()).isEqualTo(RuntimeScanProfile.STANDARD);
+        verify(fixture.mapper, times(2)).insert(any());
+    }
+
+    @Test
+    void missingCurrentStateDoesNotLoadTransitionRules() {
+        Fixture fixture = fixture();
+
+        fixture.service.current("BTCUSDT", "read-only");
+
+        verifyNoInteractions(fixture.rules, fixture.mapper);
+    }
+
     private static Fixture fixture() {
         RuleConfigService rules = mock(RuleConfigService.class);
         when(rules.getRuleConfigMap()).thenReturn(ruleMap());
@@ -149,7 +210,7 @@ class ScanProfileTransitionServiceTest {
         RuleVersionLogMapper mapper = mock(RuleVersionLogMapper.class);
         when(mapper.insert(any())).thenReturn(1);
         MutableClock clock = new MutableClock(Instant.parse("2026-07-10T10:00:00Z"));
-        return new Fixture(new ScanProfileTransitionService(rules, mapper, clock), mapper, clock);
+        return new Fixture(new ScanProfileTransitionService(rules, mapper, clock), rules, mapper, clock);
     }
 
     private static Map<String, RuleConfigDO> ruleMap() {
@@ -190,7 +251,8 @@ class ScanProfileTransitionServiceTest {
                 null, null, false, null, false, false, null);
     }
 
-    private record Fixture(ScanProfileTransitionService service, RuleVersionLogMapper mapper, MutableClock clock) {}
+    private record Fixture(ScanProfileTransitionService service, RuleConfigService rules,
+                           RuleVersionLogMapper mapper, MutableClock clock) {}
 
     private static final class MutableClock extends Clock {
         private Instant instant;

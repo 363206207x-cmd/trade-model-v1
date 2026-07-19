@@ -124,6 +124,28 @@ lookup gate:
 The fix is not effective mainline evidence until review and merge. No provider
 call was enabled or executed by this closure.
 
+## Read-Only Plan and Execution-State Separation Closure
+
+PR #1131 review comment `3610342417` identified that status reads and the real
+scan scheduler shared a plan-building path that evaluated mutable profile
+transitions. The branch now gives the two paths explicit contracts:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Read-only universe | `PASS_OFFLINE_PENDING_REVIEW` | `currentUniverse()` reads existing transition state with `current()` only. It cannot create state, advance recovery, change a profile, or write transition audit. |
+| Read-only plan | `PASS_OFFLINE_PENDING_REVIEW` | `currentPlan()` is the only plan used by Dashboard, runtime-status, and single-asset profile reads. One hundred repeated reads produce zero transition mutations and zero audit rows. |
+| Execution universe | `PASS_OFFLINE_PENDING_REVIEW` | `evaluateUniverseForExecution(scanCycleTraceId)` is the only universe path that calls `evaluate()`. A required cycle trace deterministically scopes each instrument evaluation. |
+| Execution plan | `PASS_OFFLINE_PENDING_REVIEW` | `planForExecution(scanCycleTraceId)` is Scheduler-only. Every relevant canonical instrument is evaluated at most once per real scan cycle and all due datasets reuse that effective profile. |
+| Recovery ownership | `PASS_OFFLINE_PENDING_REVIEW` | Recovery confirmation advances only through real Scheduler scan cycles. Dashboard and runtime-status reads cannot substitute for recovery cycles. |
+| Audit ownership | `PASS_OFFLINE_PENDING_REVIEW` | Transition audit remains limited to a changed transition reached from the real execution path. Disabled schedulers, disabled provider calls, missing refresh ports, reads, and unchanged evaluations write zero rows. |
+| Last effective reason | `PASS_OFFLINE_PENDING_REVIEW` | `current()` returns the reason and rule version from the last real evaluation without recomputing thresholds or mutating runtime state. |
+
+The execution-path test raises BTC to `HIGH`, performs 100 read-only plan
+queries, and then requires two real scan cycles to satisfy recovery hysteresis
+and step down to `STANDARD`. Only the actual rise and downgrade write audit
+rows. This remains branch-level offline evidence pending re-review and merge;
+no provider, AI, notification, order, or trading call was enabled.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.
@@ -132,5 +154,5 @@ call was enabled or executed by this closure.
 - No notification was delivered.
 - No trading capability was added.
 - No live provider or AI call was made while closing Reviewer Rounds 1, 2, 3,
-  or the snapshot-retention review comment.
+  the snapshot-retention review comment, or the read-only plan review comment.
 - Production readiness remains `BLOCKED`.

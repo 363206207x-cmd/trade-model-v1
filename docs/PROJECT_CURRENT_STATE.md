@@ -43,9 +43,10 @@ PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
 `4730021827` requested five correctness fixes and Reviewer Round 2 review
 `4730247371` requested three focused corrections. Reviewer Round 3 review
 `4730325751` requested the HALF_OPEN probe lifecycle correction. Review comment
-`3610213592` then identified the snapshot-retention lookup-order gap. This
-branch records the three rounds plus the focused retention hard-bound closure,
-pending the snapshot-retention final re-review:
+`3610213592` then identified the snapshot-retention lookup-order gap, and review
+comment `3610342417` identified read-only plan mutation of runtime profile
+state. This branch records the three rounds plus both focused closures, pending
+the read-only plan final re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -77,6 +78,11 @@ pending the snapshot-retention final re-review:
     metadata expiry cannot exceed `staleUntil`, the exact boundary is removed,
     and shorter/longer consumers continue sharing the stable key only while the
     dataset remains retained.
+11. `currentUniverse/currentPlan` are side-effect-free status paths, while
+    `evaluateUniverseForExecution/planForExecution` are Scheduler-only. A real
+    scan evaluates each relevant asset once, all due datasets reuse that
+    profile, and only real scan cycles advance recovery or write changed
+    transition audit. One hundred status reads leave state unchanged.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,

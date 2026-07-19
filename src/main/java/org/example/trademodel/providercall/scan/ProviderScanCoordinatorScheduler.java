@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -38,8 +39,9 @@ public class ProviderScanCoordinatorScheduler {
         if (!globalSchedulersEnabled || !properties.isEnabled() || !properties.isSchedulerEnabled()) return 0;
         ProviderDatasetRefreshPort port = refreshPortProvider.getIfAvailable();
         if (port == null) return 0;
+        String scanCycleTraceId = "provider-scan-cycle-" + UUID.randomUUID();
         int[] count = {0};
-        scanPlanService.currentPlan().stream()
+        scanPlanService.planForExecution(scanCycleTraceId).stream()
                 .sorted(Comparator.comparingInt(item -> item.effectivePriority().rank()))
                 .forEach(item -> item.dueDatasets().stream()
                         .sorted(Comparator.comparingInt(Enum::ordinal))
