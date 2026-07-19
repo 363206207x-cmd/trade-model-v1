@@ -25,11 +25,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -151,6 +154,180 @@ class ScanProfileTransitionServiceTest {
         Fixture fixture = fixture();
         fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, hotReset(), "trace-audit");
         verify(fixture.mapper).insert(any());
+    }
+
+    @Test
+    void auditExceptionDoesNotPublishFirstTransition() {
+        Fixture fixture = fixture();
+        when(fixture.mapper.insert(any())).thenThrow(new IllegalStateException("audit unavailable"));
+
+        assertThatThrownBy(() -> fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-failed-audit"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("audit unavailable");
+
+        assertThat(fixture.service.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+        ProfileTransitionResult current = fixture.service.current("BTCUSDT", "read-after-failure");
+        assertThat(current.effectiveProfile()).isEqualTo(RuntimeScanProfile.LOW);
+        assertThat(current.effectiveReason()).isEqualTo("NO_RUNTIME_ESCALATION");
+    }
+
+    @Test
+    void auditZeroRowsDoesNotPublishTransition() {
+        Fixture fixture = fixture();
+        when(fixture.mapper.insert(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-zero-row"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("profile transition audit insert count must be exactly 1");
+
+        assertThat(fixture.service.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+        assertThat(fixture.service.current("BTCUSDT", "read-zero-row").effectiveReason())
+                .isEqualTo("NO_RUNTIME_ESCALATION");
+    }
+
+    @Test
+    void auditUnexpectedRowCountDoesNotPublishTransition() {
+        Fixture fixture = fixture();
+        when(fixture.mapper.insert(any())).thenReturn(2);
+
+        assertThatThrownBy(() -> fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-two-rows"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("profile transition audit insert count must be exactly 1");
+
+        assertThat(fixture.service.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+        assertThat(fixture.service.current("BTCUSDT", "read-two-rows").effectiveReason())
+                .isEqualTo("NO_RUNTIME_ESCALATION");
+    }
+
+    @Test
+    void failedDowngradeAuditPreservesEntirePreviousState() {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-high");
+        fixture.clock.advance(Duration.ofSeconds(301));
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
+                ProfileTransitionSignal.recovery(), "trace-recovery-one");
+        ProfileTransitionResult beforeFailure = fixture.service.current("BTCUSDT", "before-failure");
+        when(fixture.mapper.insert(any())).thenThrow(new IllegalStateException("downgrade audit unavailable"));
+
+        assertThatThrownBy(() -> fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
+                ProfileTransitionSignal.recovery(), "trace-recovery-two"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("downgrade audit unavailable");
+
+        ProfileTransitionResult afterFailure = fixture.service.current("BTCUSDT", "after-failure");
+        assertThat(afterFailure.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(afterFailure.effectiveSince()).isEqualTo(beforeFailure.effectiveSince());
+        assertThat(afterFailure.nextDowngradeEligibleAt()).isEqualTo(beforeFailure.nextDowngradeEligibleAt());
+        assertThat(afterFailure.effectiveReason()).isEqualTo(beforeFailure.effectiveReason());
+        assertThat(afterFailure.ruleVersion()).isEqualTo(beforeFailure.ruleVersion());
+    }
+
+    @Test
+    void successfulRetryAfterAuditFailurePublishesOnce() {
+        Fixture fixture = fixture();
+        AtomicInteger insertAttempts = new AtomicInteger();
+        AtomicInteger successfulInserts = new AtomicInteger();
+        when(fixture.mapper.insert(any())).thenAnswer(invocation -> {
+            if (insertAttempts.getAndIncrement() == 0) {
+                throw new IllegalStateException("audit unavailable");
+            }
+            successfulInserts.incrementAndGet();
+            return 1;
+        });
+
+        assertThatThrownBy(() -> fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-first"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(fixture.service.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+
+        ProfileTransitionResult retry = fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-retry");
+
+        assertThat(retry.changed()).isTrue();
+        assertThat(retry.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(fixture.service.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(insertAttempts).hasValue(2);
+        assertThat(successfulInserts).hasValue(1);
+        verify(fixture.mapper, times(2)).insert(any());
+    }
+
+    @Test
+    void auditCallbackSeesPreviousPublishedStateUntilInsertReturns() {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.STANDARD,
+                ProfileTransitionSignal.recovery(), "trace-initialize");
+        AtomicReference<RuntimeScanProfile> profileDuringAudit = new AtomicReference<>();
+        AtomicReference<ProfileTransitionResult> stateDuringAudit = new AtomicReference<>();
+        when(fixture.mapper.insert(any())).thenAnswer(invocation -> {
+            profileDuringAudit.set(fixture.service.currentProfile("BTCUSDT"));
+            stateDuringAudit.set(fixture.service.current("BTCUSDT", "read-inside-audit"));
+            return 1;
+        });
+
+        ProfileTransitionResult changed = fixture.service.evaluate(
+                "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-high");
+
+        assertThat(profileDuringAudit).hasValue(RuntimeScanProfile.STANDARD);
+        assertThat(stateDuringAudit.get().effectiveProfile()).isEqualTo(RuntimeScanProfile.STANDARD);
+        assertThat(changed.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        assertThat(fixture.service.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.HIGH);
+    }
+
+    @Test
+    void readOnlyThreadSeesOldStateAfterAuditFailure() throws Exception {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.STANDARD,
+                ProfileTransitionSignal.recovery(), "trace-initialize");
+        CountDownLatch auditEntered = new CountDownLatch(1);
+        CountDownLatch releaseAudit = new CountDownLatch(1);
+        when(fixture.mapper.insert(any())).thenAnswer(invocation -> {
+            auditEntered.countDown();
+            if (!releaseAudit.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("timed out waiting to fail transition audit");
+            }
+            throw new IllegalStateException("audit unavailable");
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ProfileTransitionResult> evaluation = pool.submit(() -> fixture.service.evaluate(
+                    "BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-failed-high"));
+            assertThat(auditEntered.await(2, TimeUnit.SECONDS)).isTrue();
+            Future<ProfileTransitionResult> read = pool.submit(() ->
+                    fixture.service.current("BTCUSDT", "read-after-audit-failure"));
+            assertThatThrownBy(() -> read.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            releaseAudit.countDown();
+            assertThatThrownBy(() -> evaluation.get(2, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(IllegalStateException.class);
+            assertThat(read.get(2, TimeUnit.SECONDS).effectiveProfile())
+                    .isEqualTo(RuntimeScanProfile.STANDARD);
+        } finally {
+            releaseAudit.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void unchangedEvaluationDoesNotRequireAudit() {
+        Fixture fixture = fixture();
+        fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO, highSignal(), "trace-high");
+        clearInvocations(fixture.mapper);
+        fixture.clock.advance(Duration.ofSeconds(301));
+
+        ProfileTransitionResult firstRecovery = fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
+                ProfileTransitionSignal.recovery(), "trace-recovery-one");
+
+        assertThat(firstRecovery.changed()).isFalse();
+        assertThat(firstRecovery.effectiveProfile()).isEqualTo(RuntimeScanProfile.HIGH);
+        verifyNoInteractions(fixture.mapper);
+        assertThat(fixture.service.evaluate("BTCUSDT", UserScanProfile.AUTO,
+                ProfileTransitionSignal.recovery(), "trace-recovery-two").effectiveProfile())
+                .isEqualTo(RuntimeScanProfile.STANDARD);
+        verify(fixture.mapper, times(1)).insert(any());
     }
 
     @Test

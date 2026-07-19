@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -68,6 +69,20 @@ class ProviderScanCoordinatorSchedulerTest {
 
         verify(fixture.refreshPortProvider).getIfAvailable();
         verifyNoInteractions(fixture.planService, fixture.refreshPort);
+    }
+
+    @Test
+    void auditFailurePreventsRefreshExecution() {
+        Fixture fixture = fixture(true, true, true);
+        when(fixture.planService.planForExecution(anyString()))
+                .thenThrow(new IllegalStateException("profile transition audit unavailable"));
+
+        assertThatThrownBy(fixture.scheduler::scanOnce)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("profile transition audit unavailable");
+
+        verify(fixture.planService, times(1)).planForExecution(anyString());
+        verifyNoInteractions(fixture.refreshPort);
     }
 
     @SuppressWarnings("unchecked")

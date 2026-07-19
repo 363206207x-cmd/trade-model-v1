@@ -80,6 +80,21 @@ Synchronization does not change read ownership: neither read method creates a
 missing state, evaluates rules, advances recovery, mutates timing, or writes
 transition audit.
 
+Changed transitions use copy-on-write staged State. Evaluation copies profile,
+effective time, downgrade eligibility, last transition/evaluation time, last
+effective reason, rule version, and recovery cycles without mutating the
+published object. The staged transition is published only after its audit
+insert succeeds with exactly one row. An audit exception, zero inserted rows,
+or an unexpected row count throws, leaves the entire previous State visible,
+and prevents Scheduler refresh execution. Unchanged evaluations still publish
+their staged recovery/evaluation bookkeeping without creating an audit row.
+
+Runtime-status treats Watchlist and Discovery as optional count sources. A
+null list or `RuntimeException` while reading either count produces zero for
+that count only. It does not replace the read-only scan plan, evaluate a
+transition, trigger refresh, expose the invalid configuration, or suppress
+budget and health status.
+
 ```text
 TRANSITION_STATE_PUBLICATION: SAME_MONITOR_AS_EVALUATE
 READ_ONLY_STATE_VISIBILITY: COHERENT_AFTER_COMPLETED_EXECUTION
@@ -87,6 +102,13 @@ MIXED_TRANSITION_SNAPSHOT_COUNT: 0
 CURRENT_METHOD_MUTATIONS: 0
 CURRENT_PROFILE_METHOD_MUTATIONS: 0
 READ_ONLY_TRANSITION_AUDIT_ROWS: 0
+RUNTIME_STATUS_OPTIONAL_UNIVERSE_FAILURE: HTTP_200_WITH_ZERO_COUNT
+OPTIONAL_UNIVERSE_COUNT_FAILURE: FAIL_SOFT_READ_ONLY
+TRANSITION_STATE_PUBLICATION_ORDER: AUDIT_SUCCESS_THEN_STATE_PUBLISH
+AUDIT_INSERT_COUNT_REQUIRED: EXACTLY_1
+AUDIT_FAILURE_STATE_RESULT: PREVIOUS_STATE_PRESERVED
+AUDIT_FAILURE_PROVIDER_REFRESH_COUNT: 0
+UNAUDITED_TRANSITION_PUBLICATION_COUNT: 0
 ```
 
 ## API and Persistence

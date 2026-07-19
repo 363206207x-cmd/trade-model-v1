@@ -176,6 +176,37 @@ Provider HTTP work, cache/snapshot refresh, Dashboard rendering, AI,
 notifications, or trading. This is branch-level offline evidence pending final
 re-review and merge.
 
+## Runtime-Status Resilience and Audit-Before-Publication Closure
+
+Two P2 review threads opened after the prior exact-Head pass. The focused
+branch closure keeps status reads available when optional universe
+configuration is invalid and makes changed transition publication depend on
+successful audit persistence:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Optional watchlist count | `PASS_OFFLINE_PENDING_REVIEW` | A `RuntimeException` or null optional list yields count `0`; it does not fail the runtime-status response or expose configuration content. |
+| Optional discovery count | `PASS_OFFLINE_PENDING_REVIEW` | A `RuntimeException` or null optional list yields count `0`; budgets, health, current plan, and existing transition state remain readable. |
+| Read ownership | `PASS_OFFLINE_PENDING_REVIEW` | Repeated degraded count reads still use `currentPlan/current`, invoke no execution plan or transition evaluation, and perform no Provider or AI call. |
+| Transition staging | `PASS_OFFLINE_PENDING_REVIEW` | Evaluation copies every published State field and mutates only the staged copy. Readers cannot observe it before publication. |
+| Audit order | `PASS_OFFLINE_PENDING_REVIEW` | A changed transition writes its audit before `states.put`; the insert count must be exactly one. |
+| Audit failure | `PASS_OFFLINE_PENDING_REVIEW` | Exception, zero rows, or an unexpected row count throws and preserves the entire previous published State. |
+| Scheduler fail-closed | `PASS_OFFLINE_PENDING_REVIEW` | Execution-plan failure propagates before dataset iteration, so transition-audit failure produces zero refresh calls. |
+
+```text
+RUNTIME_STATUS_OPTIONAL_UNIVERSE_FAILURE: HTTP_200_WITH_ZERO_COUNT
+OPTIONAL_UNIVERSE_COUNT_FAILURE: FAIL_SOFT_READ_ONLY
+TRANSITION_STATE_PUBLICATION_ORDER: AUDIT_SUCCESS_THEN_STATE_PUBLISH
+UNAUDITED_TRANSITION_PUBLICATION_COUNT: 0
+AUDIT_INSERT_COUNT_REQUIRED: EXACTLY_1
+AUDIT_FAILURE_STATE_RESULT: PREVIOUS_STATE_PRESERVED
+AUDIT_FAILURE_PROVIDER_REFRESH_COUNT: 0
+```
+
+These are deterministic offline branch tests pending final reviewer re-review
+and merged-main activation. They do not prove live Provider availability or
+production readiness.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.

@@ -46,53 +46,56 @@ public class ScanProfileTransitionService {
         String safeTrace = required(traceId, "traceId");
         Instant now = clock.instant();
         RuntimeScanProfile floor = userFloor(userProfile);
-        State state = states.computeIfAbsent(normalized, ignored -> new State(floor, now));
+        State published = states.get(normalized);
+        State staged = published == null ? new State(floor, now) : published.copy();
         Thresholds thresholds = thresholds();
         if (thresholds == null) {
-            RuntimeScanProfile kept = RuntimeScanProfile.max(state.profile, floor);
-            state.recordEvaluation("PROFILE_RULE_CONFIG_UNAVAILABLE", "UNKNOWN", now);
-            return result(normalized, state.profile, kept, "PROFILE_RULE_CONFIG_UNAVAILABLE", state.since,
-                    state.nextDowngradeEligibleAt, "UNKNOWN", false, safeTrace);
+            RuntimeScanProfile kept = RuntimeScanProfile.max(staged.profile, floor);
+            staged.recordEvaluation("PROFILE_RULE_CONFIG_UNAVAILABLE", "UNKNOWN", now);
+            states.put(normalized, staged);
+            return result(normalized, staged.profile, kept, "PROFILE_RULE_CONFIG_UNAVAILABLE", staged.since,
+                    staged.nextDowngradeEligibleAt, "UNKNOWN", false, safeTrace);
         }
 
         Requested requested = requested(signal, thresholds);
         RuntimeScanProfile target = RuntimeScanProfile.max(floor, requested.profile);
-        RuntimeScanProfile previous = state.profile;
+        RuntimeScanProfile previous = staged.profile;
         boolean changed = false;
         String reason = requested.reason;
-        if (target.rank() > state.profile.rank()) {
-            state.profile = target;
-            state.since = now;
-            state.recoveryCycles = 0;
-            state.nextDowngradeEligibleAt = now.plusSeconds(holdSeconds(target, thresholds));
+        if (target.rank() > staged.profile.rank()) {
+            staged.profile = target;
+            staged.since = now;
+            staged.recoveryCycles = 0;
+            staged.nextDowngradeEligibleAt = now.plusSeconds(holdSeconds(target, thresholds));
             changed = true;
-        } else if (target.rank() < state.profile.rank()) {
-            state.recoveryCycles++;
-            boolean holdComplete = state.nextDowngradeEligibleAt == null
-                    || !now.isBefore(state.nextDowngradeEligibleAt);
-            boolean cooldownComplete = state.lastTransitionAt == null
-                    || !now.isBefore(state.lastTransitionAt.plusSeconds(thresholds.downgradeCooldownSeconds));
-            if (holdComplete && cooldownComplete && state.recoveryCycles >= thresholds.recoveryConfirmCycles) {
-                state.profile = RuntimeScanProfile.max(floor, state.profile.oneLevelDown());
-                state.since = now;
-                state.recoveryCycles = 0;
-                state.nextDowngradeEligibleAt = now.plusSeconds(thresholds.downgradeCooldownSeconds);
+        } else if (target.rank() < staged.profile.rank()) {
+            staged.recoveryCycles++;
+            boolean holdComplete = staged.nextDowngradeEligibleAt == null
+                    || !now.isBefore(staged.nextDowngradeEligibleAt);
+            boolean cooldownComplete = staged.lastTransitionAt == null
+                    || !now.isBefore(staged.lastTransitionAt.plusSeconds(thresholds.downgradeCooldownSeconds));
+            if (holdComplete && cooldownComplete && staged.recoveryCycles >= thresholds.recoveryConfirmCycles) {
+                staged.profile = RuntimeScanProfile.max(floor, staged.profile.oneLevelDown());
+                staged.since = now;
+                staged.recoveryCycles = 0;
+                staged.nextDowngradeEligibleAt = now.plusSeconds(thresholds.downgradeCooldownSeconds);
                 reason = "RECOVERY_HYSTERESIS";
                 changed = true;
             } else {
                 reason = "RECOVERY_HYSTERESIS";
             }
         } else {
-            state.recoveryCycles = 0;
+            staged.recoveryCycles = 0;
         }
+        staged.recordEvaluation(reason, thresholds.ruleVersion, now);
         if (changed) {
-            state.lastTransitionAt = now;
-            audit(normalized, previous, state.profile, reason, requested.triggerValue,
-                    thresholds.ruleVersion, state.nextDowngradeEligibleAt, safeTrace, now);
+            staged.lastTransitionAt = now;
+            audit(normalized, previous, staged.profile, reason, requested.triggerValue,
+                    thresholds.ruleVersion, staged.nextDowngradeEligibleAt, safeTrace, now);
         }
-        state.recordEvaluation(reason, thresholds.ruleVersion, now);
-        return result(normalized, previous, state.profile, reason, state.since,
-                state.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
+        states.put(normalized, staged);
+        return result(normalized, previous, staged.profile, reason, staged.since,
+                staged.nextDowngradeEligibleAt, thresholds.ruleVersion, changed, safeTrace);
     }
 
     public synchronized RuntimeScanProfile currentProfile(String symbol) {
@@ -201,7 +204,10 @@ public class ScanProfileTransitionService {
         row.setUpdatedBy("provider-call-orchestrator");
         row.setIsDeleted(0);
         row.setVersionNo(1);
-        auditMapper.insert(row);
+        int inserted = auditMapper.insert(row);
+        if (inserted != 1) {
+            throw new IllegalStateException("profile transition audit insert count must be exactly 1");
+        }
     }
 
     private static int holdSeconds(RuntimeScanProfile profile, Thresholds t) {
@@ -267,6 +273,16 @@ public class ScanProfileTransitionService {
         private String lastRuleVersion;
         private int recoveryCycles;
         private State(RuntimeScanProfile profile, Instant since) { this.profile = profile; this.since = since; }
+        private State copy() {
+            State copy = new State(profile, since);
+            copy.nextDowngradeEligibleAt = nextDowngradeEligibleAt;
+            copy.lastTransitionAt = lastTransitionAt;
+            copy.lastEvaluatedAt = lastEvaluatedAt;
+            copy.lastEffectiveReason = lastEffectiveReason;
+            copy.lastRuleVersion = lastRuleVersion;
+            copy.recoveryCycles = recoveryCycles;
+            return copy;
+        }
         private void recordEvaluation(String reason, String ruleVersion, Instant evaluatedAt) {
             this.lastEffectiveReason = reason;
             this.lastRuleVersion = ruleVersion;

@@ -41,6 +41,103 @@ class ProviderCallRuntimeStatusServiceImplTest {
 
     @Test
     void oneHundredRuntimeStatusQueriesRemainOnReadOnlyPlanPath() {
+        Fixture fixture = fixture();
+
+        for (int index = 0; index < 100; index++) {
+            assertThat(fixture.service.currentStatus().effectiveProfilesBySymbol())
+                    .containsEntry("BTCUSDT", RuntimeScanProfile.HIGH);
+        }
+
+        verify(fixture.planService, times(100)).currentPlan();
+        verify(fixture.planService, never()).planForExecution(anyString());
+        verify(fixture.transitionService, times(100)).current("BTCUSDT", "runtime-status-query");
+        verify(fixture.transitionService, never()).evaluate(anyString(), any(), any(), anyString());
+    }
+
+    @Test
+    void invalidWatchlistConfigDoesNotBreakRuntimeStatus() {
+        Fixture fixture = fixture();
+        when(fixture.watchlistSource.currentWatchlist())
+                .thenThrow(new IllegalArgumentException("invalid optional watchlist configuration"));
+        when(fixture.discoverySource.currentDiscoveryUniverse()).thenReturn(List.of(
+                ProviderCallTestFixtures.perpetual("ETHUSDT"),
+                ProviderCallTestFixtures.perpetual("SOLUSDT")));
+
+        ProviderCallRuntimeStatus status = fixture.service.currentStatus();
+
+        assertThat(status.manualWatchlistCount()).isZero();
+        assertThat(status.discoveryPoolCount()).isEqualTo(2);
+        assertThat(status.providerBudgets()).isNotEmpty();
+        assertThat(status.providerStatuses()).isNotEmpty();
+        verify(fixture.planService).currentPlan();
+        verify(fixture.planService, never()).planForExecution(anyString());
+        verify(fixture.transitionService).current("BTCUSDT", "runtime-status-query");
+        verify(fixture.transitionService, never()).evaluate(anyString(), any(), any(), anyString());
+    }
+
+    @Test
+    void invalidDiscoveryConfigDoesNotBreakRuntimeStatus() {
+        Fixture fixture = fixture();
+        when(fixture.watchlistSource.currentWatchlist()).thenReturn(List.of(
+                ProviderCallTestFixtures.perpetual("ETHUSDT")));
+        when(fixture.discoverySource.currentDiscoveryUniverse())
+                .thenThrow(new IllegalArgumentException("invalid optional discovery configuration"));
+
+        ProviderCallRuntimeStatus status = fixture.service.currentStatus();
+
+        assertThat(status.manualWatchlistCount()).isOne();
+        assertThat(status.discoveryPoolCount()).isZero();
+        assertThat(status.effectiveProfilesBySymbol()).containsEntry("BTCUSDT", RuntimeScanProfile.HIGH);
+    }
+
+    @Test
+    void bothOptionalUniverseSourcesInvalidReturnZeroCounts() {
+        Fixture fixture = fixture();
+        when(fixture.watchlistSource.currentWatchlist()).thenThrow(new IllegalStateException("watchlist invalid"));
+        when(fixture.discoverySource.currentDiscoveryUniverse())
+                .thenThrow(new IllegalStateException("discovery invalid"));
+
+        ProviderCallRuntimeStatus status = fixture.service.currentStatus();
+
+        assertThat(status.manualWatchlistCount()).isZero();
+        assertThat(status.discoveryPoolCount()).isZero();
+        assertThat(status.providerBudgets()).containsKeys("BINANCE", "COINGLASS", "AI", "EXTERNAL_CONTEXT");
+        assertThat(status.providerStatuses()).containsKeys("BINANCE", "COINGLASS", "AI", "EXTERNAL_CONTEXT");
+        assertThat(status.runtimeProfilesBySymbol()).containsEntry("BTCUSDT", RuntimeScanProfile.HIGH);
+    }
+
+    @Test
+    void nullOptionalUniverseListsReturnZeroCounts() {
+        Fixture fixture = fixture();
+        when(fixture.watchlistSource.currentWatchlist()).thenReturn(null);
+        when(fixture.discoverySource.currentDiscoveryUniverse()).thenReturn(null);
+
+        ProviderCallRuntimeStatus status = fixture.service.currentStatus();
+
+        assertThat(status.manualWatchlistCount()).isZero();
+        assertThat(status.discoveryPoolCount()).isZero();
+    }
+
+    @Test
+    void repeatedBadUniverseStatusQueriesRemainReadOnly() {
+        Fixture fixture = fixture();
+        when(fixture.watchlistSource.currentWatchlist()).thenThrow(new IllegalArgumentException("watchlist invalid"));
+        when(fixture.discoverySource.currentDiscoveryUniverse())
+                .thenThrow(new IllegalArgumentException("discovery invalid"));
+
+        for (int index = 0; index < 100; index++) {
+            ProviderCallRuntimeStatus status = fixture.service.currentStatus();
+            assertThat(status.manualWatchlistCount()).isZero();
+            assertThat(status.discoveryPoolCount()).isZero();
+        }
+
+        verify(fixture.planService, times(100)).currentPlan();
+        verify(fixture.planService, never()).planForExecution(anyString());
+        verify(fixture.transitionService, times(100)).current("BTCUSDT", "runtime-status-query");
+        verify(fixture.transitionService, never()).evaluate(anyString(), any(), any(), anyString());
+    }
+
+    private static Fixture fixture() {
         ProviderCallProfilePreferenceService preferenceService = mock(ProviderCallProfilePreferenceService.class);
         ProviderScanPlanService planService = mock(ProviderScanPlanService.class);
         ScanProfileTransitionService transitionService = mock(ScanProfileTransitionService.class);
@@ -80,16 +177,15 @@ class ProviderCallRuntimeStatusServiceImplTest {
                 budgetManager, circuitBreaker, healthRegistry, concurrencyGuard, watchlistSource,
                 discoverySource, candidateRegistry, notificationProperties,
                 Clock.fixed(Instant.parse("2026-07-19T00:00:00Z"), ZoneOffset.UTC));
+        return new Fixture(service, planService, transitionService, watchlistSource, discoverySource);
+    }
 
-        for (int index = 0; index < 100; index++) {
-            assertThat(service.currentStatus().effectiveProfilesBySymbol())
-                    .containsEntry("BTCUSDT", RuntimeScanProfile.HIGH);
-        }
-
-        verify(planService, times(100)).currentPlan();
-        verify(planService, never()).planForExecution(anyString());
-        verify(transitionService, times(100)).current("BTCUSDT", "runtime-status-query");
-        verify(transitionService, never()).evaluate(anyString(), any(), any(), anyString());
+    private record Fixture(
+            ProviderCallRuntimeStatusServiceImpl service,
+            ProviderScanPlanService planService,
+            ScanProfileTransitionService transitionService,
+            WatchlistAssetSource watchlistSource,
+            DiscoveryUniverseSource discoverySource) {
     }
 
     private static ScanPlanItem planItem() {

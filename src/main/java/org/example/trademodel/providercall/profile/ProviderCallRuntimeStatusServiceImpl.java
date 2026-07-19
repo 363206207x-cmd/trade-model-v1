@@ -20,9 +20,11 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @Service
 public class ProviderCallRuntimeStatusServiceImpl implements ProviderCallRuntimeStatusService {
@@ -128,9 +130,20 @@ public class ProviderCallRuntimeStatusServiceImpl implements ProviderCallRuntime
                 properties.intervalSeconds(baseRuntime, AssetPriority.P1_WATCHLIST, ProviderDatasetType.PRICE),
                 properties.intervalSeconds(baseRuntime, AssetPriority.P2_CANDIDATE, ProviderDatasetType.PRICE),
                 properties.intervalSeconds(baseRuntime, AssetPriority.P3_DISCOVERY, ProviderDatasetType.PRICE),
-                budgets, health, concurrencyGuard.state(), watchlistSource.currentWatchlist().size(),
-                candidateRegistry.countAt(clock.instant()), discoverySource.currentDiscoveryUniverse().size(),
+                budgets, health, concurrencyGuard.state(),
+                safeOptionalUniverseCount(watchlistSource::currentWatchlist),
+                candidateRegistry.countAt(clock.instant()),
+                safeOptionalUniverseCount(discoverySource::currentDiscoveryUniverse),
                 notificationProperties.getOpportunityScope());
+    }
+
+    private static int safeOptionalUniverseCount(Supplier<? extends Collection<?>> source) {
+        try {
+            Collection<?> values = source.get();
+            return values == null ? 0 : Math.max(0, values.size());
+        } catch (RuntimeException ignored) {
+            return 0;
+        }
     }
 
     private static String runtimeLabel(RuntimeScanProfile profile) {

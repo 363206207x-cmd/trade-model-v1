@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -50,9 +51,48 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ProviderScanReadOnlyExecutionIntegrationTest {
+
+    @Test
+    void auditFailurePreventsRefreshExecution() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-07-19T10:00:00Z"));
+        ProviderCallProperties properties = properties();
+        RuleConfigService ruleConfigService = mock(RuleConfigService.class);
+        when(ruleConfigService.getRuleConfigMap()).thenReturn(ruleMap());
+        when(ruleConfigService.resolveActiveRuleVersion()).thenReturn("v-test");
+        RuleVersionLogMapper auditMapper = mock(RuleVersionLogMapper.class);
+        when(auditMapper.insert(any())).thenThrow(new IllegalStateException("transition audit unavailable"));
+        ScanProfileTransitionService transitions = new ScanProfileTransitionService(
+                ruleConfigService, auditMapper, clock);
+        ProviderSymbolMappingRegistry mappings = ProviderCallTestFixtures.binanceRegistry("BTCUSDT");
+        DefaultProviderScanUniverseSource source = source(
+                properties, transitions, mappings, new AtomicBoolean(true), clock);
+        FrequencyMatrixVersionService versionService = mock(FrequencyMatrixVersionService.class);
+        when(versionService.currentVersion()).thenReturn("v-test");
+        ScanUniverseResolver resolver = new ScanUniverseResolver(properties,
+                new AssetPriorityResolver(mappings), new ProviderCallProfileResolver(),
+                new ProviderDueTimePolicy(properties), versionService);
+        ProviderScanPlanServiceImpl planService = new ProviderScanPlanServiceImpl(source, resolver);
+        ProviderDatasetRefreshPort refreshPort = mock(ProviderDatasetRefreshPort.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ProviderDatasetRefreshPort> refreshPortProvider = mock(ObjectProvider.class);
+        when(refreshPortProvider.getIfAvailable()).thenReturn(refreshPort);
+        ProviderScanCoordinatorScheduler scheduler = new ProviderScanCoordinatorScheduler(
+                properties, true, planService, refreshPortProvider);
+
+        assertThatThrownBy(scheduler::scanOnce)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("transition audit unavailable");
+
+        assertThat(transitions.currentProfile("BTCUSDT")).isEqualTo(RuntimeScanProfile.LOW);
+        assertThat(transitions.current("BTCUSDT", "read-after-audit-failure").effectiveReason())
+                .isEqualTo("NO_RUNTIME_ESCALATION");
+        verify(auditMapper).insert(any());
+        verifyNoInteractions(refreshPort);
+    }
 
     @Test
     void oneHundredReadOnlyPlansCannotReplaceTwoRealRecoveryScanCycles() {

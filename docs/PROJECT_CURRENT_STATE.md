@@ -45,9 +45,12 @@ PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
 `4730325751` requested the HALF_OPEN probe lifecycle correction. Review comment
 `3610213592` then identified the snapshot-retention lookup-order gap, and review
 comment `3610342417` identified read-only plan mutation of runtime profile
-state. Review `4730635925` identified the remaining transition-state
-publication boundary gap. This branch records the three rounds plus all three
-focused closures, pending the transition-state publication final re-review:
+state. Review `4730635925` identified the transition-state publication
+boundary gap. Final review `4730817855` passed that exact Head, after which two
+new P2 threads identified optional-universe count resilience and
+audit-before-publication atomicity. This branch records the three rounds plus
+the focused closures below, pending a new runtime-status and audit-atomicity
+final re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -90,6 +93,13 @@ focused closures, pending the transition-state publication final re-review:
     reason, effective time, downgrade time, and rule-version snapshot.
     Thirty-two concurrent readers repeating 100 queries produce zero mixed
     snapshots, state mutations, or additional audit rows.
+13. optional Watchlist and Discovery count failures are isolated to count `0`;
+    runtime-status remains readable and continues using the side-effect-free
+    current plan without Provider, AI, transition, or audit mutation.
+14. transition evaluation mutates a complete staged State copy, requires an
+    audit insert count of exactly one, and publishes only after audit success.
+    Audit exception, zero rows, or unexpected rows preserve the entire prior
+    State and stop Scheduler refresh before any dataset call.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,
