@@ -207,6 +207,40 @@ These are deterministic offline branch tests pending final reviewer re-review
 and merged-main activation. They do not prove live Provider availability or
 production readiness.
 
+## Queued-Attempt Timeout Classification Closure
+
+PR #1131 thread `PRRT_kwDOSc6fQc6SF53A` identified that the physical timeout
+supervisor could fire while work was still queued and then misclassify local
+executor pressure as a remote transport timeout. The branch now gives every
+attempt an atomic phase and makes timeout classification depend on which phase
+wins the compare-and-set race:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Attempt phase | `PASS_OFFLINE_PENDING_REVIEW` | `QUEUED -> LOCAL_ADMISSION -> REMOTE_IN_FLIGHT`; timeout and completion are one-winner atomic transitions. |
+| Queue timeout | `LOCAL_ADMISSION` | `PROVIDER_EXECUTOR_QUEUE_TIMEOUT`; adapter, attempt budget, physical-start audit, remote retry, health failure, and circuit failure counts are zero. |
+| Pre-remote timeout | `LOCAL_ADMISSION` | `PROVIDER_PRE_REMOTE_TIMEOUT`; the adapter-start CAS fails closed, no timeout retry or remote failure is recorded, and any existing completion audit keeps the local reason. |
+| Remote timeout | `REMOTE_TRANSPORT` | `PROVIDER_TIMEOUT` is possible only after the adapter-start transition wins. Existing interruption, lease ownership, retry budget, health, and circuit tests remain passing. |
+| HALF_OPEN | `PASS_OFFLINE_PENDING_REVIEW` | A queue/pre-remote timeout releases the permit without a remote attempt, so a later recovery probe remains available. |
+| Race integrity | `PASS_100_ATOMIC_ITERATIONS` | Every controlled race yields either local timeout with zero adapter calls or remote timeout with exactly one adapter call; no mixed outcome is accepted. |
+
+```text
+ATTEMPT_PHASE_MODEL: QUEUED_LOCAL_ADMISSION_REMOTE_IN_FLIGHT
+QUEUE_TIMEOUT_CLASSIFICATION: LOCAL_ADMISSION
+PRE_REMOTE_TIMEOUT_CLASSIFICATION: LOCAL_ADMISSION
+REMOTE_TIMEOUT_CLASSIFICATION: REMOTE_TRANSPORT_ONLY_AFTER_ADAPTER_START
+QUEUE_TIMEOUT_PROVIDER_HEALTH_FAILURE_COUNT: 0
+QUEUE_TIMEOUT_CIRCUIT_FAILURE_COUNT: 0
+QUEUE_TIMEOUT_RETRY_COUNT: 0
+QUEUE_TIMEOUT_ADAPTER_CALL_COUNT: 0
+QUEUE_TIMEOUT_BUDGET_ATTEMPTS: 0
+PR_STATE: OPEN_DRAFT_UNMERGED
+NEXT_TASK: Reviewer P3-CALL1 Queued Attempt Classification Final Re-review
+```
+
+These are offline branch results. No real Provider or AI call was made, and
+the closure is not effective mainline evidence until review and merge.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.

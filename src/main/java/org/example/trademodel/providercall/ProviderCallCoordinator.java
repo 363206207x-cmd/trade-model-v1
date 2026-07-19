@@ -13,7 +13,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class ProviderCallCoordinator {
@@ -186,11 +186,11 @@ public class ProviderCallCoordinator {
             return;
         }
         String attemptId = request.traceId() + "-attempt-" + attemptNumber + "-" + UUID.randomUUID();
-        AtomicBoolean timedOut = new AtomicBoolean();
+        AttemptExecutionState executionState = new AttemptExecutionState();
         ProviderCallExecutor.TaskHandle<ProviderAdapterResponse<T>> handle;
         try {
             handle = callExecutor.submit(request.priority(),
-                    () -> runPhysicalAttempt(request, attemptId, attemptNumber, timedOut));
+                    () -> runPhysicalAttempt(request, attemptId, attemptNumber, executionState));
         } catch (RejectedExecutionException rejected) {
             ProviderAdapterResponse<T> response = ProviderAdapterResponse.failed(
                     UnifiedSourceStatus.DEGRADED, 0, "PROVIDER_EXECUTOR_REJECTED", null);
@@ -200,11 +200,12 @@ public class ProviderCallCoordinator {
         }
 
         Runnable cancellation = () -> {
-            if (timedOut.compareAndSet(false, true)) {
+            AttemptExecutionPhase timeoutPhase = executionState.requestTimeout();
+            if (timeoutPhase == AttemptExecutionPhase.REMOTE_TIMEOUT_REQUESTED) {
                 healthRegistry.recordFailure(request.key().snapshotKey(), UnifiedSourceStatus.DEGRADED,
                         "PROVIDER_TIMEOUT_PHYSICAL_PENDING");
             }
-            handle.cancelInterruptibly();
+            if (timeoutPhase != null) handle.cancelInterruptibly();
         };
         ScheduledFuture<?> timeout;
         try {
@@ -212,12 +213,12 @@ public class ProviderCallCoordinator {
         } catch (RejectedExecutionException supervisorUnavailable) {
             handle.cancelInterruptibly();
             observeAttemptCompletion(request, stale, flight, attemptNumber, used5xxRetries,
-                    usedTimeoutRetries, timedOut, handle, null, permit);
+                    usedTimeoutRetries, executionState, handle, null, permit);
             return;
         }
 
         observeAttemptCompletion(request, stale, flight, attemptNumber, used5xxRetries,
-                usedTimeoutRetries, timedOut, handle, timeout, permit);
+                usedTimeoutRetries, executionState, handle, timeout, permit);
     }
 
     private <T> void observeAttemptCompletion(
@@ -227,7 +228,7 @@ public class ProviderCallCoordinator {
             int attemptNumber,
             int used5xxRetries,
             int usedTimeoutRetries,
-            AtomicBoolean timedOut,
+            AttemptExecutionState executionState,
             ProviderCallExecutor.TaskHandle<ProviderAdapterResponse<T>> handle,
             ScheduledFuture<?> timeout,
             ProviderCircuitPermit permit) {
@@ -237,7 +238,10 @@ public class ProviderCallCoordinator {
 
             ProviderAdapterResponse<T> effective = response;
             Throwable cause = unwrap(failure);
-            if (timedOut.get()) {
+            if (executionState.cancelledBeforeRemote()) {
+                effective = ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
+                        executionState.localTimeoutReason(), null);
+            } else if (executionState.remoteTimeoutRequested()) {
                 effective = ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0,
                         "PROVIDER_TIMEOUT", null);
             } else if (cause != null) {
@@ -288,42 +292,152 @@ public class ProviderCallCoordinator {
             ProviderCallRequest<T> request,
             String attemptId,
             int attemptNumber,
-            AtomicBoolean timedOut) {
-        ProviderConcurrencyGuard.Lease lease = concurrencyGuard.tryAcquire(
-                request.key().datasetType(), request.priority());
-        if (lease == null) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
-                    "PROVIDER_CONCURRENCY_REJECTED", null);
-        }
-        try (lease) {
-            if (!budget.reserveAttempt(request.key(), request.priority(), request.effectiveProfile(),
-                    attemptNumber > 1)) {
+            AttemptExecutionState executionState) {
+        if (!executionState.beginLocalAdmission()) return executionState.localTimeoutResponse();
+
+        boolean attemptStartAudited = false;
+        String completionReason = "PROVIDER_RESPONSE_MALFORMED";
+        UnifiedSourceStatus completionStatus = UnifiedSourceStatus.ERROR;
+        try {
+            ProviderConcurrencyGuard.Lease lease = concurrencyGuard.tryAcquire(
+                    request.key().datasetType(), request.priority());
+            if (lease == null) {
                 return ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
-                        "PROVIDER_BUDGET_REJECTED", null);
+                        "PROVIDER_CONCURRENCY_REJECTED", null);
             }
-            auditAttempt(request, attemptId, attemptNumber, ProviderCallAuditPhase.PHYSICAL_ATTEMPT_STARTED,
-                    UnifiedSourceStatus.WAITING_SYNC, "PHYSICAL_ATTEMPT_STARTED");
-            ProviderAdapterResponse<T> response = null;
-            String completionReason = "PROVIDER_RESPONSE_MALFORMED";
-            UnifiedSourceStatus completionStatus = UnifiedSourceStatus.ERROR;
-            try {
-                response = request.adapterCall().get();
-                if (timedOut.get()) {
-                    completionReason = "PROVIDER_TIMEOUT_PHYSICAL_ENDED";
-                } else if (response != null) {
-                    completionReason = response.reasonCode();
-                    completionStatus = response.sourceStatus() == null
-                            ? UnifiedSourceStatus.ERROR : response.sourceStatus();
+            try (lease) {
+                if (executionState.cancelledBeforeRemote()) return executionState.localTimeoutResponse();
+                if (!budget.reserveAttempt(request.key(), request.priority(), request.effectiveProfile(),
+                        attemptNumber > 1)) {
+                    return ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
+                            "PROVIDER_BUDGET_REJECTED", null);
                 }
-                return response;
-            } catch (RuntimeException failure) {
-                completionReason = timedOut.get() ? "PROVIDER_TIMEOUT_PHYSICAL_ENDED" : "PROVIDER_CALL_FAILED";
-                throw failure;
-            } finally {
+                if (executionState.cancelledBeforeRemote()) return executionState.localTimeoutResponse();
+                auditAttempt(request, attemptId, attemptNumber, ProviderCallAuditPhase.PHYSICAL_ATTEMPT_STARTED,
+                        UnifiedSourceStatus.WAITING_SYNC, "PHYSICAL_ATTEMPT_STARTED");
+                attemptStartAudited = true;
+                if (!executionState.beginRemoteAttempt()) {
+                    completionReason = executionState.localTimeoutReason();
+                    completionStatus = UnifiedSourceStatus.DEGRADED;
+                    return executionState.localTimeoutResponse();
+                }
+
+                try {
+                    ProviderAdapterResponse<T> response = request.adapterCall().get();
+                    if (executionState.completeRemoteAttempt()) {
+                        if (response != null) {
+                            completionReason = response.reasonCode();
+                            completionStatus = response.sourceStatus() == null
+                                    ? UnifiedSourceStatus.ERROR : response.sourceStatus();
+                        }
+                    } else if (executionState.remoteTimeoutRequested()) {
+                        completionReason = "PROVIDER_TIMEOUT_PHYSICAL_ENDED";
+                    }
+                    return response;
+                } catch (RuntimeException failure) {
+                    if (executionState.completeRemoteAttempt()) {
+                        completionReason = "PROVIDER_CALL_FAILED";
+                    } else if (executionState.remoteTimeoutRequested()) {
+                        completionReason = "PROVIDER_TIMEOUT_PHYSICAL_ENDED";
+                    }
+                    throw failure;
+                }
+            }
+        } finally {
+            executionState.completeLocalAttempt();
+            if (attemptStartAudited) {
                 auditAttempt(request, attemptId, attemptNumber,
                         ProviderCallAuditPhase.PHYSICAL_ATTEMPT_COMPLETED, completionStatus,
                         completionReason == null ? "PHYSICAL_ATTEMPT_COMPLETED" : completionReason);
             }
+        }
+    }
+
+    enum AttemptExecutionPhase {
+        QUEUED,
+        LOCAL_ADMISSION,
+        REMOTE_IN_FLIGHT,
+        REMOTE_TIMEOUT_REQUESTED,
+        CANCELLED_BEFORE_REMOTE,
+        COMPLETED
+    }
+
+    static final class AttemptExecutionState {
+        private static final String QUEUE_TIMEOUT = "PROVIDER_EXECUTOR_QUEUE_TIMEOUT";
+        private static final String PRE_REMOTE_TIMEOUT = "PROVIDER_PRE_REMOTE_TIMEOUT";
+
+        private final AtomicReference<AttemptExecutionPhase> phase =
+                new AtomicReference<>(AttemptExecutionPhase.QUEUED);
+        private final AtomicReference<String> localTimeoutReason = new AtomicReference<>();
+
+        boolean beginLocalAdmission() {
+            return phase.compareAndSet(AttemptExecutionPhase.QUEUED, AttemptExecutionPhase.LOCAL_ADMISSION);
+        }
+
+        boolean beginRemoteAttempt() {
+            return phase.compareAndSet(AttemptExecutionPhase.LOCAL_ADMISSION,
+                    AttemptExecutionPhase.REMOTE_IN_FLIGHT);
+        }
+
+        AttemptExecutionPhase requestTimeout() {
+            while (true) {
+                AttemptExecutionPhase current = phase.get();
+                if (current == AttemptExecutionPhase.QUEUED) {
+                    if (cancelBeforeRemote(current, QUEUE_TIMEOUT)) {
+                        return AttemptExecutionPhase.CANCELLED_BEFORE_REMOTE;
+                    }
+                    continue;
+                }
+                if (current == AttemptExecutionPhase.LOCAL_ADMISSION) {
+                    if (cancelBeforeRemote(current, PRE_REMOTE_TIMEOUT)) {
+                        return AttemptExecutionPhase.CANCELLED_BEFORE_REMOTE;
+                    }
+                    continue;
+                }
+                if (current == AttemptExecutionPhase.REMOTE_IN_FLIGHT) {
+                    if (phase.compareAndSet(current, AttemptExecutionPhase.REMOTE_TIMEOUT_REQUESTED)) {
+                        return AttemptExecutionPhase.REMOTE_TIMEOUT_REQUESTED;
+                    }
+                    continue;
+                }
+                return null;
+            }
+        }
+
+        boolean completeRemoteAttempt() {
+            return phase.compareAndSet(AttemptExecutionPhase.REMOTE_IN_FLIGHT,
+                    AttemptExecutionPhase.COMPLETED);
+        }
+
+        void completeLocalAttempt() {
+            phase.compareAndSet(AttemptExecutionPhase.LOCAL_ADMISSION, AttemptExecutionPhase.COMPLETED);
+        }
+
+        boolean cancelledBeforeRemote() {
+            return phase.get() == AttemptExecutionPhase.CANCELLED_BEFORE_REMOTE;
+        }
+
+        boolean remoteTimeoutRequested() {
+            return phase.get() == AttemptExecutionPhase.REMOTE_TIMEOUT_REQUESTED;
+        }
+
+        String localTimeoutReason() {
+            String reason = localTimeoutReason.get();
+            return reason == null ? PRE_REMOTE_TIMEOUT : reason;
+        }
+
+        <T> ProviderAdapterResponse<T> localTimeoutResponse() {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
+                    localTimeoutReason(), null);
+        }
+
+        private boolean cancelBeforeRemote(AttemptExecutionPhase expected, String reason) {
+            localTimeoutReason.compareAndSet(null, reason);
+            if (phase.compareAndSet(expected, AttemptExecutionPhase.CANCELLED_BEFORE_REMOTE)) return true;
+            if (phase.get() != AttemptExecutionPhase.CANCELLED_BEFORE_REMOTE) {
+                localTimeoutReason.compareAndSet(reason, null);
+            }
+            return false;
         }
     }
 

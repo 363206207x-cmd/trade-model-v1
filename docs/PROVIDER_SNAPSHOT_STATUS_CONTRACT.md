@@ -92,6 +92,16 @@ budget, concurrency, and configuration failures likewise do not increment the
 remote provider circuit. Remote transport, physical timeout, `5xx`, malformed
 response, and invalid payload remain fail-closed circuit inputs.
 
+Physical-attempt timeout classification uses an atomic execution phase. A
+timeout in `QUEUED` is `PROVIDER_EXECUTOR_QUEUE_TIMEOUT`; a timeout in
+`LOCAL_ADMISSION` is `PROVIDER_PRE_REMOTE_TIMEOUT`. Both remain `DEGRADED`
+local admission evidence and cannot mutate remote health, open the circuit,
+consume timeout retry, or call the adapter. A pure queued timeout also consumes
+zero attempt budget. `PROVIDER_TIMEOUT` remains an `ERROR` remote transport
+result only after `REMOTE_IN_FLIGHT` wins immediately before the adapter call.
+This preserves fail-closed snapshots without turning local queue pressure into
+false provider unavailability.
+
 Circuit admission is attempt-owned. A HALF_OPEN physical attempt carries one
 idempotent permit until the attempt actually ends. Local rejection releases
 the probe, `429` or auth settles it as remote-reachable, remote failure reopens

@@ -180,6 +180,12 @@ class ProviderFailureIsolationTest {
                 UnifiedSourceStatus.DEGRADED, 0, "PROVIDER_EXECUTOR_REJECTED", null)))
                 .isEqualTo(ProviderFailureOrigin.LOCAL_ADMISSION);
         assertThat(ProviderFailureClassifier.classify(ProviderAdapterResponse.failed(
+                UnifiedSourceStatus.DEGRADED, 0, "PROVIDER_EXECUTOR_QUEUE_TIMEOUT", null)))
+                .isEqualTo(ProviderFailureOrigin.LOCAL_ADMISSION);
+        assertThat(ProviderFailureClassifier.classify(ProviderAdapterResponse.failed(
+                UnifiedSourceStatus.DEGRADED, 0, "PROVIDER_PRE_REMOTE_TIMEOUT", null)))
+                .isEqualTo(ProviderFailureOrigin.LOCAL_ADMISSION);
+        assertThat(ProviderFailureClassifier.classify(ProviderAdapterResponse.failed(
                 UnifiedSourceStatus.DEGRADED, 0, "PROVIDER_BUDGET_REJECTED", null)))
                 .isEqualTo(ProviderFailureOrigin.LOCAL_BUDGET);
         assertThat(ProviderFailureClassifier.classify(ProviderAdapterResponse.failed(
@@ -188,6 +194,9 @@ class ProviderFailureIsolationTest {
         assertThat(ProviderFailureClassifier.classify(ProviderAdapterResponse.failed(
                 UnifiedSourceStatus.ERROR, 503, "PROVIDER_5XX", null)))
                 .isEqualTo(ProviderFailureOrigin.REMOTE_SERVER);
+        assertThat(ProviderFailureClassifier.classify(ProviderAdapterResponse.failed(
+                UnifiedSourceStatus.ERROR, 0, "PROVIDER_TIMEOUT", null)))
+                .isEqualTo(ProviderFailureOrigin.REMOTE_TRANSPORT);
         assertThat(ProviderFailureClassifier.classify(null))
                 .isEqualTo(ProviderFailureOrigin.REMOTE_PAYLOAD);
     }

@@ -48,9 +48,11 @@ comment `3610342417` identified read-only plan mutation of runtime profile
 state. Review `4730635925` identified the transition-state publication
 boundary gap. Final review `4730817855` passed that exact Head, after which two
 new P2 threads identified optional-universe count resilience and
-audit-before-publication atomicity. This branch records the three rounds plus
-the focused closures below, pending a new runtime-status and audit-atomicity
-final re-review:
+audit-before-publication atomicity. Those fixes were followed by thread
+`PRRT_kwDOSc6fQc6SF53A`, which identified queued attempts being classified as
+remote timeouts before Adapter start. This branch records the three rounds plus
+the focused closures below, pending a queued-attempt classification final
+re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -100,6 +102,11 @@ final re-review:
     audit insert count of exactly one, and publishes only after audit success.
     Audit exception, zero rows, or unexpected rows preserve the entire prior
     State and stop Scheduler refresh before any dataset call.
+15. each Provider attempt uses atomic `QUEUED`, `LOCAL_ADMISSION`, and
+    `REMOTE_IN_FLIGHT` phases. Queue and pre-remote timeouts remain local,
+    cause zero remote health/circuit/retry/adapter effects, and a pure queue
+    timeout consumes zero attempt budget. `PROVIDER_TIMEOUT` is reserved for a
+    timeout after Adapter start wins the phase race.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,
@@ -1202,5 +1209,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1129 P3-H Draft PR; Round 4 exact integrity evidence pending Round 5 re-review and merge
+- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; queued-attempt timeout classification closure pending final re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

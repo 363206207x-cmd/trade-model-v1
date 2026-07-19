@@ -44,6 +44,22 @@ preserves its interrupt flag without cancelling the shared call. Client-level
 connect/read/request timeouts remain mandatory when real HTTP adapters are
 introduced.
 
+Each submitted attempt has one atomic execution phase:
+
+```text
+QUEUED -> LOCAL_ADMISSION -> REMOTE_IN_FLIGHT -> COMPLETED
+```
+
+The timeout supervisor competes with those transitions by compare-and-set. A
+timeout that wins in `QUEUED` becomes `PROVIDER_EXECUTOR_QUEUE_TIMEOUT`; a
+timeout that wins in `LOCAL_ADMISSION` becomes
+`PROVIDER_PRE_REMOTE_TIMEOUT`. Both are local admission outcomes. They call no
+adapter, cause no provider-health or circuit failure, and cannot enter timeout
+retry. A pure queue timeout also consumes no attempt budget and writes no
+physical-attempt start audit. Only a timeout that wins after
+`REMOTE_IN_FLIGHT` may become `PROVIDER_TIMEOUT` and retain the existing remote
+transport, bounded retry, health, and circuit behavior.
+
 ## Single Flight and Failure
 
 One stable `ProviderSnapshotKey` has one owner lifecycle. Waiters with different
@@ -92,3 +108,15 @@ recorded.
 
 Tests use fixtures only; no live quota was consumed. Production readiness
 remains `BLOCKED`.
+
+```text
+ATTEMPT_PHASE_MODEL: QUEUED_LOCAL_ADMISSION_REMOTE_IN_FLIGHT
+QUEUE_TIMEOUT_CLASSIFICATION: LOCAL_ADMISSION
+PRE_REMOTE_TIMEOUT_CLASSIFICATION: LOCAL_ADMISSION
+REMOTE_TIMEOUT_CLASSIFICATION: REMOTE_TRANSPORT_ONLY_AFTER_ADAPTER_START
+QUEUE_TIMEOUT_PROVIDER_HEALTH_FAILURE_COUNT: 0
+QUEUE_TIMEOUT_CIRCUIT_FAILURE_COUNT: 0
+QUEUE_TIMEOUT_RETRY_COUNT: 0
+QUEUE_TIMEOUT_ADAPTER_CALL_COUNT: 0
+QUEUE_TIMEOUT_BUDGET_ATTEMPTS: 0
+```

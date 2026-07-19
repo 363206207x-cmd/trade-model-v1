@@ -8,6 +8,8 @@ public final class ProviderFailureClassifier {
     private static final Set<String> LOCAL_ADMISSION_REASONS = Set.of(
             "PROVIDER_EXECUTOR_REJECTED",
             "PROVIDER_CALL_CANCELLED",
+            "PROVIDER_EXECUTOR_QUEUE_TIMEOUT",
+            "PROVIDER_PRE_REMOTE_TIMEOUT",
             "PROVIDER_EXECUTOR_QUEUE_FULL",
             "PROVIDER_EXECUTOR_PRIORITY_QUEUE_RESERVED",
             "PROVIDER_EXECUTOR_SHUTDOWN");
