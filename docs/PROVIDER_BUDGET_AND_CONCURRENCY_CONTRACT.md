@@ -35,9 +35,12 @@ and application shutdown explicitly terminates the executor. Provider adapter
 work never runs on the ForkJoin common pool.
 
 Every physical attempt owns its concurrency lease inside the worker and
-releases it in `finally`. A waiting caller timing out requests interruption and
-returns `PROVIDER_TIMEOUT`, but it cannot release that lease or remove the
-Single Flight while an uninterruptible adapter is still running. Client-level
+releases it in `finally`. The owner request fixes the physical attempt timeout;
+its supervisor alone may request interruption. A waiting caller timeout is a
+separate logical deadline: it returns stale fallback or `PROVIDER_TIMEOUT` to
+that caller only and cannot set the physical timeout flag, cancel or retry the
+flight, release its lease, or remove Single Flight. An interrupted waiter
+preserves its interrupt flag without cancelling the shared call. Client-level
 connect/read/request timeouts remain mandatory when real HTTP adapters are
 introduced.
 
@@ -49,7 +52,17 @@ only after the physical chain completes; logical caller timeout is not physical
 completion. Different instruments, timeframes, market types, or source versions
 remain independent.
 
-`401/403` do not retry. `429` records Retry-After. `5xx` and timeout retries are
+Local admission, queue, budget, minimum-gap, concurrency, disabled, and
+not-configured outcomes are local coordination state. They remain fail-closed
+and audited, but do not increment the remote provider circuit or mark remote
+provider health down. Repeated P3 discovery pressure therefore cannot open a
+provider circuit that blocks a later P0 position refresh.
+
+`401/403` are remote auth/configuration errors and do not retry or share the
+5xx failure counter. `429` records Retry-After and remote degraded status but
+does not open the provider circuit. Network/transport failure, physical
+timeout, remote `5xx`, malformed response, and invalid remote payload are
+remote circuit failures. `5xx` and timeout retries are
 bounded and may start only after the previous physical attempt ends. Every
 attempt receives a distinct attempt ID, budget reservation, concurrency lease,
 and start/end audit event. Timeout and 5xx retries therefore consume real RPM;

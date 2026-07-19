@@ -53,7 +53,8 @@ class CoinGlassArchitectureAndSafetyTest {
         when(priceService.get(anyString(), any(), any(), anyString())).thenReturn(priceResult());
         DefaultProviderDatasetRefreshPort port = new DefaultProviderDatasetRefreshPort(priceService,
                 mock(CoordinatedOhlcvSnapshotService.class), mock(PersistedOhlcvBarMapper.class),
-                derivativesService, new ProviderCallProperties(), registry);
+                ProviderCallTestFixtures.binanceRegistry("BTCUSDT"), derivativesService,
+                new ProviderCallProperties(), registry);
 
         port.refresh(item(), ProviderDatasetType.PRICE);
 

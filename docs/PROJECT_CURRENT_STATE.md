@@ -40,8 +40,9 @@ PR #1130 remains frozen `OPEN / DRAFT / UNMERGED` with no action. P4 is not
 allowed. Production Deployment Readiness remains `BLOCKED`.
 
 PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
-`4730021827` requested five correctness fixes; this branch now records their
-offline closure pending Reviewer Round 2:
+`4730021827` requested five correctness fixes and Reviewer Round 2 review
+`4730247371` requested three focused corrections. This branch now records both
+rounds' offline closure pending Reviewer Round 3:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -55,6 +56,15 @@ offline closure pending Reviewer Round 2:
    remains provenance and notification deduplication;
 5. SPOT and PERPETUAL identities remain exact end to end; unsupported
    perpetual price/OHLCV fails `NOT_CONFIGURED` and never falls back to spot.
+6. caller wait timeout and interrupt cannot cancel, retry, or remove a shared
+   physical flight; only the owner-fixed physical timeout supervisor owns
+   attempt cancellation;
+7. local queue, budget, concurrency, minimum-gap, disabled, and not-configured
+   outcomes do not increment remote provider circuit failures or mark remote
+   health down; `429` applies Retry-After without opening the circuit;
+8. persisted OHLCV due-state reads bind provider and market type, so a recent
+   `SPOT` row cannot suppress `USDT_PERP` refresh or create false perpetual
+   `READY`; all four timeframe observations preserve market identity.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,

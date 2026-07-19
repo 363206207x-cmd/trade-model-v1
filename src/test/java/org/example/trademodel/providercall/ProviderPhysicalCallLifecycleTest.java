@@ -8,8 +8,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -20,7 +22,7 @@ class ProviderPhysicalCallLifecycleTest {
     private static final Instant NOW = Instant.parse("2026-07-19T10:00:00Z");
 
     @Test
-    void uninterruptibleAdapterCannotReleaseConcurrencySlotEarly() throws Exception {
+    void uninterruptiblePhysicalCallStillOwnsConcurrencyLease() throws Exception {
         try (Harness harness = harness(1, 2)) {
             CountDownLatch entered = new CountDownLatch(1);
             CountDownLatch release = new CountDownLatch(1);
@@ -83,6 +85,237 @@ class ProviderPhysicalCallLifecycleTest {
             assertThat(harness.singleFlight.activeFlightCount()).isEqualTo(1);
             release.countDown();
             awaitState(() -> harness.singleFlight.activeFlightCount() == 0);
+        }
+    }
+
+    @Test
+    void singleFlightRemovedOnlyAfterPhysicalChainCompletes() {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch release = new CountDownLatch(1);
+            ProviderCallResult<String> result = harness.coordinator.execute(
+                    request("flight-chain", Duration.ofMillis(60), 0, 0, () -> {
+                        awaitIgnoringInterrupt(release);
+                        return ProviderAdapterResponse.ready("late", NOW);
+                    }));
+
+            assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_TIMEOUT");
+            assertThat(harness.singleFlight.activeFlightCount()).isEqualTo(1);
+            release.countDown();
+            awaitState(() -> harness.singleFlight.activeFlightCount() == 0);
+        }
+    }
+
+    @Test
+    void shortWaiterTimeoutDoesNotCancelLongOwner() throws Exception {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicBoolean interrupted = new AtomicBoolean();
+            AtomicInteger calls = new AtomicInteger();
+            CompletableFuture<ProviderCallResult<String>> owner = CompletableFuture.supplyAsync(() ->
+                    harness.coordinator.execute(request("owner", AssetPriority.P0_POSITION,
+                            Duration.ofSeconds(2), 0, 0, () -> {
+                                calls.incrementAndGet();
+                                entered.countDown();
+                                try {
+                                    release.await();
+                                } catch (InterruptedException failure) {
+                                    interrupted.set(true);
+                                    Thread.currentThread().interrupt();
+                                }
+                                return ProviderAdapterResponse.ready("owner-ready", NOW);
+                            })));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+
+            ProviderCallResult<String> waiter = harness.coordinator.execute(
+                    request("waiter", AssetPriority.P0_POSITION, Duration.ofMillis(50), 0, 1,
+                            () -> ProviderAdapterResponse.ready("must-not-run", NOW)));
+
+            assertThat(waiter.metadata().errorCode()).isEqualTo("PROVIDER_TIMEOUT");
+            assertThat(interrupted).isFalse();
+            assertThat(calls).hasValue(1);
+            assertThat(harness.singleFlight.activeFlightCount()).isEqualTo(1);
+            release.countDown();
+            assertThat(owner.get(1, TimeUnit.SECONDS).payload()).isEqualTo("owner-ready");
+        }
+    }
+
+    @Test
+    void lowerPriorityWaiterCannotCancelPositionRefresh() throws Exception {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicBoolean interrupted = new AtomicBoolean();
+            CompletableFuture<ProviderCallResult<String>> owner = CompletableFuture.supplyAsync(() ->
+                    harness.coordinator.execute(request("position-owner", AssetPriority.P0_POSITION,
+                            Duration.ofSeconds(2), 0, 0, () -> {
+                                entered.countDown();
+                                try {
+                                    release.await();
+                                } catch (InterruptedException failure) {
+                                    interrupted.set(true);
+                                    Thread.currentThread().interrupt();
+                                }
+                                return ProviderAdapterResponse.ready("position-ready", NOW);
+                            })));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+
+            ProviderCallResult<String> discovery = harness.coordinator.execute(
+                    request("discovery-waiter", AssetPriority.P3_DISCOVERY, Duration.ofMillis(40), 0, 0,
+                            () -> ProviderAdapterResponse.ready("must-not-run", NOW)));
+
+            assertThat(discovery.metadata().errorCode()).isEqualTo("PROVIDER_TIMEOUT");
+            assertThat(interrupted).isFalse();
+            release.countDown();
+            assertThat(owner.get(1, TimeUnit.SECONDS).payload()).isEqualTo("position-ready");
+        }
+    }
+
+    @Test
+    void waiterTimeoutDoesNotSetPhysicalTimedOutFlag() throws Exception {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            CompletableFuture<ProviderCallResult<String>> owner = CompletableFuture.supplyAsync(() ->
+                    harness.coordinator.execute(request("flag-owner", AssetPriority.P0_POSITION,
+                            Duration.ofSeconds(2), 0, 0, () -> {
+                                entered.countDown();
+                                awaitIgnoringInterrupt(release);
+                                return ProviderAdapterResponse.ready("ready", NOW);
+                            })));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+
+            harness.coordinator.execute(request("flag-waiter", AssetPriority.P3_DISCOVERY,
+                    Duration.ofMillis(40), 0, 0,
+                    () -> ProviderAdapterResponse.ready("must-not-run", NOW)));
+
+            assertThat(harness.audit.snapshot()).noneMatch(event ->
+                    "PROVIDER_TIMEOUT_PHYSICAL_PENDING".equals(event.reasonCode()));
+            assertThat(harness.health.get(request("health-view", Duration.ofSeconds(1), 0, 0,
+                    () -> ProviderAdapterResponse.ready("unused", NOW)).key().snapshotKey()).lastReasonCode())
+                    .isNull();
+            release.countDown();
+            assertThat(owner.get(1, TimeUnit.SECONDS).payload()).isEqualTo("ready");
+        }
+    }
+
+    @Test
+    void waiterTimeoutDoesNotTriggerRetry() throws Exception {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicInteger calls = new AtomicInteger();
+            CompletableFuture<ProviderCallResult<String>> owner = CompletableFuture.supplyAsync(() ->
+                    harness.coordinator.execute(request("retry-owner", AssetPriority.P0_POSITION,
+                            Duration.ofSeconds(2), 0, 1, () -> {
+                                calls.incrementAndGet();
+                                entered.countDown();
+                                awaitIgnoringInterrupt(release);
+                                return ProviderAdapterResponse.ready("ready", NOW);
+                            })));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+
+            harness.coordinator.execute(request("retry-waiter", AssetPriority.P3_DISCOVERY,
+                    Duration.ofMillis(40), 0, 1,
+                    () -> ProviderAdapterResponse.ready("must-not-run", NOW)));
+            release.countDown();
+
+            assertThat(owner.get(1, TimeUnit.SECONDS).payload()).isEqualTo("ready");
+            assertThat(calls).hasValue(1);
+        }
+    }
+
+    @Test
+    void interruptedWaiterDoesNotCancelSharedFlight() throws Exception {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicBoolean ownerInterrupted = new AtomicBoolean();
+            AtomicBoolean waiterInterruptPreserved = new AtomicBoolean();
+            AtomicReference<ProviderCallResult<String>> waiterResult = new AtomicReference<>();
+            CompletableFuture<ProviderCallResult<String>> owner = CompletableFuture.supplyAsync(() ->
+                    harness.coordinator.execute(request("interrupt-owner", AssetPriority.P0_POSITION,
+                            Duration.ofSeconds(2), 0, 0, () -> {
+                                entered.countDown();
+                                try {
+                                    release.await();
+                                } catch (InterruptedException failure) {
+                                    ownerInterrupted.set(true);
+                                    Thread.currentThread().interrupt();
+                                }
+                                return ProviderAdapterResponse.ready("ready", NOW);
+                            })));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            Thread waiter = new Thread(() -> {
+                waiterResult.set(harness.coordinator.execute(request("interrupt-waiter",
+                        AssetPriority.P3_DISCOVERY, Duration.ofSeconds(2), 0, 0,
+                        () -> ProviderAdapterResponse.ready("must-not-run", NOW))));
+                waiterInterruptPreserved.set(Thread.currentThread().isInterrupted());
+            });
+            waiter.start();
+            awaitState(() -> harness.singleFlight.waitingCallerCount() == 1);
+
+            waiter.interrupt();
+            waiter.join(1_000L);
+
+            assertThat(waiter.isAlive()).isFalse();
+            assertThat(waiterResult.get().metadata().errorCode()).isEqualTo("PROVIDER_CALL_INTERRUPTED");
+            assertThat(waiterInterruptPreserved).isTrue();
+            assertThat(ownerInterrupted).isFalse();
+            release.countDown();
+            assertThat(owner.get(1, TimeUnit.SECONDS).payload()).isEqualTo("ready");
+        }
+    }
+
+    @Test
+    void physicalAttemptTimeoutStillCancelsInterruptibly() throws Exception {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch entered = new CountDownLatch(1);
+            AtomicBoolean interrupted = new AtomicBoolean();
+
+            ProviderCallResult<String> result = harness.coordinator.execute(
+                    request("physical-timeout", Duration.ofMillis(80), 0, 0, () -> {
+                        entered.countDown();
+                        try {
+                            new CountDownLatch(1).await();
+                        } catch (InterruptedException expected) {
+                            interrupted.set(true);
+                            Thread.currentThread().interrupt();
+                        }
+                        return ProviderAdapterResponse.ready("late", NOW);
+                    }));
+
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_TIMEOUT");
+            awaitState(interrupted::get);
+        }
+    }
+
+    @Test
+    void backgroundRetryCanCompleteAfterOriginalCallerReturns() {
+        try (Harness harness = harness(1, 2)) {
+            CountDownLatch releaseFirstAttempt = new CountDownLatch(1);
+            AtomicInteger calls = new AtomicInteger();
+            ProviderCallRequest<String> request = request("background-retry", Duration.ofMillis(70), 0, 1,
+                    () -> {
+                        if (calls.incrementAndGet() == 1) {
+                            awaitIgnoringInterrupt(releaseFirstAttempt);
+                            return ProviderAdapterResponse.ready("late-first", NOW);
+                        }
+                        return ProviderAdapterResponse.ready("retry-ready", NOW);
+                    });
+
+            ProviderCallResult<String> caller = harness.coordinator.execute(request);
+
+            assertThat(caller.metadata().errorCode()).isEqualTo("PROVIDER_TIMEOUT");
+            assertThat(harness.singleFlight.activeFlightCount()).isEqualTo(1);
+            awaitState(() -> "PROVIDER_TIMEOUT_PHYSICAL_PENDING".equals(
+                    harness.health.get(request.key().snapshotKey()).lastReasonCode()));
+            releaseFirstAttempt.countDown();
+            awaitState(() -> calls.get() == 2 && harness.singleFlight.activeFlightCount() == 0);
+            ProviderCallResult<String> cached = harness.coordinator.peek(request.key(), request.priority(),
+                    request.freshTtl(), "background-retry-peek");
+            assertThat(cached.payload()).isEqualTo("retry-ready");
         }
     }
 
@@ -211,9 +444,19 @@ class ProviderPhysicalCallLifecycleTest {
             int retry5xx,
             int retryTimeout,
             java.util.function.Supplier<ProviderAdapterResponse<String>> adapter) {
+        return request(bucket, AssetPriority.P0_POSITION, timeout, retry5xx, retryTimeout, adapter);
+    }
+
+    private static ProviderCallRequest<String> request(
+            String bucket,
+            AssetPriority priority,
+            Duration timeout,
+            int retry5xx,
+            int retryTimeout,
+            java.util.function.Supplier<ProviderAdapterResponse<String>> adapter) {
         ProviderRequestKey key = new ProviderRequestKey("TEST", ProviderDatasetType.PRICE,
                 ProviderCallTestFixtures.spot("BTCUSDT"), "BTCUSDT", "GLOBAL", bucket, "TEST_V1");
-        return new ProviderCallRequest<>(key, AssetPriority.P0_POSITION, UserScanProfile.AUTO,
+        return new ProviderCallRequest<>(key, priority, UserScanProfile.AUTO,
                 RuntimeScanProfile.STANDARD, List.of("TEST"), "FM-TEST", Duration.ofSeconds(5),
                 Duration.ofMinutes(2), timeout, "trace-" + bucket, retry5xx, retryTimeout, adapter);
     }
@@ -234,10 +477,11 @@ class ProviderPhysicalCallLifecycleTest {
         ProviderConcurrencyGuard concurrency = new ProviderConcurrencyGuard(properties);
         ProviderCallExecutor executor = new ProviderCallExecutor(workers, queue,
                 properties.getReservedPrioritySlots());
+        ProviderHealthRegistry health = new ProviderHealthRegistry(clock);
         ProviderCallCoordinator coordinator = new ProviderCallCoordinator(properties, cache, singleFlight,
                 budget, new ProviderCircuitBreaker(10, 1, clock), audit, concurrency,
-                new ProviderHealthRegistry(clock), executor, new ProviderSnapshotRetentionPolicy(), clock);
-        return new Harness(coordinator, singleFlight, budget, audit, concurrency, executor);
+                health, executor, new ProviderSnapshotRetentionPolicy(), clock);
+        return new Harness(coordinator, singleFlight, budget, audit, concurrency, health, executor);
     }
 
     private static void awaitIgnoringInterrupt(CountDownLatch latch) {
@@ -271,6 +515,7 @@ class ProviderPhysicalCallLifecycleTest {
             ProviderRateBudgetManager budget,
             ProviderCallAuditLog audit,
             ProviderConcurrencyGuard concurrency,
+            ProviderHealthRegistry health,
             ProviderCallExecutor executor
     ) implements AutoCloseable {
         @Override

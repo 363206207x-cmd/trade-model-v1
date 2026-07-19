@@ -70,4 +70,14 @@ public record ProviderCallRequest<T>(
         }
         return value;
     }
+
+    /** The maximum time this logical caller waits for the shared flight. */
+    public Duration callerWaitTimeout() {
+        return timeout;
+    }
+
+    /** The owner request fixes this timeout for each physical attempt in the shared flight. */
+    public Duration physicalAttemptTimeout() {
+        return timeout;
+    }
 }

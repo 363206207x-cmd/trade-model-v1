@@ -38,6 +38,19 @@ public interface PersistedOhlcvBarMapper {
 
     @Select(BASE_SELECT
             + "WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
+            + "AND provider = #{provider} AND provider_market_type = #{providerMarketType} "
+            + "AND is_closed = TRUE AND is_deleted = 0 "
+            + "ORDER BY close_time_ms DESC, id DESC LIMIT #{limit}")
+    List<PersistedOhlcvBarDO> selectLatestClosedWindowBySource(
+            @Param("symbol") String symbol,
+            @Param("timeframe") String timeframe,
+            @Param("provider") String provider,
+            @Param("providerMarketType") String providerMarketType,
+            @Param("limit") int limit
+    );
+
+    @Select(BASE_SELECT
+            + "WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
             + "AND open_time_ms = #{openTimeMs} AND is_deleted = 0 "
             + "ORDER BY id DESC LIMIT 1")
     PersistedOhlcvBarDO selectBySymbolTimeframeAndOpenTime(

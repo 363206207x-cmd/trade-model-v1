@@ -56,5 +56,26 @@ unsupported perpetual adapter are `NOT_CONFIGURED`; they do not consume a spot
 snapshot or relabel spot metadata. Derivatives evidence cannot attach to a spot
 instrument. A mixed-market `AnalysisInputBundle` fails closed.
 
+## Persisted OHLCV Due State
+
+The scan refresh port uses a dedicated authoritative-read query for due-state
+decisions. It binds provider symbol, timeframe, persisted source provider, and
+`provider_market_type`; the existing generic query remains unchanged for its
+other consumers. A row can produce `NO_NEW_CLOSED_BAR_DUE / READY / FRESH`
+only when it is closed, non-deleted, source `READY`, freshness `FRESH`, quality
+`OK`, has a positive persisted source version, matches the requested provider
+and market type, and its next timeframe close is not yet due.
+
+Persisted market types are `SPOT` and `USDT_PERP`. A recent `SPOT` row cannot
+suppress a canonical `PERPETUAL` refresh. `ProviderRefreshObservation` retains
+canonical instrument, provider, provider market type, timeframe, and mapping
+source version for every OHLCV timeframe, including unavailable results.
+
+Logical caller timeout is not a provider snapshot failure. It cannot update
+the shared flight's physical timeout state or remote health. Local admission,
+budget, concurrency, and configuration failures likewise do not increment the
+remote provider circuit. Remote transport, physical timeout, `5xx`, malformed
+response, and invalid payload remain fail-closed circuit inputs.
+
 Decision Cutoff Time is deferred to P3-I1. Production readiness remains
 `BLOCKED`.

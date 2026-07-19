@@ -58,5 +58,19 @@ linear perpetual identity. A spot reference, if introduced later, must be a
 separate explicitly labelled input and can never masquerade as an execution
 price.
 
+Persisted OHLCV due-state identity is equally strict. The dedicated lookup
+uses provider symbol, timeframe, authoritative persisted provider, and
+`provider_market_type`; canonical `SPOT` maps to persisted `SPOT`, while
+canonical linear `PERPETUAL` maps to `USDT_PERP`. For the current primary
+Binance public OHLCV writer, persisted provider identity is `BINANCE_PUBLIC`.
+Source version remains present in the mapping and refresh observation, but is
+not used as a SQL equality constraint because the persisted column is an
+integer ingestion contract while mapping versions are named contract IDs.
+
+Consequently a recent `BINANCE_PUBLIC / SPOT` bar cannot make
+`BINANCE / PERPETUAL / LINEAR` appear ready. Without matching authoritative
+perpetual rows, the unconfigured perpetual adapter returns explicit
+`PERPETUAL_OHLCV_PROVIDER_NOT_CONFIGURED` for all four timeframes.
+
 Mappings are configuration/in-memory in P3-CALL1. No database migration and no
 dynamic symbol discovery are included. Production readiness remains `BLOCKED`.

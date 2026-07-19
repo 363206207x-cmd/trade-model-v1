@@ -163,7 +163,6 @@ public class ProviderCallCoordinator {
         ProviderSnapshotKey snapshotKey = request.key().snapshotKey();
         String provider = snapshotKey.provider();
         if (!properties.isEnabled() || !properties.isExternalCallsEnabled()) {
-            healthRegistry.recordFailure(snapshotKey, UnifiedSourceStatus.DISABLED, "PROVIDER_CALL_DISABLED");
             flight.completion().complete(failOrStale(request, stale, UnifiedSourceStatus.DISABLED,
                     "PROVIDER_CALL_DISABLED"));
             return;
@@ -192,8 +191,6 @@ public class ProviderCallCoordinator {
             handle = callExecutor.submit(request.priority(),
                     () -> runPhysicalAttempt(request, attemptId, attemptNumber, timedOut));
         } catch (RejectedExecutionException rejected) {
-            healthRegistry.recordFailure(request.key().snapshotKey(), UnifiedSourceStatus.DEGRADED,
-                    "PROVIDER_EXECUTOR_REJECTED");
             flight.completion().complete(finishResponse(request, stale,
                     ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
                             "PROVIDER_EXECUTOR_REJECTED", null)));
@@ -207,12 +204,10 @@ public class ProviderCallCoordinator {
             }
             handle.cancelInterruptibly();
         };
-        flight.setCancellation(cancellation);
-        ScheduledFuture<?> timeout = callExecutor.schedule(cancellation, request.timeout());
+        ScheduledFuture<?> timeout = callExecutor.schedule(cancellation, request.physicalAttemptTimeout());
 
         handle.completion().whenComplete((response, failure) -> {
             timeout.cancel(false);
-            flight.clearCancellation(cancellation);
             if (flight.completion().isDone()) return;
 
             ProviderAdapterResponse<T> effective = response;
@@ -299,19 +294,13 @@ public class ProviderCallCoordinator {
             SnapshotCacheService.SnapshotLookup<T> stale,
             ProviderRefreshFlight<ProviderCallResult<T>> flight) {
         try {
-            return flight.completion().get(request.timeout().toMillis(), TimeUnit.MILLISECONDS);
+            return flight.completion().get(request.callerWaitTimeout().toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException timeout) {
-            flight.requestCancellation();
-            healthRegistry.recordFailure(request.key().snapshotKey(), UnifiedSourceStatus.DEGRADED,
-                    "PROVIDER_TIMEOUT_PHYSICAL_PENDING");
             return failOrStale(request, stale, UnifiedSourceStatus.DEGRADED, "PROVIDER_TIMEOUT");
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-            flight.requestCancellation();
             return failOrStale(request, stale, UnifiedSourceStatus.ERROR, "PROVIDER_CALL_INTERRUPTED");
         } catch (ExecutionException failure) {
-            healthRegistry.recordFailure(request.key().snapshotKey(), UnifiedSourceStatus.ERROR,
-                    "PROVIDER_CALL_FAILED");
             return failOrStale(request, stale, UnifiedSourceStatus.ERROR, "PROVIDER_CALL_FAILED");
         }
     }
@@ -354,10 +343,13 @@ public class ProviderCallCoordinator {
         if (status == 429) {
             budget.applyRetryAfter(provider, response.retryAfterSeconds() == null ? 60 : response.retryAfterSeconds());
         }
-        circuitBreaker.recordFailure(provider);
+        ProviderFailureOrigin failureOrigin = ProviderFailureClassifier.classify(response);
+        if (failureOrigin.affectsProviderCircuit()) circuitBreaker.recordFailure(provider);
         UnifiedSourceStatus sourceStatus = response == null ? UnifiedSourceStatus.ERROR : response.sourceStatus();
-        healthRegistry.recordFailure(snapshotKey,
-                sourceStatus == null ? UnifiedSourceStatus.ERROR : sourceStatus, reason);
+        if (failureOrigin.recordsRemoteHealthFailure()) {
+            healthRegistry.recordFailure(snapshotKey,
+                    sourceStatus == null ? UnifiedSourceStatus.ERROR : sourceStatus, reason);
+        }
         return failOrStale(request, stale,
                 sourceStatus == null ? UnifiedSourceStatus.ERROR : sourceStatus, reason);
     }

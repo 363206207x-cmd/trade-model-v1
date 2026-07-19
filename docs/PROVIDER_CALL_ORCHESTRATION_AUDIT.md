@@ -56,7 +56,7 @@ gaps. The branch closes them with offline fixtures and fail-closed contracts:
 
 | Gate | Branch result | Contract |
 |---|---|---|
-| Physical call lifecycle | `PASS_BOUNDED` | A dedicated bounded `ProviderCallExecutor` owns adapter work. The physical task acquires and releases its concurrency lease and records every attempt. A logical timeout requests interruption but does not claim the physical call stopped or release Single Flight early. |
+| Physical call lifecycle | `PASS_BOUNDED` | A dedicated bounded `ProviderCallExecutor` owns adapter work. The physical task acquires and releases its concurrency lease and records every attempt. Only the physical attempt timeout supervisor requests interruption; a logical caller timeout only ends that caller's wait. |
 | Stable snapshot sharing | `PASS` | `ProviderSnapshotKey` excludes consumer TTL and `timeBucket`; cache, health, and Single Flight use the stable provider/dataset/instrument/timeframe/source identity. Consumer TTL only evaluates freshness. |
 | Four-timeframe OHLCV | `PASS_4_OF_4` | `5m`, `15m`, `1h`, and `4h` have independent minimum-gap identities and budget attempts. One timeframe failure is recorded without rewriting another result. |
 | Candidate confirmation | `PASS` | Consecutive confirmation follows `CandidateLogicIdentity`; changing market evidence updates `latestEvidenceHash` without resetting unchanged strategy/rule/direction/trigger logic. |
@@ -70,6 +70,23 @@ retry cannot start until the preceding physical attempt has actually ended.
 These are branch-level offline test results. Only merged main establishes an
 effective capability, and no real provider availability is claimed.
 
+## Reviewer Round 2 Focused Closure
+
+PR #1131 Reviewer Round 2 (`4730247371`) identified three remaining runtime
+correctness gaps. They are closed on this branch with offline deterministic
+tests:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Shared-flight cancellation ownership | `PASS` | The owner request fixes each physical attempt timeout. A joined caller's wait timeout or thread interrupt returns only for that caller and cannot cancel, retry, remove, or release the shared physical flight. Physical timeout supervision remains interruptible and a bounded retry may finish after the original caller returns. |
+| Local/remote failure isolation | `PASS` | `ProviderFailureClassifier` separates local admission, budget, concurrency, and configuration outcomes from remote rate-limit, auth, transport, server, and payload failures. Local rejection remains audited but does not increment the provider circuit or mark remote health down. `429` applies Retry-After without circuit failure; real transport/5xx/payload failures remain circuit inputs. |
+| Market-aware OHLCV due state | `PASS` | The dedicated persisted-bar lookup binds symbol, timeframe, persisted provider, and `provider_market_type`. `SPOT` rows cannot suppress `USDT_PERP` refresh or produce perpetual `READY`; each of `5m`, `15m`, `1h`, and `4h` retains canonical identity, provider, market type, and source version. |
+
+The current perpetual OHLCV adapter remains unconfigured. In the absence of a
+matching valid `USDT_PERP` persisted bar, all four timeframes enter
+`CoordinatedOhlcvSnapshotService` and return
+`PERPETUAL_OHLCV_PROVIDER_NOT_CONFIGURED`; no spot fallback is used.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.
@@ -77,5 +94,5 @@ effective capability, and no real provider availability is claimed.
 - No AI correctness or availability was proven.
 - No notification was delivered.
 - No trading capability was added.
-- No live provider or AI call was made while closing Reviewer Round 1.
+- No live provider or AI call was made while closing Reviewer Rounds 1 or 2.
 - Production readiness remains `BLOCKED`.

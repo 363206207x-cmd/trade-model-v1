@@ -10,6 +10,9 @@ import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.coinglass.CoinGlassDerivativesSnapshotService;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.example.trademodel.providercall.snapshot.CoordinatedOhlcvSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
@@ -28,6 +31,7 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     private final MarketPriceSnapshotService priceService;
     private final CoordinatedOhlcvSnapshotService ohlcvService;
     private final PersistedOhlcvBarMapper ohlcvBarMapper;
+    private final ProviderSymbolMappingRegistry mappingRegistry;
     private final CoinGlassDerivativesSnapshotService derivativesService;
     private final ProviderCallProperties properties;
     private final ProviderRefreshStateRegistry registry;
@@ -37,16 +41,18 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
                                              CoordinatedOhlcvSnapshotService ohlcvService,
                                              PersistedOhlcvBarMapper ohlcvBarMapper,
+                                             ProviderSymbolMappingRegistry mappingRegistry,
                                              CoinGlassDerivativesSnapshotService derivativesService,
                                              ProviderCallProperties properties,
                                              ProviderRefreshStateRegistry registry) {
-        this(priceService, ohlcvService, ohlcvBarMapper, derivativesService, properties, registry,
+        this(priceService, ohlcvService, ohlcvBarMapper, mappingRegistry, derivativesService, properties, registry,
                 Clock.systemUTC());
     }
 
     public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
                                              CoordinatedOhlcvSnapshotService ohlcvService,
                                              PersistedOhlcvBarMapper ohlcvBarMapper,
+                                             ProviderSymbolMappingRegistry mappingRegistry,
                                              CoinGlassDerivativesSnapshotService derivativesService,
                                              ProviderCallProperties properties,
                                              ProviderRefreshStateRegistry registry,
@@ -54,6 +60,7 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
         this.priceService = priceService;
         this.ohlcvService = ohlcvService;
         this.ohlcvBarMapper = ohlcvBarMapper;
+        this.mappingRegistry = mappingRegistry;
         this.derivativesService = derivativesService;
         this.properties = properties;
         this.registry = registry;
@@ -94,33 +101,44 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     }
 
     private void refreshOhlcv(ScanPlanItem item, String traceId, Instant attemptedAt) {
-        boolean due = false;
-        Instant latestDataTime = null;
-        for (String timeframe : PRIMARY_TIMEFRAMES) {
-            OhlcvDueState dueState = dueState(item.symbol(), timeframe, attemptedAt);
-            if (dueState.latestCloseTime() != null
-                    && (latestDataTime == null || dueState.latestCloseTime().isAfter(latestDataTime))) {
-                latestDataTime = dueState.latestCloseTime();
+        ProviderSymbolMapping mapping;
+        try {
+            mapping = mappingRegistry.resolve("BINANCE", item.canonicalInstrumentId());
+        } catch (RuntimeException missingMapping) {
+            for (String timeframe : PRIMARY_TIMEFRAMES) {
+                registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                        ProviderDatasetType.OHLCV, UnifiedSourceStatus.NOT_CONFIGURED,
+                        SnapshotFreshnessStatus.UNAVAILABLE, "PROVIDER_SYMBOL_MAPPING_NOT_FOUND",
+                        attemptedAt, null, traceId, timeframe, "BINANCE",
+                        providerMarketType(item.canonicalInstrumentId().marketType()), "UNVERIFIED"));
             }
-            if (!dueState.due()) continue;
-            due = true;
+            return;
+        }
+        OhlcvPersistedSourceIdentity sourceIdentity = sourceIdentity(mapping);
+        for (String timeframe : PRIMARY_TIMEFRAMES) {
+            OhlcvDueState dueState = dueState(mapping, sourceIdentity, timeframe, attemptedAt);
+            if (!dueState.due()) {
+                registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                        ProviderDatasetType.OHLCV, UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH,
+                        "NO_NEW_CLOSED_BAR_DUE", attemptedAt, dueState.latestCloseTime(), traceId, timeframe,
+                        mapping.provider(), sourceIdentity.providerMarketType(), mapping.sourceVersion()));
+                continue;
+            }
             ProviderCallResult<OhlcvIngestionResult> result = ohlcvService.refresh(
                     item.canonicalInstrumentId(), timeframe, 100, item.effectivePriority(), traceId);
-            record(item, ProviderDatasetType.OHLCV, result, attemptedAt, traceId, timeframe);
-        }
-        if (!due) {
-            registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
-                    ProviderDatasetType.OHLCV,
-                    UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH, "NO_NEW_CLOSED_BAR_DUE",
-                    attemptedAt, latestDataTime, traceId));
-            return;
+            recordOhlcv(item, mapping, sourceIdentity, result, attemptedAt, traceId, timeframe);
         }
     }
 
-    private OhlcvDueState dueState(String symbol, String timeframe, Instant now) {
+    private OhlcvDueState dueState(ProviderSymbolMapping mapping,
+                                   OhlcvPersistedSourceIdentity sourceIdentity,
+                                   String timeframe,
+                                   Instant now) {
         try {
-            List<PersistedOhlcvBarDO> rows = ohlcvBarMapper.selectLatestClosedWindow(symbol, timeframe, 1);
-            if (rows == null || rows.isEmpty() || rows.get(0).getCloseTimeMs() == null) {
+            List<PersistedOhlcvBarDO> rows = ohlcvBarMapper.selectLatestClosedWindowBySource(
+                    mapping.providerSymbol(), timeframe, sourceIdentity.persistedProvider(),
+                    sourceIdentity.providerMarketType(), 1);
+            if (rows == null || rows.isEmpty() || !validAuthoritativeBar(rows.get(0), sourceIdentity)) {
                 return new OhlcvDueState(true, null);
             }
             Instant latestClose = Instant.ofEpochMilli(rows.get(0).getCloseTimeMs());
@@ -129,6 +147,32 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
             // A failed authoritative-read check must not suppress refresh recovery.
             return new OhlcvDueState(true, null);
         }
+    }
+
+    private static boolean validAuthoritativeBar(PersistedOhlcvBarDO row,
+                                                  OhlcvPersistedSourceIdentity sourceIdentity) {
+        return row != null
+                && row.getCloseTimeMs() != null
+                && Boolean.TRUE.equals(row.getClosed())
+                && sourceIdentity.persistedProvider().equalsIgnoreCase(row.getProvider())
+                && sourceIdentity.providerMarketType().equalsIgnoreCase(row.getProviderMarketType())
+                && "READY".equalsIgnoreCase(row.getSourceStatus())
+                && "FRESH".equalsIgnoreCase(row.getFreshnessStatus())
+                && "OK".equalsIgnoreCase(row.getQualityStatus())
+                && row.getSourceVersion() != null
+                && row.getSourceVersion() > 0
+                && (row.getIsDeleted() == null || row.getIsDeleted() == 0);
+    }
+
+    private static OhlcvPersistedSourceIdentity sourceIdentity(ProviderSymbolMapping mapping) {
+        String persistedProvider = "BINANCE".equalsIgnoreCase(mapping.provider())
+                ? "BINANCE_PUBLIC" : mapping.provider();
+        return new OhlcvPersistedSourceIdentity(persistedProvider,
+                providerMarketType(mapping.canonicalInstrumentId().marketType()));
+    }
+
+    private static String providerMarketType(MarketType marketType) {
+        return marketType == MarketType.PERPETUAL ? "USDT_PERP" : "SPOT";
     }
 
     private static long timeframeSeconds(String timeframe) {
@@ -168,6 +212,35 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
                 result.metadata().providerDataTime(), result.metadata().traceId(), timeframe));
     }
 
+    private void recordOhlcv(ScanPlanItem item,
+                             ProviderSymbolMapping mapping,
+                             OhlcvPersistedSourceIdentity sourceIdentity,
+                             ProviderCallResult<?> result,
+                             Instant attemptedAt,
+                             String traceId,
+                             String timeframe) {
+        if (result == null || result.metadata() == null) {
+            registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                    ProviderDatasetType.OHLCV, UnifiedSourceStatus.ERROR,
+                    SnapshotFreshnessStatus.UNAVAILABLE, "PROVIDER_RESULT_MISSING", attemptedAt, null, traceId,
+                    timeframe, mapping.provider(), sourceIdentity.providerMarketType(), mapping.sourceVersion()));
+            return;
+        }
+        registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                ProviderDatasetType.OHLCV, result.metadata().sourceStatus(), result.metadata().freshnessStatus(),
+                result.metadata().errorCode(), attemptedAt, result.metadata().providerDataTime(),
+                result.metadata().traceId(), timeframe, mapping.provider(), sourceIdentity.providerMarketType(),
+                usableSourceVersion(result.metadata().sourceVersion(), mapping.sourceVersion())));
+    }
+
+    private static String usableSourceVersion(String resultVersion, String mappingVersion) {
+        return resultVersion == null || resultVersion.isBlank() || "UNVERIFIED".equalsIgnoreCase(resultVersion)
+                ? mappingVersion : resultVersion;
+    }
+
     private record OhlcvDueState(boolean due, Instant latestCloseTime) {
+    }
+
+    private record OhlcvPersistedSourceIdentity(String persistedProvider, String providerMarketType) {
     }
 }
