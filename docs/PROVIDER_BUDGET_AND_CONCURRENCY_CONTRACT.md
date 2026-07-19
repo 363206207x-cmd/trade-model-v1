@@ -68,6 +68,18 @@ attempt receives a distinct attempt ID, budget reservation, concurrency lease,
 and start/end audit event. Timeout and 5xx retries therefore consume real RPM;
 retry accounting can never bypass the budget.
 
+Each physical attempt also owns one idempotent `ProviderCircuitPermit`.
+When an OPEN circuit cools down, the permit carries the exclusive HALF_OPEN
+probe token. Remote success or `EMPTY_CONFIRMED` closes the circuit; remote
+transport/physical timeout/`5xx`/invalid payload reopens it; `429` and auth
+responses settle reachability without counting an availability failure; and a
+local admission, budget, minimum-gap, concurrency, configuration, or shutdown
+rejection releases the token without claiming a remote attempt. The next
+request can therefore probe after local pressure clears or Retry-After expires.
+A caller wait timeout or interrupt never receives or settles this permit.
+Repeated permit settlement is a no-op, and no completed path may leave a
+HALF_OPEN token claimed.
+
 The per-symbol minimum-gap key contains provider, dataset, canonical
 instrument, timeframe, and source version. Four due OHLCV requests (`5m`,
 `15m`, `1h`, `4h`) can consume four independent budget attempts in one scan;

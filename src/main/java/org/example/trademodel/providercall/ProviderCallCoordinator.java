@@ -160,17 +160,9 @@ public class ProviderCallCoordinator {
             ProviderCallRequest<T> request,
             SnapshotCacheService.SnapshotLookup<T> stale,
             ProviderRefreshFlight<ProviderCallResult<T>> flight) {
-        ProviderSnapshotKey snapshotKey = request.key().snapshotKey();
-        String provider = snapshotKey.provider();
         if (!properties.isEnabled() || !properties.isExternalCallsEnabled()) {
             flight.completion().complete(failOrStale(request, stale, UnifiedSourceStatus.DISABLED,
                     "PROVIDER_CALL_DISABLED"));
-            return;
-        }
-        if (!circuitBreaker.allowRequest(provider)) {
-            healthRegistry.recordFailure(snapshotKey, UnifiedSourceStatus.DEGRADED, "PROVIDER_CIRCUIT_OPEN");
-            flight.completion().complete(failOrStale(request, stale, UnifiedSourceStatus.DEGRADED,
-                    "PROVIDER_CIRCUIT_OPEN"));
             return;
         }
         startAttempt(request, stale, flight, 1, 0, 0);
@@ -184,6 +176,15 @@ public class ProviderCallCoordinator {
             int used5xxRetries,
             int usedTimeoutRetries) {
         if (flight.completion().isDone()) return;
+        ProviderCircuitPermit permit = circuitBreaker.tryAcquire(request.key().provider());
+        if (!permit.acquired()) {
+            completeCircuitOpen(request, stale, flight);
+            return;
+        }
+        if (flight.completion().isDone()) {
+            permit.releaseWithoutRemoteAttempt();
+            return;
+        }
         String attemptId = request.traceId() + "-attempt-" + attemptNumber + "-" + UUID.randomUUID();
         AtomicBoolean timedOut = new AtomicBoolean();
         ProviderCallExecutor.TaskHandle<ProviderAdapterResponse<T>> handle;
@@ -191,9 +192,10 @@ public class ProviderCallCoordinator {
             handle = callExecutor.submit(request.priority(),
                     () -> runPhysicalAttempt(request, attemptId, attemptNumber, timedOut));
         } catch (RejectedExecutionException rejected) {
-            flight.completion().complete(finishResponse(request, stale,
-                    ProviderAdapterResponse.failed(UnifiedSourceStatus.DEGRADED, 0,
-                            "PROVIDER_EXECUTOR_REJECTED", null)));
+            ProviderAdapterResponse<T> response = ProviderAdapterResponse.failed(
+                    UnifiedSourceStatus.DEGRADED, 0, "PROVIDER_EXECUTOR_REJECTED", null);
+            settleCircuitPermit(permit, response);
+            flight.completion().complete(finishResponse(request, stale, response));
             return;
         }
 
@@ -204,11 +206,34 @@ public class ProviderCallCoordinator {
             }
             handle.cancelInterruptibly();
         };
-        ScheduledFuture<?> timeout = callExecutor.schedule(cancellation, request.physicalAttemptTimeout());
+        ScheduledFuture<?> timeout;
+        try {
+            timeout = callExecutor.schedule(cancellation, request.physicalAttemptTimeout());
+        } catch (RejectedExecutionException supervisorUnavailable) {
+            handle.cancelInterruptibly();
+            observeAttemptCompletion(request, stale, flight, attemptNumber, used5xxRetries,
+                    usedTimeoutRetries, timedOut, handle, null, permit);
+            return;
+        }
+
+        observeAttemptCompletion(request, stale, flight, attemptNumber, used5xxRetries,
+                usedTimeoutRetries, timedOut, handle, timeout, permit);
+    }
+
+    private <T> void observeAttemptCompletion(
+            ProviderCallRequest<T> request,
+            SnapshotCacheService.SnapshotLookup<T> stale,
+            ProviderRefreshFlight<ProviderCallResult<T>> flight,
+            int attemptNumber,
+            int used5xxRetries,
+            int usedTimeoutRetries,
+            AtomicBoolean timedOut,
+            ProviderCallExecutor.TaskHandle<ProviderAdapterResponse<T>> handle,
+            ScheduledFuture<?> timeout,
+            ProviderCircuitPermit permit) {
 
         handle.completion().whenComplete((response, failure) -> {
-            timeout.cancel(false);
-            if (flight.completion().isDone()) return;
+            if (timeout != null) timeout.cancel(false);
 
             ProviderAdapterResponse<T> effective = response;
             Throwable cause = unwrap(failure);
@@ -220,15 +245,21 @@ public class ProviderCallCoordinator {
                         cause instanceof CancellationException ? "PROVIDER_CALL_CANCELLED" : "PROVIDER_CALL_FAILED",
                         null);
             }
+            applyRetryAfter(request.key().provider(), effective);
+            settleCircuitPermit(permit, effective);
+            if (flight.completion().isDone()) return;
 
-            if (isTimeout(effective) && usedTimeoutRetries < request.maxRetryTimeout()) {
+            boolean circuitAllowsRetry = circuitBreaker.state(request.key().provider()) != ProviderCircuitState.OPEN;
+            if (circuitAllowsRetry && isTimeout(effective)
+                    && usedTimeoutRetries < request.maxRetryTimeout()) {
                 scheduleRetry(request, stale, flight, attemptNumber + 1, used5xxRetries,
-                        usedTimeoutRetries + 1);
+                        usedTimeoutRetries + 1, effective);
                 return;
             }
-            if (isRetryable5xx(effective) && used5xxRetries < request.maxRetry5xx()) {
+            if (circuitAllowsRetry && isRetryable5xx(effective)
+                    && used5xxRetries < request.maxRetry5xx()) {
                 scheduleRetry(request, stale, flight, attemptNumber + 1, used5xxRetries + 1,
-                        usedTimeoutRetries);
+                        usedTimeoutRetries, effective);
                 return;
             }
             flight.completion().complete(finishResponse(request, stale, effective));
@@ -241,9 +272,16 @@ public class ProviderCallCoordinator {
             ProviderRefreshFlight<ProviderCallResult<T>> flight,
             int attemptNumber,
             int used5xxRetries,
-            int usedTimeoutRetries) {
-        callExecutor.schedule(() -> startAttempt(request, stale, flight, attemptNumber,
-                used5xxRetries, usedTimeoutRetries), boundedBackoff(attemptNumber));
+            int usedTimeoutRetries,
+            ProviderAdapterResponse<T> terminalResponse) {
+        try {
+            callExecutor.schedule(() -> startAttempt(request, stale, flight, attemptNumber,
+                    used5xxRetries, usedTimeoutRetries), boundedBackoff(attemptNumber));
+        } catch (RejectedExecutionException retrySupervisorUnavailable) {
+            if (!flight.completion().isDone()) {
+                flight.completion().complete(finishResponse(request, stale, terminalResponse));
+            }
+        }
     }
 
     private <T> ProviderAdapterResponse<T> runPhysicalAttempt(
@@ -312,7 +350,6 @@ public class ProviderCallCoordinator {
         ProviderSnapshotKey snapshotKey = request.key().snapshotKey();
         String provider = snapshotKey.provider();
         if (response != null && response.ready()) {
-            circuitBreaker.recordSuccess(provider);
             healthRegistry.recordSuccess(snapshotKey, UnifiedSourceStatus.READY);
             Instant fetchTime = clock.instant();
             ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
@@ -324,7 +361,6 @@ public class ProviderCallCoordinator {
                     budget.state(provider, circuitBreaker.state(provider))));
         }
         if (response != null && response.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED) {
-            circuitBreaker.recordSuccess(provider);
             healthRegistry.recordSuccess(snapshotKey, UnifiedSourceStatus.EMPTY_CONFIRMED);
             Instant fetchTime = clock.instant();
             ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
@@ -337,14 +373,9 @@ public class ProviderCallCoordinator {
                     budget.state(provider, circuitBreaker.state(provider))));
         }
 
-        int status = response == null ? 0 : response.httpStatus();
         String reason = response == null || response.reasonCode() == null
                 ? "PROVIDER_RESPONSE_MALFORMED" : response.reasonCode();
-        if (status == 429) {
-            budget.applyRetryAfter(provider, response.retryAfterSeconds() == null ? 60 : response.retryAfterSeconds());
-        }
         ProviderFailureOrigin failureOrigin = ProviderFailureClassifier.classify(response);
-        if (failureOrigin.affectsProviderCircuit()) circuitBreaker.recordFailure(provider);
         UnifiedSourceStatus sourceStatus = response == null ? UnifiedSourceStatus.ERROR : response.sourceStatus();
         if (failureOrigin.recordsRemoteHealthFailure()) {
             healthRegistry.recordFailure(snapshotKey,
@@ -352,6 +383,40 @@ public class ProviderCallCoordinator {
         }
         return failOrStale(request, stale,
                 sourceStatus == null ? UnifiedSourceStatus.ERROR : sourceStatus, reason);
+    }
+
+    private void applyRetryAfter(String provider, ProviderAdapterResponse<?> response) {
+        if (response != null && response.httpStatus() == 429) {
+            budget.applyRetryAfter(provider,
+                    response.retryAfterSeconds() == null ? 60 : response.retryAfterSeconds());
+        }
+    }
+
+    private static void settleCircuitPermit(ProviderCircuitPermit permit, ProviderAdapterResponse<?> response) {
+        if (response != null && (response.ready()
+                || response.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED)) {
+            permit.recordSuccess();
+            return;
+        }
+        ProviderFailureOrigin origin = ProviderFailureClassifier.classify(response);
+        if (origin.affectsProviderCircuit()) {
+            permit.recordRemoteFailure();
+        } else if (origin == ProviderFailureOrigin.REMOTE_RATE_LIMIT
+                || origin == ProviderFailureOrigin.REMOTE_AUTH) {
+            permit.recordRemoteReachable();
+        } else {
+            permit.releaseWithoutRemoteAttempt();
+        }
+    }
+
+    private <T> void completeCircuitOpen(
+            ProviderCallRequest<T> request,
+            SnapshotCacheService.SnapshotLookup<T> stale,
+            ProviderRefreshFlight<ProviderCallResult<T>> flight) {
+        ProviderSnapshotKey snapshotKey = request.key().snapshotKey();
+        healthRegistry.recordFailure(snapshotKey, UnifiedSourceStatus.DEGRADED, "PROVIDER_CIRCUIT_OPEN");
+        flight.completion().complete(failOrStale(request, stale, UnifiedSourceStatus.DEGRADED,
+                "PROVIDER_CIRCUIT_OPEN"));
     }
 
     private static boolean isRetryable5xx(ProviderAdapterResponse<?> response) {

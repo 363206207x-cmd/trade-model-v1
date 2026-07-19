@@ -6,10 +6,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -28,6 +30,7 @@ public class ProviderCallExecutor implements AutoCloseable {
     private final int maxQueuedCalls;
     private final int reservedPriorityQueueSlots;
     private final Object admissionLock = new Object();
+    private final Set<PhysicalTask<?>> outstandingTasks = ConcurrentHashMap.newKeySet();
 
     @Autowired
     public ProviderCallExecutor(ProviderCallProperties properties) {
@@ -60,6 +63,8 @@ public class ProviderCallExecutor implements AutoCloseable {
             if (queueReservedForHigherPriority(priority, executor.getQueue().size())) {
                 throw new RejectedExecutionException("PROVIDER_EXECUTOR_PRIORITY_QUEUE_RESERVED");
             }
+            outstandingTasks.add(task);
+            task.completion.whenComplete((ignored, failure) -> outstandingTasks.remove(task));
             try {
                 executor.execute(control);
             } catch (RejectedExecutionException rejected) {
@@ -91,13 +96,19 @@ public class ProviderCallExecutor implements AutoCloseable {
             boolean controlStopped = controlScheduler.awaitTermination(bounded.toMillis(), TimeUnit.MILLISECONDS);
             if (!providerStopped) executor.shutdownNow();
             if (!controlStopped) controlScheduler.shutdownNow();
+            if (!providerStopped) cancelOutstandingTasks();
             return providerStopped && controlStopped;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             executor.shutdownNow();
             controlScheduler.shutdownNow();
+            cancelOutstandingTasks();
             return false;
         }
+    }
+
+    private void cancelOutstandingTasks() {
+        outstandingTasks.forEach(PhysicalTask::cancelInterruptibly);
     }
 
     @PreDestroy

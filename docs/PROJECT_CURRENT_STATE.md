@@ -41,8 +41,10 @@ allowed. Production Deployment Readiness remains `BLOCKED`.
 
 PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
 `4730021827` requested five correctness fixes and Reviewer Round 2 review
-`4730247371` requested three focused corrections. This branch now records both
-rounds' offline closure pending Reviewer Round 3:
+`4730247371` requested three focused corrections. Reviewer Round 3 review
+`4730325751` requested the final HALF_OPEN probe lifecycle correction. This
+branch now records all three rounds' offline closure pending final merge
+readiness review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -65,6 +67,11 @@ rounds' offline closure pending Reviewer Round 3:
 8. persisted OHLCV due-state reads bind provider and market type, so a recent
    `SPOT` row cannot suppress `USDT_PERP` refresh or create false perpetual
    `READY`; all four timeframe observations preserve market identity.
+9. every physical attempt owns an idempotent circuit permit; local rejection
+   releases a HALF_OPEN probe, `429`/auth settles remote reachability, remote
+   failure reopens, success closes, and waiter timeout cannot release the
+   owner's token. Completed fixture paths leave zero permanently claimed
+   HALF_OPEN probes.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,

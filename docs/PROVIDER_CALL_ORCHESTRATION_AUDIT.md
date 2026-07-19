@@ -87,6 +87,24 @@ matching valid `USDT_PERP` persisted bar, all four timeframes enter
 `CoordinatedOhlcvSnapshotService` and return
 `PERPETUAL_OHLCV_PROVIDER_NOT_CONFIGURED`; no spot fallback is used.
 
+## Reviewer Round 3 Final Focused Closure
+
+PR #1131 Reviewer Round 3 (`4730325751`) identified one final circuit lifecycle
+gap. It is closed on this branch with an explicit, one-shot
+`ProviderCircuitPermit` and offline deterministic tests:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| HALF_OPEN permit ownership | `PASS` | Each physical attempt acquires its own circuit permit. Only a HALF_OPEN owner carries the unique probe token; logical callers and Single Flight waiters never own it. |
+| Local rejection release | `PASS` | Executor, concurrency, budget, per-symbol gap, local configuration, pre-attempt cancellation, and shutdown cancellation of queued work release the probe without incrementing remote failures or closing the circuit as success. |
+| Remote reachable settlement | `PASS` | `429` applies Retry-After and `401/403` auth responses record remote reachability; both settle the probe without joining the 5xx availability counter. |
+| Remote terminal state | `PASS` | Success and `EMPTY_CONFIRMED` close the circuit. Physical timeout, transport failure, `5xx`, malformed response, and invalid payload reopen it. |
+| Idempotency and retry | `PASS` | A permit settles once. Every retry reacquires circuit permission for its own physical attempt; an OPEN circuit cannot be bypassed by a background retry. |
+
+No completed fixture path retains `HALF_OPEN + probeClaimed`; permanent
+HALF_OPEN count is zero. This remains branch-level offline evidence pending the
+final merge-readiness review.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.
@@ -94,5 +112,5 @@ matching valid `USDT_PERP` persisted bar, all four timeframes enter
 - No AI correctness or availability was proven.
 - No notification was delivered.
 - No trading capability was added.
-- No live provider or AI call was made while closing Reviewer Rounds 1 or 2.
+- No live provider or AI call was made while closing Reviewer Rounds 1, 2, or 3.
 - Production readiness remains `BLOCKED`.

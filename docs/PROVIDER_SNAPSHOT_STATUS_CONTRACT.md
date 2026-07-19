@@ -77,5 +77,12 @@ budget, concurrency, and configuration failures likewise do not increment the
 remote provider circuit. Remote transport, physical timeout, `5xx`, malformed
 response, and invalid payload remain fail-closed circuit inputs.
 
+Circuit admission is attempt-owned. A HALF_OPEN physical attempt carries one
+idempotent permit until the attempt actually ends. Local rejection releases
+the probe, `429` or auth settles it as remote-reachable, remote failure reopens
+the circuit, and READY/`EMPTY_CONFIRMED` closes it. Caller timeout and joined
+waiters cannot release the owner permit. Thus a completed snapshot path cannot
+strand the provider in a permanently claimed HALF_OPEN state.
+
 Decision Cutoff Time is deferred to P3-I1. Production readiness remains
 `BLOCKED`.
