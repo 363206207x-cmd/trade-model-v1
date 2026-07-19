@@ -78,6 +78,15 @@ only after the physical chain completes; logical caller timeout is not physical
 completion. Different instruments, timeframes, market types, or source versions
 remain independent.
 
+The completed physical result is shared once; each logical waiter result is
+rewrapped from a caller-TTL cache lookup. Therefore every waiter owns its trace,
+priority, profile fields, frequency-matrix version, TTL, metadata, and
+request-result audit. Rewrapping performs zero additional adapter calls, budget
+reservations, circuit settlements, remote-health updates, retries, or
+physical-attempt audits. If a successful physical result has already crossed
+retention before caller rewrap, the waiter fails closed instead of returning
+the owner's metadata.
+
 Local admission, queue, budget, minimum-gap, concurrency, disabled, and
 not-configured outcomes are local coordination state. They remain fail-closed
 and audited, but do not increment the remote provider circuit or mark remote
@@ -134,4 +143,13 @@ CANCELLED_QUEUE_SLOT_RECLAMATION: PASS
 REPEATED_QUEUE_TIMEOUT_QUEUE_GROWTH: 0
 P0_RESERVED_SLOT_AFTER_CANCELLED_P3: AVAILABLE
 SINGLE_FLIGHT_AND_EXECUTOR_QUEUE_CLEANUP: CONSISTENT
+SHARED_FLIGHT_PHYSICAL_RESULT: SHARED_ONCE
+SHARED_FLIGHT_CALLER_RESULT: PER_CALLER_REWRAPPED
+WAITER_TRACE_OWNERSHIP: CALLER_OWN
+WAITER_PROFILE_AUDIT: CALLER_OWN
+WAITER_TTL: CALLER_OWN
+WAITER_ADDITIONAL_PROVIDER_CALLS: 0
+WAITER_ADDITIONAL_BUDGET_RESERVATIONS: 0
+WAITER_ADDITIONAL_CIRCUIT_SETTLEMENTS: 0
+WAITER_ADDITIONAL_REMOTE_HEALTH_MUTATIONS: 0
 ```

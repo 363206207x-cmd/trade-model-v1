@@ -3,6 +3,7 @@ package org.example.trademodel.providercall;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -124,8 +125,9 @@ public class ProviderCallCoordinator {
                     callerFallback = stale;
                     startRefresh(request, stale, registration.flight());
                 }
+                return awaitOwnerResult(request, callerFallback, registration.flight());
             }
-            return await(request, callerFallback, registration.flight());
+            return awaitAndRewrapWaiterResult(request, callerFallback, registration.flight());
         }
     }
 
@@ -441,7 +443,7 @@ public class ProviderCallCoordinator {
         }
     }
 
-    private <T> ProviderCallResult<T> await(
+    private <T> ProviderCallResult<T> awaitOwnerResult(
             ProviderCallRequest<T> request,
             SnapshotCacheService.SnapshotLookup<T> stale,
             ProviderRefreshFlight<ProviderCallResult<T>> flight) {
@@ -457,6 +459,47 @@ public class ProviderCallCoordinator {
         }
     }
 
+    private <T> ProviderCallResult<T> awaitAndRewrapWaiterResult(
+            ProviderCallRequest<T> request,
+            SnapshotCacheService.SnapshotLookup<T> callerFallback,
+            ProviderRefreshFlight<ProviderCallResult<T>> flight) {
+        try {
+            ProviderCallResult<T> sharedResult = flight.completion().get(
+                    request.callerWaitTimeout().toMillis(), TimeUnit.MILLISECONDS);
+            return adaptSharedFlightResultForCaller(request, callerFallback, sharedResult);
+        } catch (TimeoutException timeout) {
+            return failOrStale(request, callerFallback, UnifiedSourceStatus.DEGRADED, "PROVIDER_TIMEOUT");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return failOrStale(request, callerFallback, UnifiedSourceStatus.ERROR,
+                    "PROVIDER_CALL_INTERRUPTED");
+        } catch (ExecutionException failure) {
+            return failOrStale(request, callerFallback, UnifiedSourceStatus.ERROR, "PROVIDER_CALL_FAILED");
+        }
+    }
+
+    private <T> ProviderCallResult<T> adaptSharedFlightResultForCaller(
+            ProviderCallRequest<T> request,
+            SnapshotCacheService.SnapshotLookup<T> callerFallback,
+            ProviderCallResult<T> sharedResult) {
+        SnapshotCacheService.SnapshotLookup<T> callerLookup = cache.lookup(
+                request.key().snapshotKey(), clock.instant(), request.freshTtl());
+        if (callerLookup.fresh()) return cached(request, callerLookup, false);
+        if (callerLookup.staleReadable()) return cached(request, callerLookup, true);
+
+        ProviderSnapshotMetadata sharedMetadata = sharedResult == null ? null : sharedResult.metadata();
+        if (sharedMetadata != null && (sharedMetadata.sourceStatus() == UnifiedSourceStatus.READY
+                || sharedMetadata.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED)) {
+            return failOrStale(request, null, UnifiedSourceStatus.DEGRADED,
+                    "SNAPSHOT_EXPIRED_BEFORE_CALLER_REWRAP");
+        }
+        UnifiedSourceStatus status = sharedMetadata == null || sharedMetadata.sourceStatus() == null
+                ? UnifiedSourceStatus.ERROR : sharedMetadata.sourceStatus();
+        String reason = sharedMetadata == null || sharedMetadata.errorCode() == null
+                ? "PROVIDER_CALL_FAILED" : sharedMetadata.errorCode();
+        return failOrStale(request, callerFallback, status, reason);
+    }
+
     private <T> ProviderCallResult<T> finishResponse(
             ProviderCallRequest<T> request,
             SnapshotCacheService.SnapshotLookup<T> stale,
@@ -464,25 +507,43 @@ public class ProviderCallCoordinator {
         ProviderSnapshotKey snapshotKey = request.key().snapshotKey();
         String provider = snapshotKey.provider();
         if (response != null && response.ready()) {
-            healthRegistry.recordSuccess(snapshotKey, UnifiedSourceStatus.READY);
+            Duration retention = validDatasetRetention(snapshotKey);
+            if (retention == null) {
+                return failOrStale(request, stale, UnifiedSourceStatus.ERROR,
+                        "PROVIDER_SNAPSHOT_RETENTION_INVALID");
+            }
             Instant fetchTime = clock.instant();
+            Instant expiresAt = boundedExpiry(fetchTime, request.freshTtl(), retention);
+            if (expiresAt == null || !expiresAt.isAfter(fetchTime)) {
+                return failOrStale(request, stale, UnifiedSourceStatus.ERROR,
+                        "PROVIDER_SNAPSHOT_RETENTION_INVALID");
+            }
+            healthRegistry.recordSuccess(snapshotKey, UnifiedSourceStatus.READY);
             ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
-                    fetchTime.plus(request.freshTtl()), UnifiedSourceStatus.READY,
+                    expiresAt, UnifiedSourceStatus.READY,
                     SnapshotFreshnessStatus.FRESH, false, false, null, List.of());
-            cache.put(snapshotKey, response.payload(), metadata,
-                    retentionPolicy.staleRetention(snapshotKey.datasetType()));
+            cache.put(snapshotKey, response.payload(), metadata, retention);
             return audited(request, new ProviderCallResult<>(response.payload(), metadata,
                     budget.state(provider, circuitBreaker.state(provider))));
         }
         if (response != null && response.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED) {
-            healthRegistry.recordSuccess(snapshotKey, UnifiedSourceStatus.EMPTY_CONFIRMED);
+            Duration retention = validDatasetRetention(snapshotKey);
+            if (retention == null) {
+                return failOrStale(request, stale, UnifiedSourceStatus.ERROR,
+                        "PROVIDER_SNAPSHOT_RETENTION_INVALID");
+            }
             Instant fetchTime = clock.instant();
+            Instant expiresAt = boundedExpiry(fetchTime, request.freshTtl(), retention);
+            if (expiresAt == null || !expiresAt.isAfter(fetchTime)) {
+                return failOrStale(request, stale, UnifiedSourceStatus.ERROR,
+                        "PROVIDER_SNAPSHOT_RETENTION_INVALID");
+            }
+            healthRegistry.recordSuccess(snapshotKey, UnifiedSourceStatus.EMPTY_CONFIRMED);
             ProviderSnapshotMetadata metadata = metadata(request, response.providerDataTime(), fetchTime,
-                    fetchTime.plus(request.freshTtl()), UnifiedSourceStatus.EMPTY_CONFIRMED,
+                    expiresAt, UnifiedSourceStatus.EMPTY_CONFIRMED,
                     SnapshotFreshnessStatus.FRESH, false, false, response.reasonCode(),
                     response.reasonCode() == null ? List.of() : List.of(response.reasonCode()));
-            cache.put(snapshotKey, null, metadata,
-                    retentionPolicy.staleRetention(snapshotKey.datasetType()));
+            cache.put(snapshotKey, null, metadata, retention);
             return audited(request, new ProviderCallResult<>(null, metadata,
                     budget.state(provider, circuitBreaker.state(provider))));
         }
@@ -566,11 +627,69 @@ public class ProviderCallCoordinator {
             SnapshotCacheService.SnapshotLookup<T> lookup,
             boolean fallback,
             SnapshotFreshnessStatus freshness) {
-        ProviderSnapshotMetadata metadata = lookup.metadata().asCacheHit(
-                freshness, fallback,
-                lookup.metadata().fetchTime().plus(request.freshTtl()), clock.instant());
+        ProviderSnapshotMetadata metadata = callerCacheMetadata(request, lookup.metadata(), freshness, fallback);
         return audited(request, new ProviderCallResult<>(lookup.payload(), metadata,
                 budget.state(request.key().provider(), circuitBreaker.state(request.key().provider()))));
+    }
+
+    private <T> ProviderSnapshotMetadata callerCacheMetadata(
+            ProviderCallRequest<T> request,
+            ProviderSnapshotMetadata stored,
+            SnapshotFreshnessStatus freshness,
+            boolean fallback) {
+        ProviderRequestKey key = request.key();
+        Instant asOf = clock.instant();
+        Instant ageBasis = stored.providerDataTime() == null ? stored.fetchTime() : stored.providerDataTime();
+        long ageSeconds = ageBasis == null || asOf.isBefore(ageBasis)
+                ? 0L : Duration.between(ageBasis, asOf).toSeconds();
+        return new ProviderSnapshotMetadata(key.provider(), key.datasetType(), key.canonicalInstrumentId(),
+                key.providerSymbol(), key.timeframe(), stored.providerDataTime(), stored.fetchTime(),
+                boundedExpiry(key.snapshotKey(), stored.fetchTime(), request.freshTtl()), ageSeconds,
+                fallback ? UnifiedSourceStatus.STALE : stored.sourceStatus(), freshness, request.traceId(),
+                key.canonical(), key.sourceVersion(), true, fallback, stored.errorCode(), stored.reasonCodes());
+    }
+
+    private Instant boundedExpiry(
+            ProviderSnapshotKey snapshotKey,
+            Instant fetchTime,
+            Duration requestedFreshTtl) {
+        Duration retention = validDatasetRetention(snapshotKey);
+        if (retention == null) return fetchTime;
+        return boundedExpiry(fetchTime, requestedFreshTtl, retention);
+    }
+
+    private static Instant boundedExpiry(
+            Instant fetchTime,
+            Duration requestedFreshTtl,
+            Duration retention) {
+        if (fetchTime == null || retention == null || retention.isZero() || retention.isNegative()) {
+            return fetchTime;
+        }
+        Instant retentionExpiry;
+        try {
+            retentionExpiry = fetchTime.plus(retention);
+        } catch (DateTimeException | ArithmeticException invalidRetentionBoundary) {
+            return fetchTime;
+        }
+        if (requestedFreshTtl == null || requestedFreshTtl.isZero() || requestedFreshTtl.isNegative()) {
+            return fetchTime;
+        }
+        try {
+            Instant requestedExpiry = fetchTime.plus(requestedFreshTtl);
+            return requestedExpiry.isBefore(retentionExpiry) ? requestedExpiry : retentionExpiry;
+        } catch (DateTimeException | ArithmeticException invalidRequestedExpiry) {
+            return retentionExpiry;
+        }
+    }
+
+    private Duration validDatasetRetention(ProviderSnapshotKey snapshotKey) {
+        if (snapshotKey == null || snapshotKey.datasetType() == null) return null;
+        try {
+            Duration retention = retentionPolicy.staleRetention(snapshotKey.datasetType());
+            return retention == null || retention.isZero() || retention.isNegative() ? null : retention;
+        } catch (RuntimeException invalidRetentionPolicy) {
+            return null;
+        }
     }
 
     private <T> ProviderCallResult<T> failOrStale(

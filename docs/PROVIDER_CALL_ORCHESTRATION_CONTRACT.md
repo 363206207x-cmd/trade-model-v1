@@ -51,9 +51,24 @@ Stale fallback is never returned as healthy: metadata changes to source status `
 
 Configured cadence provides independent TTL ownership for position/core/candidate/pool price, derivatives, OHLCV references, external context, and later AI review snapshots. A price refresh does not refresh derivatives.
 
+Every READY, `EMPTY_CONFIRMED`, cache-hit, stale-fallback, read-only peek, and
+shared-flight waiter result reports `expiresAt` as the earlier of the caller's
+fresh TTL deadline and the dataset-retention deadline. A long caller TTL cannot
+outlive retention, while a short producer TTL does not become a permanent
+freshness ceiling for a later caller sharing the stable snapshot.
+
 ## Single Flight
 
-`ProviderSingleFlightGuard` allows one owner for an identical `ProviderRequestKey`. Concurrent waiters receive the same completed result. The concurrency test uses latches and a waiter counter, not timing sleeps, and proves one adapter invocation.
+`ProviderSingleFlightGuard` allows one owner for an identical stable
+`ProviderSnapshotKey`. Concurrent waiters share the owner's physical call,
+retry, budget, circuit-permit, health, and cache-write lifecycle, but they do
+not return the owner's caller result directly. After completion, each waiter
+rereads the cache with its own fresh TTL and receives its own trace-bearing
+metadata and request-result audit for its priority, profile, reason codes, and
+frequency-matrix version. Waiter rewrapping adds zero Provider calls, budget
+reservations, circuit settlements, remote-health mutations, or physical-attempt
+audits. Latch-based tests prove one adapter invocation and independent caller
+results without timing-sleep coordination.
 
 ## Provider Budget
 

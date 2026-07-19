@@ -241,12 +241,53 @@ CANCELLED_QUEUE_SLOT_RECLAMATION: PASS
 REPEATED_QUEUE_TIMEOUT_QUEUE_GROWTH: 0
 P0_RESERVED_SLOT_AFTER_CANCELLED_P3: AVAILABLE
 SINGLE_FLIGHT_AND_EXECUTOR_QUEUE_CLEANUP: CONSISTENT
-PR_STATE: OPEN_DRAFT_UNMERGED
-NEXT_TASK: Reviewer P3-CALL1 Cancelled Queue Slot Reclamation Final Re-review
+PR_STATE_AT_QUEUE_SLOT_CLOSURE: OPEN_DRAFT_UNMERGED
+QUEUE_SLOT_CLOSURE_HANDOFF: SUPERSEDED_BY_CALLER_REWRAP_AND_RETENTION_REVIEW
 ```
 
 These are offline branch results. No real Provider or AI call was made, and
 the closure is not effective mainline evidence until review and merge.
+
+## Per-Caller Shared-Flight and Retention-Expiry Closure
+
+Threads `PRRT_kwDOSc6fQc6SGsJ7` and `PRRT_kwDOSc6fQc6SGsJ9` identified two
+caller-boundary gaps after the queue-slot closure: joined waiters returned the
+owner's caller metadata, and refreshed metadata could advertise an expiry later
+than cache retention. The focused branch fix preserves stable-key sharing while
+separating physical and caller results:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Physical flight | `SHARED_ONCE` | One Provider call/retry chain, budget chain, circuit-permit lifecycle, health mutation path, and cache write remain owner-only. |
+| Caller result | `PER_CALLER_REWRAPPED` | A waiter rereads cache with its own fresh TTL and receives its own trace-bearing metadata and request-result audit. |
+| Caller audit | `PASS_CALLER_OWN` | Priority, base/effective profile, reason codes, and frequency-matrix version come from each caller; physical-attempt start/end audits remain one owner chain. |
+| Waiter fallback/failure | `PASS_FAIL_CLOSED` | Stale-readable data uses waiter metadata; an unavailable cache uses only the shared physical status/error and never returns owner caller metadata. |
+| READY expiry | `PASS_RETENTION_BOUNDED` | `min(fetchTime + callerFreshTtl, fetchTime + datasetRetention)`. |
+| EMPTY_CONFIRMED expiry | `PASS_RETENTION_BOUNDED` | Uses the same bound as READY. |
+| Cache/peek/waiter expiry | `PASS_RETENTION_BOUNDED` | Cache hit, stale fallback, read-only peek, and waiter rewrap cannot advertise a time beyond retention. |
+| Short-owner sharing | `PASS` | The owner's short returned expiry does not permanently cap a later caller before retention. |
+| Overflow | `PASS_FAIL_CLOSED` | Caller-expiry overflow falls back to the valid retention boundary. |
+
+```text
+SHARED_FLIGHT_PHYSICAL_RESULT: SHARED_ONCE
+SHARED_FLIGHT_CALLER_RESULT: PER_CALLER_REWRAPPED
+WAITER_TRACE_OWNERSHIP: CALLER_OWN
+WAITER_PROFILE_AUDIT: CALLER_OWN
+WAITER_TTL: CALLER_OWN
+WAITER_PROVIDER_CALL_COUNT: 0_ADDITIONAL
+WAITER_REMOTE_HEALTH_MUTATION_COUNT: 0_ADDITIONAL
+WAITER_CIRCUIT_SETTLEMENT_COUNT: 0_ADDITIONAL
+READY_EXPIRY: MIN_CALLER_TTL_AND_DATASET_RETENTION
+EMPTY_CONFIRMED_EXPIRY: MIN_CALLER_TTL_AND_DATASET_RETENTION
+CACHE_HIT_EXPIRY: MIN_CALLER_TTL_AND_DATASET_RETENTION
+EXPIRY_AFTER_RETENTION_COUNT: 0
+PR_STATE: OPEN_DRAFT_UNMERGED
+NEXT_TASK: Reviewer P3-CALL1 Caller Rewrap and Retention Expiry Final Re-review
+```
+
+These are deterministic offline branch results pending Reviewer re-review and
+merged-main activation. No real Provider, AI, notification, order, position
+mutation, or trading action was run.
 
 ## Explicit Non-Claims
 

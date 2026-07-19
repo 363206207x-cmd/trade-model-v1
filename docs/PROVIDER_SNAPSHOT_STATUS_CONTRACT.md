@@ -38,6 +38,45 @@ without extending retention. `metadata.expiresAt` is subject to the same cap.
 `READY` and `EMPTY_CONFIRMED` snapshots use the same boundary. Lookup and
 `purgeExpired` both treat `now >= staleUntil` as expired.
 
+Returned metadata uses the same rule for every refresh, cache hit, read-only
+peek, stale fallback, and shared-flight waiter:
+
+```text
+expiresAt = min(fetchTime + callerFreshTtl, fetchTime + datasetRetention)
+```
+
+An overflowing caller TTL falls back to the retention boundary. Invalid
+retention fails closed. The producer's stored short-TTL `expiresAt` does not
+permanently shorten a later caller because cache freshness is recalculated from
+`fetchTime` with that caller's TTL; the returned metadata is then independently
+capped by dataset retention.
+
+## Shared-Flight Caller Ownership
+
+Single Flight shares one physical Provider call/retry chain, one circuit-permit
+lifecycle, one budgeted attempt chain, and one cache write. It does not share
+caller identity. A successful waiter rereads the shared cache with its own TTL
+and receives a newly constructed caller result and request-result audit using
+its own trace, priority, base/effective profile, profile reason codes, and
+frequency-matrix version. It performs no additional Provider call, budget
+reservation, remote-health mutation, circuit settlement, or physical-attempt
+audit.
+
+```text
+SHARED_FLIGHT_PHYSICAL_RESULT: SHARED_ONCE
+SHARED_FLIGHT_CALLER_RESULT: PER_CALLER_REWRAPPED
+WAITER_TRACE_OWNERSHIP: CALLER_OWN
+WAITER_PROFILE_AUDIT: CALLER_OWN
+WAITER_TTL: CALLER_OWN
+WAITER_PROVIDER_CALL_COUNT: 0_ADDITIONAL
+WAITER_REMOTE_HEALTH_MUTATION_COUNT: 0_ADDITIONAL
+WAITER_CIRCUIT_SETTLEMENT_COUNT: 0_ADDITIONAL
+READY_EXPIRY: MIN_CALLER_TTL_AND_DATASET_RETENTION
+EMPTY_CONFIRMED_EXPIRY: MIN_CALLER_TTL_AND_DATASET_RETENTION
+CACHE_HIT_EXPIRY: MIN_CALLER_TTL_AND_DATASET_RETENTION
+EXPIRY_AFTER_RETENTION_COUNT: 0
+```
+
 ## Freshness States
 
 - `FRESH`: return the cached snapshot without a call.

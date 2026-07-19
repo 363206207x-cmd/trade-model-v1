@@ -52,8 +52,10 @@ audit-before-publication atomicity. Those fixes were followed by thread
 `PRRT_kwDOSc6fQc6SF53A`, which identified queued attempts being classified as
 remote timeouts before Adapter start. Review `4731186182` then identified that
 a cancelled queued control could remain in the bounded executor queue after its
-logical flight completed. This branch records the three rounds plus the focused
-closures below, pending a cancelled queue-slot reclamation final re-review:
+logical flight completed. Two later P2 threads identified owner caller metadata
+being returned to joined waiters and refreshed metadata expiry exceeding dataset
+retention. This branch records the three rounds plus the focused closures below,
+pending caller-rewrap and retention-expiry final re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -113,6 +115,17 @@ closures below, pending a cancelled queue-slot reclamation final re-review:
     repeated P3 queue timeouts leave zero queued controls and zero queue growth;
     P0 reserved admission remains available. Running cancellation only requests
     interruption and cannot remove another request's queued control.
+17. Shared Flight shares one physical request, retry, budget, circuit, health,
+    and cache-write lifecycle, while every waiter result is rebuilt from its own
+    cache lookup. Waiter trace, priority, profile, reason codes, frequency
+    version, TTL, metadata, and request audit are caller-owned; additional
+    Provider calls, budget reservations, circuit settlements, remote-health
+    mutations, and physical-attempt audits are zero.
+18. READY, `EMPTY_CONFIRMED`, cache-hit, stale-fallback, read-only peek, and
+    waiter metadata expiry use the earlier caller-TTL and dataset-retention
+    boundary. Long TTLs cannot outlive retention, short TTLs remain short, exact
+    boundaries are preserved, overflow falls back to retention, and a short
+    Owner expiry does not permanently cap a later caller.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,
@@ -1215,5 +1228,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; cancelled queue-slot reclamation closure pending final re-review
+- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; caller rewrap and retention-expiry closure pending final re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE
