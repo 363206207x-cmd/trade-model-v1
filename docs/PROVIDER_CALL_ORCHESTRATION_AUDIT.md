@@ -105,6 +105,25 @@ No completed fixture path retains `HALF_OPEN + probeClaimed`; permanent
 HALF_OPEN count is zero. This remains branch-level offline evidence pending the
 final merge-readiness review.
 
+## Snapshot Retention Hard-Bound Final Closure
+
+PR #1131 review comment `3610213592` identified that a long consumer freshness
+TTL could be evaluated before dataset retention. The focused branch fix keeps
+the stable snapshot key and sharing behavior while making retention the first
+lookup gate:
+
+| Gate | Branch result | Contract |
+|---|---|---|
+| Dataset retention | `PASS_OFFLINE_PENDING_REVIEW` | `DATASET_RETENTION` is the hard upper bound. `now >= staleUntil` returns `UNAVAILABLE` and conditionally removes only the matching entry. |
+| Lookup order | `PASS_OFFLINE_PENDING_REVIEW` | Retention is checked before consumer freshness. `effectiveFreshUntil = min(requestedFreshUntil, staleUntil)`. |
+| Long consumer TTL | `PASS_OFFLINE_PENDING_REVIEW` | A consumer TTL cannot keep a snapshot fresh or readable beyond retention. `metadata.expiresAt` is capped by the same boundary. |
+| Short consumer TTL | `PASS_OFFLINE_PENDING_REVIEW` | A shorter TTL makes the snapshot `STALE_READABLE` while it remains inside retention. |
+| Sharing and fallback | `PRESERVED_OFFLINE_PENDING_REVIEW` | Different consumer TTLs still share one stable key; existing cross-profile, cross-bucket stale fallback, and Single Flight fixtures remain in the focused suite. |
+| Exact boundary | `PASS_OFFLINE_PENDING_REVIEW` | Lookup and purge agree at `staleUntil - 1ns`, `staleUntil`, and `staleUntil + 1ns`; the exact boundary is expired. |
+
+The fix is not effective mainline evidence until review and merge. No provider
+call was enabled or executed by this closure.
+
 ## Explicit Non-Claims
 
 - No live provider readiness was proven.
@@ -112,5 +131,6 @@ final merge-readiness review.
 - No AI correctness or availability was proven.
 - No notification was delivered.
 - No trading capability was added.
-- No live provider or AI call was made while closing Reviewer Rounds 1, 2, or 3.
+- No live provider or AI call was made while closing Reviewer Rounds 1, 2, 3,
+  or the snapshot-retention review comment.
 - Production readiness remains `BLOCKED`.

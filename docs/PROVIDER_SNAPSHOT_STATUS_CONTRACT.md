@@ -23,6 +23,21 @@ dataset-specific (`ProviderSnapshotRetentionPolicy`), never extended or
 shortened by an arbitrary reader. Expired entries are purged, so advancing
 request buckets cannot create an unbounded cache.
 
+## Dataset Retention Hard Bound
+
+`DATASET_RETENTION` is a `HARD_UPPER_BOUND`. Cache lookup checks retention
+before consumer freshness. At `now >= staleUntil`, the matching entry is
+atomically removed and the result is `UNAVAILABLE`; the exact boundary is not
+readable. Within retention, `effectiveFreshUntil` is the earlier of the
+caller's requested freshness deadline and `staleUntil`.
+
+`CALLER_FRESH_TTL` may shorten freshness or extend it relative to the producer
+only within dataset retention. A shorter TTL produces `STALE_READABLE` while
+the entry remains retained, and a longer TTL preserves cross-profile sharing
+without extending retention. `metadata.expiresAt` is subject to the same cap.
+`READY` and `EMPTY_CONFIRMED` snapshots use the same boundary. Lookup and
+`purgeExpired` both treat `now >= staleUntil` as expired.
+
 ## Freshness States
 
 - `FRESH`: return the cached snapshot without a call.

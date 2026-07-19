@@ -42,9 +42,10 @@ allowed. Production Deployment Readiness remains `BLOCKED`.
 PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
 `4730021827` requested five correctness fixes and Reviewer Round 2 review
 `4730247371` requested three focused corrections. Reviewer Round 3 review
-`4730325751` requested the final HALF_OPEN probe lifecycle correction. This
-branch now records all three rounds' offline closure pending final merge
-readiness review:
+`4730325751` requested the HALF_OPEN probe lifecycle correction. Review comment
+`3610213592` then identified the snapshot-retention lookup-order gap. This
+branch records the three rounds plus the focused retention hard-bound closure,
+pending the snapshot-retention final re-review:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the
@@ -72,6 +73,10 @@ readiness review:
    failure reopens, success closes, and waiter timeout cannot release the
    owner's token. Completed fixture paths leave zero permanently claimed
    HALF_OPEN probes.
+10. dataset retention is checked before caller freshness; a caller TTL or
+    metadata expiry cannot exceed `staleUntil`, the exact boundary is removed,
+    and shorter/longer consumers continue sharing the stable key only while the
+    dataset remains retained.
 
 Each physical retry receives its own budget reservation and audit lifecycle.
 These are fixture-only branch results: real provider calls, real AI calls,
