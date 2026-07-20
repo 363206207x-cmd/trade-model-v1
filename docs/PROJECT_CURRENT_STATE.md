@@ -34,7 +34,7 @@ form login backed by Spring Security server-side Session and `tm_user`:
 7. bootstrap requires explicit `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD`, is idempotent, and never overwrites an existing password;
 8. existing Dashboard/Review browser writes now send the framework CSRF header.
 
-Targeted security tests and the full 4040-test suite pass with 0 failures and 0
+Targeted security tests and the full 4088-test suite pass with 0 failures and 0
 errors; 14 Docker/Testcontainers cases remain environment-gated. A bounded
 localhost two-start file-H2 run proved generic failure, login, Session refresh,
 logout, persistence, bootstrap no-overwrite, old-Session rejection after
@@ -1240,5 +1240,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1131 P3-CALL1 Open/Draft/unmerged; caller rewrap and retention-expiry closure pending final re-review
+- CURRENT_PACKAGE_PR: #1133 P3-U1 Open/Draft/unmerged; documentation evidence consistency fix pending exact-head re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

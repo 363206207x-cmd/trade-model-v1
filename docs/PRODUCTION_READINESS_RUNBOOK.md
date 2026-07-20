@@ -95,7 +95,7 @@ server-side Session backed by a minimal BCrypt `tm_user` record.
 - Session: 30-minute default timeout, fixation migration, HttpOnly Cookie, SameSite=Lax, local HTTP Secure=false, and prod Secure=true.
 - User initialization: both `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD` must be supplied through runtime configuration or approved secret injection; bootstrap is idempotent and never overwrites an existing user.
 - Failure policy: five failures in 15 minutes produce a temporary 15-minute block; the single-instance in-memory store is bounded and successful authentication resets the user state.
-- Validation: targeted security tests, 4040-test full suite, and disposable localhost two-start H2 runtime validation PASS. Docker/Testcontainers and controlled PostgreSQL V8 are environment-gated/not run, not PASS.
+- Validation: targeted security tests, 4088-test full suite, and disposable localhost two-start H2 runtime validation PASS. Docker/Testcontainers and controlled PostgreSQL V8 are environment-gated/not run, not PASS.
 - Deployment gap: the existing P3-H exact-V7 and Basic-auth smoke surfaces remain historical integration contracts and require a separate Session/V8 update before any real staging attempt.
 - Safety: no Provider, AI, Telegram, Push, order, position mutation, or trading call is introduced. Production readiness remains BLOCKED.
 
