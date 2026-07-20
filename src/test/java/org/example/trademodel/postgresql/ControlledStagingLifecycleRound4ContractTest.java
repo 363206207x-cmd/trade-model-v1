@@ -44,13 +44,13 @@ class ControlledStagingLifecycleRound4ContractTest {
     }
 
     @Test
-    void v7RuleValueDriftBlocksSteadyStart() throws Exception {
+    void v8RuleValueDriftBlocksSteadyStart() throws Exception {
         assertThat(runner()).contains(
                 "cfg-provider-scan-data-quality",
                 "cfg-deriv-min-data-quality",
-                "expect_full_readonly_verify_rejection V7_PROVIDER_RULE_VALUE",
-                "expect_full_readonly_verify_rejection V7_DERIV_RULE_VALUE");
-        assertThat(steadyVerify()).contains("postgres-versioned-contract-verify.sh 7 STEADY_STATE");
+                "expect_full_readonly_verify_rejection V8_PROVIDER_RULE_VALUE",
+                "expect_full_readonly_verify_rejection V8_DERIV_RULE_VALUE");
+        assertThat(steadyVerify()).contains("postgres-versioned-contract-verify.sh 8 STEADY_STATE");
     }
 
     @Test
@@ -76,16 +76,17 @@ class ControlledStagingLifecycleRound4ContractTest {
     }
 
     @Test
-    void schemaContractHasAuthoritativeV1ThroughV7Fingerprints() throws Exception {
+    void schemaContractHasAuthoritativeV1ThroughV8Fingerprints() throws Exception {
         String verifier = versionedVerifier();
-        for (int version = 1; version <= 7; version++) {
+        for (int version = 1; version <= 8; version++) {
             assertThat(verifier).contains(version + ") expected_schema_fingerprint=");
         }
         assertThat(verifier).doesNotContain("PENDING_V");
         assertThat(recoveryVerify()).contains(
                 "postgres-versioned-contract-verify.sh \"${applied_version}\" RECOVERY");
         assertThat(versionedVerifier()).contains(
-                "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V7");
+                "8) expected_schema_fingerprint=c491831c3a30a7f0cd411b4aedeee4ac",
+                "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V${expected_version}");
     }
 
     @Test
@@ -104,10 +105,10 @@ class ControlledStagingLifecycleRound4ContractTest {
     @Test
     void steadyStateSchemaDriftFixturesFailClosed() throws Exception {
         assertThat(runner()).contains(
-                "expect_full_readonly_verify_rejection V7_MISSING_INDEX",
+                "expect_full_readonly_verify_rejection V8_MISSING_INDEX",
                 "tm_decision_result ALTER COLUMN valid_from",
-                "expect_full_readonly_verify_rejection V7_OFFSET_COLUMN_TYPE",
-                "expect_full_readonly_verify_rejection V7_ROW_LEVEL_SECURITY");
+                "expect_full_readonly_verify_rejection V8_OFFSET_COLUMN_TYPE",
+                "expect_full_readonly_verify_rejection V8_ROW_LEVEL_SECURITY");
     }
 
     @Test
@@ -144,10 +145,25 @@ class ControlledStagingLifecycleRound4ContractTest {
     }
 
     @Test
-    void writeProbeDisablesSessionReadOnlyBeforePermissionProbe() throws Exception {
+    void writeProbeSeparatesBusinessDenialFromBoundedAuthenticationWrites() throws Exception {
         assertThat(P3hContractTestSupport.read("deploy/p3h/p3h-app-readonly-probe.sh"))
-                .contains("SET default_transaction_read_only=off; UPDATE flyway_schema_history")
+                .contains("UPDATE flyway_schema_history", "INSERT INTO tm_user",
+                        "AUTH_SESSION_WRITE_CONTRACT: ALLOWED_BOUNDED")
                 .contains("P3H_APP_ROLE_PROBE: BLOCKED_WRITE_ALLOWED");
+    }
+
+    @Test
+    void authWriteExceptionIsExactAndBusinessTablesRemainReadOnly() throws Exception {
+        assertThat(grants()).contains(
+                "GRANT INSERT (username, password_hash, created_at, last_login_at)",
+                "GRANT UPDATE (last_login_at)",
+                "GRANT USAGE ON SEQUENCE public.tm_user_id_seq");
+        assertThat(steadyVerify()).contains(
+                "AUTH_SESSION_COLUMN_WRITE_CONTRACT: PASS",
+                "AUTH_SESSION_SEQUENCE_USAGE_CONTRACT: PASS",
+                "BUSINESS_TABLE_WRITE_PRIVILEGES: NONE");
+        assertThat(grants()).doesNotContain("GRANT INSERT ON ALL TABLES",
+                "GRANT UPDATE ON ALL TABLES");
     }
 
     @Test

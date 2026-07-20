@@ -4,7 +4,7 @@
 
 - Main baseline at branch creation: `d84f0b95023d0ef50443b96d61972c1dbfbdeec8`
 - Branch: `codex/p3-u1-personal-login-session-auth`
-- Delivery state: `PR_OPEN_UNMERGED` in Draft PR #1133; the capability is not effective on merged main until the PR is reviewed and merged.
+- Delivery state: `PR_OPEN_READY_UNMERGED` in PR #1133; the capability is not effective on merged main until the new exact Head is reviewed and merged.
 - Production readiness: `BLOCKED`
 - P3-U2: not allowed before reviewed merged-main activation of P3-U1.
 
@@ -50,9 +50,11 @@ audit line, or default mapper log.
 
 Current migration smoke contracts expect the current V1-to-V8 chain and 28
 `tm_*` tables. Historical V7 evidence tests are target-pinned to V7 so prior
-evidence is not silently reclassified. Controlled PostgreSQL V8 execution was
-not run because Docker/Testcontainers was unavailable; this is not a
-PostgreSQL PASS claim.
+evidence is not silently reclassified. The P3-H migration service now applies
+the canonical Flyway chain through V8 before the application can start; core
+and steady-state verification require eight successful migrations, the exact
+V8 schema fingerprint, `tm_user`, and its five columns. No V8 SQL is copied
+into Compose or a second schema source.
 
 ## Initial Personal User
 
@@ -74,8 +76,11 @@ At startup the bootstrap:
 
 The Compose and P3-H ConfigTree templates map the existing versioned
 application credential into `trade-model.auth.initial-password`; no credential
-value is committed. Real server deployment and real secret-store injection are
-not part of this package.
+value is committed. The application database role remains read-only for every
+business table. Its only write privileges are the exact `tm_user` bootstrap
+columns, `last_login_at`, and `tm_user_id_seq` usage required by this
+authentication contract. Real server deployment and real secret-store
+injection are not part of this package.
 
 `.env.example` leaves `TRADE_MODEL_INITIAL_PASSWORD` blank. Operators must use
 an approved secret store or an untracked local environment file; there is no
@@ -156,15 +161,20 @@ ran during validation.
 - `MEDIUM-1`: usernames use the explicit ASCII allowlist and audit values receive
   deterministic separator/control encoding before structured logging.
 
-These fixes are implemented and locally validated on the PR branch. Merge
-readiness remains `PENDING_RE_REVIEW`; PR #1133 remains Draft and unmerged.
+These fixes are implemented and locally validated on the PR branch. PR #1133
+is Ready and unmerged; any new P3-H/Smoke fix commit requires exact-Head CI and
+independent re-review before merge authorization.
 
 ## Remaining Gates
 
-P3-U1 remains unmerged until its Draft PR is independently reviewed. The
-current P3-H exact-V7 deployment harness and Basic-auth smoke scripts are
-historical/deferred integration surfaces; they must receive an explicit
-Session/V8 deployment-contract package before any real staging attempt.
-Controlled PostgreSQL V8, real mobile browser, real reverse-proxy Session/CSRF,
+P3-U1 remains unmerged. The current branch closes the code-level P3-H gap with
+the existing one-shot migration service, exact V8/`tm_user` verification, and
+bounded auth-only database writes. `prod-smoke.sh` and the release gate now use
+form login, a temporary Cookie jar, CSRF-protected logout, and post-logout
+Session invalidation. The smoke reacquires the post-authentication CSRF token
+from the authenticated Dashboard logout form after Session fixation migration;
+there is no current Basic Auth compatibility path.
+Historical P3-G/PDR Basic-auth evidence remains historical and is not a current
+P3-U1 deployment contract. Real mobile browser, real reverse-proxy Session/CSRF,
 real secret-store injection, credential rotation, and release-owner approval
 remain missing. Production deployment cannot proceed.

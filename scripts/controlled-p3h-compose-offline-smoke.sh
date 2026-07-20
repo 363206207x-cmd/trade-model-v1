@@ -2,7 +2,7 @@
 set -euo pipefail
 
 EXPECTED_CONFIRMATION="I_CONFIRM_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE"
-EXPECTED_BRANCH="codex/staging-readonly-tls-secrets-p3h"
+EXPECTED_BRANCH="codex/p3-u1-personal-login-session-auth"
 GREENFIELD_CONFIRMATION="I_CONFIRM_EMPTY_GREENFIELD_INITIALIZATION"
 GREENFIELD_RECOVERY_CONFIRMATION="I_CONFIRM_RECOVER_CONTROLLED_GREENFIELD_INITIALIZATION"
 FAILURE_INJECTION_CONFIRMATION="I_CONFIRM_LOCAL_P3H_FAILURE_INJECTION"
@@ -586,7 +586,7 @@ printf '%s' "${recovery_output}" | grep -q 'PARTIAL_INITIALIZATION_RECOVERY: PAS
   || blocked "BLOCKED_PARTIAL_INITIALIZATION_RECOVERY_EVIDENCE"
 printf '%s' "${recovery_output}" | grep -q 'RECOVERED_READONLY_CONTRACT: PASS' \
   || blocked "BLOCKED_PARTIAL_INITIALIZATION_READONLY_RECOVERY"
-[ "$(flyway_success_count)" = "7" ] \
+[ "$(flyway_success_count)" = "8" ] \
   || blocked "BLOCKED_PARTIAL_INITIALIZATION_FINAL_VERSION"
 
 run_bounded 180 compose --profile validation down --volumes --remove-orphans >/dev/null \
@@ -610,9 +610,15 @@ database_fingerprint() {
     while IFS= read -r table_name; do
       [ -n "${table_name}" ] || continue
       quoted_table="${table_name//\"/\"\"}"
-      compose exec -T postgres psql --username=p3h_bootstrap \
-        --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
-        --command="SELECT '${quoted_table}', count(*), coalesce(md5(string_agg(md5(row_to_json(t)::text), '' ORDER BY md5(row_to_json(t)::text))), md5('')) FROM public.\"${quoted_table}\" t"
+      if [ "${table_name}" = "tm_user" ]; then
+        compose exec -T postgres psql --username=p3h_bootstrap \
+          --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
+          --command="SELECT 'tm_user', count(*), coalesce(md5(string_agg(md5(row_to_json(t)::text), '' ORDER BY md5(row_to_json(t)::text))), md5('')) FROM (SELECT id, username, password_hash, created_at FROM public.tm_user) t"
+      else
+        compose exec -T postgres psql --username=p3h_bootstrap \
+          --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
+          --command="SELECT '${quoted_table}', count(*), coalesce(md5(string_agg(md5(row_to_json(t)::text), '' ORDER BY md5(row_to_json(t)::text))), md5('')) FROM public.\"${quoted_table}\" t"
+      fi
     done < <(compose exec -T postgres psql --username=p3h_bootstrap \
       --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
       --command="SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name")
@@ -623,7 +629,7 @@ CURRENT_STAGE="first-boot"
 run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
   || blocked "BLOCKED_FIRST_BOOT"
 first_flyway_count="$(flyway_success_count)"
-[ "${first_flyway_count}" = "7" ] || blocked "BLOCKED_FIRST_BOOT_FLYWAY"
+[ "${first_flyway_count}" = "8" ] || blocked "BLOCKED_FIRST_BOOT_FLYWAY"
 first_fingerprint="$(database_fingerprint)"
 
 CURRENT_STAGE="post-migration-readonly-grant-recovery"
@@ -638,9 +644,9 @@ psql_admin trade_model_v1_p3h_primary "
   ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
     REVOKE ALL ON TABLES FROM p3h_backup_reader" \
   || blocked "BLOCKED_POST_MIGRATION_GRANT_FIXTURE_SETUP"
-P3H_START_MODE=RECOVER_GREENFIELD_INITIALIZATION
+P3H_START_MODE=STEADY_STATE_START
 P3H_GREENFIELD_INITIALIZE_CONFIRM=""
-P3H_GREENFIELD_RECOVERY_CONFIRM="${GREENFIELD_RECOVERY_CONFIRMATION}"
+P3H_GREENFIELD_RECOVERY_CONFIRM=""
 export P3H_START_MODE P3H_GREENFIELD_INITIALIZE_CONFIRM P3H_GREENFIELD_RECOVERY_CONFIRM
 set +e
 grant_recovery_output="$(run_bounded 360 \
@@ -651,7 +657,7 @@ if [ "${grant_recovery_status}" -ne 0 ]; then
   print_sanitized_p3h_status_lines "${grant_recovery_output}"
   blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY"
 fi
-printf '%s' "${grant_recovery_output}" | grep -q 'RECOVERED_READONLY_CONTRACT: PASS' \
+printf '%s' "${grant_recovery_output}" | grep -q 'STEADY_STATE_RESTART: PASS' \
   || blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY_EVIDENCE"
 [ "$(flyway_success_count)" = "${first_flyway_count}" ] \
   || blocked "BLOCKED_POST_MIGRATION_GRANT_RECOVERY_RERAN_MIGRATIONS"
@@ -660,7 +666,7 @@ printf '%s' "${grant_recovery_output}" | grep -q 'RECOVERED_READONLY_CONTRACT: P
 
 CURRENT_STAGE="v2-secret-activation"
 P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V2
-P3H_ACTIVE_APP_ADMIN_SECRET_VERSION=V2
+P3H_ACTIVE_APP_ADMIN_SECRET_VERSION=V1
 P3H_SECRET_VERSION_ACTIVATION_CONFIRM="${ROTATION_CONFIRMATION}"
 export P3H_ACTIVE_APP_DATABASE_SECRET_VERSION P3H_ACTIVE_APP_ADMIN_SECRET_VERSION
 export P3H_SECRET_VERSION_ACTIVATION_CONFIRM
@@ -693,30 +699,38 @@ if compose --profile validation run --rm --no-deps \
   blocked "BLOCKED_V1_DATABASE_SECRET_STILL_ACCEPTED"
 fi
 
-curl_auth_status() {
+session_smoke() {
   local secret_file="$1"
-  local config_file="$2"
-  {
-    echo 'silent'
-    echo 'show-error'
-    echo 'max-time = 20'
-    echo "cacert = \"${SECRET_DIR}/tls_certificate\""
-    printf 'user = "p3h_operator:%s"\n' "$(tr -d '\r\n' <"${secret_file}")"
-  } >"${config_file}"
-  chmod 600 "${config_file}"
-  curl --config "${config_file}" --output /dev/null --write-out '%{http_code}' \
-    "https://localhost:${P3H_HTTPS_HOST_PORT}/api/dashboard/home"
+  local label="$2"
+  SESSION_SMOKE_LOG="${TEMP_ROOT}/session-smoke-${label}.log"
+  (
+    TRADE_MODEL_SMOKE_USERNAME=p3h_operator
+    TRADE_MODEL_SMOKE_PASSWORD="$(tr -d '\r\n' <"${secret_file}")"
+    TRADE_MODEL_SMOKE_CA_CERT="${SECRET_DIR}/tls_certificate"
+    APP_URL="https://localhost:${P3H_HTTPS_HOST_PORT}"
+    SMOKE_PHASE=FETCH_AND_VALIDATE
+    SMOKE_RESPONSE_DIR=""
+    SMOKE_SPLIT_PHASE_CONFIRM=""
+    export TRADE_MODEL_SMOKE_USERNAME TRADE_MODEL_SMOKE_PASSWORD
+    export TRADE_MODEL_SMOKE_CA_CERT APP_URL SMOKE_PHASE SMOKE_RESPONSE_DIR
+    export SMOKE_SPLIT_PHASE_CONFIRM
+    run_bounded 180 bash "${ROOT_DIR}/scripts/prod-smoke.sh"
+  ) >"${SESSION_SMOKE_LOG}" 2>&1
 }
 
-new_admin_status="$(curl_auth_status "${SECRET_DIR}/app_admin_password_v2" \
-  "${TEMP_ROOT}/curl-admin-v2.conf")"
-old_admin_status="$(curl_auth_status "${SECRET_DIR}/app_admin_password_v1" \
-  "${TEMP_ROOT}/curl-admin-v1.conf")"
-[ "${new_admin_status}" = "200" ] \
-  || blocked "BLOCKED_V2_ADMIN_SECRET_REJECTED"
-case "${old_admin_status}" in 401|403) ;; *)
-  blocked "BLOCKED_V1_ADMIN_SECRET_STILL_ACCEPTED" ;;
-esac
+print_sanitized_session_smoke_failure() {
+  [ -f "${SESSION_SMOKE_LOG:-}" ] || return 0
+  LC_ALL=C grep -E '^FAIL ' \
+    "${SESSION_SMOKE_LOG}" || true
+}
+
+if ! session_smoke "${SECRET_DIR}/app_admin_password_v1" active-admin-v1; then
+  print_sanitized_session_smoke_failure
+  blocked "BLOCKED_ACTIVE_ADMIN_SESSION_SMOKE"
+fi
+if session_smoke "${SECRET_DIR}/app_admin_password_v2" inactive-admin-v2; then
+  blocked "BLOCKED_UNAPPLIED_ADMIN_SECRET_ACCEPTED"
+fi
 
 CURRENT_STAGE="reboot-like-restart"
 run_bounded 120 compose stop >/dev/null \
@@ -738,15 +752,13 @@ if compose --profile validation run --rm --no-deps \
     -e P3H_ACTIVE_APP_DATABASE_SECRET_VERSION=V1 app-role-probe >/dev/null 2>&1; then
   blocked "BLOCKED_REBOOT_REACTIVATED_V1_DATABASE_SECRET"
 fi
-reboot_new_admin_status="$(curl_auth_status "${SECRET_DIR}/app_admin_password_v2" \
-  "${TEMP_ROOT}/curl-admin-v2-after-reboot.conf")"
-reboot_old_admin_status="$(curl_auth_status "${SECRET_DIR}/app_admin_password_v1" \
-  "${TEMP_ROOT}/curl-admin-v1-after-reboot.conf")"
-[ "${reboot_new_admin_status}" = "200" ] \
-  || blocked "BLOCKED_REBOOT_V2_ADMIN_SECRET_REJECTED"
-case "${reboot_old_admin_status}" in 401|403) ;; *)
-  blocked "BLOCKED_REBOOT_REACTIVATED_V1_ADMIN_SECRET" ;;
-esac
+if ! session_smoke "${SECRET_DIR}/app_admin_password_v1" active-admin-v1-after-reboot; then
+  print_sanitized_session_smoke_failure
+  blocked "BLOCKED_REBOOT_ACTIVE_ADMIN_SESSION_SMOKE"
+fi
+if session_smoke "${SECRET_DIR}/app_admin_password_v2" inactive-admin-v2-after-reboot; then
+  blocked "BLOCKED_REBOOT_UNAPPLIED_ADMIN_SECRET_ACCEPTED"
+fi
 
 materialized_volume_exists() {
   docker volume ls --quiet \
@@ -822,46 +834,46 @@ exercise_failed_start_cleanup DURING_PROXY_HEALTH
 run_bounded 360 "${ROOT_DIR}/deploy/p3h/p3h-compose-start.sh" \
   || blocked "BLOCKED_FINAL_STEADY_STATE_RECOVERY"
 
-CURRENT_STAGE="v7-rule-and-schema-drift"
+CURRENT_STAGE="v8-rule-and-schema-drift"
 psql_admin trade_model_v1_p3h_primary \
   "UPDATE tm_rule_config SET rule_value='61' WHERE rule_id='cfg-provider-scan-data-quality'" \
-  || blocked "BLOCKED_V7_PROVIDER_RULE_FIXTURE_SETUP"
-expect_full_readonly_verify_rejection V7_PROVIDER_RULE_VALUE
+  || blocked "BLOCKED_V8_PROVIDER_RULE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V8_PROVIDER_RULE_VALUE
 psql_admin trade_model_v1_p3h_primary \
   "UPDATE tm_rule_config SET rule_value='60' WHERE rule_id='cfg-provider-scan-data-quality'" \
-  || blocked "BLOCKED_V7_PROVIDER_RULE_FIXTURE_CLEANUP"
+  || blocked "BLOCKED_V8_PROVIDER_RULE_FIXTURE_CLEANUP"
 
 psql_admin trade_model_v1_p3h_primary \
   "UPDATE tm_rule_config SET rule_value='59' WHERE rule_id='cfg-deriv-min-data-quality'" \
-  || blocked "BLOCKED_V7_DERIV_RULE_FIXTURE_SETUP"
-expect_full_readonly_verify_rejection V7_DERIV_RULE_VALUE
+  || blocked "BLOCKED_V8_DERIV_RULE_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V8_DERIV_RULE_VALUE
 psql_admin trade_model_v1_p3h_primary \
   "UPDATE tm_rule_config SET rule_value='60' WHERE rule_id='cfg-deriv-min-data-quality'" \
-  || blocked "BLOCKED_V7_DERIV_RULE_FIXTURE_CLEANUP"
+  || blocked "BLOCKED_V8_DERIV_RULE_FIXTURE_CLEANUP"
 
 psql_admin trade_model_v1_p3h_primary \
   "DROP INDEX idx_tm_ai_call_log_status_time" \
-  || blocked "BLOCKED_V7_MISSING_INDEX_FIXTURE_SETUP"
-expect_full_readonly_verify_rejection V7_MISSING_INDEX
+  || blocked "BLOCKED_V8_MISSING_INDEX_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V8_MISSING_INDEX
 psql_admin trade_model_v1_p3h_primary \
   "CREATE INDEX idx_tm_ai_call_log_status_time ON tm_ai_call_log(call_status, started_at)" \
-  || blocked "BLOCKED_V7_MISSING_INDEX_FIXTURE_CLEANUP"
+  || blocked "BLOCKED_V8_MISSING_INDEX_FIXTURE_CLEANUP"
 
 psql_admin trade_model_v1_p3h_primary \
   "ALTER TABLE tm_decision_result ALTER COLUMN valid_from TYPE varchar(64)" \
-  || blocked "BLOCKED_V7_OFFSET_COLUMN_FIXTURE_SETUP"
-expect_full_readonly_verify_rejection V7_OFFSET_COLUMN_TYPE
+  || blocked "BLOCKED_V8_OFFSET_COLUMN_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V8_OFFSET_COLUMN_TYPE
 psql_admin trade_model_v1_p3h_primary \
   "ALTER TABLE tm_decision_result ALTER COLUMN valid_from TYPE timestamp with time zone USING valid_from::timestamptz" \
-  || blocked "BLOCKED_V7_OFFSET_COLUMN_FIXTURE_CLEANUP"
+  || blocked "BLOCKED_V8_OFFSET_COLUMN_FIXTURE_CLEANUP"
 
 psql_admin trade_model_v1_p3h_primary \
   "ALTER TABLE tm_user_position ENABLE ROW LEVEL SECURITY" \
-  || blocked "BLOCKED_V7_RLS_FIXTURE_SETUP"
-expect_full_readonly_verify_rejection V7_ROW_LEVEL_SECURITY
+  || blocked "BLOCKED_V8_RLS_FIXTURE_SETUP"
+expect_full_readonly_verify_rejection V8_ROW_LEVEL_SECURITY
 psql_admin trade_model_v1_p3h_primary \
   "ALTER TABLE tm_user_position DISABLE ROW LEVEL SECURITY" \
-  || blocked "BLOCKED_V7_RLS_FIXTURE_CLEANUP"
+  || blocked "BLOCKED_V8_RLS_FIXTURE_CLEANUP"
 
 CURRENT_STAGE="readonly-role-membership-drift"
 psql_admin postgres "GRANT p3h_migration_owner TO p3h_app_readonly" \
@@ -969,9 +981,9 @@ CURRENT_STAGE="final-runtime-verification"
 if ! flyway_state="$(compose exec -T postgres psql --username=p3h_bootstrap \
   --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
   --command="SELECT count(*) || '|' || max(version) FROM flyway_schema_history WHERE success=true")"; then
-  blocked "BLOCKED_FLYWAY_V7_QUERY"
+  blocked "BLOCKED_FLYWAY_V8_QUERY"
 fi
-[ "${flyway_state}" = "7|7" ] || blocked "BLOCKED_FLYWAY_V7_VERIFICATION"
+[ "${flyway_state}" = "8|8" ] || blocked "BLOCKED_FLYWAY_V8_VERIFICATION"
 
 role_state="$(compose exec -T postgres psql --username=p3h_bootstrap \
   --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
@@ -1058,7 +1070,7 @@ fi
 echo "FIRST_BOOT: PASS"
 echo "PARTIAL_INITIALIZATION_RECOVERY: PASS"
 echo "RECOVERY_CONFIRMATION_STATUS: REQUIRED_AND_PROVEN"
-echo "RECOVERED_FLYWAY_VERSION: 7"
+echo "RECOVERED_FLYWAY_VERSION: 8"
 echo "RECOVERED_READONLY_CONTRACT: PASS"
 echo "STEADY_STATE_RESTART: PASS"
 echo "REBOOT_LIKE_RESTART: PASS"
@@ -1066,11 +1078,12 @@ echo "DATABASE_VOLUME_PRESERVED: PASS"
 echo "PRIMARY_DATABASE_VOLUME: PRESENT"
 echo "FLYWAY_REPEAT: ZERO_MIGRATIONS"
 echo "CONTENT_FINGERPRINT: MATCH"
-echo "ACTIVE_SECRET_VERSION_PRESERVED: PASS"
+echo "ACTIVE_DATABASE_SECRET_VERSION_PRESERVED: PASS"
 echo "ACTIVE_APP_DATABASE_SECRET_VERSION: V2"
-echo "ACTIVE_APP_ADMIN_SECRET_VERSION: V2"
-echo "OLD_SECRET_V1_POST_ROTATION: DENIED"
-echo "ADMIN_SECRET_VERSION_AFTER_REBOOT: V2_ACTIVE_V1_DENIED"
+echo "ACTIVE_APP_ADMIN_SECRET_VERSION: V1"
+echo "ADMIN_SECRET_ROTATION_STATUS: NOT_RUN_REQUIRES_CONTROLLED_TM_USER_PASSWORD_ROTATION"
+echo "SESSION_AUTH_SMOKE: PASS_FORM_LOGIN_SESSION_CSRF"
+echo "POST_LOGOUT_SESSION_INVALIDATION: PASS"
 echo "DATABASE_SECRET_VERSION_AFTER_REBOOT: V2_ACTIVE_V1_DENIED"
 echo "FAILED_START_DATABASE_PROCESS: STOPPED"
 echo "FAILED_START_CLEANUP: PASS"
@@ -1079,7 +1092,7 @@ echo "READONLY_DEFAULT_ACL_CONTRACT: PASS"
 echo "READONLY_SEQUENCE_PRIVILEGE_CONTRACT: PASS"
 echo "RULE_DEFAULT_CONTENT_CONTRACT: MATCH_EXACT_VERSIONED_ROWS"
 echo "RECOVERY_SCHEMA_CONTRACT: MATCH_EXACT_PREFIX"
-echo "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V7"
+echo "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V8"
 echo "READONLY_EFFECTIVE_TABLE_PRIVILEGES: PASS"
 echo "READONLY_COLUMN_PRIVILEGES: PASS"
 echo "PUBLIC_WRITE_PRIVILEGES: NONE"
@@ -1096,7 +1109,7 @@ echo "APP_IMAGE_SOURCE: PASS_EXACT_COMMITTED_GIT_ARCHIVE"
 echo "APP_IMAGE_REVISION: ${current_head}"
 echo "ROLE_PROVISIONING_STATUS: PASS"
 echo "DATABASE_PROVISIONING_STATUS: PASS_PRIMARY_AND_RECOVERY"
-echo "FLYWAY_V1_TO_V7_STATUS: PASS"
+echo "FLYWAY_V1_TO_V8_STATUS: PASS"
 echo "APP_SECRET_READABILITY_STATUS: PASS_ACTUAL_CONTAINER"
 echo "UNRELATED_UID_SECRET_READABILITY: DENIED"
 echo "SECRET_VALUES_IN_DOCKER_INSPECT: ABSENT"
@@ -1106,7 +1119,8 @@ echo "HOST_HEADER_CONTRACT: PASS"
 echo "UNKNOWN_HTTPS_HOST_REJECTED: PASS"
 echo "TLS_LOCAL_HEALTH: PASS"
 echo "TLS_1_3_LOCAL: ${local_tls_1_3}"
-echo "READ_ONLY_WRITE_PROBE: DENIED"
+echo "BUSINESS_WRITE_PROBE: DENIED"
+echo "AUTH_SESSION_WRITE_CONTRACT: ALLOWED_BOUNDED"
 echo "LIVE_PROVIDER_CALLS: 0"
 echo "LOCAL_COMPOSE_TEMPLATE_SMOKE: PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE"
 echo "REAL_STAGING_STATUS: BLOCKED_MISSING_AUTHORIZED_INPUT"

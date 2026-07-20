@@ -81,13 +81,15 @@ PDR-M3 is historical merged-main evidence for a single-operator Spring Security 
 - Local/test compatibility: tests can disable the gate with `trade-model.auth.enabled=false`; local development keeps an explicit fallback account unless overridden.
 - Protected surfaces: dashboard and review pages, dashboard/review APIs, manual user-position APIs, push recheck APIs, opportunity log APIs, rule/system/external-context/market/AI API surfaces, and write endpoints are behind authentication when the gate is enabled.
 - Production credential guard: prod startup rejects missing admin credentials and unsafe defaults such as `password`, `admin`, `change-me`, `changeme`, `123456`, and the local fallback password.
-- Smoke behavior: readonly production smoke checks require auth credentials through `SMOKE_AUTH_USERNAME` / `SMOKE_AUTH_PASSWORD` or `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`; scripts must not print passwords.
+- Historical smoke behavior at the PDR-M3 Head used `SMOKE_AUTH_USERNAME` /
+  `SMOKE_AUTH_PASSWORD` or `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`. Those
+  names and Basic Auth are not the current P3-U1 smoke contract.
 - Deferred: HTTPS / reverse proxy configuration, secrets manager integration, credential rotation, audit logging, rate limiting, real server auth smoke evidence, and production release-gate approval.
 
 ## P3-U1 Personal Login + Session Authentication Candidate
 
 P3-U1 is locally validated on `codex/p3-u1-personal-login-session-auth` and is
-not effective on merged main until its Draft PR is reviewed and merged. It
+not effective on merged main until Ready PR #1133 is re-reviewed and merged. It
 replaces the formal application access path with Thymeleaf form login and a
 server-side Session backed by a minimal BCrypt `tm_user` record.
 
@@ -95,8 +97,8 @@ server-side Session backed by a minimal BCrypt `tm_user` record.
 - Session: 30-minute default timeout, fixation migration, HttpOnly Cookie, SameSite=Lax, local HTTP Secure=false, and prod Secure=true.
 - User initialization: both `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD` must be supplied through runtime configuration or approved secret injection; bootstrap is idempotent and never overwrites an existing user.
 - Failure policy: five failures in 15 minutes produce a temporary 15-minute block; the single-instance in-memory store is bounded and successful authentication resets the user state.
-- Validation: targeted security tests, 4088-test full suite, and disposable localhost two-start H2 runtime validation PASS. Docker/Testcontainers and controlled PostgreSQL V8 are environment-gated/not run, not PASS.
-- Deployment gap: the existing P3-H exact-V7 and Basic-auth smoke surfaces remain historical integration contracts and require a separate Session/V8 update before any real staging attempt.
+- Validation: targeted security tests, the prior 4088-test full suite, and disposable localhost two-start H2 runtime validation PASS. New exact-Head test/CI and P3-H runtime results must be reported separately; no skipped check is PASS.
+- Deployment-contract closure: this PR branch updates the existing P3-H one-shot migration service and fail-closed verifiers to exact V8/`tm_user`, preserves business-data read-only access with bounded authentication writes, and migrates current production smoke/release-gate checks to form login, Session Cookie, CSRF logout, and post-logout invalidation. Historical P3-G/PDR Basic-auth evidence is not reclassified.
 - Safety: no Provider, AI, Telegram, Push, order, position mutation, or trading call is introduced. Production readiness remains BLOCKED.
 
 ## PDR-M4 Observability + Production Smoke Gate
@@ -561,7 +563,9 @@ export APP_URL=http://localhost:8081
 curl -fsS "$APP_URL/actuator/health"
 curl -fsS "$APP_URL/actuator/health/liveness"
 curl -fsS "$APP_URL/actuator/health/readiness"
-APP_ADMIN_USERNAME=operator APP_ADMIN_PASSWORD='replace-me' bash scripts/prod-smoke.sh
+export TRADE_MODEL_SMOKE_USERNAME="$TRADE_MODEL_INITIAL_USERNAME"
+export TRADE_MODEL_SMOKE_PASSWORD="$TRADE_MODEL_INITIAL_PASSWORD"
+bash scripts/prod-smoke.sh
 ```
 
 Stop/restart commands:
@@ -584,7 +588,9 @@ docker compose logs --tail=200 migrate
 Troubleshooting checklist:
 
 - If `/actuator/health/readiness` is not `UP`, inspect app logs and database connectivity first.
-- If smoke auth fails, rotate or re-enter `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`; do not print secrets in logs.
+- If smoke auth fails, verify the runtime-injected initial user, form login,
+  Session Cookie, and CSRF contract. Do not print credentials, Cookies, Session
+  IDs, CSRF tokens, headers, or response bodies.
 - If dashboard/review smoke fails but readiness is `UP`, inspect application logs, database schema/migration state, and API response body locally.
 - If safety fields fail, stop the deployment rehearsal and do not proceed to release-gate review.
 - If rollback is needed, stop the app, restore to a controlled recovery database, start the app against the restored database, then rerun readiness and smoke checks.
@@ -601,7 +607,8 @@ Security notes:
 Required environment categories:
 
 - App bind/profile: `SPRING_PROFILES_ACTIVE`, `APP_PORT`, `APP_BIND_ADDRESS`, `SERVER_ADDRESS`, `TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND`.
-- Auth: `APP_ADMIN_USERNAME`, `APP_ADMIN_PASSWORD`; optional smoke overrides `SMOKE_AUTH_USERNAME`, `SMOKE_AUTH_PASSWORD`.
+- Auth bootstrap: `TRADE_MODEL_INITIAL_USERNAME`, `TRADE_MODEL_INITIAL_PASSWORD` from an approved runtime secret source.
+- Auth smoke: `TRADE_MODEL_SMOKE_USERNAME`, `TRADE_MODEL_SMOKE_PASSWORD`; optional private-CA path `TRADE_MODEL_SMOKE_CA_CERT`.
 - Database: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `PROD_DATASOURCE_URL`, `PROD_DATASOURCE_USERNAME`, `PROD_DATASOURCE_PASSWORD`.
 - Position provider: `POSITION_PROVIDER_TYPE`, `BINANCE_API_BASE_URL`, `BINANCE_API_KEY`, `BINANCE_API_SECRET`.
 - Optional AI provider toggles/keys: `TRADE_MODEL_AI_ENABLED`, provider-specific enabled flags, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`.
@@ -650,7 +657,9 @@ The real-server release gate must collect redacted evidence for every item below
 2. PostgreSQL startup: `docker compose up -d postgres`, `docker compose ps`, and PostgreSQL logs show a healthy database without printing secrets.
 3. Flyway migration: `docker compose --profile migrate run --rm migrate` succeeds and `flyway_schema_history` records successful migrations.
 4. App prod startup: `docker compose up -d app` starts the app with the prod profile and no unsafe production guard failure.
-5. Authenticated smoke: `scripts/prod-smoke.sh` passes health, liveness, readiness, dashboard home, review center, and safety-field checks.
+5. Authenticated smoke: `scripts/prod-smoke.sh` passes public health checks,
+   anonymous API denial, form login, Session-authenticated Dashboard/Review
+   reads, CSRF-protected logout, post-logout Session invalidation, and safety-field checks.
 6. Backup drill: `scripts/prod-backup.sh` creates a timestamped ignored backup file without printing secrets.
 7. Restore drill: `scripts/prod-restore.sh` restores into a controlled recovery database and smoke passes after restore. If restore is not run, readiness cannot advance beyond `BLOCKED`.
 8. HTTPS / reverse proxy / auth smoke: HTTPS access and authenticated dashboard/review API checks pass through the intended server entrypoint.
@@ -834,18 +843,19 @@ are `NOT_ATTEMPTED`.
 The repository now has explicit `INITIALIZE_GREENFIELD`,
 `RECOVER_GREENFIELD_INITIALIZATION`, and `STEADY_STATE_START` modes.
 Initialization uses the deterministic empty-DB ->
-role bootstrap -> Flyway V1-V7 -> grants -> Secret materialization -> app
+role bootstrap -> canonical Flyway V1-V8 -> grants -> Secret materialization -> app
 health -> proxy health chain. Recovery requires a separate exact confirmation,
-a continuous checksum-valid V1-VN prefix or V7 pre-grant state, exact
+a continuous checksum-valid V1-VN prefix or V8 pre-grant state, exact
 versioned rule rows and normalized schema fingerprints, exact P3-H
 identity/objects, and zero business rows. Recovery and steady state validate
-core state before refreshing grants, then require the full read-only contract;
+core state before refreshing grants, then require exact V8, `tm_user`, and the
+business-read-only/auth-session-write contract;
 neither requires an empty database or runs baseline, repair, or clean.
 It also has strict attestation and canonical-file guards, an implemented
 `SYSTEMD_CREDENTIALS` adapter, effective runtime-mount verification, fixed
 non-root Config Tree materialization, pinned SSH identity, proxy-only ingress,
 internal networking, fixed Host routing, strict TLS target/TLS 1.3 checks,
-read-only application probing, rotation, backup/restore, reboot, redaction,
+business-read-only/auth-write probing, rotation, backup/restore, reboot, redaction,
 and leak-scan contracts. Round 2 local evidence includes retained-volume and
 reboot-like restarts, zero repeated migrations, matching content fingerprints,
 V2 preservation/V1 denial, injected-failure cleanup, strict object inventory,
@@ -857,11 +867,21 @@ failed-start cleanup with persistent volumes retained, zero app/backup role
 memberships, exact SELECT-only default/Sequence ACLs, and post-reboot V2
 admin/database success with V1 denial.
 
-Round 4 local evidence additionally covers exact V1-V7 rule-default and schema
+Round 4 historical local evidence covers exact V1-V7 rule-default and schema
 contracts, fail-closed rule/schema mutation fixtures, effective SELECT-only
 table privileges, absence of PUBLIC and column-level writes, and strict
 pre-network grammar for staging hostname, SSH host, and SSH user. These remain
 disposable local template results, not authorized-server evidence.
+
+The P3-U1 PR branch updates the current machine contract beyond that historical
+round: steady state requires exact V8 and `tm_user`; the application role keeps
+all business data read-only while receiving only the `tm_user` bootstrap
+columns, `last_login_at`, and `tm_user_id_seq` privileges required by personal
+Session authentication. Current `prod-smoke.sh` and the release gate use form
+login, a temporary Cookie jar, CSRF logout, and post-logout Session invalidation.
+No Basic Auth compatibility route is added. The full exact-Head disposable
+Compose result must be reported separately and never substitutes for real
+staging evidence.
 
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved
@@ -877,9 +897,9 @@ deployment cannot proceed.
 
 ## Next Packages
 
-1. Complete Reviewer P3-H Offline Harness Round 5 re-review, preserving the
-   distinction between local template PASS and missing real-staging evidence.
-2. Obtain separately authorized controlled staging inputs before any real
+1. Complete exact-Head CI and re-review for P3-U1 PR #1133, preserving the
+   distinction between local template evidence and missing real-staging evidence.
+2. After reviewed merged-main activation, obtain separately authorized controlled staging inputs before any real
    P3-H execution; never send secret values through chat, GitHub, or docs.
 3. Execute server, Secret Store, TLS, HTTPS, rotation, backup/restore, reboot,
    and leak-scan gates only after all attestations validate.

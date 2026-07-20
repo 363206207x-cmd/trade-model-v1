@@ -151,14 +151,14 @@ psql "$REHEARSAL_DATABASE_URL" -c "select count(*) from flyway_schema_history;" 
 2. Create and verify a pre-migration backup with `scripts/prod-backup.sh`.
 3. Restore the backup into a separate recovery database with `scripts/prod-restore.sh` and verify the restored state.
 4. Run Flyway migration only in the rehearsal environment, using the same migration path as production would use.
-5. Verify `flyway_schema_history` contains successful V1-V7 rows with the
-   reviewed checksums.
+5. For the current P3-U1/P3-H contract, verify `flyway_schema_history`
+   contains successful V1-V8 rows with the reviewed checksums.
 6. Run readonly app smoke against the migrated rehearsal database:
 
 ```bash
 export APP_URL="http://staging-app-host:8081"
-export SMOKE_AUTH_USERNAME="operator"
-export SMOKE_AUTH_PASSWORD="redacted"
+export TRADE_MODEL_SMOKE_USERNAME="operator"
+export TRADE_MODEL_SMOKE_PASSWORD="redacted"
 
 bash scripts/prod-smoke.sh
 ```
@@ -167,8 +167,8 @@ bash scripts/prod-smoke.sh
 
 ```bash
 export APP_URL="http://staging-app-host:8081"
-export APP_ADMIN_USERNAME="operator"
-export APP_ADMIN_PASSWORD="redacted"
+export TRADE_MODEL_SMOKE_USERNAME="operator"
+export TRADE_MODEL_SMOKE_PASSWORD="redacted"
 export RELEASE_GATE_REQUIRE_DOCKER="true"
 export RELEASE_GATE_REQUIRE_BACKUP="true"
 export RELEASE_GATE_REQUIRE_PROVIDER_SMOKE="false"

@@ -77,7 +77,8 @@ Required evidence:
 
 - Migration command succeeds.
 - `flyway_schema_history` exists.
-- V1 and V2 migrations are recorded with `success=true`.
+- V1 through V8 migrations are recorded with `success=true`.
+- The exact V8 contract includes `tm_user` and its required columns before the app starts.
 - No schema drift or unsafe prod guard failure is present.
 
 Evidence output summary:
@@ -119,8 +120,8 @@ Commands:
 
 ```bash
 export APP_URL=http://localhost:8081
-export SMOKE_AUTH_USERNAME="$APP_ADMIN_USERNAME"
-export SMOKE_AUTH_PASSWORD="$APP_ADMIN_PASSWORD"
+export TRADE_MODEL_SMOKE_USERNAME="$TRADE_MODEL_INITIAL_USERNAME"
+export TRADE_MODEL_SMOKE_PASSWORD="$TRADE_MODEL_INITIAL_PASSWORD"
 bash scripts/prod-smoke.sh
 ```
 
@@ -129,11 +130,15 @@ Required evidence:
 - `/actuator/health` returns HTTP 200 and `status=UP`.
 - `/actuator/health/liveness` returns HTTP 200 and `status=UP`.
 - `/actuator/health/readiness` returns HTTP 200 and `status=UP`.
+- Anonymous `/api/dashboard/home` returns HTTP 401.
+- `GET /login` returns the form and a non-hardcoded CSRF token.
+- `POST /login` establishes an authenticated server-side Session Cookie.
 - `/api/dashboard/home` returns HTTP 200 with expected shape.
 - `/api/review/center` returns HTTP 200 with expected shape.
+- CSRF-protected `POST /logout` succeeds and the pre-logout Session is rejected afterward.
 - `safety.notAutoTrading=true`.
 - `safety.notOrderExecution=true`.
-- Password is not printed.
+- Password, Cookie, Session ID, CSRF token, response body, and request headers are not printed.
 
 Evidence output summary:
 
@@ -177,6 +182,8 @@ export RESTORE_CONFIRM=I_UNDERSTAND_RESTORE_CAN_OVERWRITE_DATA
 bash scripts/prod-restore.sh
 
 export APP_URL=http://localhost:8081
+export TRADE_MODEL_SMOKE_USERNAME="$TRADE_MODEL_INITIAL_USERNAME"
+export TRADE_MODEL_SMOKE_PASSWORD="$TRADE_MODEL_INITIAL_PASSWORD"
 bash scripts/prod-smoke.sh
 ```
 
@@ -198,12 +205,15 @@ Status: `PASS` / `FAIL` / `NOT_RUN`
 
 ## 8. HTTPS / Reverse Proxy / Auth Smoke
 
-Commands depend on the server reverse proxy. Minimum required checks:
+Commands depend on the server reverse proxy. The current authentication smoke
+must use the same form-login/Session/CSRF path as a browser:
 
 ```bash
-curl -fsS https://YOUR_HOST/actuator/health
-curl -fsS -u "$APP_ADMIN_USERNAME:$APP_ADMIN_PASSWORD" https://YOUR_HOST/api/dashboard/home
-curl -fsS -u "$APP_ADMIN_USERNAME:$APP_ADMIN_PASSWORD" https://YOUR_HOST/api/review/center
+export APP_URL=https://YOUR_HOST
+export TRADE_MODEL_SMOKE_CA_CERT=/approved/runtime/ca-bundle.pem
+export TRADE_MODEL_SMOKE_USERNAME="$TRADE_MODEL_INITIAL_USERNAME"
+export TRADE_MODEL_SMOKE_PASSWORD="$TRADE_MODEL_INITIAL_PASSWORD"
+bash scripts/prod-smoke.sh
 ```
 
 Required evidence:
@@ -211,10 +221,11 @@ Required evidence:
 - HTTPS endpoint is reachable.
 - HTTP-to-HTTPS policy is documented.
 - Dashboard and review APIs require authentication.
+- Login, Session Cookie, CSRF logout, and post-logout invalidation all pass through the proxy.
 - Unauthenticated dashboard/review requests return 401 or the documented
   authentication-denied status; they must never return 200.
 - A deliberately incorrect staging password is denied without printing the
-  password, Authorization header, or response body.
+  password, Cookie, Session ID, CSRF token, header, or response body.
 - Password is not printed.
 - If HTTPS/reverse proxy is not implemented, this blocker remains open.
 

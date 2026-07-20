@@ -263,7 +263,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trade_model_v1_p3h_primary
       SPRING_DATASOURCE_USERNAME: p3h_app_readonly
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-      SPRING_DATASOURCE_HIKARI_READ_ONLY: "true"
+      SPRING_DATASOURCE_HIKARI_READ_ONLY: "false"
       SERVER_PORT: "8081"
       SERVER_ADDRESS: 0.0.0.0
       TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND: "true"

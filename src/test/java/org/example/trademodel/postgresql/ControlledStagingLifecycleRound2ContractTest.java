@@ -34,7 +34,7 @@ class ControlledStagingLifecycleRound2ContractTest {
         assertThat(flyway).contains("migrate|validate");
         assertThat(flyway).doesNotContain("repair)", "clean)", "baseline)");
         assertThat(verify).contains(
-                "7|7|0|1,2,3,4,5,6,7",
+                "8|8|0|1,2,3,4,5,6,7,8",
                 "P3H_ROLE_AND_GRANT_CONTRACT: PASS");
     }
 
@@ -53,8 +53,8 @@ class ControlledStagingLifecycleRound2ContractTest {
         assertThat(materializer).contains(
                 "active_database_secret", "active_admin_secret", "V1)", "V2)");
         assertThat(runner).contains(
-                "ACTIVE_SECRET_VERSION_PRESERVED: PASS",
-                "OLD_SECRET_V1_POST_ROTATION: DENIED");
+                "ACTIVE_DATABASE_SECRET_VERSION_PRESERVED: PASS",
+                "ADMIN_SECRET_ROTATION_STATUS: NOT_RUN_REQUIRES_CONTROLLED_TM_USER_PASSWORD_ROTATION");
     }
 
     @Test

@@ -7,11 +7,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ControlledStagingLifecycleRound3ContractTest {
 
     @Test
-    void migrationStopsAfterV3CanRecoverToV7() throws Exception {
+    void migrationStopsAfterV3CanRecoverToV8() throws Exception {
         assertThat(runner()).contains(
                 "-e FLYWAY_TARGET=3 migrate",
                 "PARTIAL_INITIALIZATION_RECOVERY: PASS",
-                "RECOVERED_FLYWAY_VERSION: 7");
+                "RECOVERED_FLYWAY_VERSION: 8");
         assertThat(start()).contains(
                 "RECOVER_GREENFIELD_INITIALIZATION",
                 "run --rm --no-deps greenfield-recovery-verify",
@@ -24,10 +24,19 @@ class ControlledStagingLifecycleRound3ContractTest {
 
     @Test
     void migrationCompletesButReadonlyGrantFailsCanRecover() throws Exception {
-        assertThat(runner()).contains(
+        String script = runner();
+        int repairStart = script.indexOf("CURRENT_STAGE=\"post-migration-readonly-grant-recovery\"");
+        int repairEnd = script.indexOf("CURRENT_STAGE=\"v2-secret-activation\"");
+
+        assertThat(repairStart).isGreaterThanOrEqualTo(0);
+        assertThat(repairEnd).isGreaterThan(repairStart);
+        String postBootGrantRepair = script.substring(repairStart, repairEnd);
+        assertThat(postBootGrantRepair).contains(
                 "post-migration-readonly-grant-recovery",
                 "BLOCKED_POST_MIGRATION_GRANT_RECOVERY",
-                "RECOVERED_READONLY_CONTRACT: PASS");
+                "P3H_START_MODE=STEADY_STATE_START",
+                "STEADY_STATE_RESTART: PASS");
+        assertThat(postBootGrantRepair).doesNotContain("P3H_START_MODE=RECOVER_GREENFIELD_INITIALIZATION");
         assertThat(start()).contains(
                 "run_core_state_verify",
                 "run_full_readonly_state_verify");
@@ -39,7 +48,7 @@ class ControlledStagingLifecycleRound3ContractTest {
                 "DELETE FROM flyway_schema_history WHERE version='2'",
                 "expect_recovery_rejection NONCONTIGUOUS_FLYWAY_HISTORY");
         assertThat(recoveryVerify()).contains(
-                "expected_versions=1,2,3,4,5,6,7",
+                "expected_versions=1,2,3,4,5,6,7,8",
                 "BLOCKED_FLYWAY_PREFIX");
     }
 
@@ -184,6 +193,7 @@ class ControlledStagingLifecycleRound3ContractTest {
     void unsafeSequenceUsageFails() throws Exception {
         assertThat(runner()).contains("GRANT USAGE, UPDATE ON ALL SEQUENCES");
         assertThat(steadyVerify()).contains(
+                "c.relname <> 'tm_user_id_seq'",
                 "has_sequence_privilege('p3h_app_readonly', c.oid, 'USAGE')");
     }
 
@@ -216,13 +226,13 @@ class ControlledStagingLifecycleRound3ContractTest {
     }
 
     @Test
-    void rebootLikeRestartRevalidatesBothAdminAndDatabaseV2WhileDenyingV1() throws Exception {
+    void rebootLikeRestartRevalidatesDatabaseRotationAndSessionAuthWithoutFakeUserRotation() throws Exception {
         assertThat(runner()).contains(
-                "curl-admin-v2-after-reboot.conf",
-                "curl-admin-v1-after-reboot.conf",
                 "BLOCKED_REBOOT_V2_DATABASE_SECRET_REJECTED",
                 "BLOCKED_REBOOT_REACTIVATED_V1_DATABASE_SECRET",
-                "ADMIN_SECRET_VERSION_AFTER_REBOOT: V2_ACTIVE_V1_DENIED",
+                "active-admin-v1-after-reboot",
+                "inactive-admin-v2-after-reboot",
+                "ADMIN_SECRET_ROTATION_STATUS: NOT_RUN_REQUIRES_CONTROLLED_TM_USER_PASSWORD_ROTATION",
                 "DATABASE_SECRET_VERSION_AFTER_REBOOT: V2_ACTIVE_V1_DENIED");
     }
 

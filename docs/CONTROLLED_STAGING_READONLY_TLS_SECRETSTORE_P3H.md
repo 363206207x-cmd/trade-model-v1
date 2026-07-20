@@ -12,6 +12,32 @@ Production Deployment Readiness: `BLOCKED`
 
 P4 Allowed: `NO`
 
+## P3-U1 V8 And Session Contract Addendum
+
+PR #1133 updates the current P3-H machine contract without rewriting the
+historical P3-H evidence below:
+
+- the existing one-shot Flyway service applies the canonical migration files
+  through V8 before the application can start;
+- core/grant/steady checks require eight successful versions, exact V8 schema,
+  `tm_user`, and all five user columns;
+- no hand-written `CREATE TABLE tm_user`, copied V8 SQL, baseline, repair,
+  clean, DROP, or TRUNCATE path is added;
+- the application role remains read-only for business data and receives only
+  column-scoped user bootstrap, `last_login_at`, and `tm_user_id_seq` access;
+- `prod-smoke.sh` and the release gate use form login, a temporary Cookie jar,
+  post-authentication CSRF retrieval from the Dashboard logout form,
+  CSRF-protected logout, and post-logout Session invalidation;
+- the database credential rotation path remains separately controlled, while
+  personal-user/admin password rotation is `NOT_RUN` and is not inferred from
+  Config Tree rematerialization.
+
+All V7/Basic-auth statements in the earlier round-by-round evidence are
+historical exact-Head results. They are not the current P3-U1 deployment
+contract and are not silently reclassified as V8/Session PASS. Real staging,
+real reverse-proxy Session/CSRF, real Secret Store injection, and production
+deployment remain `NOT_ATTEMPTED`/`BLOCKED`.
+
 ## Scope And Provenance
 
 - Base merged main: `8f0640331e58e8b8b657c7db08e6d79b03d37a4f`.
@@ -51,6 +77,11 @@ probe, remote command, server inventory, secret mount, database operation, or
 HTTPS request was attempted.
 
 ## Offline And Local Template Evidence
+
+The table below preserves the merged P3-H offline-harness evidence at its
+reviewed V7/Basic-auth Head. The P3-U1 addendum above defines the current
+unmerged V8/Session machine contract; a new exact-Head run is reported
+separately and does not rewrite historical evidence.
 
 | Contract | Repository/local result | Real-server evidence |
 | --- | --- | --- |
@@ -98,21 +129,23 @@ real-server PASS.
 `deploy/p3h/docker-compose.p3h.yml` defines digest-pinned PostgreSQL 16,
 Flyway, application, and Nginx services. `p3h-compose-start.sh` is the only
 lifecycle entrypoint and requires one explicit mode. `INITIALIZE_GREENFIELD`
-enforces strict empty-object inventory, role/database bootstrap, Flyway V1-V7,
+enforces strict empty-object inventory, role/database bootstrap, Flyway V1-V8,
 and grants. `RECOVER_GREENFIELD_INITIALIZATION` requires a distinct exact
-confirmation, validates a continuous checksum-valid V1-VN prefix or a V7
+confirmation, validates a continuous checksum-valid V1-VN prefix or a V8
 pre-grant state, exact versioned rule-default rows, an exact normalized schema
 fingerprint, P3-H identity/objects, and zero business rows, then
-continues to V7. Recovery and steady state both run `CORE_STATE_VERIFY`,
+continues to V8. Recovery and steady state both run `CORE_STATE_VERIFY`,
 refresh grants, then run `FULL_READONLY_STATE_VERIFY`. No mode runs Flyway
 baseline, repair, or clean. Recovery's pre-migrate Flyway validation ignores
 only pending migrations (`*:pending`), while applied checksum, failed,
 missing, and future states remain fail-closed; post-migrate validation is
 strict. PostgreSQL and the
 application expose no host ports. The backend network is internal; only the
-reverse proxy publishes 80/443. The application runs read-only with Flyway and
-SQL init disabled, and all schedulers, AI, providers, and external-call
-switches off.
+reverse proxy publishes 80/443. The application keeps Flyway and SQL init
+disabled because the successful one-shot migration service is its startup
+dependency. Its role is read-only for business data with only bounded
+authentication writes, and all schedulers, AI, providers, and external-call
+switches are off.
 
 All long-running Compose services use `restart: "no"`; systemd is the sole
 lifecycle owner, so Docker daemon auto-restart cannot bypass migration,
@@ -133,20 +166,21 @@ Active application database/admin Secret versions are selected only by the
 non-sensitive `P3H_ACTIVE_APP_DATABASE_SECRET_VERSION` and
 `P3H_ACTIVE_APP_ADMIN_SECRET_VERSION` values (`V1` or `V2`). Rotation updates
 the database role through a separately confirmed one-shot action. Restart
-does not select V1 implicitly and does not reactivate an old credential. The
-reboot-like local path proves V2 admin HTTP 200 and V2 database connection,
-then proves V1 admin HTTP 401/403 and V1 database connection denial.
+does not select V1 implicitly and does not reactivate an old database
+credential. Personal-user/admin rotation is not performed by bootstrap and is
+recorded as `NOT_RUN`; the current local path keeps admin V1 while proving V2
+database connection and V1 database denial.
 
 The app and backup roles are required to have zero `pg_auth_members` rows, so
 neither can `SET ROLE` to migration, recovery, bootstrap, or another user
 role. Read-only grant refresh first clears existing/default table and Sequence
 ACLs, PUBLIC table/Sequence ACLs, and app/backup/PUBLIC column-level write ACLs,
-then grants only SELECT. Full verification uses effective privilege checks and
-rejects non-SELECT default ACL entries, Sequence USAGE/UPDATE, PUBLIC writes,
-column INSERT/UPDATE/REFERENCES, table writes, schema CREATE, database
-CREATE/TEMP, missing SELECT, or any role membership. The application write
-probe disables session-default read-only mode first, so its denial independently
-proves the permission layer.
+then grants SELECT plus only the exact `tm_user` INSERT columns,
+`last_login_at` UPDATE, and `tm_user_id_seq` USAGE required by authentication.
+Full verification rejects any other write, sequence UPDATE, schema/database
+write, missing SELECT, or role membership. The application probe proves both
+denied business/password writes and the bounded bootstrap/last-login path in a
+rolled-back transaction.
 
 Only `SYSTEMD_CREDENTIALS` is implemented for a future server run. The unit
 uses `LoadCredentialEncrypted=` and a bounded adapter; SOPS, Vault, and cloud
@@ -165,10 +199,10 @@ The non-root application mounts that volume read-only and uses
 - `binance.api.secret`.
 
 The P3-U1 branch also supplies the non-secret initial username and enables the
-Secure Session Cookie through environment configuration. This property-name
-alignment does not prove real staging, controlled PostgreSQL V8, or a
-reverse-proxy Session/CSRF smoke. The current P3-H exact-V7 and Basic-auth
-smoke surfaces remain a separate integration blocker.
+Secure Session Cookie through environment configuration. Its current machine
+contract requires exact V8/`tm_user` before bootstrap and uses Session/CSRF
+smoke. This does not prove real staging, a real Secret Store, or real
+reverse-proxy Session/CSRF evidence.
 
 No `.env`, secret value, private key, dump, backup, or attestation is included
 in the image build context. The nonfunctional Binance placeholders are needed
@@ -184,8 +218,9 @@ responses. It does not allow `curl -k` or `--insecure`.
 
 Only health endpoints may be unauthenticated. Dashboard, Review Center, Run
 Baseline, and `/api/**` require application authentication. A real evidence
-run must prove good credentials succeed, missing/bad credentials fail, health
-details remain hidden, and Authorization/Cookie values never enter logs.
+run must prove anonymous API denial, form login, Session Cookie use,
+CSRF-protected logout, post-logout invalidation, missing/bad credential denial,
+hidden health details, and zero credential/Cookie/Session/CSRF leakage.
 
 The disposable local template proved approved-host redirect and HTTPS health,
 unknown HTTP/HTTPS host rejection, and a TLS 1.3 handshake with a generated
@@ -221,9 +256,9 @@ redacted evidence from one authorized non-production server:
 
 1. attestation, host identity, OS/Docker/UTC/NTP/firewall baseline;
 2. exact source archive and immutable image metadata;
-3. empty Greenfield PostgreSQL followed by Flyway V1-V7 and zero-repeat run;
-4. isolated migration, read-only app, backup, and recovery roles;
-5. denied application write probe;
+3. empty Greenfield PostgreSQL followed by Flyway V1-V8, exact `tm_user`, and zero-repeat run;
+4. isolated migration, business-read-only/auth-session app, backup, and recovery roles;
+5. denied business/password writes plus successful bounded bootstrap/`last_login_at` probe;
 6. real runtime Secret Store mount and fail-closed Config Tree startup;
 7. verified TLS, redirect, authenticated/unauthenticated HTTPS smoke, 429, and redacted logs;
 8. official backup/restore to the independent recovery database with content match;
@@ -347,6 +382,6 @@ that script's path guard.
 `P3H_RESULT: NOT_COMPLETE`
 
 Production readiness remains `BLOCKED`; production deployment cannot
-proceed. The next task is **Reviewer P3-H Offline Harness Round 5 Re-review**.
+proceed. The next task is **PR #1133 exact-Head CI and re-review**.
 Any later real execution requires a new explicit authorized input set and must
 preserve the no-secret-output contract.

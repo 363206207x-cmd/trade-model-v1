@@ -93,6 +93,8 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
         builder.environment().put("SMOKE_ALLOW_EXTERNAL_CALLS", "false");
         builder.environment().remove("SMOKE_AUTH_USERNAME");
         builder.environment().remove("SMOKE_AUTH_PASSWORD");
+        builder.environment().remove("TRADE_MODEL_SMOKE_USERNAME");
+        builder.environment().remove("TRADE_MODEL_SMOKE_PASSWORD");
         builder.environment().remove("APP_ADMIN_USERNAME");
         builder.environment().remove("APP_ADMIN_PASSWORD");
 
@@ -669,6 +671,7 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                 .redirectErrorStream(true);
         for (String name : List.of(
                 "SMOKE_PHASE", "SMOKE_RESPONSE_DIR", "SMOKE_SPLIT_PHASE_CONFIRM",
+                "TRADE_MODEL_SMOKE_USERNAME", "TRADE_MODEL_SMOKE_PASSWORD",
                 "SMOKE_AUTH_USERNAME", "SMOKE_AUTH_PASSWORD", "APP_ADMIN_USERNAME",
                 "APP_ADMIN_PASSWORD")) {
             builder.environment().remove(name);

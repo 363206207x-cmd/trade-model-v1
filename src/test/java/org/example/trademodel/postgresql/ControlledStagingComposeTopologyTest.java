@@ -18,7 +18,7 @@ class ControlledStagingComposeTopologyTest {
                 "SPRING_SQL_INIT_MODE: never",
                 "SPRING_DATASOURCE_USERNAME: p3h_app_readonly",
                 "SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver",
-                "SPRING_DATASOURCE_HIKARI_READ_ONLY: \"true\"",
+                "SPRING_DATASOURCE_HIKARI_READ_ONLY: \"false\"",
                 "TRADE_MODEL_PRODUCTION_SCHEDULER_POLICY: LOCKED_DOWN",
                 "TRADE_MODEL_PROVIDER_EXTERNAL_CALLS_ENABLED: \"false\"",
                 "TRADE_MODEL_AI_ENABLED: \"false\"",
@@ -72,15 +72,29 @@ class ControlledStagingComposeTopologyTest {
     }
 
     @Test
-    void appCannotStartBeforeV7() throws Exception {
+    void appCannotStartBeforeV8AndTmUserContract() throws Exception {
         String grants = P3hContractTestSupport.read("deploy/p3h/postgres-readonly-grants.sql");
         String compose = P3hContractTestSupport.read("deploy/p3h/docker-compose.p3h.yml");
 
         assertThat(grants).contains(
-                "successful_migrations <> 7", "final_version <> '7'",
-                "P3-H Flyway V7 verification failed");
+                "successful_migrations <> 8", "final_version <> '8'",
+                "P3-H Flyway V8 verification failed",
+                "public.tm_user", "public.tm_user_id_seq");
         assertThat(serviceBlock(compose, "app", "proxy")).contains(
                 "secret-materializer:", "condition: service_completed_successfully");
+    }
+
+    @Test
+    void migrationServiceUsesCanonicalV8WithoutDuplicatingTmUserDdl() throws Exception {
+        String compose = P3hContractTestSupport.read("deploy/p3h/docker-compose.p3h.yml");
+        String start = P3hContractTestSupport.read("deploy/p3h/p3h-compose-start.sh");
+
+        assertThat(serviceBlock(compose, "migrate", "readonly-grants")).contains(
+                "../../src/main/resources/db/migration:/flyway/sql:ro",
+                "FLYWAY_BASELINE_ON_MIGRATE: \"false\"",
+                "FLYWAY_CLEAN_DISABLED: \"true\"");
+        assertThat(start).contains("P3H_CURRENT_STEP=FLYWAY_MIGRATE");
+        assertThat(compose + start).doesNotContain("CREATE TABLE tm_user");
     }
 
     @Test
