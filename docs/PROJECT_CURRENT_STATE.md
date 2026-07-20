@@ -18,7 +18,7 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 
 Merged main at branch creation is
 `d84f0b95023d0ef50443b96d61972c1dbfbdeec8`. P3-U1 is implemented on
-`codex/p3-u1-personal-login-session-auth` and is
+`codex/p3-u1-personal-login-session-auth` in Draft PR #1133 and is
 `LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_UNMERGED`; it is not yet an effective
 merged-main capability.
 

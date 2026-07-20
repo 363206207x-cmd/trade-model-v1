@@ -7,7 +7,7 @@ existing_module_maturity: "PARTIAL"
 module: "P3-U1 Personal Login Page and Session Authentication"
 branch: "codex/p3-u1-personal-login-session-auth"
 risk: "B-risk authentication, Session, CSRF, tm_user V8 migration, bootstrap, tests, and directly related configuration; no external calls or trading"
-current_pr: "P3-U1 DRAFT PR OPEN / UNMERGED after publication; GitHub assigns the PR number"
+current_pr: "PR #1133 OPEN / DRAFT / UNMERGED"
 next_business_phase: "P3-U2 Mobile Dashboard Productization"
 next_business_phase_allowed: false
 compatibility_next_business_phase_allowed_note: "P3-U1 must be independently reviewed and effective on merged main before P3-U2; P4 and production deployment remain blocked."

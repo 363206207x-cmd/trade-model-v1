@@ -41,7 +41,7 @@ The following do not count as completed:
 
 - Current merged main at branch creation is `d84f0b95023d0ef50443b96d61972c1dbfbdeec8`. It contains P3-CALL1 through PR #1131 (`cac3d5ea139e26278cf5cf722975830099c23f65`) and the reviewed marker cleanup through PR #1132. Real staging remains `BLOCKED_MISSING_AUTHORIZED_INPUT`; no server or real Secret Store access is proven.
 - Current active package: P3-U1 Personal Login Page and Session Authentication on `codex/p3-u1-personal-login-session-auth`.
-- Current P3-U1 branch state: `LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_UNMERGED`. Only merged main counts as effective.
+- Current P3-U1 branch state: `LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_UNMERGED` in Draft PR #1133. Only merged main counts as effective.
 - P3-U1 implements a Thymeleaf form login, server-side Spring Security Session, BCrypt-backed `tm_user`, UTC-naive `last_login_at`, bounded failure limiting, sanitized login audit, CSRF-protected browser writes/logout, and idempotent explicit-credential bootstrap. It does not add JWT, OAuth, registration, multi-user administration, RBAC, Provider/AI calls, Telegram, orders, positions, or trading.
 - P3-U1 validation: targeted security tests PASS; full Maven 4040 tests / 0 failures / 0 errors / 14 skips; localhost disposable file-H2 two-start login/session/logout/restart evidence PASS; password and BCrypt hash log matches zero.
 - P3-U1 limitations: controlled PostgreSQL V8 is `ENVIRONMENT_GATED_SKIP`, real mobile Safari/Chrome are `NOT_RUN`, and the P3-H exact-V7/Basic-smoke deployment surface remains a separate integration gate. No PostgreSQL V8, real mobile, real staging, or production-readiness PASS is claimed.

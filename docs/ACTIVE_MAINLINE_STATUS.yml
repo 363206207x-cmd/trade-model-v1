@@ -22,7 +22,7 @@ compatibility_next_business_phase_allowed_note: "P3-U1 is locally validated but 
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "P3-U1 DRAFT PR OPEN / UNMERGED after publication; GitHub assigns the PR number"
+current_pr: "PR #1133 OPEN / DRAFT / UNMERGED"
 current_branch: "codex/p3-u1-personal-login-session-auth"
 current_package_pr: "P3-U1 personal login and Session authentication; local implementation and runtime validated, not effective until reviewed and merged main"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"

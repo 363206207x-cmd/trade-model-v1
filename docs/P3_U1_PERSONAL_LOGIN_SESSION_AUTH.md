@@ -4,7 +4,7 @@
 
 - Main baseline at branch creation: `d84f0b95023d0ef50443b96d61972c1dbfbdeec8`
 - Branch: `codex/p3-u1-personal-login-session-auth`
-- Delivery state: `LOCAL_IMPLEMENTATION_VALIDATED`; the capability is not effective on merged main until its Draft PR is reviewed and merged.
+- Delivery state: `PR_OPEN_UNMERGED` in Draft PR #1133; the capability is not effective on merged main until the PR is reviewed and merged.
 - Production readiness: `BLOCKED`
 - P3-U2: not allowed before reviewed merged-main activation of P3-U1.
 
