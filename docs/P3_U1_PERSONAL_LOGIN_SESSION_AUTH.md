@@ -126,8 +126,14 @@ cannot create a new log line or inject an `outcome`/`reason` field.
 Automated validation on this branch:
 
 - P3-U1 security-blocker targeted suite: 96 tests, 0 failures, 0 errors, 0 skips
-- Full Maven suite: 4088 tests, 0 failures, 0 errors, 14 environment-gated skips
+- Full Maven suite: 4099 tests, 0 failures, 0 errors, 14 environment-gated skips
 - Docker/Testcontainers: `ENVIRONMENT_GATED_SKIP`
+- P3-H runtime PostgreSQL V8 validation: `PASS_LOCAL_DISPOSABLE_ONLY`
+- PostgreSQL V8 status: `PASS_LOCAL_DISPOSABLE_POSTGRESQL16_ONLY`
+- Real production PostgreSQL V8 validation: `NOT_RUN`
+- Local disposable Session/CSRF smoke: `PASS`
+- Real reverse-proxy Session/CSRF: `NOT_RUN`
+- Secret Store injection and credential rotation: `MISSING_EVIDENCE`
 - Responsive static contract: PASS at 320/375/390-width CSS constraints, 16px inputs, 48px controls, no horizontal-overflow layout
 - Real mobile Safari: NOT_RUN
 - Real mobile Chrome: NOT_RUN
@@ -151,6 +157,14 @@ disabled. It proved:
 
 No real Provider, AI, Telegram, Push, order, position mutation, or trading call
 ran during validation.
+
+The exact-Head disposable P3-H run used PostgreSQL 16, applied canonical Flyway
+V1-V8, verified `tm_user`, and completed the browser-equivalent smoke sequence:
+`GET /login`, login CSRF extraction, `POST /login`, Session Cookie reuse,
+authenticated Dashboard/Review reads, authenticated logout CSRF extraction,
+`POST /logout`, and rejection of the old Session. This is local disposable
+evidence only. It is not real production PostgreSQL or real reverse-proxy
+Session/CSRF evidence.
 
 ## Security Review Blocker Closure
 

@@ -97,7 +97,7 @@ server-side Session backed by a minimal BCrypt `tm_user` record.
 - Session: 30-minute default timeout, fixation migration, HttpOnly Cookie, SameSite=Lax, local HTTP Secure=false, and prod Secure=true.
 - User initialization: both `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD` must be supplied through runtime configuration or approved secret injection; bootstrap is idempotent and never overwrites an existing user.
 - Failure policy: five failures in 15 minutes produce a temporary 15-minute block; the single-instance in-memory store is bounded and successful authentication resets the user state.
-- Validation: targeted security tests, the prior 4088-test full suite, and disposable localhost two-start H2 runtime validation PASS. New exact-Head test/CI and P3-H runtime results must be reported separately; no skipped check is PASS.
+- Validation: targeted security tests, the exact-Head 4099-test full suite (0 failures, 0 errors, 14 environment-gated skips), and disposable localhost two-start H2 runtime validation PASS. The exact-Head disposable P3-H run also passed canonical Flyway V1-V8/`tm_user` on PostgreSQL 16 and local Session/CSRF smoke. Real production PostgreSQL V8 and real reverse-proxy Session/CSRF remain `NOT_RUN`; no skipped check is PASS.
 - Deployment-contract closure: this PR branch updates the existing P3-H one-shot migration service and fail-closed verifiers to exact V8/`tm_user`, preserves business-data read-only access with bounded authentication writes, and migrates current production smoke/release-gate checks to form login, Session Cookie, CSRF logout, and post-logout invalidation. Historical P3-G/PDR Basic-auth evidence is not reclassified.
 - Safety: no Provider, AI, Telegram, Push, order, position mutation, or trading call is introduced. Production readiness remains BLOCKED.
 
@@ -880,8 +880,10 @@ columns, `last_login_at`, and `tm_user_id_seq` privileges required by personal
 Session authentication. Current `prod-smoke.sh` and the release gate use form
 login, a temporary Cookie jar, CSRF logout, and post-logout Session invalidation.
 No Basic Auth compatibility route is added. The full exact-Head disposable
-Compose result must be reported separately and never substitutes for real
-staging evidence.
+Compose result is `PASS_LOCAL_DISPOSABLE_ONLY` on PostgreSQL 16, including
+V1-V8/`tm_user` and the local browser-equivalent Session/CSRF smoke. It never
+substitutes for real production PostgreSQL, real reverse-proxy, or real staging
+evidence, all of which remain `NOT_RUN` or blocked.
 
 A future authorized run must provide the complete P3-H environment contract
 outside chat and GitHub. It must collect redacted evidence from one approved

@@ -12,6 +12,33 @@ Production Deployment Readiness: `BLOCKED`
 
 P4 Allowed: `NO`
 
+## Current P3-U1 Exact-Head Evidence Classification
+
+`LOCAL_DISPOSABLE_EVIDENCE: PASS`
+
+`P3H_RUNTIME_POSTGRESQL_V8_VALIDATION: PASS_LOCAL_DISPOSABLE_ONLY`
+
+`POSTGRESQL_V8_STATUS: PASS_LOCAL_DISPOSABLE_POSTGRESQL16_ONLY`
+
+`LOCAL_DISPOSABLE_SESSION_CSRF_SMOKE: PASS`
+
+The local disposable sequence covered `GET /login`, CSRF extraction,
+`POST /login`, Session Cookie reuse, authenticated Dashboard/Review reads,
+authenticated logout CSRF extraction, `POST /logout`, and old-Session denial.
+
+`REAL_PRODUCTION_POSTGRESQL_V8_VALIDATION: NOT_RUN`
+
+`REAL_REVERSE_PROXY_EVIDENCE: NOT_RUN`
+
+`REAL_REVERSE_PROXY_SESSION_CSRF: NOT_RUN`
+
+`TESTCONTAINERS_STATUS: ENVIRONMENT_GATED_SKIP`
+
+`SECRET_STORE_AND_ROTATION: MISSING_EVIDENCE`
+
+These local results are unmerged PR #1133 evidence. They are not real staging,
+real production database, real Secret Store, or production-readiness evidence.
+
 ## P3-U1 V8 And Session Contract Addendum
 
 PR #1133 updates the current P3-H machine contract without rewriting the
@@ -223,11 +250,12 @@ CSRF-protected logout, post-logout invalidation, missing/bad credential denial,
 hidden health details, and zero credential/Cookie/Session/CSRF leakage.
 
 The disposable local template proved approved-host redirect and HTTPS health,
-unknown HTTP/HTTPS host rejection, and a TLS 1.3 handshake with a generated
-one-day localhost certificate. This is not certificate issuance or real
-staging endpoint evidence. Authenticated dashboard/review smoke, real rate
-limit evidence, certificate rotation/renewal, and server proxy-log evidence
-remain `NOT_ATTEMPTED`.
+unknown HTTP/HTTPS host rejection, a TLS 1.3 handshake with a generated one-day
+localhost certificate, and browser-equivalent form-login/Session/CSRF/logout
+smoke through the local disposable proxy. This is not certificate issuance or
+real staging endpoint evidence. Real reverse-proxy Session/CSRF, real rate-limit
+evidence, certificate rotation/renewal, and server proxy-log evidence remain
+`NOT_RUN`/`NOT_ATTEMPTED`.
 
 ## Backup And Restore Plan
 
@@ -376,6 +404,12 @@ that script's path guard.
 `OFFLINE_HARNESS: PASS`
 
 `LOCAL_COMPOSE_TEMPLATE_SMOKE: PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE`
+
+`P3H_RUNTIME_POSTGRESQL_V8_VALIDATION: PASS_LOCAL_DISPOSABLE_ONLY`
+
+`LOCAL_DISPOSABLE_SESSION_CSRF_SMOKE: PASS`
+
+`REAL_REVERSE_PROXY_SESSION_CSRF: NOT_RUN`
 
 `REAL_STAGING_STATUS: BLOCKED_MISSING_AUTHORIZED_INPUT`
 

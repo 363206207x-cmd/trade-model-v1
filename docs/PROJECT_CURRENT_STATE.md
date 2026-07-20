@@ -19,7 +19,7 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 Merged main at branch creation is
 `d84f0b95023d0ef50443b96d61972c1dbfbdeec8`. P3-U1 is implemented on
 `codex/p3-u1-personal-login-session-auth` in Ready PR #1133 and is
-`LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_UNMERGED`; it is not yet an effective
+`LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_READY_UNMERGED`; it is not yet an effective
 merged-main capability.
 
 The branch replaces the formal Basic-auth access path with a minimal personal
@@ -34,7 +34,7 @@ form login backed by Spring Security server-side Session and `tm_user`:
 7. bootstrap requires explicit `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD`, is idempotent, and never overwrites an existing password;
 8. existing Dashboard/Review browser writes now send the framework CSRF header.
 
-Targeted security tests and the full 4088-test suite pass with 0 failures and 0
+Targeted security tests and the full 4099-test suite pass with 0 failures and 0
 errors; 14 Docker/Testcontainers cases remain environment-gated. A bounded
 localhost two-start file-H2 run proved generic failure, login, Session refresh,
 logout, persistence, bootstrap no-overwrite, old-Session rejection after
@@ -42,9 +42,12 @@ restart, and zero password/hash matches in logs. The current branch additionally
 updates the P3-H migration service and preflight to exact V8/`tm_user`, preserves
 business-data read-only privileges with only bounded authentication writes, and
 migrates current production smoke/release-gate authentication from Basic Auth
-to form login, Session Cookie, CSRF logout, and post-logout invalidation. These
-changes remain unmerged; real mobile Safari/Chrome, real reverse-proxy smoke,
-real staging, and production deployment were not run.
+to form login, Session Cookie, CSRF logout, and post-logout invalidation. The
+exact-Head disposable P3-H run passed canonical Flyway V1-V8 and `tm_user` on
+local PostgreSQL 16 and passed the local browser-equivalent Session/CSRF smoke.
+These changes remain unmerged; real production PostgreSQL V8, real mobile
+Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
+injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`; P3-U2 and P4 are not allowed.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
@@ -1244,5 +1247,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1133 P3-U1 Open/Ready/unmerged; P3-H V8/tm_user and Session/CSRF smoke closure pending exact-head CI/re-review
+- CURRENT_PACKAGE_PR: #1133 P3-U1 Open/Ready/unmerged; P3-H V8/tm_user and Session/CSRF evidence aligned, pending new exact-head CI/re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE
