@@ -31,6 +31,7 @@ class ControlledGreenfieldFlywayV7ActionTest {
         Flyway flyway = Flyway.configure()
                 .dataSource(jdbcUrl, username, password)
                 .locations("classpath:db/migration")
+                .target("7")
                 .baselineOnMigrate(false)
                 .cleanDisabled(true)
                 .connectRetries(0)

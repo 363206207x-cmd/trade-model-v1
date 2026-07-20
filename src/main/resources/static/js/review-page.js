@@ -8,6 +8,16 @@
     var entryContext = document.getElementById('review-entry-context');
     var currentAggregate = null;
 
+    function csrfHeaders(headers) {
+        var result = Object.assign({}, headers || {});
+        var tokenMeta = document.querySelector('meta[name="_csrf"]');
+        var headerMeta = document.querySelector('meta[name="_csrf_header"]');
+        var token = tokenMeta ? tokenMeta.getAttribute('content') : '';
+        var headerName = headerMeta ? headerMeta.getAttribute('content') : '';
+        if (token && headerName) result[headerName] = token;
+        return result;
+    }
+
     /**
      * 复盘错误类型中文标签（与 ReviewErrorType / PROJECT_SPEC 二十一（四）一致）；仅用于展示，接口与保存仍为原始码值。
      */
@@ -1211,7 +1221,7 @@
             };
             fetch('/api/review/save', {
                 method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                headers: csrfHeaders({ 'Accept': 'application/json', 'Content-Type': 'application/json' }),
                 body: JSON.stringify(payload)
             }).then(function (res) {
                 return res.json().then(function (body) {

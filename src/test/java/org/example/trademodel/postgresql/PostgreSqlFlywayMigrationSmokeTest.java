@@ -55,7 +55,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
     private static final String CONTROLLED_RUN = "I_UNDERSTAND_THIS_WRITES_SCHEMA_TO_CONTROLLED_DB";
 
     @Test
-    void postgreSqlV7MigrationRuntimeTest() throws Exception {
+    void postgreSqlCurrentMigrationRuntimeTest() throws Exception {
         DatabaseTarget controlledTarget = controlledDatabaseTarget();
         if (controlledTarget != null) {
             assertPostgreSqlRuntime(controlledTarget);
@@ -80,7 +80,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
 
         try (Connection connection = DriverManager.getConnection(
                 target.jdbcUrl(), target.username(), target.password())) {
-            assertThat(countTradeModelTables(connection)).isEqualTo(27);
+            assertThat(countTradeModelTables(connection)).isEqualTo(28);
             assertTablesExist(connection, List.of(
                     "tm_analysis_run",
                     "tm_decision_result",
@@ -92,6 +92,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "tm_push_snapshot",
                     "tm_push_recheck_log",
                     "tm_ai_call_log",
+                    "tm_user",
                     "tm_asset_state"));
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
@@ -282,7 +283,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(7);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(8);
             }
         }
     }

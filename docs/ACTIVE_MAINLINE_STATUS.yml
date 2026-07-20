@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P3-CALL1 PR #1131 shared-flight waiters are rewrapped with caller-owned metadata and all returned expiry paths are retention-bounded in offline tests; the closure awaits final re-review, the Draft remains unmerged, and all external calls remain disabled"
-active_block_cn: "P3-CALL1 PR #1131 已由离线测试验证 Shared Flight Waiter 使用调用方独立元数据重包装，且所有返回 expiry 均受 retention 限制；整改等待最终复审，Draft 尚未合并，所有外部调用继续禁用"
+active_block: "P3-U1 personal login and server-side Session authentication are locally validated on codex/p3-u1-personal-login-session-auth; the package remains unmerged and production readiness remains BLOCKED"
+active_block_cn: "P3-U1 个人登录与服务端 Session 认证已在 codex/p3-u1-personal-login-session-auth 完成本地验证；当前包尚未合并，生产就绪继续 BLOCKED"
 
-next_required_action: "Reviewer P3-CALL1 Caller Rewrap and Retention Expiry Final Re-review of Draft PR #1131; do not merge or start P3-U1 before explicit review closure and merged-main activation. Do not touch frozen PR #1130 or start P4."
-next_business_phase: "P3-U1 Personal Login Page and Session Authentication"
+next_required_action: "Review the P3-U1 Draft PR and its login/session/BCrypt/CSRF/runtime evidence; do not mark P3-U1 effective or start P3-U2 before reviewed merged-main activation. Do not start P4."
+next_business_phase: "P3-U2 Mobile Dashboard Productization"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Compatibility field remains false while P3-CALL1 is unmerged. P3-U1 may start only after reviewed merged-main activation; P4 and production deployment remain blocked."
+compatibility_next_business_phase_allowed_note: "P3-U1 is locally validated but unmerged. P3-U2 may start only after reviewed P3-U1 merged-main activation; P4 and production deployment remain blocked."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "#1131 OPEN / DRAFT / UNMERGED; caller rewrap and retention-expiry closure pending final re-review"
-current_branch: "codex/p3-call1-provider-orchestration-final"
-current_package_pr: "P3-CALL1 PR #1131 caller rewrap and retention-expiry offline closure pending final re-review; not effective until reviewed and merged main"
+current_pr: "P3-U1 DRAFT PR OPEN / UNMERGED after publication; GitHub assigns the PR number"
+current_branch: "codex/p3-u1-personal-login-session-auth"
+current_package_pr: "P3-U1 personal login and Session authentication; local implementation and runtime validated, not effective until reviewed and merged main"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -171,8 +171,8 @@ p3h_config_tree_injection: "PASS_LOCAL_DISPOSABLE_NON_ROOT_UID_10001"
 p3h_secret_backend_implementation: "SYSTEMD_CREDENTIALS_ONLY"
 p3h_runtime_mount_verification: "GUARD_PASS_NOT_RUN_ON_REAL_STAGING"
 p3h_p4_allowed: "NO"
-p3_call1_status: "CALLER_REWRAP_AND_RETENTION_EXPIRY_OFFLINE_PENDING_FINAL_REVIEW"
-p3_call1_effective: false
+p3_call1_status: "DONE/effective on merged main cac3d5ea139e26278cf5cf722975830099c23f65 by PR #1131; offline/default-disabled provider coordination only"
+p3_call1_effective: true
 p3_call1_review_id: "4730817855"
 p3_call1_round1_review_id: "4730021827"
 p3_call1_round2_review_id: "4730247371"
@@ -264,6 +264,19 @@ p3_call1_telegram_sends: "0"
 p3_call1_orders: "0"
 p3_call1_trading: "DISABLED"
 p3_call1_p4_allowed: "NO"
+p3_clean2a1b_status: "DONE/effective on merged main d84f0b95023d0ef50443b96d61972c1dbfbdeec8 by PR #1132"
+p3_clean2a1b_effective: true
+p3_u1_status: "LOCAL_IMPLEMENTATION_VALIDATED_PR_OPEN_UNMERGED"
+p3_u1_effective: false
+p3_u1_branch: "codex/p3-u1-personal-login-session-auth"
+p3_u1_main_baseline: "d84f0b95023d0ef50443b96d61972c1dbfbdeec8"
+p3_u1_authentication: "FORM_LOGIN_SERVER_SIDE_SESSION"
+p3_u1_user_store: "TM_USER_BCRYPT"
+p3_u1_runtime_validation: "PASS_LOCALHOST_DISPOSABLE_FILE_H2_TWO_STARTS"
+p3_u1_postgresql_v8: "ENVIRONMENT_GATED_SKIP_NOT_PASS"
+p3_u1_mobile_safari: "NOT_RUN"
+p3_u1_mobile_chrome: "NOT_RUN"
+p3_u2_allowed: false
 p4_status: "BLOCKED"
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
@@ -316,6 +329,8 @@ notes:
   - "P3-H Round 4 adds exact versioned full-row rule defaults, exact normalized V1-V7 schema fingerprints, effective/PUBLIC/column read-only privilege closure, strict staging/SSH input grammar, and real disposable drift/injection rejection fixtures."
   - "P3-H offline harness is PASS and the actual disposable local Compose template smoke is PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE; this is not controlled-staging evidence."
   - "P3-H result remains NOT_COMPLETE with REAL_STAGING BLOCKED_MISSING_AUTHORIZED_INPUT, SERVER_ACCESS and SECRET_ACCESS NOT_ATTEMPTED; no server evidence is represented as PASS."
+  - "P3-CALL1 is effective on merged main cac3d5ea139e26278cf5cf722975830099c23f65 by PR #1131; PR #1132 cleanup is effective on d84f0b95023d0ef50443b96d61972c1dbfbdeec8."
+  - "P3-U1 is locally validated only: form login, server-side Session, BCrypt tm_user, CSRF, bounded failure limiting, audit logging, and two-start localhost persistence passed. PostgreSQL V8 and real mobile browsers were not run; P3-U2 and P4 remain blocked."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."
   - "P4 is BLOCKED_MISSING_REAL_FIXTURE; no real replay, provider validation, profitability, or production-readiness PASS is claimed."

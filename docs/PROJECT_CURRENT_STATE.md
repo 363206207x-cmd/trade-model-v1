@@ -6,18 +6,50 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-CALL1 Unified Provider Orchestration, Adjustable Profiles and Opportunity Discovery Foundation
-Next Business Phase: P3-U1 Personal Login Page and Session Authentication, only after P3-CALL1 is reviewed and effective on merged main
-Next Business Phase Allowed: NO while P3-CALL1 is unmerged; NO for P4 and production deployment
+Current Work Package: P3-U1 Personal Login Page and Session Authentication
+Next Business Phase: P3-U2 Mobile Dashboard Productization, only after P3-U1 is reviewed and effective on merged main
+Next Business Phase Allowed: NO while P3-U1 is unmerged; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
+## P3-U1 Personal Login Page and Session Authentication
+
+Merged main at branch creation is
+`d84f0b95023d0ef50443b96d61972c1dbfbdeec8`. P3-U1 is implemented on
+`codex/p3-u1-personal-login-session-auth` and is
+`LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_UNMERGED`; it is not yet an effective
+merged-main capability.
+
+The branch replaces the formal Basic-auth access path with a minimal personal
+form login backed by Spring Security server-side Session and `tm_user`:
+
+1. `GET /login` and CSRF-protected `POST /login` use the existing Thymeleaf stack;
+2. BCrypt hashes, a unique normalized username, UTC-naive `created_at`, and success-only `last_login_at` are persisted;
+3. login failure limiting is bounded to 1024 normalized usernames, locks after 5 failures for 15 minutes, expires, and resets on success;
+4. browser routes redirect to login while APIs return sanitized JSON `401`;
+5. logout is POST/CSRF-only, invalidates the Session, and deletes JSESSIONID;
+6. Session fixation migration, 30-minute timeout, HttpOnly, SameSite=Lax, and prod Secure Cookie policies are explicit;
+7. bootstrap requires explicit `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD`, is idempotent, and never overwrites an existing password;
+8. existing Dashboard/Review browser writes now send the framework CSRF header.
+
+Targeted security tests and the full 4040-test suite pass with 0 failures and 0
+errors; 14 Docker/Testcontainers cases remain environment-gated. A bounded
+localhost two-start file-H2 run proved generic failure, login, Session refresh,
+logout, persistence, bootstrap no-overwrite, old-Session rejection after
+restart, and zero password/hash matches in logs. Controlled PostgreSQL V8 and
+real mobile Safari/Chrome were not run. The exact-V7 P3-H deployment harness
+and Basic-auth smoke scripts remain a separate Session/V8 integration gate.
+Production readiness remains `BLOCKED`; P3-U2 and P4 are not allowed.
+
+See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
+
 ## P3-CALL1 Unified Provider Orchestration
 
-Merged main `230528b0942737275a397323bcfff874541e2ea8` is the exact P3-CALL1
-baseline. The package adds an offline, default-disabled coordination foundation:
+P3-CALL1 is effective on merged main
+`cac3d5ea139e26278cf5cf722975830099c23f65` by PR #1131. The package adds an
+offline, default-disabled coordination foundation:
 
 1. canonical spot/perpetual instrument identities and explicit provider symbol mappings;
 2. strict `P0_POSITION > P2_CANDIDATE > P1_WATCHLIST > P3_DISCOVERY` planning;
@@ -33,29 +65,9 @@ P3-CALL1 does not call Binance, CoinGlass, external context, or AI; it does not
 start a business scheduler, send Telegram/Push, create or mutate a position,
 create an order, or trade. Its runtime auto-candidate owner remains in-memory.
 Dynamic discovery, live adapters, Decision Cutoff Time, real AI, and Telegram
-delivery are explicitly deferred. Only merged main counts, so this branch is
-not effective until reviewed and merged.
-
-PR #1130 remains frozen `OPEN / DRAFT / UNMERGED` with no action. P4 is not
-allowed. Production Deployment Readiness remains `BLOCKED`.
-
-PR #1131 remains `OPEN / DRAFT / UNMERGED`. Reviewer Round 1 review
-`4730021827` requested five correctness fixes and Reviewer Round 2 review
-`4730247371` requested three focused corrections. Reviewer Round 3 review
-`4730325751` requested the HALF_OPEN probe lifecycle correction. Review comment
-`3610213592` then identified the snapshot-retention lookup-order gap, and review
-comment `3610342417` identified read-only plan mutation of runtime profile
-state. Review `4730635925` identified the transition-state publication
-boundary gap. Final review `4730817855` passed that exact Head, after which two
-new P2 threads identified optional-universe count resilience and
-audit-before-publication atomicity. Those fixes were followed by thread
-`PRRT_kwDOSc6fQc6SF53A`, which identified queued attempts being classified as
-remote timeouts before Adapter start. Review `4731186182` then identified that
-a cancelled queued control could remain in the bounded executor queue after its
-logical flight completed. Two later P2 threads identified owner caller metadata
-being returned to joined waiters and refreshed metadata expiry exceeding dataset
-retention. This branch records the three rounds plus the focused closures below,
-pending caller-rewrap and retention-expiry final re-review:
+delivery are explicitly deferred. P4 remains disallowed and Production
+Deployment Readiness remains `BLOCKED`. The reviewed correctness closures now
+effective on main include:
 
 1. physical provider work uses a dedicated bounded executor, and logical
    timeout cannot release its concurrency lease or Single Flight before the

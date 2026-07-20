@@ -114,7 +114,7 @@ class ControlledPostgreSqlFlywayV7EvidenceTest {
     @Test
     @Order(1)
     void freshV1ToV7MigrationAndIdempotentRerunPass() throws Exception {
-        Flyway flyway = flyway(FRESH_DATABASE, null);
+        Flyway flyway = flyway(FRESH_DATABASE, "7");
 
         MigrateResult first = flyway.migrate();
         assertThat(first.success).isTrue();
@@ -148,7 +148,7 @@ class ControlledPostgreSqlFlywayV7EvidenceTest {
 
         insertHistoricalV6Rows();
 
-        Flyway throughV7 = flyway(UPGRADE_DATABASE, null);
+        Flyway throughV7 = flyway(UPGRADE_DATABASE, "7");
         MigrateResult v7Result = throughV7.migrate();
         assertThat(v7Result.success).isTrue();
         assertThat(v7Result.migrationsExecuted).isEqualTo(1);

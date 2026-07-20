@@ -118,23 +118,23 @@ class ProductionProfileSafetyGuardTest {
     @Test
     void rejectsMissingAdminCredentials() {
         MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.admin-username", "");
-        environment.setProperty("trade-model.auth.admin-password", " ");
+        environment.setProperty("trade-model.auth.initial-username", "");
+        environment.setProperty("trade-model.auth.initial-password", " ");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production admin username missing")
-                .hasMessageContaining("production admin password missing");
+                .hasMessageContaining("production initial username missing")
+                .hasMessageContaining("production initial password missing");
     }
 
     @Test
     void rejectsUnsafeAdminPasswordDefaults() {
         MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.admin-password", "change-me");
+        environment.setProperty("trade-model.auth.initial-password", "change-me");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production admin password uses an unsafe default value");
+                .hasMessageContaining("production initial password uses an unsafe default value");
     }
 
     @Test
@@ -351,8 +351,12 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("position.provider.type", "BINANCE");
         environment.setProperty("binance.api.key", "configured-key");
         environment.setProperty("binance.api.secret", "configured-secret");
-        environment.setProperty("trade-model.auth.admin-username", "operator");
-        environment.setProperty("trade-model.auth.admin-password", "configured-admin-password");
+        environment.setProperty("trade-model.auth.enabled", "true");
+        environment.setProperty("trade-model.auth.initial-username", "operator");
+        environment.setProperty("trade-model.auth.initial-password", "configured-initial-password");
+        environment.setProperty("server.servlet.session.cookie.http-only", "true");
+        environment.setProperty("server.servlet.session.cookie.same-site", "lax");
+        environment.setProperty("server.servlet.session.cookie.secure", "true");
         environment.setProperty("management.endpoints.web.exposure.include", "health");
         environment.setProperty("trade-model.security.rate-limit.enabled", "true");
         environment.setProperty("trade-model.security.rate-limit.requests-per-minute", "120");

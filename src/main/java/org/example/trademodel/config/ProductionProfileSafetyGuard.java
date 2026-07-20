@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 @Profile("prod")
 public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
-    private static final Set<String> UNSAFE_ADMIN_PASSWORDS = Set.of(
+    private static final Set<String> UNSAFE_INITIAL_PASSWORDS = Set.of(
             "PASSWORD",
             "ADMIN",
             "CHANGE-ME",
@@ -118,16 +118,30 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             errors.add("production actuator web exposure must be limited to health");
         }
 
-        String adminUsername = property(environment, "trade-model.auth.admin-username");
-        if (isBlank(adminUsername)) {
-            errors.add("production admin username missing");
+        if (!isTrue(property(environment, "trade-model.auth.enabled"))) {
+            errors.add("production personal authentication must be enabled");
         }
 
-        String adminPassword = property(environment, "trade-model.auth.admin-password");
-        if (isBlank(adminPassword)) {
-            errors.add("production admin password missing");
-        } else if (isUnsafeAdminPassword(adminPassword)) {
-            errors.add("production admin password uses an unsafe default value");
+        String initialUsername = property(environment, "trade-model.auth.initial-username");
+        if (isBlank(initialUsername)) {
+            errors.add("production initial username missing");
+        }
+
+        String initialPassword = property(environment, "trade-model.auth.initial-password");
+        if (isBlank(initialPassword)) {
+            errors.add("production initial password missing");
+        } else if (isUnsafeInitialPassword(initialPassword)) {
+            errors.add("production initial password uses an unsafe default value");
+        }
+
+        if (!isTrue(property(environment, "server.servlet.session.cookie.http-only"))) {
+            errors.add("production session cookie must be HttpOnly");
+        }
+        if (!"LAX".equals(normalized(property(environment, "server.servlet.session.cookie.same-site")))) {
+            errors.add("production session cookie SameSite must be Lax");
+        }
+        if (!isTrue(property(environment, "server.servlet.session.cookie.secure"))) {
+            errors.add("production session cookie must be Secure");
         }
 
         validateProductionSchedulerPolicy(environment, errors);
@@ -330,8 +344,9 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         return "true".equalsIgnoreCase(trim(value));
     }
 
-    private static boolean isUnsafeAdminPassword(String value) {
-        return UNSAFE_ADMIN_PASSWORDS.contains(normalized(value));
+    private static boolean isUnsafeInitialPassword(String value) {
+        String normalizedValue = normalized(value);
+        return normalizedValue.length() < 12 || UNSAFE_INITIAL_PASSWORDS.contains(normalizedValue);
     }
 
     private static boolean hasUnsafeActuatorExposure(String exposure) {

@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}">
+    <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}">
     <!-- th:text 由 DashboardController 注入，修改 Controller 中 title 即可生效 -->
     <title th:text="${title}">TRINE LOGIC (V1)</title>
     <style>
@@ -166,6 +168,20 @@
             cursor: pointer;
         }
         .icon-only:hover { background: var(--bg-elevated); }
+        .logout-form { margin: 0; }
+        .logout-button {
+            min-height: 30px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 4px 10px;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .logout-button:hover { background: var(--bg-elevated); }
         .icon-search::before {
             content: "";
             width: 11px;
@@ -2800,6 +2816,9 @@
                 <span class="icon-only icon-bell" aria-hidden="true"></span>
                 <button type="button" class="icon-only icon-theme" id="themeBtn" aria-label="切换明暗主题" title="切换明暗主题">夜间主题</button>
             </span>
+            <form class="logout-form" th:action="@{/logout}" method="post">
+                <button class="logout-button" type="submit">退出</button>
+            </form>
         </div>
     </header>
 
@@ -3519,6 +3538,16 @@
  * =============================================================================
  */
 (function () {
+    function csrfHeaders(headers) {
+        var result = Object.assign({}, headers || {});
+        var tokenMeta = document.querySelector('meta[name="_csrf"]');
+        var headerMeta = document.querySelector('meta[name="_csrf_header"]');
+        var token = tokenMeta ? tokenMeta.getAttribute("content") : "";
+        var headerName = headerMeta ? headerMeta.getAttribute("content") : "";
+        if (token && headerName) result[headerName] = token;
+        return result;
+    }
+
     var REFRESH_MS = 30000;
     var refreshTimer = null;
     var allDecisions = [];
@@ -6754,7 +6783,7 @@
         setText("providerProfileMessage", "正在保存");
         fetch("/api/provider-call/base-profile", {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ profile: requested, reason: "首页手动调整调用基础档位" })
         }).then(function (response) {
             return response.json().catch(function () { return {}; }).then(function (payload) {
@@ -9967,7 +9996,7 @@
             fetch("/api/user-positions/manual-open", {
                 method: "POST",
                 credentials: "same-origin",
-                headers: { "Content-Type": "application/json" },
+                headers: csrfHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify(payload)
             })
                 .then(function (r) { return parseDashboardApiResponse(r, "保存失败，请检查输入"); })
@@ -10137,7 +10166,7 @@
             fetch("/api/user-positions/" + encodeURIComponent(closingPositionId) + "/manual-close", {
                 method: "POST",
                 credentials: "same-origin",
-                headers: { "Content-Type": "application/json" },
+                headers: csrfHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify(payload)
             })
                 .then(function (r) { return parseDashboardApiResponse(r, "记录失败，请检查输入"); })

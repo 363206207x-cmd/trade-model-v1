@@ -11,7 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -19,8 +19,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "trade-model.auth.enabled=true",
-        "trade-model.auth.admin-username=operator",
-        "trade-model.auth.admin-password=operator-secret",
         "trade-model.security.rate-limit.enabled=true",
         "trade-model.security.rate-limit.requests-per-minute=2",
         "trade-model.security.rate-limit.window-ms=60000"
@@ -34,12 +32,12 @@ class RequestRateLimitFilterTest {
 
     @Test
     void blocksExcessiveRequestsWithoutPrintingSecrets(CapturedOutput output) throws Exception {
-        mockMvc.perform(get("/api/dashboard/home").with(httpBasic("operator", "operator-secret")))
+        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/dashboard/home").with(httpBasic("operator", "operator-secret")))
+        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/dashboard/home").with(httpBasic("operator", "operator-secret")))
+        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))

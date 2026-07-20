@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8081}
   address: ${SERVER_ADDRESS:127.0.0.1}
+  servlet:
+    session:
+      cookie:
+        secure: ${TRADE_MODEL_SESSION_COOKIE_SECURE:true}
 
 spring:
   datasource:

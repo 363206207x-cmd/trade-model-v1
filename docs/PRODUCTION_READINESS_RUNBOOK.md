@@ -75,7 +75,7 @@ PDR-M2 adds a server deployment skeleton. It does not deploy to a real server an
 
 ## PDR-M3 Auth + Access Control Gate
 
-PDR-M3 adds a single-operator Spring Security Basic Auth gate. It does not add a database user table, signup, roles UI, OAuth, public production exposure, or production release approval.
+PDR-M3 is historical merged-main evidence for a single-operator Spring Security Basic Auth gate. It does not add a database user table, signup, roles UI, OAuth, public production exposure, or production release approval.
 
 - Auth model: one in-memory operator account from `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD`.
 - Local/test compatibility: tests can disable the gate with `trade-model.auth.enabled=false`; local development keeps an explicit fallback account unless overridden.
@@ -83,6 +83,21 @@ PDR-M3 adds a single-operator Spring Security Basic Auth gate. It does not add a
 - Production credential guard: prod startup rejects missing admin credentials and unsafe defaults such as `password`, `admin`, `change-me`, `changeme`, `123456`, and the local fallback password.
 - Smoke behavior: readonly production smoke checks require auth credentials through `SMOKE_AUTH_USERNAME` / `SMOKE_AUTH_PASSWORD` or `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD`; scripts must not print passwords.
 - Deferred: HTTPS / reverse proxy configuration, secrets manager integration, credential rotation, audit logging, rate limiting, real server auth smoke evidence, and production release-gate approval.
+
+## P3-U1 Personal Login + Session Authentication Candidate
+
+P3-U1 is locally validated on `codex/p3-u1-personal-login-session-auth` and is
+not effective on merged main until its Draft PR is reviewed and merged. It
+replaces the formal application access path with Thymeleaf form login and a
+server-side Session backed by a minimal BCrypt `tm_user` record.
+
+- Login/logout: `GET /login`, Spring Security `POST /login`, and CSRF-protected `POST /logout`.
+- Session: 30-minute default timeout, fixation migration, HttpOnly Cookie, SameSite=Lax, local HTTP Secure=false, and prod Secure=true.
+- User initialization: both `TRADE_MODEL_INITIAL_USERNAME` and `TRADE_MODEL_INITIAL_PASSWORD` must be supplied through runtime configuration or approved secret injection; bootstrap is idempotent and never overwrites an existing user.
+- Failure policy: five failures in 15 minutes produce a temporary 15-minute block; the single-instance in-memory store is bounded and successful authentication resets the user state.
+- Validation: targeted security tests, 4040-test full suite, and disposable localhost two-start H2 runtime validation PASS. Docker/Testcontainers and controlled PostgreSQL V8 are environment-gated/not run, not PASS.
+- Deployment gap: the existing P3-H exact-V7 and Basic-auth smoke surfaces remain historical integration contracts and require a separate Session/V8 update before any real staging attempt.
+- Safety: no Provider, AI, Telegram, Push, order, position mutation, or trading call is introduced. Production readiness remains BLOCKED.
 
 ## PDR-M4 Observability + Production Smoke Gate
 

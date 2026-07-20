@@ -44,7 +44,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
                 .migrate();
 
         try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
-            assertThat(countTradeModelTables(connection)).isEqualTo(27);
+            assertThat(countTradeModelTables(connection)).isEqualTo(28);
             assertTablesExist(connection, List.of(
                     "tm_analysis_run",
                     "tm_decision_result",
@@ -56,6 +56,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     "tm_push_snapshot",
                     "tm_push_recheck_log",
                     "tm_ai_call_log",
+                    "tm_user",
                     "tm_asset_state"));
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
@@ -144,10 +145,10 @@ class ControlledPostgreSqlFlywaySmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isEqualTo(7);
-                assertThat(rs.getInt(2)).isEqualTo(7);
+                assertThat(rs.getInt(1)).isEqualTo(8);
+                assertThat(rs.getInt(2)).isEqualTo(8);
                 assertThat(rs.getString(3)).isEqualTo("1");
-                assertThat(rs.getString(4)).isEqualTo("7");
+                assertThat(rs.getString(4)).isEqualTo("8");
             }
         }
         try (PreparedStatement statement = connection.prepareStatement("""

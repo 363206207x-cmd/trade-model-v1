@@ -160,9 +160,15 @@ The non-root application mounts that volume read-only and uses
 `configtree:/run/secrets/config/` for:
 
 - `spring.datasource.password`;
-- `trade-model.auth.admin-password`;
+- `trade-model.auth.initial-password`;
 - `binance.api.key`; and
 - `binance.api.secret`.
+
+The P3-U1 branch also supplies the non-secret initial username and enables the
+Secure Session Cookie through environment configuration. This property-name
+alignment does not prove real staging, controlled PostgreSQL V8, or a
+reverse-proxy Session/CSRF smoke. The current P3-H exact-V7 and Basic-auth
+smoke surfaces remain a separate integration blocker.
 
 No `.env`, secret value, private key, dump, backup, or attestation is included
 in the image build context. The nonfunctional Binance placeholders are needed

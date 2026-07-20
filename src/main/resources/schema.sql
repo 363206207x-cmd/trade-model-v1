@@ -830,6 +830,15 @@ CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_trace_id ON tm_ai_call_log(trace_i
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_provider_time ON tm_ai_call_log(provider_name, started_at);
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_status_time ON tm_ai_call_log(call_status, started_at);
 
+CREATE TABLE IF NOT EXISTS tm_user (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    last_login_at TIMESTAMP,
+    CONSTRAINT uq_tm_user_username UNIQUE (username)
+);
+
 -- tm_asset_state 语义：每个 symbol 当前仅一行（会被后续分析覆盖更新）。
 MERGE INTO tm_rule_config KEY(rule_key) VALUES
 ('cfg-confused-enter-threshold', 'confused_state_config', 'confused_state_config.enter_threshold', '70', 'Confused state enter threshold', 'v1.0', TRUE),
