@@ -1,9 +1,11 @@
 package org.example.trademodel.security;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 final class PersonalUsernamePolicy {
     static final int MAX_LENGTH = 64;
+    private static final Pattern SAFE_USERNAME = Pattern.compile("[a-z0-9._@-]+");
 
     private PersonalUsernamePolicy() {
     }
@@ -16,6 +18,6 @@ final class PersonalUsernamePolicy {
         if (username == null || username.isBlank() || username.length() > MAX_LENGTH) {
             return false;
         }
-        return username.chars().noneMatch(Character::isISOControl);
+        return SAFE_USERNAME.matcher(username).matches();
     }
 }

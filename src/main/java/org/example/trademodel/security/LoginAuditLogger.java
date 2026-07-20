@@ -2,6 +2,7 @@ package org.example.trademodel.security;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,14 +41,38 @@ public class LoginAuditLogger {
     private void audit(String outcome, String username, String reason) {
         Instant eventTime = clock.instant();
         log.info("LOGIN_AUDIT username={} eventTime={} outcome={} reason={}",
-                safe(username), eventTime, outcome, safe(reason));
+                safeAuditValue(username), eventTime, outcome, safeAuditValue(reason));
     }
 
-    private static String safe(String value) {
+    static String safeAuditValue(String value) {
         if (value == null || value.isBlank()) {
             return "-";
         }
-        String sanitized = value.replaceAll("[\\r\\n\\t]", "_");
-        return sanitized.length() <= 128 ? sanitized : sanitized.substring(0, 128);
+        StringBuilder sanitized = new StringBuilder();
+        value.codePoints().forEach(codePoint -> appendAuditCodePoint(sanitized, codePoint));
+        return sanitized.isEmpty() ? "-" : sanitized.toString();
+    }
+
+    private static void appendAuditCodePoint(StringBuilder target, int codePoint) {
+        String fragment;
+        if (isSafeAuditCodePoint(codePoint)) {
+            fragment = new String(Character.toChars(codePoint));
+        } else {
+            String hex = Integer.toHexString(codePoint).toUpperCase(Locale.ROOT);
+            fragment = "_u" + "0".repeat(Math.max(0, 4 - hex.length())) + hex + "_";
+        }
+        if (target.length() + fragment.length() <= 128) {
+            target.append(fragment);
+        }
+    }
+
+    private static boolean isSafeAuditCodePoint(int codePoint) {
+        return codePoint >= 'a' && codePoint <= 'z'
+                || codePoint >= 'A' && codePoint <= 'Z'
+                || codePoint >= '0' && codePoint <= '9'
+                || codePoint == '.'
+                || codePoint == '_'
+                || codePoint == '@'
+                || codePoint == '-';
     }
 }

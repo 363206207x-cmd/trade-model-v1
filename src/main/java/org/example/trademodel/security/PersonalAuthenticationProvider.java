@@ -63,11 +63,6 @@ public class PersonalAuthenticationProvider implements AuthenticationProvider {
                 ? ""
                 : authentication.getCredentials().toString();
 
-        if (loginAttemptService.isBlocked(username)) {
-            loginAuditLogger.blocked(username);
-            throw new LockedException(GENERIC_FAILURE);
-        }
-
         UserDetails userDetails;
         try {
             if (!validUsername) {
@@ -76,15 +71,20 @@ public class PersonalAuthenticationProvider implements AuthenticationProvider {
             userDetails = userDetailsService.loadUserByUsername(username);
         } catch (UsernameNotFoundException ex) {
             passwordEncoder.matches(rawPassword, dummyPasswordHash);
-            reject(username);
+            rejectUnknownUsername(username);
             return null;
         } catch (RuntimeException ex) {
             loginAuditLogger.failure(username, "authentication_store_unavailable");
             throw new InternalAuthenticationServiceException("Authentication service unavailable", ex);
         }
 
-        if (!passwordEncoder.matches(rawPassword, userDetails.getPassword())) {
-            reject(username);
+        boolean passwordMatches = passwordEncoder.matches(rawPassword, userDetails.getPassword());
+        if (loginAttemptService.isKnownUserBlocked(username)) {
+            loginAuditLogger.blocked(username);
+            throw new LockedException(GENERIC_FAILURE);
+        }
+        if (!passwordMatches) {
+            rejectKnownUser(username);
         }
 
         try {
@@ -98,7 +98,7 @@ public class PersonalAuthenticationProvider implements AuthenticationProvider {
             throw new InternalAuthenticationServiceException("Authentication service unavailable", ex);
         }
 
-        loginAttemptService.reset(username);
+        loginAttemptService.resetKnownUser(username);
         loginAuditLogger.success(username);
         return UsernamePasswordAuthenticationToken.authenticated(
                 userDetails, null, userDetails.getAuthorities());
@@ -109,8 +109,15 @@ public class PersonalAuthenticationProvider implements AuthenticationProvider {
         return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
     }
 
-    private void reject(String username) {
-        LoginAttemptService.FailureResult result = loginAttemptService.registerFailure(username);
+    private void rejectKnownUser(String username) {
+        reject(username, loginAttemptService.registerKnownUserFailure(username));
+    }
+
+    private void rejectUnknownUsername(String username) {
+        reject(username, loginAttemptService.registerUnknownUsernameFailure(username));
+    }
+
+    private void reject(String username, LoginAttemptService.FailureResult result) {
         if (result == LoginAttemptService.FailureResult.TEMPORARILY_BLOCKED) {
             loginAuditLogger.blocked(username);
             throw new LockedException(GENERIC_FAILURE);

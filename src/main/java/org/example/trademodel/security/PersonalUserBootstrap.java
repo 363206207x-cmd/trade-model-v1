@@ -17,8 +17,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class PersonalUserBootstrap implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(PersonalUserBootstrap.class);
-    private static final int MIN_PASSWORD_LENGTH = 12;
-
     private final boolean authEnabled;
     private final String initialUsername;
     private final String initialPassword;
@@ -70,8 +68,8 @@ public class PersonalUserBootstrap implements ApplicationRunner {
         if (!PersonalUsernamePolicy.isValid(username)) {
             throw new IllegalStateException("Personal user bootstrap username is invalid");
         }
-        if (initialPassword.length() < MIN_PASSWORD_LENGTH) {
-            throw new IllegalStateException("Personal user bootstrap password does not meet minimum length");
+        if (InitialPasswordPolicy.isUnsafe(initialPassword)) {
+            throw new IllegalStateException("Personal user bootstrap password is unsafe");
         }
         if (personalUserMapper.findByUsername(username) != null) {
             log.info("PERSONAL_USER_BOOTSTRAP username={} status=SKIPPED_ALREADY_EXISTS", username);

@@ -64,8 +64,8 @@ class PersonalLoginSessionSecurityTest {
         }
         jdbcTemplate.update("UPDATE tm_user SET password_hash = ?, last_login_at = NULL WHERE username = ?",
                 passwordEncoder.encode(PASSWORD), USERNAME);
-        loginAttemptService.reset(USERNAME);
-        loginAttemptService.reset("unknown-user");
+        loginAttemptService.resetKnownUser(USERNAME);
+        loginAttemptService.resetUnknownUsername("unknown-user");
     }
 
     @Test
@@ -161,6 +161,20 @@ class PersonalLoginSessionSecurityTest {
     }
 
     @Test
+    void invalidUsernameUsesUnifiedLoginFailureResponse() throws Exception {
+        mockMvc.perform(formLogin().user("operator outcome=SUCCESS").password("wrong-password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error=true"))
+                .andExpect(unauthenticated());
+
+        mockMvc.perform(get("/login?error=true"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "用户名或密码错误，或当前登录暂时受限。")));
+        assertThat(personalUserMapper.findByUsername(USERNAME).getLastLoginAt()).isNull();
+    }
+
+    @Test
     void storedPasswordIsBcryptAndSuccessfulLoginUpdatesLastLoginOnlyThen() throws Exception {
         PersonalUserDO before = personalUserMapper.findByUsername(USERNAME);
         assertThat(before.getPasswordHash()).isNotEqualTo(PASSWORD).startsWith("$2");
@@ -181,20 +195,20 @@ class PersonalLoginSessionSecurityTest {
                     .andExpect(unauthenticated())
                     .andExpect(redirectedUrl("/login?error=true"));
         }
-        assertThat(loginAttemptService.isBlocked(USERNAME)).isTrue();
+        assertThat(loginAttemptService.isKnownUserBlocked(USERNAME)).isTrue();
 
         mockMvc.perform(formLogin().user(USERNAME).password(PASSWORD))
                 .andExpect(unauthenticated())
                 .andExpect(redirectedUrl("/login?error=true"));
         assertThat(personalUserMapper.findByUsername(USERNAME).getLastLoginAt()).isNull();
 
-        loginAttemptService.reset(USERNAME);
+        loginAttemptService.resetKnownUser(USERNAME);
         mockMvc.perform(formLogin().user(USERNAME).password("wrong-password"))
                 .andExpect(unauthenticated());
-        assertThat(loginAttemptService.failureCount(USERNAME)).isEqualTo(1);
+        assertThat(loginAttemptService.knownUserFailureCount(USERNAME)).isEqualTo(1);
         mockMvc.perform(formLogin().user(USERNAME).password(PASSWORD))
                 .andExpect(authenticated().withUsername(USERNAME));
-        assertThat(loginAttemptService.failureCount(USERNAME)).isZero();
+        assertThat(loginAttemptService.knownUserFailureCount(USERNAME)).isZero();
     }
 
     @Test

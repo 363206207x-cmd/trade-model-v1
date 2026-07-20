@@ -12,10 +12,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -87,6 +90,33 @@ class PersonalAuthenticationProviderTest {
 
         verify(userDetailsService, never()).loadUserByUsername(any());
         verify(loginAuditLogger).failure("<invalid>", "invalid_credentials");
+    }
+
+    @Test
+    void knownAndUnknownFailuresUseIndependentAttemptState() {
+        stubValidUser();
+        assertThatThrownBy(() -> provider.authenticate(authentication(USERNAME, "wrong-password")))
+                .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
+        when(userDetailsService.loadUserByUsername("unknown-user"))
+                .thenThrow(new UsernameNotFoundException("not found"));
+
+        assertThatThrownBy(() -> provider.authenticate(authentication("unknown-user", "wrong-password")))
+                .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
+
+        assertThat(loginAttemptService.knownUserFailureCount(USERNAME)).isEqualTo(1);
+        assertThat(loginAttemptService.knownUserStateCount()).isEqualTo(1);
+        assertThat(loginAttemptService.unknownUsernameStateCount()).isEqualTo(1);
+    }
+
+    @Test
+    void validExistingUsernameStillAuthenticates() {
+        stubValidUser();
+        when(personalUserMapper.updateLastLoginAt(eq(USERNAME), any())).thenReturn(1);
+
+        Authentication authentication = provider.authenticate(authentication(USERNAME, PASSWORD));
+
+        assertThat(authentication.isAuthenticated()).isTrue();
+        assertThat(authentication.getName()).isEqualTo(USERNAME);
     }
 
     private static UsernamePasswordAuthenticationToken authentication(String username, String password) {

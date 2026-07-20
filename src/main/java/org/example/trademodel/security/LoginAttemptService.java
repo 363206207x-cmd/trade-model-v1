@@ -23,7 +23,10 @@ public class LoginAttemptService {
     private final Duration lockDuration;
     private final int maxTrackedUsernames;
     private final Clock clock;
-    private final LinkedHashMap<String, AttemptState> states = new LinkedHashMap<>(16, 0.75f, true);
+    private final LinkedHashMap<String, AttemptState> knownUserStates = new LinkedHashMap<>();
+    private final LinkedHashMap<String, AttemptState> unknownUsernameStates =
+            new LinkedHashMap<>(16, 0.75f, true);
+    private Instant knownStateCapacityBlockedUntil;
 
     @Autowired
     public LoginAttemptService(
@@ -47,26 +50,57 @@ public class LoginAttemptService {
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
-    synchronized boolean isBlocked(String username) {
+    synchronized boolean isKnownUserBlocked(String username) {
         Instant now = clock.instant();
-        purgeExpired(now);
-        AttemptState state = states.get(key(username));
+        purgeExpired(knownUserStates, now);
+        if (isKnownStateCapacityBlocked(now)) {
+            return true;
+        }
+        AttemptState state = knownUserStates.get(key(username));
         return state != null && state.blockedUntil != null && now.isBefore(state.blockedUntil);
     }
 
-    synchronized FailureResult registerFailure(String username) {
+    synchronized FailureResult registerKnownUserFailure(String username) {
         Instant now = clock.instant();
-        purgeExpired(now);
+        purgeExpired(knownUserStates, now);
+        if (isKnownStateCapacityBlocked(now)) {
+            return FailureResult.TEMPORARILY_BLOCKED;
+        }
         String key = key(username);
-        AttemptState state = states.get(key);
+        AttemptState state = knownUserStates.get(key);
         if (state == null) {
-            ensureCapacity();
+            if (knownUserStates.size() >= maxTrackedUsernames) {
+                knownStateCapacityBlockedUntil = now.plus(lockDuration);
+                return FailureResult.TEMPORARILY_BLOCKED;
+            }
             state = new AttemptState(now);
-            states.put(key, state);
+            knownUserStates.put(key, state);
         } else if (!now.isBefore(state.windowStartedAt.plus(failureWindow))) {
             state = new AttemptState(now);
-            states.put(key, state);
+            knownUserStates.put(key, state);
         }
+
+        return registerFailure(state, now);
+    }
+
+    synchronized FailureResult registerUnknownUsernameFailure(String username) {
+        Instant now = clock.instant();
+        purgeExpired(unknownUsernameStates, now);
+        String key = key(username);
+        AttemptState state = unknownUsernameStates.get(key);
+        if (state == null) {
+            ensureUnknownCapacity();
+            state = new AttemptState(now);
+            unknownUsernameStates.put(key, state);
+        } else if (!now.isBefore(state.windowStartedAt.plus(failureWindow))) {
+            state = new AttemptState(now);
+            unknownUsernameStates.put(key, state);
+        }
+
+        return registerFailure(state, now);
+    }
+
+    private FailureResult registerFailure(AttemptState state, Instant now) {
 
         if (state.blockedUntil != null && now.isBefore(state.blockedUntil)) {
             return FailureResult.TEMPORARILY_BLOCKED;
@@ -80,22 +114,31 @@ public class LoginAttemptService {
         return FailureResult.FAILURE_RECORDED;
     }
 
-    public synchronized void reset(String username) {
-        states.remove(key(username));
+    public synchronized void resetKnownUser(String username) {
+        knownUserStates.remove(key(username));
     }
 
-    synchronized int trackedUsernameCount() {
-        purgeExpired(clock.instant());
-        return states.size();
+    synchronized void resetUnknownUsername(String username) {
+        unknownUsernameStates.remove(key(username));
     }
 
-    synchronized int failureCount(String username) {
-        purgeExpired(clock.instant());
-        AttemptState state = states.get(key(username));
+    synchronized int knownUserStateCount() {
+        purgeExpired(knownUserStates, clock.instant());
+        return knownUserStates.size();
+    }
+
+    synchronized int unknownUsernameStateCount() {
+        purgeExpired(unknownUsernameStates, clock.instant());
+        return unknownUsernameStates.size();
+    }
+
+    synchronized int knownUserFailureCount(String username) {
+        purgeExpired(knownUserStates, clock.instant());
+        AttemptState state = knownUserStates.get(key(username));
         return state == null ? 0 : state.failures;
     }
 
-    private void purgeExpired(Instant now) {
+    private void purgeExpired(Map<String, AttemptState> states, Instant now) {
         Iterator<Map.Entry<String, AttemptState>> iterator = states.entrySet().iterator();
         while (iterator.hasNext()) {
             AttemptState state = iterator.next().getValue();
@@ -107,15 +150,26 @@ public class LoginAttemptService {
         }
     }
 
-    private void ensureCapacity() {
-        while (states.size() >= maxTrackedUsernames) {
-            Iterator<String> iterator = states.keySet().iterator();
+    private void ensureUnknownCapacity() {
+        while (unknownUsernameStates.size() >= maxTrackedUsernames) {
+            Iterator<String> iterator = unknownUsernameStates.keySet().iterator();
             if (!iterator.hasNext()) {
                 return;
             }
             iterator.next();
             iterator.remove();
         }
+    }
+
+    private boolean isKnownStateCapacityBlocked(Instant now) {
+        if (knownStateCapacityBlockedUntil == null) {
+            return false;
+        }
+        if (!now.isBefore(knownStateCapacityBlockedUntil)) {
+            knownStateCapacityBlockedUntil = null;
+            return false;
+        }
+        return true;
     }
 
     private static Duration positive(Duration value, Duration fallback) {

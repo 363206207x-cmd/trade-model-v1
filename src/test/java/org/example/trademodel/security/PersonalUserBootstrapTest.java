@@ -68,7 +68,7 @@ class PersonalUserBootstrapTest {
     }
 
     @Test
-    void existingUserIsNeverOverwritten() {
+    void existingUserIsStillNotOverwritten() {
         PersonalUserMapper mapper = mock(PersonalUserMapper.class);
         PersonalUserDO existing = new PersonalUserDO();
         existing.setUsername("operator");
@@ -95,6 +95,34 @@ class PersonalUserBootstrapTest {
                 true, "operator", "short", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
                 .run(mock(ApplicationArguments.class)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("minimum length");
+                .hasMessageContaining("unsafe");
+    }
+
+    @Test
+    void blankBootstrapPasswordDoesNotCreateUser() {
+        PersonalUserMapper mapper = mock(PersonalUserMapper.class);
+
+        assertThatThrownBy(() -> new PersonalUserBootstrap(
+                true, "operator", " ", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
+                .run(mock(ApplicationArguments.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("requires both");
+
+        verify(mapper, never()).insert(any(PersonalUserDO.class));
+        verify(mapper, never()).countAll();
+    }
+
+    @Test
+    void bootstrapRejectsPublicTemplatePassword() {
+        PersonalUserMapper mapper = mock(PersonalUserMapper.class);
+
+        assertThatThrownBy(() -> new PersonalUserBootstrap(
+                true, "operator", "replace-with-long-local-secret",
+                mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
+                .run(mock(ApplicationArguments.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unsafe");
+
+        verify(mapper, never()).insert(any(PersonalUserDO.class));
     }
 }

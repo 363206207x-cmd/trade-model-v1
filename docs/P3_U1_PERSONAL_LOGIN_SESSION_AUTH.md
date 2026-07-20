@@ -66,7 +66,7 @@ TRADE_MODEL_INITIAL_PASSWORD=<long local secret>
 At startup the bootstrap:
 
 1. runs only when authentication is enabled and both values are present;
-2. normalizes and validates the username and requires a password of at least 12 characters;
+2. normalizes and validates the username and rejects blank, short, known-default, and template-style passwords;
 3. creates a BCrypt-backed user only when the table is empty and the username is absent;
 4. never overwrites an existing user or password;
 5. fails closed for incomplete or unsafe input;
@@ -77,13 +77,29 @@ application credential into `trade-model.auth.initial-password`; no credential
 value is committed. Real server deployment and real secret-store injection are
 not part of this package.
 
+`.env.example` leaves `TRADE_MODEL_INITIAL_PASSWORD` blank. Operators must use
+an approved secret store or an untracked local environment file; there is no
+fixed, publicly reusable password placeholder. The production safety guard and
+bootstrap share the same minimal initial-password policy, including explicit
+rejection of `replace-with-*`, change/default/example/sample/placeholder
+templates, existing weak sentinels, blanks, and values shorter than 12
+characters.
+
 ## Failure Limit And Audit
 
 - Threshold: 5 consecutive failures
 - Failure window: 15 minutes
 - Temporary lock: 15 minutes
 - Reset: successful authentication or lock expiry
-- Storage: single-instance in-memory, access-ordered, capped at 1024 usernames
+- Storage: separate single-instance in-memory state for confirmed users and
+  unknown usernames; each state area is independently capped at the configured
+  1024-entry default
+- Confirmed-user state: active failures and locks are never evicted by unknown
+  username traffic; expired state is cleaned, and confirmed-user capacity
+  exhaustion fails closed instead of deleting active protection
+- Unknown-username state: access-ordered and bounded; unknown entries may evict
+  only other unknown entries
+- Successful authentication: resets only that confirmed user's state
 - Invalid/oversized username key: bounded and never queried from the user store
 - User-facing error: identical for unknown user, wrong password, and temporary block
 
@@ -93,12 +109,19 @@ contain password, BCrypt hash, Session ID, Cookie, CSRF token, request body, or
 authorization data. Authentication fails closed if the user query or
 `last_login_at` write fails.
 
+Canonical usernames are at most 64 characters and contain only ASCII letters,
+digits, `.`, `_`, `-`, and optional `@`. Spaces, `=`, controls, Unicode line
+separators, and invisible characters fail through the same generic login
+response. Audit fields apply a second deterministic ASCII encoding layer, so
+CR/LF/TAB, U+0085, U+2028, U+2029, spaces, `=`, and other field separators
+cannot create a new log line or inject an `outcome`/`reason` field.
+
 ## Validation Evidence
 
 Automated validation on this branch:
 
-- P3-U1 and existing security targeted tests: PASS
-- Full Maven suite: 4040 tests, 0 failures, 0 errors, 14 environment-gated skips
+- P3-U1 security-blocker targeted suite: 96 tests, 0 failures, 0 errors, 0 skips
+- Full Maven suite: 4088 tests, 0 failures, 0 errors, 14 environment-gated skips
 - Docker/Testcontainers: `ENVIRONMENT_GATED_SKIP`
 - Responsive static contract: PASS at 320/375/390-width CSS constraints, 16px inputs, 48px controls, no horizontal-overflow layout
 - Real mobile Safari: NOT_RUN
@@ -123,6 +146,18 @@ disabled. It proved:
 
 No real Provider, AI, Telegram, Push, order, position mutation, or trading call
 ran during validation.
+
+## Security Review Blocker Closure
+
+- `HIGH-1`: known-user failure and lock state is isolated from the bounded
+  unknown-username LRU, so unknown spray cannot evict active account protection.
+- `HIGH-2`: the public environment template contains no accepted fixed initial
+  password, and the shared guard/bootstrap policy rejects known template values.
+- `MEDIUM-1`: usernames use the explicit ASCII allowlist and audit values receive
+  deterministic separator/control encoding before structured logging.
+
+These fixes are implemented and locally validated on the PR branch. Merge
+readiness remains `PENDING_RE_REVIEW`; PR #1133 remains Draft and unmerged.
 
 ## Remaining Gates
 

@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.net.URI;
 
+import org.example.trademodel.security.InitialPasswordPolicy;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -16,15 +17,6 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("prod")
 public class ProductionProfileSafetyGuard implements ApplicationRunner {
-
-    private static final Set<String> UNSAFE_INITIAL_PASSWORDS = Set.of(
-            "PASSWORD",
-            "ADMIN",
-            "CHANGE-ME",
-            "CHANGEME",
-            "123456",
-            "DEV-LOCAL-PASSWORD"
-    );
 
     private static final Set<String> ALLOWED_ACTUATOR_EXPOSURE = Set.of("HEALTH");
 
@@ -130,7 +122,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         String initialPassword = property(environment, "trade-model.auth.initial-password");
         if (isBlank(initialPassword)) {
             errors.add("production initial password missing");
-        } else if (isUnsafeInitialPassword(initialPassword)) {
+        } else if (InitialPasswordPolicy.isUnsafe(initialPassword)) {
             errors.add("production initial password uses an unsafe default value");
         }
 
@@ -342,11 +334,6 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
     private static boolean isTrue(String value) {
         return "true".equalsIgnoreCase(trim(value));
-    }
-
-    private static boolean isUnsafeInitialPassword(String value) {
-        String normalizedValue = normalized(value);
-        return normalizedValue.length() < 12 || UNSAFE_INITIAL_PASSWORDS.contains(normalizedValue);
     }
 
     private static boolean hasUnsafeActuatorExposure(String exposure) {
