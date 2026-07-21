@@ -6,8 +6,8 @@
 - Package: iPhone private test app foundation
 - Branch: `codex/p3-u2-iphone-private-test-app`
 - Base at branch creation: `b7fb33d543927b6f770d6092fd6f5df3751f3d57`
-- Delivery state: local implementation validated; Draft PR required and
-  unmerged work is not effective merged-main capability
+- Delivery state: security fix locally validated in Draft PR #1134; exact-Head
+  re-review pending, and unmerged work is not effective merged-main capability
 - Production readiness: `BLOCKED`
 
 ## Scope Delivered
@@ -46,7 +46,10 @@ PositionMonitor, Review, AI, Push, Telegram, or trading code is changed.
 ## Security Contract
 
 - Missing/malformed base URL: fail closed with a configuration screen.
-- Loopback URL: rejected for physical-device-safe configuration.
+- Loopback URL: rejected for every environment after deterministic host
+  normalization, including localhost case/trailing-dot variants, the full IPv4
+  `127.0.0.0/8` range, IPv6 `::1` representations, and IPv4-mapped IPv6
+  loopback addresses.
 - Credential-bearing URL: rejected.
 - Development HTTP: accepted only for RFC1918 private IPv4 or `.local` hosts.
 - Production: HTTPS required.
@@ -65,7 +68,8 @@ PositionMonitor, Review, AI, Push, Telegram, or trading code is changed.
 - iOS Runtime 26.5 (`23F77`)
 - iPhone 17 Pro Simulator
 - Xcode Debug Simulator build: `PASS`
-- Swift unit/security/project tests: 30 passed, 0 failed
+- Xcode Release Simulator build: `PASS`
+- Swift unit/security/project tests: 47 passed, 0 failed
 - UI fail-closed launch test: 1 passed, 0 failed
 - Simulator install/launch and missing-configuration visual check: `PASS`
 - Loading, network-error, retry, redirect, and trusted-navigation behavior:

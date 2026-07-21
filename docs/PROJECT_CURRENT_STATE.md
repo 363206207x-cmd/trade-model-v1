@@ -6,8 +6,8 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-U2 iPhone Private Test App Foundation
-Next Business Phase: P3-U2 independent iOS/security review and user-controlled real-iPhone acceptance
+Current Work Package: P3-U2 iPhone Private Test App Foundation security fix in Draft PR #1134
+Next Business Phase: P3-U2 exact-Head independent iOS/security re-review, then separately authorized real-iPhone acceptance
 Next Business Phase Allowed: NO while the P3-U2 Draft PR is unmerged; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
@@ -27,7 +27,7 @@ The branch adds strict environment/Info.plist base-URL configuration, private
 LAN HTTP only in development, HTTPS-only production, no loopback/default host,
 same-origin WebView navigation, system external HTTPS/mailto/tel handling,
 default TLS validation, persistent default WebKit storage, native loading and
-redacted error/retry UI, Xcode project/signing hygiene, 30 unit/security/project
+redacted error/retry UI, Xcode project/signing hygiene, 47 unit/security/project
 tests, one UI launch test, and a passing iOS 26.5 iPhone 17 Pro Simulator
 build/install/launch check. It remains unmerged branch evidence. Real iPhone
 installation/login/Session persistence, deployed HTTPS server, App Store,
@@ -1265,5 +1265,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: P3-U2 iPhone private test app Draft PR/open/unmerged; local Simulator evidence only, pending independent iOS/security review
+- CURRENT_PACKAGE_PR: PR #1134 P3-U2 iPhone private test app Draft/open/unmerged; loopback security fix locally validated, pending exact-Head independent iOS/security re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

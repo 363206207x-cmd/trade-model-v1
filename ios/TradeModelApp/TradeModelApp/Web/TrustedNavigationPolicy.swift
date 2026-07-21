@@ -20,6 +20,9 @@ struct TrustedNavigationPolicy {
             guard let candidateOrigin = WebOrigin(url: url) else {
                 return .block
             }
+            guard !HostSecurityPolicy.isLoopbackHost(candidateOrigin.host) else {
+                return .block
+            }
             if candidateOrigin == trustedOrigin {
                 return .allowInWebView
             }

@@ -52,6 +52,27 @@ final class TrustedNavigationPolicyTests: XCTestCase {
         )
     }
 
+    func testExternalLocalhostWithTrailingDotIsBlocked() {
+        XCTAssertEqual(
+            policy.decision(for: URL(string: "https://localhost.")!),
+            .block
+        )
+    }
+
+    func testExternalIpv4LoopbackRangeIsBlocked() {
+        XCTAssertEqual(
+            policy.decision(for: URL(string: "https://127.0.0.2")!),
+            .block
+        )
+    }
+
+    func testExternalIpv6LoopbackIsBlocked() {
+        XCTAssertEqual(
+            policy.decision(for: URL(string: "https://[::1]")!),
+            .block
+        )
+    }
+
     private var policy: TrustedNavigationPolicy {
         TrustedNavigationPolicy(trustedOrigin: origin)
     }

@@ -1,4 +1,46 @@
+import Darwin
 import Foundation
+
+enum HostSecurityPolicy {
+    static func normalizedHost(_ rawHost: String) -> String {
+        var host = rawHost.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if host.hasPrefix("[") && host.hasSuffix("]") {
+            host.removeFirst()
+            host.removeLast()
+        }
+        while host.hasSuffix(".") {
+            host.removeLast()
+        }
+        return host
+    }
+
+    static func isLoopbackHost(_ rawHost: String) -> Bool {
+        let host = normalizedHost(rawHost)
+        guard !host.isEmpty else { return false }
+        if host == "localhost" {
+            return true
+        }
+
+        var ipv4 = in_addr()
+        if host.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 {
+            let address = UInt32(bigEndian: ipv4.s_addr)
+            return address & 0xff00_0000 == 0x7f00_0000
+        }
+
+        var ipv6 = in6_addr()
+        guard host.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1 else {
+            return false
+        }
+        return withUnsafeBytes(of: &ipv6) { rawBytes in
+            let bytes = rawBytes.bindMemory(to: UInt8.self)
+            let ipv6Loopback = bytes.prefix(15).allSatisfy { $0 == 0 } && bytes[15] == 1
+            let ipv4Mapped = bytes.prefix(10).allSatisfy { $0 == 0 }
+                && bytes[10] == 0xff
+                && bytes[11] == 0xff
+            return ipv6Loopback || (ipv4Mapped && bytes[12] == 127)
+        }
+    }
+}
 
 enum BackendConfigurationError: Error, Equatable {
     case missingBaseURL
@@ -38,7 +80,7 @@ struct BackendConfiguration: Equatable {
         }
         guard let components = URLComponents(string: candidate),
               let scheme = components.scheme?.lowercased(),
-              let host = components.host?.lowercased(),
+              let rawHost = components.host,
               ["http", "https"].contains(scheme),
               components.query == nil,
               components.fragment == nil,
@@ -46,10 +88,14 @@ struct BackendConfiguration: Equatable {
               let parsedOrigin = WebOrigin(url: parsedURL) else {
             throw BackendConfigurationError.invalidBaseURL
         }
+        let host = HostSecurityPolicy.normalizedHost(rawHost)
+        guard !host.isEmpty else {
+            throw BackendConfigurationError.invalidBaseURL
+        }
         guard components.user == nil, components.password == nil else {
             throw BackendConfigurationError.credentialsNotAllowed
         }
-        guard !Self.isLoopback(host) else {
+        guard !HostSecurityPolicy.isLoopbackHost(host) else {
             throw BackendConfigurationError.loopbackNotAllowed
         }
 
@@ -91,10 +137,6 @@ struct BackendConfiguration: Equatable {
         } catch {
             return .failure(.invalidBaseURL)
         }
-    }
-
-    private static func isLoopback(_ host: String) -> Bool {
-        host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     private static func isPrivateNetworkHost(_ host: String) -> Bool {
