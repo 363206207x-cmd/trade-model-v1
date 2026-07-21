@@ -1,7 +1,40 @@
 {
   "contractVersion": "P3-U2-IPHONE-HOME-IA-V2",
+  "contractRevision": "REVIEW_FINDINGS_FIX_1",
+  "fixtureContract": {
+    "normalPreview": "STRUCTURAL_FIELD_TOKENS",
+    "captureMode": "SAFE_EMPTY_STATE_WITH_DATA_FIELD_TOKEN",
+    "liveData": false
+  },
   "designBase": "168ef18c7ad148d960902c913f6ddb4b53318e14",
   "fixtureMode": "STATIC_LAYOUT_FIXTURE",
+  "selectedAssetContract": {
+    "collection": "assets[]",
+    "tokenPattern": "assets[index].field",
+    "executionScope": "executionSuggestion for selectedSymbol",
+    "aiScope": "aiDecision for selectedSymbol",
+    "positionScope": "positions[] remains independent"
+  },
+  "fieldOwnershipContract": {
+    "gptFinalPlanMode": "aiDecision.tabs[GPT_FINAL].finalPlanMode",
+    "consistencyOwnsFinalPlanMode": false,
+    "consistencyFields": "aiDecision.consistency.* only"
+  },
+  "navigationContract": {
+    "home": {
+      "route": "/dashboard",
+      "prototypeBehavior": "reset app-scroll to top and focus app-title"
+    },
+    "positions": {
+      "prototypeTarget": "#position-monitor",
+      "viewAllRoute": "CONTRACT_UNRESOLVED",
+      "viewAllBehavior": "disabled design placeholder; no self-link"
+    },
+    "review": {
+      "route": "/review/dashboard",
+      "prototypeBehavior": "record sanitized route target without network navigation"
+    }
+  },
   "deviceMeasurements": {
     "iPhone17ProMax": {
       "logicalSizePoints": "440 x 956",
@@ -1071,7 +1104,7 @@
       "webLabel": "AI 计划模式",
       "backendField": "aiDecision.tabs[GPT_FINAL].finalPlanMode",
       "sourceObject": "DashboardHomeVO.AiTabVO",
-      "valueContract": "Synthesis plan mode adjustment; not execution authorization",
+      "valueContract": "GPT_FINAL-owned synthesis plan mode adjustment; never owned by ConsistencyVO and not execution authorization",
       "mobileLabel": "AI 计划模式",
       "priority": "P0",
       "mobileLocation": "最终裁决官",
@@ -1521,7 +1554,7 @@
       "webLabel": "Dashboard",
       "backendField": "route:/dashboard",
       "sourceObject": "DashboardController / iOS BackendConfiguration.rootURL",
-      "valueContract": "Existing authenticated Dashboard route",
+      "valueContract": "Existing authenticated Dashboard route; static prototype resets its internal app-scroll and focuses the title",
       "mobileLabel": "首页",
       "priority": "P0",
       "mobileLocation": "固定底部导航",
@@ -1536,7 +1569,7 @@
       "webLabel": "持仓监控",
       "backendField": "positions[]",
       "sourceObject": "DashboardHomeVO.positions",
-      "valueContract": "Prototype in-page anchor only; does not add a backend route or write action",
+      "valueContract": "Bottom navigation uses an in-page anchor only; no full-position route exists, so the separate view-all control is disabled as CONTRACT_UNRESOLVED",
       "mobileLabel": "持仓",
       "priority": "P0",
       "mobileLocation": "固定底部导航",
@@ -1551,7 +1584,7 @@
       "webLabel": "复盘中心",
       "backendField": "route:/review/dashboard",
       "sourceObject": "Existing Dashboard reviewCenterLink",
-      "valueContract": "Existing authenticated review route",
+      "valueContract": "Existing authenticated review route; never aliases the AI evidence section",
       "mobileLabel": "复盘",
       "priority": "P0",
       "mobileLocation": "固定底部导航",

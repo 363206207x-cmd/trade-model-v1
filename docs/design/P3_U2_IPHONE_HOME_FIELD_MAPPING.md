@@ -4,6 +4,7 @@
 
 - Design base: `168ef18c7ad148d960902c913f6ddb4b53318e14`
 - Mapping contract: `P3-U2-IPHONE-HOME-IA-V2`
+- Contract revision: `REVIEW_FINDINGS_FIX_1`
 - Confirmed display fields: **102**
 - Unresolved fields: **1**
 - Prototype data mode: `STATIC_LAYOUT_FIXTURE`
@@ -31,13 +32,13 @@ code does not expose it.
 
 | Module | Confirmed | Unresolved | Mobile rule |
 |---|---:|---:|---|
-| A. Top status | 7 | 1 | Render seven confirmed text cells; do not invent an eighth cell. |
-| B. Realtime alert | 4 | 0 | At most two rows. |
-| C. Key event | 4 | 0 | At most two rows; current service returns at most one. |
+| A. Top status | 7 | 1 | Render seven confirmed values in one lightweight status band; do not invent an eighth cell. |
+| B. Realtime alert | 4 | 0 | One compact summary; second row remains available through disclosure. |
+| C. Key event | 4 | 0 | One compact summary; additional detail remains in disclosure. |
 | D. Watch asset | 15 | 0 | Three assets; P0/P1 on the pager, P2 in expansion/detail. |
-| E. Execution advice | 14 | 0 | Follows selected asset; fail-closed fields stay empty. |
-| F. Position monitor | 17 | 0 | Independent of selected asset; manual positions only. |
-| G. AI evidence review | 30 | 0 | One role visible at a time; roles keep distinct fields. |
+| E. Execution advice | 14 | 0 | Compact direction/entry summary follows selected asset; complete fields expand. |
+| F. Position monitor | 17 | 0 | Independent compact manual-position summaries; complete fields expand. |
+| G. AI evidence review | 30 | 0 | One compact role summary visible at a time; complete role fields expand. |
 | H. Adjudication consistency | 8 | 0 | Embedded in the AI header, not a fourth AI role. |
 | I. Bottom navigation | 3 | 0 | Existing route or in-page section target only. |
 
@@ -62,6 +63,10 @@ contract tests all expose exactly seven status cells. The product task names
 contract confirms it. IA v2 therefore renders seven cells and records the
 candidate as `UNRESOLVED_FIELD`; it does not reuse a position risk field or
 derive a new aggregate.
+
+The seven confirmed values use a shared status band with no per-value card
+background, icon, emoji, ring, or shadow. Labels remain at least `12pt` at the
+standard prototype scale.
 
 ## B. Realtime Alert
 
@@ -102,7 +107,10 @@ derive a new aggregate.
 | 分析时间 | `assets[].latestAnalysisTime` | `AssetVO` | Decision create time | 分析时间 | P2 | 详情页 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
 
 Only the first seven rows may appear on a watch card. IA v2 keeps exactly
-three cards. P2 rows are deliberately excluded from the home card.
+three cards. Each selector binds to one explicit `assets[index]` object; the
+prototype never generates a singular `asset[index]` token. P2 rows are
+deliberately excluded from the home card. Selection uses one accessible radio
+group, with no nested disclosure or second focusable control inside a card.
 
 ## E. Execution Advice
 
@@ -125,7 +133,9 @@ three cards. P2 rows are deliberately excluded from the home card.
 
 Execution advice follows `selectedSymbol`. It never becomes a UserPosition,
 order, or automatic action. User stop values remain separate from system plan
-boundaries.
+boundaries. The default mobile state is `COMPACT_SUMMARY`: backend status,
+blocked reason, direction, and entry zone remain visible; all remaining
+confirmed fields stay available in the native disclosure.
 
 ## F. Position Monitor
 
@@ -151,7 +161,11 @@ boundaries.
 
 Position cards are never re-scoped when a watch asset changes. Unknown raw
 status values display `状态待同步`; raw values belong only in controlled
-diagnostics.
+diagnostics. The repository currently exposes no authenticated full-position
+page route. “查看全部持仓” is therefore `CONTRACT_UNRESOLVED` and the static
+prototype renders a disabled `44pt` design placeholder instead of a false
+self-link. The existing manual-action control is represented as disabled in
+the static fixture and performs no write.
 
 ## G. AI Evidence Review
 
@@ -172,7 +186,7 @@ diagnostics.
 | 最终倾向 | `finalMarketBias` | Synthesis final market bias | 当前角色 | 暂无 | CONFIRMED |
 | 置信度 | `finalConfidence` | Synthesis confidence | 当前角色 | 暂无 | CONFIRMED |
 | 风险等级 | `finalRiskLevel` | Synthesis risk | 当前角色 | 暂无 | CONFIRMED |
-| AI 计划模式 | `finalPlanMode` | Review mode, not execution | 当前角色 | 暂无 | CONFIRMED |
+| AI 计划模式 | `aiDecision.tabs[GPT_FINAL].finalPlanMode` | Owned by `AiTabVO` for GPT_FINAL; review mode, not execution | 当前角色展开 | 暂无 | CONFIRMED |
 | 是否值得开仓 | `worthOpening` | Explicit Boolean only | 当前角色 | 等待同步 | CONFIRMED |
 | 最终结论 | `finalConclusion` | Sanitized summary | 当前角色 | 等待同步 | CONFIRMED |
 | 核心支持证据 | `coreSupportingEvidence` | SUPPORT reason labels only | 展开区 | 暂无该角色证据 | CONFIRMED |
@@ -183,6 +197,9 @@ diagnostics.
 All rows are P0 except the two evidence lists and `decisionSummary`, which are
 P1. Evidence: `DashboardHomeVO`, `DashboardHomeServiceImpl`,
 `DashboardHomeServiceImplTest`, and `DashboardControllerTest`.
+
+`finalPlanMode` belongs only to the GPT_FINAL tab. `ConsistencyVO` has no such
+field, so the consistency summary does not render or claim ownership of it.
 
 ### GEMINI_REVIEW / 冲突复核官
 
@@ -223,18 +240,21 @@ P1. Evidence: `DashboardHomeVO`, `DashboardHomeServiceImpl`,
 | 一句话摘要 | `consistency.consistencySummary` | `ConsistencyVO` | Backend role-count summary | 一句话摘要 | P0 | AI 头部 | 等待 AI 三角色结果同步后生成一致性结论 | No | CONFIRMED | `DashboardHomeServiceImpl` |
 
 The score has no ring visualization. Current service output is `null`, so the
-prototype displays `--` and cannot fabricate a 0-100 value.
+prototype displays `--` and cannot fabricate a 0-100 value. The compact
+consistency summary shows only fields actually owned by `ConsistencyVO`;
+GPT_FINAL plan mode remains in the GPT_FINAL disclosure.
 
 ## I. Bottom Navigation
 
 | Web label | Backend/target | Source object | Value contract | Mobile label | Priority | Location | Empty | Rename | Status | Evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Dashboard | `/dashboard` | Existing authenticated route | Existing iOS root route | 首页 | P0 | Fixed bottom nav | 首页 | Yes | CONFIRMED | `BackendConfiguration.swift` |
+| Dashboard | `/dashboard` | Existing authenticated route | Prototype resets `.app-scroll` to `0` and focuses the page title | 首页 | P0 | Fixed bottom nav | 首页 | Yes | CONFIRMED | `BackendConfiguration.swift` |
 | 持仓监控 | `positions[]` / `#position-monitor` | Home read model | Prototype in-page anchor only | 持仓 | P0 | Fixed bottom nav | 暂无持仓 | Yes | CONFIRMED | `dashboard.html` |
-| 复盘中心 | `/review/dashboard` | Existing Dashboard link | Existing authenticated route | 复盘 | P0 | Fixed bottom nav | 复盘 | Yes | CONFIRMED | `dashboard.html` |
+| 复盘中心 | `/review/dashboard` | Existing Dashboard link | Existing authenticated route; never the AI section | 复盘 | P0 | Fixed bottom nav | 复盘 | Yes | CONFIRMED | `dashboard.html` |
 
-No fourth navigation destination is introduced. The static anchor adds no
-backend route and performs no write.
+No fourth navigation destination is introduced. The static prototype records
+the sanitized `/review/dashboard` target without issuing a network request.
+The position-section anchor adds no backend route and performs no write.
 
 ## Display Isolation Rules
 
@@ -246,8 +266,10 @@ backend route and performs no write.
 5. Missing AI role data never borrows another role's content.
 6. Unknown enum values display `状态待同步` or `未知状态`; raw values remain
    available only to diagnostics.
-7. The static wireframe contains field tokens only and no market, event,
-   position, or AI evidence values.
+7. Normal preview contains field tokens only. Capture mode replaces their
+   visible text with safe empty states while retaining exact paths in
+   `data-field-token`; neither mode contains market, event, position, or AI
+   evidence values.
 
 ## Unresolved Field
 

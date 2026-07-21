@@ -22,7 +22,7 @@ cookie, storage, or form submission.
 | `device` | `17pm`, `12pm` | Applies the measured device layout contract |
 | `theme` | `light`, `dark` | Selects the local color token set |
 | `text` | `standard`, `large` | Applies standard text or Dynamic Type +1 |
-| `capture` | `1` | Hides desktop controls and fills the browser viewport |
+| `capture` | `1` | Hides desktop controls, fills the viewport, and renders safe empty-state copy while retaining exact `data-field-token` bindings |
 
 Example:
 
@@ -42,30 +42,80 @@ The checked-in viewport captures were rendered directly from `index.html`:
 - `screenshots/iphone-17-pro-max-dark.png`
 - `screenshots/iphone-12-pro-max-light.png`
 - `screenshots/iphone-12-pro-max-dark.png`
+- `screenshots/iphone-17-pro-max-first-screen.png`
+- `screenshots/iphone-17-pro-max-position-collapsed.png`
+- `screenshots/iphone-17-pro-max-ai-collapsed.png`
+- `screenshots/iphone-17-pro-max-large-text.png`
 
-The 12PM fixture shows one row in each stacked alert/event panel to preserve
-the first-screen asset task; the contract and DOM retain a maximum capacity of
-two rows. This is responsive density behavior, not whole-page scaling.
+Both fixtures show one compact alert/event summary; native disclosure retains
+capacity for a second row. Capture mode displays only `--`, `待同步`, `等待同步`,
+`否`, and the explicit no-block fallback instead of manufacturing market or AI
+evidence. Every replaced value retains its exact path in `data-field-token`.
+The 12PM panels stack independently rather than scaling the 17PM layout.
+
+## Browser Acceptance Evidence
+
+The localhost fixture was checked in the in-app browser with the real logical
+viewports. Measurements are CSS pixels, which equal logical points for this
+prototype.
+
+| Check | Result |
+|---|---|
+| 17PM first screen | Header, seven-status band, alert/event, selected asset, complete execution compact summary, and the start of position monitoring visible |
+| Execution core vs bottom nav | Core bottom `732.4pt`; bottom-nav top `861pt`; visible `YES` |
+| Asset switch | `assets[1]` updates execution and AI; position markup remains byte-for-byte unchanged |
+| AI role switch | Exactly one `tabpanel` visible |
+| Home navigation | `.app-scroll` moved from `797.5` to `0`; focus returned to `#app-title` |
+| Review navigation | Sanitized target `/review/dashboard`; fixture URL unchanged |
+| Disclosures | Execution, position, consistency, and active-role disclosures each opened and closed |
+| Accessibility structure | 3 radios; 0 listboxes; 0 options; 0 nested interactive controls |
+| Touch targets | 18 visible targets checked; 0 below `44 x 44pt` |
+| Horizontal scrolling | Page overflow `NONE`; only `.asset-pager` remains horizontally scrollable |
+| CSS/resources | One stylesheet loaded with 138 CSSOM rules; local script loaded and executed without browser log errors |
+| Long tokens | Longest visible normal-preview token: 51 characters; no page overflow at standard or large text |
+
+Exact module measurements are recorded in
+`../P3_U2_IPHONE_HOME_IA_V2.md`.
 
 ## Interaction Contract
 
-- Select one of three watch assets to update only the execution-advice and AI
-  context labels.
+- Select one of three watch assets through a radio group to update only the
+  execution-advice and AI context labels. Every token uses `assets[index]`.
 - Position-monitor markup remains unchanged when the selected asset changes.
 - Select one AI role at a time through the segmented control.
-- Expand native details blocks for long fields and secondary evidence.
+- Expand native details blocks for complete execution, position, consistency,
+  and role evidence.
+- “首页” resets the internal `.app-scroll` owner and focuses the page title.
+- “复盘” targets `/review/dashboard`; the fixture records the sanitized target
+  without issuing a network request.
+- No authenticated full-position page route currently exists. The view-all
+  control is a disabled `CONTRACT_UNRESOLVED` design placeholder, not a false
+  self-link.
 - Switch device, theme, and text size from the desktop control panel.
-- Use `window.P3U2Prototype.getState()` for non-production browser checks.
+- Use `document.P3U2Prototype.getState()` and
+  `document.P3U2Prototype.runContractChecks()` for non-production browser checks
+  when the host permits extending `document`. A `window.P3U2Prototype` alias is
+  likewise exposed when the host permits extending `window`; locked-down hosts
+  can assert the same DOM contract directly.
+
+The watch pager contains one focusable control per card. It does not mix
+`listbox`, `option`, and nested `summary` controls. All visible controls retain
+at least a `44 x 44pt` target.
 
 ## Field Integrity
 
-Every displayed value is a `{fieldName}` structural token. The visible
-`STATIC_LAYOUT_FIXTURE` marker confirms that the page contains no live market
-data or generated business evidence.
+Normal preview mode displays `{fieldName}` structural tokens. Capture mode
+uses safe empty-state copy and retains each exact path in `data-field-token`.
+The visible `STATIC_LAYOUT_FIXTURE` marker confirms that the page contains no
+live market data or generated business evidence.
 
 Current source code confirms seven top status fields. The task's proposed
 eighth field, `top.holdingRisk`, has no current backend field and is retained
 as `UNRESOLVED` in `field-map.json`; it is deliberately not rendered.
+
+`finalPlanMode` belongs to
+`aiDecision.tabs[GPT_FINAL].finalPlanMode`. `ConsistencyVO` does not own that
+field, so the consistency summary does not render it.
 
 ## Safety Boundaries
 

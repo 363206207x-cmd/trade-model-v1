@@ -26,7 +26,7 @@ than hard-code model names.
 
 ```text
 App Header
-Status Grid
+Status Band
 Realtime Alert / Key Event
 Watch Asset Pager (3 assets)
 Execution Advice (selected asset)
@@ -47,13 +47,13 @@ viewport. These are target envelopes, not fixed heights.
 
 | Module | Min | Default target | Default max | Growth rule |
 |---|---:|---:|---:|---|
-| App header | 56 | 64 | 80 | Grows for Dynamic Type; non-sticky |
-| Status grid | 128 | 144 | 208 | Two text rows per cell; content wraps |
-| Alert/event row | 120 | 144 | 208 | Two panels side by side; each row wraps |
-| Watch heading + pager | 184 | 216 | 280 | Card is content-driven; local horizontal scroll |
-| Execution advice | 248 | 360 | none | Definition list grows; long rows expand |
-| Position monitor | 260 | 420 | none | Three summaries, then existing detail route |
-| AI review + consistency | 340 | 520 | none | One role only; evidence grows vertically |
+| App header | 50 | 56 | 72 | Grows for Dynamic Type; non-sticky |
+| Status band | 82 | 104 | 132 | Seven text values; no per-value card surface |
+| Alert/event row | 80 | 96 | 136 | Two compact disclosures side by side |
+| Watch heading + pager | 160 | 184 | 224 | One radio-group card; local horizontal scroll |
+| Execution advice | 140 | 184 | none | Compact status/direction/entry; complete fields expand |
+| Position monitor | 360 | 520 | none | Three compact disclosures; full-page route unresolved |
+| AI review + consistency | 400 | 560 | none | Compact consistency and one role; complete fields expand |
 | Bottom navigation | 56 | 60 | 72 | Fixed, plus `34pt` safe-area inset |
 
 ### 17PM first-screen cutoff
@@ -61,21 +61,21 @@ viewport. These are target envelopes, not fixed heights.
 At standard text size, the first viewport contains:
 
 1. app header;
-2. seven-status grid;
+2. seven-status band;
 3. alert/event row;
 4. selected watch asset card and the next-card edge;
-5. execution-advice header/status and approximately the first two definition
-   rows.
+5. execution-advice title, backend status, direction, and entry zone.
 
-The execution module intentionally continues below the fold. Position and AI
-are not compressed into the first screen.
+The execution disclosure may continue below the fold, but a title-only cutoff
+is a failure. The reviewed fixture fits the complete collapsed execution
+summary and the beginning of position monitoring above the bottom navigation.
+Position details and AI are not compressed into the first screen.
 
 ### 17PM second-screen cutoff
 
-The second viewport completes execution advice, shows up to three position
-summaries, and reveals the AI-review heading/consistency summary. Full AI
-evidence may continue into a third viewport when content is long or Dynamic
-Type is increased.
+The second viewport completes execution advice and begins the compact position
+list. Full position and AI evidence continues in document flow; its default
+height is reduced through disclosure rather than type scaling.
 
 ## 12PM Height Budget
 
@@ -85,23 +85,22 @@ The portrait screen is `926pt`. Subtracting the measured safe areas leaves
 
 | Module | Min | Default target | Default max | Adaptation |
 |---|---:|---:|---:|---|
-| App header | 52 | 56 | 80 | Tighter spacing, same text size |
-| Status grid | 128 | 144 | 224 | Four columns, seven cells, wrapping labels |
-| Realtime alert | 76 | 96 | 160 | Full-width above event; one row visible in the default fixture, capacity remains two |
-| Key event | 76 | 96 | 160 | Full-width below alert; one row visible in the default fixture, capacity remains two |
-| Watch heading + pager | 176 | 204 | 280 | Card width 91%; P1 fields in expansion |
-| Execution advice | 248 | 360 | none | Same semantics; long rows collapse to 3 lines |
-| Position monitor | 240 | 360 | none | Two summaries, then existing detail route |
-| AI review + consistency | 340 | 520 | none | Segments wrap internally if Dynamic Type grows |
+| App header | 48 | 54 | 72 | Tighter spacing, same text size |
+| Status band | 82 | 104 | 148 | Four columns, seven truthful values |
+| Realtime alert | 56 | 72 | 128 | Full-width compact disclosure above event |
+| Key event | 56 | 72 | 128 | Full-width compact disclosure below alert |
+| Watch heading + pager | 160 | 184 | 232 | Card width 91%; one radio control |
+| Execution advice | 140 | 184 | none | Same compact summary; complete fields expand |
+| Position monitor | 260 | 360 | none | Two compact disclosures; route unresolved |
+| AI review + consistency | 400 | 560 | none | Segments wrap internally if Dynamic Type grows |
 | Bottom navigation | 56 | 60 | 72 | Fixed, plus `34pt` safe-area inset |
 
 ### 12PM first-screen cutoff
 
-The first viewport contains the app header, seven-status grid, one visible row
-from each stacked alert/event summary, and the selected asset card. Each
-summary keeps a two-row data capacity, but the secondary row is outside the
-default 12PM density budget. The implementation must not shrink text to force
-additional modules into view.
+The first viewport contains the app header, seven-status band, one compact
+disclosure from each stacked alert/event panel, and the selected asset card.
+Each disclosure keeps two-row data capacity. The implementation must not
+shrink text to force additional modules into view.
 
 ### 12PM second-screen cutoff
 
@@ -126,10 +125,10 @@ scaled copy of 17PM.
 
 | Content | Default | Expanded behavior |
 |---|---|---|
-| 12PM asset P1 fields | Collapsed | Native details block reveals confidence/latest price |
-| Execution long rows | Up to three lines | Native details reveals full token/content |
-| Position P1 fields | Collapsed | Per-position details block |
-| AI evidence lists | First responsibility fields visible | Native details reveals remaining evidence fields |
+| Asset selector | P0 + P1 in one radio control | No nested interactive expansion |
+| Execution advice | Status, direction, entry zone | Native details reveals every remaining confirmed field |
+| Position fields | Risk, entry logic, direction support, reversal, current advice | Per-position details reveals remaining confirmed fields |
+| AI evidence | Compact role conclusion plus 1-2 evidence fields | Native details reveals every remaining role field |
 | Consistency score/asset block | Compact text summary | Details block; score remains `--` if missing |
 
 Expansion never changes business state and never requests new data.
@@ -165,8 +164,9 @@ Expansion never changes business state and never requests new data.
 - inter-card gap: `12pt`;
 - P1 fields move to expansion rather than reducing font size.
 
-The prototype uses scroll snapping and explicit card buttons. It does not
-display three narrow cards simultaneously.
+The prototype uses scroll snapping and one accessible radio button per card.
+It does not display three narrow cards simultaneously or nest a disclosure in
+the selection control.
 
 ## Scroll And Focus Order
 
@@ -176,7 +176,7 @@ VoiceOver/keyboard order follows visual order:
 2. seven status values;
 3. alert rows;
 4. event rows;
-5. asset heading and three asset selectors;
+5. asset heading and one three-item radio group;
 6. execution advice;
 7. independent positions;
 8. consistency summary;
@@ -218,14 +218,40 @@ Validation passes only when:
 | Check | 17PM | 12PM |
 |---|---|---|
 | Whole-page scaling | Forbidden | Forbidden |
-| Status layout | 4 columns / 7 truthful cells | 4 columns / 7 truthful cells |
+| Status layout | 4 columns / 7 truthful band values | 4 columns / 7 truthful band values |
 | Alert/event | Side by side | Stacked |
 | Watch card width | 86% content width | 91% content width |
-| Default asset fields | P0 + P1 | P0; P1 expanded |
+| Default asset fields | P0 + P1 | P0 + P1 |
 | Position summaries | Up to 3 | Up to 2 |
 | AI roles visible | Exactly 1 | Exactly 1 |
 | Horizontal page overflow | None | None |
 | Bottom safe-area reservation | 34pt | 34pt |
+
+## Rendered Measurement Evidence
+
+The measurements below come from the checked-in localhost fixture in capture
+mode at standard text size. Capture mode uses truthful empty states and retains
+each exact binding in `data-field-token`; it does not use whole-page scaling.
+
+| Module/check | 17PM Light | 17PM Dark | 12PM Light | 12PM Dark |
+|---|---:|---:|---:|---:|
+| Header height | `68.3pt` | `68.3pt` | `68.3pt` | `68.3pt` |
+| Top-status height | `132.6pt` | `132.6pt` | `132.6pt` | `132.6pt` |
+| Alert/event height | `95.6pt` | `95.6pt` | `178.2pt` | `178.2pt` |
+| Watch-asset height | `204.4pt` | `204.4pt` | `204.4pt` | `204.4pt` |
+| Execution default height | `234.4pt` | `234.4pt` | `234.4pt` | `234.4pt` |
+| Position default height | `865.2pt` | `865.2pt` | `610.1pt` | `610.1pt` |
+| AI default height | `701.5pt` | `701.5pt` | `701.5pt` | `701.5pt` |
+| Execution top Y | `563.0pt` | `563.0pt` | `630.6pt` | `630.6pt` |
+| Bottom-nav top Y | `861.0pt` | `861.0pt` | `831.0pt` | `831.0pt` |
+| Execution core above nav | `YES` | `YES` | `YES` | `YES` |
+| Horizontal page overflow | `NONE` | `NONE` | `NONE` | `NONE` |
+| Visible position summaries | `3` | `3` | `2` | `2` |
+
+At Dynamic Type +1, 17PM remains overflow-free with its execution core above
+the nav. 12PM remains overflow-free and preserves every field in document
+flow; it is not required to force the execution core into that smaller first
+viewport. All visible controls remain at least `44 x 44pt` in both sizes.
 
 ## Prototype Interaction Contract
 
@@ -234,11 +260,13 @@ The static prototype implements only local layout behavior:
 - device preview switch;
 - light/dark switch;
 - standard/large text switch;
-- three-asset selection;
+- three-asset radio selection;
 - execution and AI context-label update;
 - one-role-at-a-time AI tabs;
 - native long-text expansion;
-- in-page bottom-navigation anchors.
+- home scroll-owner reset;
+- in-page position navigation;
+- sanitized `/review/dashboard` target capture.
 
 It performs zero network requests and contains no form submission, storage,
 cookie, Session, CSRF, Provider, AI, Telegram, Push, order, position mutation,

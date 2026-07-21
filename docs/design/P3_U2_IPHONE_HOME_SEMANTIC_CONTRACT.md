@@ -15,8 +15,9 @@ Design base: `168ef18c7ad148d960902c913f6ddb4b53318e14`.
    screenshots.
 2. Every visible value comes from `DashboardHomeVO` or an existing route/section
    target documented in the field map.
-3. Prototype values use `{fieldName}` tokens and are labelled
-   `STATIC_LAYOUT_FIXTURE`.
+3. Normal prototype values use `{fieldName}` tokens. Screenshot capture mode
+   uses safe empty-state copy while preserving the exact path in
+   `data-field-token`; both modes are labelled `STATIC_LAYOUT_FIXTURE`.
 4. Empty data stays empty. The mobile layer does not infer, repair, summarize,
    or manufacture a business result.
 5. Unknown enum values display `状态待同步` or `未知状态`; raw values remain in
@@ -43,10 +44,11 @@ as `UNRESOLVED_FIELD` and is not rendered.
 
 Presentation contract:
 
-- compact four-column text grid;
+- compact four-column status band without seven independent card surfaces;
 - no status icons, emoji, ring, or decorative chart;
 - text remains the primary state signal;
-- state color is a thin supplemental accent only;
+- labels remain at least `12pt` at the standard prototype scale;
+- state color is supplemental text emphasis only;
 - long enum labels wrap and are never abbreviated into opaque fragments;
 - raw values may appear only in a future controlled expansion, not in the
   default mobile summary.
@@ -58,8 +60,9 @@ These modules form the second information row.
 - 17PM: alert and event panels sit side by side; alert receives the larger
   visual priority.
 - 12PM: panels stack vertically, alert first.
-- Default limit: two alert rows and two event rows. The current backend event
-  builder returns at most one row.
+- Default view: one compact alert summary and one compact event summary.
+  A native disclosure retains capacity for a second row; the current backend
+  event builder returns at most one row.
 - Empty states are exactly `暂无告警` and `暂无关键事件`.
 - The prototype uses only structural tokens. It does not invent CPI events,
   abnormal prices, timestamps, or countdowns.
@@ -82,21 +85,29 @@ P1 summary:
 - 置信度
 - 最新价
 
-17PM shows P0 and P1. On 12PM, P1 moves into the native card expansion so the
-P0 semantics remain readable. Data source, freshness, timeframe freshness,
-evidence count, analysis time, and unavailable reason stay in a detail layer.
+17PM and 12PM show the same compact P0/P1 selector without a nested control.
+Data source, freshness, timeframe freshness, evidence count, analysis time,
+and unavailable reason stay in a future detail layer.
 
 Selection contract:
 
 - selecting an asset changes execution-advice scope;
 - selecting an asset changes AI-evidence and consistency scope;
 - selecting an asset does **not** change the position-monitor list;
+- each selector is one radio control bound to `assets[index]`;
+- no selector may generate the nonexistent singular `asset[index]` path;
 - placeholder/default slots are not treated as analyzed assets;
 - no chart, candle, sparkline, or generated price series is present.
 
 ## D. Execution Advice
 
 The module title remains `执行建议`.
+
+Default presentation is `COMPACT_SUMMARY`: backend status, blocked reason,
+direction, and entry zone remain visible. Stop loss, take-profit rules,
+leverage, position suggestion, validity, invalid condition, structured time
+boundaries, and verified original-plan copy remain complete in one native
+disclosure.
 
 The mobile definition list uses only:
 
@@ -143,8 +154,12 @@ Home summary fields:
 - 下次验证
 - 人工处理入口
 
-17PM shows at most three summaries; 12PM shows at most two. Additional rows use
-the existing review/detail route. The prototype does not implement a write.
+17PM shows at most three compact summaries; 12PM shows at most two. Each
+summary defaults to asset/direction, risk, entry logic, direction support,
+reversal state, and current advice; remaining confirmed fields are disclosed.
+The repository has no authenticated full-position page route. The separate
+view-all control is therefore `CONTRACT_UNRESOLVED`, visibly disabled, and
+never self-links to fake navigation. The prototype does not implement a write.
 
 ### Product status mapping
 
@@ -192,6 +207,10 @@ Only one role panel is visible at a time. Switching role does not change the
 selected asset. Switching asset preserves the active role while changing the
 AI field scope.
 
+Each role defaults to a compact conclusion, risk/confidence where applicable,
+and one or two role-specific evidence fields. All remaining confirmed role
+fields stay available in the role disclosure; no responsibility is removed.
+
 ### GPT_FINAL
 
 Displays final market bias, confidence, risk, plan mode, worth-opening opinion,
@@ -228,17 +247,19 @@ Visible summary:
 
 - 一致性等级
 - 冲突等级
-- AI 计划模式 (reused from GPT_FINAL)
 - 是否进入冲突阻断
-- 降级原因
 - 一句话摘要
+
+Expanded consistency fields are applicability, score, asset-direction block,
+and downgrade reason. `finalPlanMode` is not a consistency field. Its only
+valid path is `aiDecision.tabs[GPT_FINAL].finalPlanMode`, displayed in the
+GPT_FINAL role disclosure.
 
 `aiApplicable == false` takes precedence over `confused` and
 `directionalPushBlocked`. In that state:
 
 - consistency level: 不适用;
 - conflict level: 不适用;
-- AI plan mode: 不适用;
 - final tendency: 暂无;
 - score: `--`;
 - directional asset block may still independently display 是 in expansion;
@@ -251,12 +272,14 @@ No score ring is used. A number is shown only if
 
 The fixed bottom navigation contains three truthful targets:
 
-- 首页: existing `/dashboard` route;
+- 首页: existing `/dashboard` route; in the static prototype it resets the
+  internal `.app-scroll` owner and focuses the page title;
 - 持仓: in-page position-monitor anchor in this prototype;
-- 复盘: existing `/review/dashboard` route.
+- 复盘: existing `/review/dashboard` route, never the AI section.
 
 The in-page anchor is an IA navigation device, not a new backend route. The
-static prototype prevents navigation and performs no write.
+static prototype captures the sanitized app-route target for testing, prevents
+network navigation, and performs no write.
 
 ## Responsive Semantics
 
@@ -267,6 +290,7 @@ static prototype prevents navigation and performs no write.
 - alert and event panels share a row;
 - selected asset card is 86% of content width;
 - P0 and P1 asset fields remain visible;
+- execution compact status, direction, and entry zone appear above the fold;
 - up to three position summaries appear before “view all”.
 
 ### iPhone 12 Pro Max
@@ -275,12 +299,17 @@ static prototype prevents navigation and performs no write.
 - measured safe area: `47 / 0 / 34 / 0pt`;
 - alert and event panels stack;
 - selected asset card is 91% of content width;
-- asset P1 fields move into expansion;
+- asset P1 fields remain in the single selector control;
 - up to two position summaries appear before “view all”.
 
 No responsive mode scales the whole Dashboard. Text remains at least the iOS
 body baseline, controls retain a 44pt target, and long Chinese or enum text
 wraps.
+
+Rendered acceptance at standard text measured the 17PM execution core at
+`732.4pt`, above the bottom-navigation top at `861pt`. The page has no
+horizontal overflow: the watch section establishes layout/paint containment,
+so only its pager owns horizontal scrolling.
 
 ## Review Checklist
 
@@ -305,6 +334,8 @@ wraps.
 - [x] Asset selection scopes execution and AI.
 - [x] Position content remains unchanged by asset selection.
 - [x] Long text uses native expand/collapse.
+- [x] Asset selection uses one radio-group control with no nested interaction.
+- [x] Home resets the actual scroll owner; review targets `/review/dashboard`.
 - [x] Bottom navigation reserves the measured home-indicator inset.
 
 ### Visual and safety

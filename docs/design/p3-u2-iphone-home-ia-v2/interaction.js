@@ -8,6 +8,10 @@
   const roleTabs = Array.from(document.querySelectorAll("[data-role]"));
   const rolePanels = Array.from(document.querySelectorAll("[data-role-panel]"));
   const positionSection = document.querySelector("[data-position-independent]");
+  const appTitle = document.querySelector("#app-title");
+  const homeNav = document.querySelector("[data-home-nav]");
+  const positionNav = document.querySelector("[data-position-nav]");
+  const reviewNav = document.querySelector("[data-review-nav]");
   const linkedSections = [
     document.querySelector("#execution-advice"),
     document.querySelector("#ai-review")
@@ -28,6 +32,44 @@
   let selectedAssetIndex = 0;
   let activeRole = "gpt";
   const initialPositionMarkup = positionSection ? positionSection.innerHTML : "";
+  const captureUsesSafeEmptyState = params.get("capture") === "1";
+
+  const fixtureFallback = (fieldPath) => {
+    if (/blockedReason/i.test(fieldPath)) {
+      return "暂无阻断原因";
+    }
+    if (/summary|message|conclusion|statusMessage/i.test(fieldPath)) {
+      return "等待同步";
+    }
+    if (/status|state|level|label|direction|stance|risk|quality|mode/i.test(fieldPath)) {
+      return "待同步";
+    }
+    if (/blocked|worthOpening|reversed|available/i.test(fieldPath)) {
+      return "否";
+    }
+    return "--";
+  };
+
+  const applyCaptureSafeEmptyState = () => {
+    if (!captureUsesSafeEmptyState) {
+      return;
+    }
+    const tokenPattern = /\{([^{}]+)\}/g;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+    textNodes.forEach((textNode) => {
+      const source = textNode.nodeValue || "";
+      const fieldPaths = Array.from(source.matchAll(tokenPattern), (match) => match[1]);
+      if (fieldPaths.length === 0) {
+        return;
+      }
+      textNode.parentElement?.setAttribute("data-field-token", fieldPaths.join(","));
+      textNode.nodeValue = source.replace(tokenPattern, (_token, fieldPath) => fixtureFallback(fieldPath));
+    });
+  };
 
   const setPressed = (selector, value, attribute) => {
     document.querySelectorAll(selector).forEach((button) => {
@@ -62,7 +104,7 @@
     updateQuery("text", textSize);
   };
 
-  const assetToken = (index) => `{asset[${index}].symbol}`;
+  const assetToken = (index) => `{assets[${index}].symbol}`;
 
   const selectAsset = (index, scrollCard = true) => {
     if (!Number.isInteger(index) || index < 0 || index >= assetButtons.length) {
@@ -72,12 +114,14 @@
     selectedAssetIndex = index;
     assetButtons.forEach((button) => {
       const selected = Number(button.dataset.assetIndex) === index;
-      button.setAttribute("aria-selected", String(selected));
-      button.closest(".asset-card")?.setAttribute("data-selected", String(selected));
+      button.setAttribute("aria-checked", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      button.setAttribute("data-selected", String(selected));
     });
 
     document.querySelectorAll("[data-selected-asset-token]").forEach((node) => {
-      node.textContent = assetToken(index);
+      node.dataset.fieldToken = assetToken(index).slice(1, -1);
+      node.textContent = captureUsesSafeEmptyState ? "--" : assetToken(index);
     });
     linkedSections.forEach((section) => {
       section.dataset.selectedAssetIndex = String(index);
@@ -150,23 +194,75 @@
     });
   });
 
-  document.querySelectorAll(".bottom-nav a").forEach((link) => {
-    link.addEventListener("click", () => {
-      document.querySelectorAll(".bottom-nav a").forEach((item) => item.removeAttribute("aria-current"));
-      link.setAttribute("aria-current", "page");
-    });
+  const setCurrentNavigation = (current) => {
+    document.querySelectorAll(".bottom-nav a").forEach((item) => item.removeAttribute("aria-current"));
+    current?.setAttribute("aria-current", "page");
+  };
+
+  homeNav?.addEventListener("click", (event) => {
+    event.preventDefault();
+    appScroll.scrollTo({ top: 0, behavior: "auto" });
+    appTitle?.focus({ preventScroll: true });
+    document.body.dataset.navigationTarget = "/dashboard";
+    setCurrentNavigation(homeNav);
   });
+
+  positionNav?.addEventListener("click", (event) => {
+    event.preventDefault();
+    positionSection?.scrollIntoView({ block: "start", behavior: "auto" });
+    document.body.dataset.navigationTarget = "#position-monitor";
+    setCurrentNavigation(positionNav);
+  });
+
+  reviewNav?.addEventListener("click", (event) => {
+    event.preventDefault();
+    document.body.dataset.navigationTarget = "/review/dashboard";
+    setCurrentNavigation(reviewNav);
+  });
+
+  document.querySelectorAll(".bottom-nav a").forEach((link) => {
+    link.addEventListener("click", () => setCurrentNavigation(link));
+  });
+
+  const runContractChecks = () => {
+    const markup = document.documentElement.outerHTML;
+    const nestedInteractiveControlCount = document.querySelectorAll(
+      '[role="radio"] button, [role="radio"] a, [role="radio"] summary, [role="radio"] details'
+    ).length;
+    const touchTargets = Array.from(document.querySelectorAll(
+      ".asset-select, summary, .bottom-nav a, .route-unresolved, .manual-action"
+    ));
+    const undersizedTouchTargets = touchTargets.filter((node) => {
+      if (node.getClientRects().length === 0) {
+        return false;
+      }
+      const rect = node.getBoundingClientRect();
+      return rect.width < 44 || rect.height < 44;
+    });
+    return Object.freeze({
+      invalidConsistencyPlanModePath: markup.includes(
+        ["aiDecision", "consistency", "finalPlanMode"].join(".")
+      ),
+      invalidAssetTokenCount: (markup.match(/\{asset\[\d+\]\./g) || []).length,
+      reviewNavigationTarget: reviewNav?.getAttribute("href") || null,
+      positionViewAllSelfLink: Boolean(document.querySelector('.position-section a[href="#position-monitor"]')),
+      nestedInteractiveControlCount,
+      undersizedTouchTargetCount: undersizedTouchTargets.length,
+      unresolvedPositionRoute: Boolean(document.querySelector(".route-unresolved[disabled]"))
+    });
+  };
 
   if (params.get("capture") === "1") {
     document.body.classList.add("capture-mode");
   }
+  applyCaptureSafeEmptyState();
   applyDevice(normalized("device", "17pm"));
   applyTheme(normalized("theme", "light"));
   applyTextSize(normalized("text", "standard"));
   selectAsset(0, false);
   selectRole("gpt");
 
-  window.P3U2Prototype = Object.freeze({
+  const prototypeApi = Object.freeze({
     selectAsset,
     selectRole,
     getState: () => ({
@@ -179,7 +275,16 @@
       executionAssetIndex: document.querySelector("#execution-advice")?.dataset.selectedAssetIndex,
       aiAssetIndex: document.querySelector("#ai-review")?.dataset.selectedAssetIndex,
       positionMarkupUnchanged: !positionSection || positionSection.innerHTML === initialPositionMarkup,
-      horizontalOverflow: appScroll.scrollWidth > appScroll.clientWidth
-    })
+      horizontalOverflow: appScroll.scrollWidth > appScroll.clientWidth,
+      appScrollTop: appScroll.scrollTop,
+      navigationTarget: document.body.dataset.navigationTarget || null
+    }),
+    runContractChecks
   });
+  if (Object.isExtensible(document)) {
+    document.P3U2Prototype = prototypeApi;
+  }
+  if (Object.isExtensible(window)) {
+    window.P3U2Prototype = prototypeApi;
+  }
 })();
