@@ -1,6 +1,13 @@
 server:
   port: 8081
   address: 0.0.0.0
+  servlet:
+    session:
+      timeout: ${TRADE_MODEL_SESSION_TIMEOUT:30m}
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${TRADE_MODEL_SESSION_COOKIE_SECURE:false}
 
 spring:
   application:
@@ -26,6 +33,7 @@ mybatis:
 logging:
   level:
     org.example.trademodel: DEBUG
+    org.example.trademodel.mapper.PersonalUserMapper: INFO
 
 management:
   endpoints:
@@ -160,8 +168,13 @@ trade-model:
       max-retry-timeout: 1
   auth:
     enabled: ${TRADE_MODEL_AUTH_ENABLED:true}
-    admin-username: ${APP_ADMIN_USERNAME:admin}
-    admin-password: ${APP_ADMIN_PASSWORD:dev-local-password}
+    initial-username: ${TRADE_MODEL_INITIAL_USERNAME:}
+    initial-password: ${TRADE_MODEL_INITIAL_PASSWORD:}
+    login-attempts:
+      failure-threshold: ${TRADE_MODEL_LOGIN_FAILURE_THRESHOLD:5}
+      window-minutes: ${TRADE_MODEL_LOGIN_FAILURE_WINDOW_MINUTES:15}
+      lock-minutes: ${TRADE_MODEL_LOGIN_LOCK_MINUTES:15}
+      max-tracked-usernames: ${TRADE_MODEL_LOGIN_MAX_TRACKED_USERNAMES:1024}
   security:
     rate-limit:
       enabled: ${TRADE_MODEL_SECURITY_RATE_LIMIT_ENABLED:true}

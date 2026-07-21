@@ -34,6 +34,7 @@ case "${applied_version}" in
   5) expected_versions=1,2,3,4,5 ;;
   6) expected_versions=1,2,3,4,5,6 ;;
   7) expected_versions=1,2,3,4,5,6,7 ;;
+  8) expected_versions=1,2,3,4,5,6,7,8 ;;
   *) echo "P3H_GREENFIELD_RECOVERY_VERIFY: BLOCKED_FLYWAY_PREFIX" >&2; exit 2 ;;
 esac
 if [ "${successful_count}" != "${applied_version}" ] \
@@ -64,27 +65,31 @@ database_count="$(${psql_postgres} --command="
   || { echo "P3H_GREENFIELD_RECOVERY_VERIFY: BLOCKED_DATABASE_IDENTITY" >&2; exit 2; }
 
 object_violation_count="$(${psql_primary} --command="
-  WITH expected_tables(name) AS (VALUES
-    ('tm_analysis_run'), ('tm_evidence_item'), ('tm_score_item'),
-    ('tm_macro_event'), ('tm_news_event'), ('tm_decision_result'),
-    ('tm_execution_plan'), ('tm_market_environment_snapshot'),
-    ('tm_persisted_ohlcv_bar'), ('tm_rule_config'), ('tm_user_config'),
-    ('tm_real_position'), ('tm_user_position'), ('tm_position_monitor_log'),
-    ('tm_push_snapshot'), ('tm_account_risk_snapshot'), ('tm_push_recheck_log'),
-    ('tm_push_recheck_dispatch_config'), ('tm_push_recheck_dispatch_config_audit'),
-    ('tm_monitor_alert'), ('tm_opportunity_log'), ('tm_missed_opportunity'),
-    ('tm_review_result'), ('tm_rule_version_log'), ('tm_asset_state'),
-    ('tm_hot_reset_event'), ('tm_ai_call_log')
+  WITH expected_tables(name, min_version) AS (VALUES
+    ('tm_analysis_run', 1), ('tm_evidence_item', 1), ('tm_score_item', 1),
+    ('tm_macro_event', 1), ('tm_news_event', 1), ('tm_decision_result', 1),
+    ('tm_execution_plan', 1), ('tm_market_environment_snapshot', 1),
+    ('tm_persisted_ohlcv_bar', 1), ('tm_rule_config', 1), ('tm_user_config', 1),
+    ('tm_real_position', 1), ('tm_user_position', 1), ('tm_position_monitor_log', 1),
+    ('tm_push_snapshot', 1), ('tm_account_risk_snapshot', 1), ('tm_push_recheck_log', 1),
+    ('tm_push_recheck_dispatch_config', 1), ('tm_push_recheck_dispatch_config_audit', 1),
+    ('tm_monitor_alert', 1), ('tm_opportunity_log', 1), ('tm_missed_opportunity', 1),
+    ('tm_review_result', 1), ('tm_rule_version_log', 1), ('tm_asset_state', 1),
+    ('tm_hot_reset_event', 1), ('tm_ai_call_log', 1), ('tm_user', 8)
   ), violations AS (
     SELECT 'missing_table' AS kind, e.name
     FROM expected_tables e
-    WHERE to_regclass('public.' || e.name) IS NULL
+    WHERE e.min_version <= ${applied_version}
+      AND to_regclass('public.' || e.name) IS NULL
     UNION ALL
     SELECT 'unexpected_table', c.relname
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
       AND c.relname <> 'flyway_schema_history'
-      AND NOT EXISTS (SELECT 1 FROM expected_tables e WHERE e.name = c.relname)
+      AND NOT EXISTS (
+        SELECT 1 FROM expected_tables e
+        WHERE e.name = c.relname AND e.min_version <= ${applied_version}
+      )
     UNION ALL
     SELECT 'unexpected_relation', c.relname
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -98,7 +103,10 @@ object_violation_count="$(${psql_primary} --command="
         FROM pg_depend d
         JOIN pg_class owner_table ON owner_table.oid = d.refobjid
         WHERE d.objid = c.oid AND d.deptype IN ('a', 'i')
-          AND EXISTS (SELECT 1 FROM expected_tables e WHERE e.name = owner_table.relname)
+          AND EXISTS (
+            SELECT 1 FROM expected_tables e
+            WHERE e.name = owner_table.relname AND e.min_version <= ${applied_version}
+          )
       )
     UNION ALL
     SELECT 'unexpected_schema', nspname FROM pg_namespace

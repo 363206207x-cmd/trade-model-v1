@@ -32,6 +32,10 @@ class ProdSmokeScriptHealthTest {
 
         assertThat(script).contains("SMOKE_ALLOW_EXTERNAL_CALLS=\"${SMOKE_ALLOW_EXTERNAL_CALLS:-false}\"");
         assertThat(script).contains(
+                "TRADE_MODEL_SMOKE_USERNAME", "TRADE_MODEL_SMOKE_PASSWORD",
+                "fetch_authenticated_dashboard_page", "extract_form_csrf",
+                "SESSION_AUTH_SMOKE: PASS_FORM_LOGIN_SESSION_CSRF",
+                "POST_LOGOUT_SESSION_INVALIDATION: PASS",
                 "SMOKE_PHASE=\"${SMOKE_PHASE:-FETCH_AND_VALIDATE}\"",
                 "SMOKE_RESPONSE_DIR=\"${SMOKE_RESPONSE_DIR:-}\"",
                 "SMOKE_SPLIT_PHASE_CONFIRM=\"${SMOKE_SPLIT_PHASE_CONFIRM:-}\"",
@@ -40,6 +44,7 @@ class ProdSmokeScriptHealthTest {
                 "existing non-symlink directory",
                 "artifact must not be a symlink",
                 "SMOKE_EVIDENCE_SCOPE: LOCAL_CONTROLLED_SPLIT_ONLY");
+        assertThat(script).doesNotContain("curl -u", "--user");
         assertThat(script).contains("dashboard header.dataSourceText missing");
         assertThat(script).contains("marketDataProvider");
         assertThat(script).contains("aiProvider");
@@ -110,6 +115,8 @@ class ProdSmokeScriptHealthTest {
 
         assertThat(script).contains("RELEASE_GATE_REQUIRE_PROVIDER_SMOKE=\"${RELEASE_GATE_REQUIRE_PROVIDER_SMOKE:-false}\"");
         assertThat(script).contains(
+                "TRADE_MODEL_SMOKE_USERNAME=\"$AUTH_USERNAME\"",
+                "TRADE_MODEL_SMOKE_PASSWORD=\"$AUTH_PASSWORD\"",
                 "SMOKE_PHASE=\"FETCH_AND_VALIDATE\"",
                 "SMOKE_RESPONSE_DIR=\"\"",
                 "SMOKE_SPLIT_PHASE_CONFIRM=\"\"");

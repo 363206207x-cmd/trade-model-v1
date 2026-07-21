@@ -46,7 +46,7 @@ copy_secret() {
 copy_secret "/run/secrets/${active_database_secret}" \
   "${readonly_target}/config/spring.datasource.password"
 copy_secret "/run/secrets/${active_admin_secret}" \
-  "${readonly_target}/config/trade-model.auth.admin-password"
+  "${readonly_target}/config/trade-model.auth.initial-password"
 copy_secret /run/secrets/binance_nonfunctional_key \
   "${readonly_target}/config/binance.api.key"
 copy_secret /run/secrets/binance_nonfunctional_secret \

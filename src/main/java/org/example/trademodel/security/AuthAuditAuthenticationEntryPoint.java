@@ -8,17 +8,13 @@ import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 @Component
-public class AuthAuditAuthenticationEntryPoint extends BasicAuthenticationEntryPoint {
+public class AuthAuditAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private static final Logger log = LoggerFactory.getLogger(AuthAuditAuthenticationEntryPoint.class);
-
-    public AuthAuditAuthenticationEntryPoint() {
-        setRealmName("Trade Model V1");
-    }
 
     @Override
     public void commence(HttpServletRequest request,
@@ -30,6 +26,8 @@ public class AuthAuditAuthenticationEntryPoint extends BasicAuthenticationEntryP
                 RequestIdSupport.currentOrNew(),
                 request.getRemoteAddr(),
                 "authentication_required"));
-        super.commence(request, response, authException);
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"code\":401,\"msg\":\"authentication required\"}");
     }
 }

@@ -9,13 +9,13 @@ BEGIN
     INTO successful_migrations, final_version
     FROM flyway_schema_history
     WHERE success = true;
-    IF successful_migrations <> 7 OR final_version <> '7' THEN
-        RAISE EXCEPTION 'P3-H Flyway V7 verification failed';
+    IF successful_migrations <> 8 OR final_version <> '8' THEN
+        RAISE EXCEPTION 'P3-H Flyway V8 verification failed';
     END IF;
 END
 $$;
 
-ALTER ROLE p3h_app_readonly SET default_transaction_read_only = on;
+ALTER ROLE p3h_app_readonly SET default_transaction_read_only = off;
 ALTER ROLE p3h_backup_reader SET default_transaction_read_only = on;
 
 DO $$
@@ -80,6 +80,14 @@ GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO p3h_app_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO p3h_backup_reader;
 GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO p3h_backup_reader;
 
+-- P3-H remains read-only for business data. These column-level grants are the
+-- minimum writes required by PersonalUserBootstrap and successful login audit.
+GRANT INSERT (username, password_hash, created_at, last_login_at)
+    ON TABLE public.tm_user TO p3h_app_readonly;
+GRANT UPDATE (last_login_at)
+    ON TABLE public.tm_user TO p3h_app_readonly;
+GRANT USAGE ON SEQUENCE public.tm_user_id_seq TO p3h_app_readonly;
+
 ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
     REVOKE ALL ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
@@ -104,6 +112,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE p3h_migration_owner IN SCHEMA public
 DO $$
 DECLARE
     unsafe_grant_count integer;
+    auth_column_grant_mismatch_count integer;
 BEGIN
     SELECT count(*) INTO unsafe_grant_count
     FROM information_schema.role_table_grants
@@ -111,6 +120,36 @@ BEGIN
       AND privilege_type <> 'SELECT';
     IF unsafe_grant_count <> 0 THEN
         RAISE EXCEPTION 'P3-H read-only grant verification failed';
+    END IF;
+
+    WITH expected(table_schema, table_name, column_name, privilege_type) AS (
+        VALUES
+            ('public', 'tm_user', 'username', 'INSERT'),
+            ('public', 'tm_user', 'password_hash', 'INSERT'),
+            ('public', 'tm_user', 'created_at', 'INSERT'),
+            ('public', 'tm_user', 'last_login_at', 'INSERT'),
+            ('public', 'tm_user', 'last_login_at', 'UPDATE')
+    ), actual AS (
+        SELECT table_schema, table_name, column_name, privilege_type
+        FROM information_schema.column_privileges
+        WHERE grantee = 'p3h_app_readonly'
+          AND privilege_type IN ('INSERT', 'UPDATE', 'REFERENCES')
+    ), differences AS (
+        (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+        UNION ALL
+        (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+    )
+    SELECT count(*) INTO auth_column_grant_mismatch_count FROM differences;
+
+    IF auth_column_grant_mismatch_count <> 0 THEN
+        RAISE EXCEPTION 'P3-H authentication column grant verification failed';
+    END IF;
+
+    IF NOT has_sequence_privilege(
+            'p3h_app_readonly', 'public.tm_user_id_seq', 'USAGE')
+       OR has_sequence_privilege(
+            'p3h_app_readonly', 'public.tm_user_id_seq', 'UPDATE') THEN
+        RAISE EXCEPTION 'P3-H authentication sequence grant verification failed';
     END IF;
 END
 $$;

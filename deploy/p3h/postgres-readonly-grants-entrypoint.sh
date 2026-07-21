@@ -19,7 +19,7 @@ psql --host=postgres --username=p3h_bootstrap --dbname=trade_model_v1_p3h_primar
 
 case "${P3H_READONLY_GRANTS_MODE:-}" in
   INITIALIZE)
-    echo "STAGING_FLYWAY_FRESH_INSTALL: PASS_V1_TO_V7"
+    echo "STAGING_FLYWAY_FRESH_INSTALL: PASS_V1_TO_V8"
     ;;
   STEADY_STATE)
     echo "P3H_READONLY_GRANTS_REFRESH: PASS"
@@ -32,5 +32,7 @@ case "${P3H_READONLY_GRANTS_MODE:-}" in
     exit 2
     ;;
 esac
-echo "STAGING_FLYWAY_FINAL_VERSION: 7"
+echo "STAGING_FLYWAY_FINAL_VERSION: 8"
+echo "P3H_BUSINESS_DATA_ROLE: READ_ONLY"
+echo "P3H_AUTH_SESSION_WRITE_SCOPE: TM_USER_COLUMNS_ONLY"
 echo "P3H_READONLY_GRANTS: PASS"

@@ -10,7 +10,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,8 +18,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "trade-model.auth.enabled=true",
-        "trade-model.auth.admin-username=operator",
-        "trade-model.auth.admin-password=operator-secret",
         "management.endpoints.web.exposure.include=health",
         "management.endpoint.health.probes.enabled=true",
         "management.endpoint.health.show-details=never",
@@ -61,7 +59,7 @@ class ActuatorHealthSecurityTest {
                 "/actuator/configprops",
                 "/actuator/mappings",
                 "/actuator/loggers")) {
-            MvcResult result = mockMvc.perform(get(path).with(httpBasic("operator", "operator-secret")))
+            MvcResult result = mockMvc.perform(get(path).with(user("operator").roles("OPERATOR")))
                     .andReturn();
             String body = result.getResponse().getContentAsString();
 

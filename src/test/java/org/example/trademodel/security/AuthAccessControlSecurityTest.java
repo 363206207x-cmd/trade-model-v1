@@ -14,7 +14,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -22,9 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "trade-model.auth.enabled=true",
-        "trade-model.auth.admin-username=operator",
-        "trade-model.auth.admin-password=operator-secret"
+        "trade-model.auth.enabled=true"
 })
 @AutoConfigureMockMvc
 class AuthAccessControlSecurityTest {
@@ -40,47 +39,47 @@ class AuthAccessControlSecurityTest {
     private RuleVersionLogMapper ruleVersionLogMapper;
 
     @Test
-    void dashboardPageRequiresAuthenticationAndAllowsBasicAuth() throws Exception {
+    void dashboardPageRequiresAuthenticationAndAllowsSessionPrincipal() throws Exception {
         mockMvc.perform(get("/dashboard"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().is3xxRedirection());
 
-        mockMvc.perform(get("/dashboard").with(httpBasic("operator", "operator-secret")))
+        mockMvc.perform(get("/dashboard").with(user("operator").roles("OPERATOR")))
                 .andExpect(status().isOk());
     }
 
     @Test
-    void dashboardHomeApiRequiresAuthenticationAndAllowsBasicAuth() throws Exception {
+    void dashboardHomeApiRequiresAuthenticationAndAllowsSessionPrincipal() throws Exception {
         mockMvc.perform(get("/api/dashboard/home"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(get("/api/dashboard/home").with(httpBasic("operator", "operator-secret")))
+        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
                 .andExpect(status().isOk());
     }
 
     @Test
     void reviewDashboardRequiresAuthenticationAndAllowsBasicAuth() throws Exception {
         mockMvc.perform(get("/review/dashboard"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().is3xxRedirection());
 
-        mockMvc.perform(get("/review/dashboard").with(httpBasic("operator", "operator-secret")))
+        mockMvc.perform(get("/review/dashboard").with(user("operator").roles("OPERATOR")))
                 .andExpect(status().isOk());
     }
 
     @Test
     void writeAndRecheckEndpointsRequireAuthentication() throws Exception {
-        mockMvc.perform(post("/api/user-positions/manual-open").contentType("application/json").content("{}"))
+        mockMvc.perform(post("/api/user-positions/manual-open").with(csrf()).contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(post("/api/review/user-positions/1/feedback").contentType("application/json").content("{}"))
+        mockMvc.perform(post("/api/review/user-positions/1/feedback").with(csrf()).contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(post("/api/opportunity-log/op-1/evaluate").contentType("application/json").content("{}"))
+        mockMvc.perform(post("/api/opportunity-log/op-1/evaluate").with(csrf()).contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(post("/api/push/recheck/1").contentType("application/json").content("{}"))
+        mockMvc.perform(post("/api/push/recheck/1").with(csrf()).contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(post("/api/push/recheck/dispatch/config").contentType("application/json").content("{}"))
+        mockMvc.perform(post("/api/push/recheck/dispatch/config").with(csrf()).contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -101,12 +100,14 @@ class AuthAccessControlSecurityTest {
     @Test
     void scanProfileUpdateIsAuthenticatedAndAudited() throws Exception {
         mockMvc.perform(put("/api/config/scan-profile")
+                        .with(csrf())
                         .contentType("application/json")
                         .content("{}"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(put("/api/config/scan-profile")
-                        .with(httpBasic("operator", "operator-secret"))
+                        .with(user("operator").roles("OPERATOR"))
+                        .with(csrf())
                         .contentType("application/json")
                         .content("""
                                 {

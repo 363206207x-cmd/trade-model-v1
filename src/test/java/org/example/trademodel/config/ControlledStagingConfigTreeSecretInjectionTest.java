@@ -31,12 +31,12 @@ class ControlledStagingConfigTreeSecretInjectionTest {
     void configTreeInjectsRequiredSecretsAndProductionGuardAcceptsThem() throws Exception {
         StandardEnvironment environment = loadConfigTree(Map.of(
                 "spring.datasource.password", DATABASE_SECRET,
-                "trade-model.auth.admin-password", ADMIN_SECRET,
+                "trade-model.auth.initial-password", ADMIN_SECRET,
                 "binance.api.key", BINANCE_KEY,
                 "binance.api.secret", BINANCE_SECRET));
 
         assertThat(environment.getProperty("spring.datasource.password")).isEqualTo(DATABASE_SECRET);
-        assertThat(environment.getProperty("trade-model.auth.admin-password")).isEqualTo(ADMIN_SECRET);
+        assertThat(environment.getProperty("trade-model.auth.initial-password")).isEqualTo(ADMIN_SECRET);
         assertThat(environment.getProperty("binance.api.key")).isEqualTo(BINANCE_KEY);
         assertThat(environment.getProperty("binance.api.secret")).isEqualTo(BINANCE_SECRET);
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
@@ -46,7 +46,7 @@ class ControlledStagingConfigTreeSecretInjectionTest {
     @Test
     void missingConfigTreeSecretFailsClosedWithoutDisclosingOtherValues() throws Exception {
         StandardEnvironment environment = loadConfigTree(Map.of(
-                "trade-model.auth.admin-password", ADMIN_SECRET,
+                "trade-model.auth.initial-password", ADMIN_SECRET,
                 "binance.api.key", BINANCE_KEY,
                 "binance.api.secret", BINANCE_SECRET));
 
@@ -75,8 +75,12 @@ class ControlledStagingConfigTreeSecretInjectionTest {
         String materializer = Files.readString(Path.of("deploy/p3h/p3h-secret-materializer.sh"),
                 StandardCharsets.UTF_8);
         assertThat(materializer).contains(
-                "spring.datasource.password", "trade-model.auth.admin-password",
+                "spring.datasource.password", "trade-model.auth.initial-password",
                 "binance.api.key", "binance.api.secret", "chmod 400");
+        assertThat(compose).contains(
+                "TRADE_MODEL_AUTH_ENABLED: \"true\"",
+                "TRADE_MODEL_INITIAL_USERNAME: p3h_operator",
+                "TRADE_MODEL_SESSION_COOKIE_SECURE: \"true\"");
         assertThat(compose).doesNotContain(
                 "PROD_DATASOURCE_PASSWORD:", "APP_ADMIN_PASSWORD:",
                 "BINANCE_API_KEY:", "BINANCE_API_SECRET:", ".env");
@@ -108,7 +112,11 @@ class ControlledStagingConfigTreeSecretInjectionTest {
         properties.put("server.address", "0.0.0.0");
         properties.put("trade-model.production.allow-public-bind", "true");
         properties.put("position.provider.type", "BINANCE");
-        properties.put("trade-model.auth.admin-username", "p3h_operator");
+        properties.put("trade-model.auth.enabled", "true");
+        properties.put("trade-model.auth.initial-username", "p3h_operator");
+        properties.put("server.servlet.session.cookie.http-only", "true");
+        properties.put("server.servlet.session.cookie.same-site", "lax");
+        properties.put("server.servlet.session.cookie.secure", "true");
         properties.put("management.endpoints.web.exposure.include", "health");
         properties.put("trade-model.security.rate-limit.enabled", "true");
         properties.put("trade-model.security.rate-limit.requests-per-minute", "120");

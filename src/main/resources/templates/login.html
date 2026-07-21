@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>登录 · TRINE LOGIC</title>
+    <link rel="stylesheet" th:href="@{/css/login.css}" href="/css/login.css">
+</head>
+<body>
+<main class="login-shell">
+    <section class="login-panel" aria-labelledby="login-title">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <p class="product-name">TRINE LOGIC</p>
+        <h1 id="login-title">个人复核入口</h1>
+
+        <div class="login-message login-message-error" th:if="${loginError}" role="alert" aria-live="polite">
+            用户名或密码错误，或当前登录暂时受限。
+        </div>
+        <div class="login-message login-message-info" th:if="${sessionExpired}" role="status" aria-live="polite">
+            会话已结束，请重新登录。
+        </div>
+        <div class="login-message login-message-success" th:if="${loggedOut}" role="status" aria-live="polite">
+            已安全退出。
+        </div>
+
+        <form class="login-form" th:action="@{/login}" method="post">
+            <label for="username">用户名</label>
+            <input id="username" name="username" type="text" autocomplete="username"
+                   maxlength="64" required autofocus>
+
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+            <button type="submit">登录</button>
+        </form>
+        <p class="login-footnote">交易决策复核工作台</p>
+    </section>
+</main>
+</body>
+</html>

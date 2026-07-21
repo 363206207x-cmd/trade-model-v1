@@ -1,10 +1,21 @@
 package org.example.trademodel.config;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.example.trademodel.mapper.PersonalUserMapper;
+import org.example.trademodel.security.PersonalUserBootstrap;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class ProductionProfileSafetyGuardTest {
 
@@ -118,23 +129,103 @@ class ProductionProfileSafetyGuardTest {
     @Test
     void rejectsMissingAdminCredentials() {
         MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.admin-username", "");
-        environment.setProperty("trade-model.auth.admin-password", " ");
+        environment.setProperty("trade-model.auth.initial-username", "");
+        environment.setProperty("trade-model.auth.initial-password", " ");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production admin username missing")
-                .hasMessageContaining("production admin password missing");
+                .hasMessageContaining("production initial username missing")
+                .hasMessageContaining("production initial password missing");
     }
 
     @Test
     void rejectsUnsafeAdminPasswordDefaults() {
         MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.admin-password", "change-me");
+        environment.setProperty("trade-model.auth.initial-password", "change-me");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production admin password uses an unsafe default value");
+                .hasMessageContaining("production initial password uses an unsafe default value");
+    }
+
+    @Test
+    void copiedEnvExampleFailsProductionSafetyGuard() throws Exception {
+        String templateValue = Files.readAllLines(Path.of(".env.example")).stream()
+                .filter(line -> line.startsWith("TRADE_MODEL_INITIAL_PASSWORD="))
+                .map(line -> line.substring(line.indexOf('=') + 1))
+                .findFirst()
+                .orElseThrow();
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.initial-password", templateValue);
+
+        assertThat(templateValue).isEmpty();
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production initial password missing");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "replace-with-long-local-secret",
+            "replace-with-your-secret",
+            "REPLACE-WITH-YOUR-SECRET"
+    })
+    void replaceWithPrefixIsRejected(String password) {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.initial-password", password);
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production initial password uses an unsafe default value");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "placeholder-password",
+            "placeholder",
+            "example-password",
+            "sample-password",
+            "default-password",
+            "secret-password",
+            "long-local-secret",
+            "change-me",
+            "change-this-password",
+            "dev-local-password",
+            "<long-local-secret>"
+    })
+    void placeholderValuesAreRejected(String password) {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.initial-password", password);
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production initial password uses an unsafe default value");
+    }
+
+    @Test
+    void validStrongPasswordStillPasses() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.initial-password", "A9!real-operator-secret-2026");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void bootstrapAndProductionGuardUseConsistentPolicy() {
+        String unsafePassword = "replace-with-long-local-secret";
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.auth.initial-password", unsafePassword);
+        PersonalUserBootstrap bootstrap = new PersonalUserBootstrap(
+                true, "operator", unsafePassword, mock(PersonalUserMapper.class),
+                new BCryptPasswordEncoder());
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unsafe default value");
+        assertThatThrownBy(() -> bootstrap.run(mock(ApplicationArguments.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unsafe");
     }
 
     @Test
@@ -351,8 +442,12 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("position.provider.type", "BINANCE");
         environment.setProperty("binance.api.key", "configured-key");
         environment.setProperty("binance.api.secret", "configured-secret");
-        environment.setProperty("trade-model.auth.admin-username", "operator");
-        environment.setProperty("trade-model.auth.admin-password", "configured-admin-password");
+        environment.setProperty("trade-model.auth.enabled", "true");
+        environment.setProperty("trade-model.auth.initial-username", "operator");
+        environment.setProperty("trade-model.auth.initial-password", "configured-initial-password");
+        environment.setProperty("server.servlet.session.cookie.http-only", "true");
+        environment.setProperty("server.servlet.session.cookie.same-site", "lax");
+        environment.setProperty("server.servlet.session.cookie.secure", "true");
         environment.setProperty("management.endpoints.web.exposure.include", "health");
         environment.setProperty("trade-model.security.rate-limit.enabled", "true");
         environment.setProperty("trade-model.security.rate-limit.requests-per-minute", "120");

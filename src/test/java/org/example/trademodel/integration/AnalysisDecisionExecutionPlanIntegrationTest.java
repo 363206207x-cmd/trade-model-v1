@@ -40,6 +40,7 @@ import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -47,15 +48,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,6 +79,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     private static final String ANALYSIS_ID = "ana-int-decision-plan-1";
     private static final String SYMBOL = "BTCUSDT";
+    private static final Instant PLAN_VALIDITY_NOW = Instant.parse("2026-07-20T11:49:00Z");
+    private static final DateTimeFormatter PLAN_VALIDITY_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     @Autowired
     private AnalysisRunMapper analysisRunMapper;
@@ -108,6 +114,10 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @BeforeEach
     void cleanDashboardRuntimeTables() {
+        ReflectionTestUtils.invokeMethod(
+                dashboardHomeService,
+                "setPlanValidityClock",
+                Clock.fixed(PLAN_VALIDITY_NOW, ZoneOffset.UTC));
         for (String table : List.of(
                 "tm_push_recheck_log",
                 "tm_push_snapshot",
@@ -135,6 +145,14 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                     : emptyRoleResult(request);
         });
         when(aiDecisionOrchestratorService.providerReadiness()).thenReturn(List.of());
+    }
+
+    @AfterEach
+    void restoreDashboardPlanValidityClock() {
+        ReflectionTestUtils.invokeMethod(
+                dashboardHomeService,
+                "setPlanValidityClock",
+                Clock.systemUTC());
     }
 
     @Test
@@ -500,10 +518,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     private String persistControlledAnalysisDecisionAndPlan() {
         LocalDateTime now = LocalDateTime.of(2026, 7, 2, 9, 30);
-        OffsetDateTime validityNow = OffsetDateTime.now(ZoneOffset.UTC).withNano(0);
+        OffsetDateTime validityNow = OffsetDateTime.ofInstant(PLAN_VALIDITY_NOW, ZoneOffset.UTC);
         OffsetDateTime validFrom = validityNow.minusHours(1);
         OffsetDateTime expiresAt = validityNow.plusHours(1);
-        String validPeriod = validFrom + " ~ " + expiresAt;
+        String validPeriod = PLAN_VALIDITY_FORMAT.format(validFrom)
+                + " ~ "
+                + PLAN_VALIDITY_FORMAT.format(expiresAt);
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(ANALYSIS_ID);
         run.setSymbol(SYMBOL);

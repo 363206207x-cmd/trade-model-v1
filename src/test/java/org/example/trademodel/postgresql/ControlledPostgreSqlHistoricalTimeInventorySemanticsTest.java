@@ -57,6 +57,7 @@ class ControlledPostgreSqlHistoricalTimeInventorySemanticsTest {
         Flyway.configure()
                 .dataSource(jdbcUrl, username, password)
                 .locations("classpath:db/migration")
+                .target("7")
                 .load()
                 .migrate();
         inventoryQuery = loadInventoryQuery();

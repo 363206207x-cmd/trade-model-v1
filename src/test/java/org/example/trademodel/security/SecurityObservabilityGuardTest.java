@@ -10,15 +10,13 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "trade-model.auth.enabled=true",
-        "trade-model.auth.admin-username=operator",
-        "trade-model.auth.admin-password=operator-secret",
         "trade-model.security.rate-limit.enabled=true",
         "trade-model.security.rate-limit.requests-per-minute=100",
         "trade-model.security.rate-limit.window-ms=60000"
@@ -45,13 +43,15 @@ class SecurityObservabilityGuardTest {
 
     @Test
     void authenticationFailuresAreAuditedWithoutCredentialValues(CapturedOutput output) throws Exception {
-        mockMvc.perform(get("/api/dashboard/home").with(httpBasic("operator", "bad-secret")))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().exists("WWW-Authenticate"));
+        mockMvc.perform(get("/api/dashboard/home"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(formLogin().user("operator").password("bad-secret"))
+                .andExpect(status().is3xxRedirection());
 
         assertThat(output).contains("AUTH_AUDIT");
         assertThat(output).contains("outcome=FAILURE");
         assertThat(output).contains("path=/api/dashboard/home");
+        assertThat(output).contains("LOGIN_AUDIT");
         assertThat(output).doesNotContain("bad-secret");
     }
 
