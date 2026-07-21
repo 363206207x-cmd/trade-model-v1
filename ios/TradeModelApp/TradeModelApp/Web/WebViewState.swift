@@ -39,8 +39,12 @@ final class WebViewState: ObservableObject {
     }
 
     func didFinishNavigation(canGoBack: Bool) {
-        self.canGoBack = canGoBack
-        phase = .content
+        if self.canGoBack != canGoBack {
+            self.canGoBack = canGoBack
+        }
+        if phase != .content {
+            phase = .content
+        }
     }
 
     func didFailNavigation() {

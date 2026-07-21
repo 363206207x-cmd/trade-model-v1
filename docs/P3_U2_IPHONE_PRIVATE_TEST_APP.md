@@ -28,7 +28,7 @@ The package adds an iPhone-only Xcode project under `ios/TradeModelApp`:
 
 ## Existing Authentication Reuse
 
-The app loads the configured origin's `/dashboard`. An unauthenticated backend
+The app loads the configured origin's `/dashboard/mobile`. An unauthenticated backend
 Session redirects to `/login`; a valid form login redirects back to the
 Dashboard. The WebView owns the browser flow:
 

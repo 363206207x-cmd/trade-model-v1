@@ -9,6 +9,13 @@ final class TrustedNavigationPolicyTests: XCTestCase {
         XCTAssertEqual(decision, .allowInWebView)
     }
 
+    func testLoginMobileHomeAndReviewRemainSameOriginNavigation() {
+        for path in ["/login", "/dashboard/mobile", "/review/dashboard"] {
+            let url = URL(string: "https://app.example.test\(path)")!
+            XCTAssertEqual(policy.decision(for: url), .allowInWebView)
+        }
+    }
+
     func testExternalHttpsOpensOutsideApp() {
         let url = URL(string: "https://docs.example.test/help")!
         XCTAssertEqual(policy.decision(for: url), .openExternally(url))

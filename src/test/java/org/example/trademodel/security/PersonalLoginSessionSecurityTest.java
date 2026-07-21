@@ -88,6 +88,10 @@ class PersonalLoginSessionSecurityTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("**/login"));
 
+        mockMvc.perform(get("/dashboard/mobile"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+
         mockMvc.perform(get("/api/dashboard/home"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().json("{\"code\":401,\"msg\":\"authentication required\"}"));
@@ -113,6 +117,29 @@ class PersonalLoginSessionSecurityTest {
         mockMvc.perform(get("/dashboard").session(session))
                 .andExpect(status().isOk())
                 .andExpect(authenticated().withUsername(USERNAME));
+
+        mockMvc.perform(get("/dashboard/mobile").session(session))
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(USERNAME))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("AI 证据复核")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("完整持仓页待实现")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("top.holdingRisk"))));
+    }
+
+    @Test
+    void mobileSavedRequestReturnsToMobileProjectionAfterLogin() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        mockMvc.perform(get("/dashboard/mobile").session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+
+        mockMvc.perform(post("/login")
+                        .session(session)
+                        .with(csrf())
+                        .param("username", USERNAME)
+                        .param("password", PASSWORD))
+                .andExpect(authenticated().withUsername(USERNAME))
+                .andExpect(redirectedUrlPattern("**/dashboard/mobile*"));
     }
 
     @Test
