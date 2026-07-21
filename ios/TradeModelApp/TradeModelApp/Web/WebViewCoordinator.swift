@@ -7,17 +7,20 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     private let navigationPolicy: TrustedNavigationPolicy
     private let state: WebViewState
     private let externalOpener: (URL) -> Void
+    private var textSizeLevel: MobileWebTextSizeLevel
     private weak var webView: WKWebView?
 
     init(
         rootURL: URL,
         navigationPolicy: TrustedNavigationPolicy,
         state: WebViewState,
+        textSizeLevel: MobileWebTextSizeLevel,
         externalOpener: @escaping (URL) -> Void
     ) {
         self.rootURL = rootURL
         self.navigationPolicy = navigationPolicy
         self.state = state
+        self.textSizeLevel = textSizeLevel
         self.externalOpener = externalOpener
     }
 
@@ -47,6 +50,15 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
     }
 
+    func updateTextSize(_ newLevel: MobileWebTextSizeLevel, in webView: WKWebView) {
+        guard newLevel != textSizeLevel else { return }
+        textSizeLevel = newLevel
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        controller.addUserScript(newLevel.userScript)
+        webView.evaluateJavaScript(newLevel.attributeScript)
+    }
+
     @objc func refresh(_ sender: UIRefreshControl) {
         state.refresh()
         sender.endRefreshing()
@@ -73,6 +85,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+        webView.evaluateJavaScript(textSizeLevel.attributeScript)
         state.didFinishNavigation(canGoBack: webView.canGoBack)
     }
 

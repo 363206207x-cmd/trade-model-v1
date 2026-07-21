@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     private let configurationResult: Result<BackendConfiguration, BackendConfigurationError>
     @StateObject private var webViewState = WebViewState()
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(
         configurationResult: Result<BackendConfiguration, BackendConfigurationError> =
@@ -28,7 +29,11 @@ struct ContentView: View {
             browserToolbar
             Divider()
             ZStack {
-                TradeModelWebView(configuration: configuration, state: webViewState)
+                TradeModelWebView(
+                    configuration: configuration,
+                    state: webViewState,
+                    textSizeLevel: MobileWebTextSizeLevel(dynamicTypeSize: dynamicTypeSize)
+                )
 
                 switch webViewState.phase {
                 case .loading:
@@ -56,18 +61,24 @@ struct ContentView: View {
 
             Button(action: webViewState.goBack) {
                 Image(systemName: "chevron.backward")
-                    .frame(width: 36, height: 36)
+                    .frame(width: 20, height: 20)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!webViewState.canGoBack)
             .accessibilityLabel("返回")
+            .accessibilityIdentifier("toolbar-back")
 
             Button(action: webViewState.refresh) {
                 Image(systemName: "arrow.clockwise")
-                    .frame(width: 36, height: 36)
+                    .frame(width: 20, height: 20)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("刷新")
+            .accessibilityIdentifier("toolbar-refresh")
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 48)

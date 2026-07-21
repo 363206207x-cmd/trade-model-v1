@@ -29,7 +29,7 @@ This package implements a mobile information projection of the existing Dashboar
 15. **Position route**: a complete position page remains `CONTRACT_UNRESOLVED`; the page shows a disabled `完整持仓页待实现` control and creates no route.
 16. **Appearance**: light and dark colors follow `prefers-color-scheme`; color is supplementary and never the sole state signal.
 17. **Device layout**: 440 pt uses the primary pager and up to three position summaries; the 428 pt breakpoint stacks alerts/events and shows up to two position summaries without scaling the page.
-18. **Accessibility**: controls are at least 44 pt, tabs/radios expose selection state, native disclosures expose expanded state, headings follow document order, and text can wrap under Dynamic Type.
+18. **Accessibility**: controls are at least 44 pt, tabs/radios expose selection state, native disclosures expose expanded state, headings follow document order, and a bounded SwiftUI-to-WKWebView bridge maps Dynamic Type to mobile-only root font levels.
 19. **Desktop boundary**: the desktop controller, template, endpoint contract, and behavior are not changed by this package.
 20. **Validation**: MVC/authentication, template and JavaScript contracts, iOS URL/security tests, full Java regression, Swift XCTest, simulator build, and actual localhost visual acceptance are required before review.
 
@@ -90,9 +90,48 @@ Acceptance results:
 - visible interactive controls measured at least 44 pt;
 - the page shell stayed at the viewport width with global horizontal overflow clipped while the asset pager retained its intentional local horizontal scroll;
 - the 17 Pro Max Simulator passed Light, Dark, and one-step larger Dynamic Type (`large` to `extra-large`) visual inspection;
-- the 12 Pro Max Simulator passed independent Light and Dark visual inspection without page scaling.
+- the 12 Pro Max Simulator passed independent Light and Dark plus larger-text visual inspection without page scaling;
+- real WKWebView DOM tests cover asset/AI linkage, same-card request races, Home reset/focus, AI tab exclusivity, Dynamic Type computed styles, and bottom-navigation clearance at the 12 Pro Max breakpoint.
 
 During Simulator acceptance, repeated `didFinishNavigation` publication from `UIViewRepresentable.updateUIView` kept the loading overlay active and produced a SwiftUI runtime warning. `WebViewState` now publishes only when `phase` or `canGoBack` actually changes. The idempotence regression test proves a repeated identical completion produces no additional publication. Authentication, Session, Cookie, CSRF, trusted-origin, and URL security contracts are unchanged.
+
+## Confirmed Findings Closure
+
+The pre-change 17 Pro Max baseline placed the execution section near `746.7pt`, its required core near `948pt`, and the bottom navigation near `845.7pt`, producing approximately `-102.3pt` clearance. The native back and refresh targets measured `36x36pt`; Web content remained at a fixed `17px`; the package had six source-contract tests but no real DOM interaction or request-race test.
+
+The fixed implementation was measured in the mobile Web content viewport using the running production template and production CSS/JavaScript. CSS pixels map one-to-one to iOS layout points for this viewport. The required execution core measurement includes the direction, entry zone, and disclosure entry rather than stopping at the field grid.
+
+| Measurement | Default text | Larger text |
+| --- | ---: | ---: |
+| Execution top | `446.36pt` | `469.72pt` |
+| Execution field-grid bottom | `598.58pt` | `627.70pt` |
+| Required execution-core bottom | `642.58pt` | `671.70pt` |
+| Bottom-navigation top | `705.00pt` | `705.00pt` |
+| Required-core clearance | `62.42pt` | `33.30pt` |
+| Body computed font | `17.00px` | `18.36px` |
+| Execution-value computed font | `14.96px` | `16.1568px` |
+| Global horizontal overflow | none | none |
+
+Both clearances exceed the required `12pt`. The 17 Pro Max screenshots show the execution title, asset, status, direction, entry zone, risk/fail-closed explanation, and disclosure entry above the navigation. No `transform: scale` or global page scaling was introduced. On the 12 Pro Max larger-text layout, a real WKWebView geometry test scrolls the final content marker to at least `12pt` above the fixed navigation, proving content remains reachable rather than permanently obscured.
+
+SwiftUI maps supported `DynamicTypeSize` values to exactly four whitelisted levels: `default`, `large`, `extra-large`, and `accessibility`. A main-frame-only `WKUserScript` writes only the fixed `data-mobile-text-size` attribute. CSS changes the mobile root font size and lets the layout reflow; it does not accept arbitrary CSS or script input. Page refresh and completed navigation reapply the current bounded level. The measured larger/default font ratio is `1.08`; the global content scale remains `1.00`.
+
+The native toolbar icons remain visually compact, while their actual XCUI frames are:
+
+```text
+BACK_BUTTON_FRAME: 44.0x44.0pt
+REFRESH_BUTTON_FRAME: 44.0x44.0pt
+VOICEOVER_LABELS: PASS (返回 / 刷新)
+```
+
+The asset request path now assigns a monotonic sequence to each card and captures each request's own `AbortController`. An older request may clear `aria-busy` only when its sequence is still current for that card. The real DOM race fixture confirms:
+
+```text
+ARIA_BUSY_AFTER_OLD_REQUEST_FINISHES: true
+ARIA_BUSY_AFTER_LATEST_REQUEST_FINISHES: false
+```
+
+The source-contract suite remains six tests. Six additional real WKWebView DOM interaction tests execute production CSS and JavaScript; they are not source-string assertions. No remote dependency was added.
 
 ## Implementation Screenshots
 
@@ -103,6 +142,8 @@ During Simulator acceptance, repeated `didFinishNavigation` publication from `UI
 - `docs/implementation-screenshots/p3-u2-simulator-12pm-light.png`
 - `docs/implementation-screenshots/p3-u2-simulator-12pm-dark.png`
 - `docs/implementation-screenshots/p3-u2-simulator-17pm-dark-large-text.png`
+- `docs/implementation-screenshots/p3-u2-simulator-12pm-dark-large-text.png`
+- `docs/implementation-screenshots/p3-u2-native-back-button-44pt-xcui.png`
 - `docs/implementation-screenshots/p3-u2-mobile-17pm-position-summary.png`
 - `docs/implementation-screenshots/p3-u2-mobile-17pm-ai-gpt.png`
 - `docs/implementation-screenshots/p3-u2-mobile-17pm-ai-gemini.png`
@@ -115,8 +156,12 @@ The screenshots are generated from the running implementation. Design-contract p
 ## Validation
 
 - Java full regression: `4108` tests, `0` failures, `0` errors, `14` environment-gated skips.
-- Swift XCTest on iPhone 17 Pro Max Simulator: `50` tests, all passed.
+- Swift XCTest on iPhone 17 Pro Max Simulator: `62` tests (`59` unit/real-WKWebView tests and `3` XCUI tests), `0` failures.
+- Real DOM interaction tests: `6`, `0` failures.
+- Native touch-target tests: return `44x44pt`, refresh `44x44pt`, VoiceOver labels passed.
+- JavaScript syntax, Xcode project parse, and mobile CSS computed-style parsing in real WKWebView: `PASS`.
 - Workflow contract: `PASS` (`WORKFLOW_CONTRACT_OK`).
+- V1 state command: `PASS`; it continues to report production deployment readiness `BLOCKED` and does not unlock the next business phase.
 - Git diff check: `PASS`.
 - Delivery check: `ENVIRONMENT_PATH_GATED_ONLY`; the isolated worktree path is `/Users/xuchao/Documents/trade-model-v1-p0-0-audit/p3-u2-work`, while the script requires `/Users/xuchao/Documents/trade-model-v1`. It exited with code `2` before business checks and is not reported as a pass.
 - Real iPhone validation: `NOT_RUN`.

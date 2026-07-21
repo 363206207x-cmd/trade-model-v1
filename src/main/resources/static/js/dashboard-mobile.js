@@ -282,7 +282,9 @@
     requestSequence += 1;
     var sequence = requestSequence;
     if (activeRequest) activeRequest.abort();
-    activeRequest = new AbortController();
+    var request = new AbortController();
+    activeRequest = request;
+    sourceCard.dataset.requestSequence = String(sequence);
     sourceCard.setAttribute("aria-busy", "true");
 
     try {
@@ -294,7 +296,7 @@
         method: "GET",
         credentials: "same-origin",
         headers: { Accept: "application/json" },
-        signal: activeRequest.signal
+        signal: request.signal
       });
       if (!response.ok) throw new Error("HOME_REQUEST_FAILED");
       var envelope = await response.json();
@@ -310,7 +312,11 @@
         failClosedAfterLoadError();
       }
     } finally {
-      sourceCard.removeAttribute("aria-busy");
+      if (sourceCard.dataset.requestSequence === String(sequence)) {
+        sourceCard.removeAttribute("aria-busy");
+        delete sourceCard.dataset.requestSequence;
+      }
+      if (activeRequest === request) activeRequest = null;
     }
   }
 

@@ -24,6 +24,10 @@
 		B0000000000000000000000F /* SecurityContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000010 /* SecurityContractTests.swift */; };
 		B00000000000000000000010 /* XcodeProjectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* XcodeProjectContractTests.swift */; };
 		B00000000000000000000011 /* TradeModelAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* TradeModelAppUITests.swift */; };
+		B00000000000000000000012 /* MobileWebTextSizeLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* MobileWebTextSizeLevelTests.swift */; };
+		B00000000000000000000013 /* DashboardMobileDomInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000015 /* DashboardMobileDomInteractionTests.swift */; };
+		B00000000000000000000014 /* dashboard-mobile.js in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000016 /* dashboard-mobile.js */; };
+		B00000000000000000000015 /* dashboard-mobile.css in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000017 /* dashboard-mobile.css */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +66,10 @@
 		F00000000000000000000010 /* SecurityContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityContractTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000011 /* XcodeProjectContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XcodeProjectContractTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000013 /* TradeModelAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeModelAppUITests.swift; sourceTree = "<group>"; };
+		F00000000000000000000014 /* MobileWebTextSizeLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWebTextSizeLevelTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000015 /* DashboardMobileDomInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMobileDomInteractionTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000016 /* dashboard-mobile.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = dashboard-mobile.js; path = ../../src/main/resources/static/js/dashboard-mobile.js; sourceTree = SOURCE_ROOT; };
+		F00000000000000000000017 /* dashboard-mobile.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = dashboard-mobile.css; path = ../../src/main/resources/static/css/dashboard-mobile.css; sourceTree = SOURCE_ROOT; };
 		F00000000000000000000020 /* TradeModelApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TradeModelApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000021 /* TradeModelAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TradeModelAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000022 /* TradeModelAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TradeModelAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -98,6 +106,7 @@
 				G00000000000000000000003 /* TradeModelApp */,
 				G00000000000000000000007 /* TradeModelAppTests */,
 				G00000000000000000000008 /* TradeModelAppUITests */,
+				G00000000000000000000009 /* DOM Test Resources */,
 				G00000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -163,6 +172,8 @@
 				F0000000000000000000000F /* WebViewStateTests.swift */,
 				F00000000000000000000010 /* SecurityContractTests.swift */,
 				F00000000000000000000011 /* XcodeProjectContractTests.swift */,
+				F00000000000000000000014 /* MobileWebTextSizeLevelTests.swift */,
+				F00000000000000000000015 /* DashboardMobileDomInteractionTests.swift */,
 			);
 			path = TradeModelAppTests;
 			sourceTree = "<group>";
@@ -173,6 +184,15 @@
 				F00000000000000000000013 /* TradeModelAppUITests.swift */,
 			);
 			path = TradeModelAppUITests;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000009 /* DOM Test Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000016 /* dashboard-mobile.js */,
+				F00000000000000000000017 /* dashboard-mobile.css */,
+			);
+			name = "DOM Test Resources";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -287,6 +307,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B00000000000000000000014 /* dashboard-mobile.js in Resources */,
+				B00000000000000000000015 /* dashboard-mobile.css in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -326,6 +348,8 @@
 				B0000000000000000000000E /* WebViewStateTests.swift in Sources */,
 				B0000000000000000000000F /* SecurityContractTests.swift in Sources */,
 				B00000000000000000000010 /* XcodeProjectContractTests.swift in Sources */,
+				B00000000000000000000012 /* MobileWebTextSizeLevelTests.swift in Sources */,
+				B00000000000000000000013 /* DashboardMobileDomInteractionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -15,9 +15,22 @@
   --focus: #1876c7;
   --nav-height: 58px;
   --content-max: 440px;
+  --mobile-root-font-size: 17px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 17px;
+  font-size: var(--mobile-root-font-size);
   letter-spacing: 0;
+}
+
+:root[data-mobile-text-size="large"] {
+  --mobile-root-font-size: 18.36px;
+}
+
+:root[data-mobile-text-size="extra-large"] {
+  --mobile-root-font-size: 19.55px;
+}
+
+:root[data-mobile-text-size="accessibility"] {
+  --mobile-root-font-size: 21.25px;
 }
 
 * {
@@ -709,6 +722,102 @@ h3 {
 
   .header-meta {
     max-width: 42%;
+  }
+}
+
+@media (min-width: 431px) {
+  .mobile-home {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .mobile-header {
+    min-height: 44px;
+    padding-top: 2px;
+    padding-bottom: 4px;
+  }
+
+  .mobile-header .page-context,
+  .status-section .section-heading {
+    display: none;
+  }
+
+  .status-section {
+    padding-top: 4px;
+    padding-bottom: 5px;
+  }
+
+  .status-grid {
+    gap: 2px 8px;
+    padding: 3px 0;
+  }
+
+  .status-cell {
+    min-height: 31px;
+  }
+
+  .status-cell dd {
+    margin-top: 1px;
+  }
+
+  .alert-event-section,
+  .watch-section {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .watch-section .section-heading,
+  .execution-section .section-heading {
+    margin-bottom: 4px;
+  }
+
+  .selection-context {
+    margin-bottom: 4px;
+  }
+
+  .asset-pager {
+    padding-bottom: 4px;
+  }
+
+  .asset-card {
+    min-height: 104px;
+    padding: 8px;
+  }
+
+  .asset-core-grid {
+    margin-top: 3px;
+  }
+
+  .asset-core-grid b {
+    margin-top: 1px;
+  }
+
+  .asset-p1-inline {
+    margin-top: 4px;
+    padding-top: 3px;
+  }
+
+  .execution-section {
+    padding-top: 7px;
+  }
+
+  .execution-section .semantic-state-line {
+    min-height: 34px;
+    padding: 2px 0;
+  }
+
+  .execution-section .semantic-explanation {
+    margin: 4px 0 5px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .execution-compact-grid > div {
+    padding: 6px 9px;
+  }
+
+  .execution-compact-grid dd {
+    margin-top: 2px;
+    line-height: 1.3;
   }
 }
 
