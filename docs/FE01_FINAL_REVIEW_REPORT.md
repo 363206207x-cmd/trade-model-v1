@@ -1,183 +1,192 @@
-# FE-01 Overview Dashboard Final Exact-HEAD Review
+# FE-01 Overview Dashboard Final Exact-Commit Review
 
-## 1. Final Result
+## 1. Review Decision
 
 | Item | Result |
 |---|---|
 | Review date | 2026-07-24 |
-| Review mode | Read-only exact-HEAD review |
+| Review mode | Read-only exact-commit review |
+| Reviewed commit | `a000e115c39c500b1bcb8e140673aa3896d594d8` |
+| Commit subject | `fix(frontend): close FE-01 overview contract gaps` |
 | Branch | `codex/p3-u2-iphone-home-mobile-projection-p1` |
-| Reviewed HEAD | `b939c8b8ae84d3eb93d2d5eb60c3e3c5be268a58` |
-| Worktree | `DIRTY` |
-| FE01 remediation in current worktree | `PASS_CANDIDATE` |
-| FE01 remediation in reviewed HEAD | `NO` |
-| FE01_FINAL_STATUS | `FAIL` |
+| Isolated review worktree | `CLEAN` |
+| FE01_FINAL_STATUS | `PASS` |
 | FE02_ALLOWED | `NO` |
 | Production readiness | `BLOCKED` |
 
-The FE-01 remediation behaves correctly in the current worktree, but the
-reviewed commit does not contain that remediation. The passing Maven, contract,
-and iOS DOM evidence therefore binds to the dirty worktree, not to the reviewed
-HEAD. This is not an exact-HEAD PASS.
+The FE-01 implementation and its tests are complete and internally consistent
+at the reviewed commit. No scoped code blocker remains.
 
-## 2. Exact-HEAD Inclusion
+`FE02_ALLOWED` remains `NO` because the reviewed commit is not contained in
+local `main`. Repository governance requires reviewed merged main（已合并主线）,
+synced main（已同步主线）, and a clean worktree（干净工作区）before a later
+business package starts.
 
-Result: `FAIL`
+## 2. Commit Integrity
 
-The following required FE-01 artifacts exist only in the current worktree:
+Result: `PASS`
 
-- `src/main/resources/static/js/frontend-contract.js` is untracked and does
-  not exist in `HEAD`;
-- `src/test/java/org/example/trademodel/controller/FrontendImplementationFoundationContractTest.java`
-  is untracked and does not exist in `HEAD`;
-- the restricted desktop refresh implementation and its endpoint-allowlist
-  tests are modifications after `HEAD`;
-- the real-template iOS DOM endpoint test is a modification after `HEAD`.
+The reviewed object exists as a Git commit and contains 13 scoped files:
 
-Consequently, `b939c8b8ae84d3eb93d2d5eb60c3e3c5be268a58` cannot be treated as the
-immutable FE-01 remediation commit.
+- the FE-01 final review and governing frontend interaction documents;
+- Desktop and Mobile Overview templates/scripts/styles;
+- the shared frontend contract;
+- Java controller/contract/security tests;
+- the iOS Dashboard DOM interaction test.
+
+An isolated detached worktree was created directly from
+`a000e115c39c500b1bcb8e140673aa3896d594d8`. Its status was clean before and
+after validation.
+
+The original development worktree has no post-commit diff in any of the 13
+reviewed FE-01 files. It still contains pre-existing local Xcode signing files
+and untracked historical/design documents. Those files are not part of this
+commit or this review result.
 
 ## 3. Dashboard API Contract
 
 ### Desktop
 
-Result: `FAIL_AT_HEAD`
+Result: `PASS`
 
-The reviewed HEAD's `refreshDashboard()` still calls:
+The normal `refreshDashboard()` call graph contains:
 
-- `fetchLocalRealPipelineStatus()`;
-- `fetchProviderRuntimeStatus()`;
-- `requestDetailForSelectedSymbol()`;
-- `refreshDashboardDiagnostics()` on Home failure.
+```text
+refreshDashboard
+  -> fetchDashboardHome
+  -> renderDashboardHomePayload
+  -> renderDashboardHomeUnavailable on failure
+```
 
-This violates the FE-01 rule that the normal Overview refresh depend only on:
+`fetchDashboardHome()` calls only:
 
 ```text
 GET /api/dashboard/home
 ```
 
-The current worktree removes that fan-out and fails closed through
-`renderDashboardHomeUnavailable()`, but that fix is not committed.
+It does not call `requestDetailForSelectedSymbol()`,
+`refreshDashboardDiagnostics()`, `fetchLocalRealPipelineStatus()`, or
+`fetchProviderRuntimeStatus()`.
+
+Legacy diagnostics helpers remain in the template for non-FE-01 operational
+surfaces, but they have no call site from the normal Overview refresh flow.
+They therefore do not create an Overview diagnostic API fan-out.
 
 ### Mobile
 
-Result: `PASS_AT_HEAD`
+Result: `PASS`
 
-The reviewed HEAD's mobile script contains one fetch path:
+The Mobile Overview script has one network fetch:
 
 ```text
 GET /api/dashboard/home
 ```
 
-No additional mobile Overview API dependency was found.
+No additional Mobile Overview diagnostic endpoint was found.
 
 ## 4. Asset-State Semantics
 
-Result: `FAIL_EXACT_HEAD_NOT_BOUND`
+Result: `PASS`
 
-The required semantic is:
+The shared frontend contract and Mobile template both define:
 
 ```text
-triggered = 条件已触发，不代表已开仓，也不代表用户持仓
+triggered = 条件已触发，不代表已开仓
 ```
 
-The current worktree encodes this in the shared frontend contract and mobile
-projection. The reviewed HEAD does not contain that shared contract or an
-equivalent explicit frontend mapping. It therefore cannot prove the required
-semantic at the exact commit.
+No FE-01 mapping treats `triggered` as:
 
-No automatic position creation was found, but absence of automatic creation
-does not replace the required explicit UI-state contract.
+- 已开仓;
+- 当前持仓;
+- 持仓监控中;
+- a generated `UserPosition`.
+
+The Desktop compact label `已触发` remains an asset-condition label and is not
+used as position evidence.
 
 ## 5. Execution Plan and User Position Separation
 
-Result: `FAIL_AT_HEAD`
+Result: `PASS`
 
-The reviewed HEAD's desktop `renderHomeExecutionFromPayload()` switches the
-Execution Plan region into `positionMode` and renders User Position and
-Position Monitor fields inside that same renderer, including:
-
-- position status;
-- user entry price;
-- floating P/L;
-- user stop loss and take profit;
-- monitoring status and suggested manual action.
-
-This does not preserve the required presentation boundary:
+The reviewed implementation preserves:
 
 ```text
 Execution Plan != User Position
 ```
 
-The current worktree separates these render paths and applies the exact-plan
-fail-closed guard, but those changes are not in the reviewed HEAD.
+Desktop:
 
-## 6. Figma Baseline
+- `renderHomeExecutionFromPayload()` reads only the system suggestion and
+  renders direction, entry, stop, take-profit, leverage, position suggestion,
+  validity, and invalidation fields;
+- `renderHomePositionsFromPayload()` separately reads actual user-position and
+  monitor facts;
+- exact plan identity and validity are checked before numeric plan boundaries
+  are shown.
 
-Result: `PASS`
+Mobile:
 
-Read-only inspection of Figma file
-`rdMYmsAvZYkXHJX8hdl7UN` confirmed:
+- Execution Suggestion and Position Monitor are separate sections;
+- system suggestions are labelled for manual review only;
+- user entry, leverage, size, stop loss, and take profit remain position facts;
+- asset selection updates Decision/Plan/AI context without mutating the
+  Position Monitor DOM.
 
-| Node | Name | Size | Page |
-|---|---|---|---|
-| `53:3` | `Overview Dashboard / Desktop Web` | `1440 x 2584` | `01 Overview Dashboard` |
-| `53:53` | `Overview Dashboard / iPhone` | `430 x 2266` | `01 Overview Dashboard` |
+No plan creates a position, and no buy/sell/order/automatic-trading control was
+added.
 
-No Figma node was modified during this review.
+## 6. Validation Binding
 
-## 7. Test-Evidence Binding
+All validation below ran from the clean isolated worktree at the exact reviewed
+commit.
 
-### Current Worktree Evidence
-
-| Check | Result |
+| Validation | Result |
 |---|---|
-| Full Maven reports | `4116` tests, `0` failures, `0` errors, `14` environment-gated skips |
-| FE-01 targeted Maven/contract tests | `155` tests, `0` failures, `0` errors |
-| iOS DOM suite | `16` tests, `0` failures, iPhone 17 Pro Max Simulator |
+| Full Maven regression | `4116` tests, `0` failures, `0` errors, `14` environment-gated skips |
+| FE-01 contract tests | `155` tests, `0` failures, `0` errors, `0` skips |
+| iOS Dashboard DOM tests | `16` tests, `0` failures |
+| `git diff --check` | `PASS` |
+| Worktree after tests | `CLEAN` |
 
-The targeted contract suite was rerun after the remediation files and passed.
-The iOS result bundle confirms all 16 selected DOM tests passed.
+The 14 full-suite skips are Docker/Testcontainers environment gates. They are
+not reported as Docker, PostgreSQL, or Testcontainers PASS.
 
-### Exact-HEAD Binding
+No live Provider call, live AI call, external notification, order, position
+mutation, or production deployment was executed by this review.
 
-Result: `FAIL`
+## 7. Remaining Blockers
 
-These tests loaded modified and untracked worktree files. At least two tested
-contract artifacts do not exist in the reviewed HEAD. The evidence is valid for
-the remediation candidate in the current worktree, but it is not valid
-exact-HEAD evidence for `b939c8b8ae84d3eb93d2d5eb60c3e3c5be268a58`.
+No scoped FE-01 code blocker remains.
 
-## 8. Safety Review
+Delivery blockers before FE-02:
 
-| Boundary | Result |
-|---|---|
-| Automatic open/close/reverse | `NOT_ADDED` |
-| Buy/sell/order controls | `NOT_ADDED` |
-| AI voting or AI rule bypass | `NOT_ADDED` |
-| Execution Plan treated as User Position | `REVIEWED_HEAD_UI_SEPARATION_FAIL` |
-| Production readiness | `BLOCKED` |
+1. Push the reviewed commit if it is not already on the remote branch.
+2. Complete the repository's PR review and merge authorization flow.
+3. Merge the reviewed FE-01 package to `main`.
+4. Sync local `main` and confirm a clean worktree.
+5. Re-run the merged-main state gate before starting FE-02.
 
-## 9. Remaining Blockers
-
-1. Isolate the intended FE-00/FE-01 remediation from unrelated local Xcode
-   signing/project changes.
-2. Commit the complete remediation so one new immutable HEAD contains the
-   implementation and its tests.
-3. Start from a clean worktree at that exact HEAD.
-4. Rerun full Maven, FE-01 contract tests, iOS DOM tests, and repository gates.
-5. Perform a new independent exact-HEAD review.
-6. Merge the reviewed package to `main` before treating it as effective or
-   entering FE-02.
-
-## 10. Gate Decision
+## 8. Final Gate
 
 ```text
 FE01_FINAL_STATUS:
-FAIL
+PASS
+
+FE01_EXACT_COMMIT_REVIEW:
+PASS
+
+FE01_EFFECTIVE_ON_MERGED_MAIN:
+NO
 
 FE02_ALLOWED:
 NO
+
+REMAINING_BLOCKERS:
+MERGED_MAIN_EFFECTIVITY_AND_CLEAN_SYNC
+
+PRODUCTION_READINESS:
+BLOCKED
 ```
 
-Current phase is NOT DONE. Next phase is NOT allowed.
+Current FE-01 review is complete at the exact commit. The package is not yet
+effective on merged main, so the next phase is not allowed.
