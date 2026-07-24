@@ -7,6 +7,15 @@ final class SecurityContractTests: XCTestCase {
         XCTAssertFalse(source.contains("SecItemAdd"))
     }
 
+    func testUserDefaultsPersistenceIsRestrictedToValidatedBackendURL() throws {
+        let source = try applicationSource()
+        let writeCount = source.components(separatedBy: "userDefaults.set(").count - 1
+
+        XCTAssertEqual(writeCount, 1)
+        XCTAssertTrue(source.contains("configuration.baseURL.absoluteString"))
+        XCTAssertTrue(source.contains("forKey: persistedBaseURLKey"))
+    }
+
     func testNoSessionCookieLogging() throws {
         let source = try applicationSource()
         XCTAssertFalse(source.contains("print("))

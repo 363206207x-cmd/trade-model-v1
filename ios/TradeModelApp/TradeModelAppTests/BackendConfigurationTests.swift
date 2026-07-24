@@ -12,6 +12,56 @@ final class BackendConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.rootURL.absoluteString, "http://192.168.50.20:8081/dashboard")
     }
 
+    func testPrivateIpv4RangesAreAllowedInDevelopment() {
+        for candidate in [
+            "http://10.20.30.40:8081",
+            "http://172.16.0.1:8081",
+            "http://172.31.255.254:8081",
+            "http://192.168.1.10:8081"
+        ] {
+            XCTAssertNoThrow(
+                try BackendConfiguration(
+                    baseURLString: candidate,
+                    environment: .development
+                )
+            )
+        }
+    }
+
+    func testPrivateLookingHostnameSuffixIsRejectedForDevelopmentHttp() {
+        for candidate in [
+            "http://10.0.0.1.attacker.example:8081",
+            "http://172.16.0.1.attacker.example:8081",
+            "http://192.168.1.1.attacker.example:8081"
+        ] {
+            XCTAssertThrowsError(
+                try BackendConfiguration(
+                    baseURLString: candidate,
+                    environment: .development
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? BackendConfigurationError,
+                    .insecureDevelopmentHost
+                )
+            }
+        }
+    }
+
+    func testPublicIpv4IsRejectedForDevelopmentHttp() {
+        XCTAssertThrowsError(
+            try BackendConfiguration(
+                baseURLString: "http://203.0.113.10:8081",
+                environment: .development
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? BackendConfigurationError,
+                .insecureDevelopmentHost
+            )
+        }
+    }
+
     func testNormalProductionHttpsDomainIsAllowed() throws {
         let configuration = try BackendConfiguration(
             baseURLString: "https://trade.example.com",
@@ -158,13 +208,195 @@ final class BackendConfigurationTests: XCTestCase {
     }
 
     func testProcessEnvironmentOverridesBuildSetting() throws {
-        let configuration = try BackendConfiguration.resolve(
-            environment: .production,
-            processEnvironment: ["TRADE_MODEL_BASE_URL": "https://runtime.example.test"],
-            infoDictionary: ["TRADE_MODEL_BASE_URL": "https://build.example.test"]
-        )
+        try withIsolatedDefaults { defaults in
+            defaults.set(
+                "https://persisted.example.test",
+                forKey: BackendConfiguration.persistedBaseURLKey
+            )
+            let configuration = try BackendConfiguration.resolve(
+                environment: .production,
+                processEnvironment: [
+                    "TRADE_MODEL_BASE_URL": "https://runtime.example.test"
+                ],
+                infoDictionary: [
+                    "TRADE_MODEL_BASE_URL": "https://build.example.test"
+                ],
+                userDefaults: defaults
+            )
 
-        XCTAssertEqual(configuration.baseURL.host, "runtime.example.test")
+            XCTAssertEqual(configuration.baseURL.host, "runtime.example.test")
+            XCTAssertEqual(
+                defaults.string(forKey: BackendConfiguration.persistedBaseURLKey),
+                "https://runtime.example.test"
+            )
+        }
+    }
+
+    func testFreshLaunchPersistsValidatedRuntimeBackendURL() throws {
+        try withIsolatedDefaults { defaults in
+            let configuration = try BackendConfiguration.resolve(
+                environment: .development,
+                processEnvironment: [
+                    "TRADE_MODEL_BASE_URL": "http://192.168.50.20:8081"
+                ],
+                infoDictionary: [:],
+                userDefaults: defaults
+            )
+
+            XCTAssertEqual(
+                configuration.baseURL.absoluteString,
+                "http://192.168.50.20:8081"
+            )
+            XCTAssertEqual(
+                defaults.string(forKey: BackendConfiguration.persistedBaseURLKey),
+                "http://192.168.50.20:8081"
+            )
+        }
+    }
+
+    func testRelaunchUsesPersistedBackendURLWhenLaunchConfigIsMissing() throws {
+        try withIsolatedDefaults { defaults in
+            _ = try BackendConfiguration.resolve(
+                environment: .development,
+                processEnvironment: [
+                    "TRADE_MODEL_BASE_URL": "http://192.168.50.20:8081"
+                ],
+                infoDictionary: [:],
+                userDefaults: defaults
+            )
+
+            let relaunched = try BackendConfiguration.resolve(
+                environment: .development,
+                processEnvironment: [:],
+                infoDictionary: ["TRADE_MODEL_BASE_URL": ""],
+                userDefaults: defaults
+            )
+
+            XCTAssertEqual(
+                relaunched.baseURL.absoluteString,
+                "http://192.168.50.20:8081"
+            )
+        }
+    }
+
+    func testBuildSettingIsUsedBeforePersistedBackendURL() throws {
+        try withIsolatedDefaults { defaults in
+            defaults.set(
+                "https://persisted.example.test",
+                forKey: BackendConfiguration.persistedBaseURLKey
+            )
+
+            let configuration = try BackendConfiguration.resolve(
+                environment: .production,
+                processEnvironment: [:],
+                infoDictionary: [
+                    "TRADE_MODEL_BASE_URL": "https://build.example.test"
+                ],
+                userDefaults: defaults
+            )
+
+            XCTAssertEqual(configuration.baseURL.host, "build.example.test")
+            XCTAssertEqual(
+                defaults.string(forKey: BackendConfiguration.persistedBaseURLKey),
+                "https://build.example.test"
+            )
+        }
+    }
+
+    func testMissingConfigurationFailsClosedWithoutPersistedFallback() throws {
+        try withIsolatedDefaults { defaults in
+            XCTAssertThrowsError(
+                try BackendConfiguration.resolve(
+                    environment: .development,
+                    processEnvironment: [:],
+                    infoDictionary: [
+                        "TRADE_MODEL_BASE_URL": "$(TRADE_MODEL_BASE_URL)"
+                    ],
+                    userDefaults: defaults
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? BackendConfigurationError,
+                    .missingBaseURL
+                )
+            }
+        }
+    }
+
+    func testExplicitEmptyRuntimeConfigurationFailsClosed() throws {
+        try withIsolatedDefaults { defaults in
+            defaults.set(
+                "https://persisted.example.test",
+                forKey: BackendConfiguration.persistedBaseURLKey
+            )
+
+            XCTAssertThrowsError(
+                try BackendConfiguration.resolve(
+                    environment: .production,
+                    processEnvironment: ["TRADE_MODEL_BASE_URL": ""],
+                    infoDictionary: [:],
+                    userDefaults: defaults
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? BackendConfigurationError,
+                    .missingBaseURL
+                )
+            }
+        }
+    }
+
+    func testInvalidRuntimeConfigurationDoesNotReplacePersistedValue() throws {
+        try withIsolatedDefaults { defaults in
+            defaults.set(
+                "https://persisted.example.test",
+                forKey: BackendConfiguration.persistedBaseURLKey
+            )
+
+            XCTAssertThrowsError(
+                try BackendConfiguration.resolve(
+                    environment: .production,
+                    processEnvironment: [
+                        "TRADE_MODEL_BASE_URL": "https://user:secret@example.test"
+                    ],
+                    infoDictionary: [:],
+                    userDefaults: defaults
+                )
+            )
+            XCTAssertEqual(
+                defaults.string(forKey: BackendConfiguration.persistedBaseURLKey),
+                "https://persisted.example.test"
+            )
+        }
+    }
+
+    func testPersistenceIsIsolatedBetweenUserDefaultsSuites() throws {
+        try withIsolatedDefaults { firstDefaults in
+            _ = try BackendConfiguration.resolve(
+                environment: .production,
+                processEnvironment: [
+                    "TRADE_MODEL_BASE_URL": "https://first.example.test"
+                ],
+                infoDictionary: [:],
+                userDefaults: firstDefaults
+            )
+
+            try withIsolatedDefaults { secondDefaults in
+                XCTAssertThrowsError(
+                    try BackendConfiguration.resolve(
+                        environment: .production,
+                        processEnvironment: [:],
+                        infoDictionary: [:],
+                        userDefaults: secondDefaults
+                    )
+                ) { error in
+                    XCTAssertEqual(
+                        error as? BackendConfigurationError,
+                        .missingBaseURL
+                    )
+                }
+            }
+        }
     }
 
     private func assertLoopbackRejected(
@@ -185,5 +417,17 @@ final class BackendConfigurationTests: XCTestCase {
                 line: line
             )
         }
+    }
+
+    private func withIsolatedDefaults(
+        _ body: (UserDefaults) throws -> Void
+    ) rethrows {
+        let suiteName = "BackendConfigurationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        try body(defaults)
     }
 }
