@@ -25,8 +25,9 @@ enum HostSecurityPolicy {
             return address & 0xff00_0000 == 0x7f00_0000
         }
 
+        let ipv6Host = removingIPv6ZoneIdentifier(from: host)
         var ipv6 = in6_addr()
-        guard host.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1 else {
+        guard ipv6Host.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1 else {
             return false
         }
         return withUnsafeBytes(of: &ipv6) { rawBytes in
@@ -48,6 +49,14 @@ enum HostSecurityPolicy {
             return UInt32(bigEndian: ipv4.s_addr)
         }
         return nil
+    }
+
+    private static func removingIPv6ZoneIdentifier(from host: String) -> String {
+        guard host.contains(":"),
+              let zoneSeparator = host.firstIndex(of: "%") else {
+            return host
+        }
+        return String(host[..<zoneSeparator])
     }
 }
 

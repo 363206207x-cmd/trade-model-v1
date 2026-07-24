@@ -75,6 +75,21 @@ final class BackendConfigurationTests: XCTestCase {
         assertLoopbackRejected("https://[0:0:0:0:0:0:0:1]")
     }
 
+    func testIpv6LoopbackWithZoneIdentifierIsRejected() {
+        for candidate in [
+            "https://[::1%25lo0]",
+            "https://[0:0:0:0:0:0:0:1%25en0]",
+            "https://[::ffff:127.0.0.1%25en0]"
+        ] {
+            assertLoopbackRejected(candidate)
+        }
+    }
+
+    func testRawIpv6LoopbackZoneIdentifierIsDetected() {
+        XCTAssertTrue(HostSecurityPolicy.isLoopbackHost("::1%lo0"))
+        XCTAssertTrue(HostSecurityPolicy.isLoopbackHost("[::1%25lo0]"))
+    }
+
     func testIpv4MappedIpv6LoopbackIsRejected() {
         assertLoopbackRejected("https://[::ffff:127.0.0.1]")
         assertLoopbackRejected("https://[::ffff:127.1.2.3]")
