@@ -121,8 +121,15 @@ class PersonalLoginSessionSecurityTest {
         mockMvc.perform(get("/dashboard/mobile").session(session))
                 .andExpect(status().isOk())
                 .andExpect(authenticated().withUsername(USERNAME))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("AI 证据复核")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("完整持仓页待实现")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("AI 三角色复核")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-asset-search-toggle")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-asset-add")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("完整持仓页待实现"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("{asset"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("{position"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("{aiDecision"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("{marketTrend"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("{riskLevel"))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("top.holdingRisk"))));
     }
 
