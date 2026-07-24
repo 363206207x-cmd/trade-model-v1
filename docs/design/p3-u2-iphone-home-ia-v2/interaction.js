@@ -31,7 +31,7 @@
 
   let selectedAssetIndex = 0;
   let activeRole = "gpt";
-  const initialPositionMarkup = positionSection ? positionSection.innerHTML : "";
+  let initialPositionMarkup = "";
   const captureUsesSafeEmptyState = params.get("capture") === "1";
 
   const fixtureFallback = (fieldPath) => {
@@ -69,6 +69,15 @@
       textNode.parentElement?.setAttribute("data-field-token", fieldPaths.join(","));
       textNode.nodeValue = source.replace(tokenPattern, (_token, fieldPath) => fixtureFallback(fieldPath));
     });
+  };
+
+  const validateCaptureSafeEmptyState = () => {
+    if (!captureUsesSafeEmptyState || !positionSection) {
+      return;
+    }
+    if (/\{[^{}]+\}/.test(positionSection.textContent || "")) {
+      throw new Error("Capture-mode position safe-empty normalization failed");
+    }
   };
 
   const setPressed = (selector, value, attribute) => {
@@ -256,6 +265,8 @@
     document.body.classList.add("capture-mode");
   }
   applyCaptureSafeEmptyState();
+  validateCaptureSafeEmptyState();
+  initialPositionMarkup = positionSection ? positionSection.innerHTML : "";
   applyDevice(normalized("device", "17pm"));
   applyTheme(normalized("theme", "light"));
   applyTextSize(normalized("text", "standard"));

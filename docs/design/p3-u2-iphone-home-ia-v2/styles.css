@@ -787,6 +787,11 @@ details p {
   margin-top: 6px;
 }
 
+.ai-decision-mode {
+  margin-top: 0;
+  border-top: 0;
+}
+
 .role-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
