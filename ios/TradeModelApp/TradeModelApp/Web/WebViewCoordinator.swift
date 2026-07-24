@@ -74,7 +74,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         didFailProvisionalNavigation navigation: WKNavigation?,
         withError error: Error
     ) {
-        state.didFailNavigation()
+        handleNavigationFailure(error)
     }
 
     func webView(
@@ -82,7 +82,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         didFail navigation: WKNavigation?,
         withError error: Error
     ) {
-        state.didFailNavigation()
+        handleNavigationFailure(error)
     }
 
     func webView(
@@ -113,6 +113,16 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
             break
         }
         return nil
+    }
+
+    static func shouldReportNavigationFailure(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain != NSURLErrorDomain || error.code != NSURLErrorCancelled
+    }
+
+    private func handleNavigationFailure(_ error: Error) {
+        guard Self.shouldReportNavigationFailure(error) else { return }
+        state.didFailNavigation()
     }
 
     private func handle(

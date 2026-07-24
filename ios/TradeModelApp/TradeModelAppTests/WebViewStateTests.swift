@@ -1,4 +1,5 @@
 import Combine
+import WebKit
 import XCTest
 @testable import TradeModelApp
 
@@ -38,6 +39,56 @@ final class WebViewStateTests: XCTestCase {
         }
     }
 
+    func testCancelledNavigationErrorIsNotReportable() {
+        XCTAssertFalse(
+            WebViewCoordinator.shouldReportNavigationFailure(URLError(.cancelled))
+        )
+    }
+
+    func testRealNetworkErrorIsReportable() {
+        XCTAssertTrue(
+            WebViewCoordinator.shouldReportNavigationFailure(
+                URLError(.notConnectedToInternet)
+            )
+        )
+    }
+
+    func testCancelledNavigationCallbacksDoNotShowNetworkError() {
+        let state = WebViewState()
+        let coordinator = makeCoordinator(state: state)
+        let webView = WKWebView()
+        state.didFinishNavigation(canGoBack: false)
+
+        coordinator.webView(
+            webView,
+            didFailProvisionalNavigation: nil,
+            withError: URLError(.cancelled)
+        )
+        XCTAssertEqual(state.phase, .content)
+
+        coordinator.webView(
+            webView,
+            didFail: nil,
+            withError: URLError(.cancelled)
+        )
+        XCTAssertEqual(state.phase, .content)
+    }
+
+    func testRealNavigationFailureShowsNetworkError() {
+        let state = WebViewState()
+        let coordinator = makeCoordinator(state: state)
+
+        coordinator.webView(
+            WKWebView(),
+            didFailProvisionalNavigation: nil,
+            withError: URLError(.notConnectedToInternet)
+        )
+
+        guard case .error = state.phase else {
+            return XCTFail("Expected a real network failure to remain reportable")
+        }
+    }
+
     func testLoginRedirectIsNotTreatedAsFailure() {
         let state = WebViewState()
         state.didStartNavigation()
@@ -63,5 +114,17 @@ final class WebViewStateTests: XCTestCase {
 
         XCTAssertEqual(loadedURL, configuredRoot)
         XCTAssertEqual(state.phase, .loading)
+    }
+
+    private func makeCoordinator(state: WebViewState) -> WebViewCoordinator {
+        let rootURL = URL(string: "https://app.example.test")!
+        return WebViewCoordinator(
+            rootURL: rootURL,
+            navigationPolicy: TrustedNavigationPolicy(
+                trustedOrigin: WebOrigin(url: rootURL)!
+            ),
+            state: state,
+            externalOpener: { _ in }
+        )
     }
 }
