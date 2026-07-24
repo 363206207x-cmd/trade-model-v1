@@ -6,21 +6,39 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-U1 Personal Login Page and Session Authentication
-Next Business Phase: P3-U2 Mobile Dashboard Productization, only after P3-U1 is reviewed and effective on merged main
-Next Business Phase Allowed: NO while P3-U1 is unmerged; NO for P4 and production deployment
+Current Work Package: P3-U2 iPhone Private Test App Foundation security fix in Draft PR #1134
+Next Business Phase: P3-U2 exact-Head independent iOS/security re-review, then separately authorized real-iPhone acceptance
+Next Business Phase Allowed: NO while the P3-U2 Draft PR is unmerged; NO for P4 and production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
+## P3-U2 iPhone Private Test App Foundation
+
+P3-U1 is effective on merged main
+`b7fb33d543927b6f770d6092fd6f5df3751f3d57` through PR #1133. P3-U2 is now
+implemented on `codex/p3-u2-iphone-private-test-app` as an iPhone-only SwiftUI
++ `WKWebView` client. It reuses the existing form-login, server-side Session,
+Cookie, CSRF, redirect, and logout behavior without changing Java or backend
+authentication.
+
+The branch adds strict environment/Info.plist base-URL configuration, private
+LAN HTTP only in development, HTTPS-only production, no loopback/default host,
+same-origin WebView navigation, system external HTTPS/mailto/tel handling,
+default TLS validation, persistent default WebKit storage, native loading and
+redacted error/retry UI, Xcode project/signing hygiene, 47 unit/security/project
+tests, one UI launch test, and a passing iOS 26.5 iPhone 17 Pro Simulator
+build/install/launch check. It remains unmerged branch evidence. Real iPhone
+installation/login/Session persistence, deployed HTTPS server, App Store,
+TestFlight, Ad Hoc, P4, and production readiness are not claimed.
+
+See `docs/P3_U2_IPHONE_PRIVATE_TEST_APP.md`.
+
 ## P3-U1 Personal Login Page and Session Authentication
 
-Merged main at branch creation is
-`d84f0b95023d0ef50443b96d61972c1dbfbdeec8`. P3-U1 is implemented on
-`codex/p3-u1-personal-login-session-auth` in Ready PR #1133 and is
-`LOCAL_IMPLEMENTATION_VALIDATED / PR_OPEN_READY_UNMERGED`; it is not yet an effective
-merged-main capability.
+P3-U1 is effective on merged main
+`b7fb33d543927b6f770d6092fd6f5df3751f3d57` through PR #1133.
 
 The branch replaces the formal Basic-auth access path with a minimal personal
 form login backed by Spring Security server-side Session and `tm_user`:
@@ -45,10 +63,10 @@ migrates current production smoke/release-gate authentication from Basic Auth
 to form login, Session Cookie, CSRF logout, and post-logout invalidation. The
 exact-Head disposable P3-H run passed canonical Flyway V1-V8 and `tm_user` on
 local PostgreSQL 16 and passed the local browser-equivalent Session/CSRF smoke.
-These changes remain unmerged; real production PostgreSQL V8, real mobile
+These changes are effective on merged main; real production PostgreSQL V8, real mobile
 Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
-Production readiness remains `BLOCKED`; P3-U2 and P4 are not allowed.
+Production readiness remains `BLOCKED`; P3-U2 is the active bounded package and P4 is not allowed.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
@@ -1247,5 +1265,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: #1133 P3-U1 Open/Ready/unmerged; P3-H V8/tm_user and Session/CSRF evidence aligned, pending new exact-head CI/re-review
+- CURRENT_PACKAGE_PR: PR #1134 P3-U2 iPhone private test app Draft/open/unmerged; loopback security fix locally validated, pending exact-Head independent iOS/security re-review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

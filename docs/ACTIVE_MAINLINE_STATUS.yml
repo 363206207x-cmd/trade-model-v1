@@ -12,19 +12,19 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "P3-U1 exact-Head evidence is aligned for local disposable PostgreSQL 16 V8 and Session/CSRF smoke; PR #1133 remains Ready, unmerged, and pending independent exact-Head re-review; production readiness remains BLOCKED"
-active_block_cn: "P3-U1 精确 Head 的本地 disposable PostgreSQL 16 V8 与 Session/CSRF Smoke 证据已对齐；PR #1133 仍为 Ready、未合并并等待新精确 Head 独立复审；生产就绪继续 BLOCKED"
+active_block: "P3-U2 iPhone private test app foundation security fix is locally validated in Draft PR #1134; the package remains unmerged and requires exact-Head independent iOS/security re-review before real-iPhone acceptance; production readiness remains BLOCKED"
+active_block_cn: "P3-U2 iPhone 私人测试 App 基础安全修复已在 Draft PR #1134 本地验证；该包仍未合并，需先完成精确 Head 独立 iOS/安全复审，再进入真实 iPhone 验收；生产就绪继续 BLOCKED"
 
-next_required_action: "Run exact-Head CI and independent re-review for PR #1133 after evidence-document alignment; do not mark P3-U1 effective or start P3-U2 before reviewed merged-main activation. Do not start P4."
-next_business_phase: "P3-U2 Mobile Dashboard Productization"
+next_required_action: "Independently re-review the exact security-fix Head of Draft PR #1134; do not begin real-iPhone acceptance, mark the unmerged branch effective, or start P4."
+next_business_phase: "P3-U2 Real iPhone Installation and Session Acceptance"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "P3-U1 is locally validated but unmerged. P3-U2 may start only after reviewed P3-U1 merged-main activation; P4 and production deployment remain blocked."
+compatibility_next_business_phase_allowed_note: "P3-U1 is effective on merged main b7fb33d543927b6f770d6092fd6f5df3751f3d57. P3-U2 implementation is branch-only until reviewed and merged; real-device acceptance, P4, and production deployment remain blocked."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "PR #1133 OPEN / READY / UNMERGED"
-current_branch: "codex/p3-u1-personal-login-session-auth"
-current_package_pr: "P3-U1 personal login and Session authentication; local implementation and runtime validated, not effective until reviewed and merged main"
+current_pr: "PR #1134 OPEN / DRAFT / UNMERGED"
+current_branch: "codex/p3-u2-iphone-private-test-app"
+current_package_pr: "PR #1134 P3-U2 iPhone private test app foundation security fix; local Simulator validation PASS, pending exact-Head re-review, not effective until merged main"
 unrelated_open_prs: "DERIVED_BY_V1_STATE"
 block_next_business_phase_only: false
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -266,12 +266,12 @@ p3_call1_trading: "DISABLED"
 p3_call1_p4_allowed: "NO"
 p3_clean2a1b_status: "DONE/effective on merged main d84f0b95023d0ef50443b96d61972c1dbfbdeec8 by PR #1132"
 p3_clean2a1b_effective: true
-p3_u1_status: "PR_READY_UNMERGED"
-p3_u1_effective: false
-p3_u1_merged_main_status: "NOT_MERGED"
-p3_u1_effective_status: "PENDING_MERGED_MAIN"
+p3_u1_status: "DONE/effective on merged main b7fb33d543927b6f770d6092fd6f5df3751f3d57 by PR #1133"
+p3_u1_effective: true
+p3_u1_merged_main_status: "MERGED_MAIN"
+p3_u1_effective_status: "EFFECTIVE"
 p3_u1_branch: "codex/p3-u1-personal-login-session-auth"
-p3_u1_main_baseline: "d84f0b95023d0ef50443b96d61972c1dbfbdeec8"
+p3_u1_main_baseline: "b7fb33d543927b6f770d6092fd6f5df3751f3d57"
 p3_u1_authentication: "FORM_LOGIN_SERVER_SIDE_SESSION"
 p3_u1_user_store: "TM_USER_BCRYPT"
 p3_u1_runtime_validation: "PASS_LOCALHOST_DISPOSABLE_FILE_H2_TWO_STARTS"
@@ -285,7 +285,20 @@ p3_u1_testcontainers_status: "ENVIRONMENT_GATED_SKIP"
 p3_u1_secret_store_and_rotation: "MISSING_EVIDENCE"
 p3_u1_mobile_safari: "NOT_RUN"
 p3_u1_mobile_chrome: "NOT_RUN"
-p3_u2_allowed: false
+p3_u2_allowed: true
+p3_u2_status: "SECURITY_FIX_VALIDATED_DRAFT_PR_OPEN_UNMERGED_PENDING_RE_REVIEW"
+p3_u2_effective: false
+p3_u2_pr_number: 1134
+p3_u2_pr_state: "OPEN_DRAFT_UNMERGED"
+p3_u2_merged_main_status: "NOT_MERGED"
+p3_u2_effective_status: "NOT_EFFECTIVE"
+p3_u2_branch: "codex/p3-u2-iphone-private-test-app"
+p3_u2_main_baseline: "b7fb33d543927b6f770d6092fd6f5df3751f3d57"
+p3_u2_architecture: "SWIFTUI_WKWEBVIEW_IPHONE_ONLY"
+p3_u2_simulator_build: "PASS_IOS_26_5_IPHONE_17_PRO"
+p3_u2_swift_tests: "48_TESTS_0_FAILURES_0_SKIPPED"
+p3_u2_real_iphone: "NOT_RUN"
+p3_u2_server_deployment: "NOT_RUN"
 p4_status: "BLOCKED"
 review_only_slice_count_is_delivery_standard: false
 legacy_v1_docs_status: "historical compatibility evidence only"
@@ -339,7 +352,8 @@ notes:
   - "P3-H offline harness is PASS and the actual disposable local Compose template smoke is PASS_LOCAL_DISPOSABLE_P3H_TEMPLATE_SMOKE; this is not controlled-staging evidence."
   - "P3-H result remains NOT_COMPLETE with REAL_STAGING BLOCKED_MISSING_AUTHORIZED_INPUT, SERVER_ACCESS and SECRET_ACCESS NOT_ATTEMPTED; no server evidence is represented as PASS."
   - "P3-CALL1 is effective on merged main cac3d5ea139e26278cf5cf722975830099c23f65 by PR #1131; PR #1132 cleanup is effective on d84f0b95023d0ef50443b96d61972c1dbfbdeec8."
-  - "P3-U1 exact-Head local evidence is 4099 tests / 0 failures / 0 errors / 14 skips, PASS_LOCAL_DISPOSABLE PostgreSQL 16 canonical Flyway V1-V8 with tm_user, and PASS local disposable form-login/Session/CSRF/logout smoke. Real production PostgreSQL V8, real reverse-proxy Session/CSRF, real mobile browsers, Secret Store injection, and rotation were not run; P3-U2 and P4 remain blocked."
+  - "P3-U1 is effective on merged main b7fb33d543927b6f770d6092fd6f5df3751f3d57 by PR #1133; real production PostgreSQL V8, real reverse-proxy Session/CSRF, Secret Store injection, and rotation remain unproven."
+  - "P3-U2 Draft PR #1134 adds an unmerged iPhone-only SwiftUI/WKWebView foundation with strict backend URL and trusted-navigation contracts. Its security-fix Head rejects normalized localhost, IPv4 127/8, IPv6 loopback, and IPv4-mapped IPv6 loopback through a shared policy; 48 Swift tests pass. Real iPhone installation, real server login, App Store/TestFlight/Ad Hoc, P4, and production readiness are not claimed."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."
   - "P3 replay validation is DONE/effective by PR #1105 and remains package-level PARTIAL because its input is not real historical data."
   - "P4 is BLOCKED_MISSING_REAL_FIXTURE; no real replay, provider validation, profitability, or production-readiness PASS is claimed."

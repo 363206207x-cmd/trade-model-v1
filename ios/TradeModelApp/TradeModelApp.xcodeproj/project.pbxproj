@@ -1,0 +1,534 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B00000000000000000000001 /* TradeModelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* TradeModelApp.swift */; };
+		B00000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* ContentView.swift */; };
+		B00000000000000000000003 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* AppEnvironment.swift */; };
+		B00000000000000000000004 /* BackendConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* BackendConfiguration.swift */; };
+		B00000000000000000000005 /* TrustedNavigationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* TrustedNavigationPolicy.swift */; };
+		B00000000000000000000006 /* WebViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* WebViewState.swift */; };
+		B00000000000000000000007 /* TradeModelWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000007 /* TradeModelWebView.swift */; };
+		B00000000000000000000008 /* WebViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000008 /* WebViewCoordinator.swift */; };
+		B00000000000000000000009 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000009 /* LoadingView.swift */; };
+		B0000000000000000000000A /* NetworkErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000A /* NetworkErrorView.swift */; };
+		B0000000000000000000000B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000B /* Assets.xcassets */; };
+		B0000000000000000000000C /* BackendConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* BackendConfigurationTests.swift */; };
+		B0000000000000000000000D /* TrustedNavigationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000E /* TrustedNavigationPolicyTests.swift */; };
+		B0000000000000000000000E /* WebViewStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* WebViewStateTests.swift */; };
+		B0000000000000000000000F /* SecurityContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000010 /* SecurityContractTests.swift */; };
+		B00000000000000000000010 /* XcodeProjectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* XcodeProjectContractTests.swift */; };
+		B00000000000000000000011 /* TradeModelAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* TradeModelAppUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = P00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T00000000000000000000001;
+			remoteInfo = TradeModelApp;
+		};
+		D00000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = P00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T00000000000000000000001;
+			remoteInfo = TradeModelApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		F00000000000000000000001 /* TradeModelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeModelApp.swift; sourceTree = "<group>"; };
+		F00000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F00000000000000000000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		F00000000000000000000004 /* BackendConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendConfiguration.swift; sourceTree = "<group>"; };
+		F00000000000000000000005 /* TrustedNavigationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedNavigationPolicy.swift; sourceTree = "<group>"; };
+		F00000000000000000000006 /* WebViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewState.swift; sourceTree = "<group>"; };
+		F00000000000000000000007 /* TradeModelWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeModelWebView.swift; sourceTree = "<group>"; };
+		F00000000000000000000008 /* WebViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewCoordinator.swift; sourceTree = "<group>"; };
+		F00000000000000000000009 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		F0000000000000000000000A /* NetworkErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkErrorView.swift; sourceTree = "<group>"; };
+		F0000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F0000000000000000000000C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F0000000000000000000000D /* BackendConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendConfigurationTests.swift; sourceTree = "<group>"; };
+		F0000000000000000000000E /* TrustedNavigationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedNavigationPolicyTests.swift; sourceTree = "<group>"; };
+		F0000000000000000000000F /* WebViewStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewStateTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000010 /* SecurityContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityContractTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000011 /* XcodeProjectContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XcodeProjectContractTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000013 /* TradeModelAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeModelAppUITests.swift; sourceTree = "<group>"; };
+		F00000000000000000000020 /* TradeModelApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TradeModelApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000021 /* TradeModelAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TradeModelAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000022 /* TradeModelAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TradeModelAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		H00000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		H00000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		H00000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G00000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				G00000000000000000000003 /* TradeModelApp */,
+				G00000000000000000000007 /* TradeModelAppTests */,
+				G00000000000000000000008 /* TradeModelAppUITests */,
+				G00000000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G00000000000000000000002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000020 /* TradeModelApp.app */,
+				F00000000000000000000021 /* TradeModelAppTests.xctest */,
+				F00000000000000000000022 /* TradeModelAppUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000003 /* TradeModelApp */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000001 /* TradeModelApp.swift */,
+				F00000000000000000000002 /* ContentView.swift */,
+				G00000000000000000000004 /* Configuration */,
+				G00000000000000000000005 /* Web */,
+				G00000000000000000000006 /* UI */,
+				F0000000000000000000000B /* Assets.xcassets */,
+				F0000000000000000000000C /* Info.plist */,
+			);
+			path = TradeModelApp;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000004 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000003 /* AppEnvironment.swift */,
+				F00000000000000000000004 /* BackendConfiguration.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000005 /* Web */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000007 /* TradeModelWebView.swift */,
+				F00000000000000000000008 /* WebViewCoordinator.swift */,
+				F00000000000000000000006 /* WebViewState.swift */,
+				F00000000000000000000005 /* TrustedNavigationPolicy.swift */,
+			);
+			path = Web;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000006 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000009 /* LoadingView.swift */,
+				F0000000000000000000000A /* NetworkErrorView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000007 /* TradeModelAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				F0000000000000000000000D /* BackendConfigurationTests.swift */,
+				F0000000000000000000000E /* TrustedNavigationPolicyTests.swift */,
+				F0000000000000000000000F /* WebViewStateTests.swift */,
+				F00000000000000000000010 /* SecurityContractTests.swift */,
+				F00000000000000000000011 /* XcodeProjectContractTests.swift */,
+			);
+			path = TradeModelAppTests;
+			sourceTree = "<group>";
+		};
+		G00000000000000000000008 /* TradeModelAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000013 /* TradeModelAppUITests.swift */,
+			);
+			path = TradeModelAppUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T00000000000000000000001 /* TradeModelApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00000000000000000000002 /* Build configuration list for PBXNativeTarget "TradeModelApp" */;
+			buildPhases = (
+				S00000000000000000000001 /* Sources */,
+				H00000000000000000000001 /* Frameworks */,
+				R00000000000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TradeModelApp;
+			productName = TradeModelApp;
+			productReference = F00000000000000000000020 /* TradeModelApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		T00000000000000000000002 /* TradeModelAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00000000000000000000003 /* Build configuration list for PBXNativeTarget "TradeModelAppTests" */;
+			buildPhases = (
+				S00000000000000000000002 /* Sources */,
+				H00000000000000000000002 /* Frameworks */,
+				R00000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D00000000000000000000003 /* PBXTargetDependency */,
+			);
+			name = TradeModelAppTests;
+			productName = TradeModelAppTests;
+			productReference = F00000000000000000000021 /* TradeModelAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		T00000000000000000000003 /* TradeModelAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00000000000000000000004 /* Build configuration list for PBXNativeTarget "TradeModelAppUITests" */;
+			buildPhases = (
+				S00000000000000000000003 /* Sources */,
+				H00000000000000000000003 /* Frameworks */,
+				R00000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D00000000000000000000004 /* PBXTargetDependency */,
+			);
+			name = TradeModelAppUITests;
+			productName = TradeModelAppUITests;
+			productReference = F00000000000000000000022 /* TradeModelAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		P00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					T00000000000000000000001 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					T00000000000000000000002 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = T00000000000000000000001;
+					};
+					T00000000000000000000003 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = T00000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = L00000000000000000000001 /* Build configuration list for PBXProject "TradeModelApp" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = G00000000000000000000001;
+			productRefGroup = G00000000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				T00000000000000000000001 /* TradeModelApp */,
+				T00000000000000000000002 /* TradeModelAppTests */,
+				T00000000000000000000003 /* TradeModelAppUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		R00000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0000000000000000000000B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		R00000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		R00000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		S00000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000001 /* TradeModelApp.swift in Sources */,
+				B00000000000000000000002 /* ContentView.swift in Sources */,
+				B00000000000000000000003 /* AppEnvironment.swift in Sources */,
+				B00000000000000000000004 /* BackendConfiguration.swift in Sources */,
+				B00000000000000000000005 /* TrustedNavigationPolicy.swift in Sources */,
+				B00000000000000000000006 /* WebViewState.swift in Sources */,
+				B00000000000000000000007 /* TradeModelWebView.swift in Sources */,
+				B00000000000000000000008 /* WebViewCoordinator.swift in Sources */,
+				B00000000000000000000009 /* LoadingView.swift in Sources */,
+				B0000000000000000000000A /* NetworkErrorView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S00000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0000000000000000000000C /* BackendConfigurationTests.swift in Sources */,
+				B0000000000000000000000D /* TrustedNavigationPolicyTests.swift in Sources */,
+				B0000000000000000000000E /* WebViewStateTests.swift in Sources */,
+				B0000000000000000000000F /* SecurityContractTests.swift in Sources */,
+				B00000000000000000000010 /* XcodeProjectContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S00000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000011 /* TradeModelAppUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D00000000000000000000003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T00000000000000000000001 /* TradeModelApp */;
+			targetProxy = D00000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		D00000000000000000000004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T00000000000000000000001 /* TradeModelApp */;
+			targetProxy = D00000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C00000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C00000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		C00000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TradeModelApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.trademodel.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TRADE_MODEL_APP_ENVIRONMENT = development;
+				TRADE_MODEL_BASE_URL = "";
+			};
+			name = Debug;
+		};
+		C00000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TradeModelApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.trademodel.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TRADE_MODEL_APP_ENVIRONMENT = production;
+				TRADE_MODEL_BASE_URL = "";
+			};
+			name = Release;
+		};
+		C00000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.trademodel.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TradeModelApp.app/TradeModelApp";
+			};
+			name = Debug;
+		};
+		C00000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.trademodel.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TradeModelApp.app/TradeModelApp";
+			};
+			name = Release;
+		};
+		C00000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.trademodel.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TradeModelApp;
+			};
+			name = Debug;
+		};
+		C00000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.trademodel.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TradeModelApp;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		L00000000000000000000001 /* Build configuration list for PBXProject "TradeModelApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C00000000000000000000001 /* Debug */,
+				C00000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L00000000000000000000002 /* Build configuration list for PBXNativeTarget "TradeModelApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C00000000000000000000003 /* Debug */,
+				C00000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L00000000000000000000003 /* Build configuration list for PBXNativeTarget "TradeModelAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C00000000000000000000005 /* Debug */,
+				C00000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L00000000000000000000004 /* Build configuration list for PBXNativeTarget "TradeModelAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C00000000000000000000007 /* Debug */,
+				C00000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = P00000000000000000000001 /* Project object */;
+}

@@ -38,3 +38,15 @@ data/*.mv.db
 data/*.trace.db
 data/*.lock.db
 .runtime/
+
+# Xcode/iOS local build and signing artifacts
+DerivedData/
+ios/**/build/
+*.xcuserstate
+xcuserdata/
+*.mobileprovision
+*.p12
+*.cer
+*.key
+ios/**/*.local.xcconfig
+ios/**/*-local.xcconfig
