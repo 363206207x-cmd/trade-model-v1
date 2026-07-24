@@ -35,6 +35,9 @@
   const captureUsesSafeEmptyState = params.get("capture") === "1";
 
   const fixtureFallback = (fieldPath) => {
+    if (fieldPath === "aiDecision.decisionModeLabel") {
+      return "仅规则判断";
+    }
     if (/blockedReason/i.test(fieldPath)) {
       return "暂无阻断原因";
     }

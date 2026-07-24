@@ -50,10 +50,14 @@ class P3U2IPhoneHomePrototypeContractTest {
     }
 
     @Test
-    void aiDecisionModeIsRenderedInTheHeaderWithFailClosedFallback() throws IOException {
+    void aiDecisionModeIsRenderedInTheHeaderWithRuleOnlyFallback() throws IOException {
         String html = Files.readString(PROTOTYPE_DIR.resolve("index.html"));
         String script = Files.readString(PROTOTYPE_DIR.resolve("interaction.js"));
         String aiHeader = section(html, "<section class=\"ai-section\"", "<div class=\"role-tabs\"");
+        int decisionModeFallback =
+                script.indexOf("if (fieldPath === \"aiDecision.decisionModeLabel\")");
+        int genericModeFallback =
+                script.indexOf("status|state|level|label|direction|stance|risk|quality|mode");
 
         assertThat(aiHeader)
                 .contains("<span>AI 运行状态</span>")
@@ -61,8 +65,10 @@ class P3U2IPhoneHomePrototypeContractTest {
                 .contains("<span>复核模式</span>")
                 .contains("{aiDecision.decisionModeLabel}");
         assertThat(script)
-                .contains("status|state|level|label|direction|stance|risk|quality|mode")
+                .contains("return \"仅规则判断\";")
                 .contains("return \"待同步\";");
+        assertThat(decisionModeFallback).isGreaterThanOrEqualTo(0);
+        assertThat(genericModeFallback).isGreaterThan(decisionModeFallback);
     }
 
     private static String section(String source, String startMarker, String endMarker) {
