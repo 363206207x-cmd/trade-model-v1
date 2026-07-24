@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import TradeModelApp
 
@@ -11,6 +12,21 @@ final class WebViewStateTests: XCTestCase {
         let state = WebViewState()
         state.didFinishNavigation(canGoBack: false)
         XCTAssertEqual(state.phase, .content)
+    }
+
+    func testRepeatedSuccessfulLoadDoesNotRepublishUnchangedState() {
+        let state = WebViewState()
+        var publicationCount = 0
+        let cancellable = state.objectWillChange.sink {
+            publicationCount += 1
+        }
+
+        state.didFinishNavigation(canGoBack: false)
+        publicationCount = 0
+        state.didFinishNavigation(canGoBack: false)
+
+        XCTAssertEqual(publicationCount, 0)
+        withExtendedLifetime(cancellable) {}
     }
 
     func testNetworkFailureShowsRetry() {

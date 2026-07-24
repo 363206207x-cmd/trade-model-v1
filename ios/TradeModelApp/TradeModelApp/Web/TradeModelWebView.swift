@@ -41,6 +41,6 @@ struct TradeModelWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.updateNavigationState()
+        // Navigation state is published only by WKNavigationDelegate callbacks.
     }
 }

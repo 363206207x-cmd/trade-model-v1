@@ -51,6 +51,18 @@ final class BackendConfigurationTests: XCTestCase {
         assertLoopbackRejected("https://127.255.255.255")
     }
 
+    func testLegacyNumericIpv4LoopbackAliasesAreRejected() {
+        for candidate in [
+            "https://127.1",
+            "https://127.0.1",
+            "https://2130706433",
+            "https://017700000001",
+            "https://0x7f000001"
+        ] {
+            assertLoopbackRejected(candidate)
+        }
+    }
+
     func testIpv6CompressedLoopbackIsRejected() {
         assertLoopbackRejected("https://[::1]")
     }

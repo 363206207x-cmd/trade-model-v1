@@ -40,13 +40,6 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         )
     }
 
-    func updateNavigationState() {
-        guard let webView else { return }
-        if case .content = state.phase {
-            state.didFinishNavigation(canGoBack: webView.canGoBack)
-        }
-    }
-
     @objc func refresh(_ sender: UIRefreshControl) {
         state.refresh()
         sender.endRefreshing()

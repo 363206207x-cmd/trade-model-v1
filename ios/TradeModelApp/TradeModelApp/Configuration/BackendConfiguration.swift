@@ -21,9 +21,7 @@ enum HostSecurityPolicy {
             return true
         }
 
-        var ipv4 = in_addr()
-        if host.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 {
-            let address = UInt32(bigEndian: ipv4.s_addr)
+        if let address = ipv4Address(host) {
             return address & 0xff00_0000 == 0x7f00_0000
         }
 
@@ -39,6 +37,17 @@ enum HostSecurityPolicy {
                 && bytes[11] == 0xff
             return ipv6Loopback || (ipv4Mapped && bytes[12] == 127)
         }
+    }
+
+    private static func ipv4Address(_ host: String) -> UInt32? {
+        var ipv4 = in_addr()
+        if host.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 {
+            return UInt32(bigEndian: ipv4.s_addr)
+        }
+        if host.withCString({ inet_aton($0, &ipv4) }) == 1 {
+            return UInt32(bigEndian: ipv4.s_addr)
+        }
+        return nil
     }
 }
 

@@ -66,6 +66,15 @@ final class TrustedNavigationPolicyTests: XCTestCase {
         )
     }
 
+    func testExternalLegacyNumericIpv4LoopbackAliasesAreBlocked() {
+        for candidate in ["https://127.1", "https://2130706433"] {
+            XCTAssertEqual(
+                policy.decision(for: URL(string: candidate)!),
+                .block
+            )
+        }
+    }
+
     func testExternalIpv6LoopbackIsBlocked() {
         XCTAssertEqual(
             policy.decision(for: URL(string: "https://[::1]")!),
