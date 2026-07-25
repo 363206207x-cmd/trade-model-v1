@@ -17,6 +17,7 @@ import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserConfigDO;
@@ -1542,6 +1543,31 @@ class DashboardHomeServiceImplTest {
                 .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
                 .containsExactly("BTCUSDT", "ETHUSDT", "SOLUSDT");
         assertThat(asset(home, "SOL/USDT").getSlotType()).isEqualTo("DECISION");
+    }
+
+    @Test
+    void realFallbackAssetsAreCollectedBeforeDefaultSlotsAreUsedToFillTheLimit() {
+        PersistedOhlcvBarDO bnb = new PersistedOhlcvBarDO();
+        bnb.setSymbol("BNBUSDT");
+        bnb.setTimeframe("5m");
+        bnb.setClosePrice(new BigDecimal("620.00"));
+        bnb.setProvider("BINANCE_PUBLIC");
+        bnb.setFreshnessStatus("FRESH");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of());
+        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
+                .thenReturn(List.of(bnb));
+
+        DashboardHomeVO home = service.getHome("BNBUSDT", 3);
+
+        assertThat(home.getAssets())
+                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BNBUSDT", "BTCUSDT", "ETHUSDT");
+        assertThat(asset(home, "BNB/USDT").getSlotType()).isEqualTo("MARKET_DATA");
+        assertThat(home.getAssets().subList(1, 3))
+                .extracting(DashboardHomeVO.AssetVO::getSlotType)
+                .containsOnly("DEFAULT_SLOT");
     }
 
     @Test

@@ -241,7 +241,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
-        home.setAssets(buildAssets(decisions, selectedDecision, effectiveLimit));
+        home.setAssets(buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit));
         PositionRowsResult positionRowsResult = buildPositions(positions);
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
@@ -507,6 +507,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private List<DashboardHomeVO.AssetVO> buildAssets(List<DecisionResultVO> decisions,
                                                       DecisionResultVO selectedDecision,
+                                                      String selectedSymbol,
                                                       int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         LinkedHashSet<String> used = new LinkedHashSet<>();
@@ -520,24 +521,56 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
             assets.add(assetFromDecision(assets.size() + 1, decision));
         }
-        String selectedSymbol = selectedDecision == null
+        String selectedDecisionSymbol = selectedDecision == null
                 ? null : normalizeSymbol(selectedDecision.getSymbol());
-        if (selectedSymbol != null && !used.contains(selectedSymbol)) {
+        if (selectedDecisionSymbol != null && !used.contains(selectedDecisionSymbol)) {
             if (assets.size() >= limit) {
                 DashboardHomeVO.AssetVO removed = assets.remove(assets.size() - 1);
                 used.remove(removed.getRawSymbol());
             }
-            used.add(selectedSymbol);
+            used.add(selectedDecisionSymbol);
             assets.add(assetFromDecision(assets.size() + 1, selectedDecision));
         }
-        for (String symbol : DEFAULT_SYMBOLS) {
+        String normalizedSelected = normalizeSymbol(selectedSymbol);
+        LinkedHashSet<String> fallbackSymbols = new LinkedHashSet<>();
+        if (normalizedSelected != null && !used.contains(normalizedSelected)) {
+            fallbackSymbols.add(normalizedSelected);
+        }
+        fallbackSymbols.addAll(DEFAULT_SYMBOLS);
+
+        List<DashboardHomeVO.AssetVO> emptyFallbacks = new ArrayList<>();
+        for (String symbol : fallbackSymbols) {
+            boolean selectedFallback = symbol.equals(normalizedSelected);
+            if (assets.size() >= limit && !selectedFallback) {
+                break;
+            }
+            if (used.contains(symbol)) {
+                continue;
+            }
+            DashboardHomeVO.AssetVO fallback = assetPlaceholder(0, symbol);
+            if ("DEFAULT_SLOT".equals(fallback.getSlotType())) {
+                emptyFallbacks.add(fallback);
+                continue;
+            }
+            if (selectedFallback && assets.size() >= limit) {
+                DashboardHomeVO.AssetVO removed = assets.remove(assets.size() - 1);
+                used.remove(removed.getRawSymbol());
+            }
+            if (assets.size() < limit) {
+                fallback.setSlot(assets.size() + 1);
+                used.add(symbol);
+                assets.add(fallback);
+            }
+        }
+        for (DashboardHomeVO.AssetVO fallback : emptyFallbacks) {
             if (assets.size() >= limit) {
                 break;
             }
-            if (!used.add(symbol)) {
+            if (!used.add(fallback.getRawSymbol())) {
                 continue;
             }
-            assets.add(assetPlaceholder(assets.size() + 1, symbol));
+            fallback.setSlot(assets.size() + 1);
+            assets.add(fallback);
         }
         return assets;
     }

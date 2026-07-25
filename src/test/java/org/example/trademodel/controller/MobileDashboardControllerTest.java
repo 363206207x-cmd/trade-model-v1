@@ -85,6 +85,26 @@ class MobileDashboardControllerTest {
     }
 
     @Test
+    void mobileRouteUsesFirstRealAssetWhenImplicitDefaultIsOnlyAPlaceholder() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedSymbol("BTCUSDT");
+        home.setAssets(List.of(
+                asset("BNBUSDT", "MARKET_DATA"),
+                asset("BTCUSDT", "DEFAULT_SLOT"),
+                asset("ETHUSDT", "DEFAULT_SLOT")));
+        when(dashboardHomeService.getHome(null, 3, null)).thenReturn(home);
+
+        MvcResult result = mockMvc.perform(get("/dashboard/mobile"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(mobileAssets(result))
+                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BNBUSDT");
+        assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
+    }
+
+    @Test
     void mobileRouteKeepsDeepLinkedAssetSelectedWithinThreeVisibleCards() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("SOLUSDT");

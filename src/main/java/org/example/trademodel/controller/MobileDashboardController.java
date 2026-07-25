@@ -27,11 +27,11 @@ public class MobileDashboardController {
             Model model) {
         DashboardHomeVO home = dashboardHomeService.getHome(selectedSymbol, MOBILE_HOME_ASSET_LIMIT, null);
         model.addAttribute("home", home);
-        model.addAttribute("mobileAssets", mobileAssets(home));
+        model.addAttribute("mobileAssets", mobileAssets(home, selectedSymbol));
         return "dashboard-mobile";
     }
 
-    static List<DashboardHomeVO.AssetVO> mobileAssets(DashboardHomeVO home) {
+    static List<DashboardHomeVO.AssetVO> mobileAssets(DashboardHomeVO home, String requestedSymbol) {
         if (home == null || home.getAssets() == null) {
             return List.of();
         }
@@ -42,13 +42,19 @@ public class MobileDashboardController {
             return List.of();
         }
 
-        String selectedSymbol = normalizedSymbol(home.getSelectedSymbol());
+        String normalizedRequest = normalizedSymbol(requestedSymbol);
+        String selectedSymbol = normalizedRequest != null
+                ? normalizedRequest : normalizedSymbol(home.getSelectedSymbol());
         DashboardHomeVO.AssetVO selected = selectedSymbol == null ? null : available.stream()
                 .filter(asset -> selectedSymbol.equals(normalizedSymbol(asset.getRawSymbol())))
                 .findFirst()
                 .orElse(null);
-        if (selectedSymbol != null && selected == null) {
+        if (normalizedRequest != null && selected == null) {
             return List.of();
+        }
+        if (selected == null) {
+            selected = available.get(0);
+            home.setSelectedSymbol(normalizedSymbol(selected.getRawSymbol()));
         }
 
         List<DashboardHomeVO.AssetVO> visible = new ArrayList<>(
@@ -72,6 +78,6 @@ public class MobileDashboardController {
         if (symbol == null || symbol.isBlank()) {
             return null;
         }
-        return symbol.trim().toUpperCase(Locale.ROOT);
+        return symbol.trim().toUpperCase(Locale.ROOT).replace("/", "");
     }
 }
