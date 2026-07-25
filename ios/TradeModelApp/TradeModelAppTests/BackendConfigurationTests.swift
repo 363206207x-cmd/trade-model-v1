@@ -9,7 +9,7 @@ final class BackendConfigurationTests: XCTestCase {
         )
 
         XCTAssertEqual(configuration.baseURL.absoluteString, "http://192.168.50.20:8081")
-        XCTAssertEqual(configuration.rootURL.absoluteString, "http://192.168.50.20:8081/dashboard")
+        XCTAssertEqual(configuration.rootURL.absoluteString, "http://192.168.50.20:8081/dashboard/mobile")
     }
 
     func testPrivateIpv4RangesAreAllowedInDevelopment() {
@@ -69,6 +69,7 @@ final class BackendConfigurationTests: XCTestCase {
         )
 
         XCTAssertEqual(configuration.baseURL.host, "trade.example.com")
+        XCTAssertEqual(configuration.rootURL.absoluteString, "https://trade.example.com/dashboard/mobile")
     }
 
     func testLocalhostIsRejected() {

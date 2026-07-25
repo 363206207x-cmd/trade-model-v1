@@ -1,0 +1,798 @@
+import WebKit
+import XCTest
+
+@MainActor
+final class DashboardMobileDomInteractionTests: XCTestCase {
+    private var navigationDelegate: NavigationDelegate?
+
+    func testAssetSwitchUpdatesExecutionAndAiWithoutMutatingPositionDom() throws {
+        let webView = try loadFixture()
+        let originalPosition = try stringValue(
+            "document.querySelector('[data-position-independent]').outerHTML",
+            in: webView
+        )
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
+        try run("window.__resolveDashboard(0, 'ETHUSDT')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-execution-field=\"direction\"]').textContent === 'DIR_ETHUSDT'",
+            in: webView
+        ))
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
+            "ETHUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-run-status]').textContent", in: webView),
+            "AI_ETHUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("window.location.search", in: webView),
+            "?selectedSymbol=ETHUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-independent]').outerHTML", in: webView),
+            originalPosition
+        )
+    }
+
+    func testDesktopOverviewRuntimeRefreshUsesOnlyHomeProjection() throws {
+        let webView = try loadDesktopTemplate()
+
+        XCTAssertTrue(waitUntil("window.__overviewRequests.length === 1", in: webView, timeout: 2))
+        XCTAssertTrue(try booleanValue(
+            "window.__overviewRequests.every(request => request.url.startsWith('/api/dashboard/home?'))",
+            in: webView
+        ))
+
+        try run("void window.refreshDashboard()", in: webView)
+        XCTAssertTrue(waitUntil("window.__overviewRequests.length === 2", in: webView, timeout: 2))
+        XCTAssertTrue(try booleanValue(
+            "window.__overviewRequests.every(request => request.url.startsWith('/api/dashboard/home?'))",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "window.__overviewRequests.every(request => request.options.method === 'GET')",
+            in: webView
+        ))
+    }
+
+    func testRapidSameAssetRequestsKeepBusyUntilLatestRequestFinishes() throws {
+        let webView = try loadFixture()
+        let cardSelector = "document.querySelector('[data-symbol=\"BTCUSDT\"]')"
+
+        try run("\(cardSelector).click(); \(cardSelector).click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 2", in: webView))
+        XCTAssertTrue(waitUntil("window.__pendingRequests[0].aborted === true", in: webView))
+        XCTAssertEqual(try stringValue("\(cardSelector).getAttribute('aria-busy')", in: webView), "true")
+
+        try run("window.__resolveDashboard(1, 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("!\(cardSelector).hasAttribute('aria-busy')", in: webView))
+        XCTAssertEqual(try booleanValue("\(cardSelector).hasAttribute('aria-busy')", in: webView), false)
+    }
+
+    func testUnverifiedExecutionPlanClearsPreviouslyVisibleBoundaries() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
+        try run("window.__resolveDashboard(0, 'ETHUSDT', false)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-execution-field=\"statusLabel\"]').textContent === '当前暂无可验证的执行建议'",
+            in: webView
+        ))
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"direction\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"entryZone\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.getElementById('execution-advice').dataset.exactPlanVisible", in: webView),
+            "false"
+        )
+    }
+
+    func testHomeNavigationResetsScrollAndFocusesTitle() throws {
+        let webView = try loadFixture()
+        try run("window.scrollTo(0, 900)", in: webView)
+        XCTAssertTrue(waitUntil("window.scrollY > 0", in: webView))
+
+        try run("document.querySelector('[data-home-nav]').click()", in: webView)
+        XCTAssertTrue(waitUntil(
+            "window.scrollY === 0 && document.activeElement.id === 'mobile-page-context'",
+            in: webView,
+            timeout: 2
+        ))
+    }
+
+    func testSelectedThirdAssetStaysVisibleWithoutMovingTheDocument() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
+        try run("window.__resolveDashboard(0, 'SOLUSDT')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-symbol=\"SOLUSDT\"]').getAttribute('aria-checked') === 'true'",
+            in: webView
+        ))
+        XCTAssertTrue(waitUntil(
+            "(() => { const pager = document.querySelector('.asset-pager').getBoundingClientRect(); const card = document.querySelector('[data-symbol=\"SOLUSDT\"]').getBoundingClientRect(); return document.querySelector('.asset-pager').scrollLeft > 0 && card.left >= pager.left - 1 && card.right <= pager.right + 1; })()",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(try numberValue("window.scrollX", in: webView), 0)
+        XCTAssertTrue(try booleanValue(
+            "(() => { const pager = document.querySelector('.asset-pager').getBoundingClientRect(); const card = document.querySelector('[data-symbol=\"SOLUSDT\"]').getBoundingClientRect(); return card.left >= pager.left - 1 && card.right <= pager.right + 1; })()",
+            in: webView
+        ))
+    }
+
+    func testDeepLinkedThirdAssetIsSelectedAndKeyboardReachableOnFirstRender() throws {
+        let webView = try loadFixture(selectedSymbol: "SOLUSDT")
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
+            "SOLUSDT"
+        )
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('.asset-card[aria-checked=\"true\"]').length", in: webView),
+            1
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('.asset-card[aria-checked=\"true\"]').dataset.symbol", in: webView),
+            "SOLUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-symbol=\"SOLUSDT\"]').getAttribute('tabindex')", in: webView),
+            "0"
+        )
+
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').focus()", in: webView)
+
+        XCTAssertEqual(
+            try stringValue("document.activeElement.dataset.symbol", in: webView),
+            "SOLUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("window.location.search", in: webView),
+            "?selectedSymbol=SOLUSDT"
+        )
+    }
+
+    func testAiRoleSwitchKeepsOnePanelVisibleWithoutChangingAsset() throws {
+        let webView = try loadFixture()
+        let selectedAsset = try stringValue(
+            "document.querySelector('[data-selected-asset-token]').textContent",
+            in: webView
+        )
+
+        try run("document.querySelector('[data-role=\"GEMINI_REVIEW\"]').click()", in: webView)
+
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('[data-role][aria-selected=\"true\"]').length", in: webView),
+            1
+        )
+        XCTAssertEqual(
+            try numberValue("Array.from(document.querySelectorAll('[data-role-panel]')).filter(p => !p.hidden).length", in: webView),
+            1
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-role][aria-selected=\"true\"]').dataset.role", in: webView),
+            "GEMINI_REVIEW"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
+            selectedAsset
+        )
+    }
+
+    func testDynamicTypeAttributeChangesComputedMobileFontSizes() throws {
+        let webView = try loadFixture()
+        let defaultBody = try numberValue("parseFloat(getComputedStyle(document.body).fontSize)", in: webView)
+        let defaultExecution = try numberValue(
+            "parseFloat(getComputedStyle(document.querySelector('[data-execution-field=\"direction\"]')).fontSize)",
+            in: webView
+        )
+
+        try run("document.documentElement.dataset.mobileTextSize = 'large'", in: webView)
+        let largeBody = try numberValue("parseFloat(getComputedStyle(document.body).fontSize)", in: webView)
+        let largeExecution = try numberValue(
+            "parseFloat(getComputedStyle(document.querySelector('[data-execution-field=\"direction\"]')).fontSize)",
+            in: webView
+        )
+
+        XCTAssertEqual(defaultBody, 16, accuracy: 0.01)
+        XCTAssertEqual(largeBody, 18, accuracy: 0.01)
+        XCTAssertGreaterThan(largeBody, defaultBody)
+        XCTAssertGreaterThan(largeExecution, defaultExecution)
+        XCTAssertEqual(
+            try stringValue("document.documentElement.dataset.mobileTextSize", in: webView),
+            "large"
+        )
+    }
+
+    func testWatchSearchAndUnavailableAddKeepExistingThreeAssetContract() throws {
+        let webView = try loadFixture()
+
+        XCTAssertEqual(try numberValue("document.querySelectorAll('.asset-select').length", in: webView), 3)
+        XCTAssertGreaterThanOrEqual(
+            try numberValue("document.querySelector('[data-asset-search-toggle]').getBoundingClientRect().height", in: webView),
+            44
+        )
+        XCTAssertGreaterThanOrEqual(
+            try numberValue("document.querySelector('[data-asset-add]').getBoundingClientRect().height", in: webView),
+            44
+        )
+
+        try run("document.querySelector('[data-asset-search-toggle]').click()", in: webView)
+        try run("""
+            const input = document.querySelector('[data-asset-search-input]');
+            input.value = 'ETH';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            """, in: webView)
+
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('.asset-search-result').length", in: webView),
+            1
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('.asset-search-result').textContent", in: webView),
+            "ETHUSDT"
+        )
+
+        try run("document.querySelector('.asset-search-result').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
+        try run("window.__resolveDashboard(0, 'ETHUSDT')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-selected-asset-token]').textContent === 'ETHUSDT'",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue("document.querySelector('[data-asset-add]').disabled", in: webView))
+        XCTAssertEqual(
+            try stringValue("document.getElementById('watch-add-contract-status').textContent", in: webView),
+            "添加资产暂未开放"
+        )
+        XCTAssertTrue(try booleanValue(
+            "Object.keys(localStorage).every(key => !key.includes('dashboard_custom_symbols'))",
+            in: webView
+        ))
+        XCTAssertEqual(try numberValue("document.querySelectorAll('.asset-select').length", in: webView), 3)
+    }
+
+    func testApprovedInformationArchitectureHasSevenSectionsAndThreeNavigationItems() throws {
+        let webView = try loadFixture()
+
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('main > header, main > section')).map(node => node.id || node.className).join('|')",
+                in: webView
+            ),
+            "mobile-header|mobile-status|mobile-alerts|watch-assets|execution-advice|position-monitor|ai-review"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('.bottom-nav button, .bottom-nav a')).map(node => node.textContent.trim()).join('|')",
+                in: webView
+            ),
+            "首页|持仓|复盘"
+        )
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('.bottom-nav button, .bottom-nav a').length", in: webView),
+            3
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-review-nav]').getAttribute('href')", in: webView),
+            "/review/dashboard"
+        )
+        XCTAssertEqual(try numberValue("document.querySelectorAll('.status-cell').length", in: webView), 7)
+        XCTAssertEqual(try numberValue("document.querySelectorAll('[data-role]').length", in: webView), 3)
+        XCTAssertEqual(
+            try stringValue("Array.from(document.querySelectorAll('[data-role] .role-code')).map(node => node.textContent).join('|')", in: webView),
+            "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
+        )
+    }
+
+    func testNativeToolbarProjectionDoesNotRepeatVisibleProductTitle() throws {
+        let webView = try loadFixture()
+
+        XCTAssertEqual(try numberValue("document.querySelectorAll('h1').length", in: webView), 1)
+        XCTAssertEqual(
+            try stringValue("document.querySelector('h1').textContent", in: webView),
+            "首页概览"
+        )
+        XCTAssertEqual(try booleanValue("document.body.textContent.includes('Trade Model')", in: webView), false)
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('mobile-page-context').getBoundingClientRect().height > 0",
+            in: webView
+        ))
+    }
+
+    func testHeaderSearchAndSectionNavigationStayInsideExistingMobileProjection() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-header-search]').click()", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-asset-search-toggle]').getAttribute('aria-expanded') === 'true' && document.activeElement.matches('[data-asset-search-input]')",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-home-nav]').getAttribute('aria-current')", in: webView),
+            "page"
+        )
+
+        try run("document.querySelector('[data-position-nav]').click()", in: webView)
+        XCTAssertTrue(waitUntil("document.activeElement.id === 'mobile-position-title'", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-nav]').getAttribute('aria-current')", in: webView),
+            "page"
+        )
+        XCTAssertEqual(try numberValue("document.querySelectorAll('.bottom-nav [aria-current]').length", in: webView), 1)
+    }
+
+    func testOnlyAssetPagerCanOverflowHorizontallyAndAllVisibleNavigationTargetsFit() throws {
+        let webView = try loadFixture(width: 440, height: 852)
+
+        XCTAssertGreaterThan(
+            try numberValue("document.querySelector('.asset-pager').scrollWidth", in: webView),
+            try numberValue("document.querySelector('.asset-pager').clientWidth", in: webView)
+        )
+        XCTAssertEqual(try booleanValue("document.documentElement.scrollWidth > window.innerWidth", in: webView), false)
+        XCTAssertEqual(try booleanValue("document.body.scrollWidth > window.innerWidth", in: webView), false)
+        XCTAssertEqual(
+            try numberValue("Array.from(document.querySelectorAll('.bottom-nav button, .bottom-nav a')).filter(node => node.getBoundingClientRect().height < 44).length", in: webView),
+            0
+        )
+    }
+
+    func testApprovedLayoutCapturesLightAndDarkEvidence() throws {
+        let appearances: [(CGFloat, CGFloat, UIUserInterfaceStyle, String, String)] = [
+            (440, 956, .light, "default", "p3-u2-mobile-home-17pm-light"),
+            (440, 956, .dark, "default", "p3-u2-mobile-home-17pm-dark"),
+            (440, 956, .light, "accessibility", "p3-u2-mobile-home-17pm-large-text"),
+            (428, 926, .light, "default", "p3-u2-mobile-home-12pm-light"),
+            (428, 926, .dark, "default", "p3-u2-mobile-home-12pm-dark"),
+            (428, 926, .light, "accessibility", "p3-u2-mobile-home-12pm-large-text")
+        ]
+
+        for (width, height, style, textSize, name) in appearances {
+            let webView = try loadFixture(width: width, height: height, interfaceStyle: style)
+            try run("document.documentElement.dataset.mobileTheme = '\(style == .dark ? "dark" : "light")'", in: webView)
+            try run("document.documentElement.dataset.mobileTextSize = '\(textSize)'", in: webView)
+            let background = try stringValue("getComputedStyle(document.body).backgroundColor", in: webView)
+            if style == .dark {
+                XCTAssertEqual(background, "rgb(16, 18, 20)")
+            } else {
+                XCTAssertEqual(background, "rgb(232, 235, 239)")
+            }
+            let captured = expectation(description: "captured \(name)")
+            var snapshot: UIImage?
+            var snapshotError: Error?
+            webView.takeSnapshot(with: nil) { image, error in
+                snapshot = image
+                snapshotError = error
+                captured.fulfill()
+            }
+            wait(for: [captured], timeout: 5)
+            XCTAssertNil(snapshotError)
+            let image = try XCTUnwrap(snapshot)
+            XCTAssertEqual(image.size.width, width, accuracy: 0.01)
+            XCTAssertEqual(image.size.height, height, accuracy: 0.01)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
+    func testRootDoesNotScrollHorizontallyAcrossSupportedPhoneModes() throws {
+        let scenarios: [(CGFloat, CGFloat, UIUserInterfaceStyle, String)] = [
+            (440, 852, .light, "standard"),
+            (440, 852, .dark, "large"),
+            (440, 852, .light, "accessibility"),
+            (428, 746, .light, "large"),
+            (428, 746, .dark, "standard"),
+            (428, 746, .dark, "accessibility")
+        ]
+
+        for (width, height, style, textSize) in scenarios {
+            let webView = try loadFixture(width: width, height: height, interfaceStyle: style)
+            try run("document.documentElement.dataset.mobileTextSize = '\(textSize)'", in: webView)
+            try run("window.scrollTo(200, 0)", in: webView)
+
+            XCTAssertLessThanOrEqual(
+                try numberValue("document.documentElement.scrollWidth", in: webView),
+                try numberValue("window.innerWidth", in: webView),
+                "document overflow at width \(width), style \(style.rawValue), text \(textSize)"
+            )
+            XCTAssertLessThanOrEqual(
+                try numberValue("document.body.scrollWidth", in: webView),
+                try numberValue("window.innerWidth", in: webView),
+                "body overflow at width \(width), style \(style.rawValue), text \(textSize)"
+            )
+            XCTAssertEqual(try numberValue("window.scrollX", in: webView), 0)
+            XCTAssertGreaterThan(
+                try numberValue("document.querySelector('.asset-pager').scrollWidth", in: webView),
+                try numberValue("document.querySelector('.asset-pager').clientWidth", in: webView)
+            )
+        }
+    }
+
+    func testLargeTextContentCanScrollClearOfBottomNavigationOn12ProMax() throws {
+        for textSize in ["large", "accessibility"] {
+            let webView = try loadFixture(width: 428, height: 746)
+            try run("document.documentElement.dataset.mobileTextSize = '\(textSize)'", in: webView)
+            try run("window.scrollTo(0, document.documentElement.scrollHeight)", in: webView)
+
+            XCTAssertTrue(waitUntil("window.scrollY > 0", in: webView))
+            let markerBottom = try numberValue(
+                "document.getElementById('fixture-end-marker').getBoundingClientRect().bottom",
+                in: webView
+            )
+            let navigationTop = try numberValue(
+                "document.querySelector('.bottom-nav').getBoundingClientRect().top",
+                in: webView
+            )
+
+            XCTAssertLessThanOrEqual(markerBottom, navigationTop - 12, "text size: \(textSize)")
+            XCTAssertEqual(
+                try booleanValue("document.documentElement.scrollWidth > window.innerWidth", in: webView),
+                false,
+                "text size: \(textSize)"
+            )
+        }
+    }
+
+    private func loadFixture(
+        width: CGFloat = 440,
+        height: CGFloat = 852,
+        interfaceStyle: UIUserInterfaceStyle = .light,
+        selectedSymbol: String = "BTCUSDT"
+    ) throws -> WKWebView {
+        let loaded = expectation(description: "mobile fixture loaded")
+        let delegate = NavigationDelegate { loaded.fulfill() }
+        navigationDelegate = delegate
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        webView.overrideUserInterfaceStyle = interfaceStyle
+        webView.navigationDelegate = delegate
+        webView.loadHTMLString(
+            try fixtureHTML(selectedSymbol: selectedSymbol),
+            baseURL: URL(string: "https://app.example.test/dashboard/mobile")
+        )
+        wait(for: [loaded], timeout: 5)
+        XCTAssertTrue(waitUntil("document.readyState === 'complete'", in: webView))
+        return webView
+    }
+
+    private func loadDesktopTemplate() throws -> WKWebView {
+        let loaded = expectation(description: "desktop template loaded")
+        let delegate = NavigationDelegate { loaded.fulfill() }
+        navigationDelegate = delegate
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1440, height: 900))
+        webView.navigationDelegate = delegate
+        webView.loadHTMLString(
+            try desktopTemplateHTML(),
+            baseURL: URL(string: "https://app.example.test/dashboard")
+        )
+        wait(for: [loaded], timeout: 5)
+        XCTAssertTrue(waitUntil("document.readyState === 'complete'", in: webView))
+        return webView
+    }
+
+    private func desktopTemplateHTML() throws -> String {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let templateURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/templates/dashboard.html")
+        let contractURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/js/frontend-contract.js")
+        guard FileManager.default.fileExists(atPath: templateURL.path),
+              FileManager.default.fileExists(atPath: contractURL.path) else {
+            throw FixtureError.missingProductionResource
+        }
+
+        var html = try String(contentsOf: templateURL)
+        let contractScript = try String(contentsOf: contractURL)
+        let requestProbe = """
+        <script>
+          window.__overviewRequests = [];
+          window.setInterval = function() { return 0; };
+          window.clearInterval = function() {};
+          window.fetch = function(url, options) {
+            return new Promise(function(resolve, reject) {
+              var request = {
+                url: String(url),
+                options: options || {},
+                resolve: resolve,
+                reject: reject,
+                aborted: false
+              };
+              if (request.options.signal) {
+                request.options.signal.addEventListener('abort', function() {
+                  request.aborted = true;
+                  reject(new DOMException('Aborted', 'AbortError'));
+                }, { once: true });
+              }
+              window.__overviewRequests.push(request);
+            });
+          };
+        </script>
+        """
+        html = html.replacingOccurrences(
+            of: "<script th:src=\"@{/js/frontend-contract.js}\" src=\"/js/frontend-contract.js\"></script>",
+            with: "<script>\(contractScript)</script>\(requestProbe)"
+        )
+        html = html.replacingOccurrences(
+            of: "<script src=\"/js/alert-explain.js\"></script>",
+            with: ""
+        )
+        return html
+    }
+
+    private func fixtureHTML(selectedSymbol: String) throws -> String {
+        let bundle = Bundle(for: DashboardMobileDomInteractionTests.self)
+        guard let scriptURL = bundle.url(forResource: "dashboard-mobile", withExtension: "js"),
+              let styleURL = bundle.url(forResource: "dashboard-mobile", withExtension: "css") else {
+            throw FixtureError.missingProductionResource
+        }
+        let script = try String(contentsOf: scriptURL)
+        let styles = try String(contentsOf: styleURL)
+        let contractURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("src/main/resources/static/js/frontend-contract.js")
+        guard FileManager.default.fileExists(atPath: contractURL.path) else {
+            throw FixtureError.missingProductionResource
+        }
+        let contractScript = try String(contentsOf: contractURL)
+        let btcSelected = selectedSymbol == "BTCUSDT"
+        let ethSelected = selectedSymbol == "ETHUSDT"
+        let solSelected = selectedSymbol == "SOLUSDT"
+        return """
+        <!doctype html>
+        <html lang="zh-CN">
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>\(styles)</style>
+          <script>\(contractScript)</script>
+          <script>
+            window.__pendingRequests = [];
+            window.fetch = function(url, options) {
+              return new Promise(function(resolve, reject) {
+                var request = { url: url, options: options, resolve: resolve, reject: reject, aborted: false };
+                options.signal.addEventListener('abort', function() {
+                  request.aborted = true;
+                  reject(new DOMException('Aborted', 'AbortError'));
+                }, { once: true });
+                window.__pendingRequests.push(request);
+              });
+            };
+            window.__resolveDashboard = function(index, symbol, verified) {
+              var request = window.__pendingRequests[index];
+              var data = {
+                selectedSymbol: symbol,
+                executionSuggestion: {
+                  status: 'USABLE_REVIEW_PLAN',
+                  statusLabel: 'READY_' + symbol,
+                  blockedReason: 'RISK_' + symbol,
+                  sourceExecutionPlanId: verified === false ? null : 'PLAN_' + symbol,
+                  direction: 'DIR_' + symbol,
+                  entryZone: 'ENTRY_' + symbol
+                },
+                aiDecision: {
+                  runStatusLabel: 'AI_' + symbol,
+                  consistency: {
+                    consistencyLevel: 'CONSISTENT_' + symbol,
+                    level: 'NONE',
+                    confused: false,
+                    aiApplicable: true
+                  },
+                  tabs: [
+                    { role: 'GPT_FINAL', resultAvailable: true, finalConclusion: 'GPT_' + symbol },
+                    { role: 'GEMINI_REVIEW', resultAvailable: true, reviewConclusion: 'GEMINI_' + symbol },
+                    { role: 'GROK_CHALLENGE', resultAvailable: true, challengeConclusion: 'GROK_' + symbol }
+                  ]
+                }
+              };
+              request.resolve({
+                ok: true,
+                json: function() { return Promise.resolve({ code: 200, data: data }); }
+              });
+            };
+          </script>
+        </head>
+        <body>
+          <main class="mobile-home" data-mobile-home-root>
+            <header class="mobile-header">
+              <div class="product-lockup">
+                <h1 class="page-heading" id="mobile-page-context" tabindex="-1">首页概览</h1>
+              </div>
+              <div class="header-actions">
+                <button class="header-action" type="button" data-header-status-nav>状态</button>
+                <button class="header-action" type="button" data-header-search>搜索</button>
+                <button class="header-action" type="button" data-header-alerts-nav>通知</button>
+              </div>
+            </header>
+            <section class="status-section" id="mobile-status">
+              <h2 id="mobile-status-title" tabindex="-1">当前概览</h2>
+              <dl class="status-grid">
+                <div class="status-cell"><dt>市场趋势</dt><dd>震荡</dd></div>
+                <div class="status-cell"><dt>风险等级</dt><dd>中</dd></div>
+                <div class="status-cell"><dt>数据质量分</dt><dd>82</dd></div>
+                <div class="status-cell"><dt>AI 冲突等级</dt><dd>低</dd></div>
+                <div class="status-cell"><dt>待复核机会</dt><dd>2</dd></div>
+                <div class="status-cell"><dt>冲突阻断</dt><dd>否</dd></div>
+                <div class="status-cell"><dt>热重置</dt><dd>未触发</dd></div>
+              </dl>
+            </section>
+            <section class="alert-event-section" id="mobile-alerts">
+              <div class="alert-event-grid">
+                <article class="signal-panel"><h2 id="mobile-alert-title" tabindex="-1">实时告警</h2><p>暂无告警</p></article>
+                <article class="signal-panel"><h2>关键事件</h2><p>暂无关键事件</p></article>
+              </div>
+            </section>
+            <section class="watch-section" id="watch-assets">
+              <div class="section-heading watch-heading">
+                <h2 id="mobile-watch-title" tabindex="-1" aria-label="重点资产监控">重点资产</h2>
+                <div class="watch-actions">
+                  <button class="watch-tool-button" type="button" data-asset-search-toggle
+                          aria-expanded="false" aria-controls="mobile-asset-search">搜索</button>
+                  <button class="watch-tool-button" type="button" data-asset-add disabled
+                          aria-disabled="true" aria-describedby="watch-add-contract-status">添加</button>
+                </div>
+              </div>
+              <div class="asset-search-panel" id="mobile-asset-search" hidden>
+                <label for="mobile-asset-search-input">搜索当前重点资产</label>
+                <input id="mobile-asset-search-input" data-asset-search-input>
+                <ul class="asset-search-results" data-asset-search-results></ul>
+              </div>
+              <p class="watch-action-status" data-watch-action-status></p>
+              <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
+              <strong data-selected-asset-token>\(selectedSymbol)</strong>
+              <div class="asset-pager" role="radiogroup">
+                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
+                  <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
+                  <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
+                  <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
+                  <span class="asset-conclusion"><small>一句话结论</small><strong>等待触发条件</strong></span>
+                </button>
+                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
+                  <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">待复核候选</span></span>
+                  <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
+                  <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
+                  <span class="asset-conclusion"><small>一句话结论</small><strong>等待人工复核</strong></span>
+                </button>
+                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
+                  <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">高风险</span></span>
+                  <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
+                  <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>
+                  <span class="asset-conclusion"><small>一句话结论</small><strong>风险升高</strong></span>
+                </button>
+              </div>
+            </section>
+            <section class="execution-section" id="execution-advice" data-exact-plan-visible="false">
+              <h2 id="mobile-execution-title" tabindex="-1">执行建议</h2>
+              <strong data-execution-field="statusLabel">等待同步</strong>
+              <p data-execution-field="blockedReason">暂无补充说明</p>
+              <dl class="definition-list execution-compact-grid">
+                <div><dt>方向</dt><dd data-execution-field="direction">--</dd></div>
+                <div><dt>入场区间</dt><dd data-execution-field="entryZone">--</dd></div>
+              </dl>
+            </section>
+            <section class="position-section" id="position-monitor" data-position-independent>
+              <h2 id="mobile-position-title" tabindex="-1">持仓监控</h2>
+              <p>BTCUSDT / 多 · 等待首次监控</p>
+            </section>
+            <section class="ai-section" id="ai-review">
+              <h2 id="mobile-ai-title" tabindex="-1">AI 三角色复核</h2>
+              <strong data-ai-run-status>等待同步</strong>
+              <span data-consistency-field="consistencyLevel">等待同步</span>
+              <span data-consistency-field="level">--</span>
+              <span data-consistency-field="confused">否</span>
+              <span data-consistency-field="consistencySummary">等待同步</span>
+              <div data-ai-role-root>
+                <div class="role-tabs" role="tablist">
+                  <button id="mobile-role-tab-GPT_FINAL" data-role="GPT_FINAL" aria-selected="true"><span class="role-code">GPT_FINAL</span><span class="role-name">最终裁决官</span></button>
+                  <button id="mobile-role-tab-GEMINI_REVIEW" data-role="GEMINI_REVIEW" aria-selected="false"><span class="role-code">GEMINI_REVIEW</span><span class="role-name">冲突复核官</span></button>
+                  <button id="mobile-role-tab-GROK_CHALLENGE" data-role="GROK_CHALLENGE" aria-selected="false"><span class="role-code">GROK_CHALLENGE</span><span class="role-name">反方挑战官</span></button>
+                </div>
+                <article data-role-panel="GPT_FINAL">最终结论：等待更多证据后人工复核。</article>
+                <article data-role-panel="GEMINI_REVIEW" hidden>复核结论：当前没有发现新增冲突。</article>
+                <article data-role-panel="GROK_CHALLENGE" hidden>挑战结论：继续关注反向风险。</article>
+              </div>
+            </section>
+            <div style="height: 1800px"></div>
+            <div id="fixture-end-marker" style="height: 1px"></div>
+          </main>
+          <nav class="bottom-nav">
+            <button type="button" data-home-nav aria-current="page">首页</button>
+            <button type="button" data-position-nav>持仓</button>
+            <a href="/review/dashboard" data-review-nav>复盘</a>
+          </nav>
+          <script>\(script)</script>
+        </body>
+        </html>
+        """
+    }
+
+    private func waitUntil(_ expression: String, in webView: WKWebView, timeout: TimeInterval = 1) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if (try? booleanValue(expression, in: webView)) == true {
+                return true
+            }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        } while Date() < deadline
+        return false
+    }
+
+    private func run(_ script: String, in webView: WKWebView) throws {
+        _ = try evaluate(script, in: webView)
+    }
+
+    private func stringValue(_ script: String, in webView: WKWebView) throws -> String {
+        guard let result = try evaluate(script, in: webView) as? String else {
+            throw FixtureError.unexpectedJavaScriptValue
+        }
+        return result
+    }
+
+    private func numberValue(_ script: String, in webView: WKWebView) throws -> Double {
+        guard let result = try evaluate(script, in: webView) as? NSNumber else {
+            throw FixtureError.unexpectedJavaScriptValue
+        }
+        return result.doubleValue
+    }
+
+    private func booleanValue(_ script: String, in webView: WKWebView) throws -> Bool {
+        guard let result = try evaluate("Boolean(\(script))", in: webView) as? NSNumber else {
+            throw FixtureError.unexpectedJavaScriptValue
+        }
+        return result.boolValue
+    }
+
+    private func evaluate(_ script: String, in webView: WKWebView) throws -> Any? {
+        let completed = expectation(description: "JavaScript evaluated")
+        var value: Any?
+        var evaluationError: Error?
+        webView.evaluateJavaScript(script) { result, error in
+            value = result
+            evaluationError = error
+            completed.fulfill()
+        }
+        wait(for: [completed], timeout: 5)
+        if let evaluationError {
+            throw evaluationError
+        }
+        return value
+    }
+
+    private final class NavigationDelegate: NSObject, WKNavigationDelegate {
+        private let finish: () -> Void
+
+        init(finish: @escaping () -> Void) {
+            self.finish = finish
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+            finish()
+        }
+    }
+
+    private enum FixtureError: Error {
+        case missingProductionResource
+        case unexpectedJavaScriptValue
+    }
+}

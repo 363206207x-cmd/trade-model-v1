@@ -219,7 +219,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
         ProviderReadinessVO providerReadiness = safeProviderReadiness();
 
-        String normalizedSelected = normalizeSymbol(selectedSymbol);
+        String normalizedRequest = normalizeSymbol(selectedSymbol);
+        String normalizedSelected = normalizedRequest;
         if (normalizedSelected == null) {
             normalizedSelected = firstDecisionSymbol(decisions);
         }
@@ -231,6 +232,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (selectedDecision == null) {
             selectedDecision = safeDecisionBySymbol(normalizedSelected);
         }
+        List<DashboardHomeVO.AssetVO> assets =
+                buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
+        if (normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
+            String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
+            if (firstRenderableSymbol != null) {
+                normalizedSelected = firstRenderableSymbol;
+                selectedDecision = findDecision(decisions, normalizedSelected);
+                if (selectedDecision == null) {
+                    selectedDecision = safeDecisionBySymbol(normalizedSelected);
+                }
+                assets = buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
+            }
+        }
 
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
@@ -241,7 +255,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
-        home.setAssets(buildAssets(decisions, effectiveLimit));
+        home.setAssets(assets);
         PositionRowsResult positionRowsResult = buildPositions(positions);
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
@@ -505,7 +519,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return List.of(row);
     }
 
-    private List<DashboardHomeVO.AssetVO> buildAssets(List<DecisionResultVO> decisions, int limit) {
+    private List<DashboardHomeVO.AssetVO> buildAssets(List<DecisionResultVO> decisions,
+                                                      DecisionResultVO selectedDecision,
+                                                      String selectedSymbol,
+                                                      int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         LinkedHashSet<String> used = new LinkedHashSet<>();
         for (DecisionResultVO decision : decisions == null ? List.<DecisionResultVO>of() : decisions) {
@@ -518,16 +535,81 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
             assets.add(assetFromDecision(assets.size() + 1, decision));
         }
-        for (String symbol : DEFAULT_SYMBOLS) {
+        String selectedDecisionSymbol = selectedDecision == null
+                ? null : normalizeSymbol(selectedDecision.getSymbol());
+        if (selectedDecisionSymbol != null && !used.contains(selectedDecisionSymbol)) {
+            if (assets.size() >= limit) {
+                DashboardHomeVO.AssetVO removed = assets.remove(assets.size() - 1);
+                used.remove(removed.getRawSymbol());
+            }
+            used.add(selectedDecisionSymbol);
+            assets.add(assetFromDecision(assets.size() + 1, selectedDecision));
+        }
+        String normalizedSelected = normalizeSymbol(selectedSymbol);
+        LinkedHashSet<String> fallbackSymbols = new LinkedHashSet<>();
+        if (normalizedSelected != null && !used.contains(normalizedSelected)) {
+            fallbackSymbols.add(normalizedSelected);
+        }
+        fallbackSymbols.addAll(DEFAULT_SYMBOLS);
+
+        List<DashboardHomeVO.AssetVO> emptyFallbacks = new ArrayList<>();
+        for (String symbol : fallbackSymbols) {
+            boolean selectedFallback = symbol.equals(normalizedSelected);
+            if (assets.size() >= limit && !selectedFallback) {
+                break;
+            }
+            if (used.contains(symbol)) {
+                continue;
+            }
+            DashboardHomeVO.AssetVO fallback = assetPlaceholder(0, symbol);
+            if ("DEFAULT_SLOT".equals(fallback.getSlotType())) {
+                emptyFallbacks.add(fallback);
+                continue;
+            }
+            if (selectedFallback && assets.size() >= limit) {
+                DashboardHomeVO.AssetVO removed = assets.remove(assets.size() - 1);
+                used.remove(removed.getRawSymbol());
+            }
+            if (assets.size() < limit) {
+                fallback.setSlot(assets.size() + 1);
+                used.add(symbol);
+                assets.add(fallback);
+            }
+        }
+        for (DashboardHomeVO.AssetVO fallback : emptyFallbacks) {
             if (assets.size() >= limit) {
                 break;
             }
-            if (!used.add(symbol)) {
+            if (!used.add(fallback.getRawSymbol())) {
                 continue;
             }
-            assets.add(assetPlaceholder(assets.size() + 1, symbol));
+            fallback.setSlot(assets.size() + 1);
+            assets.add(fallback);
         }
         return assets;
+    }
+
+    private boolean hasRenderableAsset(List<DashboardHomeVO.AssetVO> assets, String symbol) {
+        String normalized = normalizeSymbol(symbol);
+        return normalized != null && assets.stream()
+                .anyMatch(asset -> isRenderableAsset(asset)
+                        && normalized.equals(normalizeSymbol(asset.getRawSymbol())));
+    }
+
+    private String firstRenderableAssetSymbol(List<DashboardHomeVO.AssetVO> assets) {
+        return assets.stream()
+                .filter(this::isRenderableAsset)
+                .map(DashboardHomeVO.AssetVO::getRawSymbol)
+                .map(this::normalizeSymbol)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isRenderableAsset(DashboardHomeVO.AssetVO asset) {
+        return asset != null
+                && hasText(asset.getRawSymbol())
+                && !"DEFAULT_SLOT".equalsIgnoreCase(asset.getSlotType());
     }
 
     private DashboardHomeVO.AssetVO assetFromDecision(int slot, DecisionResultVO decision) {

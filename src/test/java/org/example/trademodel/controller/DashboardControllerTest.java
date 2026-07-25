@@ -87,6 +87,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class DashboardControllerTest {
     private static final Path DASHBOARD_TEMPLATE =
             Path.of("src/main/resources/templates/dashboard.html");
+    private static final Path FRONTEND_CONTRACT =
+            Path.of("src/main/resources/static/js/frontend-contract.js");
     private static final Path DASHBOARD_VISUAL_FIXTURE =
             Path.of("scripts/dashboard-visual-acceptance-fixture.py");
     private static final String INTERNAL_PUSH_PREVIEW_START =
@@ -395,10 +397,12 @@ public class DashboardControllerTest {
     @Test
     void existingMonitorWithoutNextScheduleDoesNotSayFirstMonitor() throws Exception {
         String monitorTime = functionBody("positionMonitorTimeCellHtml");
+        String positions = functionBody("renderHomePositionsFromPayload");
         String execution = functionBody("renderHomeExecutionFromPayload");
 
         assertThat(monitorTime).contains("if (!lastMonitorAt)", "暂无下次监控排期");
-        assertThat(execution).contains("p.lastMonitorAt ? \"暂无下次监控排期\" : \"等待首次监控\"");
+        assertThat(positions).contains("positionMonitorTimeCellHtml");
+        assertThat(execution).doesNotContain("lastMonitorAt", "nextMonitorAt");
     }
 
     @Test
@@ -439,8 +443,10 @@ public class DashboardControllerTest {
         String renderer = functionBody("renderHomeAssetsFromPayload");
 
         assertThat(renderer).contains("assetStateLabel", "marketBiasLabel", "confidenceLabel", "riskLevelLabel");
-        assertThat(renderer).contains("是否值得开仓", "当前结论");
-        assertThat(renderer).doesNotContain("数据来源", "数据状态", "四周期新鲜度", "证据数", "分析时间");
+        assertThat(renderer).contains(
+                "当前价格", "综合评分", "方向", "置信度", "风险等级", "一句话结论");
+        assertThat(renderer).doesNotContain(
+                "是否值得开仓", "数据来源", "数据状态", "四周期新鲜度", "证据数", "分析时间");
     }
 
     @Test
@@ -448,7 +454,7 @@ public class DashboardControllerTest {
         String html = Files.readString(DASHBOARD_TEMPLATE);
         String renderer = functionBody("renderHomeAssetsFromPayload");
 
-        assertThat(renderer).contains("tile-compact-row conclusion", "当前结论");
+        assertThat(renderer).contains("tile-compact-row conclusion", "一句话结论");
         assertThat(html).contains(
                 ".tile-compact-row.conclusion .value",
                 "-webkit-line-clamp: 2",
@@ -456,35 +462,42 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void executionCardSwitchesToRealPositionMonitorWithoutInventingSystemStops() throws Exception {
+    void executionCardNeverRebindsUserPositionOrMonitoringFacts() throws Exception {
         String renderer = functionBody("renderHomeExecutionFromPayload");
 
-        assertThat(renderer).contains("s.positionMode === true", "s.positionMonitor");
-        assertThat(renderer).contains("用户止损", "用户止盈", "系统建议止损", "系统建议止盈");
-        assertThat(renderer).contains("原执行计划，仅用于持仓复核和复盘对照");
-        assertThat(renderer).contains("等待首次监控");
+        assertThat(renderer)
+                .contains("frontendContract.executionPlanAccess(s)")
+                .contains("方向", "入场区间", "止损价", "阶梯止盈", "杠杆", "仓位建议", "失效条件")
+                .doesNotContain(
+                        "positionMonitor", "用户开仓价", "用户止损", "用户止盈",
+                        "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态");
     }
 
     @Test
     void unverifiedPositionSourceDoesNotRenderEmptyOriginalPlanTable() throws Exception {
         String renderer = functionBody("renderHomeExecutionFromPayload");
+        String contract = Files.readString(FRONTEND_CONTRACT);
 
-        assertThat(renderer).contains(
-                "String(s.originalPlanIdentity || \"\").toUpperCase() !== \"VERIFIED\"",
-                "暂无可关联的原执行计划",
-                "execution-original-plan-empty");
-        assertThat(renderer.indexOf("originalPlanIdentity"))
-                .isLessThan(renderer.indexOf("var originalRows"));
+        assertThat(renderer)
+                .contains("if (!access.visible)", "box.innerHTML")
+                .doesNotContain("originalRows", "execution-original-plan");
+        assertThat(contract)
+                .contains("sourceExecutionPlanId")
+                .contains("计划来源不可验证")
+                .contains("originalPlanIdentity")
+                .contains("originalPlanCurrentValidity");
     }
 
     @Test
-    void verifiedOriginalPlanUsesBackendIdentityAndLabelWithoutInferringValidity() throws Exception {
+    void verifiedOriginalPlanRequiresCurrentValidityBeforeShowingBoundaries() throws Exception {
         String renderer = functionBody("renderHomeExecutionFromPayload");
+        String contract = Files.readString(FRONTEND_CONTRACT);
 
-        assertThat(renderer).contains(
-                "String(s.originalPlanIdentity || \"\").toUpperCase() !== \"VERIFIED\"",
-                "escapeHtml(s.originalPlanLabel || \"原执行计划，仅用于持仓复核和复盘对照\")");
-        assertThat(renderer).doesNotContain("originalPlanCurrentValidity");
+        assertThat(contract).contains(
+                "String(plan.originalPlanIdentity || \"\").toUpperCase() === \"VERIFIED\"",
+                "String(plan.originalPlanCurrentValidity || \"\").toUpperCase() === \"ACTIVE\"");
+        assertThat(renderer.indexOf("if (!access.visible)"))
+                .isLessThan(renderer.indexOf("var rows ="));
     }
 
     @Test
@@ -587,17 +600,21 @@ public class DashboardControllerTest {
     void multiPositionFailureClearsPreviousPlan() throws Exception {
         String payloadRenderer = functionBody("renderDashboardHomePayload");
         String executionRenderer = functionBody("renderHomeExecutionFromPayload");
+        String contract = Files.readString(FRONTEND_CONTRACT);
         String unavailable = functionBody("renderDashboardHomeUnavailable");
-        int selectionStart = executionRenderer.indexOf("if (selectionBlocked)");
-        int positionModeStart = executionRenderer.indexOf("if (s.positionMode", selectionStart);
+        int hiddenStart = executionRenderer.indexOf("if (!access.visible)");
+        int rowsStart = executionRenderer.indexOf("var rows =", hiddenStart);
 
         assertThat(payloadRenderer).contains(
                 "home.selectedPositionId != null", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH",
                 "renderHomeExecutionFromPayload");
-        assertThat(selectionStart).isGreaterThanOrEqualTo(0);
-        assertThat(positionModeStart).isGreaterThan(selectionStart);
-        assertThat(executionRenderer.substring(selectionStart, positionModeStart))
-                .contains("box.innerHTML", "请选择具体持仓")
+        assertThat(contract).contains(
+                "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH",
+                "请选择具体持仓");
+        assertThat(hiddenStart).isGreaterThanOrEqualTo(0);
+        assertThat(rowsStart).isGreaterThan(hiddenStart);
+        assertThat(executionRenderer.substring(hiddenStart, rowsStart))
+                .contains("box.innerHTML", "return")
                 .doesNotContain("entryZone", "stopLoss", "takeProfitRules", "sourceAnalysisId");
         assertThat(unavailable).contains("selectedPositionId = null", "当前不展示执行计划");
     }
@@ -694,15 +711,38 @@ public class DashboardControllerTest {
     void homeApiFailureRendersFailClosedEmptyState() throws Exception {
         String refresh = functionBody("refreshDashboard");
         String unavailable = functionBody("renderDashboardHomeUnavailable");
-        Set<String> diagnosticCalls = directFunctionCalls(functionBody("refreshDashboardDiagnostics"));
 
-        assertThat(directFunctionCalls(refresh)).contains(
-                "fetchDashboardHome", "renderDashboardHomeUnavailable", "refreshDashboardDiagnostics");
+        assertThat(directFunctionCalls(refresh))
+                .contains("fetchDashboardHome", "renderDashboardHomeUnavailable")
+                .doesNotContain(
+                        "fetchLocalRealPipelineStatus", "fetchProviderRuntimeStatus",
+                        "requestDetailForSelectedSymbol", "refreshDashboardDiagnostics");
         assertThat(unavailable).contains("首页数据暂不可用", "等待重新同步", "当前不展示执行计划");
         assertThat(unavailable).doesNotContain("entryZone", "stopLoss", "takeProfitRules", "finalPlanMode");
-        assertThat(diagnosticCalls).doesNotContain(
-                "renderDashboardHomePayload", "renderHomePositionsFromPayload",
-                "renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload");
+    }
+
+    @Test
+    void overviewRefreshUsesOnlyDashboardHomeProjection() throws Exception {
+        String refresh = functionBody("refreshDashboard");
+        String homeRequest = functionBody("fetchDashboardHome");
+        Set<String> currentFlow = reachableFunctionCalls("refreshDashboard");
+
+        assertThat(refresh).doesNotContain(
+                "fetchLocalRealPipelineStatus", "fetchProviderRuntimeStatus",
+                "requestDetailForSelectedSymbol", "refreshDashboardDiagnostics");
+        assertThat(homeRequest)
+                .contains("var query = \"?limit=6\"", "fetch(\"/api/dashboard/home\" + query")
+                .doesNotContain("/api/dashboard/detail", "/api/dashboard/summary");
+        assertThat(currentFlow)
+                .contains("fetchDashboardHome", "renderDashboardHomePayload",
+                        "renderDashboardHomeUnavailable")
+                .doesNotContain(
+                        "fetchLocalRealPipelineStatus", "fetchProviderRuntimeStatus",
+                        "requestDetailForSelectedSymbol", "refreshDashboardDiagnostics",
+                        "fetchPositionProviderStatus", "fetchWatchlistRuntimeStatus",
+                        "fetchEvidenceScoreRuntimeStatus", "fetchDecisionResultRuntimeStatus",
+                        "fetchExecutionPlanBoundaryRuntimeStatus",
+                        "submitManualPosition", "submitManualClose");
     }
 
     @Test
@@ -745,17 +785,18 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void defaultSlotIsNonInteractivePlaceholder() throws Exception {
+    void syntheticDefaultSlotsAreExcludedFromOverviewAndSidebar() throws Exception {
+        String filter = functionBody("fixedHomeAssetList");
         String tiles = functionBody("renderHomeAssetsFromPayload");
-        String tilePlaceholder = sourceSlice(tiles, "if (placeholder)", "var bias =");
         String sidebar = functionBody("renderSidebarSlots");
-        String sidebarPlaceholder = sourceSlice(sidebar, "if (placeholder)", "var active =");
 
-        assertThat(tiles).contains("asset.slotType", "DEFAULT_SLOT", "el.classList.contains(\"placeholder\")");
-        assertThat(tilePlaceholder).contains("aria-disabled=\"true\"", "等待首轮分析");
-        assertThat(tilePlaceholder).doesNotContain("data-symbol=", "方向：", "风险等级", "是否值得开仓");
-        assertThat(sidebarPlaceholder).contains("<div", "aria-disabled=\"true\"", "等待首轮分析");
-        assertThat(sidebarPlaceholder).doesNotContain("<button", "data-symbol=");
+        assertThat(filter).contains("slotType !== \"DEFAULT_SLOT\"");
+        assertThat(tiles)
+                .contains("暂无重点资产", "等待后端返回可验证的资产分析")
+                .doesNotContain("__placeholder", "等待首轮分析");
+        assertThat(sidebar)
+                .contains("暂无可验证重点资产")
+                .doesNotContain("__placeholder", "等待首轮分析", "aria-disabled=\"true\"");
     }
 
     @Test

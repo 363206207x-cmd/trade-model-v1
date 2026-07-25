@@ -102,7 +102,7 @@ final class WebViewStateTests: XCTestCase {
     func testRetryReloadsConfiguredRoot() {
         let state = WebViewState()
         var loadedURL: URL?
-        let configuredRoot = URL(string: "https://app.example.test/dashboard")!
+        let configuredRoot = URL(string: "https://app.example.test/dashboard/mobile")!
         state.configureActions(
             retry: { loadedURL = configuredRoot },
             goBack: {},
@@ -124,6 +124,7 @@ final class WebViewStateTests: XCTestCase {
                 trustedOrigin: WebOrigin(url: rootURL)!
             ),
             state: state,
+            textSizeLevel: .defaultSize,
             externalOpener: { _ in }
         )
     }

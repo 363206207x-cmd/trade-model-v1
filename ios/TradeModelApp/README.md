@@ -82,7 +82,7 @@ must perform and record that acceptance separately.
 
 - The app opens without clipping around the Dynamic Island or Home Indicator.
 - An unauthenticated Session reaches `/login` through the backend redirect.
-- Valid form login reaches `/dashboard`.
+- Valid form login reaches the mobile projection at `/dashboard/mobile`.
 - App background/foreground does not force a refresh.
 - Reopening the app reuses an unexpired `JSESSIONID` from
   `WKWebsiteDataStore.default()`.

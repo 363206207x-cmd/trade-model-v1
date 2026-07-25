@@ -156,7 +156,9 @@ struct BackendConfiguration: Equatable {
         }
 
         self.baseURL = parsedURL
-        self.rootURL = parsedURL.appendingPathComponent("dashboard")
+        self.rootURL = parsedURL
+            .appendingPathComponent("dashboard")
+            .appendingPathComponent("mobile")
         self.environment = environment
         self.origin = parsedOrigin
     }
