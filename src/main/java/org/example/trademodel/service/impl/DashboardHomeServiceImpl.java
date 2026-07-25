@@ -241,7 +241,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
-        home.setAssets(buildAssets(decisions, effectiveLimit));
+        home.setAssets(buildAssets(decisions, selectedDecision, effectiveLimit));
         PositionRowsResult positionRowsResult = buildPositions(positions);
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
@@ -505,7 +505,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return List.of(row);
     }
 
-    private List<DashboardHomeVO.AssetVO> buildAssets(List<DecisionResultVO> decisions, int limit) {
+    private List<DashboardHomeVO.AssetVO> buildAssets(List<DecisionResultVO> decisions,
+                                                      DecisionResultVO selectedDecision,
+                                                      int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         LinkedHashSet<String> used = new LinkedHashSet<>();
         for (DecisionResultVO decision : decisions == null ? List.<DecisionResultVO>of() : decisions) {
@@ -517,6 +519,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 continue;
             }
             assets.add(assetFromDecision(assets.size() + 1, decision));
+        }
+        String selectedSymbol = selectedDecision == null
+                ? null : normalizeSymbol(selectedDecision.getSymbol());
+        if (selectedSymbol != null && !used.contains(selectedSymbol)) {
+            if (assets.size() >= limit) {
+                DashboardHomeVO.AssetVO removed = assets.remove(assets.size() - 1);
+                used.remove(removed.getRawSymbol());
+            }
+            used.add(selectedSymbol);
+            assets.add(assetFromDecision(assets.size() + 1, selectedDecision));
         }
         for (String symbol : DEFAULT_SYMBOLS) {
             if (assets.size() >= limit) {

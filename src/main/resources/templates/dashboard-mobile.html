@@ -138,13 +138,13 @@
         <div class="watch-actions" aria-label="重点资产工具">
           <button class="watch-tool-button" type="button" data-asset-search-toggle
                   aria-expanded="false" aria-controls="mobile-asset-search"
-                  th:disabled="${#lists.isEmpty(home.assets)}">搜索</button>
+                  th:disabled="${#lists.isEmpty(mobileAssets)}">搜索</button>
           <button class="watch-tool-button" type="button" data-asset-add disabled aria-disabled="true"
                   aria-describedby="watch-add-contract-status">添加</button>
         </div>
       </div>
       <p class="section-note watch-limit-note"
-         th:text="${#lists.size(home.assets) > 3 ? '3 个资产 · 横向切换' : #lists.size(home.assets) + ' 个资产 · 横向切换'}">横向切换</p>
+         th:text="${#lists.size(mobileAssets) + ' 个资产 · 横向切换'}">横向切换</p>
       <div class="asset-search-panel" id="mobile-asset-search" hidden>
         <label for="mobile-asset-search-input">搜索当前重点资产</label>
         <input id="mobile-asset-search-input" type="search" inputmode="search" autocomplete="off"
@@ -158,16 +158,16 @@
                          th:text="${home.selectedSymbol != null ? home.selectedSymbol : '--'}">--</strong>
       </p>
 
-      <p class="empty-state" th:if="${#lists.isEmpty(home.assets)}">暂无重点资产</p>
+      <p class="empty-state" th:if="${#lists.isEmpty(mobileAssets)}">暂无重点资产</p>
       <div class="asset-pager" role="radiogroup" aria-label="选择重点资产"
-           th:unless="${#lists.isEmpty(home.assets)}">
+           th:unless="${#lists.isEmpty(mobileAssets)}">
         <button class="asset-card asset-select" type="button" role="radio"
-                th:each="asset, stat : ${home.assets}" th:if="${stat.index < 3}"
+                th:each="asset, stat : ${mobileAssets}"
                 th:with="assetKey=${asset.rawSymbol != null ? asset.rawSymbol : asset.symbol},selected=${home.selectedSymbol == assetKey or (home.selectedSymbol == null and stat.first)},stateKey=${asset.assetState != null ? #strings.toLowerCase(asset.assetState) : 'unknown'}"
                 th:classappend="${selected ? ' is-selected' : ''}"
-                th:attr="data-symbol=${assetKey},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(home.assets) > 3 ? 3 : #lists.size(home.assets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
+                th:attr="data-symbol=${assetKey},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
           <span class="visually-hidden"
-                th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + (#lists.size(home.assets) > 3 ? 3 : #lists.size(home.assets)) + ' 个'}">重点资产</span>
+                th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + #lists.size(mobileAssets) + ' 个'}">重点资产</span>
           <span class="asset-card-top">
             <span class="asset-symbol" th:text="${asset.symbol != null ? asset.symbol : '--'}">--</span>
             <span class="asset-state"

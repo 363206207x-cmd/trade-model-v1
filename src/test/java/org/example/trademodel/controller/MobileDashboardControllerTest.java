@@ -8,8 +8,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -56,5 +60,78 @@ class MobileDashboardControllerTest {
                 .andExpect(model().attribute("home", home));
 
         verify(dashboardHomeService).getHome(null, 3, null);
+    }
+
+    @Test
+    void mobileRouteFiltersDefaultSlotsBeforeRendering() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedSymbol("BTCUSDT");
+        home.setAssets(List.of(
+                asset("BTCUSDT", "DECISION"),
+                asset("ETHUSDT", "DEFAULT_SLOT"),
+                asset("SOLUSDT", "MARKET_DATA")));
+        when(dashboardHomeService.getHome("BTCUSDT", 3, null)).thenReturn(home);
+
+        MvcResult result = mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "BTCUSDT"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(mobileAssets(result))
+                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BTCUSDT", "SOLUSDT");
+        assertThat(mobileAssets(result))
+                .extracting(DashboardHomeVO.AssetVO::getSlotType)
+                .doesNotContain("DEFAULT_SLOT");
+    }
+
+    @Test
+    void mobileRouteKeepsDeepLinkedAssetSelectedWithinThreeVisibleCards() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedSymbol("SOLUSDT");
+        home.setAssets(List.of(
+                asset("BTCUSDT", "DECISION"),
+                asset("ETHUSDT", "DECISION"),
+                asset("BNBUSDT", "DECISION"),
+                asset("SOLUSDT", "DECISION")));
+        when(dashboardHomeService.getHome("SOLUSDT", 3, null)).thenReturn(home);
+
+        MvcResult result = mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "SOLUSDT"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(mobileAssets(result))
+                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BTCUSDT", "ETHUSDT", "SOLUSDT");
+    }
+
+    @Test
+    void mobileRouteFailsClosedWhenDeepLinkedAssetHasNoRealCard() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedSymbol("XRPUSDT");
+        home.setAssets(List.of(
+                asset("BTCUSDT", "DECISION"),
+                asset("XRPUSDT", "DEFAULT_SLOT")));
+        when(dashboardHomeService.getHome("XRPUSDT", 3, null)).thenReturn(home);
+
+        MvcResult result = mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "XRPUSDT"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(mobileAssets(result)).isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<DashboardHomeVO.AssetVO> mobileAssets(MvcResult result) {
+        return (List<DashboardHomeVO.AssetVO>) result.getModelAndView()
+                .getModel()
+                .get("mobileAssets");
+    }
+
+    private DashboardHomeVO.AssetVO asset(String symbol, String slotType) {
+        DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
+        asset.setRawSymbol(symbol);
+        asset.setSymbol(symbol);
+        asset.setSlotType(slotType);
+        return asset;
     }
 }

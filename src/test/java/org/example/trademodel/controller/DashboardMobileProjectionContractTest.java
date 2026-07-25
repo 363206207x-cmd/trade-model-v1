@@ -15,6 +15,8 @@ class DashboardMobileProjectionContractTest {
     private static final Path FRONTEND_CONTRACT =
             Path.of("src/main/resources/static/js/frontend-contract.js");
     private static final Path STYLES = Path.of("src/main/resources/static/css/dashboard-mobile.css");
+    private static final Path MOBILE_CONTROLLER =
+            Path.of("src/main/java/org/example/trademodel/controller/MobileDashboardController.java");
 
     @Test
     void mobileTemplateProjectsOnlyConfirmedBackendSemantics() throws Exception {
@@ -57,7 +59,8 @@ class DashboardMobileProjectionContractTest {
         String html = Files.readString(TEMPLATE);
 
         assertThat(html)
-                .contains("th:if=\"${stat.index < 3}\"")
+                .contains("th:each=\"asset, stat : ${mobileAssets}\"")
+                .doesNotContain("th:each=\"asset, stat : ${home.assets}\"")
                 .contains("home.executionSuggestion")
                 .contains("home.positions")
                 .contains("data-position-independent")
@@ -74,6 +77,23 @@ class DashboardMobileProjectionContractTest {
                 .doesNotContain("/positions")
                 .doesNotContain("/api/order")
                 .doesNotContain("/api/trade");
+    }
+
+    @Test
+    void mobileAssetProjectionExcludesDefaultSlotsAndFailsClosedWithoutASelectedCard() throws Exception {
+        String controller = Files.readString(MOBILE_CONTROLLER);
+        String html = Files.readString(TEMPLATE);
+
+        assertThat(controller)
+                .contains("\"DEFAULT_SLOT\".equalsIgnoreCase(asset.getSlotType())")
+                .contains("selectedSymbol != null && selected == null")
+                .contains("return List.of()")
+                .contains("visible.add(selected)");
+        assertThat(html)
+                .contains("#lists.isEmpty(mobileAssets)")
+                .contains("aria-checked=${selected}")
+                .contains("tabindex=${selected ? 0 : -1}")
+                .doesNotContain("#lists.isEmpty(home.assets)");
     }
 
     @Test

@@ -134,6 +134,38 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
+    func testDeepLinkedThirdAssetIsSelectedAndKeyboardReachableOnFirstRender() throws {
+        let webView = try loadFixture(selectedSymbol: "SOLUSDT")
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
+            "SOLUSDT"
+        )
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('.asset-card[aria-checked=\"true\"]').length", in: webView),
+            1
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('.asset-card[aria-checked=\"true\"]').dataset.symbol", in: webView),
+            "SOLUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-symbol=\"SOLUSDT\"]').getAttribute('tabindex')", in: webView),
+            "0"
+        )
+
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').focus()", in: webView)
+
+        XCTAssertEqual(
+            try stringValue("document.activeElement.dataset.symbol", in: webView),
+            "SOLUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("window.location.search", in: webView),
+            "?selectedSymbol=SOLUSDT"
+        )
+    }
+
     func testAiRoleSwitchKeepsOnePanelVisibleWithoutChangingAsset() throws {
         let webView = try loadFixture()
         let selectedAsset = try stringValue(
@@ -421,7 +453,8 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
     private func loadFixture(
         width: CGFloat = 440,
         height: CGFloat = 852,
-        interfaceStyle: UIUserInterfaceStyle = .light
+        interfaceStyle: UIUserInterfaceStyle = .light,
+        selectedSymbol: String = "BTCUSDT"
     ) throws -> WKWebView {
         let loaded = expectation(description: "mobile fixture loaded")
         let delegate = NavigationDelegate { loaded.fulfill() }
@@ -430,7 +463,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         webView.overrideUserInterfaceStyle = interfaceStyle
         webView.navigationDelegate = delegate
         webView.loadHTMLString(
-            try fixtureHTML(),
+            try fixtureHTML(selectedSymbol: selectedSymbol),
             baseURL: URL(string: "https://app.example.test/dashboard/mobile")
         )
         wait(for: [loaded], timeout: 5)
@@ -506,7 +539,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         return html
     }
 
-    private func fixtureHTML() throws -> String {
+    private func fixtureHTML(selectedSymbol: String) throws -> String {
         let bundle = Bundle(for: DashboardMobileDomInteractionTests.self)
         guard let scriptURL = bundle.url(forResource: "dashboard-mobile", withExtension: "js"),
               let styleURL = bundle.url(forResource: "dashboard-mobile", withExtension: "css") else {
@@ -524,6 +557,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             throw FixtureError.missingProductionResource
         }
         let contractScript = try String(contentsOf: contractURL)
+        let btcSelected = selectedSymbol == "BTCUSDT"
+        let ethSelected = selectedSymbol == "ETHUSDT"
+        let solSelected = selectedSymbol == "SOLUSDT"
         return """
         <!doctype html>
         <html lang="zh-CN">
@@ -624,21 +660,21 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               </div>
               <p class="watch-action-status" data-watch-action-status></p>
               <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
-              <strong data-selected-asset-token>BTCUSDT</strong>
+              <strong data-selected-asset-token>\(selectedSymbol)</strong>
               <div class="asset-pager" role="radiogroup">
-                <button class="asset-card asset-select is-selected" data-symbol="BTCUSDT" data-asset-state="observing" data-selected="true" aria-checked="true">
+                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
                   <span class="asset-conclusion"><small>一句话结论</small><strong>等待触发条件</strong></span>
                 </button>
-                <button class="asset-card asset-select" data-symbol="ETHUSDT" data-asset-state="candidate" data-selected="false" aria-checked="false">
+                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">待复核候选</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
                   <span class="asset-conclusion"><small>一句话结论</small><strong>等待人工复核</strong></span>
                 </button>
-                <button class="asset-card asset-select" data-symbol="SOLUSDT" data-asset-state="high_risk" data-selected="false" aria-checked="false">
+                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">高风险</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>

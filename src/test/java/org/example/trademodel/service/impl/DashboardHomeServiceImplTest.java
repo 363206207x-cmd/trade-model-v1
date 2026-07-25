@@ -1522,6 +1522,29 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void selectedDecisionOutsideVisibleLimitReplacesLastRankedAsset() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "MEDIUM", 75, 20,
+                "LEVEL_1", false, "{\"state\":\"OBSERVING\"}");
+        DecisionResultVO bnb = decision("BNBUSDT", "RANGE", "LOW", "LOW", 70, 10,
+                "LEVEL_1", false, "{\"state\":\"OBSERVING\"}");
+        DecisionResultVO sol = decision("SOLUSDT", "BULLISH", "MEDIUM", "HIGH", 80, 40,
+                "LEVEL_3_DIVERGENCE", false, "{\"state\":\"HIGH_RISK\"}");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth, bnb, sol));
+        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+
+        DashboardHomeVO home = service.getHome("SOLUSDT", 3);
+
+        assertThat(home.getSelectedSymbol()).isEqualTo("SOLUSDT");
+        assertThat(home.getAssets())
+                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BTCUSDT", "ETHUSDT", "SOLUSDT");
+        assertThat(asset(home, "SOL/USDT").getSlotType()).isEqualTo("DECISION");
+    }
+
+    @Test
     void oneMinuteDecisionDoesNotExposeFormalExecutionSuggestionBoundary() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 85, 10,
                 "LEVEL_1", true, "{\"state\":\"CANDIDATE\"}");
