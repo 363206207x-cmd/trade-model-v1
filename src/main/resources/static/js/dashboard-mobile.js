@@ -83,6 +83,21 @@
     frontendContract.replaceUrlParam("selectedSymbol", symbol);
   }
 
+  function updateAssetDetailLink(symbol) {
+    var link = document.querySelector("[data-asset-detail-link]");
+    if (!link) return;
+    var normalized = normalizeSymbol(symbol);
+    if (!normalized) {
+      link.removeAttribute("href");
+      link.setAttribute("aria-disabled", "true");
+      return;
+    }
+    link.href = "/dashboard/asset-detail?selectedSymbol="
+      + encodeURIComponent(normalized)
+      + "&view=mobile";
+    link.removeAttribute("aria-disabled");
+  }
+
   function setSelectedAsset(symbol) {
     setText("[data-selected-asset-token]", symbol, "--");
     var selectedCard = null;
@@ -95,6 +110,7 @@
       if (selected) selectedCard = card;
     });
     keepAssetCardVisible(selectedCard, "auto");
+    updateAssetDetailLink(selectedCard ? symbol : null);
   }
 
   function updateExecution(suggestion) {
@@ -584,6 +600,7 @@
     keepAssetCardVisible(initialAsset, "auto");
     if (initialAsset && initialAsset.dataset.symbol) {
       updateSelectedSymbolUrl(initialAsset.dataset.symbol);
+      updateAssetDetailLink(initialAsset.dataset.symbol);
     }
     var roleRoot = document.querySelector("[data-ai-role-root]");
     if (roleRoot) bindRoleControls(roleRoot);
