@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-text-size="standard">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>P3-U2 iPhone Home IA v2</title>
+  <script>
+    if (new URLSearchParams(window.location.search).get("capture") === "1") {
+      document.documentElement.dataset.captureContract = "loading";
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="interaction.js" defer></script>
+</head>
+<body>
+  <aside class="prototype-controls" aria-label="线框预览控制">
+    <div class="control-group" role="group" aria-label="设备预览">
+      <span class="control-label">设备</span>
+      <button type="button" data-device-control="17pm" aria-pressed="true">17 Pro Max</button>
+      <button type="button" data-device-control="12pm" aria-pressed="false">12 Pro Max</button>
+    </div>
+    <div class="control-group" role="group" aria-label="外观">
+      <span class="control-label">外观</span>
+      <button type="button" data-theme-control="light" aria-pressed="true">浅色</button>
+      <button type="button" data-theme-control="dark" aria-pressed="false">深色</button>
+    </div>
+    <div class="control-group" role="group" aria-label="文字大小">
+      <span class="control-label">文字</span>
+      <button type="button" data-text-control="standard" aria-pressed="true">标准</button>
+      <button type="button" data-text-control="large" aria-pressed="false">放大一档</button>
+    </div>
+  </aside>
+
+  <main class="device-stage" aria-label="iPhone 首页线框预览">
+    <div class="device-shell" data-device="17pm">
+      <div class="app-scroll" id="home-scroll">
+        <header class="app-header">
+          <div>
+            <p class="fixture-label">STATIC_LAYOUT_FIXTURE</p>
+            <h1 id="app-title" tabindex="-1">Trade Model</h1>
+            <p class="page-context">首页 · 当前业务状态</p>
+          </div>
+          <div class="header-meta" aria-label="原型状态">
+            <span>静态字段结构</span>
+            <span>非实时数据</span>
+          </div>
+        </header>
+
+        <section class="status-section" aria-labelledby="status-title">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="section-kicker">系统状态</p>
+              <h2 id="status-title">当前概览</h2>
+            </div>
+            <span class="section-note">7 项已确认字段</span>
+          </div>
+          <dl class="status-grid">
+            <div class="status-cell">
+              <dt>市场趋势</dt>
+              <dd>{systemState.marketTrend.valueLabel}</dd>
+            </div>
+            <div class="status-cell">
+              <dt>风险等级</dt>
+              <dd>{systemState.riskLevel.valueLabel}</dd>
+            </div>
+            <div class="status-cell">
+              <dt>数据质量分</dt>
+              <dd>{systemState.dataQuality.valueLabel}</dd>
+            </div>
+            <div class="status-cell">
+              <dt>AI 冲突等级</dt>
+              <dd>{systemState.aiConflict.valueLabel}</dd>
+            </div>
+            <div class="status-cell">
+              <dt>待复核机会</dt>
+              <dd>{systemState.pendingReview.valueLabel}</dd>
+            </div>
+            <div class="status-cell status-warning">
+              <dt>冲突阻断</dt>
+              <dd>{systemState.confused.valueLabel}</dd>
+            </div>
+            <div class="status-cell">
+              <dt>热重置</dt>
+              <dd>{systemState.hotReset.valueLabel}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="alert-event-section" aria-label="实时告警与关键事件">
+          <div class="alert-event-grid">
+            <article class="signal-panel" aria-labelledby="alert-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">优先处理</p>
+                  <h2 id="alert-title">实时告警</h2>
+                </div>
+                <span>最多 2 条</span>
+              </div>
+              <details class="signal-disclosure">
+                <summary>
+                  <span class="signal-summary">
+                    <span class="signal-line">
+                      <strong>{alerts[0].level}</strong>
+                      <span>{alerts[0].symbol}</span>
+                    </span>
+                    <span>{alerts[0].message}</span>
+                  </span>
+                </summary>
+                <div class="signal-expanded">
+                  <p>时间：{alerts[0].time}</p>
+                  <p><strong>{alerts[1].level}</strong> {alerts[1].symbol} · {alerts[1].message}</p>
+                  <p>时间：{alerts[1].time}</p>
+                </div>
+              </details>
+            </article>
+
+            <article class="signal-panel" aria-labelledby="event-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">证据窗口</p>
+                  <h2 id="event-title">关键事件</h2>
+                </div>
+                <span>最多 2 条</span>
+              </div>
+              <details class="signal-disclosure">
+                <summary>
+                  <span class="signal-summary">
+                    <span class="signal-line">
+                      <strong>{events[0].impactLevel}</strong>
+                      <span>{events[0].timeWindow}</span>
+                    </span>
+                    <span>{events[0].label}</span>
+                  </span>
+                </summary>
+                <div class="signal-expanded">
+                  <p>事件类型：{events[0].type}</p>
+                  <p><strong>{events[1].impactLevel}</strong> {events[1].label}</p>
+                  <p>窗口：{events[1].timeWindow}</p>
+                </div>
+              </details>
+            </article>
+          </div>
+        </section>
+
+        <section class="watch-section" id="watch-assets" aria-labelledby="watch-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">决策观察</p>
+              <h2 id="watch-title">重点资产</h2>
+            </div>
+            <span class="section-note">3 个 · 横向切换</span>
+          </div>
+          <p class="selection-context" aria-live="polite">
+            当前选择：<strong data-selected-asset-token>{assets[0].symbol}</strong>
+          </p>
+
+          <div class="asset-pager" role="radiogroup" aria-label="选择重点资产">
+            <button class="asset-card asset-select" type="button" role="radio" aria-checked="true"
+                    aria-posinset="1" aria-setsize="3" data-selected="true" data-asset-index="0">
+              <span class="visually-hidden">重点资产 1，共 3 个。</span>
+              <span class="asset-card-top">
+                <span class="asset-symbol">{assets[0].symbol}</span>
+                <span class="asset-score">综合评分 {assets[0].compositeScore}</span>
+              </span>
+              <span class="asset-core-grid">
+                <span><small>方向</small><b>{assets[0].marketBiasLabel}</b></span>
+                <span><small>风险等级</small><b>{assets[0].riskLabel}</b></span>
+                <span><small>是否值得开仓</small><b>{assets[0].worthOpening}</b></span>
+              </span>
+              <span class="asset-p1-inline">
+                <span>置信度 {assets[0].confidenceLabel}</span>
+                <span>最新价 {assets[0].latestPrice}</span>
+              </span>
+            </button>
+
+            <button class="asset-card asset-select" type="button" role="radio" aria-checked="false"
+                    aria-posinset="2" aria-setsize="3" data-selected="false" data-asset-index="1" tabindex="-1">
+              <span class="visually-hidden">重点资产 2，共 3 个。</span>
+              <span class="asset-card-top">
+                <span class="asset-symbol">{assets[1].symbol}</span>
+                <span class="asset-score">综合评分 {assets[1].compositeScore}</span>
+              </span>
+              <span class="asset-core-grid">
+                <span><small>方向</small><b>{assets[1].marketBiasLabel}</b></span>
+                <span><small>风险等级</small><b>{assets[1].riskLabel}</b></span>
+                <span><small>是否值得开仓</small><b>{assets[1].worthOpening}</b></span>
+              </span>
+              <span class="asset-p1-inline">
+                <span>置信度 {assets[1].confidenceLabel}</span>
+                <span>最新价 {assets[1].latestPrice}</span>
+              </span>
+            </button>
+
+            <button class="asset-card asset-select" type="button" role="radio" aria-checked="false"
+                    aria-posinset="3" aria-setsize="3" data-selected="false" data-asset-index="2" tabindex="-1">
+              <span class="visually-hidden">重点资产 3，共 3 个。</span>
+              <span class="asset-card-top">
+                <span class="asset-symbol">{assets[2].symbol}</span>
+                <span class="asset-score">综合评分 {assets[2].compositeScore}</span>
+              </span>
+              <span class="asset-core-grid">
+                <span><small>方向</small><b>{assets[2].marketBiasLabel}</b></span>
+                <span><small>风险等级</small><b>{assets[2].riskLabel}</b></span>
+                <span><small>是否值得开仓</small><b>{assets[2].worthOpening}</b></span>
+              </span>
+              <span class="asset-p1-inline">
+                <span>置信度 {assets[2].confidenceLabel}</span>
+                <span>最新价 {assets[2].latestPrice}</span>
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <section class="execution-section" id="execution-advice" aria-labelledby="execution-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">随重点资产切换</p>
+              <h2 id="execution-title">执行建议</h2>
+            </div>
+            <span class="context-chip" data-selected-asset-token>{assets[0].symbol}</span>
+          </div>
+          <div class="semantic-state-line">
+            <span>执行建议状态</span>
+            <strong>{executionSuggestion.statusLabel}</strong>
+          </div>
+          <p class="semantic-explanation">{executionSuggestion.blockedReason}</p>
+
+          <dl class="definition-list execution-compact-grid">
+            <div><dt>方向</dt><dd>{executionSuggestion.direction}</dd></div>
+            <div data-execution-core-field><dt>入场区间</dt><dd>{executionSuggestion.entryZone}</dd></div>
+          </dl>
+          <details class="long-details module-details">
+            <summary>展开完整执行建议</summary>
+            <dl class="definition-list expanded-list">
+              <div><dt>止损价</dt><dd>{executionSuggestion.stopLoss}</dd></div>
+              <div><dt>杠杆</dt><dd>{executionSuggestion.leverageSuggestion}</dd></div>
+              <div class="full-row"><dt>阶梯止盈</dt><dd>{executionSuggestion.takeProfitRules}</dd></div>
+              <div class="full-row"><dt>仓位建议</dt><dd>{executionSuggestion.positionSuggestion}</dd></div>
+              <div class="full-row"><dt>有效期</dt><dd>{executionSuggestion.validPeriod}</dd></div>
+              <div class="full-row"><dt>失效条件</dt><dd>{executionSuggestion.invalidCondition}</dd></div>
+              <div><dt>开始时间</dt><dd>{executionSuggestion.validFrom}</dd></div>
+              <div><dt>到期时间</dt><dd>{executionSuggestion.expiresAt}</dd></div>
+              <div class="full-row"><dt>原执行计划</dt><dd>{executionSuggestion.originalPlanLabel}</dd></div>
+            </dl>
+          </details>
+        </section>
+
+        <section class="position-section" id="position-monitor" aria-labelledby="position-title" data-position-independent>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">独立于重点资产选择</p>
+              <h2 id="position-title">持仓监控</h2>
+            </div>
+            <button class="route-unresolved" type="button" disabled aria-disabled="true">
+              完整持仓页待实现
+            </button>
+          </div>
+          <p class="section-description">只展示用户手动录入的开放持仓及其持续验证结论。</p>
+
+          <div class="position-list">
+            <article class="position-card" data-position-id-token="{positions[0].positionId}">
+              <div class="position-heading">
+                <h3>{positions[0].symbol} / {positions[0].directionLabel}</h3>
+                <span>{positions[0].riskLevelLabel}</span>
+              </div>
+              <dl class="position-core position-summary">
+                <div><dt>入场逻辑</dt><dd>{positions[0].entryLogicStatusLabel}</dd></div>
+                <div><dt>方向支持</dt><dd>{positions[0].directionSupportStatusLabel}</dd></div>
+                <div><dt>反转状态</dt><dd>{positions[0].reversalStatusLabel}</dd></div>
+                <div class="full-row"><dt>当前建议</dt><dd>{positions[0].suggestedManualActionText}</dd></div>
+              </dl>
+              <div class="position-actions">
+                <details class="position-details">
+                  <summary>展开监控详情</summary>
+                  <dl class="definition-list expanded-list">
+                    <div><dt>用户开仓价</dt><dd>{positions[0].entryPrice}</dd></div>
+                    <div><dt>当前价</dt><dd>{positions[0].currentPrice}</dd></div>
+                    <div><dt>浮动盈亏</dt><dd>{positions[0].pnlPct}</dd></div>
+                    <div><dt>下次验证</dt><dd>{positions[0].nextMonitorAt}</dd></div>
+                    <div><dt>用户止损</dt><dd>{positions[0].userStopLoss}</dd></div>
+                    <div><dt>用户止盈</dt><dd>{positions[0].userTakeProfit}</dd></div>
+                    <div class="full-row"><dt>监控结论</dt><dd>{positions[0].monitorConclusion}</dd></div>
+                    <div><dt>最近监控</dt><dd>{positions[0].lastMonitorAt}</dd></div>
+                    <div><dt>持仓状态</dt><dd>{positions[0].positionStatusLabel}</dd></div>
+                  </dl>
+                </details>
+                <button class="manual-action" type="button" disabled aria-disabled="true">人工处理</button>
+              </div>
+            </article>
+
+            <article class="position-card" data-position-id-token="{positions[1].positionId}">
+              <div class="position-heading">
+                <h3>{positions[1].symbol} / {positions[1].directionLabel}</h3>
+                <span>{positions[1].riskLevelLabel}</span>
+              </div>
+              <dl class="position-core position-summary">
+                <div><dt>入场逻辑</dt><dd>{positions[1].entryLogicStatusLabel}</dd></div>
+                <div><dt>方向支持</dt><dd>{positions[1].directionSupportStatusLabel}</dd></div>
+                <div><dt>反转状态</dt><dd>{positions[1].reversalStatusLabel}</dd></div>
+                <div class="full-row"><dt>当前建议</dt><dd>{positions[1].suggestedManualActionText}</dd></div>
+              </dl>
+              <div class="position-actions">
+                <details class="position-details">
+                  <summary>展开监控详情</summary>
+                  <dl class="definition-list expanded-list">
+                    <div><dt>用户开仓价</dt><dd>{positions[1].entryPrice}</dd></div>
+                    <div><dt>当前价</dt><dd>{positions[1].currentPrice}</dd></div>
+                    <div><dt>浮动盈亏</dt><dd>{positions[1].pnlPct}</dd></div>
+                    <div><dt>下次验证</dt><dd>{positions[1].nextMonitorAt}</dd></div>
+                    <div><dt>用户止损</dt><dd>{positions[1].userStopLoss}</dd></div>
+                    <div><dt>用户止盈</dt><dd>{positions[1].userTakeProfit}</dd></div>
+                    <div class="full-row"><dt>监控结论</dt><dd>{positions[1].monitorConclusion}</dd></div>
+                    <div><dt>最近监控</dt><dd>{positions[1].lastMonitorAt}</dd></div>
+                    <div><dt>持仓状态</dt><dd>{positions[1].positionStatusLabel}</dd></div>
+                  </dl>
+                </details>
+                <button class="manual-action" type="button" disabled aria-disabled="true">人工处理</button>
+              </div>
+            </article>
+
+            <article class="position-card position-third" data-position-id-token="{positions[2].positionId}">
+              <div class="position-heading">
+                <h3>{positions[2].symbol} / {positions[2].directionLabel}</h3>
+                <span>{positions[2].riskLevelLabel}</span>
+              </div>
+              <dl class="position-core position-summary">
+                <div><dt>入场逻辑</dt><dd>{positions[2].entryLogicStatusLabel}</dd></div>
+                <div><dt>方向支持</dt><dd>{positions[2].directionSupportStatusLabel}</dd></div>
+                <div><dt>反转状态</dt><dd>{positions[2].reversalStatusLabel}</dd></div>
+                <div class="full-row"><dt>当前建议</dt><dd>{positions[2].suggestedManualActionText}</dd></div>
+              </dl>
+              <div class="position-actions">
+                <details class="position-details">
+                  <summary>展开监控详情</summary>
+                  <dl class="definition-list expanded-list">
+                    <div><dt>用户开仓价</dt><dd>{positions[2].entryPrice}</dd></div>
+                    <div><dt>当前价</dt><dd>{positions[2].currentPrice}</dd></div>
+                    <div><dt>浮动盈亏</dt><dd>{positions[2].pnlPct}</dd></div>
+                    <div><dt>下次验证</dt><dd>{positions[2].nextMonitorAt}</dd></div>
+                    <div><dt>用户止损</dt><dd>{positions[2].userStopLoss}</dd></div>
+                    <div><dt>用户止盈</dt><dd>{positions[2].userTakeProfit}</dd></div>
+                    <div class="full-row"><dt>监控结论</dt><dd>{positions[2].monitorConclusion}</dd></div>
+                    <div><dt>最近监控</dt><dd>{positions[2].lastMonitorAt}</dd></div>
+                    <div><dt>持仓状态</dt><dd>{positions[2].positionStatusLabel}</dd></div>
+                  </dl>
+                </details>
+                <button class="manual-action" type="button" disabled aria-disabled="true">人工处理</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="ai-section" id="ai-review" aria-labelledby="ai-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">随重点资产切换</p>
+              <h2 id="ai-title">AI 证据复核</h2>
+            </div>
+            <span class="context-chip" data-selected-asset-token>{assets[0].symbol}</span>
+          </div>
+
+          <div class="consistency-summary" aria-labelledby="consistency-title">
+            <div class="consistency-heading">
+              <div>
+                <p class="section-kicker">三角色综合结论</p>
+                <h3 id="consistency-title">裁决一致性</h3>
+              </div>
+              <strong>{aiDecision.consistency.consistencyLevel}</strong>
+            </div>
+            <dl class="consistency-grid consistency-compact-grid">
+              <div><dt>冲突等级</dt><dd>{aiDecision.consistency.level}</dd></div>
+              <div><dt>冲突阻断</dt><dd>{aiDecision.consistency.confused}</dd></div>
+              <div class="full-row"><dt>一句话摘要</dt><dd>{aiDecision.consistency.consistencySummary}</dd></div>
+            </dl>
+            <details>
+              <summary>展开一致性补充字段</summary>
+              <p>一致性适用性：{aiDecision.consistency.aiApplicable}</p>
+              <p>一致性评分：{aiDecision.consistency.consistencyScore}</p>
+              <p>资产方向阻断：{aiDecision.consistency.directionalPushBlocked}</p>
+              <p>降级原因：{aiDecision.consistency.downgradeReason}</p>
+            </details>
+          </div>
+
+          <div class="ai-run-state">
+            <span>AI 运行状态</span>
+            <strong>{aiDecision.runStatusLabel}</strong>
+          </div>
+          <div class="ai-run-state ai-decision-mode">
+            <span>复核模式</span>
+            <strong>{aiDecision.decisionModeLabel}</strong>
+          </div>
+
+          <div class="role-tabs" role="tablist" aria-label="AI 角色">
+            <button type="button" role="tab" id="role-tab-gpt" aria-selected="true" aria-controls="role-panel-gpt" data-role="gpt">最终裁决官</button>
+            <button type="button" role="tab" id="role-tab-gemini" aria-selected="false" aria-controls="role-panel-gemini" data-role="gemini" tabindex="-1">冲突复核官</button>
+            <button type="button" role="tab" id="role-tab-grok" aria-selected="false" aria-controls="role-panel-grok" data-role="grok" tabindex="-1">反方挑战官</button>
+          </div>
+
+          <article class="role-panel" role="tabpanel" id="role-panel-gpt" aria-labelledby="role-tab-gpt" data-role-panel="gpt">
+            <div class="role-heading">
+              <div><span>GPT_FINAL</span><h3>最终裁决官</h3></div>
+              <strong>{aiDecision.tabs[GPT_FINAL].runStatusLabel}</strong>
+            </div>
+            <p class="role-status">{aiDecision.tabs[GPT_FINAL].statusMessage}</p>
+            <dl class="definition-list role-fields role-summary-fields">
+              <div><dt>最终倾向</dt><dd>{aiDecision.tabs[GPT_FINAL].finalMarketBias}</dd></div>
+              <div><dt>置信度</dt><dd>{aiDecision.tabs[GPT_FINAL].finalConfidence}</dd></div>
+              <div><dt>风险等级</dt><dd>{aiDecision.tabs[GPT_FINAL].finalRiskLevel}</dd></div>
+              <div class="full-row"><dt>最终结论</dt><dd>{aiDecision.tabs[GPT_FINAL].finalConclusion}</dd></div>
+              <div class="full-row"><dt>核心支持证据</dt><dd>{aiDecision.tabs[GPT_FINAL].coreSupportingEvidence}</dd></div>
+            </dl>
+            <details class="long-details">
+              <summary>展开完整裁决证据</summary>
+              <p>核心反证：{aiDecision.tabs[GPT_FINAL].coreCounterEvidence}</p>
+              <p>AI 计划模式：{aiDecision.tabs[GPT_FINAL].finalPlanMode}</p>
+              <p>是否值得开仓：{aiDecision.tabs[GPT_FINAL].worthOpening}</p>
+              <p>裁决摘要：{aiDecision.tabs[GPT_FINAL].decisionSummary}</p>
+              <p>降级 / 阻断原因：{aiDecision.tabs[GPT_FINAL].downgradeReason}</p>
+            </details>
+          </article>
+
+          <article class="role-panel" role="tabpanel" id="role-panel-gemini" aria-labelledby="role-tab-gemini" data-role-panel="gemini" hidden>
+            <div class="role-heading">
+              <div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div>
+              <strong>{aiDecision.tabs[GEMINI_REVIEW].runStatusLabel}</strong>
+            </div>
+            <p class="role-status">{aiDecision.tabs[GEMINI_REVIEW].statusMessage}</p>
+            <dl class="definition-list role-fields role-summary-fields">
+              <div class="full-row"><dt>复核意见</dt><dd>{aiDecision.tabs[GEMINI_REVIEW].reviewVerdict}</dd></div>
+              <div><dt>是否建议降级</dt><dd>{aiDecision.tabs[GEMINI_REVIEW].downgradeRecommendation}</dd></div>
+              <div class="full-row"><dt>复核结论</dt><dd>{aiDecision.tabs[GEMINI_REVIEW].reviewConclusion}</dd></div>
+            </dl>
+            <details class="long-details">
+              <summary>展开完整复核证据</summary>
+              <p>发现的冲突：{aiDecision.tabs[GEMINI_REVIEW].detectedContradictions}</p>
+              <p>证据不足点：{aiDecision.tabs[GEMINI_REVIEW].weakEvidence}</p>
+              <p>逻辑漏洞：{aiDecision.tabs[GEMINI_REVIEW].logicGaps}</p>
+              <p>风险调整建议：{aiDecision.tabs[GEMINI_REVIEW].riskAdjustmentSuggestion}</p>
+              <p>需要人工复核：{aiDecision.tabs[GEMINI_REVIEW].manualReviewRequired}</p>
+            </details>
+          </article>
+
+          <article class="role-panel" role="tabpanel" id="role-panel-grok" aria-labelledby="role-tab-grok" data-role-panel="grok" hidden>
+            <div class="role-heading">
+              <div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div>
+              <strong>{aiDecision.tabs[GROK_CHALLENGE].runStatusLabel}</strong>
+            </div>
+            <p class="role-status">{aiDecision.tabs[GROK_CHALLENGE].statusMessage}</p>
+            <dl class="definition-list role-fields role-summary-fields">
+              <div class="full-row"><dt>反方论点</dt><dd>{aiDecision.tabs[GROK_CHALLENGE].challengeThesis}</dd></div>
+              <div class="full-row"><dt>突发新闻 / 事件风险</dt><dd>{aiDecision.tabs[GROK_CHALLENGE].eventRisks}</dd></div>
+              <div class="full-row"><dt>反方挑战结论</dt><dd>{aiDecision.tabs[GROK_CHALLENGE].challengeConclusion}</dd></div>
+            </dl>
+            <details class="long-details">
+              <summary>展开完整挑战证据</summary>
+              <p>反向证据：{aiDecision.tabs[GROK_CHALLENGE].counterEvidence}</p>
+              <p>情绪反转风险：{aiDecision.tabs[GROK_CHALLENGE].sentimentReversalRisks}</p>
+              <p>微观结构陷阱：{aiDecision.tabs[GROK_CHALLENGE].microstructureTraps}</p>
+              <p>流动性风险：{aiDecision.tabs[GROK_CHALLENGE].liquidityRisks}</p>
+            </details>
+          </article>
+        </section>
+
+        <footer class="prototype-footer">
+          <strong>STATIC_LAYOUT_FIXTURE</strong>
+          <p>字段结构预览，不连接后端，不代表实时行情、AI 证据或交易指令。</p>
+        </footer>
+      </div>
+
+      <nav class="bottom-nav" aria-label="主要导航">
+        <a href="/dashboard" data-home-nav aria-current="page">首页</a>
+        <a href="#position-monitor" data-position-nav>持仓</a>
+        <a href="/review/dashboard" data-review-nav>复盘</a>
+      </nav>
+    </div>
+  </main>
+</body>
+</html>
