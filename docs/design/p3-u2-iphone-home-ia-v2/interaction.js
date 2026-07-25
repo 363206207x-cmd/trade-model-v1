@@ -32,25 +32,60 @@
   let selectedAssetIndex = 0;
   let activeRole = "gpt";
   let initialPositionMarkup = "";
+  let captureEmptyStates = new Map();
   const captureUsesSafeEmptyState = params.get("capture") === "1";
 
+  const fieldPathCandidates = (fieldPath) => Array.from(new Set([
+    fieldPath,
+    fieldPath.replace(/\[\d+\]/g, "[]"),
+    fieldPath.replace(/\[[^\]]+\]/g, "[]")
+  ]));
+
+  const buildCaptureEmptyStates = (fieldMap) => {
+    if (!fieldMap || !Array.isArray(fieldMap.fields)) {
+      throw new Error("Capture-mode field map is invalid");
+    }
+
+    const emptyStates = new Map();
+    fieldMap.fields.forEach((field) => {
+      if (typeof field.backendField !== "string" || typeof field.emptyState !== "string") {
+        return;
+      }
+      field.backendField.split(/\s+\/\s+/).forEach((fieldPath) => {
+        const normalizedPath = fieldPath.trim();
+        if (!normalizedPath) {
+          return;
+        }
+        const mappedStates = emptyStates.get(normalizedPath) || new Set();
+        mappedStates.add(field.emptyState);
+        emptyStates.set(normalizedPath, mappedStates);
+      });
+    });
+    return emptyStates;
+  };
+
+  const loadCaptureEmptyStates = async () => {
+    const response = await fetch("field-map.json", {
+      cache: "no-store",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+      throw new Error(`Capture-mode field map request failed: ${response.status}`);
+    }
+    return buildCaptureEmptyStates(await response.json());
+  };
+
   const fixtureFallback = (fieldPath) => {
-    if (fieldPath === "aiDecision.decisionModeLabel") {
-      return "仅规则判断";
+    const matchedPath = fieldPathCandidates(fieldPath)
+      .find((candidate) => captureEmptyStates.has(candidate));
+    if (!matchedPath) {
+      throw new Error(`Capture-mode field has no mapped empty state: ${fieldPath}`);
     }
-    if (/blockedReason/i.test(fieldPath)) {
-      return "暂无阻断原因";
+    const mappedStates = captureEmptyStates.get(matchedPath);
+    if (mappedStates.size !== 1) {
+      throw new Error(`Capture-mode field has conflicting empty states: ${fieldPath}`);
     }
-    if (/summary|message|conclusion|statusMessage/i.test(fieldPath)) {
-      return "等待同步";
-    }
-    if (/status|state|level|label|direction|stance|risk|quality|mode/i.test(fieldPath)) {
-      return "待同步";
-    }
-    if (/blocked|worthOpening|reversed|available/i.test(fieldPath)) {
-      return "否";
-    }
-    return "--";
+    return mappedStates.values().next().value;
   };
 
   const applyCaptureSafeEmptyState = () => {
@@ -132,8 +167,11 @@
     });
 
     document.querySelectorAll("[data-selected-asset-token]").forEach((node) => {
-      node.dataset.fieldToken = assetToken(index).slice(1, -1);
-      node.textContent = captureUsesSafeEmptyState ? "--" : assetToken(index);
+      const selectedAssetField = assetToken(index).slice(1, -1);
+      node.dataset.fieldToken = selectedAssetField;
+      node.textContent = captureUsesSafeEmptyState
+        ? fixtureFallback(selectedAssetField)
+        : assetToken(index);
     });
     linkedSections.forEach((section) => {
       section.dataset.selectedAssetIndex = String(index);
@@ -264,41 +302,65 @@
     });
   };
 
-  if (params.get("capture") === "1") {
-    document.body.classList.add("capture-mode");
-  }
-  applyCaptureSafeEmptyState();
-  validateCaptureSafeEmptyState();
-  initialPositionMarkup = positionSection ? positionSection.innerHTML : "";
-  applyDevice(normalized("device", "17pm"));
-  applyTheme(normalized("theme", "light"));
-  applyTextSize(normalized("text", "standard"));
-  selectAsset(0, false);
-  selectRole("gpt");
+  const initializePrototype = () => {
+    applyCaptureSafeEmptyState();
+    validateCaptureSafeEmptyState();
+    initialPositionMarkup = positionSection ? positionSection.innerHTML : "";
+    applyDevice(normalized("device", "17pm"));
+    applyTheme(normalized("theme", "light"));
+    applyTextSize(normalized("text", "standard"));
+    selectAsset(0, false);
+    selectRole("gpt");
 
-  const prototypeApi = Object.freeze({
-    selectAsset,
-    selectRole,
-    getState: () => ({
-      device: shell.dataset.device,
-      theme: documentElement.dataset.theme,
-      textSize: documentElement.dataset.textSize,
-      selectedAssetIndex,
-      activeRole,
-      visibleRoleCount: rolePanels.filter((panel) => !panel.hidden).length,
-      executionAssetIndex: document.querySelector("#execution-advice")?.dataset.selectedAssetIndex,
-      aiAssetIndex: document.querySelector("#ai-review")?.dataset.selectedAssetIndex,
-      positionMarkupUnchanged: !positionSection || positionSection.innerHTML === initialPositionMarkup,
-      horizontalOverflow: appScroll.scrollWidth > appScroll.clientWidth,
-      appScrollTop: appScroll.scrollTop,
-      navigationTarget: document.body.dataset.navigationTarget || null
-    }),
-    runContractChecks
-  });
+    const prototypeApi = Object.freeze({
+      selectAsset,
+      selectRole,
+      getState: () => ({
+        device: shell.dataset.device,
+        theme: documentElement.dataset.theme,
+        textSize: documentElement.dataset.textSize,
+        selectedAssetIndex,
+        activeRole,
+        visibleRoleCount: rolePanels.filter((panel) => !panel.hidden).length,
+        executionAssetIndex: document.querySelector("#execution-advice")?.dataset.selectedAssetIndex,
+        aiAssetIndex: document.querySelector("#ai-review")?.dataset.selectedAssetIndex,
+        positionMarkupUnchanged: !positionSection || positionSection.innerHTML === initialPositionMarkup,
+        horizontalOverflow: appScroll.scrollWidth > appScroll.clientWidth,
+        appScrollTop: appScroll.scrollTop,
+        navigationTarget: document.body.dataset.navigationTarget || null
+      }),
+      runContractChecks
+    });
+    if (Object.isExtensible(document)) {
+      document.P3U2Prototype = prototypeApi;
+    }
+    if (Object.isExtensible(window)) {
+      window.P3U2Prototype = prototypeApi;
+    }
+    document.body.dataset.captureContract = captureUsesSafeEmptyState ? "ready" : "not-requested";
+    return prototypeApi;
+  };
+
+  if (captureUsesSafeEmptyState) {
+    document.body.classList.add("capture-mode");
+    document.body.dataset.captureContract = "loading";
+  }
+
+  const prototypeReady = captureUsesSafeEmptyState
+    ? loadCaptureEmptyStates().then((emptyStates) => {
+      captureEmptyStates = emptyStates;
+      return initializePrototype();
+    })
+    : Promise.resolve(initializePrototype());
+
   if (Object.isExtensible(document)) {
-    document.P3U2Prototype = prototypeApi;
+    document.P3U2PrototypeReady = prototypeReady;
   }
   if (Object.isExtensible(window)) {
-    window.P3U2Prototype = prototypeApi;
+    window.P3U2PrototypeReady = prototypeReady;
   }
+  prototypeReady.catch((error) => {
+    document.body.dataset.captureContract = "error";
+    console.error(error);
+  });
 })();
