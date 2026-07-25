@@ -29,6 +29,7 @@ class AssetDetailFrontendContractTest {
                 .contains("data-asset-field=\"confidence\"")
                 .contains("data-asset-field=\"risk\"")
                 .contains("data-asset-field=\"state\"")
+                .contains("data-asset-field=\"worthOpening\"")
                 .contains("data-asset-field=\"conclusion\"")
                 .contains("当前判断不可用")
                 .contains("状态待同步")
@@ -87,10 +88,53 @@ class AssetDetailFrontendContractTest {
                 .doesNotContain("自动执行按钮");
         assertThat(script)
                 .contains("contract.executionPlanAccess(plan)")
+                .contains("var positionMode = plan.positionMode === true")
+                .contains("if (section) section.hidden = positionMode")
+                .contains("if (positionContext) positionContext.hidden = !positionMode")
+                .contains("if (positionMode)")
                 .contains("values.hidden = !access.visible")
                 .contains("access.visible ? plan[field] : null")
                 .doesNotContain("UserPosition")
                 .doesNotContain("/api/plan");
+        assertThat(script.indexOf("if (positionMode)"))
+                .isLessThan(script.indexOf("contract.executionPlanAccess(plan)"));
+        assertThat(html)
+                .contains("data-position-context hidden")
+                .contains("资产机会执行建议不在本页展示")
+                .contains("data-execution-plan hidden");
+    }
+
+    @Test
+    void worthOpeningUsesOnlyBackendValueAndFailsClosedWhenUnavailable() throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+
+        assertThat(html)
+                .contains("<dt>是否值得开仓</dt>")
+                .contains("data-asset-field=\"worthOpening\">待同步");
+        assertThat(script)
+                .contains("asset.worthOpening === true ? \"是\"")
+                .contains("asset.worthOpening === false ? \"否\" : null")
+                .contains("'[data-asset-field=\"worthOpening\"]', null, \"待同步\"")
+                .doesNotContain("worthOpening = asset.compositeScore")
+                .doesNotContain("worthOpening = asset.marketBias");
+    }
+
+    @Test
+    void requestFailureExposesRetryWithoutChangingTheApiContract() throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+
+        assertThat(html)
+                .contains("data-request-retry hidden")
+                .contains("重新加载 / 重试");
+        assertThat(script)
+                .contains("function setRetryVisible(visible)")
+                .contains("function bindRetry()")
+                .contains("loadAssetDetail();")
+                .contains("failClosed(\"数据暂不可用\", true)")
+                .contains("failClosed(\"资产标识不可验证\", false)");
+        assertThat(count(script, "fetch(")).isEqualTo(1);
     }
 
     @Test
@@ -103,7 +147,7 @@ class AssetDetailFrontendContractTest {
                 .contains("normalizeSymbol(home.selectedSymbol) !== requestedSymbol")
                 .contains("slotType !== \"DEFAULT_SLOT\" && symbol === requestedSymbol")
                 .contains("throw new Error(\"ASSET_DETAIL_NOT_VERIFIED\")")
-                .contains("failClosed(\"数据暂不可用\")")
+                .contains("failClosed(\"数据暂不可用\", true)")
                 .doesNotContain("/api/dashboard/detail")
                 .doesNotContain("/api/evidence")
                 .doesNotContain("/api/score")
@@ -140,6 +184,13 @@ class AssetDetailFrontendContractTest {
                 .contains("@media (prefers-color-scheme: dark)")
                 .contains("env(safe-area-inset-top)")
                 .contains("env(safe-area-inset-bottom)")
+                .contains("--focus-ring: #005a9c")
+                .contains("--focus-ring: #9ad5ff")
+                .contains(".retry-button:focus-visible")
+                .contains("outline: 3px solid var(--focus-ring)")
+                .contains("[data-execution-plan][hidden]")
+                .contains("[data-position-context][hidden]")
+                .doesNotContain("outline: 3px solid var(--accent-soft)")
                 .doesNotContain("font-size: clamp")
                 .doesNotContain("letter-spacing: -")
                 .doesNotContain("url(http")

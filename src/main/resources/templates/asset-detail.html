@@ -32,7 +32,12 @@
           <h1 id="asset-detail-title">Asset Detail / 资产详情</h1>
           <p>展示当前规则层结论、已返回的 AI 观点与可验证执行建议。</p>
         </div>
-        <div class="load-status" data-page-status role="status" aria-live="polite">正在同步</div>
+        <div class="load-actions">
+          <div class="load-status" data-page-status role="status" aria-live="polite">正在同步</div>
+          <button class="retry-button" type="button" data-request-retry hidden>
+            重新加载 / 重试
+          </button>
+        </div>
       </div>
     </section>
 
@@ -72,6 +77,10 @@
         <div>
           <dt>资产状态</dt>
           <dd data-asset-field="state">状态待同步</dd>
+        </div>
+        <div>
+          <dt>是否值得开仓</dt>
+          <dd data-asset-field="worthOpening">待同步</dd>
         </div>
       </dl>
       <div class="summary-conclusion">
@@ -165,8 +174,21 @@
       </article>
     </section>
 
+    <section class="content-section position-context" aria-labelledby="position-context-title"
+             data-position-context hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">真实持仓 / 只读上下文</p>
+          <h2 id="position-context-title">持仓监控上下文 / Position Monitoring Context</h2>
+        </div>
+      </div>
+      <p>
+        当前资产来自真实持仓上下文。资产机会执行建议不在本页展示，请在持仓监控中查看对应信息。
+      </p>
+    </section>
+
     <section class="content-section execution-section" aria-labelledby="execution-plan-title"
-             data-execution-plan>
+             data-execution-plan hidden>
       <div class="section-heading">
         <div>
           <p class="eyebrow">系统建议 / 仅供人工复核</p>

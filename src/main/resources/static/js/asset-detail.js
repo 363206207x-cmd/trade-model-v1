@@ -34,6 +34,11 @@
     node.dataset.status = status;
   }
 
+  function setRetryVisible(visible) {
+    var retry = document.querySelector("[data-request-retry]");
+    if (retry) retry.hidden = !visible;
+  }
+
   function exactAsset(home, requestedSymbol) {
     if (!home || normalizeSymbol(home.selectedSymbol) !== requestedSymbol) return null;
     return (Array.isArray(home.assets) ? home.assets : []).find(function (asset) {
@@ -60,6 +65,11 @@
     );
     setText('[data-asset-field="risk"]', asset.riskLabel || asset.riskLevel, "--");
     setText('[data-asset-field="state"]', state.label, "状态待同步");
+    setText(
+      '[data-asset-field="worthOpening"]',
+      asset.worthOpening === true ? "是" : asset.worthOpening === false ? "否" : null,
+      "待同步"
+    );
     setText('[data-asset-field="conclusion"]', asset.currentConclusion, "暂无可验证结论");
 
     var statePill = document.querySelector("[data-asset-state]");
@@ -141,9 +151,26 @@
 
   function renderExecution(suggestion) {
     var plan = suggestion && typeof suggestion === "object" ? suggestion : {};
-    var access = contract.executionPlanAccess(plan);
     var section = document.querySelector("[data-execution-plan]");
+    var positionContext = document.querySelector("[data-position-context]");
     var values = document.querySelector("[data-plan-values]");
+    var positionMode = plan.positionMode === true;
+
+    if (section) section.hidden = positionMode;
+    if (positionContext) positionContext.hidden = !positionMode;
+    if (positionMode) {
+      if (section) section.dataset.planVisible = "false";
+      if (values) values.hidden = true;
+      ["direction", "entryZone", "stopLoss", "takeProfitRules", "invalidCondition"].forEach(
+        function (field) {
+          setText('[data-plan-field="' + field + '"]', null, "--");
+        }
+      );
+      return;
+    }
+
+    var access = contract.executionPlanAccess(plan);
+    if (section) section.hidden = false;
     if (section) section.dataset.planVisible = String(access.visible);
     if (values) values.hidden = !access.visible;
     setText("[data-plan-status]", access.statusLabel, "执行建议待同步");
@@ -160,7 +187,7 @@
     );
   }
 
-  function failClosed(message) {
+  function failClosed(message, retryable) {
     setText('[data-asset-field="symbol"]', null, "--");
     setText('[data-asset-field="latestPrice"]', null, "--");
     setText('[data-asset-field="direction"]', null, "当前判断不可用");
@@ -168,6 +195,7 @@
     setText('[data-asset-field="confidence"]', null, "--");
     setText('[data-asset-field="risk"]', null, "--");
     setText('[data-asset-field="state"]', null, "状态待同步");
+    setText('[data-asset-field="worthOpening"]', null, "待同步");
     setText('[data-asset-field="conclusion"]', null, "暂无可验证结论");
     var statePill = document.querySelector("[data-asset-state]");
     if (statePill) {
@@ -177,6 +205,7 @@
     }
     renderAi(null);
     renderExecution(null);
+    setRetryVisible(retryable === true);
     setPageStatus(message || "暂无可验证数据", "error");
   }
 
@@ -196,11 +225,23 @@
     });
   }
 
+  function bindRetry() {
+    var retry = document.querySelector("[data-request-retry]");
+    if (!retry) return;
+    retry.addEventListener("click", function () {
+      loadAssetDetail();
+    });
+  }
+
   async function loadAssetDetail() {
+    root.setAttribute("aria-busy", "true");
+    setRetryVisible(false);
+    setPageStatus("正在同步", "loading");
+
     var selectedSymbol = normalizeSymbol(root.dataset.selectedSymbol);
     if (!/^[A-Z0-9]{2,32}$/.test(selectedSymbol) || selectedSymbol === "DEFAULT_SLOT") {
       root.setAttribute("aria-busy", "false");
-      failClosed("资产标识不可验证");
+      failClosed("资产标识不可验证", false);
       return;
     }
 
@@ -223,14 +264,16 @@
       renderAsset(asset);
       renderAi(parsed.data.aiDecision);
       renderExecution(parsed.data.executionSuggestion);
+      setRetryVisible(false);
       setPageStatus("已同步", "ready");
     } catch (error) {
-      failClosed("数据暂不可用");
+      failClosed("数据暂不可用", true);
     } finally {
       root.setAttribute("aria-busy", "false");
     }
   }
 
   bindRoleTabs();
+  bindRetry();
   loadAssetDetail();
 })();
