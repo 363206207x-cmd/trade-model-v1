@@ -53,8 +53,7 @@ public class MobileDashboardController {
             return List.of();
         }
         if (selected == null) {
-            selected = available.get(0);
-            home.setSelectedSymbol(normalizedSymbol(selected.getRawSymbol()));
+            return List.of();
         }
 
         List<DashboardHomeVO.AssetVO> visible = new ArrayList<>(

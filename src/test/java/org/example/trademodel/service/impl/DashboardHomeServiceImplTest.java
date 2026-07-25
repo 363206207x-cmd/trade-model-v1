@@ -1556,11 +1556,12 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of());
         when(userPositionService.listOpenPositions()).thenReturn(List.of());
-        when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
                 .thenReturn(List.of(bnb));
 
-        DashboardHomeVO home = service.getHome("BNBUSDT", 3);
+        DashboardHomeVO home = service.getHome(null, 3);
 
+        assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
         assertThat(home.getAssets())
                 .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
                 .containsExactly("BNBUSDT", "BTCUSDT", "ETHUSDT");
@@ -1568,6 +1569,49 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAssets().subList(1, 3))
                 .extracting(DashboardHomeVO.AssetVO::getSlotType)
                 .containsOnly("DEFAULT_SLOT");
+        verify(externalContextEvidenceBuilder).buildSnapshot(
+                eq("dashboard-home"),
+                eq("BNBUSDT"),
+                eq("1h"),
+                any(LocalDateTime.class),
+                eq("CRYPTO"));
+    }
+
+    @Test
+    void implicitRealFallbackRebuildsDecisionContextForResolvedSymbol() {
+        PersistedOhlcvBarDO bnbBar = new PersistedOhlcvBarDO();
+        bnbBar.setSymbol("BNBUSDT");
+        bnbBar.setTimeframe("5m");
+        bnbBar.setClosePrice(new BigDecimal("620.00"));
+        bnbBar.setProvider("BINANCE_PUBLIC");
+        bnbBar.setFreshnessStatus("FRESH");
+
+        DecisionResultVO bnbDecision = decision("BNBUSDT", "BULLISH", "HIGH", "MEDIUM", 86, 20,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        bnbDecision.setEntryZone("610-615");
+        bnbDecision.setStopLoss("600");
+        bnbDecision.setTakeProfitRules("630 / 640");
+        bnbDecision.setLeverageSuggestion("2x");
+        bnbDecision.setPositionSuggestion("人工复核仓位");
+        bnbDecision.setValidPeriod(ACTIVE_VALID_PERIOD);
+        bnbDecision.setInvalidCondition("跌破 600");
+        setActivePlanValidity(bnbDecision);
+        allowMatchingSnapshot(bnbDecision);
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of());
+        lenient().when(decisionService.getLatestDecisionResultBySymbol("BNBUSDT"))
+                .thenReturn(bnbDecision);
+        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
+                .thenReturn(List.of(bnbBar));
+
+        DashboardHomeVO home = service.getHome(null, 3);
+
+        assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
+        assertThat(home.getAssets().get(0).getSlotType()).isEqualTo("DECISION");
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-BNBUSDT");
+        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BULLISH");
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo("610-615");
     }
 
     @Test

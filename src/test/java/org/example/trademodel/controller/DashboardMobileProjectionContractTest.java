@@ -88,7 +88,7 @@ class DashboardMobileProjectionContractTest {
                 .contains("\"DEFAULT_SLOT\".equalsIgnoreCase(asset.getSlotType())")
                 .contains("normalizedRequest != null && selected == null")
                 .contains("return List.of()")
-                .contains("home.setSelectedSymbol(normalizedSymbol(selected.getRawSymbol()))")
+                .doesNotContain("home.setSelectedSymbol")
                 .contains("visible.add(selected)");
         assertThat(html)
                 .contains("#lists.isEmpty(mobileAssets)")

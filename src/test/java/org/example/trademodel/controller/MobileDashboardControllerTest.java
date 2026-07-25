@@ -85,7 +85,7 @@ class MobileDashboardControllerTest {
     }
 
     @Test
-    void mobileRouteUsesFirstRealAssetWhenImplicitDefaultIsOnlyAPlaceholder() throws Exception {
+    void mobileRouteFailsClosedWhenImplicitSelectionDoesNotHaveARealCard() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("BTCUSDT");
         home.setAssets(List.of(
@@ -98,10 +98,8 @@ class MobileDashboardControllerTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        assertThat(mobileAssets(result))
-                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
-                .containsExactly("BNBUSDT");
-        assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
+        assertThat(mobileAssets(result)).isEmpty();
+        assertThat(home.getSelectedSymbol()).isEqualTo("BTCUSDT");
     }
 
     @Test

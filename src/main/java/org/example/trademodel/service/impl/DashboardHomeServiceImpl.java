@@ -219,7 +219,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
         ProviderReadinessVO providerReadiness = safeProviderReadiness();
 
-        String normalizedSelected = normalizeSymbol(selectedSymbol);
+        String normalizedRequest = normalizeSymbol(selectedSymbol);
+        String normalizedSelected = normalizedRequest;
         if (normalizedSelected == null) {
             normalizedSelected = firstDecisionSymbol(decisions);
         }
@@ -231,6 +232,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (selectedDecision == null) {
             selectedDecision = safeDecisionBySymbol(normalizedSelected);
         }
+        List<DashboardHomeVO.AssetVO> assets =
+                buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
+        if (normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
+            String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
+            if (firstRenderableSymbol != null) {
+                normalizedSelected = firstRenderableSymbol;
+                selectedDecision = findDecision(decisions, normalizedSelected);
+                if (selectedDecision == null) {
+                    selectedDecision = safeDecisionBySymbol(normalizedSelected);
+                }
+                assets = buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
+            }
+        }
 
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
@@ -241,7 +255,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
-        home.setAssets(buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit));
+        home.setAssets(assets);
         PositionRowsResult positionRowsResult = buildPositions(positions);
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
@@ -573,6 +587,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             assets.add(fallback);
         }
         return assets;
+    }
+
+    private boolean hasRenderableAsset(List<DashboardHomeVO.AssetVO> assets, String symbol) {
+        String normalized = normalizeSymbol(symbol);
+        return normalized != null && assets.stream()
+                .anyMatch(asset -> isRenderableAsset(asset)
+                        && normalized.equals(normalizeSymbol(asset.getRawSymbol())));
+    }
+
+    private String firstRenderableAssetSymbol(List<DashboardHomeVO.AssetVO> assets) {
+        return assets.stream()
+                .filter(this::isRenderableAsset)
+                .map(DashboardHomeVO.AssetVO::getRawSymbol)
+                .map(this::normalizeSymbol)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isRenderableAsset(DashboardHomeVO.AssetVO asset) {
+        return asset != null
+                && hasText(asset.getRawSymbol())
+                && !"DEFAULT_SLOT".equalsIgnoreCase(asset.getSlotType());
     }
 
     private DashboardHomeVO.AssetVO assetFromDecision(int slot, DecisionResultVO decision) {
