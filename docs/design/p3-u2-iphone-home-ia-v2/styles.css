@@ -67,6 +67,10 @@ body {
   line-height: 1.45;
 }
 
+html[data-capture-contract="loading"] body {
+  visibility: hidden;
+}
+
 button,
 a,
 summary {
@@ -953,6 +957,33 @@ body.capture-mode .device-shell {
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.capture-failure {
+  display: grid;
+  width: 100vw;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: var(--surface);
+}
+
+.capture-failure-content {
+  width: min(100%, 360px);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.capture-failure-content h1 {
+  margin-top: 4px;
+  font-size: 1.25rem;
+}
+
+.capture-failure-content p:last-child {
+  margin-top: 8px;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 760px) {

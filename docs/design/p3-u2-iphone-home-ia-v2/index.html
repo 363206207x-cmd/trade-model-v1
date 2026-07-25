@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <title>P3-U2 iPhone Home IA v2</title>
+  <script>
+    if (new URLSearchParams(window.location.search).get("capture") === "1") {
+      document.documentElement.dataset.captureContract = "loading";
+    }
+  </script>
   <link rel="stylesheet" href="styles.css">
   <script src="interaction.js" defer></script>
 </head>

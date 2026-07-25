@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +26,45 @@ class P3U2IPhoneHomePrototypeContractTest {
             Path.of("docs/design/p3-u2-iphone-home-ia-v2");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Pattern FIELD_TOKEN = Pattern.compile("\\{([^{}]+)}");
+
+    @Test
+    void captureModeGuardsFirstPaintUntilFieldMapIsReady() throws IOException {
+        String html = Files.readString(PROTOTYPE_DIR.resolve("index.html"));
+        String styles = Files.readString(PROTOTYPE_DIR.resolve("styles.css"));
+        String script = Files.readString(PROTOTYPE_DIR.resolve("interaction.js"));
+        int loadingGuard = html.indexOf(
+                "document.documentElement.dataset.captureContract = \"loading\";");
+        int stylesheet = html.indexOf("<link rel=\"stylesheet\" href=\"styles.css\">");
+
+        assertThat(loadingGuard).isGreaterThanOrEqualTo(0);
+        assertThat(stylesheet).isGreaterThan(loadingGuard);
+        assertThat(styles)
+                .contains("html[data-capture-contract=\"loading\"] body")
+                .contains("visibility: hidden;");
+        assertThat(script)
+                .contains("const setCaptureContract = (status) => {")
+                .contains("setCaptureContract(\"loading\");")
+                .contains("setCaptureContract(captureUsesSafeEmptyState ? \"ready\" : \"not-requested\");");
+    }
+
+    @Test
+    void captureModeFailureRemovesTemplateDomAndRendersFailClosedState() throws IOException {
+        String script = Files.readString(PROTOTYPE_DIR.resolve("interaction.js"));
+        String readme = Files.readString(PROTOTYPE_DIR.resolve("README.md"));
+
+        assertThat(script)
+                .contains("const renderCaptureFailure = () => {")
+                .contains("failure.dataset.captureFailure = \"field-map-unavailable\";")
+                .contains("message.textContent = \"字段映射加载失败，未展示未初始化内容。\";")
+                .contains("document.body.replaceChildren(failure);")
+                .contains("setCaptureContract(\"error\");")
+                .contains("renderCaptureFailure();");
+        assertThat(readme)
+                .contains("html[data-capture-contract=\"ready\"], html[data-capture-contract=\"error\"]")
+                .contains("getAttribute(\"data-capture-contract\") !== \"ready\"")
+                .contains("DOM attribute is the authoritative gate")
+                .contains("screenshot generation must stop");
+    }
 
     @Test
     void captureModeNormalizesAndValidatesPositionBeforeBaseline() throws IOException {
@@ -100,9 +141,10 @@ class P3U2IPhoneHomePrototypeContractTest {
     @Test
     void everyPrototypeTokenHasAMappedEmptyState() throws IOException {
         String html = Files.readString(PROTOTYPE_DIR.resolve("index.html"));
+        String body = section(html, "<body>", "</body>");
         Map<String, String> emptyStates = fieldEmptyStates();
         Set<String> missingFields = new TreeSet<>();
-        Matcher matcher = FIELD_TOKEN.matcher(html);
+        Matcher matcher = FIELD_TOKEN.matcher(body);
 
         while (matcher.find()) {
             String fieldPath = matcher.group(1);
@@ -114,6 +156,33 @@ class P3U2IPhoneHomePrototypeContractTest {
         }
 
         assertThat(missingFields).isEmpty();
+    }
+
+    @Test
+    void captureReferenceScreenshotsArePngsAtTheirContractViewports() throws IOException {
+        Map<String, List<Integer>> screenshotSizes = Map.of(
+                "iphone-17-pro-max-light.png", List.of(440, 956),
+                "iphone-17-pro-max-dark.png", List.of(440, 956),
+                "iphone-17-pro-max-first-screen.png", List.of(440, 956),
+                "iphone-17-pro-max-position-collapsed.png", List.of(440, 956),
+                "iphone-17-pro-max-ai-collapsed.png", List.of(440, 956),
+                "iphone-17-pro-max-large-text.png", List.of(440, 956),
+                "iphone-12-pro-max-light.png", List.of(428, 926),
+                "iphone-12-pro-max-dark.png", List.of(428, 926));
+
+        for (Map.Entry<String, List<Integer>> entry : screenshotSizes.entrySet()) {
+            Path screenshot = PROTOTYPE_DIR.resolve("screenshots").resolve(entry.getKey());
+            byte[] bytes = Files.readAllBytes(screenshot);
+            BufferedImage image = ImageIO.read(screenshot.toFile());
+
+            assertThat(bytes[0]).as(entry.getKey()).isEqualTo((byte) 0x89);
+            assertThat(bytes[1]).as(entry.getKey()).isEqualTo((byte) 0x50);
+            assertThat(bytes[2]).as(entry.getKey()).isEqualTo((byte) 0x4e);
+            assertThat(bytes[3]).as(entry.getKey()).isEqualTo((byte) 0x47);
+            assertThat(image).as(entry.getKey()).isNotNull();
+            assertThat(image.getWidth()).as(entry.getKey()).isEqualTo(entry.getValue().get(0));
+            assertThat(image.getHeight()).as(entry.getKey()).isEqualTo(entry.getValue().get(1));
+        }
     }
 
     private static Map<String, String> fieldEmptyStates() throws IOException {

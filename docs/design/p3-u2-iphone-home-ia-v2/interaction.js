@@ -35,6 +35,32 @@
   let captureEmptyStates = new Map();
   const captureUsesSafeEmptyState = params.get("capture") === "1";
 
+  const setCaptureContract = (status) => {
+    documentElement.dataset.captureContract = status;
+    document.body.dataset.captureContract = status;
+  };
+
+  const renderCaptureFailure = () => {
+    const failure = document.createElement("main");
+    const content = document.createElement("section");
+    const label = document.createElement("p");
+    const title = document.createElement("h1");
+    const message = document.createElement("p");
+
+    failure.className = "capture-failure";
+    failure.dataset.captureFailure = "field-map-unavailable";
+    failure.setAttribute("role", "alert");
+    content.className = "capture-failure-content";
+    label.className = "fixture-label";
+    label.textContent = "STATIC_LAYOUT_FIXTURE";
+    title.textContent = "原型数据不可用";
+    message.textContent = "字段映射加载失败，未展示未初始化内容。";
+    content.append(label, title, message);
+    failure.append(content);
+    document.body.replaceChildren(failure);
+    setCaptureContract("error");
+  };
+
   const fieldPathCandidates = (fieldPath) => Array.from(new Set([
     fieldPath,
     fieldPath.replace(/\[\d+\]/g, "[]"),
@@ -337,13 +363,13 @@
     if (Object.isExtensible(window)) {
       window.P3U2Prototype = prototypeApi;
     }
-    document.body.dataset.captureContract = captureUsesSafeEmptyState ? "ready" : "not-requested";
+    setCaptureContract(captureUsesSafeEmptyState ? "ready" : "not-requested");
     return prototypeApi;
   };
 
   if (captureUsesSafeEmptyState) {
     document.body.classList.add("capture-mode");
-    document.body.dataset.captureContract = "loading";
+    setCaptureContract("loading");
   }
 
   const prototypeReady = captureUsesSafeEmptyState
@@ -360,7 +386,7 @@
     window.P3U2PrototypeReady = prototypeReady;
   }
   prototypeReady.catch((error) => {
-    document.body.dataset.captureContract = "error";
-    console.error(error);
+    renderCaptureFailure();
+    console.error("Capture-mode initialization failed", error);
   });
 })();
