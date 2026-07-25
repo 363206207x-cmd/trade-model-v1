@@ -21,14 +21,13 @@ enum HostSecurityPolicy {
             return true
         }
 
-        var ipv4 = in_addr()
-        if host.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 {
-            let address = UInt32(bigEndian: ipv4.s_addr)
+        if let address = legacyCompatibleIPv4Address(host) {
             return address & 0xff00_0000 == 0x7f00_0000
         }
 
+        let ipv6Host = removingIPv6ZoneIdentifier(from: host)
         var ipv6 = in6_addr()
-        guard host.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1 else {
+        guard ipv6Host.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1 else {
             return false
         }
         return withUnsafeBytes(of: &ipv6) { rawBytes in
@@ -39,6 +38,50 @@ enum HostSecurityPolicy {
                 && bytes[11] == 0xff
             return ipv6Loopback || (ipv4Mapped && bytes[12] == 127)
         }
+    }
+
+    static func canonicalIPv4Address(_ rawHost: String) -> UInt32? {
+        let host = normalizedHost(rawHost)
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count == 4, labels.allSatisfy({ !$0.isEmpty }) else {
+            return nil
+        }
+
+        var ipv4 = in_addr()
+        guard host.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 else {
+            return nil
+        }
+        return UInt32(bigEndian: ipv4.s_addr)
+    }
+
+    static func isIPAddressLiteral(_ rawHost: String) -> Bool {
+        let host = normalizedHost(rawHost)
+        if legacyCompatibleIPv4Address(host) != nil {
+            return true
+        }
+
+        let ipv6Host = removingIPv6ZoneIdentifier(from: host)
+        var ipv6 = in6_addr()
+        return ipv6Host.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1
+    }
+
+    private static func legacyCompatibleIPv4Address(_ host: String) -> UInt32? {
+        var ipv4 = in_addr()
+        if host.withCString({ inet_pton(AF_INET, $0, &ipv4) }) == 1 {
+            return UInt32(bigEndian: ipv4.s_addr)
+        }
+        if host.withCString({ inet_aton($0, &ipv4) }) == 1 {
+            return UInt32(bigEndian: ipv4.s_addr)
+        }
+        return nil
+    }
+
+    private static func removingIPv6ZoneIdentifier(from host: String) -> String {
+        guard host.contains(":"),
+              let zoneSeparator = host.firstIndex(of: "%") else {
+            return host
+        }
+        return String(host[..<zoneSeparator])
     }
 }
 
@@ -68,6 +111,8 @@ struct WebOrigin: Equatable {
 }
 
 struct BackendConfiguration: Equatable {
+    static let persistedBaseURLKey = "tradeModel.backendBaseURL"
+
     let baseURL: URL
     let rootURL: URL
     let environment: AppEnvironment
@@ -121,14 +166,38 @@ struct BackendConfiguration: Equatable {
     static func resolve(
         environment: AppEnvironment = .current,
         processEnvironment: [String: String] = ProcessInfo.processInfo.environment,
-        infoDictionary: [String: Any] = Bundle.main.infoDictionary ?? [:]
+        infoDictionary: [String: Any] = Bundle.main.infoDictionary ?? [:],
+        userDefaults: UserDefaults = .standard
     ) throws -> BackendConfiguration {
-        let environmentValue = processEnvironment["TRADE_MODEL_BASE_URL"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let plistValue = (infoDictionary["TRADE_MODEL_BASE_URL"] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let selected = environmentValue?.isEmpty == false ? environmentValue : plistValue
-        return try BackendConfiguration(baseURLString: selected, environment: environment)
+        let selected: String?
+        let shouldPersist: Bool
+
+        if let runtimeValue = processEnvironment["TRADE_MODEL_BASE_URL"] {
+            selected = runtimeValue
+            shouldPersist = true
+        } else if let buildValue = configuredBuildValue(
+            infoDictionary["TRADE_MODEL_BASE_URL"]
+        ) {
+            selected = buildValue
+            shouldPersist = true
+        } else {
+            selected = userDefaults.string(forKey: persistedBaseURLKey)
+            shouldPersist = false
+        }
+
+        let configuration = try BackendConfiguration(
+            baseURLString: selected,
+            environment: environment
+        )
+        if shouldPersist,
+           userDefaults.string(forKey: persistedBaseURLKey)
+            != configuration.baseURL.absoluteString {
+            userDefaults.set(
+                configuration.baseURL.absoluteString,
+                forKey: persistedBaseURLKey
+            )
+        }
+        return configuration
     }
 
     static func resolveResult() -> Result<BackendConfiguration, BackendConfigurationError> {
@@ -142,15 +211,26 @@ struct BackendConfiguration: Equatable {
     }
 
     private static func isPrivateNetworkHost(_ host: String) -> Bool {
-        if host.hasSuffix(".local") {
-            return true
+        if let address = HostSecurityPolicy.canonicalIPv4Address(host) {
+            return address & 0xff00_0000 == 0x0a00_0000
+                || address & 0xfff0_0000 == 0xac10_0000
+                || address & 0xffff_0000 == 0xc0a8_0000
         }
-        let octets = host.split(separator: ".").compactMap { Int($0) }
-        guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else {
+        guard !HostSecurityPolicy.isIPAddressLiteral(host) else {
             return false
         }
-        return octets[0] == 10
-            || (octets[0] == 172 && (16...31).contains(octets[1]))
-            || (octets[0] == 192 && octets[1] == 168)
+        return host.hasSuffix(".local")
+    }
+
+    private static func configuredBuildValue(_ rawValue: Any?) -> String? {
+        guard let rawValue = rawValue as? String else {
+            return nil
+        }
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !(value.hasPrefix("$(") && value.hasSuffix(")")) else {
+            return nil
+        }
+        return value
     }
 }

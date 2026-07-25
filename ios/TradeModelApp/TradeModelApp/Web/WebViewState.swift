@@ -38,9 +38,9 @@ final class WebViewState: ObservableObject {
         // Login and dashboard redirects remain ordinary same-origin navigation.
     }
 
-    func didFinishNavigation(canGoBack: Bool) {
-        if self.canGoBack != canGoBack {
-            self.canGoBack = canGoBack
+    func didFinishNavigation(canGoBack newCanGoBack: Bool) {
+        if canGoBack != newCanGoBack {
+            canGoBack = newCanGoBack
         }
         if phase != .content {
             phase = .content

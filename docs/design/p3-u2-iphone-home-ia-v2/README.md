@@ -13,7 +13,8 @@ Serve the repository root with any local static HTTP server, then open:
 ```
 
 The prototype has no dependency installation, build step, CDN, backend call,
-cookie, storage, or form submission.
+cookie, storage, or form submission. Capture mode performs one same-directory
+request for the checked-in `field-map.json`; it makes no external request.
 
 ## Preview Parameters
 
@@ -34,6 +35,29 @@ Use a `440 x 956` browser viewport for 17PM and a `428 x 926` viewport for
 12PM. The corresponding measured safe areas are `62 / 0 / 34 / 0pt` and
 `47 / 0 / 34 / 0pt`.
 
+## Capture Readiness Gate
+
+Capture tooling must wait for a terminal DOM contract state before taking a
+screenshot:
+
+```js
+const terminalState = page.locator(
+  'html[data-capture-contract="ready"], html[data-capture-contract="error"]'
+);
+await terminalState.waitFor({ state: "attached" });
+if (await page.locator("html").getAttribute("data-capture-contract") !== "ready") {
+  throw new Error("Capture contract is not ready");
+}
+```
+
+The document marks capture mode as `loading` before the stylesheet is loaded,
+so raw template tokens never receive a visible first paint. Successful
+field-map normalization changes the state to `ready`. A load or validation
+failure removes the template DOM, renders a bounded fail-closed unavailable
+state, and changes the state to `error`; screenshot generation must stop.
+`window.P3U2PrototypeReady` is also exposed as a convenience when the host
+allows extending `window`, but the DOM attribute is the authoritative gate.
+
 ## Rendered Evidence
 
 The checked-in viewport captures were rendered directly from `index.html`:
@@ -48,8 +72,8 @@ The checked-in viewport captures were rendered directly from `index.html`:
 - `screenshots/iphone-17-pro-max-large-text.png`
 
 Both fixtures show one compact alert/event summary; native disclosure retains
-capacity for a second row. Capture mode displays only `--`, `待同步`, `等待同步`,
-`否`, and the explicit no-block fallback instead of manufacturing market or AI
+capacity for a second row. Capture mode renders the exact per-field
+`emptyState` from `field-map.json` instead of manufacturing market or AI
 evidence. Every replaced value retains its exact path in `data-field-token`.
 The 12PM panels stack independently rather than scaling the 17PM layout.
 
@@ -123,7 +147,7 @@ field, so the consistency summary does not render it.
 - Production Swift changed: `NO`
 - Dashboard template changed: `NO`
 - PR #1134 changed: `NO`
-- Network requests: `NONE`
+- Network requests: `LOCAL_FIELD_MAP_ONLY`
 - Provider or AI calls: `NONE`
 - Orders, position mutation, Push, Telegram, or trading: `NONE`
 - Production readiness: `BLOCKED`

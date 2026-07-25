@@ -241,7 +241,7 @@ each exact binding in `data-field-token`; it does not use whole-page scaling.
 | Watch-asset height | `204.4pt` | `204.4pt` | `204.4pt` | `204.4pt` |
 | Execution default height | `234.4pt` | `234.4pt` | `234.4pt` | `234.4pt` |
 | Position default height | `865.2pt` | `865.2pt` | `610.1pt` | `610.1pt` |
-| AI default height | `701.5pt` | `701.5pt` | `701.5pt` | `701.5pt` |
+| AI default height | `733.4pt` | `733.4pt` | `733.4pt` | `733.4pt` |
 | Execution top Y | `563.0pt` | `563.0pt` | `630.6pt` | `630.6pt` |
 | Bottom-nav top Y | `861.0pt` | `861.0pt` | `831.0pt` | `831.0pt` |
 | Execution core above nav | `YES` | `YES` | `YES` | `YES` |

@@ -43,13 +43,6 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         )
     }
 
-    func updateNavigationState() {
-        guard let webView else { return }
-        if case .content = state.phase {
-            state.didFinishNavigation(canGoBack: webView.canGoBack)
-        }
-    }
-
     func updateTextSize(_ newLevel: MobileWebTextSizeLevel, in webView: WKWebView) {
         guard newLevel != textSizeLevel else { return }
         textSizeLevel = newLevel
@@ -94,7 +87,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         didFailProvisionalNavigation navigation: WKNavigation?,
         withError error: Error
     ) {
-        state.didFailNavigation()
+        handleNavigationFailure(error)
     }
 
     func webView(
@@ -102,7 +95,7 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         didFail navigation: WKNavigation?,
         withError error: Error
     ) {
-        state.didFailNavigation()
+        handleNavigationFailure(error)
     }
 
     func webView(
@@ -133,6 +126,16 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
             break
         }
         return nil
+    }
+
+    static func shouldReportNavigationFailure(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain != NSURLErrorDomain || error.code != NSURLErrorCancelled
+    }
+
+    private func handleNavigationFailure(_ error: Error) {
+        guard Self.shouldReportNavigationFailure(error) else { return }
+        state.didFailNavigation()
     }
 
     private func handle(

@@ -17,8 +17,19 @@ store credentials, Session IDs, or CSRF tokens in native code.
 
 ## Configure A Development Backend
 
-The app has no built-in server address. In Xcode, edit the active Scheme,
-choose **Run > Arguments > Environment Variables**, and add:
+The app has no hard-coded server address. Backend URL resolution is explicit
+and ordered:
+
+1. `TRADE_MODEL_BASE_URL` from the current process environment.
+2. The `TRADE_MODEL_BASE_URL` value embedded in `Info.plist` through the target
+   build setting.
+3. The last successfully validated backend URL stored in this app's local
+   `UserDefaults` container.
+4. No default: if all three sources are unavailable, the app fails closed on
+   the configuration screen.
+
+For the first local launch, edit the active Scheme in Xcode, choose
+**Run > Arguments > Environment Variables**, and add:
 
 ```text
 TRADE_MODEL_BASE_URL=http://192.168.x.x:8081
@@ -40,6 +51,18 @@ project, Git, or chat.
 Development accepts explicitly configured private-LAN HTTP addresses or HTTPS.
 Production mode accepts HTTPS only. The app rejects missing, malformed,
 credential-bearing, loopback, and non-private HTTP URLs.
+
+After a valid first launch, the app stores only the validated backend URL. It
+does not store credentials, Cookies, Session IDs, or CSRF tokens. Opening the
+installed app later from the iPhone Home Screen therefore reuses the same
+backend URL even though Xcode Scheme environment variables are no longer
+present. An explicit runtime or build-setting value takes priority and replaces
+the stored URL only after validation succeeds.
+
+For a backend URL embedded in a particular local build, provide
+`TRADE_MODEL_BASE_URL` as a target build-setting override. `Info.plist` already
+uses `$(TRADE_MODEL_BASE_URL)`. Keep personal LAN values local and do not commit
+them. Deleting the app clears its stored backend URL.
 
 ## Install On Your Own iPhone
 
