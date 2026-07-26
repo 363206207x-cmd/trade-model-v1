@@ -44,6 +44,28 @@
     if (retry) retry.hidden = !visible;
   }
 
+  function updateAnalysisDetailLink(asset) {
+    var link = document.querySelector("[data-analysis-detail-link]");
+    if (!link) return;
+    var analysisId = asset && contract.hasText(asset.analysisId)
+      ? String(asset.analysisId).trim()
+      : "";
+    var symbol = normalizeSymbol(asset && (asset.rawSymbol || asset.symbol));
+    if (!analysisId || !symbol) {
+      link.hidden = true;
+      link.removeAttribute("href");
+      return;
+    }
+
+    var query = new URLSearchParams({
+      analysisId: analysisId,
+      selectedSymbol: symbol
+    });
+    if (root.dataset.mobileView === "true") query.set("view", "mobile");
+    link.href = "/dashboard/analysis-detail?" + query.toString();
+    link.hidden = false;
+  }
+
   function exactAsset(home, requestedSymbol) {
     if (!home || normalizeSymbol(home.selectedSymbol) !== requestedSymbol) return null;
     return (Array.isArray(home.assets) ? home.assets : []).find(function (asset) {
@@ -83,6 +105,7 @@
       statePill.dataset.tone = state.tone;
       statePill.dataset.state = state.code;
     }
+    updateAnalysisDetailLink(asset);
   }
 
   function rolePanel(role) {
@@ -218,6 +241,7 @@
       statePill.dataset.tone = "neutral";
       statePill.dataset.state = "unknown";
     }
+    updateAnalysisDetailLink(null);
     renderAi(null);
     renderExecution(null);
     setRetryVisible(retryable === true);

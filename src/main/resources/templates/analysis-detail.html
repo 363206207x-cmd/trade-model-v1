@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>分析详情 · Trade Model</title>
+  <link rel="stylesheet" th:href="@{/css/analysis-detail.css}" href="/css/analysis-detail.css">
+  <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js" defer></script>
+  <script th:src="@{/js/analysis-detail.js}" src="/js/analysis-detail.js" defer></script>
+</head>
+<body>
+  <main class="analysis-detail"
+        data-analysis-detail-root
+        data-analysis-id=""
+        data-selected-symbol=""
+        data-mobile-view="false"
+        th:attr="data-analysis-id=${analysisId},
+                 data-selected-symbol=${selectedSymbol},
+                 data-mobile-view=${mobileView}"
+        aria-busy="true">
+    <nav class="analysis-navigation" aria-label="分析详情导航">
+      <a class="back-button"
+         data-analysis-back
+         aria-label="返回上一层"
+         href="/dashboard">
+        <span aria-hidden="true">‹</span>
+      </a>
+      <div class="title-stack">
+        <h1>分析详情</h1>
+        <p>解释当前结论为什么成立</p>
+      </div>
+      <span class="sync-status" data-page-status data-status="loading"
+            role="status" aria-live="polite">正在同步</span>
+    </nav>
+
+    <section class="page-state" data-page-state hidden role="alert" aria-live="assertive">
+      <span class="state-mark" aria-hidden="true">!</span>
+      <div>
+        <h2 data-page-state-title>数据暂不可用</h2>
+        <p data-page-state-message>当前分析无法读取。</p>
+      </div>
+      <button class="retry-button" type="button" data-request-retry hidden>
+        重新加载
+      </button>
+    </section>
+
+    <div class="analysis-content" data-analysis-content hidden>
+      <section class="asset-context" aria-labelledby="analysis-asset-title">
+        <div class="asset-identity">
+          <div class="symbol-stack">
+            <h2 id="analysis-asset-title" data-analysis-field="symbol">--</h2>
+            <p>当前资产</p>
+          </div>
+          <span class="authority-badge">当前权威分析</span>
+        </div>
+        <div class="analysis-facts">
+          <div class="fact">
+            <span>当前方向</span>
+            <strong data-analysis-field="direction">待同步</strong>
+          </div>
+          <div class="fact">
+            <span>综合评分 / 置信度</span>
+            <strong data-analysis-field="scoreConfidence">-- / 待同步</strong>
+          </div>
+        </div>
+        <dl class="run-meta" aria-label="分析上下文">
+          <div><dt>周期</dt><dd data-analysis-field="timeframe">--</dd></div>
+          <div><dt>数据质量</dt><dd data-analysis-field="dataQuality">--</dd></div>
+          <div><dt>分析时间</dt><dd data-analysis-field="analysisTime">--</dd></div>
+        </dl>
+      </section>
+
+      <section class="module-card market-judgment" aria-labelledby="market-judgment-title">
+        <div class="module-heading">
+          <div>
+            <h2 id="market-judgment-title">市场判断</h2>
+            <p>仅显示当前分析可验证的判断摘要</p>
+          </div>
+          <span class="coverage-badge" data-market-status>待同步</span>
+        </div>
+        <dl class="judgment-list">
+          <div><dt>趋势</dt><dd data-market-field="trend">待同步</dd></div>
+          <div><dt>市场结构</dt><dd data-market-field="structure">结构判断待同步</dd></div>
+          <div><dt>市场环境</dt><dd data-market-field="environment">待同步</dd></div>
+        </dl>
+        <div class="conclusion-summary">
+          <span>当前结论摘要</span>
+          <strong data-market-field="conclusion">分析摘要待同步，不生成替代解释。</strong>
+        </div>
+      </section>
+
+      <section class="evidence-scoring" aria-labelledby="evidence-scoring-title">
+        <div class="section-heading">
+          <h2 id="evidence-scoring-title">证据与评分</h2>
+          <p>只展示当前分析实际返回的 Top 3；缺失时保持关闭。</p>
+        </div>
+
+        <div class="evidence-score-grid">
+          <section class="module-card evidence-module" aria-labelledby="key-evidence-title">
+            <div class="module-heading">
+              <div>
+                <h3 id="key-evidence-title">关键证据</h3>
+                <p>最多 3 条；不创建“查看全部”假入口。</p>
+              </div>
+              <span class="coverage-badge" data-evidence-coverage>不可用</span>
+            </div>
+            <div class="evidence-list" data-evidence-list>
+              <article class="evidence-card" data-evidence-unavailable>
+                <div class="card-heading">
+                  <strong>Evidence Card</strong>
+                  <span>不可用</span>
+                </div>
+                <dl>
+                  <div><dt>证据类型</dt><dd>状态待同步</dd></div>
+                  <div><dt>方向</dt><dd>未提供</dd></div>
+                  <div><dt>证据强度</dt><dd>未提供</dd></div>
+                  <div><dt>置信度</dt><dd>未提供</dd></div>
+                  <div><dt>来源</dt><dd>来源待同步</dd></div>
+                </dl>
+                <p>证据描述待同步。</p>
+                <small>证据当前不可用，不推断缺失内容。</small>
+              </article>
+            </div>
+            <p class="coverage-note" data-evidence-note>
+              完整证据、支持/反对关系、强度与置信度尚未提供。
+            </p>
+          </section>
+
+          <section class="module-card score-module" aria-labelledby="key-score-title">
+            <div class="module-heading">
+              <div>
+                <h3 id="key-score-title">关键评分</h3>
+                <p>仅渲染实际返回评分，不补齐八项。</p>
+              </div>
+              <span class="coverage-badge" data-score-coverage>不可用</span>
+            </div>
+            <div class="score-card">
+              <div class="card-heading">
+                <strong>Score Card</strong>
+                <span data-score-card-coverage>不可用</span>
+              </div>
+              <dl class="score-list">
+                <div><dt>趋势结构分</dt><dd data-score-type="趋势结构分">—</dd></div>
+                <div><dt>资金推动分</dt><dd data-score-type="资金推动分">—</dd></div>
+                <div><dt>杠杆风险分</dt><dd data-score-type="杠杆风险分">—</dd></div>
+                <div><dt>流动性质量分</dt><dd data-score-type="流动性质量分">—</dd></div>
+                <div><dt>情绪温度分</dt><dd data-score-type="情绪温度分">—</dd></div>
+                <div><dt>事件冲击分</dt><dd data-score-type="事件冲击分">—</dd></div>
+                <div><dt>宏观环境分</dt><dd data-score-type="宏观环境分">—</dd></div>
+                <div><dt>综合可信度分</dt><dd data-score-type="综合可信度分">—</dd></div>
+              </dl>
+              <small data-score-note>评分不可用；不合成、不平均、不排序。</small>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="module-card timeframe-module"
+               aria-labelledby="multi-timeframe-title"
+               data-fail-state="MULTI_TIMEFRAME_UNAVAILABLE">
+        <div class="module-heading">
+          <div>
+            <h2 id="multi-timeframe-title">多周期摘要</h2>
+            <p>表达周期是否收敛，不生成独立行情分析。</p>
+          </div>
+          <span class="coverage-badge" data-timeframe-status>不可用</span>
+        </div>
+        <dl class="convergence-row">
+          <dt>收敛状态</dt>
+          <dd data-timeframe-convergence>待同步</dd>
+        </dl>
+        <div class="timeframe-grid">
+          <article><strong>4H</strong><span data-timeframe="4H">待同步</span><small>方向确认</small></article>
+          <article><strong>1H</strong><span data-timeframe="1H">待同步</span><small>结构确认</small></article>
+          <article><strong>15M</strong><span data-timeframe="15M">待同步</span><small>时机与结构</small></article>
+          <article><strong>5M</strong><span data-timeframe="5M">待同步</span><small>短期风险过滤</small></article>
+        </div>
+        <p class="coverage-note">5M 仅作为短期风险过滤，不作为主趋势方向。</p>
+      </section>
+
+      <section class="module-card ai-analysis"
+               aria-labelledby="ai-analysis-title"
+               data-fail-state="AI_TRACE_UNAVAILABLE">
+        <div class="module-heading">
+          <div>
+            <h2 id="ai-analysis-title">AI 分析状态</h2>
+            <p>三个角色仅展示当前 analysisId 可验证的返回内容。</p>
+          </div>
+          <span class="coverage-badge" data-ai-status>AI 溯源不可用</span>
+        </div>
+
+        <div class="role-tabs" role="tablist" aria-label="AI 三角色">
+          <button type="button" role="tab" id="analysis-role-tab-GPT_FINAL"
+                  data-role-tab="GPT_FINAL" aria-selected="true"
+                  aria-controls="analysis-role-panel-GPT_FINAL" tabindex="0">
+            GPT_FINAL
+          </button>
+          <button type="button" role="tab" id="analysis-role-tab-GEMINI_REVIEW"
+                  data-role-tab="GEMINI_REVIEW" aria-selected="false"
+                  aria-controls="analysis-role-panel-GEMINI_REVIEW" tabindex="-1">
+            GEMINI_REVIEW
+          </button>
+          <button type="button" role="tab" id="analysis-role-tab-GROK_CHALLENGE"
+                  data-role-tab="GROK_CHALLENGE" aria-selected="false"
+                  aria-controls="analysis-role-panel-GROK_CHALLENGE" tabindex="-1">
+            GROK_CHALLENGE
+          </button>
+        </div>
+
+        <article class="role-panel" id="analysis-role-panel-GPT_FINAL"
+                 role="tabpanel" data-role-panel="GPT_FINAL"
+                 aria-labelledby="analysis-role-tab-GPT_FINAL">
+          <h3>GPT_FINAL / 最终裁决官</h3>
+          <dl>
+            <div><dt>当前状态</dt><dd data-role-state>待同步</dd></div>
+            <div><dt>当前结论摘要</dt><dd>该角色暂无可验证的详细分析</dd></div>
+            <div><dt>决策冲突状态</dt><dd data-role-conflict>待同步</dd></div>
+          </dl>
+          <p>当前分析溯源待同步；不从其他 analysis 或当前首页补全。</p>
+        </article>
+
+        <article class="role-panel" id="analysis-role-panel-GEMINI_REVIEW"
+                 role="tabpanel" data-role-panel="GEMINI_REVIEW"
+                 aria-labelledby="analysis-role-tab-GEMINI_REVIEW" hidden>
+          <h3>GEMINI_REVIEW / 冲突复核官</h3>
+          <dl>
+            <div><dt>当前状态</dt><dd data-role-state>待同步</dd></div>
+            <div><dt>当前结论摘要</dt><dd>该角色暂无可验证的冲突复核</dd></div>
+            <div><dt>决策冲突状态</dt><dd data-role-conflict>待同步</dd></div>
+          </dl>
+          <p>当前分析溯源待同步；不生成独立交易方向。</p>
+        </article>
+
+        <article class="role-panel" id="analysis-role-panel-GROK_CHALLENGE"
+                 role="tabpanel" data-role-panel="GROK_CHALLENGE"
+                 aria-labelledby="analysis-role-tab-GROK_CHALLENGE" hidden>
+          <h3>GROK_CHALLENGE / 反方挑战官</h3>
+          <dl>
+            <div><dt>当前状态</dt><dd data-role-state>待同步</dd></div>
+            <div><dt>当前结论摘要</dt><dd>该角色暂无可验证的反方挑战</dd></div>
+            <div><dt>决策冲突状态</dt><dd data-role-conflict>待同步</dd></div>
+          </dl>
+          <p>当前分析溯源待同步；不补写外部事件或技术证据。</p>
+        </article>
+      </section>
+
+      <aside class="partial-notice" data-partial-notice hidden role="status">
+        <strong>部分数据可用</strong>
+        <span>页面仅展示当前 API 已返回的摘要，未提供内容保持待同步。</span>
+      </aside>
+      <div class="bottom-safe-area" aria-hidden="true"></div>
+    </div>
+  </main>
+</body>
+</html>

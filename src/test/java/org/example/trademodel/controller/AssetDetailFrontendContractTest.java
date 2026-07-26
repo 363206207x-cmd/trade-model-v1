@@ -164,18 +164,25 @@ class AssetDetailFrontendContractTest {
     }
 
     @Test
-    void pageStopsAtTheFe02BoundaryWithoutFe03AnalysisContent() throws Exception {
+    void pageKeepsFe02ContentBoundaryWhileExposingTheVerifiedFe03Entry() throws Exception {
         String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
 
         assertThat(html)
                 .contains("资产摘要 / Asset Summary")
                 .contains("AI 当前观点 / AI Current View")
                 .contains("执行建议 / Execution Plan")
+                .contains("data-analysis-detail-link")
+                .contains("查看分析详情")
                 .doesNotContain("Market Analysis")
                 .doesNotContain("Evidence &amp; Scoring")
                 .doesNotContain("Multi Timeframe")
-                .doesNotContain("analysis-section")
-                .doesNotContain("analysis-entry");
+                .doesNotContain("analysis-section");
+        assertThat(script)
+                .contains("contract.hasText(asset.analysisId)")
+                .contains("updateAnalysisDetailLink(asset)")
+                .contains("updateAnalysisDetailLink(null)")
+                .doesNotContain("executionSuggestion.sourceAnalysisId");
     }
 
     @Test
