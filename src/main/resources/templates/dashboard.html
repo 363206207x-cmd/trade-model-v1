@@ -2937,6 +2937,7 @@
                 </div>
                 <button type="button" class="btn" id="btnAdd" disabled aria-disabled="true"
                         title="添加资产暂未开放">添加资产暂未开放</button>
+                <a class="btn" id="assetDetailLink" hidden>资产详情</a>
                 <button type="button" class="btn custom-only-action" id="btnRemove" disabled hidden>删除</button>
                 <button type="button" class="btn asset-pool-toggle" id="assetPoolToggle"
                         aria-expanded="false" disabled hidden>资产池 ▾</button>
@@ -6378,15 +6379,33 @@
         }).slice(0, 6);
     }
 
+    function updateAssetDetailLink(symbol) {
+        var link = document.getElementById("assetDetailLink");
+        if (!link) return;
+        var normalized = normalizeDisplaySymbol(symbol);
+        if (!normalized) {
+            link.removeAttribute("href");
+            link.hidden = true;
+            return;
+        }
+        link.href = "/dashboard/asset-detail?selectedSymbol=" + encodeURIComponent(normalized);
+        link.hidden = false;
+    }
+
     function renderHomeAssetsFromPayload(assets) {
         var box = document.getElementById("tilesRow");
         if (!box) return;
         var list = fixedHomeAssetList(assets);
         if (!list.length) {
+            updateAssetDetailLink(null);
             box.innerHTML = '<div class="overview-empty-state" role="status">'
                 + '<strong>暂无重点资产</strong><span>等待后端返回可验证的资产分析</span></div>';
             return;
         }
+        var linkedAsset = list.find(function (asset) {
+            return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === selectedSymbol;
+        });
+        updateAssetDetailLink(linkedAsset && (linkedAsset.rawSymbol || linkedAsset.symbol));
         box.innerHTML = list.map(function (asset, idx) {
             var rawSymbol = normalizeDisplaySymbol(asset.rawSymbol || asset.symbol);
             var selected = rawSymbol && rawSymbol === selectedSymbol ? " selected" : "";

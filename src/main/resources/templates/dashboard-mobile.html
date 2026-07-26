@@ -141,6 +141,9 @@
                   th:disabled="${#lists.isEmpty(mobileAssets)}">搜索</button>
           <button class="watch-tool-button" type="button" data-asset-add disabled aria-disabled="true"
                   aria-describedby="watch-add-contract-status">添加</button>
+          <a class="watch-tool-button watch-detail-link" data-asset-detail-link
+             th:if="${!#lists.isEmpty(mobileAssets)}"
+             th:href="@{/dashboard/asset-detail(selectedSymbol=${home.selectedSymbol},view='mobile')}">详情</a>
         </div>
       </div>
       <p class="section-note watch-limit-note"

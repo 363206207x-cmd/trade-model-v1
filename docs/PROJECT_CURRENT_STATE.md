@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: P3-U2 iPhone Private Test App Foundation security fix in Draft PR #1134
-Next Business Phase: P3-U2 exact-Head independent iOS/security re-review, then separately authorized real-iPhone acceptance
-Next Business Phase Allowed: NO while the P3-U2 Draft PR is unmerged; NO for P4 and production deployment
+Current Work Package: FE-02 Asset Detail final merge-gate remediation in PR #1137
+Next Business Phase: FE-02 exact-Head independent review, then separately authorized PR #1137 merge
+Next Business Phase Allowed: NO while PR #1137 is unmerged; NO for FE-03, P4, or production deployment
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -17,21 +17,21 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 ## P3-U2 iPhone Private Test App Foundation
 
 P3-U1 is effective on merged main
-`b7fb33d543927b6f770d6092fd6f5df3751f3d57` through PR #1133. P3-U2 is now
-implemented on `codex/p3-u2-iphone-private-test-app` as an iPhone-only SwiftUI
-+ `WKWebView` client. It reuses the existing form-login, server-side Session,
-Cookie, CSRF, redirect, and logout behavior without changing Java or backend
-authentication.
+`b7fb33d543927b6f770d6092fd6f5df3751f3d57` through PR #1133. P3-U2 is effective
+on merged main `1e061d9cdb8d0e0722842f06be34c1bb6ddd8064` through stacked PRs #1134,
+#1135, and #1136. The merged iPhone-only SwiftUI + `WKWebView` client reuses the
+existing form-login, server-side Session, Cookie, CSRF, redirect, and logout
+behavior without changing Java or backend authentication.
 
-The branch adds strict environment/Info.plist base-URL configuration, private
+The merged P3-U2 chain adds strict environment/Info.plist base-URL configuration, private
 LAN HTTP only in development, HTTPS-only production, no loopback/default host,
 same-origin WebView navigation, system external HTTPS/mailto/tel handling,
 default TLS validation, persistent default WebKit storage, native loading and
 redacted error/retry UI, Xcode project/signing hygiene, 47 unit/security/project
 tests, one UI launch test, and a passing iOS 26.5 iPhone 17 Pro Simulator
-build/install/launch check. It remains unmerged branch evidence. Real iPhone
-installation/login/Session persistence, deployed HTTPS server, App Store,
-TestFlight, Ad Hoc, P4, and production readiness are not claimed.
+build/install/launch check. These changes are merged-main evidence. Deployed
+HTTPS server, App Store, TestFlight, Ad Hoc, P4, and production readiness are
+not claimed by the merge status.
 
 See `docs/P3_U2_IPHONE_PRIVATE_TEST_APP.md`.
 
@@ -66,7 +66,8 @@ local PostgreSQL 16 and passed the local browser-equivalent Session/CSRF smoke.
 These changes are effective on merged main; real production PostgreSQL V8, real mobile
 Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
-Production readiness remains `BLOCKED`; P3-U2 is the active bounded package and P4 is not allowed.
+Production readiness remains `BLOCKED`; FE-02 is the active bounded frontend
+package, and FE-03/P4 are not allowed before FE-02 is merged and validated on main.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
@@ -1265,5 +1266,5 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: PR #1134 P3-U2 iPhone private test app Draft/open/unmerged; loopback security fix locally validated, pending exact-Head independent iOS/security re-review
+- CURRENT_PACKAGE_PR: PR #1137 FE-02 Asset Detail open/ready/unmerged; final merge-gate remediation pending exact-Head independent review
 - UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE

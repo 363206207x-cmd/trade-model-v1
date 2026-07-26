@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>资产详情 · Trade Model</title>
+  <link rel="stylesheet" th:href="@{/css/asset-detail.css}" href="/css/asset-detail.css">
+  <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js" defer></script>
+  <script th:src="@{/js/asset-detail.js}" src="/js/asset-detail.js" defer></script>
+</head>
+<body>
+  <header class="detail-topbar">
+    <div class="topbar-inner">
+      <a class="back-link" th:if="${mobileView}"
+         th:href="@{/dashboard/mobile(selectedSymbol=${selectedSymbol})}">返回首页</a>
+      <a class="back-link" th:unless="${mobileView}"
+         th:href="@{/dashboard(selectedSymbol=${selectedSymbol})}">返回首页</a>
+      <span class="product-name">Trade Model</span>
+      <span class="read-only-badge">只读分析</span>
+    </div>
+  </header>
+
+  <main class="asset-detail"
+        data-asset-detail-root
+        th:attr="data-selected-symbol=${selectedSymbol}"
+        aria-busy="true">
+    <section class="page-intro" aria-labelledby="asset-detail-title">
+      <p class="eyebrow">V1 Product UI / 资产分析</p>
+      <div class="intro-row">
+        <div>
+          <h1 id="asset-detail-title">Asset Detail / 资产详情</h1>
+          <p>展示当前规则层结论、已返回的 AI 观点与可验证执行建议。</p>
+        </div>
+        <div class="load-actions">
+          <div class="load-status" data-page-status role="status" aria-live="polite">正在同步</div>
+          <button class="retry-button" type="button" data-request-retry hidden>
+            重新加载 / 重试
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary-section" id="asset-summary" aria-labelledby="asset-summary-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">当前资产决策摘要</p>
+          <h2 id="asset-summary-title">资产摘要 / Asset Summary</h2>
+        </div>
+        <span class="state-pill" data-asset-state data-tone="neutral">状态待同步</span>
+      </div>
+      <dl class="summary-grid">
+        <div>
+          <dt>资产</dt>
+          <dd data-asset-field="symbol">--</dd>
+        </div>
+        <div>
+          <dt>当前价格</dt>
+          <dd data-asset-field="latestPrice">--</dd>
+        </div>
+        <div>
+          <dt>方向</dt>
+          <dd data-asset-field="direction">当前判断不可用</dd>
+        </div>
+        <div>
+          <dt>综合评分</dt>
+          <dd data-asset-field="score">--</dd>
+        </div>
+        <div>
+          <dt>置信度</dt>
+          <dd data-asset-field="confidence">--</dd>
+        </div>
+        <div>
+          <dt>风险等级</dt>
+          <dd data-asset-field="risk">--</dd>
+        </div>
+        <div>
+          <dt>资产状态</dt>
+          <dd data-asset-field="state">状态待同步</dd>
+        </div>
+        <div>
+          <dt>是否值得开仓</dt>
+          <dd data-asset-field="worthOpening">待同步</dd>
+        </div>
+      </dl>
+      <div class="summary-conclusion">
+        <span>当前结论</span>
+        <strong data-asset-field="conclusion">暂无可验证结论</strong>
+      </div>
+    </section>
+
+    <section class="content-section ai-section" aria-labelledby="ai-current-view-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">规则层方向保持优先</p>
+          <h2 id="ai-current-view-title">AI 当前观点 / AI Current View</h2>
+        </div>
+        <div class="ai-meta">
+          <span><small>运行状态</small><strong data-ai-run-status>未调用</strong></span>
+          <span><small>复核模式</small><strong data-ai-decision-mode>仅规则判断</strong></span>
+        </div>
+      </div>
+
+      <div class="role-tabs" role="tablist" aria-label="AI 三角色">
+        <button type="button" role="tab" id="asset-role-tab-GPT_FINAL"
+                data-role-tab="GPT_FINAL" aria-selected="true"
+                aria-controls="asset-role-panel-GPT_FINAL" tabindex="0">
+          <span>GPT_FINAL</span>
+          <strong>最终裁决官</strong>
+        </button>
+        <button type="button" role="tab" id="asset-role-tab-GEMINI_REVIEW"
+                data-role-tab="GEMINI_REVIEW" aria-selected="false"
+                aria-controls="asset-role-panel-GEMINI_REVIEW" tabindex="-1">
+          <span>GEMINI_REVIEW</span>
+          <strong>冲突复核官</strong>
+        </button>
+        <button type="button" role="tab" id="asset-role-tab-GROK_CHALLENGE"
+                data-role-tab="GROK_CHALLENGE" aria-selected="false"
+                aria-controls="asset-role-panel-GROK_CHALLENGE" tabindex="-1">
+          <span>GROK_CHALLENGE</span>
+          <strong>反方挑战官</strong>
+        </button>
+      </div>
+
+      <article class="role-panel" id="asset-role-panel-GPT_FINAL"
+               role="tabpanel" data-role-panel="GPT_FINAL"
+               aria-labelledby="asset-role-tab-GPT_FINAL">
+        <div class="role-heading">
+          <div><span>GPT_FINAL</span><h3>最终裁决官</h3></div>
+          <strong data-role-field="runStatusLabel">待同步</strong>
+        </div>
+        <p class="role-status" data-role-field="statusMessage">当前角色观点待同步</p>
+        <dl class="role-grid">
+          <div><dt>最终倾向</dt><dd data-role-field="finalMarketBias">--</dd></div>
+          <div><dt>置信度</dt><dd data-role-field="finalConfidence">--</dd></div>
+          <div><dt>风险等级</dt><dd data-role-field="finalRiskLevel">--</dd></div>
+          <div class="wide"><dt>最终结论</dt><dd data-role-field="finalConclusion">待同步</dd></div>
+          <div class="wide"><dt>裁决摘要</dt><dd data-role-field="decisionSummary">待同步</dd></div>
+        </dl>
+        <p class="provenance-note">当前仅提供角色结论摘要，完整证据关联尚未提供。</p>
+      </article>
+
+      <article class="role-panel" id="asset-role-panel-GEMINI_REVIEW"
+               role="tabpanel" data-role-panel="GEMINI_REVIEW"
+               aria-labelledby="asset-role-tab-GEMINI_REVIEW" hidden>
+        <div class="role-heading">
+          <div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div>
+          <strong data-role-field="runStatusLabel">待同步</strong>
+        </div>
+        <p class="role-status" data-role-field="statusMessage">当前角色观点待同步</p>
+        <dl class="role-grid">
+          <div class="wide"><dt>复核意见</dt><dd data-role-field="reviewVerdict">待同步</dd></div>
+          <div><dt>调整建议</dt><dd data-role-field="downgradeRecommendation">--</dd></div>
+          <div class="wide"><dt>复核结论</dt><dd data-role-field="reviewConclusion">待同步</dd></div>
+          <div class="wide"><dt>已返回冲突</dt><dd data-role-field="detectedContradictions">待同步</dd></div>
+        </dl>
+        <p class="provenance-note">当前仅提供冲突复核摘要，不生成独立交易方向。</p>
+      </article>
+
+      <article class="role-panel" id="asset-role-panel-GROK_CHALLENGE"
+               role="tabpanel" data-role-panel="GROK_CHALLENGE"
+               aria-labelledby="asset-role-tab-GROK_CHALLENGE" hidden>
+        <div class="role-heading">
+          <div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div>
+          <strong data-role-field="runStatusLabel">待同步</strong>
+        </div>
+        <p class="role-status" data-role-field="statusMessage">当前角色观点待同步</p>
+        <dl class="role-grid">
+          <div class="wide"><dt>反方论点</dt><dd data-role-field="challengeThesis">待同步</dd></div>
+          <div class="wide"><dt>事件风险</dt><dd data-role-field="eventRisks">待同步</dd></div>
+          <div class="wide"><dt>挑战结论</dt><dd data-role-field="challengeConclusion">待同步</dd></div>
+        </dl>
+        <p class="provenance-note">当前仅展示后端返回的反方摘要，不补写技术证据。</p>
+      </article>
+    </section>
+
+    <section class="content-section execution-section" aria-labelledby="execution-plan-title"
+             data-execution-plan hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">系统建议 / 仅供人工复核</p>
+          <h2 id="execution-plan-title">执行建议 / Execution Plan</h2>
+        </div>
+        <span class="plan-status" data-plan-status>执行建议待同步</span>
+      </div>
+      <p class="plan-reason" data-plan-reason>计划来源不可验证</p>
+      <dl class="plan-grid" data-plan-values hidden>
+        <div><dt>方向</dt><dd data-plan-field="direction">--</dd></div>
+        <div><dt>入场区间</dt><dd data-plan-field="entryZone">--</dd></div>
+        <div><dt>止损</dt><dd data-plan-field="stopLoss">--</dd></div>
+        <div><dt>止盈方案</dt><dd data-plan-field="takeProfitRules">--</dd></div>
+        <div class="wide"><dt>失效条件</dt><dd data-plan-field="invalidCondition">--</dd></div>
+      </dl>
+      <p class="safety-note">执行建议不是用户持仓，不代表已开仓，不提供买卖、下单或自动执行能力。</p>
+    </section>
+  </main>
+</body>
+</html>
