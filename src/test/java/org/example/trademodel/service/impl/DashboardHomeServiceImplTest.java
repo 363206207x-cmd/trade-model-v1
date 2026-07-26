@@ -1546,7 +1546,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void decisionAssetsExposeOnlyTheirExactAnalysisIdentity() {
+    void decisionAssetsExposeOnlyTheirAuthoritativeMatchingAnalysisIdentity() {
         DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
         btc.setAnalysisId("analysis-btc-exact");
@@ -1559,12 +1559,86 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLatestDecisionResults(anyInt()))
                 .thenReturn(List.of(btc, eth, solWithoutIdentity));
+        when(analysisRunMapper.selectById("analysis-btc-exact"))
+                .thenReturn(analysisRun("analysis-btc-exact", "BTC/USDT"));
+        when(analysisRunMapper.selectById("analysis-eth-exact"))
+                .thenReturn(analysisRun("analysis-eth-exact", "ETHUSDT"));
 
         DashboardHomeVO home = service.getHome("BTCUSDT", 3);
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isEqualTo("analysis-btc-exact");
         assertThat(asset(home, "ETH/USDT").getAnalysisId()).isEqualTo("analysis-eth-exact");
         assertThat(asset(home, "SOL/USDT").getAnalysisId()).isNull();
+        verify(analysisRunMapper, never()).selectLatestBySymbol(anyString());
+    }
+
+    @Test
+    void orphanAnalysisIdentityFailsClosedWithoutBreakingDashboard() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        btc.setAnalysisId("analysis-orphan");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc));
+        when(analysisRunMapper.selectById("analysis-orphan")).thenReturn(null);
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 1);
+
+        assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
+        assertThat(asset(home, "BTC/USDT").getMarketBias()).isEqualTo("BULLISH");
+        verify(analysisRunMapper, never()).selectLatestBySymbol(anyString());
+    }
+
+    @Test
+    void mismatchedAnalysisRunSymbolFailsClosed() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        btc.setAnalysisId("analysis-symbol-mismatch");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc));
+        when(analysisRunMapper.selectById("analysis-symbol-mismatch"))
+                .thenReturn(analysisRun("analysis-symbol-mismatch", "ETHUSDT"));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 1);
+
+        assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
+        verify(analysisRunMapper, never()).selectLatestBySymbol(anyString());
+    }
+
+    @Test
+    void nullDecisionAnalysisIdentityRemainsNullWithoutLookupOrFallback() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        btc.setAnalysisId(null);
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 1);
+
+        assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
+        verify(analysisRunMapper, never()).selectById(anyString());
+        verify(analysisRunMapper, never()).selectLatestBySymbol(anyString());
+    }
+
+    @Test
+    void analysisIdentityLookupFailureIsIsolatedPerAsset() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        btc.setAnalysisId("analysis-btc-failing");
+        DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "HIGH", 74, 35,
+                "LEVEL_2_REVIEW", false, "{\"state\":\"OBSERVING\"}");
+        eth.setAnalysisId("analysis-eth-valid");
+
+        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth));
+        when(analysisRunMapper.selectById("analysis-btc-failing"))
+                .thenThrow(new IllegalStateException("isolated lookup failure"));
+        when(analysisRunMapper.selectById("analysis-eth-valid"))
+                .thenReturn(analysisRun("analysis-eth-valid", "ETHUSDT"));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 2);
+
+        assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
+        assertThat(asset(home, "BTC/USDT").getMarketBias()).isEqualTo("BULLISH");
+        assertThat(asset(home, "ETH/USDT").getAnalysisId()).isEqualTo("analysis-eth-valid");
     }
 
     @Test
@@ -2873,6 +2947,13 @@ class DashboardHomeServiceImplTest {
         decision.setIsWorthOpening(worthOpening);
         decision.setAssetStateSnapshot(assetStateSnapshot);
         return decision;
+    }
+
+    private AnalysisRunDO analysisRun(String analysisId, String symbol) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        return run;
     }
 
     private DashboardHomeVO.AssetVO asset(DashboardHomeVO home, String symbol) {

@@ -615,9 +615,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.AssetVO assetFromDecision(int slot, DecisionResultVO decision) {
         DashboardHomeVO.AssetVO asset = assetBase(slot, normalizeSymbol(decision.getSymbol()));
         asset.setSlotType("DECISION");
-        if (hasText(decision.getAnalysisId())) {
-            asset.setAnalysisId(decision.getAnalysisId());
-        }
+        asset.setAnalysisId(authoritativeAnalysisId(decision, asset));
         asset.setMarketBias(trimToNull(decision.getMarketBiasHierarchy()));
         asset.setMarketBiasLabel(biasLabel(decision.getMarketBiasHierarchy()));
         applyPersistedMarketData(asset, normalizeSymbol(decision.getSymbol()));
@@ -638,6 +636,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setWorthOpening(decision.getIsWorthOpening());
         asset.setCurrentConclusion(currentConclusion(decision, assetState));
         return asset;
+    }
+
+    private String authoritativeAnalysisId(DecisionResultVO decision, DashboardHomeVO.AssetVO asset) {
+        if (decision == null || asset == null || analysisRunMapper == null
+                || !hasText(decision.getAnalysisId())) {
+            return null;
+        }
+        String assetSymbol = normalizeSymbol(asset.getSymbol());
+        if (assetSymbol == null) {
+            return null;
+        }
+        try {
+            AnalysisRunDO run = analysisRunMapper.selectById(decision.getAnalysisId());
+            if (run == null
+                    || !decision.getAnalysisId().equals(run.getAnalysisId())
+                    || !hasText(run.getSymbol())
+                    || !assetSymbol.equals(normalizeSymbol(run.getSymbol()))) {
+                return null;
+            }
+            return decision.getAnalysisId();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private DashboardHomeVO.AssetVO assetPlaceholder(int slot, String symbol) {
