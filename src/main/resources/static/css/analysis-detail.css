@@ -17,8 +17,23 @@
   --warning-soft: #fff2d8;
   --focus-ring: #005a9c;
   --shadow-soft: 0 1px 2px rgb(20 29 38 / 5%);
+  --analysis-root-font-size: 16px;
   font-family: "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
+  font-size: var(--analysis-root-font-size);
+  letter-spacing: 0;
+}
+
+:root[data-mobile-text-size="large"] {
+  --analysis-root-font-size: 18px;
+}
+
+:root[data-mobile-text-size="extra-large"] {
+  --analysis-root-font-size: 19.2px;
+}
+
+:root[data-mobile-text-size="accessibility"] {
+  --analysis-root-font-size: 20.8px;
 }
 
 * {
@@ -38,6 +53,7 @@ body {
 body {
   min-height: 100vh;
   min-height: 100dvh;
+  -webkit-text-size-adjust: 100%;
 }
 
 button,
@@ -53,6 +69,17 @@ a:focus-visible {
 
 [hidden] {
   display: none !important;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .analysis-detail {
@@ -71,9 +98,10 @@ a:focus-visible {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: center;
   width: 100%;
   min-width: 0;
+  min-height: 48px;
   margin-bottom: 20px;
 }
 
@@ -91,7 +119,7 @@ a:focus-visible {
 }
 
 .back-button span {
-  font-size: 26px;
+  font-size: 1.625rem;
   line-height: 1;
   transform: translateY(-1px);
 }
@@ -114,48 +142,15 @@ a:focus-visible {
 }
 
 .title-stack h1 {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
-  line-height: 28px;
+  line-height: 1.75rem;
 }
 
 .title-stack p {
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 17px;
-}
-
-.sync-status {
-  grid-column: 2;
-  justify-self: start;
-  min-height: 24px;
-  margin-top: 2px;
-  padding: 3px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface-card);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 16px;
-}
-
-.sync-status[data-status="ready"] {
-  border-color: #aacfc4;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.sync-status[data-status="partial"] {
-  border-color: #e2c58d;
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.sync-status[data-status="error"] {
-  border-color: #e2b2ad;
-  background: var(--danger-soft);
-  color: var(--danger);
+  font-size: 0.75rem;
+  line-height: 1.0625rem;
 }
 
 .page-state {
@@ -180,7 +175,7 @@ a:focus-visible {
   border-radius: 50%;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 700;
 }
 
@@ -190,15 +185,15 @@ a:focus-visible {
 }
 
 .page-state h2 {
-  font-size: 17px;
-  line-height: 24px;
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
 }
 
 .page-state p {
   margin-top: 4px;
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
 }
 
 .retry-button {
@@ -233,8 +228,11 @@ a:focus-visible {
 
 .asset-context {
   display: flex;
+  min-height: 172px;
   flex-direction: column;
   gap: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 .asset-identity {
@@ -250,15 +248,15 @@ a:focus-visible {
 }
 
 .symbol-stack h2 {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 700;
-  line-height: 34px;
+  line-height: 2.125rem;
 }
 
 .symbol-stack p {
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: 0.75rem;
+  line-height: 1.0625rem;
 }
 
 .authority-badge,
@@ -273,9 +271,9 @@ a:focus-visible {
   border-radius: 8px;
   background: var(--surface-muted);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
-  line-height: 17px;
+  line-height: 1.0625rem;
   text-align: center;
 }
 
@@ -284,7 +282,7 @@ a:focus-visible {
   padding: 4px 9px;
   border-radius: 999px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .coverage-badge[data-coverage="partial"] {
@@ -324,50 +322,14 @@ a:focus-visible {
 
 .fact span {
   color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.6875rem;
+  line-height: 1rem;
 }
 
 .fact strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
-  line-height: 22px;
-}
-
-.run-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--border-subtle);
-}
-
-.run-meta div {
-  min-width: 0;
-  padding: 9px 10px;
-  background: var(--surface-card);
-}
-
-.run-meta dt,
-.run-meta dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.run-meta dt {
-  color: var(--text-tertiary);
-  font-size: 10px;
-  line-height: 15px;
-}
-
-.run-meta dd {
-  margin-top: 2px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 17px;
+  line-height: 1.375rem;
 }
 
 .module-heading,
@@ -386,23 +348,23 @@ a:focus-visible {
 
 .module-heading h2,
 .section-heading h2 {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
-  line-height: 26px;
+  line-height: 1.625rem;
 }
 
 .module-heading h3 {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
-  line-height: 23px;
+  line-height: 1.4375rem;
 }
 
 .module-heading p,
 .section-heading p {
   margin-top: 4px;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: 0.75rem;
+  line-height: 1.0625rem;
 }
 
 .market-judgment,
@@ -445,15 +407,15 @@ a:focus-visible {
 .judgment-list dt,
 .convergence-row dt {
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 19px;
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
 }
 
 .judgment-list dd,
 .convergence-row dd {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 1.25rem;
   text-align: right;
 }
 
@@ -469,16 +431,16 @@ a:focus-visible {
 
 .conclusion-summary span {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
-  line-height: 17px;
+  line-height: 1.0625rem;
 }
 
 .conclusion-summary strong {
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 400;
-  line-height: 22px;
+  line-height: 1.375rem;
 }
 
 .evidence-scoring {
@@ -533,8 +495,8 @@ a:focus-visible {
 .card-heading strong {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
 }
 
 .card-heading span {
@@ -544,9 +506,9 @@ a:focus-visible {
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
-  line-height: 13px;
+  line-height: 0.8125rem;
 }
 
 .evidence-card dl,
@@ -588,15 +550,15 @@ a:focus-visible {
 .evidence-card dt,
 .score-list dt {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
-  line-height: 16px;
+  line-height: 1rem;
 }
 
 .evidence-card dd,
 .score-list dd {
-  font-size: 12px;
-  line-height: 17px;
+  font-size: 0.75rem;
+  line-height: 1.0625rem;
 }
 
 .score-list dd {
@@ -607,8 +569,8 @@ a:focus-visible {
 .evidence-card > p {
   margin: 12px 0 0;
   overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .evidence-card > small,
@@ -617,9 +579,9 @@ a:focus-visible {
   display: block;
   margin: 10px 0 0;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
-  line-height: 16px;
+  line-height: 1rem;
 }
 
 .timeframe-grid {
@@ -647,21 +609,21 @@ a:focus-visible {
 }
 
 .timeframe-grid strong {
-  font-size: 16px;
-  line-height: 22px;
+  font-size: 1rem;
+  line-height: 1.375rem;
 }
 
 .timeframe-grid span {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
-  line-height: 17px;
+  line-height: 1.0625rem;
 }
 
 .timeframe-grid small {
   color: var(--text-tertiary);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 0.6875rem;
+  line-height: 1rem;
 }
 
 .role-tabs {
@@ -682,9 +644,9 @@ a:focus-visible {
   background: var(--surface-default);
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
-  line-height: 15px;
+  line-height: 0.9375rem;
 }
 
 .role-tabs button[aria-selected="true"] {
@@ -707,9 +669,9 @@ a:focus-visible {
 }
 
 .role-panel h3 {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 1.25rem;
 }
 
 .role-panel dl {
@@ -735,23 +697,23 @@ a:focus-visible {
 
 .role-panel dt {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
-  line-height: 17px;
+  line-height: 1.0625rem;
 }
 
 .role-panel dd {
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
 }
 
 .role-panel p {
   margin-top: 12px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 1.125rem;
 }
 
 .partial-notice {
@@ -772,13 +734,13 @@ a:focus-visible {
 }
 
 .partial-notice strong {
-  font-size: 13px;
-  line-height: 19px;
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
 }
 
 .partial-notice span {
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
 }
 
 .bottom-safe-area {
@@ -801,18 +763,33 @@ a:focus-visible {
     white-space: normal;
   }
 
-  .analysis-facts,
-  .run-meta {
+  .analysis-facts {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .run-meta {
-    gap: 1px;
   }
 
   .role-tabs {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+:root[data-mobile-text-size="accessibility"] .analysis-facts,
+:root[data-mobile-text-size="accessibility"] .role-tabs,
+:root[data-mobile-text-size="accessibility"] .judgment-list div,
+:root[data-mobile-text-size="accessibility"] .convergence-row,
+:root[data-mobile-text-size="accessibility"] .evidence-card dl div,
+:root[data-mobile-text-size="accessibility"] .role-panel dl div {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:root[data-mobile-text-size="accessibility"] .judgment-list dd,
+:root[data-mobile-text-size="accessibility"] .convergence-row dd {
+  text-align: left;
+}
+
+:root[data-mobile-text-size="accessibility"] .role-tabs button {
+  padding-right: 12px;
+  padding-left: 12px;
+  text-align: left;
 }
 
 @media (min-width: 760px) {
@@ -823,15 +800,8 @@ a:focus-visible {
   }
 
   .analysis-navigation {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr);
     align-items: center;
-  }
-
-  .sync-status {
-    grid-column: 3;
-    grid-row: 1;
-    justify-self: end;
-    margin: 0;
   }
 
   .analysis-content {
@@ -851,15 +821,13 @@ a:focus-visible {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(360px, 1.35fr);
     align-items: center;
+    padding-top: 16px;
+    padding-bottom: 16px;
   }
 
   .analysis-facts {
     grid-column: 2;
     grid-row: 1;
-  }
-
-  .run-meta {
-    grid-column: 1 / -1;
   }
 
   .evidence-score-grid {

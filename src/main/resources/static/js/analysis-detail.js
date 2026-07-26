@@ -17,6 +17,8 @@
     "综合可信度分"
   ];
   var activeRole = "GPT_FINAL";
+  var requestGeneration = 0;
+  var activeRequestController = null;
 
   function hasText(value) {
     return contract.hasText(value);
@@ -55,6 +57,36 @@
 
   function currentSelectedSymbol() {
     return normalizeSymbol(root.dataset.selectedSymbol || contract.readUrlParam("selectedSymbol"));
+  }
+
+  function beginRequest(analysisId) {
+    requestGeneration += 1;
+    if (activeRequestController) {
+      activeRequestController.abort();
+    }
+    activeRequestController = typeof AbortController === "function"
+      ? new AbortController()
+      : null;
+    return {
+      analysisId: analysisId,
+      generation: requestGeneration,
+      controller: activeRequestController,
+      pageRoot: root
+    };
+  }
+
+  function isCurrentRequest(request) {
+    return request
+      && request.generation === requestGeneration
+      && request.analysisId === currentAnalysisId()
+      && request.pageRoot === root
+      && root.isConnected
+      && document.querySelector("[data-analysis-detail-root]") === root
+      && request.controller === activeRequestController;
+  }
+
+  function isAbortError(error) {
+    return error && (error.name === "AbortError" || error.code === 20);
   }
 
   function updateBackLink() {
@@ -103,10 +135,6 @@
     setPageStatus(title, "error");
   }
 
-  function formatAnalysisTime(value) {
-    return hasText(value) ? contract.formatUtcNaive(value) : "--";
-  }
-
   function renderContext(run, decision) {
     setText('[data-analysis-field="symbol"]', run.symbol, "--");
     setText(
@@ -119,13 +147,6 @@
       "-- / " + displayText(decision && decision.confidenceLevel, "待同步"),
       "-- / 待同步"
     );
-    setText('[data-analysis-field="timeframe"]', run.timeframe, "--");
-    setText(
-      '[data-analysis-field="dataQuality"]',
-      contract.displayNumber(run.dataQualityScore),
-      "--"
-    );
-    setText('[data-analysis-field="analysisTime"]', formatAnalysisTime(run.analysisTime), "--");
   }
 
   function renderMarketJudgment(decision, environment) {
@@ -428,6 +449,7 @@
   async function loadAnalysisDetail() {
     var analysisId = currentAnalysisId();
     var selectedSymbol = currentSelectedSymbol();
+    var request = beginRequest(analysisId);
     root.setAttribute("aria-busy", "true");
     root.dataset.pageState = "LOADING";
     hidePageState();
@@ -435,25 +457,31 @@
     setPageStatus("正在同步", "loading");
 
     if (!analysisId || analysisId.length > 128) {
-      root.setAttribute("aria-busy", "false");
-      showPageState(
-        "ANALYSIS_NOT_FOUND",
-        "Analysis Not Found",
-        "缺少可验证的 analysisId，无法读取分析详情。",
-        false
-      );
+      if (isCurrentRequest(request)) {
+        showPageState(
+          "ANALYSIS_NOT_FOUND",
+          "Analysis Not Found",
+          "缺少可验证的 analysisId，无法读取分析详情。",
+          false
+        );
+        root.setAttribute("aria-busy", "false");
+        activeRequestController = null;
+      }
       return;
     }
 
     try {
+      var requestOptions = {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" }
+      };
+      if (request.controller) requestOptions.signal = request.controller.signal;
       var response = await fetch(
         "/api/review/aggregate/" + encodeURIComponent(analysisId),
-        {
-          method: "GET",
-          credentials: "same-origin",
-          headers: { Accept: "application/json" }
-        }
+        requestOptions
       );
+      if (!isCurrentRequest(request)) return;
       if (response.status === 404) {
         showPageState(
           "ANALYSIS_NOT_FOUND",
@@ -464,10 +492,14 @@
         return;
       }
       if (!response.ok) throw new Error("ANALYSIS_DETAIL_REQUEST_FAILED");
-      var parsed = contract.parseApiEnvelope(await response.json());
+      var payload = await response.json();
+      if (!isCurrentRequest(request)) return;
+      var parsed = contract.parseApiEnvelope(payload);
       if (!parsed.ok) throw new Error("ANALYSIS_DETAIL_RESPONSE_INVALID");
+      if (!isCurrentRequest(request)) return;
       renderAggregate(parsed.data, analysisId, selectedSymbol);
     } catch (error) {
+      if (!isCurrentRequest(request) || isAbortError(error)) return;
       showPageState(
         "LOAD_FAILED",
         "Load Failed",
@@ -475,7 +507,10 @@
         true
       );
     } finally {
-      root.setAttribute("aria-busy", "false");
+      if (isCurrentRequest(request)) {
+        root.setAttribute("aria-busy", "false");
+        activeRequestController = null;
+      }
     }
   }
 

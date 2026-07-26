@@ -23,13 +23,17 @@ class AnalysisDetailFrontendContractTest {
         assertThat(html)
                 .contains("分析详情")
                 .contains("data-analysis-back")
+                .contains("class=\"visually-hidden\" data-page-status")
                 .contains("市场判断")
                 .contains("证据与评分")
                 .contains("多周期摘要")
                 .contains("AI 分析状态")
                 .contains("当前权威分析")
                 .contains("只展示当前分析实际返回的 Top 3")
-                .contains("不创建“查看全部”假入口");
+                .contains("不创建“查看全部”假入口")
+                .doesNotContain("class=\"sync-status\"")
+                .doesNotContain("class=\"run-meta\"")
+                .doesNotContain("data-analysis-field=\"analysisTime\"");
     }
 
     @Test
@@ -80,6 +84,27 @@ class AnalysisDetailFrontendContractTest {
                 .contains("本次分析没有可验证的完整结果")
                 .contains("分析状态不可验证")
                 .contains("runStatus !== \"SUCCESS\" && runStatus !== \"STARTED\"");
+    }
+
+    @Test
+    void concurrentReadsAreGuardedAcrossSuccessFailureRetryAndLoadingCleanup() throws Exception {
+        String script = Files.readString(SCRIPT);
+
+        assertThat(script)
+                .contains("var requestGeneration = 0")
+                .contains("var activeRequestController = null")
+                .contains("requestGeneration += 1")
+                .contains("activeRequestController.abort()")
+                .contains("generation: requestGeneration")
+                .contains("request.generation === requestGeneration")
+                .contains("request.analysisId === currentAnalysisId()")
+                .contains("document.querySelector(\"[data-analysis-detail-root]\") === root")
+                .contains("request.controller === activeRequestController")
+                .contains("if (!isCurrentRequest(request)) return")
+                .contains("if (!isCurrentRequest(request) || isAbortError(error)) return")
+                .contains("if (isCurrentRequest(request)) {")
+                .contains("retry.addEventListener(\"click\", loadAnalysisDetail)")
+                .contains("requestOptions.signal = request.controller.signal");
     }
 
     @Test
@@ -176,6 +201,7 @@ class AnalysisDetailFrontendContractTest {
 
     @Test
     void responsiveStylesPreserveFigmaDimensionsAndAccessibility() throws Exception {
+        String html = Files.readString(TEMPLATE);
         String css = Files.readString(STYLES);
 
         assertThat(css)
@@ -189,10 +215,41 @@ class AnalysisDetailFrontendContractTest {
                 .contains("@media (prefers-color-scheme: dark)")
                 .contains("@media (prefers-reduced-motion: reduce)")
                 .contains("outline: 3px solid var(--focus-ring)")
+                .contains("--analysis-root-font-size: 16px")
+                .contains(":root[data-mobile-text-size=\"large\"]")
+                .contains(":root[data-mobile-text-size=\"extra-large\"]")
+                .contains(":root[data-mobile-text-size=\"accessibility\"]")
+                .contains("--analysis-root-font-size: 20.8px")
+                .contains(".title-stack h1 {\n  font-size: 1.25rem")
+                .contains(".role-tabs button {\n  min-width: 0")
+                .contains("font-size: 0.625rem")
+                .contains("-webkit-text-size-adjust: 100%")
                 .doesNotContain("font-size: clamp")
+                .doesNotContain("transform: scale(")
                 .doesNotContain("letter-spacing: -")
                 .doesNotContain("url(http")
                 .doesNotContain("cdn");
+        assertThat(html)
+                .doesNotContain("style=\"height:")
+                .doesNotContain("class=\"run-meta\"");
+    }
+
+    @Test
+    void mobileFirstViewportKeepsFrozenNavigationAndAssetHierarchy() throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String css = Files.readString(STYLES);
+
+        assertThat(html)
+                .contains("class=\"visually-hidden\" data-page-status")
+                .doesNotContain("class=\"sync-status\"")
+                .doesNotContain("class=\"run-meta\"");
+        assertThat(css)
+                .contains(".analysis-navigation {")
+                .contains("min-height: 48px")
+                .contains("margin-bottom: 20px")
+                .contains(".asset-context {\n  display: flex;\n  min-height: 172px")
+                .doesNotContain(".sync-status")
+                .doesNotContain(".run-meta");
     }
 
     @Test
