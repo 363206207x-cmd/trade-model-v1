@@ -615,6 +615,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.AssetVO assetFromDecision(int slot, DecisionResultVO decision) {
         DashboardHomeVO.AssetVO asset = assetBase(slot, normalizeSymbol(decision.getSymbol()));
         asset.setSlotType("DECISION");
+        if (hasText(decision.getAnalysisId())) {
+            asset.setAnalysisId(decision.getAnalysisId());
+        }
         asset.setMarketBias(trimToNull(decision.getMarketBiasHierarchy()));
         asset.setMarketBiasLabel(biasLabel(decision.getMarketBiasHierarchy()));
         applyPersistedMarketData(asset, normalizeSymbol(decision.getSymbol()));

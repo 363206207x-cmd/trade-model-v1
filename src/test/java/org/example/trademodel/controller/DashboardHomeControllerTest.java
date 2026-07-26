@@ -57,6 +57,7 @@ class DashboardHomeControllerTest {
         DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
         asset.setSymbol("BTC/USDT");
         asset.setRawSymbol("BTCUSDT");
+        asset.setAnalysisId("analysis-BTCUSDT-exact");
         asset.setAssetState("CONFUSED");
         asset.setAssetStateLabel("冲突状态");
         asset.setMarketBias("WAIT");
@@ -87,6 +88,7 @@ class DashboardHomeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.assets[0].assetState").value("CONFUSED"))
                 .andExpect(jsonPath("$.data.assets[0].assetStateLabel").value("冲突状态"))
+                .andExpect(jsonPath("$.data.assets[0].analysisId").value("analysis-BTCUSDT-exact"))
                 .andExpect(jsonPath("$.data.assets[0].marketBias").value("WAIT"))
                 .andExpect(jsonPath("$.data.assets[0].marketBiasLabel").value("观望"))
                 .andExpect(jsonPath("$.data.aiDecision.runStatusLabel").value("未调用"))

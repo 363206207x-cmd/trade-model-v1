@@ -1546,6 +1546,28 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void decisionAssetsExposeOnlyTheirExactAnalysisIdentity() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 88, 25,
+                "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
+        btc.setAnalysisId("analysis-btc-exact");
+        DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "MEDIUM", "HIGH", 74, 35,
+                "LEVEL_2_REVIEW", false, "{\"state\":\"OBSERVING\"}");
+        eth.setAnalysisId("analysis-eth-exact");
+        DecisionResultVO solWithoutIdentity = decision("SOLUSDT", "RANGE", "LOW", "LOW", 60, 10,
+                "LEVEL_1", false, "{\"state\":\"OBSERVING\"}");
+        solWithoutIdentity.setAnalysisId(null);
+
+        when(decisionService.getLatestDecisionResults(anyInt()))
+                .thenReturn(List.of(btc, eth, solWithoutIdentity));
+
+        DashboardHomeVO home = service.getHome("BTCUSDT", 3);
+
+        assertThat(asset(home, "BTC/USDT").getAnalysisId()).isEqualTo("analysis-btc-exact");
+        assertThat(asset(home, "ETH/USDT").getAnalysisId()).isEqualTo("analysis-eth-exact");
+        assertThat(asset(home, "SOL/USDT").getAnalysisId()).isNull();
+    }
+
+    @Test
     void realFallbackAssetsAreCollectedBeforeDefaultSlotsAreUsedToFillTheLimit() {
         PersistedOhlcvBarDO bnb = new PersistedOhlcvBarDO();
         bnb.setSymbol("BNBUSDT");
@@ -1566,9 +1588,13 @@ class DashboardHomeServiceImplTest {
                 .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
                 .containsExactly("BNBUSDT", "BTCUSDT", "ETHUSDT");
         assertThat(asset(home, "BNB/USDT").getSlotType()).isEqualTo("MARKET_DATA");
+        assertThat(asset(home, "BNB/USDT").getAnalysisId()).isNull();
         assertThat(home.getAssets().subList(1, 3))
                 .extracting(DashboardHomeVO.AssetVO::getSlotType)
                 .containsOnly("DEFAULT_SLOT");
+        assertThat(home.getAssets().subList(1, 3))
+                .extracting(DashboardHomeVO.AssetVO::getAnalysisId)
+                .containsOnlyNulls();
         verify(externalContextEvidenceBuilder).buildSnapshot(
                 eq("dashboard-home"),
                 eq("BNBUSDT"),
