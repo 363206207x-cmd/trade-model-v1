@@ -430,6 +430,7 @@ public class DashboardHomeVO {
         private String slotType;
         private String symbol;
         private String rawSymbol;
+        private String analysisId;
         private String marketBias;
         private String marketBiasLabel;
         private Integer compositeScore;
@@ -479,6 +480,14 @@ public class DashboardHomeVO {
 
         public void setRawSymbol(String rawSymbol) {
             this.rawSymbol = rawSymbol;
+        }
+
+        public String getAnalysisId() {
+            return analysisId;
+        }
+
+        public void setAnalysisId(String analysisId) {
+            this.analysisId = analysisId;
         }
 
         public String getMarketBias() {
