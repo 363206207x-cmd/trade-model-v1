@@ -69,7 +69,7 @@ class AssetDetailFrontendContractTest {
     }
 
     @Test
-    void executionPlanRequiresSharedExactIdentityGuardAndNeverBecomesAPosition() throws Exception {
+    void executionPlanRejectsEveryPositionContextAndNeverBecomesAPosition() throws Exception {
         String html = Files.readString(TEMPLATE);
         String script = Files.readString(SCRIPT);
 
@@ -88,20 +88,28 @@ class AssetDetailFrontendContractTest {
                 .doesNotContain("自动执行按钮");
         assertThat(script)
                 .contains("contract.executionPlanAccess(plan)")
-                .contains("var positionMode = plan.positionMode === true")
-                .contains("if (section) section.hidden = positionMode")
-                .contains("if (positionContext) positionContext.hidden = !positionMode")
-                .contains("if (positionMode)")
+                .contains("var POSITION_CONTEXT_STATUSES")
+                .contains("\"POSITION_SELECTION_REQUIRED\"")
+                .contains("\"POSITION_NOT_FOUND\"")
+                .contains("\"POSITION_SYMBOL_MISMATCH\"")
+                .contains("function isPositionContextPlan(plan)")
+                .contains("plan.positionMode === true")
+                .contains("POSITION_CONTEXT_STATUSES.indexOf(status) >= 0")
+                .contains("if (positionContext)")
+                .contains("当前暂无可验证的执行建议")
+                .contains("资产机会计划上下文不可验证")
+                .contains("clearExecutionFields()")
                 .contains("values.hidden = !access.visible")
                 .contains("access.visible ? plan[field] : null")
+                .doesNotContain("请选择具体持仓")
                 .doesNotContain("UserPosition")
                 .doesNotContain("/api/plan");
-        assertThat(script.indexOf("if (positionMode)"))
+        assertThat(script.indexOf("if (positionContext)"))
                 .isLessThan(script.indexOf("contract.executionPlanAccess(plan)"));
         assertThat(html)
-                .contains("data-position-context hidden")
-                .contains("资产机会执行建议不在本页展示")
-                .contains("data-execution-plan hidden");
+                .contains("data-execution-plan hidden")
+                .doesNotContain("data-position-context")
+                .doesNotContain("Position Monitoring Context");
     }
 
     @Test
@@ -156,20 +164,18 @@ class AssetDetailFrontendContractTest {
     }
 
     @Test
-    void unavailableAnalysisCapabilitiesRemainExplicitlyDisabled() throws Exception {
+    void pageStopsAtTheFe02BoundaryWithoutFe03AnalysisContent() throws Exception {
         String html = Files.readString(TEMPLATE);
 
         assertThat(html)
-                .contains("Market Analysis")
-                .contains("Evidence &amp; Scoring")
-                .contains("Multi Timeframe")
-                .contains("完整证据与八大评分读取合同尚未提供")
-                .contains("4h / 1h / 15m / 5m 明细当前不可查看");
-        assertThat(count(html, "disabled aria-disabled=\"true\"")).isEqualTo(2);
-        assertThat(html)
-                .doesNotContain("href=\"/api/")
-                .doesNotContain("href=\"/evidence")
-                .doesNotContain("href=\"/analysis");
+                .contains("资产摘要 / Asset Summary")
+                .contains("AI 当前观点 / AI Current View")
+                .contains("执行建议 / Execution Plan")
+                .doesNotContain("Market Analysis")
+                .doesNotContain("Evidence &amp; Scoring")
+                .doesNotContain("Multi Timeframe")
+                .doesNotContain("analysis-section")
+                .doesNotContain("analysis-entry");
     }
 
     @Test
@@ -189,7 +195,8 @@ class AssetDetailFrontendContractTest {
                 .contains(".retry-button:focus-visible")
                 .contains("outline: 3px solid var(--focus-ring)")
                 .contains("[data-execution-plan][hidden]")
-                .contains("[data-position-context][hidden]")
+                .doesNotContain("[data-position-context][hidden]")
+                .doesNotContain(".analysis-entry")
                 .doesNotContain("outline: 3px solid var(--accent-soft)")
                 .doesNotContain("font-size: clamp")
                 .doesNotContain("letter-spacing: -")

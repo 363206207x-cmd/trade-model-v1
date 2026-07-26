@@ -6,6 +6,11 @@
   if (!contract || !root) return;
 
   var ROLE_ORDER = ["GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE"];
+  var POSITION_CONTEXT_STATUSES = [
+    "POSITION_SELECTION_REQUIRED",
+    "POSITION_NOT_FOUND",
+    "POSITION_SYMBOL_MISMATCH"
+  ];
   var activeRole = "GPT_FINAL";
 
   function normalizeSymbol(value) {
@@ -149,23 +154,33 @@
     activateRole(ROLE_ORDER.indexOf(ai.activeTab) >= 0 ? ai.activeTab : activeRole, false);
   }
 
+  function isPositionContextPlan(plan) {
+    var status = String(plan && plan.status || "").trim().toUpperCase();
+    return Boolean(plan && plan.positionMode === true)
+      || POSITION_CONTEXT_STATUSES.indexOf(status) >= 0;
+  }
+
+  function clearExecutionFields() {
+    ["direction", "entryZone", "stopLoss", "takeProfitRules", "invalidCondition"].forEach(
+      function (field) {
+        setText('[data-plan-field="' + field + '"]', null, "--");
+      }
+    );
+  }
+
   function renderExecution(suggestion) {
     var plan = suggestion && typeof suggestion === "object" ? suggestion : {};
     var section = document.querySelector("[data-execution-plan]");
-    var positionContext = document.querySelector("[data-position-context]");
     var values = document.querySelector("[data-plan-values]");
-    var positionMode = plan.positionMode === true;
+    var positionContext = isPositionContextPlan(plan);
 
-    if (section) section.hidden = positionMode;
-    if (positionContext) positionContext.hidden = !positionMode;
-    if (positionMode) {
+    if (section) section.hidden = false;
+    if (positionContext) {
       if (section) section.dataset.planVisible = "false";
       if (values) values.hidden = true;
-      ["direction", "entryZone", "stopLoss", "takeProfitRules", "invalidCondition"].forEach(
-        function (field) {
-          setText('[data-plan-field="' + field + '"]', null, "--");
-        }
-      );
+      setText("[data-plan-status]", null, "当前暂无可验证的执行建议");
+      setText("[data-plan-reason]", null, "资产机会计划上下文不可验证");
+      clearExecutionFields();
       return;
     }
 

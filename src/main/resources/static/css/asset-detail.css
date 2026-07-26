@@ -73,7 +73,6 @@ a {
 
 .back-link:focus-visible,
 .role-tabs button:focus-visible,
-.analysis-entry:focus-visible,
 .retry-button:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
@@ -106,8 +105,7 @@ a {
 
 .page-intro,
 .summary-section,
-.content-section,
-.analysis-section {
+.content-section {
   min-width: 0;
 }
 
@@ -228,9 +226,7 @@ h3 {
 
 dt,
 .summary-conclusion span,
-.ai-meta small,
-.analysis-entry span,
-.analysis-entry small {
+.ai-meta small {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.45;
@@ -351,24 +347,15 @@ dd {
 }
 
 .role-panel,
-.execution-section,
-.position-context {
+.execution-section {
   padding: 22px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
 }
 
-.position-context p:last-child {
-  margin: 14px 0 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
 .role-panel[hidden],
 [data-execution-plan][hidden],
-[data-position-context][hidden],
 [data-plan-values][hidden] {
   display: none;
 }
@@ -447,63 +434,6 @@ dd {
   border-color: #9bc9ae;
   color: var(--success);
   background: #eef8f2;
-}
-
-.analysis-grid {
-  display: grid;
-  margin-top: 18px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.analysis-entry {
-  display: grid;
-  min-width: 0;
-  min-height: 152px;
-  padding: 18px;
-  align-content: start;
-  gap: 7px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  background: var(--surface);
-  text-align: left;
-  text-decoration: none;
-}
-
-a.analysis-entry {
-  cursor: pointer;
-}
-
-button.analysis-entry {
-  width: 100%;
-}
-
-.analysis-entry strong {
-  font-size: 17px;
-}
-
-.analysis-entry small {
-  min-height: 36px;
-}
-
-.analysis-entry b {
-  justify-self: start;
-  margin-top: auto;
-  color: var(--accent);
-  font-size: 12px;
-}
-
-.analysis-entry:disabled {
-  border-style: dashed;
-  color: var(--text-secondary);
-  background: var(--surface-muted);
-  cursor: not-allowed;
-  opacity: 1;
-}
-
-.analysis-entry:disabled b {
-  color: var(--warning);
 }
 
 @media (max-width: 980px) {
@@ -607,14 +537,12 @@ button.analysis-entry {
   }
 
   .role-panel,
-  .execution-section,
-  .position-context {
+  .execution-section {
     padding: 18px;
   }
 
   .role-grid,
-  .plan-grid,
-  .analysis-grid {
+  .plan-grid {
     grid-template-columns: 1fr;
   }
 
