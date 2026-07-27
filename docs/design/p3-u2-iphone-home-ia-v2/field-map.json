@@ -1,6 +1,6 @@
 {
   "contractVersion": "P3-U2-IPHONE-HOME-IA-V2",
-  "contractRevision": "REVIEW_FINDINGS_FIX_1",
+  "contractRevision": "FE04_SEMANTIC_CONTRACT_V2",
   "fixtureContract": {
     "normalPreview": "STRUCTURAL_FIELD_TOKENS",
     "captureMode": "SAFE_EMPTY_STATE_WITH_DATA_FIELD_TOKEN",
@@ -13,26 +13,63 @@
     "tokenPattern": "assets[index].field",
     "executionScope": "executionSuggestion for selectedSymbol",
     "aiScope": "aiDecision for selectedSymbol",
-    "positionScope": "positions[] remains independent"
+    "positionScope": "positions[] remains independent",
+    "cardBodyBehavior": "select context without navigation",
+    "detailBehavior": "separate affordance requires authoritative nullable analysisId"
   },
   "fieldOwnershipContract": {
     "gptFinalPlanMode": "aiDecision.tabs[GPT_FINAL].finalPlanMode",
     "consistencyOwnsFinalPlanMode": false,
-    "consistencyFields": "aiDecision.consistency.* only"
+    "consistencyFields": "aiDecision.consistency.* only",
+    "selectedAssetStatusFields": "systemState.marketTrend, systemState.riskLevel, systemState.dataQuality, systemState.aiConflict",
+    "systemSummaryFields": "header.aiStatusLabel, systemState.pendingReview, systemState.confused, systemState.hotReset"
   },
   "navigationContract": {
+    "primaryTabs": [
+      "home",
+      "positions",
+      "aiAnalysis",
+      "messages",
+      "profile"
+    ],
     "home": {
       "route": "/dashboard",
+      "status": "READY",
       "prototypeBehavior": "reset app-scroll to top and focus app-title"
     },
     "positions": {
-      "prototypeTarget": "#position-monitor",
-      "viewAllRoute": "CONTRACT_UNRESOLVED",
-      "viewAllBehavior": "disabled design placeholder; no self-link"
+      "route": "CONTRACT_PARTIAL",
+      "status": "PARTIAL",
+      "identity": "exact owner-scoped positionId"
+    },
+    "aiAnalysis": {
+      "route": "CONTRACT_PARTIAL",
+      "status": "PARTIAL",
+      "detailRoute": "/dashboard/analysis-detail",
+      "missingCapability": "market asset search landing"
+    },
+    "messages": {
+      "route": "CONTRACT_PARTIAL",
+      "status": "PARTIAL",
+      "businessSources": [
+        "asset-pool opportunity",
+        "UserPosition monitoring risk"
+      ]
+    },
+    "profile": {
+      "route": "CONTRACT_PARTIAL",
+      "status": "PARTIAL",
+      "availableCapability": "minimal session/logout shell only"
     },
     "review": {
       "route": "/review/dashboard",
-      "prototypeBehavior": "record sanitized route target without network navigation"
+      "status": "CONTEXTUAL",
+      "entryRequirement": "eligible CLOSED UserPosition with exact positionId"
+    },
+    "watchAssets": {
+      "primaryTab": false,
+      "status": "PARTIAL",
+      "addPersistence": "UNAVAILABLE"
     }
   },
   "deviceMeasurements": {
@@ -57,7 +94,7 @@
       "valueContract": "Raw value is selected DecisionResultVO.marketBiasHierarchy; label mapping covers STRONG_BULLISH, BULLISH, WEAK_BULLISH, RANGE, WEAK_BEARISH, BEARISH, STRONG_BEARISH, WAIT",
       "mobileLabel": "市场趋势",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "当前资产状态",
       "emptyState": "等待同步",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -72,7 +109,7 @@
       "valueContract": "Selected DecisionResultVO.riskLevel mapped to 低 / 中 / 高 / 极高; unknown is not guessed",
       "mobileLabel": "风险等级",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "当前资产状态",
       "emptyState": "等待同步",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -87,7 +124,7 @@
       "valueContract": "Selected DecisionResultVO.dataQualityScore; numeric value only when backend supplies it",
       "mobileLabel": "数据质量分",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "当前资产状态",
       "emptyState": "--",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -99,14 +136,29 @@
       "webLabel": "AI 冲突等级",
       "backendField": "systemState.aiConflict.valueLabel",
       "sourceObject": "DashboardHomeVO.SystemStateVO / AiDecisionVO.ConsistencyVO",
-      "valueContract": "AI not applicable -> 不适用; otherwise backend conflict level label only",
+      "valueContract": "Selected-asset AI conflict; AI not applicable -> 不适用; never relabel as system-wide conflict",
       "mobileLabel": "AI 冲突等级",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "当前资产状态",
       "emptyState": "不适用",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
       "evidenceFile": "src/test/java/org/example/trademodel/controller/DashboardControllerTest.java"
+    },
+    {
+      "id": "top.aiSystemStatus",
+      "module": "A_TOP_STATUS",
+      "webLabel": "AI 系统状态",
+      "backendField": "header.aiStatusLabel",
+      "sourceObject": "DashboardHomeVO.HeaderVO",
+      "valueContract": "Existing aggregate AI runtime/status label; never derived from selected-asset conflict",
+      "mobileLabel": "AI 系统状态",
+      "priority": "P0",
+      "mobileLocation": "系统摘要",
+      "emptyState": "等待同步",
+      "canRename": true,
+      "mappingStatus": "CONFIRMED",
+      "evidenceFile": "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
     },
     {
       "id": "top.pendingReview",
@@ -117,7 +169,7 @@
       "valueContract": "Non-negative count; zero is rendered as 暂无",
       "mobileLabel": "待复核机会",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "系统摘要",
       "emptyState": "暂无",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -130,9 +182,9 @@
       "backendField": "systemState.confused.valueLabel",
       "sourceObject": "DashboardHomeVO.SystemStateVO / LightSystemStatusVO.confusedCount",
       "valueContract": "Directional block count; fallback uses ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD",
-      "mobileLabel": "冲突阻断",
+      "mobileLabel": "冲突阻断统计",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "系统摘要",
       "emptyState": "--",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -145,9 +197,9 @@
       "backendField": "systemState.hotReset.valueLabel",
       "sourceObject": "DashboardHomeVO.SystemStateVO / LightSystemStatusVO.hotResetFired",
       "valueContract": "已触发 / 未触发; metadata remains in expansion or detail",
-      "mobileLabel": "热重置",
+      "mobileLabel": "Hot Reset",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "系统摘要",
       "emptyState": "等待同步",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -357,7 +409,7 @@
       "valueContract": "Boolean or missing; this is review evidence, not execution authorization",
       "mobileLabel": "是否值得开仓",
       "priority": "P0",
-      "mobileLocation": "首页摘要",
+      "mobileLocation": "执行建议摘要",
       "emptyState": "等待同步",
       "canRename": false,
       "mappingStatus": "CONFIRMED",
@@ -1567,29 +1619,74 @@
       "id": "nav.positions",
       "module": "I_BOTTOM_NAVIGATION",
       "webLabel": "持仓监控",
-      "backendField": "positions[]",
-      "sourceObject": "DashboardHomeVO.positions",
-      "valueContract": "Bottom navigation uses an in-page anchor only; no full-position route exists, so the separate view-all control is disabled as CONTRACT_UNRESOLVED",
+      "backendField": "owner-scoped UserPosition reads",
+      "sourceObject": "UserPositionController / FE-04 target",
+      "valueContract": "Data contract exists; dedicated FE-04 product route is not implemented",
       "mobileLabel": "持仓",
       "priority": "P0",
       "mobileLocation": "固定底部导航",
-      "emptyState": "暂无持仓",
+      "emptyState": "当前不可查看",
       "canRename": true,
-      "mappingStatus": "CONFIRMED",
-      "evidenceFile": "src/main/resources/templates/dashboard.html"
+      "mappingStatus": "PARTIAL",
+      "evidenceFile": "src/main/java/org/example/trademodel/controller/UserPositionController.java"
+    },
+    {
+      "id": "nav.aiAnalysis",
+      "module": "I_BOTTOM_NAVIGATION",
+      "webLabel": "AI 分析",
+      "backendField": "analysis create/read + route:/dashboard/analysis-detail",
+      "sourceObject": "AnalysisRunController / AnalysisDetailController",
+      "valueContract": "Analysis detail exists; market-asset search landing and full entry flow are incomplete",
+      "mobileLabel": "AI分析",
+      "priority": "P0",
+      "mobileLocation": "固定底部导航",
+      "emptyState": "当前不可查看",
+      "canRename": true,
+      "mappingStatus": "PARTIAL",
+      "evidenceFile": "src/main/java/org/example/trademodel/controller/AnalysisRunController.java"
+    },
+    {
+      "id": "nav.messages",
+      "module": "I_BOTTOM_NAVIGATION",
+      "webLabel": "消息中心",
+      "backendField": "reduced notification/read models",
+      "sourceObject": "DashboardHomeVO.PushInboxVO / PushRecheck contracts",
+      "valueContract": "Business sources are asset-pool opportunity and UserPosition monitoring risk; complete inbox route is missing",
+      "mobileLabel": "消息",
+      "priority": "P0",
+      "mobileLocation": "固定底部导航",
+      "emptyState": "当前不可查看",
+      "canRename": true,
+      "mappingStatus": "PARTIAL",
+      "evidenceFile": "src/main/java/org/example/trademodel/vo/DashboardHomeVO.java"
+    },
+    {
+      "id": "nav.profile",
+      "module": "I_BOTTOM_NAVIGATION",
+      "webLabel": "Profile & Settings",
+      "backendField": "authenticated session/logout",
+      "sourceObject": "SecurityConfig / UserConfigController",
+      "valueContract": "Minimal account/session shell only; watch and settings persistence are unavailable",
+      "mobileLabel": "我的",
+      "priority": "P0",
+      "mobileLocation": "固定底部导航",
+      "emptyState": "暂未开放",
+      "canRename": true,
+      "mappingStatus": "PARTIAL",
+      "evidenceFile": "src/main/java/org/example/trademodel/controller/UserConfigController.java"
     },
     {
       "id": "nav.review",
-      "module": "I_BOTTOM_NAVIGATION",
+      "module": "J_CONTEXTUAL_NAVIGATION",
       "webLabel": "复盘中心",
       "backendField": "route:/review/dashboard",
       "sourceObject": "Existing Dashboard reviewCenterLink",
-      "valueContract": "Existing authenticated review route; never aliases the AI evidence section",
+      "valueContract": "Contextual entry only for an eligible CLOSED UserPosition with exact positionId",
       "mobileLabel": "复盘",
       "priority": "P0",
-      "mobileLocation": "固定底部导航",
-      "emptyState": "复盘",
-      "canRename": true,
+      "mobileLocation": "持仓详情上下文",
+      "emptyState": "当前不可查看",
+      "canRename": false,
       "mappingStatus": "CONFIRMED",
       "evidenceFile": "src/main/resources/templates/dashboard.html"
     }

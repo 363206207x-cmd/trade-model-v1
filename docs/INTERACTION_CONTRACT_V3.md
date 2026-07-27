@@ -4,10 +4,10 @@
 
 | Item | Value |
 | --- | --- |
-| Contract version | V3 |
-| Freeze date | 2026-07-24 |
-| Audited repository HEAD | `b939c8b8ae84d3eb93d2d5eb60c3e3c5be268a58` |
-| Current work package | `P3-U2 / IN_PROGRESS_PARTIAL` |
+| Contract version | V3.1 / FE-04 semantic correction |
+| Freeze date | 2026-07-28 |
+| Audited repository HEAD | `d523dc3e69920d6dd80a0d49f344f86757eb7b9e` |
+| Current work package | `FE-04 Information Architecture Freeze` |
 | Contract result | `FROZEN_WITH_EXPLICIT_FAIL_CLOSED_GAPS` |
 | Backend completeness | `PARTIAL` |
 | Figma change in this task | None |
@@ -34,10 +34,12 @@ Normative terms:
 When the inputs disagree, apply this order:
 
 1. Current backend, schema, API, and safety contracts.
-2. `docs/INTERACTION_BACKEND_AUDIT_V3.md`.
-3. `docs/BACKEND_PRODUCT_AUDIT_REPORT.md`.
-4. `docs/INTERACTION_SPEC_V2.md`.
-5. Current Figma page structure.
+2. `docs/design/FE04_SEMANTIC_CONTRACT_V2.md` for corrected FE-04
+   navigation and presentation ownership.
+3. `docs/INTERACTION_BACKEND_AUDIT_V3.md`.
+4. `docs/BACKEND_PRODUCT_AUDIT_REPORT.md`.
+5. `docs/INTERACTION_SPEC_V2.md`.
+6. Current Figma page structure.
 
 Figma describes presentation structure. It does not prove that data,
 persistence, navigation, or a successful action exists.
@@ -145,23 +147,37 @@ pages, not a top-level product destination.
 
 ### 2.2 Mobile navigation
 
-The implementation-ready bottom navigation contains exactly:
+The FE-04 target bottom navigation contains exactly:
 
 - `首页`;
 - `持仓`;
-- `复盘`.
+- `AI分析`;
+- `消息`;
+- `我的`.
+
+Target presence and runtime availability are separate:
+
+| Tab | Current capability |
+| --- | --- |
+| 首页 | `READY`: existing authenticated mobile Dashboard |
+| 持仓 | `PARTIAL`: owner-scoped position reads exist; FE-04 product route is pending |
+| AI分析 | `PARTIAL`: analysis create/detail exists; market-search landing is pending |
+| 消息 | `PARTIAL`: reduced read/recheck records exist; complete inbox route is pending |
+| 我的 | `PARTIAL`: minimal session/logout shell; settings and watch persistence are unavailable |
 
 Contextual navigation:
 
-- asset card or evidence entry -> Mobile Asset Detail;
+- asset-card body -> set `selectedSymbol` and stay on Mobile Home;
+- separate asset-detail affordance -> FE-03 Analysis Detail only with an
+  authoritative `analysisId`;
 - exact position card -> Mobile Position Monitor;
 - notification deep link -> Mobile Push Detail;
 - closed position -> Review;
-- account/session affordance -> Profile shell when a real route exists.
+- account/session affordance -> Profile shell.
 
-The bottom navigation MUST NOT add `观察`, `计划`, `AI`, `告警`, or `我的`
-until a real route and backend contract exist. The Figma Profile frame remains
-a reference shell and does not override this rule.
+观察资产 is not a primary tab. `复盘` remains contextual and is not a sixth
+tab. A `PARTIAL` tab must show an unavailable/disabled state until its real
+route exists; Figma presence does not authorize simulated success.
 
 ### 2.3 Cross-page identity
 
@@ -185,7 +201,7 @@ Monitor DOM.
 
 **Purpose**
 
-Provide one-screen awareness of system condition, risk, focus assets,
+Provide one-screen awareness of selected-asset and system status, risk, focus assets,
 reviewable decisions, real user positions, and monitoring.
 
 **Data sources**
@@ -197,11 +213,12 @@ reviewable decisions, real user positions, and monitoring.
 
 **Displayable fields**
 
-- 市场趋势, 风险等级, 数据质量分, AI 冲突等级;
-- 待复核机会, 冲突阻断, 热重置;
+- selected-asset 市场趋势, 风险等级, 数据质量分, AI 冲突等级;
+- system-summary AI 系统状态, 待复核机会, 冲突阻断统计, 热重置;
 - alert priority, symbol, sanitized message, and time;
 - focus asset symbol, current price, direction, composite score, confidence,
-  risk, asset state, and short conclusion;
+  risk, and asset state on the card body;
+- short conclusion outside the card body when returned;
 - selected-asset decision summary;
 - exact verified execution suggestion only;
 - user-position facts and monitor summary in a separate region;
@@ -211,8 +228,8 @@ reviewable decisions, real user positions, and monitoring.
 
 | Entry | Behavior | Target |
 | --- | --- | --- |
-| Focus asset card | Set `selectedSymbol`; update decision/plan/AI only | Stay on Overview |
-| Asset detail affordance | Preserve asset and analysis context | Asset Detail |
+| Focus asset card body | Set `selectedSymbol`; update decision/plan/AI only | Stay on Overview |
+| Asset detail affordance | Require authoritative `analysisId` | FE-03 Analysis Detail |
 | Evidence/score affordance | Preserve coverage and analysis context | Evidence & Scoring |
 | Verified plan card | Preserve exact `executionPlanId` | Strategy & Monitoring |
 | User-position card | Select exact `positionId` | Position Detail |
@@ -229,6 +246,7 @@ reviewable decisions, real user positions, and monitoring.
 - unverified plan identity:
   `当前暂无可验证的执行建议`, with all plan values hidden;
 - refresh failure: clear stale selection-dependent conclusions before error.
+- missing `analysisId`: disable detail affordance and show `当前不可查看`.
 
 ### 3.2 Evidence & Scoring
 
@@ -301,10 +319,17 @@ result as three separate business objects.
 Execution Plan:
 
 - direction from the linked decision;
+- worth-opening opinion from the selected asset/decision projection when
+  explicitly supplied;
 - entry zone, stop-loss zone, take-profit rules;
 - leverage and position suggestions;
-- validity and invalidation condition;
+- `validFrom`, `expiresAt`, and invalidation condition;
 - plan/source/revalidation status.
+
+The plan remains rule-led. Returned evidence, score, multi-timeframe, and
+available AI review/downgrade context may contribute, but AI cannot originate
+the plan or replace the rule-layer direction. `validFrom/expiresAt` are plan
+validity timestamps, never analysis timeframes.
 
 User Position:
 
@@ -331,6 +356,7 @@ Position Monitoring:
 **Fail-closed behavior**
 
 - exact plan unresolved: `暂无可验证的执行建议`;
+- conflict blocked: show the returned block and returned reasons in plan detail;
 - original position plan unresolved: `暂无可关联的原执行计划`;
 - invalid/revalidation/expired plan: muted `仅用于历史复核`;
 - monitor never run: `等待首次监控`;
@@ -345,7 +371,7 @@ Position Monitoring:
 **Purpose**
 
 Present one asset's current rule-led decision context and available
-explanation.
+explanation. Asset Detail is also the AI-analysis entry surface.
 
 **Data sources**
 
@@ -380,6 +406,7 @@ explanation.
 - no timeframe detail: `各周期明细尚未提供`;
 - no exact plan: hide plan values and navigation;
 - no role provenance: summary/reason codes only.
+- no authoritative `analysisId`: do not enter FE-03 or select a sibling run.
 
 ### 3.5 Position Detail
 
@@ -600,7 +627,7 @@ recheck rules.
 
 ### 3.11 Mobile Profile & Settings
 
-**Status:** `TARGET_ONLY / BLOCKED_BY_BACKEND_CONTRACT`.
+**Status:** `PARTIAL / FAIL_CLOSED_FOR_UNSUPPORTED_SETTINGS`.
 
 **Purpose**
 
@@ -633,8 +660,59 @@ pretending unsupported settings persistence exists.
 - no editable notification, AI mode/frequency/model, token budget, or risk
   preference success;
 - no fabricated remaining-token balance;
-- no `我的` implementation-ready bottom-nav item;
+- the `我的` target tab may be shown, but unsupported rows remain disabled;
 - no local-only persistence represented as account state.
+
+### 3.12 Mobile Message Center
+
+**Status:** `PARTIAL`.
+
+**Purpose**
+
+Provide one read-only entry for high-value product events without becoming a
+trading or delivery-control surface.
+
+**Business sources**
+
+1. asset-pool opportunity;
+2. exact UserPosition monitoring risk.
+
+System notices may be shown as a separate informational category only when a
+real record exists. They are not a third opportunity/risk Push source.
+
+Telegram is `EXTENSION / PENDING_IMPLEMENTATION`. It is a future delivery
+outlet only and must not be presented as connected, delivered, or actionable.
+
+**Fail-closed behavior**
+
+- no complete inbox route: target tab shows `当前不可查看`;
+- delivery disabled: `通知送达能力未启用`;
+- missing exact asset/position identity: no detail navigation;
+- no buy, sell, close, order, execute, or authorization control.
+
+### 3.13 AI Analysis And Asset Search
+
+**Status:** `PARTIAL`.
+
+**Target flow**
+
+```text
+search market asset
+  -> create authoritative analysisId
+  -> open FE-03 Analysis Detail
+  -> explicit optional add-to-watch action
+```
+
+Analysis create/read and FE-03 detail capability exist. Complete market-asset
+search and authenticated watch-asset persistence do not.
+
+**Fail-closed behavior**
+
+- no market-search contract: search is disabled or `暂未开放`;
+- no watch persistence: add/manage action is disabled;
+- no automatic add after search;
+- no localStorage success, fake card, fabricated analysisId, or sibling-run
+  fallback.
 
 ## 4. State Models
 

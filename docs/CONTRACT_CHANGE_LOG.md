@@ -266,3 +266,52 @@ Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No.
 Human confirmation required: Yes before B-risk PR merge.
+
+---
+
+## v1.0-fe04-semantic-contract-v2
+
+Date: 2026-07-28
+Changed by: Codex
+Reason: Reconcile the FE-04 information architecture with the approved mobile
+product decisions and the capabilities already exposed by the current
+Dashboard, analysis, position, notification, and settings contracts.
+Before: Mobile navigation, Home status ownership, Asset Card interaction,
+Execution Advice provenance, AI-analysis entry, notification scope, Telegram
+status, and asset-search availability were described inconsistently across the
+existing frontend contract documents.
+After: The contract freezes five target mobile tabs with per-tab capability
+status; separates selected-asset Home status from existing system summaries;
+keeps the Asset Card body as a context selector with a separate authoritative
+Analysis Detail affordance; defines rule-led, source-verified Execution Advice;
+keeps exactly three AI roles; limits product notification sources to
+asset-opportunity and UserPosition-risk events; marks Telegram as an extension;
+and marks market search/watch persistence as partial and fail-closed.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before a separate Figma baseline freeze or
+frontend implementation task. This documentation-only update does not make a
+runtime capability effective.
+
+---
+
+## v1.0-p3-h3-merged-main-governance-alignment
+
+Date: 2026-07-28
+Changed by: Codex
+Reason: Remove stale FE-02/P3-U2 handoff references after FE-02, P3-H1,
+FE-03, and P3-H3 became effective on merged main.
+Before: Current-state and compatibility files still pointed to PR #1134 or PR
+#1137 as open/unmerged work, and the Delivery Progress Matrix still blocked
+FE-03 behind FE-02.
+After: Governance records the merged-main evidence through P3-H3 at
+`d523dc3e69920d6dd80a0d49f344f86757eb7b9e`, keeps FE-04 frontend
+`NOT_STARTED`, and limits the next allowed package to a separately authorized
+FE-04 Figma Baseline Freeze.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before Figma modification or any later FE-04
+implementation package. This local documentation alignment becomes effective
+project governance only after it is merged to clean, synced `main`.
