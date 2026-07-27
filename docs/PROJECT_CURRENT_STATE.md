@@ -6,13 +6,32 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-02 Asset Detail final merge-gate remediation in PR #1137
-Next Business Phase: FE-02 exact-Head independent review, then separately authorized PR #1137 merge
-Next Business Phase Allowed: NO while PR #1137 is unmerged; NO for FE-03, P4, or production deployment
+Current Work Package: FE-04 Information Architecture Freeze preparation; FE-04 frontend is NOT_STARTED
+Next Business Phase: FE-04 Figma Baseline Freeze
+Next Business Phase Allowed: RUNTIME_GATED; after this governance alignment is effective on clean, synced main, only the separately authorized FE-04 Figma Baseline Freeze is allowed; FE-04 frontend implementation, API expansion, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
+
+## FE-02 through P3-H3 Merged-Main Progression
+
+The bounded frontend and prerequisite packages preceding FE-04 are effective on
+merged main:
+
+1. FE-02 Asset Detail is effective on merged main
+   `654d3821ff7046037f2cd02bf5de645b4550f196` through PR #1137.
+2. P3-H1 authoritative `analysisId` navigation is effective on merged main
+   `e8bf2b66377cc2ef99c4aac2133d237e8d79bef0` through PR #1138.
+3. FE-03 Analysis Detail is effective on merged main
+   `76383725c19d038e0bf2065ae034b06b7f34b732` through PR #1140.
+4. P3-H3 UserPosition ownership and authorization foundation is effective on
+   merged main `d523dc3e69920d6dd80a0d49f344f86757eb7b9e` through PR #1141.
+
+These merged packages satisfy the prerequisites for a separately authorized
+FE-04 Figma Baseline Freeze. They do not implement the FE-04 frontend, make a
+Figma baseline effective, authorize new APIs, or move trading capability.
+FE-04 frontend status remains `NOT_STARTED`.
 
 ## P3-U2 iPhone Private Test App Foundation
 
@@ -66,8 +85,9 @@ local PostgreSQL 16 and passed the local browser-equivalent Session/CSRF smoke.
 These changes are effective on merged main; real production PostgreSQL V8, real mobile
 Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
-Production readiness remains `BLOCKED`; FE-02 is the active bounded frontend
-package, and FE-03/P4 are not allowed before FE-02 is merged and validated on main.
+Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, and P3-H3 are now
+effective on merged main. The next bounded action is FE-04 Figma Baseline
+Freeze; FE-04 frontend implementation and P4 remain blocked.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
@@ -1266,5 +1286,6 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: PR #1137 FE-02 Asset Detail open/ready/unmerged; final merge-gate remediation pending exact-Head independent review
-- UNRELATED_OPEN_PRS: DERIVED_BY_V1_STATE
+- CURRENT_PACKAGE_PR: NONE; FE-04 Figma Baseline Freeze has no repository PR
+- OPEN_PR_COUNT: 0 verified against GitHub at main `d523dc3e69920d6dd80a0d49f344f86757eb7b9e`
+- UNRELATED_OPEN_PRS: NONE at the recorded mainline; runtime status remains derived by `scripts/v1-state.sh`

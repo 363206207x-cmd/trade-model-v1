@@ -43,7 +43,23 @@ byte-for-byte review of unavailable source binaries.
 | `READY` | A real backend contract supplies the field or transition and the frontend can display it without invention. |
 | `PARTIAL` | Some real data exists, but aggregation, identity, provenance, persistence, routing, or frontend coverage is incomplete. |
 | `FAIL_CLOSED` | The frontend must show an unavailable/unsynchronized state and must not synthesize the missing capability. |
-| `EXTENSION` | The item is outside the current V1 product contract and must not be presented as a current V1 capability. |
+| `EXTENSION` | The item is a future product extension outside current V1 delivery and must not be presented as available. |
+
+### 1.3 FE-04 Semantic Correction Overlay
+
+`docs/design/FE04_SEMANTIC_CONTRACT_V2.md` corrects the product target for:
+
+- five-tab mobile navigation: 首页 / 持仓 / AI分析 / 消息 / 我的;
+- mixed home status ownership;
+- card-body context selection plus a separate analysis-detail affordance;
+- rule-led Execution Advice and plan-validity timestamps;
+- Asset Detail as the AI-analysis entry;
+- two business message sources;
+- Telegram as an extension/pending implementation; and
+- market-asset search/add-to-watch as `PARTIAL`.
+
+This overlay changes design and interaction classification only. It does not
+upgrade any `PARTIAL`, `FAIL_CLOSED`, or `EXTENSION` capability to `READY`.
 
 ## 2. Executive Summary
 
@@ -85,6 +101,7 @@ Overall frontend contract status:
 |---|---|---|---|---|
 | Overview Dashboard | Market environment, data quality, risk, focus assets, conclusion, action suggestion | `DashboardHomeVO`, `DecisionBundleVO`, current asset state, validated `ExecutionPlan` projection | `/dashboard` and `/api/dashboard/home` exist; Figma desktop exists | `PARTIAL` |
 | Mobile Home | Status, alerts/events, focus assets, selected-asset decision/AI projection, independent position monitor | `DashboardHomeVO` | `/dashboard/mobile` exists; Figma mobile frames exist | `PARTIAL` |
+| AI Analysis entry | Market-asset search, analysis creation, FE-03 detail, optional add-to-watch | Analysis run create/read and FE-03 detail | Search landing and authenticated watch persistence are missing | `PARTIAL` |
 | Asset Detail | Single-asset summary and decision explanation | `DecisionBundleVO`, evidence/score builders, current state, plan projection | Figma frame only; no authoritative single asset-detail read route | `PARTIAL` |
 | Evidence & Scoring | Evidence chain, opposing evidence, eight scores, timeframe convergence | `EvidenceItemVO`, `ScoreItemVO`, `DecisionBundleVO` summaries | Figma frames exist; normal public read exposes only reduced summaries | `FAIL_CLOSED` for full detail |
 | Strategy & Monitoring | Execution suggestion, user position, monitoring result | `ExecutionPlan`, `UserPosition`, `PositionMonitorLog` | Figma frame exists; underlying objects exist but no single composed product page | `PARTIAL` |
@@ -452,7 +469,7 @@ It must continue to distinguish user facts from system suggestions.
 | In-app notification eligibility/audit | Implemented in reduced form | `PARTIAL` |
 | External Push delivery | No-op/disabled | `FAIL_CLOSED` |
 | Push event record and recheck | Implemented as review-only contracts | `PARTIAL` |
-| Telegram | Hardcoded/waiting-sync references only; no current delivery contract | `EXTENSION / NOT IN CURRENT PRODUCT CONTRACT` |
+| Telegram | Hardcoded/waiting-sync references only; no current delivery contract | `EXTENSION / PENDING_IMPLEMENTATION` |
 | Email | No proven V1 settings/delivery contract | `EXTENSION` |
 | AI analysis frequency setting | Backend scheduling/runtime policy, not user configuration | Not a frontend capability |
 | Token budget setting/display | System cost/rate guard, not a user balance or setting | Not a frontend capability |
@@ -483,9 +500,9 @@ The Figma file was inspected without modification.
 |---|---|---|
 | Evidence & Scoring / Asset Detail | Frames imply complete evidence/eight-score inspection | Keep `待同步` values and remove any claim of authoritative complete data |
 | AI Role Inspector | "Complete evidence" language exceeds role provenance | Use role summary plus `完整证据关联尚未提供` |
-| Mobile Profile | Contains AI frequency, token budget controls, and Telegram | Remove from current V1 flow or label as unavailable extension |
-| Mobile Message Center | Includes system notifications alongside product Push sources | Keep product Push flow limited to opportunity and position-risk events |
-| Older iPhone overview navigation | Uses `总览/证据/策略/我的` | Do not treat as implementation-ready navigation; V3 current nav is `首页/持仓/复盘` |
+| Mobile Profile | Contains AI frequency, token budget controls, and Telegram | Keep the target tab; disable unsupported settings and label Telegram as extension |
+| Mobile Message Center | Includes system notifications alongside product Push sources | Keep only opportunity and position-risk as business Push sources; system notices are informational only |
+| Older iPhone overview navigation | Uses `总览/证据/策略/我的` | Replace with the FE-04 target: `首页/持仓/AI分析/消息/我的`, with partial tabs fail-closed |
 | Mobile Push statuses | Shows raw `VALID_EXECUTABLE` terminology | Use review-only user-facing copy and retain raw value only as technical metadata |
 
 ### 14.3 Figma Implementation Status
@@ -519,13 +536,13 @@ complete evidence APIs exist.
 | FCA2-003 | Exact plan identity | Some projections can resolve a sibling/latest plan | Wrong plan values could be shown | High |
 | FCA2-004 | Manual real-position input contract | Backend requires quantity/leverage and server timestamp | Product form contract is inconsistent | High |
 | FCA2-005 | Settings must reflect real APIs | Figma includes AI frequency/token controls; settings API is minimal | Simulated configuration success | High |
-| FCA2-006 | Telegram must not be V1 core | Waiting-sync/hardcoded references and Figma controls exist | Extension can be mistaken for current delivery | High |
+| FCA2-006 | Telegram is extension/pending implementation | Waiting-sync/hardcoded references and Figma controls exist | Extension can be mistaken for current delivery | High |
 | FCA2-007 | Mobile Asset Card contract | Confidence, state, and short conclusion are not all shown | Mobile overview is incomplete | Medium |
 | FCA2-008 | Product Push delivery | Publishers/providers are no-op | Eligibility can be mistaken for actual delivery | High |
 | FCA2-009 | Position-risk notification integration | Type/policy exist; dashboard integration is incomplete | Position-risk inbox may overpromise | Medium |
 | FCA2-010 | Product page routes | Several Figma pages have no current frontend route/composed API | Prototype can be mistaken for implemented UI | Medium |
 | FCA2-011 | Human handling record | No dedicated persisted acknowledgment/history contract | UI cannot show a truthful action history | Medium |
-| FCA2-012 | Product navigation | Older Figma mobile navigation conflicts with V3 current nav | Inconsistent implementation guidance | Medium |
+| FCA2-012 | Product navigation | FE-04 freezes five target tabs; four destinations remain partial | Target presence can be mistaken for runtime availability | Medium |
 | FCA2-013 | Push source boundary | Figma message center includes system notification | Product notification scope can expand silently | Medium |
 | FCA2-014 | Review-only Push wording | Raw `VALID_EXECUTABLE` suggests execution | User may mistake review for authorization | High |
 
@@ -535,7 +552,7 @@ The following must not be presented as current V1 product capability:
 
 - AI analysis-frequency user settings;
 - user-configurable AI token budget or remaining-token balance;
-- Telegram as a current notification channel;
+- Telegram as a completed/current notification channel;
 - Telegram trading commands;
 - simulated settings save success;
 - complete role-specific AI evidence without provenance;
@@ -563,7 +580,7 @@ The following must not be presented as current V1 product capability:
 | `triggered` is not treated as opened | `PASS` |
 | Push limited to opportunity review and position risk | `PARTIAL` - system notification must remain outside the product Push flow |
 | Push Recheck is review-only | `PASS_WITH_COPY_CORRECTION_REQUIRED` |
-| Telegram is not treated as V1 core | `FAIL_IN_CURRENT_FIGMA/PLACEHOLDER_COPY`, required classification is `EXTENSION` |
+| Telegram is not treated as V1 core | `PARTIAL`, required classification is `EXTENSION / PENDING_IMPLEMENTATION` |
 | Missing data fails closed | `PARTIAL` - Figma placeholders are generally correct, but complete-evidence claims must be removed |
 | Automatic trading controls absent | `PASS` |
 
@@ -580,7 +597,7 @@ BACKEND_CONTRACT_ALIGNMENT:
 PARTIAL
 
 TELEGRAM:
-EXTENSION_NOT_IN_CURRENT_PRODUCT_CONTRACT
+EXTENSION_PENDING_IMPLEMENTATION
 
 AI_CALL_FREQUENCY_SETTING:
 NOT_A_FRONTEND_PRODUCT_CAPABILITY

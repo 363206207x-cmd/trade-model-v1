@@ -4,8 +4,9 @@
 
 - Design base: `168ef18c7ad148d960902c913f6ddb4b53318e14`
 - Mapping contract: `P3-U2-IPHONE-HOME-IA-V2`
-- Contract revision: `REVIEW_FINDINGS_FIX_1`
+- Contract revision: `FE04_SEMANTIC_CONTRACT_V2`
 - Confirmed display fields: **102**
+- Partial target fields: **4**
 - Unresolved fields: **1**
 - Prototype data mode: `STATIC_LAYOUT_FIXTURE`
 - Production Java, Swift, and Dashboard template changes: **none**
@@ -32,39 +33,47 @@ code does not expose it.
 
 | Module | Confirmed | Unresolved | Mobile rule |
 |---|---:|---:|---|
-| A. Top status | 7 | 1 | Render seven confirmed values in one lightweight status band; do not invent an eighth cell. |
+| A. Home status area | 8 | 1 | Four selected-asset values plus four existing system summaries; never relabel one scope as the other. |
 | B. Realtime alert | 4 | 0 | One compact summary; second row remains available through disclosure. |
 | C. Key event | 4 | 0 | One compact summary; additional detail remains in disclosure. |
-| D. Watch asset | 15 | 0 | Three assets; P0/P1 on the pager, P2 in expansion/detail. |
+| D. Watch asset | 15 | 0 | Card body uses exactly symbol, price, direction, score, confidence, risk, and state. |
 | E. Execution advice | 14 | 0 | Compact direction/entry summary follows selected asset; complete fields expand. |
 | F. Position monitor | 17 | 0 | Independent compact manual-position summaries; complete fields expand. |
 | G. AI evidence review | 30 | 0 | One compact role summary visible at a time; complete role fields expand. |
 | H. Adjudication consistency | 8 | 0 | Embedded in the AI header, not a fourth AI role. |
-| I. Bottom navigation | 3 | 0 | Existing route or in-page section target only. |
+| I. Bottom navigation | 1 ready / 4 partial | 0 | Five target tabs with truthful per-tab availability. |
+| J. Contextual navigation | 1 | 0 | Review remains contextual and is not a sixth primary tab. |
 
-## A. Top Status
+## A. Home Status Area
+
+### A1. Current selected-asset status
 
 | Web label | Backend field | Source object | Value contract | Mobile label | Priority | Location | Empty | Rename | Status | Evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 市场趋势 | `systemState.marketTrend.valueLabel` | `SystemStateVO.StatusCardVO` | Backend market-bias mapping | 市场趋势 | P0 | 首页摘要 | 等待同步 | No | CONFIRMED | `DashboardHomeServiceImpl` |
-| 风险等级 | `systemState.riskLevel.valueLabel` | `SystemStateVO.StatusCardVO` | Backend risk mapping | 风险等级 | P0 | 首页摘要 | 等待同步 | No | CONFIRMED | `DashboardHomeServiceImpl` |
-| 数据质量分 | `systemState.dataQuality.valueLabel` | `SystemStateVO.StatusCardVO` | Numeric only if supplied | 数据质量分 | P0 | 首页摘要 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
-| AI 冲突等级 | `systemState.aiConflict.valueLabel` | `SystemStateVO` + `ConsistencyVO` | AI not applicable is `不适用` | AI 冲突等级 | P0 | 首页摘要 | 不适用 | No | CONFIRMED | `DashboardControllerTest` |
-| 待复核机会 | `systemState.pendingReview.valueLabel` | `SystemStateVO` + `LightSystemStatusVO` | Non-negative count; zero is 暂无 | 待复核机会 | P0 | 首页摘要 | 暂无 | No | CONFIRMED | `DashboardHomeServiceImpl` |
-| 冲突阻断 | `systemState.confused.valueLabel` | `SystemStateVO` + `LightSystemStatusVO` | Directional block count | 冲突阻断 | P0 | 首页摘要 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
-| 热重置 | `systemState.hotReset.valueLabel` | `SystemStateVO.StatusCardVO` | 已触发 / 未触发 | 热重置 | P0 | 首页摘要 | 等待同步 | No | CONFIRMED | `dashboard.html` |
+| 市场趋势 | `systemState.marketTrend.valueLabel` | `SystemStateVO.StatusCardVO` | Selected-asset market-bias mapping | 市场趋势 | P0 | 当前资产状态 | 等待同步 | No | CONFIRMED | `DashboardHomeServiceImpl` |
+| 风险等级 | `systemState.riskLevel.valueLabel` | `SystemStateVO.StatusCardVO` | Selected-asset risk mapping | 风险等级 | P0 | 当前资产状态 | 等待同步 | No | CONFIRMED | `DashboardHomeServiceImpl` |
+| 数据质量分 | `systemState.dataQuality.valueLabel` | `SystemStateVO.StatusCardVO` | Selected-asset numeric value only if supplied | 数据质量分 | P0 | 当前资产状态 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
+| AI 冲突等级 | `systemState.aiConflict.valueLabel` | `SystemStateVO` + `ConsistencyVO` | Selected-asset AI conflict; not applicable is `不适用` | AI 冲突等级 | P0 | 当前资产状态 | 不适用 | No | CONFIRMED | `DashboardControllerTest` |
+
+### A2. Existing system summary
+
+| Web label | Backend field | Source object | Value contract | Mobile label | Priority | Location | Empty | Rename | Status | Evidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| AI 系统状态 | `header.aiStatusLabel` | `DashboardHomeVO.HeaderVO` | Existing aggregate AI runtime/status label; never derived from selected-asset conflict | AI 系统状态 | P0 | 系统摘要 | 等待同步 | Yes | CONFIRMED | `DashboardHomeServiceImpl` |
+| 待复核机会 | `systemState.pendingReview.valueLabel` | `SystemStateVO` + `LightSystemStatusVO` | Non-negative count; zero is 暂无 | 待复核机会 | P0 | 系统摘要 | 暂无 | No | CONFIRMED | `DashboardHomeServiceImpl` |
+| 冲突阻断 | `systemState.confused.valueLabel` | `SystemStateVO` + `LightSystemStatusVO` | Existing directional block count only | 冲突阻断统计 | P0 | 系统摘要 | `--` | Yes | CONFIRMED | `DashboardHomeServiceImpl` |
+| 热重置 | `systemState.hotReset.valueLabel` | `SystemStateVO.StatusCardVO` | 已触发 / 未触发 | Hot Reset | P0 | 系统摘要 | 等待同步 | Yes | CONFIRMED | `dashboard.html` |
 | 持仓风险（候选第八项） | none | none | Current code has no eighth top-status field | none | P0 | 不渲染 | none | No | **UNRESOLVED** | `DashboardHomeVO.SystemStateVO` |
 
 ### Top-status discrepancy
 
-`DashboardHomeVO.SystemStateVO`, `buildSystemState`, the template, and its
-contract tests all expose exactly seven status cells. The product task names
-“持仓风险” as a candidate eighth item, but no current backend field or test
-contract confirms it. IA v2 therefore renders seven cells and records the
-candidate as `UNRESOLVED_FIELD`; it does not reuse a position risk field or
-derive a new aggregate.
+`DashboardHomeVO.SystemStateVO` still exposes seven cards. FE-04 V2 additionally
+uses the existing `header.aiStatusLabel` in the same home status area and
+classifies ownership rather than inventing a new aggregate. “持仓风险” remains
+`UNRESOLVED_FIELD`; the client does not reuse a position risk field or derive a
+new total.
 
-The seven confirmed values use a shared status band with no per-value card
+The confirmed values use a shared status band with no per-value card
 background, icon, emoji, ring, or shadow. Labels remain at least `12pt` at the
 standard prototype scale.
 
@@ -94,7 +103,7 @@ standard prototype scale.
 | 综合评分 | `assets[].compositeScore` | `AssetVO` | Rounded analysis average if present | 综合评分 | P0 | 首页摘要 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
 | 方向 | `assets[].marketBiasLabel` | `AssetVO` | Backend product mapping | 方向 | P0 | 首页摘要 | 等待同步 | Yes | CONFIRMED | `DashboardHomeServiceImpl` |
 | 风险等级 | `assets[].riskLabel` | `AssetVO` | Backend product mapping | 风险等级 | P0 | 首页摘要 | 状态待同步 | No | CONFIRMED | `DashboardHomeVO` |
-| 是否值得开仓 | `assets[].worthOpening` | `AssetVO` | Boolean review evidence, never authorization | 是否值得开仓 | P0 | 首页摘要 | 等待同步 | No | CONFIRMED | `DashboardHomeControllerTest` |
+| 是否值得开仓 | `assets[].worthOpening` | `AssetVO` | Boolean review evidence, never authorization | 是否值得开仓 | P0 | 执行建议摘要 | 等待同步 | No | CONFIRMED | `DashboardHomeControllerTest` |
 | 置信度 | `assets[].confidenceLabel` | `AssetVO` | 高 / 中 / 低 when recognized | 置信度 | P1 | 17PM 摘要 / 12PM 展开 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
 | 最新价 | `assets[].latestPrice` | `AssetVO` | Persisted closed 5m OHLCV close | 最新价 | P1 | 17PM 摘要 / 12PM 展开 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
 | 资产状态 | `assets[].assetStateLabel` | `AssetVO` | Eight existing enum labels | 资产状态 | P1 | 展开区 | 状态待同步 | No | CONFIRMED | `DashboardHomeControllerTest` |
@@ -106,11 +115,12 @@ standard prototype scale.
 | 证据数 | `assets[].evidenceCount` | `AssetVO` | Analysis evidence count | 证据数量 | P2 | 详情页 | `--` | Yes | CONFIRMED | `DashboardHomeServiceImpl` |
 | 分析时间 | `assets[].latestAnalysisTime` | `AssetVO` | Decision create time | 分析时间 | P2 | 详情页 | `--` | No | CONFIRMED | `DashboardHomeServiceImpl` |
 
-Only the first seven rows may appear on a watch card. IA v2 keeps exactly
-three cards. Each selector binds to one explicit `assets[index]` object; the
-prototype never generates a singular `asset[index]` token. P2 rows are
-deliberately excluded from the home card. Selection uses one accessible radio
-group, with no nested disclosure or second focusable control inside a card.
+The watch-card body may show only 资产, 最新价, 方向, 综合评分, 置信度, 风险等级,
+and 资产状态. IA v2 keeps the three current display slots but filters placeholder
+slots. Each selector binds to one explicit `assets[index]` object; the prototype
+never generates a singular `asset[index]` token. Selection uses one accessible
+radio group. A separate sibling `查看详情` affordance may use the authoritative
+nullable `analysisId`; it is disabled when that identity is unavailable.
 
 ## E. Execution Advice
 
@@ -135,7 +145,10 @@ Execution advice follows `selectedSymbol`. It never becomes a UserPosition,
 order, or automatic action. User stop values remain separate from system plan
 boundaries. The default mobile state is `COMPACT_SUMMARY`: backend status,
 blocked reason, direction, and entry zone remain visible; all remaining
-confirmed fields stay available in the native disclosure.
+confirmed fields stay available in the native disclosure. The selected
+`assets[].worthOpening` value may be displayed in this region; it is not
+inferred from direction, score, or AI output. `validFrom/expiresAt` are plan
+validity timestamps, not analysis timeframes.
 
 ## F. Position Monitor
 
@@ -249,24 +262,36 @@ GPT_FINAL plan mode remains in the GPT_FINAL disclosure.
 | Web label | Backend/target | Source object | Value contract | Mobile label | Priority | Location | Empty | Rename | Status | Evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Dashboard | `/dashboard` | Existing authenticated route | Prototype resets `.app-scroll` to `0` and focuses the page title | 首页 | P0 | Fixed bottom nav | 首页 | Yes | CONFIRMED | `BackendConfiguration.swift` |
-| 持仓监控 | `positions[]` / `#position-monitor` | Home read model | Prototype in-page anchor only | 持仓 | P0 | Fixed bottom nav | 暂无持仓 | Yes | CONFIRMED | `dashboard.html` |
-| 复盘中心 | `/review/dashboard` | Existing Dashboard link | Existing authenticated route; never the AI section | 复盘 | P0 | Fixed bottom nav | 复盘 | Yes | CONFIRMED | `dashboard.html` |
+| 持仓监控 | owner-scoped UserPosition reads | `UserPositionController` + FE-04 target | Data contract exists; dedicated FE-04 route is not implemented | 持仓 | P0 | Fixed bottom nav | 当前不可查看 | Yes | PARTIAL | `UserPositionController` |
+| AI 分析 | analysis create/read + FE-03 detail | `AnalysisRunController` + `AnalysisDetailController` | Detail capability exists; market-search landing is incomplete | AI分析 | P0 | Fixed bottom nav | 当前不可查看 | Yes | PARTIAL | `AnalysisRunController` |
+| 消息中心 | reduced in-app notification/read models | Push/notification audit contracts | Only opportunity and UserPosition-risk business sources; complete inbox route is missing | 消息 | P0 | Fixed bottom nav | 当前不可查看 | Yes | PARTIAL | `DashboardHomeVO.PushInboxVO` |
+| 我的 | account/session shell | Authenticated session + logout | Minimal shell only; watch/settings persistence is unavailable | 我的 | P0 | Fixed bottom nav | 暂未开放 | Yes | PARTIAL | `UserConfigController` |
 
-No fourth navigation destination is introduced. The static prototype records
-the sanitized `/review/dashboard` target without issuing a network request.
-The position-section anchor adds no backend route and performs no write.
+The five labels are the target IA. A `PARTIAL` tab must not simulate a
+successful route or saved state.
+
+## J. Contextual Navigation
+
+| Web label | Backend/target | Source object | Value contract | Mobile label | Priority | Location | Empty | Rename | Status | Evidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 复盘中心 | `/review/dashboard` | Existing Review contract | Enter only from an eligible CLOSED UserPosition with exact positionId | 复盘 | P0 | Contextual entry | 当前不可查看 | No | CONFIRMED | `ReviewController` |
+
+观察资产 is not a primary tab. Search/add/manage behavior remains `PARTIAL`
+until real market-search and authenticated watch-asset persistence contracts
+exist.
 
 ## Display Isolation Rules
 
-1. Watch-asset selection changes the request context for execution advice,
+1. Watch-card body selection changes the request context for execution advice,
    AI evidence, and consistency only.
-2. Position monitor rows never change when a watch asset is selected.
-3. Execution-plan stop values never replace user-entered stop values.
-4. `ExecutionSuggestionVO` never becomes a `UserPosition`.
-5. Missing AI role data never borrows another role's content.
-6. Unknown enum values display `状态待同步` or `未知状态`; raw values remain
+2. The separate asset-detail affordance requires authoritative `analysisId`.
+3. Position monitor rows never change when a watch asset is selected.
+4. Execution-plan stop values never replace user-entered stop values.
+5. `ExecutionSuggestionVO` never becomes a `UserPosition`.
+6. Missing AI role data never borrows another role's content.
+7. Unknown enum values display `状态待同步` or `未知状态`; raw values remain
    available only to diagnostics.
-7. Normal preview contains field tokens only. Capture mode replaces their
+8. Normal preview contains field tokens only. Capture mode replaces their
    visible text with safe empty states while retaining exact paths in
    `data-field-token`; neither mode contains market, event, position, or AI
    evidence values.

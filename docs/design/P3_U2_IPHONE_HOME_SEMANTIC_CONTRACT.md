@@ -9,6 +9,11 @@ position writes, orders, messages, or trading behavior.
 
 Design base: `168ef18c7ad148d960902c913f6ddb4b53318e14`.
 
+FE-04 correction: `FE04_SEMANTIC_CONTRACT_V2.md` supersedes this
+document's mobile-navigation, home-status ownership, asset-card interaction,
+AI-analysis entry, message/Telegram, and asset-search wording. The current
+backend remains authoritative for availability and field values.
+
 ## Global Rules
 
 1. The current backend and Dashboard code outrank proposal text and historical
@@ -25,26 +30,31 @@ Design base: `168ef18c7ad148d960902c913f6ddb4b53318e14`.
 6. All AI, execution, and position-monitor content remains manual-review-only,
    not a trade instruction, not executable, and not auto-trading.
 
-## A. Top Status
+## A. Home Status Area
 
-The authoritative home read model currently contains seven status cells:
+The home read model is a mixed status area with explicit ownership.
+
+Current selected-asset status follows `selectedSymbol`:
 
 1. 市场趋势
 2. 风险等级
 3. 数据质量分
 4. AI 冲突等级
-5. 待复核机会
-6. 冲突阻断
-7. 热重置
 
-The task's candidate eighth item, 持仓风险, has no field in
-`DashboardHomeVO.SystemStateVO`, no assignment in `buildSystemState`, no card
-in `dashboard.html`, and no supporting test contract. It is therefore recorded
-as `UNRESOLVED_FIELD` and is not rendered.
+System summary status uses existing aggregate/header fields only:
+
+1. AI 系统状态
+2. 待复核机会
+3. 冲突阻断统计
+4. 热重置
+
+The client must not relabel selected-asset values as system-wide values. The
+candidate 持仓风险 aggregate still has no authoritative field and remains
+`UNRESOLVED_FIELD`.
 
 Presentation contract:
 
-- compact four-column status band without seven independent card surfaces;
+- compact status band without independent decorative card surfaces;
 - no status icons, emoji, ring, or decorative chart;
 - text remains the primary state signal;
 - labels remain at least `12pt` at the standard prototype scale;
@@ -69,31 +79,33 @@ These modules form the second information row.
 
 ## C. Watch Asset Pager
 
-The home screen contains exactly three asset cards in a horizontal
-scroll-snap pager.
+The home screen uses the backend-supplied watch assets in a horizontal
+scroll-snap pager. The current home contract supplies three display slots, but
+placeholder/default slots are never rendered as analyzed assets.
 
-P0 summary:
+The card body displays exactly:
 
 - 资产
-- 综合评分
-- 方向
-- 风险等级
-- 是否值得开仓
-
-P1 summary:
-
-- 置信度
 - 最新价
+- 方向
+- 综合评分
+- 置信度
+- 风险等级
+- 当前状态
 
 17PM and 12PM show the same compact P0/P1 selector without a nested control.
 Data source, freshness, timeframe freshness, evidence count, analysis time,
-and unavailable reason stay in a future detail layer.
+worth-opening opinion, complete evidence, score dimensions, AI output, and
+unavailable reason stay outside the card body.
 
 Selection contract:
 
-- selecting an asset changes execution-advice scope;
-- selecting an asset changes AI-evidence and consistency scope;
+- selecting the card body changes execution-advice scope;
+- selecting the card body changes AI-evidence and consistency scope;
 - selecting an asset does **not** change the position-monitor list;
+- selecting the card body does not navigate;
+- a separate `查看详情` affordance may enter FE-03 only with an authoritative
+  `analysisId`; missing identity displays `当前不可查看`;
 - each selector is one radio control bound to `assets[index]`;
 - no selector may generate the nonexistent singular `asset[index]` path;
 - placeholder/default slots are not treated as analyzed assets;
@@ -102,6 +114,11 @@ Selection contract:
 ## D. Execution Advice
 
 The module title remains `执行建议`.
+
+Execution Advice is rule-led and source-verified. Returned evidence, score,
+multi-timeframe, and available AI review/downgrade context may contribute to
+the plan, but AI never originates a plan or replaces the rule-layer direction.
+Missing required provenance or exact plan identity fails closed.
 
 Default presentation is `COMPACT_SUMMARY`: backend status, blocked reason,
 direction, and entry zone remain visible. Stop loss, take-profit rules,
@@ -112,6 +129,7 @@ disclosure.
 The mobile definition list uses only:
 
 - direction;
+- worth-opening opinion;
 - entry zone;
 - stop loss;
 - take-profit rules;
@@ -119,7 +137,12 @@ The mobile definition list uses only:
 - position suggestion;
 - validity period;
 - invalid condition;
+- structured `validFrom` and `expiresAt`;
 - backend status/blocked reason above the fields.
+
+`validFrom/expiresAt` are plan-validity timestamps. They are not replaced by
+`1H/4H` analysis timeframes. Returned conflict-block status and reasons belong
+to the Execution Advice detail.
 
 The mobile client does not add plan status, trigger conditions, execution cost,
 liquidity state, funding rate, evidence summary, or action commands.
@@ -270,16 +293,22 @@ No score ring is used. A number is shown only if
 
 ## H. Bottom Navigation
 
-The fixed bottom navigation contains three truthful targets:
+The FE-04 target bottom navigation contains exactly:
 
-- 首页: existing `/dashboard` route; in the static prototype it resets the
-  internal `.app-scroll` owner and focuses the page title;
-- 持仓: in-page position-monitor anchor in this prototype;
-- 复盘: existing `/review/dashboard` route, never the AI section.
+1. 首页
+2. 持仓
+3. AI分析
+4. 消息
+5. 我的
 
-The in-page anchor is an IA navigation device, not a new backend route. The
-static prototype captures the sanitized app-route target for testing, prevents
-network navigation, and performs no write.
+Only 首页 currently has a complete mobile route. The remaining tabs retain
+their target responsibility but must expose disabled, partial, or unavailable
+states until their real route and data contract exist. A visible target tab is
+not evidence of implemented capability.
+
+观察资产 is not a primary tab. Search, analysis, and add-to-watch remain
+explicit separate actions. 复盘 is contextual and requires an eligible
+`CLOSED` UserPosition with exact `positionId`.
 
 ## Responsive Semantics
 
@@ -315,9 +344,11 @@ so only its pager owns horizontal scrolling.
 
 ### Semantics
 
-- [x] Seven rendered top statuses come from current fields.
-- [x] Candidate eighth status is explicitly unresolved, not fabricated.
+- [x] Four selected-asset and four existing system-summary statuses have
+  explicit ownership.
+- [x] Candidate holding-risk aggregate is explicitly unresolved, not fabricated.
 - [x] Watch cards contain no new field.
+- [x] Card-body selection and the separate detail affordance are distinct.
 - [x] Execution advice contains no new action semantics.
 - [x] Position monitor and execution advice are separate.
 - [x] AI role responsibilities are distinct.
@@ -335,7 +366,8 @@ so only its pager owns horizontal scrolling.
 - [x] Position content remains unchanged by asset selection.
 - [x] Long text uses native expand/collapse.
 - [x] Asset selection uses one radio-group control with no nested interaction.
-- [x] Home resets the actual scroll owner; review targets `/review/dashboard`.
+- [x] Five target tabs retain truthful capability states; Review remains
+  contextual.
 - [x] Bottom navigation reserves the measured home-indicator inset.
 
 ### Visual and safety
