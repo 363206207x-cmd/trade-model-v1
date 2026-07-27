@@ -32,7 +32,7 @@ public interface UserPositionMapper {
     UserPositionDO selectByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
     @Select("SELECT * FROM tm_user_position " +
-            "WHERE user_id = #{userId} AND status = 'OPEN' " +
+            "WHERE user_id = #{userId} AND status IN ('OPEN', 'PARTIALLY_CLOSED') " +
             "ORDER BY opened_at DESC, id DESC")
     List<UserPositionDO> listOpenByUserId(@Param("userId") Long userId);
 
@@ -40,7 +40,7 @@ public interface UserPositionMapper {
     UserPositionDO selectClaimedByIdForSystem(@Param("id") Long id);
 
     @Select("SELECT * FROM tm_user_position " +
-            "WHERE user_id IS NOT NULL AND status = 'OPEN' " +
+            "WHERE user_id IS NOT NULL AND status IN ('OPEN', 'PARTIALLY_CLOSED') " +
             "ORDER BY opened_at DESC, id DESC")
     List<UserPositionDO> listClaimedOpenForSystemMonitoring();
 
@@ -69,7 +69,7 @@ public interface UserPositionMapper {
     @Update("UPDATE tm_user_position SET " +
             "status = 'CLOSED', closed_at = #{closedAt}, close_price = #{closePrice}, close_reason = #{closeReason}, " +
             "updated_at = #{updatedAt} " +
-            "WHERE id = #{id} AND user_id = #{userId} AND status = 'OPEN'")
+            "WHERE id = #{id} AND user_id = #{userId} AND status IN ('OPEN', 'PARTIALLY_CLOSED')")
     int manualCloseByIdAndUserId(@Param("id") Long id,
                                  @Param("userId") Long userId,
                                  @Param("closedAt") LocalDateTime closedAt,

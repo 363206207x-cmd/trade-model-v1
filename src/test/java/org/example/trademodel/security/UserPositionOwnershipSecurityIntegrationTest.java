@@ -81,13 +81,19 @@ class UserPositionOwnershipSecurityIntegrationTest {
 
     @Test
     void openListContainsOnlyCurrentOwnerOpenRowsAndNeverExposesOwnerKey() throws Exception {
+        UserPositionDO partialA = insertPosition(userAId, "BTCUSDT", "PARTIALLY_CLOSED", 6);
+        UserPositionDO partialB = insertPosition(userBId, "BTCUSDT", "PARTIALLY_CLOSED", 7);
+
         String body = mockMvc.perform(get("/api/user-positions/open").with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].id").value(openA.getId()))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(partialA.getId()))
+                .andExpect(jsonPath("$.data[0].status").value("PARTIALLY_CLOSED"))
+                .andExpect(jsonPath("$.data[1].id").value(openA.getId()))
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(body).doesNotContain("userId", "user_id", "ownerId", "owner_id");
+        assertThat(body).doesNotContain("\"id\":" + partialB.getId());
     }
 
     @Test
@@ -173,6 +179,9 @@ class UserPositionOwnershipSecurityIntegrationTest {
 
     @Test
     void nonOwnerCannotCloseAndClosedOwnerGetsConflict() throws Exception {
+        UserPositionDO partialA = insertPosition(userAId, "BTCUSDT", "PARTIALLY_CLOSED", 6);
+        UserPositionDO partialB = insertPosition(userBId, "BTCUSDT", "PARTIALLY_CLOSED", 7);
+
         mockMvc.perform(post("/api/user-positions/{id}/manual-close", openB.getId())
                         .with(user(USER_A).roles("OPERATOR"))
                         .with(csrf())
@@ -181,6 +190,24 @@ class UserPositionOwnershipSecurityIntegrationTest {
                 .andExpect(status().isNotFound());
         assertThat(userPositionMapper.selectByIdAndUserId(openB.getId(), userBId).getStatus())
                 .isEqualTo("OPEN");
+
+        mockMvc.perform(post("/api/user-positions/{id}/manual-close", partialB.getId())
+                        .with(user(USER_A).roles("OPERATOR"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(closeJson()))
+                .andExpect(status().isNotFound());
+        assertThat(userPositionMapper.selectByIdAndUserId(partialB.getId(), userBId).getStatus())
+                .isEqualTo("PARTIALLY_CLOSED");
+
+        mockMvc.perform(post("/api/user-positions/{id}/manual-close", partialA.getId())
+                        .with(user(USER_A).roles("OPERATOR"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(closeJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(partialA.getId()))
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
 
         mockMvc.perform(post("/api/user-positions/{id}/manual-close", closedA.getId())
                         .with(user(USER_A).roles("OPERATOR"))
@@ -313,6 +340,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
 
     @Test
     void dashboardRiskAndReviewCenterRemainOwnerScoped() throws Exception {
+        insertPosition(userAId, "ETHUSDT", "PARTIALLY_CLOSED", 6);
+
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
                         .param("positionId", String.valueOf(openB.getId()))
@@ -324,7 +353,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.openPositionCount").value(1))
-                .andExpect(jsonPath("$.data.includedPositionCount").value(1));
+                .andExpect(jsonPath("$.data.partiallyClosedPositionCount").value(1))
+                .andExpect(jsonPath("$.data.includedPositionCount").value(2));
 
         String reviewBody = mockMvc.perform(get("/api/review/center")
                         .with(user(USER_A).roles("OPERATOR")))

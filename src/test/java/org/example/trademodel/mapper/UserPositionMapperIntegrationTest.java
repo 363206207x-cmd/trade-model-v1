@@ -79,7 +79,7 @@ class UserPositionMapperIntegrationTest {
         List<UserPositionDO> rows = userPositionMapper.listOpenByUserId(userId);
 
         assertThat(rows).extracting(UserPositionDO::getStatus)
-                .containsExactly("OPEN")
+                .containsExactly("PARTIALLY_CLOSED", "OPEN")
                 .doesNotContain("CLOSED");
         assertThat(rows).extracting(UserPositionDO::getAssetSymbol)
                 .doesNotContain("SOLUSDT");
@@ -94,40 +94,56 @@ class UserPositionMapperIntegrationTest {
         UserPositionDO ownedB = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 1));
         ownedB.setUserId(userB);
         UserPositionDO unclaimed = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 2));
+        UserPositionDO partialA = row(
+                "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 3));
+        partialA.setUserId(userA);
+        UserPositionDO partialB = row(
+                "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 4));
+        partialB.setUserId(userB);
         userPositionMapper.insert(ownedA);
         userPositionMapper.insert(ownedB);
         userPositionMapper.insert(unclaimed);
+        userPositionMapper.insert(partialA);
+        userPositionMapper.insert(partialB);
 
         assertThat(userPositionMapper.listOpenByUserId(userA))
                 .extracting(UserPositionDO::getId)
-                .containsExactly(ownedA.getId());
+                .containsExactly(partialA.getId(), ownedA.getId());
         assertThat(userPositionMapper.listOpenByUserId(userB))
                 .extracting(UserPositionDO::getId)
-                .containsExactly(ownedB.getId());
+                .containsExactly(partialB.getId(), ownedB.getId());
         assertThat(userPositionMapper.selectByIdAndUserId(ownedB.getId(), userA)).isNull();
         assertThat(userPositionMapper.selectByIdAndUserId(unclaimed.getId(), userA)).isNull();
         assertThat(userPositionMapper.listClaimedOpenForSystemMonitoring())
                 .extracting(UserPositionDO::getId)
-                .contains(ownedA.getId(), ownedB.getId())
+                .contains(ownedA.getId(), ownedB.getId(), partialA.getId(), partialB.getId())
                 .doesNotContain(unclaimed.getId());
     }
 
     @Test
-    void conditionalCloseRequiresExactOwnerAndOpenState() {
+    void conditionalCloseRequiresExactOwnerAndActiveState() {
         Long userA = userId("mapper-close-owner-a");
         Long userB = userId("mapper-close-owner-b");
         UserPositionDO ownedA = row("ETHUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
         ownedA.setUserId(userA);
+        UserPositionDO partialA = row(
+                "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 1));
+        partialA.setUserId(userA);
         UserPositionDO unclaimed = row("SOLUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 1));
         userPositionMapper.insert(ownedA);
+        userPositionMapper.insert(partialA);
         userPositionMapper.insert(unclaimed);
         LocalDateTime closedAt = LocalDateTime.of(2026, 6, 22, 9, 0);
 
         assertThat(close(ownedA.getId(), userB, closedAt)).isZero();
+        assertThat(close(partialA.getId(), userB, closedAt)).isZero();
         assertThat(close(unclaimed.getId(), userA, closedAt)).isZero();
         assertThat(close(ownedA.getId(), userA, closedAt)).isEqualTo(1);
+        assertThat(close(partialA.getId(), userA, closedAt)).isEqualTo(1);
         assertThat(close(ownedA.getId(), userA, closedAt.plusMinutes(1))).isZero();
         assertThat(userPositionMapper.selectByIdAndUserId(ownedA.getId(), userA).getStatus())
+                .isEqualTo("CLOSED");
+        assertThat(userPositionMapper.selectByIdAndUserId(partialA.getId(), userA).getStatus())
                 .isEqualTo("CLOSED");
     }
 

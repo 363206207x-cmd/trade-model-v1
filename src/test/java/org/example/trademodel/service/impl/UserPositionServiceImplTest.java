@@ -156,24 +156,39 @@ class UserPositionServiceImplTest {
     }
 
     @Test
-    void manualCloseChangesOpenPositionToClosed() {
+    void manualCloseChangesOpenOrPartiallyClosedPositionToClosed() {
         UserPositionDO open = row(7L, "OPEN");
         UserPositionDO closed = row(7L, "CLOSED");
         closed.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
         closed.setClosePrice(new BigDecimal("105.25"));
+        UserPositionDO partiallyClosed = row(8L, "PARTIALLY_CLOSED");
+        UserPositionDO closedAfterPartial = row(8L, "CLOSED");
+        closedAfterPartial.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
+        closedAfterPartial.setClosePrice(new BigDecimal("106.25"));
         when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(open, closed);
+        when(userPositionMapper.selectByIdAndUserId(8L, USER_ID))
+                .thenReturn(partiallyClosed, closedAfterPartial);
         when(userPositionMapper.manualCloseByIdAndUserId(
                 eq(7L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any()))
                 .thenReturn(1);
+        when(userPositionMapper.manualCloseByIdAndUserId(
+                eq(8L), eq(USER_ID), any(), eq(new BigDecimal("106.25")), eq("manual exit"), any()))
+                .thenReturn(1);
 
         UserPositionVO vo = service.manualCloseForUser(7L, USER_ID, closeRequest("105.25", "manual exit"));
+        UserPositionVO partialVo =
+                service.manualCloseForUser(8L, USER_ID, closeRequest("106.25", "manual exit"));
 
         assertThat(vo.getStatus()).isEqualTo("CLOSED");
         assertThat(vo.getClosePrice()).isEqualByComparingTo("105.25");
         assertThat(vo.isNotTradeInstruction()).isTrue();
         assertThat(vo.isNotAutoTrading()).isTrue();
+        assertThat(partialVo.getStatus()).isEqualTo("CLOSED");
+        assertThat(partialVo.getClosePrice()).isEqualByComparingTo("106.25");
         verify(userPositionMapper).manualCloseByIdAndUserId(
                 eq(7L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any());
+        verify(userPositionMapper).manualCloseByIdAndUserId(
+                eq(8L), eq(USER_ID), any(), eq(new BigDecimal("106.25")), eq("manual exit"), any());
     }
 
     @Test
@@ -214,9 +229,9 @@ class UserPositionServiceImplTest {
 
         List<UserPositionVO> rows = service.listOpenPositionsForUser(USER_ID);
 
-        assertThat(rows).hasSize(1);
+        assertThat(rows).hasSize(2);
         assertThat(rows).extracting(UserPositionVO::getStatus)
-                .containsExactly("OPEN");
+                .containsExactly("OPEN", "PARTIALLY_CLOSED");
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.isManualReviewRequired()).isTrue();
             assertThat(row.isNotTradeInstruction()).isTrue();

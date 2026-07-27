@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 public class UserPositionServiceImpl implements UserPositionService {
     private static final String SOURCE_MANUAL = UserPositionSourceTypeEnum.MANUAL.name();
     private static final String STATUS_OPEN = UserPositionStatusEnum.OPEN.name();
-    private static final String STATUS_CLOSED = UserPositionStatusEnum.CLOSED.name();
     private static final Set<String> FORBIDDEN_OWNER_FIELDS = Set.of(
             "userid", "ownerid", "accountid", "principalid", "tenantid");
 
@@ -92,8 +91,8 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (existing == null) {
             throw new UserPositionNotFoundException();
         }
-        if (!STATUS_OPEN.equalsIgnoreCase(existing.getStatus())) {
-            throw new UserPositionConflictException("UserPosition is not OPEN");
+        if (!isActivePositionStatus(existing.getStatus())) {
+            throw new UserPositionConflictException("UserPosition is not OPEN or PARTIALLY_CLOSED");
         }
         LocalDateTime now = LocalDateTime.now();
         int updated = userPositionMapper.manualCloseByIdAndUserId(
@@ -124,7 +123,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         requireUserId(userId);
         List<UserPositionDO> rows = userPositionMapper.listOpenByUserId(userId);
         return (rows == null ? List.<UserPositionDO>of() : rows).stream()
-                .filter(row -> row != null && STATUS_OPEN.equalsIgnoreCase(row.getStatus()))
+                .filter(row -> row != null && isActivePositionStatus(row.getStatus()))
                 .map(UserPositionServiceImpl::toVo)
                 .collect(Collectors.toList());
     }
@@ -148,6 +147,14 @@ public class UserPositionServiceImpl implements UserPositionService {
         row.setNotAutoTrading(true);
         row.setNotOrderExecution(true);
         row.setNotPositionSync(true);
+    }
+
+    private static boolean isActivePositionStatus(String status) {
+        try {
+            return UserPositionStatusEnum.parse(status).visibleInOpenPositions();
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     public static UserPositionVO toVo(UserPositionDO row) {
