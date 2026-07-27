@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -249,7 +250,7 @@ class UserPositionReviewAdapterTest {
         state.setActualOutcome("LOSS");
         state.setAdjustmentSuggestion("tighten feedback");
         state.setUpdateTime(LocalDateTime.of(2026, 6, 22, 11, 0));
-        when(reviewService.saveOrUpdate(any())).thenReturn(state);
+        when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), any())).thenReturn(state);
 
         UserPositionReviewFeedbackReq req = new UserPositionReviewFeedbackReq();
         req.setErrorType("PLAN_EXECUTION_MISMATCH");
@@ -258,7 +259,7 @@ class UserPositionReviewAdapterTest {
         UserPositionReviewFeedbackResultDTO result = adapter.recordFeedbackForUser(USER_ID, 19L, req);
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
-        verify(reviewService).saveOrUpdate(captor.capture());
+        verify(reviewService).saveOrUpdateForUserPosition(eq(USER_ID), eq(19L), captor.capture());
         assertThat(captor.getValue().getAnalysisId()).isEqualTo("ana-server-19");
         assertThat(result.getReviewId()).isEqualTo("review-19");
         assertThat(result.isRuleFeedbackRecorded()).isTrue();
@@ -274,12 +275,12 @@ class UserPositionReviewAdapterTest {
         ReviewStateVO state = new ReviewStateVO();
         state.setReviewId("review-20");
         state.setAnalysisId("USER_POSITION_20");
-        when(reviewService.saveOrUpdate(any())).thenReturn(state);
+        when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), any())).thenReturn(state);
 
         UserPositionReviewFeedbackResultDTO result = adapter.recordFeedbackForUser(USER_ID, 20L, new UserPositionReviewFeedbackReq());
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
-        verify(reviewService).saveOrUpdate(captor.capture());
+        verify(reviewService).saveOrUpdateForUserPosition(eq(USER_ID), eq(20L), captor.capture());
         assertThat(captor.getValue().getAnalysisId()).isEqualTo("USER_POSITION_20");
         assertThat(result.getAnalysisId()).isEqualTo("USER_POSITION_20");
     }
@@ -360,8 +361,8 @@ class UserPositionReviewAdapterTest {
                 .thenReturn(plan("plan-foreign-feedback", "ana-foreign-feedback", "100", "95", "120"));
         when(analysisRunMapper.selectById("ana-foreign-feedback"))
                 .thenReturn(analysisRun("ana-foreign-feedback", "ETHUSDT"));
-        when(reviewService.saveOrUpdate(any())).thenAnswer(invocation -> {
-            WriteReviewResultReq request = invocation.getArgument(0);
+        when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), any())).thenAnswer(invocation -> {
+            WriteReviewResultReq request = invocation.getArgument(2);
             ReviewStateVO state = new ReviewStateVO();
             state.setAnalysisId(request.getAnalysisId());
             return state;
@@ -371,7 +372,7 @@ class UserPositionReviewAdapterTest {
                 26L, new UserPositionReviewFeedbackReq());
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
-        verify(reviewService).saveOrUpdate(captor.capture());
+        verify(reviewService).saveOrUpdateForUserPosition(eq(USER_ID), eq(26L), captor.capture());
         assertThat(captor.getValue().getAnalysisId()).isEqualTo("USER_POSITION_26");
         assertThat(captor.getValue().getAnalysisId()).isNotEqualTo("ana-foreign-feedback");
         assertThat(result.getAnalysisId()).isEqualTo("USER_POSITION_26");
@@ -419,8 +420,8 @@ class UserPositionReviewAdapterTest {
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 28L)).thenReturn(List.of(monitorA));
         when(executionPlanMapper.selectByPlanId("plan-A"))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
-        when(reviewService.saveOrUpdate(any())).thenAnswer(invocation -> {
-            WriteReviewResultReq request = invocation.getArgument(0);
+        when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), any())).thenAnswer(invocation -> {
+            WriteReviewResultReq request = invocation.getArgument(2);
             ReviewStateVO state = new ReviewStateVO();
             state.setReviewId("review-28");
             state.setAnalysisId(request.getAnalysisId());
@@ -432,7 +433,7 @@ class UserPositionReviewAdapterTest {
                 28L, new UserPositionReviewFeedbackReq());
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
-        verify(reviewService).saveOrUpdate(captor.capture());
+        verify(reviewService).saveOrUpdateForUserPosition(eq(USER_ID), eq(28L), captor.capture());
         assertThat(summary.getExecutionPlanId()).isEqualTo("plan-A");
         assertThat(summary.getAnalysisId()).isEqualTo("analysis-X");
         assertThat(feedback.getAnalysisId()).isEqualTo("analysis-X");

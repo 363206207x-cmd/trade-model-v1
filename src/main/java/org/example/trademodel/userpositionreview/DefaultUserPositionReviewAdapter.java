@@ -91,7 +91,7 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         req.setErrorType(trimToNull(request.getErrorType()));
         req.setActualOutcome(trimToNull(request.getActualOutcome()));
         req.setAdjustmentSuggestion(trimToNull(request.getAdjustmentSuggestion()));
-        ReviewStateVO state = reviewService.saveOrUpdate(req);
+        ReviewStateVO state = reviewService.saveOrUpdateForUserPosition(userId, position.getId(), req);
 
         UserPositionReviewFeedbackResultDTO result = new UserPositionReviewFeedbackResultDTO();
         result.setPositionId(position.getId());

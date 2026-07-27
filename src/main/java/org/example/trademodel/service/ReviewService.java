@@ -7,5 +7,7 @@ public interface ReviewService {
 
     ReviewStateVO saveOrUpdate(WriteReviewResultReq req);
 
+    ReviewStateVO saveOrUpdateForUserPosition(Long userId, Long userPositionId, WriteReviewResultReq req);
+
     ReviewStateVO getStateByAnalysisId(String analysisId);
 }

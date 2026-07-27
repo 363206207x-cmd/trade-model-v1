@@ -81,7 +81,7 @@ class ReviewCenterServiceImplTest {
         when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
-        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+        when(reviewResultMapper.listRecentByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
 
         ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
@@ -97,6 +97,7 @@ class ReviewCenterServiceImplTest {
         assertThat(vo.getDiagnostics().getReviewCenterStatus()).isEqualTo("READY_READONLY");
         verify(userPositionReviewAdapter, never()).buildSummaryForUser(any(), any());
         verify(pushRecheckLogMapper, never()).selectLatestByPushId(any());
+        verify(reviewResultMapper, never()).listRecent(anyInt());
     }
 
     @Test
@@ -107,7 +108,7 @@ class ReviewCenterServiceImplTest {
                 .thenReturn(List.of(opportunity(OpportunityLogStatus.EXECUTED_VALID), opportunity(OpportunityLogStatus.PENDING_EVALUATION)));
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(pushSnapshot()));
         when(pushRecheckLogMapper.selectLatestByPushId(3L)).thenReturn(pushLog());
-        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of(reviewResult()));
+        when(reviewResultMapper.listRecentByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(reviewResult()));
         when(analysisRunMapper.selectById("ana-rule-1")).thenReturn(analysisRun());
 
         ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
@@ -146,6 +147,7 @@ class ReviewCenterServiceImplTest {
         assertThat(vo.getDiagnostics().getPushRecheckStatus()).isEqualTo("READY");
 
         verify(pushRecheckLogMapper).selectLatestByPushId(3L);
+        verify(reviewResultMapper, never()).listRecent(anyInt());
     }
 
     @Test
@@ -153,7 +155,7 @@ class ReviewCenterServiceImplTest {
         when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
         when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
-        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+        when(reviewResultMapper.listRecentByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
 
         TmPushSnapshotDO before = pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 12, 0, 1));
         TmPushSnapshotDO equal = pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 12, 0));
@@ -178,7 +180,7 @@ class ReviewCenterServiceImplTest {
         when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
-        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+        when(reviewResultMapper.listRecentByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
 
         ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
@@ -207,7 +209,7 @@ class ReviewCenterServiceImplTest {
         when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
-        when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
+        when(reviewResultMapper.listRecentByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
 
         ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 

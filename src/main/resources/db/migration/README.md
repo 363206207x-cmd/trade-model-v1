@@ -12,7 +12,7 @@ Current migration files:
 - `V6__derivatives_business_rule_defaults.sql`: versioned derivatives evidence, risk, opportunity, and hot-reset rule defaults.
 - `V7__decision_plan_offset_times.sql`: additive offset-aware `valid_from` / `expires_at` authority for execution-plan validity; historical rows remain null and fail closed until re-analysis.
 - `V8__personal_user_session_authentication.sql`: personal `tm_user` identity storage for BCrypt-backed form login and server-side Session authentication; runtime bootstrap requires explicit credentials.
-- `V9__user_position_ownership_foundation.sql`: nullable canonical `tm_user_position.user_id` ownership, claimed-position lookup index, and restrictive foreign key; legacy rows remain unclaimed with no automatic backfill.
+- `V9__user_position_ownership_foundation.sql`: nullable canonical `tm_user_position.user_id` ownership plus owner-scoped review feedback keys, indexes, and restrictive foreign keys; legacy position rows remain unclaimed and legacy review rows remain shared, with no automatic ownership backfill.
 
 `src/main/resources/schema.sql` remains the H2 local/test bootstrap path. It is intentionally separate from the PostgreSQL Flyway migration path.
 

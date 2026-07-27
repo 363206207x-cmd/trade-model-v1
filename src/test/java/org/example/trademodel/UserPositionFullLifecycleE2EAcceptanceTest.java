@@ -118,7 +118,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
                 null);
         ReviewService reviewService = mock(ReviewService.class);
         ArgumentCaptor<WriteReviewResultReq> reviewCaptor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
-        when(reviewService.saveOrUpdate(reviewCaptor.capture())).thenAnswer(invocation -> reviewState(invocation.getArgument(0)));
+        when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), reviewCaptor.capture()))
+                .thenAnswer(invocation -> reviewState(invocation.getArgument(2)));
         UserPositionReviewAdapter reviewAdapter =
                 new DefaultUserPositionReviewAdapter(userPositionMapper, executionPlanMapper, analysisRunMapper,
                         monitorLogService, reviewService);

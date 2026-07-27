@@ -84,7 +84,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         vo.setPositionReviews(positionReviews(userId));
         vo.setOpportunityReviews(opportunityReviews(userId));
         vo.setPushReviews(pushReviews());
-        vo.setRuleFeedback(ruleFeedback());
+        vo.setRuleFeedback(ruleFeedback(userId));
 
         ReviewCenterDashboardVO.Summary summary = new ReviewCenterDashboardVO.Summary();
         summary.setPositionReviewCount(vo.getPositionReviews().size());
@@ -202,8 +202,8 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         return out;
     }
 
-    private List<ReviewCenterDashboardVO.RuleFeedbackItem> ruleFeedback() {
-        List<ReviewResultDO> rows = reviewResultMapper.listRecent(DEFAULT_LIMIT);
+    private List<ReviewCenterDashboardVO.RuleFeedbackItem> ruleFeedback(Long userId) {
+        List<ReviewResultDO> rows = reviewResultMapper.listRecentByUserId(userId, DEFAULT_LIMIT);
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }

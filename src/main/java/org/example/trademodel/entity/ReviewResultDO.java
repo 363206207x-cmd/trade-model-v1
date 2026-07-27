@@ -9,6 +9,9 @@ public class ReviewResultDO {
 
     private String id;
     private String analysisId;
+    private Long userId;
+    private Long userPositionId;
+    private String reviewScopeKey;
     private String errorType;
     private String actualOutcome;
     private String adjustmentSuggestion;
@@ -29,6 +32,30 @@ public class ReviewResultDO {
 
     public void setAnalysisId(String analysisId) {
         this.analysisId = analysisId;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public Long getUserPositionId() {
+        return userPositionId;
+    }
+
+    public void setUserPositionId(Long userPositionId) {
+        this.userPositionId = userPositionId;
+    }
+
+    public String getReviewScopeKey() {
+        return reviewScopeKey;
+    }
+
+    public void setReviewScopeKey(String reviewScopeKey) {
+        this.reviewScopeKey = reviewScopeKey;
     }
 
     public String getErrorType() {

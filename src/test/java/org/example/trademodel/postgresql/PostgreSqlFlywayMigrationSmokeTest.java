@@ -110,9 +110,11 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
                     "idx_tm_user_position_user_status_opened_at",
+                    "uk_tm_user_position_id_user",
                     "idx_tm_push_snapshot_analysis_id",
                     "idx_tm_ai_call_log_trace_id",
-                    "uk_tm_review_result_analysis_id",
+                    "uk_tm_review_result_analysis_scope",
+                    "idx_tm_review_result_user_update",
                     "uk_tm_persisted_ohlcv_bar_source",
                     "idx_tm_persisted_ohlcv_bar_ingestion_run"));
             assertOhlcvProvenanceColumnsExist(connection);

@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PersonalUserDO;
+import org.example.trademodel.entity.ReviewResultDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PersonalUserMapper;
+import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +53,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
     private UserPositionMapper userPositionMapper;
     @Autowired
     private OpportunityLogMapper opportunityLogMapper;
+    @Autowired
+    private ReviewResultMapper reviewResultMapper;
 
     private Long userAId;
     private Long userBId;
@@ -247,6 +251,48 @@ class UserPositionOwnershipSecurityIntegrationTest {
                         .with(user(USER_A).roles("OPERATOR")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void nonOwnerFeedbackEndpointCannotOverwriteOwnerReviewOrExposeItInReviewCenter() throws Exception {
+        String ownerResponse = mockMvc.perform(post("/api/review/user-positions/{id}/feedback", closedB.getId())
+                        .with(user(USER_B).roles("OPERATOR")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(reviewFeedbackJson("OWNER_B_OUTCOME", "owner-b-suggestion")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.positionId").value(closedB.getId()))
+                .andReturn().getResponse().getContentAsString();
+        String analysisId = objectMapper.readTree(ownerResponse).path("data").path("analysisId").asText();
+        String scopeKey = "USER:" + userBId + ":POSITION:" + closedB.getId();
+        ReviewResultDO beforeAttack = reviewResultMapper.selectByUserPositionScope(
+                analysisId, userBId, closedB.getId(), scopeKey);
+        assertThat(beforeAttack).isNotNull();
+        assertThat(beforeAttack.getActualOutcome()).isEqualTo("OWNER_B_OUTCOME");
+
+        mockMvc.perform(post("/api/review/user-positions/{id}/feedback", closedB.getId())
+                        .with(user(USER_A).roles("OPERATOR")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(reviewFeedbackJson("ATTACK", "must-not-write")))
+                .andExpect(status().isNotFound());
+
+        ReviewResultDO afterAttack = reviewResultMapper.selectByUserPositionScope(
+                analysisId, userBId, closedB.getId(), scopeKey);
+        assertThat(afterAttack.getId()).isEqualTo(beforeAttack.getId());
+        assertThat(afterAttack.getActualOutcome()).isEqualTo("OWNER_B_OUTCOME");
+        assertThat(afterAttack.getAdjustmentSuggestion()).isEqualTo("owner-b-suggestion");
+
+        String centerA = mockMvc.perform(get("/api/review/center")
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String centerB = mockMvc.perform(get("/api/review/center")
+                        .with(user(USER_B).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(centerA).path("data").path("ruleFeedback").toString())
+                .doesNotContain("owner-b-suggestion");
+        assertThat(objectMapper.readTree(centerB).path("data").path("ruleFeedback").toString())
+                .contains("owner-b-suggestion");
     }
 
     @Test
@@ -470,5 +516,15 @@ class UserPositionOwnershipSecurityIntegrationTest {
 
     private static String closeJson() {
         return "{\"close_price\": 105, \"close_reason\": \"manual close\"}";
+    }
+
+    private static String reviewFeedbackJson(String outcome, String suggestion) {
+        return """
+                {
+                  "errorType": "RULE_TOO_STRICT",
+                  "actualOutcome": "%s",
+                  "adjustmentSuggestion": "%s"
+                }
+                """.formatted(outcome, suggestion);
     }
 }
