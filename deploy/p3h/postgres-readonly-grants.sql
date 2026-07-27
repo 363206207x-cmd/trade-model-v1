@@ -9,8 +9,8 @@ BEGIN
     INTO successful_migrations, final_version
     FROM flyway_schema_history
     WHERE success = true;
-    IF successful_migrations <> 8 OR final_version <> '8' THEN
-        RAISE EXCEPTION 'P3-H Flyway V8 verification failed';
+    IF successful_migrations <> 9 OR final_version <> '9' THEN
+        RAISE EXCEPTION 'P3-H Flyway V9 verification failed';
     END IF;
 END
 $$;

@@ -1,6 +1,9 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.common.GlobalExceptionHandler;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.UserPositionVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -29,17 +32,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UserPositionControllerTest {
     @Mock
     private UserPositionService userPositionService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new UserPositionController(userPositionService)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new UserPositionController(userPositionService, authenticatedUserIdResolver))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
     void manualOpenEndpointReturnsUserPositionSafetyFields() throws Exception {
-        when(userPositionService.manualOpen(any())).thenReturn(vo(11L, "OPEN"));
+        when(userPositionService.manualOpenForUser(eq(7L), any())).thenReturn(vo(11L, "OPEN"));
 
         mockMvc.perform(post("/api/user-positions/manual-open")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -70,7 +79,7 @@ class UserPositionControllerTest {
 
     @Test
     void manualCloseEndpointReturnsClosedPositionWithSafetyFields() throws Exception {
-        when(userPositionService.manualClose(eq(11L), any())).thenReturn(vo(11L, "CLOSED"));
+        when(userPositionService.manualCloseForUser(eq(11L), eq(7L), any())).thenReturn(vo(11L, "CLOSED"));
 
         mockMvc.perform(post("/api/user-positions/11/manual-close")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -91,7 +100,7 @@ class UserPositionControllerTest {
 
     @Test
     void openPositionsEndpointReturnsOnlyServiceOpenRows() throws Exception {
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(
+        when(userPositionService.listOpenPositionsForUser(7L)).thenReturn(List.of(
                 vo(1L, "OPEN"),
                 vo(2L, "PARTIALLY_CLOSED")
         ));
@@ -107,7 +116,7 @@ class UserPositionControllerTest {
 
     @Test
     void getByIdReturnsNotFoundWhenPositionIsMissing() throws Exception {
-        when(userPositionService.findById(404L)).thenReturn(null);
+        when(userPositionService.findByIdForUser(404L, 7L)).thenThrow(new UserPositionNotFoundException());
 
         mockMvc.perform(get("/api/user-positions/404"))
                 .andExpect(status().isNotFound())
@@ -116,7 +125,7 @@ class UserPositionControllerTest {
 
     @Test
     void controllerReturnsBadRequestOnFailClosedValidation() throws Exception {
-        when(userPositionService.manualOpen(any()))
+        when(userPositionService.manualOpenForUser(eq(7L), any()))
                 .thenThrow(new IllegalArgumentException("source_type must be MANUAL"));
 
         mockMvc.perform(post("/api/user-positions/manual-open")
@@ -133,7 +142,7 @@ class UserPositionControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("source_type must be MANUAL"));
+                .andExpect(jsonPath("$.msg").value("invalid request"));
     }
 
     private static UserPositionVO vo(Long id, String status) {

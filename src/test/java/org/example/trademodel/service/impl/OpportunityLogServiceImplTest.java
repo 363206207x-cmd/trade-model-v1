@@ -111,7 +111,7 @@ class OpportunityLogServiceImplTest {
         UserPositionDO position = userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 10, 30));
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(position));
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of(position));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
@@ -132,7 +132,7 @@ class OpportunityLogServiceImplTest {
         OpportunityLogDO row = pendingLong();
         row.setPushPresent(false);
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 11, 30))));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
@@ -150,7 +150,7 @@ class OpportunityLogServiceImplTest {
     void evaluate_userPositionOpenedAtTargetHit_isExecutionEvidence() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 11, 0))));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
@@ -166,7 +166,7 @@ class OpportunityLogServiceImplTest {
     void evaluate_userPositionOpenedAfterInvalidationHit_isNotExecutedEvidence() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of(userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 11, 30))));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "110", "89", "91")));
@@ -184,7 +184,7 @@ class OpportunityLogServiceImplTest {
         OpportunityLogDO row = pendingLong();
         UserPositionDO position = userPosition(77L, "plan-1", null);
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of(position));
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of(position));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
         OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
@@ -199,8 +199,8 @@ class OpportunityLogServiceImplTest {
     void evaluate_shortInvalidationFirstWithoutUserPosition_returnsMissedInvalid() {
         OpportunityLogDO row = pendingShort();
         when(opportunityLogMapper.selectByOpportunityId("opp-short")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-short")).thenReturn(List.of());
-        when(userPositionMapper.listByExactSourceRefId("ana-short")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-short")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("ana-short")).thenReturn(List.of());
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("ETHUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "112", "99", "108")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
@@ -215,8 +215,8 @@ class OpportunityLogServiceImplTest {
     void evaluate_sameBarTargetAndInvalidation_isAmbiguousWithoutFinalStatus() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of());
-        when(userPositionMapper.listByExactSourceRefId("ana-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("ana-1")).thenReturn(List.of());
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "122", "89", "101")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
@@ -232,8 +232,8 @@ class OpportunityLogServiceImplTest {
     void evaluate_noBars_returnsMarketPathUnavailableWithoutFinalStatus() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of());
-        when(userPositionMapper.listByExactSourceRefId("ana-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("ana-1")).thenReturn(List.of());
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of());
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
@@ -248,8 +248,8 @@ class OpportunityLogServiceImplTest {
     void evaluate_targetFirstWithRiskBlockedBeforeTarget_returnsBlockedByRiskValid() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of());
-        when(userPositionMapper.listByExactSourceRefId("ana-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("ana-1")).thenReturn(List.of());
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "121", "99", "120")));
         when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-1")).thenReturn(riskBlocked(row.getAnchorTime().plusMinutes(5)));
@@ -267,8 +267,8 @@ class OpportunityLogServiceImplTest {
         row.setPushPresent(true);
         row.setPushId(9L);
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of());
-        when(userPositionMapper.listByExactSourceRefId("ana-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("ana-1")).thenReturn(List.of());
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "121", "99", "120")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
@@ -282,7 +282,7 @@ class OpportunityLogServiceImplTest {
     void evaluate_multipleExactUserPositions_requiresReview() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1"))
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1"))
                 .thenReturn(List.of(userPosition(1L, "plan-1"), userPosition(2L, "plan-1")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
@@ -302,8 +302,8 @@ class OpportunityLogServiceImplTest {
         decision.setHotResetInvalidatedAt(LocalDateTime.of(2026, 6, 23, 10, 30));
         decision.setHotResetReasonCode("HOT_RESET_AFTER_AS_OF");
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
-        when(userPositionMapper.listByExactSourceRefId("plan-1")).thenReturn(List.of());
-        when(userPositionMapper.listByExactSourceRefId("ana-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of());
+        when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("ana-1")).thenReturn(List.of());
         when(decisionResultMapper.selectByDecisionId("dec-1")).thenReturn(decision);
         when(executionPlanMapper.selectByPlanId("plan-1")).thenReturn(null);
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))

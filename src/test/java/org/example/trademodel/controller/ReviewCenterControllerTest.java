@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.service.ReviewCenterService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.ReviewCenterDashboardVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -22,17 +23,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReviewCenterControllerTest {
     @Mock
     private ReviewCenterService reviewCenterService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ReviewCenterController(reviewCenterService)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new ReviewCenterController(reviewCenterService, authenticatedUserIdResolver)).build();
     }
 
     @Test
     void centerEndpointReturnsApiResponseWithEmptyArrays() throws Exception {
-        when(reviewCenterService.getDashboard()).thenReturn(new ReviewCenterDashboardVO());
+        when(reviewCenterService.getDashboardForUser(7L)).thenReturn(new ReviewCenterDashboardVO());
 
         mockMvc.perform(get("/api/review/center"))
                 .andExpect(status().isOk())
@@ -50,6 +55,6 @@ class ReviewCenterControllerTest {
                 .andExpect(jsonPath("$.data.orderAction").doesNotExist())
                 .andExpect(jsonPath("$.data.executionAction").doesNotExist());
 
-        verify(reviewCenterService).getDashboard();
+        verify(reviewCenterService).getDashboardForUser(7L);
     }
 }

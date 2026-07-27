@@ -59,7 +59,8 @@ class DerivativesBusinessSafetyArchitectureTest {
     @Test
     void closedPositionNoLongerConsumesPositionDerivativesPriority() {
         String monitor = source("src/main/java/org/example/trademodel/service/impl/PositionMonitorServiceImpl.java");
-        assertThat(monitor).contains("listOpenPositions()", "validateActivePosition(position)");
+        assertThat(monitor).contains(
+                "listClaimedOpenForSystemMonitoring()", "validateActivePosition(position)");
         assertThat(monitor).contains("UserPosition status must be OPEN or PARTIALLY_CLOSED");
     }
 
@@ -85,7 +86,7 @@ class DerivativesBusinessSafetyArchitectureTest {
     @Test
     void opportunityAccountRiskUsesReadonlyAdapterAndFailsClosed() {
         String assembler = source("src/main/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImpl.java");
-        assertThat(assembler).contains("UserPositionRiskAdapter", "userPositionRiskAdapter.currentRisk()",
+        assertThat(assembler).contains("UserPositionRiskAdapter", "userPositionRiskAdapter.currentRiskForSystem()",
                 "if (userPositionRiskAdapter == null) return false");
         assertThat(assembler).doesNotContain("dataQualityScore, true, planBoundaryComplete");
     }

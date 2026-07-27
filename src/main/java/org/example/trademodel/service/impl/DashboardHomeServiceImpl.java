@@ -211,11 +211,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     @Override
     public DashboardHomeVO getHome(String selectedSymbol, Integer limit, Long selectedPositionId) {
+        return getHome(null, selectedSymbol, limit, selectedPositionId);
+    }
+
+    @Override
+    public DashboardHomeVO getHomeForUser(Long userId, String selectedSymbol, Integer limit, Long selectedPositionId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        return getHome(userId, selectedSymbol, limit, selectedPositionId);
+    }
+
+    private DashboardHomeVO getHome(Long userId, String selectedSymbol, Integer limit, Long selectedPositionId) {
         int effectiveLimit = normalizeLimit(limit);
         LightSystemStatusVO systemStatus = safeSystemStatus();
-        List<DecisionResultVO> decisions = safeDecisions(Math.max(effectiveLimit, DEFAULT_LIMIT));
+        List<DecisionResultVO> decisions = safeDecisions(userId, Math.max(effectiveLimit, DEFAULT_LIMIT));
         List<MonitorAlertDO> alerts = safeAlerts();
-        List<UserPositionVO> positions = safePositions();
+        List<UserPositionVO> positions = safePositions(userId);
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
         ProviderReadinessVO providerReadiness = safeProviderReadiness();
 
@@ -230,7 +242,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
         DecisionResultVO selectedDecision = findDecision(decisions, normalizedSelected);
         if (selectedDecision == null) {
-            selectedDecision = safeDecisionBySymbol(normalizedSelected);
+            selectedDecision = safeDecisionBySymbol(userId, normalizedSelected);
         }
         List<DashboardHomeVO.AssetVO> assets =
                 buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
@@ -240,7 +252,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 normalizedSelected = firstRenderableSymbol;
                 selectedDecision = findDecision(decisions, normalizedSelected);
                 if (selectedDecision == null) {
-                    selectedDecision = safeDecisionBySymbol(normalizedSelected);
+                    selectedDecision = safeDecisionBySymbol(userId, normalizedSelected);
                 }
                 assets = buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
             }
@@ -256,7 +268,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(assets);
-        PositionRowsResult positionRowsResult = buildPositions(positions);
+        PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
         home.setSelectedSymbol(normalizedSelected);
@@ -708,14 +720,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return asset;
     }
 
-    private PositionRowsResult buildPositions(List<UserPositionVO> positions) {
+    private PositionRowsResult buildPositions(Long userId, List<UserPositionVO> positions) {
         List<DashboardHomeVO.PositionVO> rows = new ArrayList<>();
         Map<Long, PositionPlanSourceResolver.Resolution> trustedSources = new LinkedHashMap<>();
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
             if (!isActiveManualPosition(position)) {
                 continue;
             }
-            PositionMonitorLogDTO latestMonitorLog = latestPositionMonitorLog(position.getId());
+            PositionMonitorLogDTO latestMonitorLog = latestPositionMonitorLog(userId, position.getId());
             DashboardHomeVO.PositionVO row = new DashboardHomeVO.PositionVO();
             row.setPositionId(position.getId());
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
@@ -784,12 +796,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return "OPEN".equalsIgnoreCase(normalized) || "PARTIALLY_CLOSED".equalsIgnoreCase(normalized);
     }
 
-    private PositionMonitorLogDTO latestPositionMonitorLog(Long positionId) {
-        if (positionId == null) {
+    private PositionMonitorLogDTO latestPositionMonitorLog(Long userId, Long positionId) {
+        if (userId == null || userId <= 0 || positionId == null) {
             return null;
         }
         try {
-            List<PositionMonitorLogDTO> logs = positionMonitorLogService.listByPositionId(positionId, 1);
+            List<PositionMonitorLogDTO> logs = positionMonitorLogService
+                    .listByPositionIdForUser(userId, positionId, 1);
             if (logs == null || logs.isEmpty()) {
                 return null;
             }
@@ -1483,18 +1496,25 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<DecisionResultVO> safeDecisions(int limit) {
+    private List<DecisionResultVO> safeDecisions(Long userId, int limit) {
         try {
-            List<DecisionResultVO> decisions = decisionService.getLatestDecisionResults(limit);
+            List<DecisionResultVO> decisions = userId == null
+                    ? decisionService.getLatestDecisionResults(limit)
+                    : decisionService.getLatestDecisionResultsForUser(userId, limit);
             return decisions != null ? decisions : List.of();
         } catch (RuntimeException ignored) {
             return List.of();
         }
     }
 
-    private DecisionResultVO safeDecisionBySymbol(String symbol) {
+    private DecisionResultVO safeDecisionBySymbol(Long userId, String symbol) {
         try {
-            return hasText(symbol) ? decisionService.getLatestDecisionResultBySymbol(symbol) : null;
+            if (!hasText(symbol)) {
+                return null;
+            }
+            return userId == null
+                    ? decisionService.getLatestDecisionResultBySymbol(symbol)
+                    : decisionService.getLatestDecisionResultBySymbolForUser(userId, symbol);
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -1509,9 +1529,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<UserPositionVO> safePositions() {
+    private List<UserPositionVO> safePositions(Long userId) {
+        if (userId == null || userId <= 0) {
+            return List.of();
+        }
         try {
-            List<UserPositionVO> positions = userPositionService.listOpenPositions();
+            List<UserPositionVO> positions = userPositionService.listOpenPositionsForUser(userId);
             return positions != null ? positions : List.of();
         } catch (RuntimeException ignored) {
             return List.of();

@@ -565,7 +565,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
 
     private UserPositionRiskResult resolveUserPositionRiskResult() {
         try {
-            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRiskForSystem();
             return result != null ? result : UserPositionRiskResult.failClosed("USER_POSITION_RISK_UNAVAILABLE");
         } catch (RuntimeException ex) {
             return UserPositionRiskResult.failClosed("USER_POSITION_RISK_UNAVAILABLE");

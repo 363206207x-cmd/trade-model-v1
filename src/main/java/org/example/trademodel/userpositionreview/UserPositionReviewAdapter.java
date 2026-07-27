@@ -2,7 +2,8 @@ package org.example.trademodel.userpositionreview;
 
 public interface UserPositionReviewAdapter {
 
-    UserPositionReviewSummaryDTO buildSummary(Long positionId);
+    UserPositionReviewSummaryDTO buildSummaryForUser(Long userId, Long positionId);
 
-    UserPositionReviewFeedbackResultDTO recordFeedback(Long positionId, UserPositionReviewFeedbackReq request);
+    UserPositionReviewFeedbackResultDTO recordFeedbackForUser(
+            Long userId, Long positionId, UserPositionReviewFeedbackReq request);
 }

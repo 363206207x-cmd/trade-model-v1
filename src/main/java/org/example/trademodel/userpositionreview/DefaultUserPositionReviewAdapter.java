@@ -13,6 +13,8 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPol
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.vo.ReviewStateVO;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -49,9 +51,9 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     }
 
     @Override
-    public UserPositionReviewSummaryDTO buildSummary(Long positionId) {
-        UserPositionDO position = requireClosedPosition(positionId);
-        ResolvedPositionReviewContext context = resolveReviewContext(position);
+    public UserPositionReviewSummaryDTO buildSummaryForUser(Long userId, Long positionId) {
+        UserPositionDO position = requireClosedPosition(userId, positionId);
+        ResolvedPositionReviewContext context = resolveReviewContext(userId, position);
         PositionPlanSourceResolver.Resolution planSource = context.planSource();
         ExecutionPlanDO plan = context.executionPlan();
 
@@ -75,12 +77,13 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     }
 
     @Override
-    public UserPositionReviewFeedbackResultDTO recordFeedback(Long positionId, UserPositionReviewFeedbackReq request) {
+    public UserPositionReviewFeedbackResultDTO recordFeedbackForUser(
+            Long userId, Long positionId, UserPositionReviewFeedbackReq request) {
         if (request == null) {
             throw new IllegalArgumentException("feedback request is required");
         }
-        UserPositionDO position = requireClosedPosition(positionId);
-        ResolvedPositionReviewContext context = resolveReviewContext(position);
+        UserPositionDO position = requireClosedPosition(userId, positionId);
+        ResolvedPositionReviewContext context = resolveReviewContext(userId, position);
         String analysisId = feedbackAnalysisId(position, context.planSource());
 
         WriteReviewResultReq req = new WriteReviewResultReq();
@@ -108,20 +111,23 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         return result;
     }
 
-    private UserPositionDO requireClosedPosition(Long positionId) {
+    private UserPositionDO requireClosedPosition(Long userId, Long positionId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
         if (positionId == null || positionId <= 0) {
             throw new IllegalArgumentException("position_id is required");
         }
-        UserPositionDO position = userPositionMapper.selectById(positionId);
+        UserPositionDO position = userPositionMapper.selectByIdAndUserId(positionId, userId);
         if (position == null) {
-            throw new IllegalArgumentException("UserPosition not found: " + positionId);
+            throw new UserPositionNotFoundException();
         }
         String status = trimToNull(position.getStatus());
         if ("OPEN".equals(status)) {
-            throw new IllegalArgumentException("POSITION_NOT_CLOSED");
+            throw new UserPositionConflictException("POSITION_NOT_CLOSED");
         }
         if ("PARTIALLY_CLOSED".equals(status)) {
-            throw new IllegalArgumentException("POSITION_NOT_FULLY_CLOSED");
+            throw new UserPositionConflictException("POSITION_NOT_FULLY_CLOSED");
         }
         if (!"CLOSED".equals(status)) {
             throw new IllegalArgumentException("UserPosition status must be CLOSED");
@@ -146,10 +152,10 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
         return position;
     }
 
-    private ResolvedPositionReviewContext resolveReviewContext(UserPositionDO position) {
+    private ResolvedPositionReviewContext resolveReviewContext(Long userId, UserPositionDO position) {
         List<PositionMonitorLogDTO> rawLogs;
         try {
-            rawLogs = positionMonitorLogService.listAllByPositionIdForReview(position.getId());
+            rawLogs = positionMonitorLogService.listAllByPositionIdForUserReview(userId, position.getId());
         } catch (RuntimeException ignored) {
             rawLogs = List.of();
         }

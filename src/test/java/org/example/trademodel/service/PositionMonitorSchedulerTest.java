@@ -15,7 +15,7 @@ class PositionMonitorSchedulerTest {
 
         scheduler.monitorOpenUserPositionsScheduled();
 
-        verify(service, never()).monitorOpenUserPositions();
+        verify(service, never()).monitorClaimedOpenPositionsForSystem();
     }
 
     @Test
@@ -25,6 +25,6 @@ class PositionMonitorSchedulerTest {
 
         scheduler.monitorOpenUserPositionsScheduled();
 
-        verify(service).monitorOpenUserPositions();
+        verify(service).monitorClaimedOpenPositionsForSystem();
     }
 }

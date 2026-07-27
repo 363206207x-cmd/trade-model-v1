@@ -4,7 +4,7 @@ set -eu
 expected_version="${1:-}"
 contract_phase="${2:-}"
 case "${expected_version}" in
-  1|2|3|4|5|6|7|8) ;;
+  1|2|3|4|5|6|7|8|9) ;;
   *) echo "P3H_VERSIONED_CONTRACT_VERIFY: BLOCKED_VERSION" >&2; exit 2 ;;
 esac
 case "${contract_phase}" in
@@ -41,6 +41,7 @@ case "${expected_version}" in
   6) expected_schema_fingerprint=86a2f78fed09fc3df728e441d57f6d87 ;;
   7) expected_schema_fingerprint=e302cdbc60b3c0d6a441dbc856106ded ;;
   8) expected_schema_fingerprint=c491831c3a30a7f0cd411b4aedeee4ac ;;
+  9) expected_schema_fingerprint=14c497071547839bdf74c015761633a4 ;;
 esac
 
 actual_schema_fingerprint="$(${psql_base} --file=/p3h/postgres-schema-contract.sql)" \

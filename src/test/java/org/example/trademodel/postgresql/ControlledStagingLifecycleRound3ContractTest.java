@@ -7,11 +7,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ControlledStagingLifecycleRound3ContractTest {
 
     @Test
-    void migrationStopsAfterV3CanRecoverToV8() throws Exception {
+    void migrationStopsAfterV3CanRecoverToV9() throws Exception {
         assertThat(runner()).contains(
                 "-e FLYWAY_TARGET=3 migrate",
                 "PARTIAL_INITIALIZATION_RECOVERY: PASS",
-                "RECOVERED_FLYWAY_VERSION: 8");
+                "RECOVERED_FLYWAY_VERSION: 9");
         assertThat(start()).contains(
                 "RECOVER_GREENFIELD_INITIALIZATION",
                 "run --rm --no-deps greenfield-recovery-verify",
@@ -48,7 +48,7 @@ class ControlledStagingLifecycleRound3ContractTest {
                 "DELETE FROM flyway_schema_history WHERE version='2'",
                 "expect_recovery_rejection NONCONTIGUOUS_FLYWAY_HISTORY");
         assertThat(recoveryVerify()).contains(
-                "expected_versions=1,2,3,4,5,6,7,8",
+                "expected_versions=1,2,3,4,5,6,7,8,9",
                 "BLOCKED_FLYWAY_PREFIX");
     }
 

@@ -6,13 +6,19 @@ import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand
 import java.util.List;
 
 public interface PositionMonitorLogService {
-    PositionMonitorLogDTO recordMonitorRun(RecordPositionMonitorLogCommand command);
+    PositionMonitorLogDTO recordMonitorRunForUser(Long userId, RecordPositionMonitorLogCommand command);
 
-    PositionMonitorLogDTO findById(Long logId);
+    PositionMonitorLogDTO recordMonitorRunForSystem(RecordPositionMonitorLogCommand command);
 
-    List<PositionMonitorLogDTO> listByPositionId(Long positionId, Integer limit);
+    PositionMonitorLogDTO findByIdForSystem(Long logId);
 
-    List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId);
+    List<PositionMonitorLogDTO> listByPositionIdForUser(Long userId, Long positionId, Integer limit);
 
-    List<PositionMonitorLogDTO> listByAnalysisId(String analysisId, Integer limit);
+    List<PositionMonitorLogDTO> listAllByPositionIdForUserReview(Long userId, Long positionId);
+
+    List<PositionMonitorLogDTO> listByPositionIdForSystem(Long positionId, Integer limit);
+
+    List<PositionMonitorLogDTO> listAllByPositionIdForSystemReview(Long positionId);
+
+    List<PositionMonitorLogDTO> listByAnalysisIdForSystem(String analysisId, Integer limit);
 }

@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.service.DashboardHomeService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,19 +23,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DashboardHomeControllerTest {
     @Mock
     private DashboardHomeService dashboardHomeService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new DashboardHomeController(dashboardHomeService)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new DashboardHomeController(dashboardHomeService, authenticatedUserIdResolver)).build();
     }
 
     @Test
     void homeReturnsApiResponseSuccess() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("BTCUSDT");
-        when(dashboardHomeService.getHome("BTCUSDT", 6, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "BTCUSDT", 6, null)).thenReturn(home);
 
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -46,7 +51,7 @@ class DashboardHomeControllerTest {
                 .andExpect(jsonPath("$.data.safety.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.data.safety.notAutoTrading").value(true));
 
-        verify(dashboardHomeService).getHome("BTCUSDT", 6, null);
+        verify(dashboardHomeService).getHomeForUser(7L, "BTCUSDT", 6, null);
     }
 
     @Test
@@ -80,7 +85,7 @@ class DashboardHomeControllerTest {
         ai.setConsistency(consistency);
         home.setAiDecision(ai);
 
-        when(dashboardHomeService.getHome("BTCUSDT", 6, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "BTCUSDT", 6, null)).thenReturn(home);
 
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -106,7 +111,7 @@ class DashboardHomeControllerTest {
         home.setSelectedSymbol("BTCUSDT");
         home.setSelectedPositionId(42L);
         home.setPositionSelectionStatus("EXACT_POSITION_SELECTED");
-        when(dashboardHomeService.getHome("BTCUSDT", 6, 42L)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "BTCUSDT", 6, 42L)).thenReturn(home);
 
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -116,6 +121,6 @@ class DashboardHomeControllerTest {
                 .andExpect(jsonPath("$.data.selectedPositionId").value(42))
                 .andExpect(jsonPath("$.data.positionSelectionStatus").value("EXACT_POSITION_SELECTED"));
 
-        verify(dashboardHomeService).getHome("BTCUSDT", 6, 42L);
+        verify(dashboardHomeService).getHomeForUser(7L, "BTCUSDT", 6, 42L);
     }
 }

@@ -401,10 +401,10 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     private LinkedUserPosition resolveLinkedUserPosition(OpportunityLogDO row) {
         List<UserPositionDO> rows = new ArrayList<>();
         if (!blank(row.getExecutionPlanId())) {
-            rows = safeList(userPositionMapper.listByExactSourceRefId(row.getExecutionPlanId()));
+            rows = safeList(userPositionMapper.listClaimedByExactSourceRefIdForSystem(row.getExecutionPlanId()));
         }
         if (rows.isEmpty() && !blank(row.getAnalysisId())) {
-            rows = safeList(userPositionMapper.listByExactSourceRefId(row.getAnalysisId()));
+            rows = safeList(userPositionMapper.listClaimedByExactSourceRefIdForSystem(row.getAnalysisId()));
         }
         if (rows.size() > 1) {
             return new LinkedUserPosition(null, true);

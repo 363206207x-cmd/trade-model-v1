@@ -83,7 +83,7 @@ class PushRecheckServiceImplTest {
                 org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 ruleConfigContractService);
         service.setDerivativesSnapshotReadPort(derivativesSnapshotReadPort);
-        lenient().when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        lenient().when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         lenient().when(ruleConfigContractService.requirePushRecheckThresholds())
                 .thenReturn(new RuleConfigContractService.PushRecheckThresholds(
                         new BigDecimal("0.02"), 70, 85, 60));
@@ -495,7 +495,7 @@ class PushRecheckServiceImplTest {
         s.setConfusedScoreSnapshot(10);
         s.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(81L)).thenReturn(s);
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
 
         RecheckResult r = service.recheck(81L, new BigDecimal("100"));
 
@@ -503,7 +503,7 @@ class PushRecheckServiceImplTest {
         assertThat(r.isValid()).isFalse();
         assertThat(r.isReviewPassed()).isTrue();
         assertSafeReviewOnlyResult(r);
-        verify(userPositionRiskAdapter).currentRisk();
+        verify(userPositionRiskAdapter).currentRiskForSystem();
 
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
@@ -518,14 +518,14 @@ class PushRecheckServiceImplTest {
         s.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(82L)).thenReturn(s);
         UserPositionRiskResult blocked = UserPositionRiskResult.failClosed("HIGH_LEVERAGE_RISK");
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(blocked);
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(blocked);
 
         RecheckResult r = service.recheck(82L, new BigDecimal("100"));
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.RISK_BLOCKED);
         assertThat(r.isValid()).isFalse();
         assertSafeReviewOnlyResult(r);
-        verify(userPositionRiskAdapter).currentRisk();
+        verify(userPositionRiskAdapter).currentRiskForSystem();
 
         ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
                 ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);

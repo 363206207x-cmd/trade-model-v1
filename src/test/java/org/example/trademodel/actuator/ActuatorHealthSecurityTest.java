@@ -60,11 +60,13 @@ class ActuatorHealthSecurityTest {
                 "/actuator/mappings",
                 "/actuator/loggers")) {
             MvcResult result = mockMvc.perform(get(path).with(user("operator").roles("OPERATOR")))
+                    .andExpect(status().isNotFound())
                     .andReturn();
             String body = result.getResponse().getContentAsString();
 
             assertThat(body)
-                    .contains("No static resource")
+                    .contains("\"msg\":\"resource not found\"")
+                    .doesNotContain("No static resource")
                     .doesNotContain("propertySources")
                     .doesNotContain("contexts")
                     .doesNotContain("configurationProperties")

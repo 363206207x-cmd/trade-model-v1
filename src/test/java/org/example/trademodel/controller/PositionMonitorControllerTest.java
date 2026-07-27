@@ -1,8 +1,10 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.common.GlobalExceptionHandler;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.service.PositionMonitorService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -26,17 +29,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PositionMonitorControllerTest {
     @Mock
     private PositionMonitorService positionMonitorService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new PositionMonitorController(positionMonitorService)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new PositionMonitorController(positionMonitorService, authenticatedUserIdResolver))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
     void singleEndpointReturnsReviewOnlyMonitorResult() throws Exception {
-        when(positionMonitorService.monitorUserPosition(7L)).thenReturn(result(7L));
+        when(positionMonitorService.monitorUserPositionForUser(7L, 7L)).thenReturn(result(7L));
 
         mockMvc.perform(post("/api/position-monitor/user-positions/7/run"))
                 .andExpect(status().isOk())
@@ -60,34 +69,23 @@ class PositionMonitorControllerTest {
     }
 
     @Test
-    void batchEndpointReturnsCountsAndItemResults() throws Exception {
-        PositionMonitorBatchResultDTO batch = new PositionMonitorBatchResultDTO();
-        batch.setTotalCount(1);
-        batch.setSuccessCount(1);
-        batch.setFailureCount(0);
-        batch.setBlockedCount(0);
-        batch.setResults(List.of(result(7L)));
-        when(positionMonitorService.monitorOpenUserPositions()).thenReturn(batch);
-
+    void batchEndpointIsForbiddenForAuthenticatedUsers() throws Exception {
         mockMvc.perform(post("/api/position-monitor/user-positions/open/run"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.totalCount").value(1))
-                .andExpect(jsonPath("$.data.successCount").value(1))
-                .andExpect(jsonPath("$.data.results[0].positionId").value(7))
-                .andExpect(jsonPath("$.data.reviewOnly").value(true))
-                .andExpect(jsonPath("$.data.notExecutable").value(true));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        verifyNoInteractions(positionMonitorService);
     }
 
     @Test
-    void singleEndpointReturnsBadRequestWhenMonitorFailsClosed() throws Exception {
-        when(positionMonitorService.monitorUserPosition(8L))
+    void singleEndpointSanitizesUnexpectedMonitorFailure() throws Exception {
+        when(positionMonitorService.monitorUserPositionForUser(8L, 7L))
                 .thenThrow(new IllegalStateException("QUOTE_UNAVAILABLE"));
 
         mockMvc.perform(post("/api/position-monitor/user-positions/8/run"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("QUOTE_UNAVAILABLE"));
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(jsonPath("$.msg").value("internal server error"));
     }
 
     private static PositionMonitorResultDTO result(Long positionId) {

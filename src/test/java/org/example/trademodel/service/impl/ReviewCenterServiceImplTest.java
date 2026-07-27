@@ -35,6 +35,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.when;
 @Tag("core-regression")
 class ReviewCenterServiceImplTest {
     private static final Instant NOW = Instant.parse("2026-07-13T12:00:00Z");
+    private static final Long USER_ID = 17L;
     @Mock
     private UserPositionMapper userPositionMapper;
     @Mock
@@ -75,13 +77,13 @@ class ReviewCenterServiceImplTest {
 
     @Test
     void emptySourcesReturnEmptyArraysWithoutSyntheticRows() {
-        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of());
+        when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
         when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
 
-        ReviewCenterDashboardVO vo = service.getDashboard();
+        ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
         assertThat(vo.getPositionReviews()).isEmpty();
         assertThat(vo.getOpportunityReviews()).isEmpty();
@@ -93,14 +95,14 @@ class ReviewCenterServiceImplTest {
         assertThat(vo.getSummary().getRuleFeedbackCount()).isZero();
         assertThat(vo.getDiagnostics().getOpportunityLogStatus()).isEqualTo("EMPTY");
         assertThat(vo.getDiagnostics().getReviewCenterStatus()).isEqualTo("READY_READONLY");
-        verify(userPositionReviewAdapter, never()).buildSummary(any());
+        verify(userPositionReviewAdapter, never()).buildSummaryForUser(any(), any());
         verify(pushRecheckLogMapper, never()).selectLatestByPushId(any());
     }
 
     @Test
     void mapsOnlyReadonlyFieldsFromExistingSources() {
-        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of(position()));
-        when(userPositionReviewAdapter.buildSummary(7L)).thenReturn(positionSummary());
+        when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(position()));
+        when(userPositionReviewAdapter.buildSummaryForUser(USER_ID, 7L)).thenReturn(positionSummary());
         when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(opportunity(OpportunityLogStatus.EXECUTED_VALID), opportunity(OpportunityLogStatus.PENDING_EVALUATION)));
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(pushSnapshot()));
@@ -108,7 +110,7 @@ class ReviewCenterServiceImplTest {
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of(reviewResult()));
         when(analysisRunMapper.selectById("ana-rule-1")).thenReturn(analysisRun());
 
-        ReviewCenterDashboardVO vo = service.getDashboard();
+        ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
         assertThat(vo.getPositionReviews()).hasSize(1);
         ReviewCenterDashboardVO.PositionReviewItem position = vo.getPositionReviews().get(0);
@@ -123,7 +125,7 @@ class ReviewCenterServiceImplTest {
         assertThat(opportunity.getOpportunityType()).isEqualTo(OpportunityLogStatus.EXECUTED_VALID);
         assertThat(opportunity.getWasPushed()).isTrue();
         assertThat(opportunity.getWasClicked()).isNull();
-        assertThat(opportunity.getWasExecuted()).isTrue();
+        assertThat(opportunity.getWasExecuted()).isNull();
 
         assertThat(vo.getPushReviews()).hasSize(1);
         ReviewCenterDashboardVO.PushReviewItem push = vo.getPushReviews().get(0);
@@ -148,7 +150,7 @@ class ReviewCenterServiceImplTest {
 
     @Test
     void pushExpiryUsesUtcNaiveExactBoundary() {
-        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of());
+        when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
         when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
@@ -158,7 +160,7 @@ class ReviewCenterServiceImplTest {
         TmPushSnapshotDO after = pushSnapshotAt(LocalDateTime.of(2026, 7, 13, 11, 59, 59));
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(before, equal, after));
 
-        ReviewCenterDashboardVO vo = service.getDashboard();
+        ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
         assertThat(vo.getPushReviews()).extracting(ReviewCenterDashboardVO.PushReviewItem::getExpired)
                 .containsExactly(false, true, true);
@@ -171,14 +173,14 @@ class ReviewCenterServiceImplTest {
         internal.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         internal.setExecutionPlanId("must-not-survive");
         summary.setMonitorLogs(List.of(internal));
-        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of(position()));
-        when(userPositionReviewAdapter.buildSummary(7L)).thenReturn(summary);
+        when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(position()));
+        when(userPositionReviewAdapter.buildSummaryForUser(USER_ID, 7L)).thenReturn(summary);
         when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
 
-        ReviewCenterDashboardVO vo = service.getDashboard();
+        ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
         assertThat(vo.getPositionReviews()).singleElement().satisfies(item ->
                 assertThat(item.getMonitorTimeline()).singleElement().satisfies(log -> {
@@ -200,14 +202,14 @@ class ReviewCenterServiceImplTest {
         guessedSibling.setSourceStatus("PENDING_VERIFICATION");
         guessedSibling.setSourceStatusLabel("来源待验证");
         summary.setMonitorLogs(List.of(guessedSibling));
-        when(userPositionMapper.listClosedManualPositions(anyInt())).thenReturn(List.of(position()));
-        when(userPositionReviewAdapter.buildSummary(7L)).thenReturn(summary);
+        when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(position()));
+        when(userPositionReviewAdapter.buildSummaryForUser(USER_ID, 7L)).thenReturn(summary);
         when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
 
-        ReviewCenterDashboardVO vo = service.getDashboard();
+        ReviewCenterDashboardVO vo = service.getDashboardForUser(USER_ID);
 
         assertThat(vo.getPositionReviews()).singleElement().satisfies(item ->
                 assertThat(item.getMonitorTimeline()).singleElement().satisfies(log -> {
@@ -222,6 +224,7 @@ class ReviewCenterServiceImplTest {
     private static UserPositionDO position() {
         UserPositionDO row = new UserPositionDO();
         row.setId(7L);
+        row.setUserId(USER_ID);
         row.setAssetSymbol("BTCUSDT");
         row.setSide("LONG");
         row.setStatus("CLOSED");

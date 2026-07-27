@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.service.DashboardHomeService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -16,16 +17,21 @@ public class MobileDashboardController {
     static final int MOBILE_HOME_ASSET_LIMIT = 3;
 
     private final DashboardHomeService dashboardHomeService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
-    public MobileDashboardController(DashboardHomeService dashboardHomeService) {
+    public MobileDashboardController(DashboardHomeService dashboardHomeService,
+                                     AuthenticatedUserIdResolver authenticatedUserIdResolver) {
         this.dashboardHomeService = dashboardHomeService;
+        this.authenticatedUserIdResolver = authenticatedUserIdResolver;
     }
 
     @GetMapping("/dashboard/mobile")
     public String mobileDashboard(
             @RequestParam(value = "selectedSymbol", required = false) String selectedSymbol,
             Model model) {
-        DashboardHomeVO home = dashboardHomeService.getHome(selectedSymbol, MOBILE_HOME_ASSET_LIMIT, null);
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        DashboardHomeVO home = dashboardHomeService.getHomeForUser(
+                userId, selectedSymbol, MOBILE_HOME_ASSET_LIMIT, null);
         model.addAttribute("home", home);
         model.addAttribute("mobileAssets", mobileAssets(home, selectedSymbol));
         return "dashboard-mobile";

@@ -60,6 +60,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     "tm_asset_state"));
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
+                    "idx_tm_user_position_user_status_opened_at",
                     "idx_tm_push_snapshot_analysis_id",
                     "idx_tm_ai_call_log_trace_id",
                     "uk_tm_review_result_analysis_id",
@@ -67,6 +68,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     "idx_tm_persisted_ohlcv_bar_ingestion_run"));
             assertFlywayHistorySucceeded(connection);
             assertDecisionPlanOffsetTimeColumns(connection);
+            assertUserPositionOwnershipContract(connection);
         }
     }
 
@@ -145,10 +147,10 @@ class ControlledPostgreSqlFlywaySmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isEqualTo(8);
-                assertThat(rs.getInt(2)).isEqualTo(8);
+                assertThat(rs.getInt(1)).isEqualTo(9);
+                assertThat(rs.getInt(2)).isEqualTo(9);
                 assertThat(rs.getString(3)).isEqualTo("1");
-                assertThat(rs.getString(4)).isEqualTo("8");
+                assertThat(rs.getString(4)).isEqualTo("9");
             }
         }
         try (PreparedStatement statement = connection.prepareStatement("""
@@ -176,6 +178,36 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     assertThat(rs.getString("data_type")).isEqualTo("timestamp with time zone");
                     assertThat(rs.getString("is_nullable")).isEqualTo("YES");
                 }
+            }
+        }
+    }
+
+    private static void assertUserPositionOwnershipContract(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'tm_user_position'
+                  AND column_name = 'user_id'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("data_type")).isEqualTo("bigint");
+                assertThat(rs.getString("is_nullable")).isEqualTo("YES");
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT pg_get_constraintdef(oid, true) AS definition
+                FROM pg_constraint
+                WHERE conname = 'fk_tm_user_position_user'
+                  AND conrelid = 'public.tm_user_position'::regclass
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("definition"))
+                        .contains("FOREIGN KEY (user_id) REFERENCES tm_user(id)")
+                        .contains("ON UPDATE RESTRICT")
+                        .contains("ON DELETE RESTRICT");
             }
         }
     }

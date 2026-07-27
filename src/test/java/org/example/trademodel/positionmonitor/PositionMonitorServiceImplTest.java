@@ -28,6 +28,8 @@ import org.example.trademodel.service.support.ExternalContextImportRequest;
 import org.example.trademodel.service.support.ExternalContextImportResult;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class PositionMonitorServiceImplTest {
+    private static final Long USER_ID = 17L;
+
     @Mock
     private UserPositionMapper userPositionMapper;
     @Mock
@@ -97,21 +101,13 @@ class PositionMonitorServiceImplTest {
                 new ObjectMapper(),
                 analysisRunMapper,
                 null);
-        lenient().when(positionMonitorLogService.listByPositionId(anyLong(), eq(1))).thenReturn(List.of());
-        lenient().when(positionMonitorLogService.recordMonitorRun(any())).thenAnswer(invocation -> {
-            RecordPositionMonitorLogCommand command = invocation.getArgument(0);
-            PositionMonitorLogDTO dto = new PositionMonitorLogDTO();
-            dto.setLogId(logIds.incrementAndGet());
-            dto.setPositionId(command.getPositionId());
-            dto.setAnalysisId(command.getAnalysisId());
-            dto.setExecutionPlanId(command.getExecutionPlanId());
-            dto.setCurrentPrice(command.getCurrentPrice());
-            dto.setLogicStatus(command.getLogicStatus());
-            dto.setRiskLevel(command.getRiskLevel());
-            dto.setSuggestedAction(command.getSuggestedAction());
-            dto.setCreatedAt(LocalDateTime.now());
-            return dto;
+        lenient().when(positionMonitorLogService.listByPositionIdForUser(eq(USER_ID), anyLong(), eq(1))).thenReturn(List.of());
+        lenient().when(positionMonitorLogService.recordMonitorRunForUser(eq(USER_ID), any())).thenAnswer(invocation -> {
+            return monitorLog(invocation.getArgument(1));
         });
+        lenient().when(positionMonitorLogService.listByPositionIdForSystem(anyLong(), eq(1))).thenReturn(List.of());
+        lenient().when(positionMonitorLogService.recordMonitorRunForSystem(any())).thenAnswer(invocation ->
+                monitorLog(invocation.getArgument(0)));
     }
 
     @Test
@@ -119,7 +115,7 @@ class PositionMonitorServiceImplTest {
         UserPositionDO position = position(1L, "LONG", "OPEN", "plan-valid", "90", "120");
         arrange(position, "100", risk("LOW", false), plan("plan-valid", "ana-1", "VALID", true));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(1L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(1L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_VALID");
         assertThat(result.getEntryLogicStatus()).isEqualTo("LOGIC_VALID");
@@ -135,10 +131,11 @@ class PositionMonitorServiceImplTest {
         assertForbiddenActionFieldsAbsent();
 
         ArgumentCaptor<RecordPositionMonitorLogCommand> captor = ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
-        verify(positionMonitorLogService).recordMonitorRun(captor.capture());
+        verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
         assertThat(captor.getValue().getCurrentPrice()).isEqualByComparingTo("100");
         assertThat(captor.getValue().getLogicStatus()).isEqualTo("LOGIC_VALID");
-        verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                anyLong(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -146,7 +143,7 @@ class PositionMonitorServiceImplTest {
         UserPositionDO position = position(2L, "SHORT", "OPEN", "plan-short", "110", "80");
         arrange(position, "100", risk("LOW", false), plan("plan-short", "ana-2", "VALID", true));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(2L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(2L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_VALID");
         assertThat(result.getSide()).isEqualTo("SHORT");
@@ -158,11 +155,11 @@ class PositionMonitorServiceImplTest {
     void longAndShortNearStopLossAreWeakened() {
         UserPositionDO longPosition = position(3L, "LONG", "OPEN", "plan-long-near-stop", "99", "120");
         arrange(longPosition, "100", risk("LOW", false), plan("plan-long-near-stop", "ana-3", "VALID", true));
-        assertThat(service.monitorUserPosition(3L).getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(service.monitorUserPositionForUser(3L, USER_ID).getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
 
         UserPositionDO shortPosition = position(4L, "SHORT", "OPEN", "plan-short-near-stop", "101", "80");
         arrange(shortPosition, "100", risk("LOW", false), plan("plan-short-near-stop", "ana-4", "VALID", true));
-        PositionMonitorResultDTO result = service.monitorUserPosition(4L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(4L, USER_ID);
         assertThat(result.isNearStopLoss()).isTrue();
         assertThat(result.getReasonCodes()).contains("NEAR_STOP_LOSS");
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
@@ -172,14 +169,14 @@ class PositionMonitorServiceImplTest {
     void longAndShortNearTakeProfitCanRemainValidWithManualReviewSuggestion() {
         UserPositionDO longPosition = position(5L, "LONG", "OPEN", "plan-long-near-tp", "90", "101");
         arrange(longPosition, "100", risk("LOW", false), plan("plan-long-near-tp", "ana-5", "VALID", true));
-        PositionMonitorResultDTO longResult = service.monitorUserPosition(5L);
+        PositionMonitorResultDTO longResult = service.monitorUserPositionForUser(5L, USER_ID);
         assertThat(longResult.getLogicStatus()).isEqualTo("LOGIC_VALID");
         assertThat(longResult.isNearTakeProfit()).isTrue();
         assertThat(longResult.getSuggestedAction()).isEqualTo("MANUAL_REVIEW");
 
         UserPositionDO shortPosition = position(6L, "SHORT", "PARTIALLY_CLOSED", "plan-short-near-tp", "110", "99");
         arrange(shortPosition, "100", risk("LOW", false), plan("plan-short-near-tp", "ana-6", "VALID", true));
-        PositionMonitorResultDTO shortResult = service.monitorUserPosition(6L);
+        PositionMonitorResultDTO shortResult = service.monitorUserPositionForUser(6L, USER_ID);
         assertThat(shortResult.getLogicStatus()).isEqualTo("LOGIC_VALID");
         assertThat(shortResult.isNearTakeProfit()).isTrue();
         assertThat(shortResult.getPositionStatus()).isEqualTo("PARTIALLY_CLOSED");
@@ -189,19 +186,19 @@ class PositionMonitorServiceImplTest {
     void stopBreachedAndPersistedInvalidPlansInvalidateWhileIncompleteGateWeakens() {
         UserPositionDO longBreached = position(7L, "LONG", "OPEN", "plan-long-breached", "100", "130");
         arrange(longBreached, "99", risk("LOW", false), plan("plan-long-breached", "ana-7", "VALID", true));
-        assertThat(service.monitorUserPosition(7L).getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(service.monitorUserPositionForUser(7L, USER_ID).getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
 
         UserPositionDO shortBreached = position(8L, "SHORT", "OPEN", "plan-short-breached", "100", "80");
         arrange(shortBreached, "101", risk("LOW", false), plan("plan-short-breached", "ana-8", "VALID", true));
-        assertThat(service.monitorUserPosition(8L).getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(service.monitorUserPositionForUser(8L, USER_ID).getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
 
         UserPositionDO invalidPlan = position(9L, "LONG", "OPEN", "plan-invalid", "90", "120");
         arrange(invalidPlan, "100", risk("LOW", false), plan("plan-invalid", "ana-9", "INVALID", true));
-        assertThat(service.monitorUserPosition(9L).getReasonCodes()).contains("PLAN_INVALID");
+        assertThat(service.monitorUserPositionForUser(9L, USER_ID).getReasonCodes()).contains("PLAN_INVALID");
 
         UserPositionDO incompleteSource = position(10L, "LONG", "OPEN", "plan-source-missing", "90", "120");
         arrange(incompleteSource, "100", risk("LOW", false), plan("plan-source-missing", "ana-10", "VALID", false));
-        PositionMonitorResultDTO result = service.monitorUserPosition(10L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(10L, USER_ID);
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
         assertThat(result.getReasonCodes()).contains("SOURCE_GATE_INCOMPLETE");
@@ -215,7 +212,7 @@ class PositionMonitorServiceImplTest {
         plan.setRevalidationReason("HOT_RESET_REVIEW_REQUIRED");
         arrange(position, "100", risk("LOW", false), plan);
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(101L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(101L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
@@ -255,7 +252,7 @@ class PositionMonitorServiceImplTest {
         arrange(position, "100", risk("LOW", false),
                 plan("plan-invalid-contract", "ana-106", "INVALID", true));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(106L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(106L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
         assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
@@ -269,7 +266,7 @@ class PositionMonitorServiceImplTest {
         plan.setSourceGateStatus("BLOCKED");
         arrange(position, "100", risk("LOW", false), plan);
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(107L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(107L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
         assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
@@ -280,7 +277,7 @@ class PositionMonitorServiceImplTest {
     void planContextAndMissingBoundariesWeakenLogic() {
         UserPositionDO missingContext = position(11L, "LONG", "OPEN", null, "90", "120");
         arrange(missingContext, "100", risk("LOW", false), null);
-        PositionMonitorResultDTO missingContextResult = service.monitorUserPosition(11L);
+        PositionMonitorResultDTO missingContextResult = service.monitorUserPositionForUser(11L, USER_ID);
         assertThat(missingContextResult.getAnalysisId()).isNull();
         assertThat(missingContextResult.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(missingContextResult.getReasonCodes())
@@ -288,11 +285,11 @@ class PositionMonitorServiceImplTest {
 
         UserPositionDO missingStop = position(12L, "LONG", "OPEN", "plan-missing-stop", null, "120");
         arrange(missingStop, "100", risk("LOW", false), plan("plan-missing-stop", "ana-12", "VALID", true));
-        assertThat(service.monitorUserPosition(12L).getReasonCodes()).contains("STOP_LOSS_MISSING");
+        assertThat(service.monitorUserPositionForUser(12L, USER_ID).getReasonCodes()).contains("STOP_LOSS_MISSING");
 
         UserPositionDO missingTakeProfit = position(13L, "LONG", "OPEN", "plan-missing-tp", "90", null);
         arrange(missingTakeProfit, "100", risk("LOW", false), plan("plan-missing-tp", "ana-13", "VALID", true));
-        PositionMonitorResultDTO result = service.monitorUserPosition(13L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(13L, USER_ID);
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(result.getReasonCodes()).contains("TAKE_PROFIT_MISSING");
     }
@@ -306,11 +303,11 @@ class PositionMonitorServiceImplTest {
         lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-with-plan-a-and-b"))
                 .thenReturn(latestB);
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(131L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(131L, USER_ID);
 
         ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
                 ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
-        verify(positionMonitorLogService).recordMonitorRun(captor.capture());
+        verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
         assertThat(captor.getValue().getAnalysisId())
                 .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         assertThat(captor.getValue().getExecutionPlanId()).isNull();
@@ -330,11 +327,11 @@ class PositionMonitorServiceImplTest {
         lenient().when(executionPlanMapper.selectByPlanId("plan-A-without-type"))
                 .thenReturn(plan("plan-A-without-type", "analysis-A", "VALID", true));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(132L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(132L, USER_ID);
 
         ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
                 ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
-        verify(positionMonitorLogService).recordMonitorRun(captor.capture());
+        verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
         assertThat(captor.getValue().getAnalysisId())
                 .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         assertThat(captor.getValue().getExecutionPlanId()).isNull();
@@ -351,11 +348,11 @@ class PositionMonitorServiceImplTest {
         when(executionPlanMapper.selectOnlyByAnalysisId("analysis-A")).thenReturn(planA);
         when(analysisRunMapper.selectById("analysis-A")).thenReturn(analysisRun("analysis-A", "BTC"));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(133L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(133L, USER_ID);
 
         ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
                 ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
-        verify(positionMonitorLogService).recordMonitorRun(captor.capture());
+        verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
         assertThat(captor.getValue().getAnalysisId()).isEqualTo("analysis-A");
         assertThat(captor.getValue().getExecutionPlanId()).isEqualTo("plan-A");
         assertThat(result.getAnalysisId()).isEqualTo("analysis-A");
@@ -368,11 +365,11 @@ class PositionMonitorServiceImplTest {
         arrange(position, "100", risk("LOW", false), plan("plan-A", "analysis-A", "VALID", true));
         when(analysisRunMapper.selectById("analysis-A")).thenReturn(analysisRun("analysis-A", "ETH"));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(134L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(134L, USER_ID);
 
         ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
                 ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
-        verify(positionMonitorLogService).recordMonitorRun(captor.capture());
+        verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
         assertThat(captor.getValue().getAnalysisId())
                 .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         assertThat(captor.getValue().getExecutionPlanId()).isNull();
@@ -384,70 +381,70 @@ class PositionMonitorServiceImplTest {
     void riskBlockedAndRiskIncreasedAreFailClosed() {
         UserPositionDO highRisk = position(14L, "LONG", "OPEN", "plan-high-risk", "90", "120");
         arrange(highRisk, "100", risk("HIGH", true), plan("plan-high-risk", "ana-14", "VALID", true));
-        PositionMonitorResultDTO blocked = service.monitorUserPosition(14L);
+        PositionMonitorResultDTO blocked = service.monitorUserPositionForUser(14L, USER_ID);
         assertThat(blocked.getLogicStatus()).isEqualTo("HIGH_RISK");
         assertThat(blocked.getSuggestedAction()).isEqualTo("RISK_REVIEW");
         assertThat(blocked.isRiskBlocked()).isTrue();
 
         UserPositionDO increased = position(15L, "LONG", "OPEN", "plan-risk-up", "90", "120");
         arrange(increased, "100", risk("MEDIUM", false), plan("plan-risk-up", "ana-15", "VALID", true));
-        when(positionMonitorLogService.listByPositionId(15L, 1)).thenReturn(List.of(previousLog("LOW")));
-        assertThat(service.monitorUserPosition(15L).isRiskIncreased()).isTrue();
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 15L, 1)).thenReturn(List.of(previousLog("LOW")));
+        assertThat(service.monitorUserPositionForUser(15L, USER_ID).isRiskIncreased()).isTrue();
 
         UserPositionDO unchanged = position(16L, "LONG", "OPEN", "plan-risk-same", "90", "120");
         arrange(unchanged, "100", risk("MEDIUM", false), plan("plan-risk-same", "ana-16", "VALID", true));
-        when(positionMonitorLogService.listByPositionId(16L, 1)).thenReturn(List.of(previousLog("MEDIUM")));
-        assertThat(service.monitorUserPosition(16L).isRiskIncreased()).isFalse();
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 16L, 1)).thenReturn(List.of(previousLog("MEDIUM")));
+        assertThat(service.monitorUserPositionForUser(16L, USER_ID).isRiskIncreased()).isFalse();
     }
 
     @Test
     void closedMissingInvalidQuoteAndQuoteUnavailableDoNotWriteLogs() {
-        when(userPositionMapper.selectById(17L)).thenReturn(position(17L, "LONG", "CLOSED", "plan-closed", "90", "120"));
-        assertThatThrownBy(() -> service.monitorUserPosition(17L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OPEN or PARTIALLY_CLOSED");
+        when(userPositionMapper.selectByIdAndUserId(17L, USER_ID)).thenReturn(position(17L, "LONG", "CLOSED", "plan-closed", "90", "120"));
+        assertThatThrownBy(() -> service.monitorUserPositionForUser(17L, USER_ID))
+                .isInstanceOf(UserPositionConflictException.class)
+                .hasMessageContaining("cannot be monitored");
 
-        when(userPositionMapper.selectById(18L)).thenReturn(null);
-        assertThatThrownBy(() -> service.monitorUserPosition(18L))
-                .isInstanceOf(IllegalArgumentException.class)
+        when(userPositionMapper.selectByIdAndUserId(18L, USER_ID)).thenReturn(null);
+        assertThatThrownBy(() -> service.monitorUserPositionForUser(18L, USER_ID))
+                .isInstanceOf(UserPositionNotFoundException.class)
                 .hasMessageContaining("UserPosition not found");
 
         UserPositionDO invalidQuote = position(19L, "LONG", "OPEN", "plan-invalid-price", "90", "120");
-        when(userPositionMapper.selectById(19L)).thenReturn(invalidQuote);
+        when(userPositionMapper.selectByIdAndUserId(19L, USER_ID)).thenReturn(invalidQuote);
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("0")));
-        assertThatThrownBy(() -> service.monitorUserPosition(19L))
+        assertThatThrownBy(() -> service.monitorUserPositionForUser(19L, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("INVALID_MARKET_PRICE");
 
         UserPositionDO unavailableQuote = position(20L, "LONG", "OPEN", "plan-no-quote", "90", "120");
-        when(userPositionMapper.selectById(20L)).thenReturn(unavailableQuote);
+        when(userPositionMapper.selectByIdAndUserId(20L, USER_ID)).thenReturn(unavailableQuote);
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.monitorUserPosition(20L))
+        assertThatThrownBy(() -> service.monitorUserPositionForUser(20L, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("QUOTE_UNAVAILABLE");
 
-        verify(positionMonitorLogService, never()).recordMonitorRun(any());
+        verify(positionMonitorLogService, never()).recordMonitorRunForUser(anyLong(), any());
     }
 
     @Test
     void batchMonitorsOnlyActivePositionsAndReportsIndividualFailures() {
         UserPositionDO open = position(21L, "LONG", "OPEN", "plan-batch-open", "90", "120");
         UserPositionDO partial = position(22L, "SHORT", "PARTIALLY_CLOSED", "plan-batch-partial", "110", "80");
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(open, partial));
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(open, partial));
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(risk("LOW", false));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(risk("LOW", false));
         when(executionPlanMapper.selectByPlanId("plan-batch-open"))
                 .thenReturn(plan("plan-batch-open", "ana-21", "VALID", true));
         when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.empty());
 
-        PositionMonitorBatchResultDTO batch = service.monitorOpenUserPositions();
+        PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
 
         assertThat(batch.getTotalCount()).isEqualTo(2);
         assertThat(batch.getSuccessCount()).isEqualTo(1);
         assertThat(batch.getFailureCount()).isEqualTo(1);
         assertThat(batch.getResults()).extracting(PositionMonitorResultDTO::getPositionId).containsExactly(21L);
         assertThat(batch.getFailures()).hasSize(1);
-        verify(positionMonitorLogService).recordMonitorRun(any());
+        verify(positionMonitorLogService).recordMonitorRunForSystem(any());
     }
 
     @Test
@@ -478,14 +475,15 @@ class PositionMonitorServiceImplTest {
         when(externalContextEvidenceBuilder.buildSnapshot(eq("ana-30"), eq("BTC"), eq(null), any(), eq(null)))
                 .thenReturn(snapshot);
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(30L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(30L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("HIGH_RISK");
         assertThat(result.getSuggestedAction()).isEqualTo("RISK_REVIEW");
         assertThat(result.getExternalContextBlocked()).isTrue();
         assertThat(result.getReasonCodes()).contains(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
         assertSafetyFields(result);
-        verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                anyLong(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -511,7 +509,7 @@ class PositionMonitorServiceImplTest {
         UserPositionDO position = position(31L, "LONG", "OPEN", "plan-cross-market", "90", "120");
         arrange(position, "100", risk("LOW", false), plan("plan-cross-market", "ana-31", "VALID", true));
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(31L);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(31L, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_VALID");
         assertThat(result.getExternalContextBlocked()).isFalse();
@@ -519,16 +517,17 @@ class PositionMonitorServiceImplTest {
         assertThat(result.getReasonCodes()).doesNotContain(
                 ExternalContextPolicy.REASON_WINDOW_BLOCKED,
                 "EXTERNAL_CONTEXT_REVIEW_REQUIRED");
-        verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                anyLong(), anyLong(), any(), any(), any(), any());
     }
 
     private void arrange(UserPositionDO position,
                          String currentPrice,
                          UserPositionRiskResult risk,
                          ExecutionPlanDO plan) {
-        when(userPositionMapper.selectById(position.getId())).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(position.getId(), USER_ID)).thenReturn(position);
         when(marketQuoteClient.fetch24hTicker(position.getAssetSymbol())).thenReturn(Optional.of(quote(currentPrice)));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(risk);
+        when(userPositionRiskAdapter.currentRiskForUser(USER_ID)).thenReturn(risk);
         if (plan != null) {
             when(executionPlanMapper.selectByPlanId(plan.getPlanId())).thenReturn(plan);
             when(analysisRunMapper.selectById(plan.getAnalysisId()))
@@ -544,6 +543,7 @@ class PositionMonitorServiceImplTest {
                                            String takeProfit) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
+        row.setUserId(USER_ID);
         row.setAssetSymbol(id == 22L ? "ETH" : "BTC");
         row.setSide(side);
         row.setStatus(status);
@@ -557,6 +557,20 @@ class PositionMonitorServiceImplTest {
                 ? null
                 : PositionMonitorSourceContract.executionPlanReference(sourceRefId));
         return row;
+    }
+
+    private PositionMonitorLogDTO monitorLog(RecordPositionMonitorLogCommand command) {
+        PositionMonitorLogDTO dto = new PositionMonitorLogDTO();
+        dto.setLogId(logIds.incrementAndGet());
+        dto.setPositionId(command.getPositionId());
+        dto.setAnalysisId(command.getAnalysisId());
+        dto.setExecutionPlanId(command.getExecutionPlanId());
+        dto.setCurrentPrice(command.getCurrentPrice());
+        dto.setLogicStatus(command.getLogicStatus());
+        dto.setRiskLevel(command.getRiskLevel());
+        dto.setSuggestedAction(command.getSuggestedAction());
+        dto.setCreatedAt(LocalDateTime.now());
+        return dto;
     }
 
     private static AnalysisRunDO analysisRun(String analysisId, String symbol) {
@@ -610,7 +624,7 @@ class PositionMonitorServiceImplTest {
         plan.setTakeProfitRules(takeProfitRules);
         arrange(position, "100", risk("LOW", false), plan);
 
-        PositionMonitorResultDTO result = service.monitorUserPosition(positionId);
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(positionId, USER_ID);
 
         assertThat(result.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(result.getSuggestedAction()).isEqualTo("RECHECK_PLAN");

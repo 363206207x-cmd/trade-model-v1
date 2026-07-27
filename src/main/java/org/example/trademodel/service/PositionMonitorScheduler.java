@@ -31,7 +31,7 @@ public class PositionMonitorScheduler {
             return;
         }
         try {
-            positionMonitorService.monitorOpenUserPositions();
+            positionMonitorService.monitorClaimedOpenPositionsForSystem();
         } catch (RuntimeException ex) {
             log.warn("[position-monitor-scheduler] batch skipped: {}", ex.getMessage());
         }

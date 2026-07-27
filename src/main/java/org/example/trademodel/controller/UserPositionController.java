@@ -4,6 +4,7 @@ import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,45 +20,36 @@ import java.util.List;
 @RequestMapping("/api/user-positions")
 public class UserPositionController {
     private final UserPositionService userPositionService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
-    public UserPositionController(UserPositionService userPositionService) {
+    public UserPositionController(UserPositionService userPositionService,
+                                  AuthenticatedUserIdResolver authenticatedUserIdResolver) {
         this.userPositionService = userPositionService;
+        this.authenticatedUserIdResolver = authenticatedUserIdResolver;
     }
 
     @PostMapping("/manual-open")
     public ResponseEntity<ApiResponse<UserPositionVO>> manualOpen(@RequestBody CreateUserPositionReq request) {
-        try {
-            return ResponseEntity.ok(ApiResponse.success(userPositionService.manualOpen(request)));
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(ApiResponse.badRequest(ex.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(userPositionService.manualOpenForUser(userId, request)));
     }
 
     @PostMapping("/{id}/manual-close")
     public ResponseEntity<ApiResponse<UserPositionVO>> manualClose(@PathVariable Long id,
                                                                    @RequestBody CloseUserPositionReq request) {
-        try {
-            return ResponseEntity.ok(ApiResponse.success(userPositionService.manualClose(id, request)));
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(ApiResponse.badRequest(ex.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(userPositionService.manualCloseForUser(id, userId, request)));
     }
 
     @GetMapping("/open")
     public ApiResponse<List<UserPositionVO>> openPositions() {
-        return ApiResponse.success(userPositionService.listOpenPositions());
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ApiResponse.success(userPositionService.listOpenPositionsForUser(userId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserPositionVO>> getById(@PathVariable Long id) {
-        try {
-            UserPositionVO position = userPositionService.findById(id);
-            if (position == null) {
-                return ResponseEntity.status(404).body(ApiResponse.notFound("UserPosition not found: " + id));
-            }
-            return ResponseEntity.ok(ApiResponse.success(position));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().body(ApiResponse.badRequest(ex.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(userPositionService.findByIdForUser(id, userId)));
     }
 }

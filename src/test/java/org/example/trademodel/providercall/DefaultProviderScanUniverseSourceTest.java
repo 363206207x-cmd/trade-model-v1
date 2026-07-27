@@ -83,7 +83,7 @@ class DefaultProviderScanUniverseSourceTest {
     }
 
     @Test void realScanUniverseIncludesManualOpenPositions() {
-        when(positionMapper.listOpenPositions()).thenReturn(List.of(position("BTCUSDT", "OPEN"),
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position("BTCUSDT", "OPEN"),
                 position("ETHUSDT", "PARTIALLY_CLOSED")));
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
         assertThat(source.currentUniverse().positions()).extracting(item -> item.symbol())
@@ -91,13 +91,13 @@ class DefaultProviderScanUniverseSourceTest {
     }
 
     @Test void realScanUniverseExcludesClosedPositions() {
-        when(positionMapper.listOpenPositions()).thenReturn(List.of(position("BTCUSDT", "CLOSED")));
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position("BTCUSDT", "CLOSED")));
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
         assertThat(source.currentUniverse().positions()).isEmpty();
     }
 
     @Test void realScanUniverseIncludesCandidateAndWaitingTrigger() {
-        when(positionMapper.listOpenPositions()).thenReturn(List.of());
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of());
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of(
                 state("SOLUSDT", AssetStateEnum.CANDIDATE), state("BNBUSDT", AssetStateEnum.WAITING_TRIGGER)));
         when(watchlistSource.currentWatchlist()).thenReturn(instruments("SOLUSDT", "BNBUSDT"));
@@ -106,7 +106,7 @@ class DefaultProviderScanUniverseSourceTest {
     }
 
     @Test void realScanUniverseRemainsBounded() {
-        when(positionMapper.listOpenPositions()).thenReturn(List.of());
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of());
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
         when(discoverySource.currentDiscoveryUniverse()).thenReturn(instruments("ADAUSDT", "LINKUSDT"));
         assertThat(source.currentUniverse().discoveryAssets()).containsExactlyElementsOf(
@@ -127,7 +127,7 @@ class DefaultProviderScanUniverseSourceTest {
         push.setSymbol("ADAUSDT");
         push.setPushStatus("RECHECK_INVALIDATED");
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(push));
-        when(positionMapper.listOpenPositions()).thenReturn(List.of());
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of());
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
         when(watchlistSource.currentWatchlist()).thenReturn(instruments("ADAUSDT"));
         DefaultProviderScanUniverseSource eventSource = new DefaultProviderScanUniverseSource(properties,
@@ -148,7 +148,7 @@ class DefaultProviderScanUniverseSourceTest {
 
     @Test void currentUniverseNeverCallsEvaluateAndUsesCurrentTransitionStateOnly() {
         properties.setProfileEscalationEnabled(true);
-        when(positionMapper.listOpenPositions()).thenReturn(List.of(position("BTCUSDT", "OPEN")));
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position("BTCUSDT", "OPEN")));
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
         when(transitions.current("BTCUSDT", "provider-universe-read-only"))
                 .thenReturn(transition("BTCUSDT", RuntimeScanProfile.HIGH, "NEAR_USER_STOP", "read"));
@@ -170,7 +170,7 @@ class DefaultProviderScanUniverseSourceTest {
         TmPushSnapshotDO btcPush = new TmPushSnapshotDO();
         btcPush.setSymbol("BTCUSDT");
         btcPush.setPushStatus("RECHECK_INVALIDATED");
-        when(positionMapper.listOpenPositions()).thenReturn(List.of(btcPosition));
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(btcPosition));
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of(btcState));
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(btcPush));
         when(transitions.evaluate(eq("BTCUSDT"), any(), any(), anyString()))
@@ -185,7 +185,7 @@ class DefaultProviderScanUniverseSourceTest {
 
     @Test void readOnlyAndExecutionUniverseMembershipMatch() {
         properties.setProfileEscalationEnabled(true);
-        when(positionMapper.listOpenPositions()).thenReturn(List.of(position("BTCUSDT", "OPEN")));
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position("BTCUSDT", "OPEN")));
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of(
                 state("ETHUSDT", AssetStateEnum.CANDIDATE)));
         when(transitions.current(anyString(), anyString())).thenAnswer(invocation ->
@@ -212,7 +212,7 @@ class DefaultProviderScanUniverseSourceTest {
     }
 
     private void emptySources() {
-        when(positionMapper.listOpenPositions()).thenReturn(List.of());
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of());
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
     }
 

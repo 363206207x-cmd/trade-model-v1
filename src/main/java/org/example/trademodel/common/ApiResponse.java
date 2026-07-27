@@ -45,8 +45,24 @@ public class ApiResponse<T> {
 
     /** Client error (HTTP 400). Pair with ResponseEntity.badRequest when appropriate. */
     public static <T> ApiResponse<T> badRequest(String msg) {
+        return error(400, msg);
+    }
+
+    public static <T> ApiResponse<T> unauthorized(String msg) {
+        return error(401, msg);
+    }
+
+    public static <T> ApiResponse<T> forbidden(String msg) {
+        return error(403, msg);
+    }
+
+    public static <T> ApiResponse<T> conflict(String msg) {
+        return error(409, msg);
+    }
+
+    private static <T> ApiResponse<T> error(int code, String msg) {
         ApiResponse<T> resp = new ApiResponse<>();
-        resp.code = 400;
+        resp.code = code;
         resp.msg = msg;
         resp.data = null;
         resp.requestId = "req-" + System.currentTimeMillis();

@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.service.DashboardHomeService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,40 +27,43 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MobileDashboardControllerTest {
     @Mock
     private DashboardHomeService dashboardHomeService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new MobileDashboardController(dashboardHomeService)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new MobileDashboardController(dashboardHomeService, authenticatedUserIdResolver)).build();
     }
 
     @Test
     void mobileRouteProjectsExistingDashboardHomeVoWithThreeAssets() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("BTCUSDT");
-        when(dashboardHomeService.getHome("BTCUSDT", 3, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "BTCUSDT", 3, null)).thenReturn(home);
 
         mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "BTCUSDT"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("dashboard-mobile"))
                 .andExpect(model().attribute("home", home));
 
-        verify(dashboardHomeService).getHome("BTCUSDT", 3, null);
-        verifyNoMoreInteractions(dashboardHomeService);
+        verify(dashboardHomeService).getHomeForUser(7L, "BTCUSDT", 3, null);
     }
 
     @Test
     void mobileRouteKeepsSelectionOptionalAndDoesNotSelectAPosition() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
-        when(dashboardHomeService.getHome(null, 3, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, null, 3, null)).thenReturn(home);
 
         mockMvc.perform(get("/dashboard/mobile"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("dashboard-mobile"))
                 .andExpect(model().attribute("home", home));
 
-        verify(dashboardHomeService).getHome(null, 3, null);
+        verify(dashboardHomeService).getHomeForUser(7L, null, 3, null);
     }
 
     @Test
@@ -70,7 +74,7 @@ class MobileDashboardControllerTest {
                 asset("BTCUSDT", "DECISION"),
                 asset("ETHUSDT", "DEFAULT_SLOT"),
                 asset("SOLUSDT", "MARKET_DATA")));
-        when(dashboardHomeService.getHome("BTCUSDT", 3, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "BTCUSDT", 3, null)).thenReturn(home);
 
         MvcResult result = mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "BTCUSDT"))
                 .andExpect(status().isOk())
@@ -92,7 +96,7 @@ class MobileDashboardControllerTest {
                 asset("BNBUSDT", "MARKET_DATA"),
                 asset("BTCUSDT", "DEFAULT_SLOT"),
                 asset("ETHUSDT", "DEFAULT_SLOT")));
-        when(dashboardHomeService.getHome(null, 3, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, null, 3, null)).thenReturn(home);
 
         MvcResult result = mockMvc.perform(get("/dashboard/mobile"))
                 .andExpect(status().isOk())
@@ -111,7 +115,7 @@ class MobileDashboardControllerTest {
                 asset("ETHUSDT", "DECISION"),
                 asset("BNBUSDT", "DECISION"),
                 asset("SOLUSDT", "DECISION")));
-        when(dashboardHomeService.getHome("SOLUSDT", 3, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "SOLUSDT", 3, null)).thenReturn(home);
 
         MvcResult result = mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "SOLUSDT"))
                 .andExpect(status().isOk())
@@ -129,7 +133,7 @@ class MobileDashboardControllerTest {
         home.setAssets(List.of(
                 asset("BTCUSDT", "DECISION"),
                 asset("XRPUSDT", "DEFAULT_SLOT")));
-        when(dashboardHomeService.getHome("XRPUSDT", 3, null)).thenReturn(home);
+        when(dashboardHomeService.getHomeForUser(7L, "XRPUSDT", 3, null)).thenReturn(home);
 
         MvcResult result = mockMvc.perform(get("/dashboard/mobile").param("selectedSymbol", "XRPUSDT"))
                 .andExpect(status().isOk())

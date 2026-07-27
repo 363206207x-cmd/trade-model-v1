@@ -41,6 +41,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class UserPositionReviewAdapterTest {
+    private static final Long USER_ID = 17L;
+
     @Mock
     private UserPositionMapper userPositionMapper;
     @Mock
@@ -69,13 +71,13 @@ class UserPositionReviewAdapterTest {
     @Test
     void closedLongWinReadsPlanRealFieldsAllLogsAndProducesSafeAlignedSummary() throws Exception {
         UserPositionDO position = closedPosition(1L, "LONG", "plan-1", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(1L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(1L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-1")).thenReturn(plan("plan-1", "ana-1", "100", "95", "120"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(1L)).thenReturn(List.of(
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 1L)).thenReturn(List.of(
                 log(11L, "LOGIC_VALID", "HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30)),
                 log(12L, "LOGIC_WEAKENED", "MANUAL_REVIEW", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(1L);
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 1L);
 
         assertThat(summary.getPositionId()).isEqualTo(1L);
         assertThat(summary.getAnalysisId()).isEqualTo("ana-1");
@@ -99,20 +101,21 @@ class UserPositionReviewAdapterTest {
         assertForbiddenSummaryFieldsAbsent();
 
         verify(reviewService, never()).saveOrUpdate(any());
-        verify(userPositionMapper, never()).manualClose(anyLong(), any(), any(), any(), any());
+        verify(userPositionMapper, never())
+                .manualCloseByIdAndUserId(anyLong(), anyLong(), any(), any(), any(), any());
         verify(userPositionMapper, never()).insert(any());
     }
 
     @Test
     void closedLongLossPlanInvalidationAndIgnoredWarningAreDetected() {
         UserPositionDO position = closedPosition(2L, "LONG", "plan-2", "100", "90", "95", "120");
-        when(userPositionMapper.selectById(2L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(2L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-2")).thenReturn(plan("plan-2", "ana-2", "100", "95", "120"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(2L)).thenReturn(List.of(
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 2L)).thenReturn(List.of(
                 log(21L, "PLAN_INVALIDATED", "RECHECK_PLAN", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 0)),
                 log(22L, "HIGH_RISK", "RISK_REVIEW", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 30))));
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(2L);
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 2L);
 
         assertThat(summary.getOutcome()).isEqualTo("LOSS");
         assertThat(summary.isPlanInvalidatedBeforeClose()).isTrue();
@@ -125,53 +128,54 @@ class UserPositionReviewAdapterTest {
 
     @Test
     void closedShortWinLossAndBreakevenOutcomesUseSideAwarePnl() {
-        when(userPositionMapper.selectById(3L)).thenReturn(closedPosition(3L, "SHORT", null, "100", "90", "110", "80"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(3L)).thenReturn(List.of());
-        assertThat(adapter.buildSummary(3L).getOutcome()).isEqualTo("WIN");
+        when(userPositionMapper.selectByIdAndUserId(3L, USER_ID)).thenReturn(closedPosition(3L, "SHORT", null, "100", "90", "110", "80"));
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 3L)).thenReturn(List.of());
+        assertThat(adapter.buildSummaryForUser(USER_ID, 3L).getOutcome()).isEqualTo("WIN");
 
-        when(userPositionMapper.selectById(4L)).thenReturn(closedPosition(4L, "SHORT", null, "100", "110", "115", "80"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(4L)).thenReturn(List.of());
-        assertThat(adapter.buildSummary(4L).getOutcome()).isEqualTo("LOSS");
+        when(userPositionMapper.selectByIdAndUserId(4L, USER_ID)).thenReturn(closedPosition(4L, "SHORT", null, "100", "110", "115", "80"));
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 4L)).thenReturn(List.of());
+        assertThat(adapter.buildSummaryForUser(USER_ID, 4L).getOutcome()).isEqualTo("LOSS");
 
-        when(userPositionMapper.selectById(5L)).thenReturn(closedPosition(5L, "LONG", null, "100", "100", "95", "120"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(5L)).thenReturn(List.of());
-        assertThat(adapter.buildSummary(5L).getOutcome()).isEqualTo("BREAKEVEN");
+        when(userPositionMapper.selectByIdAndUserId(5L, USER_ID)).thenReturn(closedPosition(5L, "LONG", null, "100", "100", "95", "120"));
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 5L)).thenReturn(List.of());
+        assertThat(adapter.buildSummaryForUser(USER_ID, 5L).getOutcome()).isEqualTo("BREAKEVEN");
     }
 
     @Test
     void rejectsOpenPartiallyClosedAndInvalidClosedPositionsFailClosed() {
-        when(userPositionMapper.selectById(6L)).thenReturn(positionWithStatus(6L, "OPEN"));
-        assertThatThrownBy(() -> adapter.buildSummary(6L)).hasMessageContaining("POSITION_NOT_CLOSED");
+        when(userPositionMapper.selectByIdAndUserId(6L, USER_ID)).thenReturn(positionWithStatus(6L, "OPEN"));
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 6L)).hasMessageContaining("POSITION_NOT_CLOSED");
 
-        when(userPositionMapper.selectById(7L)).thenReturn(positionWithStatus(7L, "PARTIALLY_CLOSED"));
-        assertThatThrownBy(() -> adapter.buildSummary(7L)).hasMessageContaining("POSITION_NOT_FULLY_CLOSED");
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(positionWithStatus(7L, "PARTIALLY_CLOSED"));
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 7L)).hasMessageContaining("POSITION_NOT_FULLY_CLOSED");
 
         UserPositionDO missingEntry = closedPosition(8L, "LONG", null, "100", "110", "95", "120");
         missingEntry.setEntryPrice(null);
-        when(userPositionMapper.selectById(8L)).thenReturn(missingEntry);
-        assertThatThrownBy(() -> adapter.buildSummary(8L)).hasMessageContaining("entryPrice");
+        when(userPositionMapper.selectByIdAndUserId(8L, USER_ID)).thenReturn(missingEntry);
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 8L)).hasMessageContaining("entryPrice");
 
         UserPositionDO missingClose = closedPosition(9L, "LONG", null, "100", "110", "95", "120");
         missingClose.setClosePrice(null);
-        when(userPositionMapper.selectById(9L)).thenReturn(missingClose);
-        assertThatThrownBy(() -> adapter.buildSummary(9L)).hasMessageContaining("closePrice");
+        when(userPositionMapper.selectByIdAndUserId(9L, USER_ID)).thenReturn(missingClose);
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 9L)).hasMessageContaining("closePrice");
 
         UserPositionDO badQuantity = closedPosition(10L, "LONG", null, "100", "110", "95", "120");
         badQuantity.setQuantity(BigDecimal.ZERO);
-        when(userPositionMapper.selectById(10L)).thenReturn(badQuantity);
-        assertThatThrownBy(() -> adapter.buildSummary(10L)).hasMessageContaining("quantity");
+        when(userPositionMapper.selectByIdAndUserId(10L, USER_ID)).thenReturn(badQuantity);
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 10L)).hasMessageContaining("quantity");
 
         UserPositionDO badLeverage = closedPosition(11L, "LONG", null, "100", "110", "95", "120");
         badLeverage.setLeverage(BigDecimal.ZERO);
-        when(userPositionMapper.selectById(11L)).thenReturn(badLeverage);
-        assertThatThrownBy(() -> adapter.buildSummary(11L)).hasMessageContaining("leverage");
+        when(userPositionMapper.selectByIdAndUserId(11L, USER_ID)).thenReturn(badLeverage);
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 11L)).hasMessageContaining("leverage");
 
         UserPositionDO badTime = closedPosition(12L, "LONG", null, "100", "110", "95", "120");
         badTime.setClosedAt(LocalDateTime.of(2026, 6, 22, 7, 0));
-        when(userPositionMapper.selectById(12L)).thenReturn(badTime);
-        assertThatThrownBy(() -> adapter.buildSummary(12L)).hasMessageContaining("closedAt");
+        when(userPositionMapper.selectByIdAndUserId(12L, USER_ID)).thenReturn(badTime);
+        assertThatThrownBy(() -> adapter.buildSummaryForUser(USER_ID, 12L)).hasMessageContaining("closedAt");
 
-        verify(positionMonitorLogService, never()).listAllByPositionIdForReview(6L);
+        verify(positionMonitorLogService, never())
+                .listAllByPositionIdForUserReview(USER_ID, 6L);
     }
 
     @Test
@@ -179,16 +183,16 @@ class UserPositionReviewAdapterTest {
         UserPositionDO byAnalysis = closedPosition(13L, "LONG",
                 PositionMonitorSourceContract.analysisReference("ana-13"),
                 "100", "111", "95", "120");
-        when(userPositionMapper.selectById(13L)).thenReturn(byAnalysis);
+        when(userPositionMapper.selectByIdAndUserId(13L, USER_ID)).thenReturn(byAnalysis);
         when(executionPlanMapper.selectOnlyByAnalysisId("ana-13"))
                 .thenReturn(plan("plan-from-analysis", "ana-13", "100", "95", "120"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(13L)).thenReturn(List.of());
-        assertThat(adapter.buildSummary(13L).getExecutionPlanId()).isEqualTo("plan-from-analysis");
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 13L)).thenReturn(List.of());
+        assertThat(adapter.buildSummaryForUser(USER_ID, 13L).getExecutionPlanId()).isEqualTo("plan-from-analysis");
 
         UserPositionDO missingPlan = closedPosition(14L, "LONG", null, "100", "111", "95", "120");
-        when(userPositionMapper.selectById(14L)).thenReturn(missingPlan);
-        when(positionMonitorLogService.listAllByPositionIdForReview(14L)).thenReturn(List.of());
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(14L);
+        when(userPositionMapper.selectByIdAndUserId(14L, USER_ID)).thenReturn(missingPlan);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 14L)).thenReturn(List.of());
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 14L);
         assertThat(summary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_MISSING");
         assertThat(summary.getAnalysisId()).isEqualTo("USER_POSITION_14");
         assertThat(summary.getExecutionDeviationStatus()).isEqualTo("NOT_COMPUTABLE");
@@ -198,36 +202,36 @@ class UserPositionReviewAdapterTest {
     @Test
     void executionDeviationDeviatedAndNotComputableAreSeparated() {
         UserPositionDO deviated = closedPosition(15L, "LONG", "plan-15", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(15L)).thenReturn(deviated);
+        when(userPositionMapper.selectByIdAndUserId(15L, USER_ID)).thenReturn(deviated);
         when(executionPlanMapper.selectByPlanId("plan-15")).thenReturn(plan("plan-15", "ana-15", "103", "95", "120"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(15L)).thenReturn(List.of());
-        UserPositionReviewSummaryDTO result = adapter.buildSummary(15L);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 15L)).thenReturn(List.of());
+        UserPositionReviewSummaryDTO result = adapter.buildSummaryForUser(USER_ID, 15L);
         assertThat(result.getExecutionDeviationStatus()).isEqualTo("DEVIATED");
         assertThat(result.getExecutionDeviationReasons()).contains("ENTRY_DEVIATED");
 
         UserPositionDO notComputable = closedPosition(16L, "LONG", "plan-16", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(16L)).thenReturn(notComputable);
+        when(userPositionMapper.selectByIdAndUserId(16L, USER_ID)).thenReturn(notComputable);
         ExecutionPlanDO plan = plan("plan-16", "ana-16", "zone", "stop", "take profit text");
         when(executionPlanMapper.selectByPlanId("plan-16")).thenReturn(plan);
-        when(positionMonitorLogService.listAllByPositionIdForReview(16L)).thenReturn(List.of());
-        assertThat(adapter.buildSummary(16L).getExecutionDeviationStatus()).isEqualTo("NOT_COMPUTABLE");
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 16L)).thenReturn(List.of());
+        assertThat(adapter.buildSummaryForUser(USER_ID, 16L).getExecutionDeviationStatus()).isEqualTo("NOT_COMPUTABLE");
     }
 
     @Test
     void noWarningAndNonIgnoredWarningRemainDistinct() {
         UserPositionDO noWarning = closedPosition(17L, "LONG", null, "100", "112", "95", "120");
-        when(userPositionMapper.selectById(17L)).thenReturn(noWarning);
-        when(positionMonitorLogService.listAllByPositionIdForReview(17L)).thenReturn(List.of(
+        when(userPositionMapper.selectByIdAndUserId(17L, USER_ID)).thenReturn(noWarning);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 17L)).thenReturn(List.of(
                 log(171L, "LOGIC_VALID", "HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30))));
-        UserPositionReviewSummaryDTO noWarningSummary = adapter.buildSummary(17L);
+        UserPositionReviewSummaryDTO noWarningSummary = adapter.buildSummaryForUser(USER_ID, 17L);
         assertThat(noWarningSummary.isWarnedBeforeClose()).isFalse();
         assertThat(noWarningSummary.getWarningTimelinessStatus()).isEqualTo("NO_WARNING_BEFORE_CLOSE");
 
         UserPositionDO winAfterWarning = closedPosition(18L, "LONG", null, "100", "112", "95", "120");
-        when(userPositionMapper.selectById(18L)).thenReturn(winAfterWarning);
-        when(positionMonitorLogService.listAllByPositionIdForReview(18L)).thenReturn(List.of(
+        when(userPositionMapper.selectByIdAndUserId(18L, USER_ID)).thenReturn(winAfterWarning);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 18L)).thenReturn(List.of(
                 log(181L, "LOGIC_WEAKENED", "MANUAL_REVIEW", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
-        UserPositionReviewSummaryDTO warningSummary = adapter.buildSummary(18L);
+        UserPositionReviewSummaryDTO warningSummary = adapter.buildSummaryForUser(USER_ID, 18L);
         assertThat(warningSummary.isWarnedBeforeClose()).isTrue();
         assertThat(warningSummary.isIgnoredWarning()).isFalse();
     }
@@ -235,7 +239,7 @@ class UserPositionReviewAdapterTest {
     @Test
     void feedbackRecordsThroughExistingReviewServiceAndDerivesAnalysisIdServerSide() {
         UserPositionDO position = closedPosition(19L, "LONG", "plan-19", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(19L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(19L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-19"))
                 .thenReturn(plan("plan-19", "ana-server-19", "100", "95", "120"));
         ReviewStateVO state = new ReviewStateVO();
@@ -251,7 +255,7 @@ class UserPositionReviewAdapterTest {
         req.setErrorType("PLAN_EXECUTION_MISMATCH");
         req.setActualOutcome("LOSS");
         req.setAdjustmentSuggestion("tighten feedback");
-        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedback(19L, req);
+        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedbackForUser(USER_ID, 19L, req);
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
         verify(reviewService).saveOrUpdate(captor.capture());
@@ -266,13 +270,13 @@ class UserPositionReviewAdapterTest {
     @Test
     void feedbackUsesStableUserPositionAnalysisIdWhenPlanMissing() {
         UserPositionDO position = closedPosition(20L, "LONG", null, "100", "112", "95", "120");
-        when(userPositionMapper.selectById(20L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(20L, USER_ID)).thenReturn(position);
         ReviewStateVO state = new ReviewStateVO();
         state.setReviewId("review-20");
         state.setAnalysisId("USER_POSITION_20");
         when(reviewService.saveOrUpdate(any())).thenReturn(state);
 
-        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedback(20L, new UserPositionReviewFeedbackReq());
+        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedbackForUser(USER_ID, 20L, new UserPositionReviewFeedbackReq());
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
         verify(reviewService).saveOrUpdate(captor.capture());
@@ -283,39 +287,39 @@ class UserPositionReviewAdapterTest {
     @Test
     void closedPositionCrossSymbolTypedPlanFailsClosed() {
         UserPositionDO position = closedPosition(21L, "LONG", "plan-foreign", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(21L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(21L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-foreign"))
                 .thenReturn(plan("plan-foreign", "ana-foreign", "100", "95", "120"));
         when(analysisRunMapper.selectById("ana-foreign"))
                 .thenReturn(analysisRun("ana-foreign", "ETHUSDT"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(21L)).thenReturn(List.of());
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 21L)).thenReturn(List.of());
 
-        assertUnverifiedPlanSummary(adapter.buildSummary(21L), 21L);
+        assertUnverifiedPlanSummary(adapter.buildSummaryForUser(USER_ID, 21L), 21L);
     }
 
     @Test
     void closedPositionMissingAnalysisRunFailsClosed() {
         UserPositionDO position = closedPosition(22L, "LONG", "plan-no-run", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(22L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(22L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-no-run"))
                 .thenReturn(plan("plan-no-run", "ana-no-run", "100", "95", "120"));
         when(analysisRunMapper.selectById("ana-no-run")).thenReturn(null);
-        when(positionMonitorLogService.listAllByPositionIdForReview(22L)).thenReturn(List.of());
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 22L)).thenReturn(List.of());
 
-        assertUnverifiedPlanSummary(adapter.buildSummary(22L), 22L);
+        assertUnverifiedPlanSummary(adapter.buildSummaryForUser(USER_ID, 22L), 22L);
     }
 
     @Test
     void closedPositionPlanRunAnalysisMismatchFailsClosed() {
         UserPositionDO position = closedPosition(23L, "LONG", "plan-run-mismatch", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(23L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(23L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-run-mismatch"))
                 .thenReturn(plan("plan-run-mismatch", "ana-plan", "100", "95", "120"));
         when(analysisRunMapper.selectById("ana-plan"))
                 .thenReturn(analysisRun("ana-other", "BTCUSDT"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(23L)).thenReturn(List.of());
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 23L)).thenReturn(List.of());
 
-        assertUnverifiedPlanSummary(adapter.buildSummary(23L), 23L);
+        assertUnverifiedPlanSummary(adapter.buildSummaryForUser(USER_ID, 23L), 23L);
     }
 
     @Test
@@ -323,23 +327,23 @@ class UserPositionReviewAdapterTest {
         UserPositionDO position = closedPosition(24L, "LONG",
                 PositionMonitorSourceContract.analysisReference("ana-ambiguous"),
                 "100", "112", "95", "120");
-        when(userPositionMapper.selectById(24L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(24L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectOnlyByAnalysisId("ana-ambiguous")).thenReturn(null);
-        when(positionMonitorLogService.listAllByPositionIdForReview(24L)).thenReturn(List.of());
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 24L)).thenReturn(List.of());
 
-        assertUnverifiedPlanSummary(adapter.buildSummary(24L), 24L);
+        assertUnverifiedPlanSummary(adapter.buildSummaryForUser(USER_ID, 24L), 24L);
         verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
     }
 
     @Test
     void closedPositionExactVerifiedPlanStillBuildsReview() {
         UserPositionDO position = closedPosition(25L, "LONG", "plan-exact", "100", "112", "95", "120");
-        when(userPositionMapper.selectById(25L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(25L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-exact"))
                 .thenReturn(plan("plan-exact", "ana-exact", "100", "95", "120"));
-        when(positionMonitorLogService.listAllByPositionIdForReview(25L)).thenReturn(List.of());
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 25L)).thenReturn(List.of());
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(25L);
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 25L);
 
         assertThat(summary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_FOUND");
         assertThat(summary.getAnalysisId()).isEqualTo("ana-exact");
@@ -351,7 +355,7 @@ class UserPositionReviewAdapterTest {
     void unverifiedClosedPositionFeedbackNeverTargetsForeignAnalysis() {
         UserPositionDO position = closedPosition(26L, "LONG", "plan-foreign-feedback",
                 "100", "112", "95", "120");
-        when(userPositionMapper.selectById(26L)).thenReturn(position);
+        when(userPositionMapper.selectByIdAndUserId(26L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-foreign-feedback"))
                 .thenReturn(plan("plan-foreign-feedback", "ana-foreign-feedback", "100", "95", "120"));
         when(analysisRunMapper.selectById("ana-foreign-feedback"))
@@ -363,7 +367,7 @@ class UserPositionReviewAdapterTest {
             return state;
         });
 
-        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedback(
+        UserPositionReviewFeedbackResultDTO result = adapter.recordFeedbackForUser(USER_ID,
                 26L, new UserPositionReviewFeedbackReq());
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
@@ -380,15 +384,15 @@ class UserPositionReviewAdapterTest {
                 "100", "112", "95", "120");
         PositionMonitorLogDTO monitorA = sourceLog(271L, 27L, "analysis-X", "plan-A",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
-        when(userPositionMapper.selectById(27L)).thenReturn(position);
-        when(positionMonitorLogService.listAllByPositionIdForReview(27L)).thenReturn(List.of(monitorA));
+        when(userPositionMapper.selectByIdAndUserId(27L, USER_ID)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 27L)).thenReturn(List.of(monitorA));
         when(executionPlanMapper.selectByPlanId("plan-A"))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
         lenient().when(executionPlanMapper.selectOnlyByAnalysisId("analysis-X")).thenReturn(null);
         lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-X"))
                 .thenReturn(plan("plan-B", "analysis-X", "B-entry", "B-stop", "B-tp"));
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(27L);
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 27L);
 
         assertThat(summary.getPlanContextStatus()).isEqualTo("PLAN_CONTEXT_FOUND");
         assertThat(summary.getExecutionPlanId()).isEqualTo("plan-A");
@@ -411,8 +415,8 @@ class UserPositionReviewAdapterTest {
                 "100", "112", "95", "120");
         PositionMonitorLogDTO monitorA = sourceLog(281L, 28L, "analysis-X", "plan-A",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
-        when(userPositionMapper.selectById(28L)).thenReturn(position);
-        when(positionMonitorLogService.listAllByPositionIdForReview(28L)).thenReturn(List.of(monitorA));
+        when(userPositionMapper.selectByIdAndUserId(28L, USER_ID)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 28L)).thenReturn(List.of(monitorA));
         when(executionPlanMapper.selectByPlanId("plan-A"))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
         when(reviewService.saveOrUpdate(any())).thenAnswer(invocation -> {
@@ -423,8 +427,8 @@ class UserPositionReviewAdapterTest {
             return state;
         });
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(28L);
-        UserPositionReviewFeedbackResultDTO feedback = adapter.recordFeedback(
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 28L);
+        UserPositionReviewFeedbackResultDTO feedback = adapter.recordFeedbackForUser(USER_ID,
                 28L, new UserPositionReviewFeedbackReq());
 
         ArgumentCaptor<WriteReviewResultReq> captor = ArgumentCaptor.forClass(WriteReviewResultReq.class);
@@ -444,12 +448,12 @@ class UserPositionReviewAdapterTest {
                 "100", "112", "95", "120");
         PositionMonitorLogDTO guessedB = sourceLog(291L, 29L, "analysis-X", "plan-B",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
-        when(userPositionMapper.selectById(29L)).thenReturn(position);
-        when(positionMonitorLogService.listAllByPositionIdForReview(29L)).thenReturn(List.of(guessedB));
+        when(userPositionMapper.selectByIdAndUserId(29L, USER_ID)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 29L)).thenReturn(List.of(guessedB));
         when(executionPlanMapper.selectByPlanId("plan-A"))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(29L);
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 29L);
 
         assertThat(summary.getExecutionPlanId()).isEqualTo("plan-A");
         assertThat(summary.getEntryZone()).isEqualTo("A-entry");
@@ -468,10 +472,10 @@ class UserPositionReviewAdapterTest {
         position.setSourceRefId("legacy-untyped");
         PositionMonitorLogDTO legacy = sourceLog(301L, 30L, "analysis-X", "plan-A",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
-        when(userPositionMapper.selectById(30L)).thenReturn(position);
-        when(positionMonitorLogService.listAllByPositionIdForReview(30L)).thenReturn(List.of(legacy));
+        when(userPositionMapper.selectByIdAndUserId(30L, USER_ID)).thenReturn(position);
+        when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 30L)).thenReturn(List.of(legacy));
 
-        UserPositionReviewSummaryDTO summary = adapter.buildSummary(30L);
+        UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 30L);
 
         assertUnverifiedPlanSummary(summary, 30L);
         assertThat(summary.getMonitorLogs()).singleElement().satisfies(log -> {
@@ -497,6 +501,7 @@ class UserPositionReviewAdapterTest {
                                                  String takeProfit) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
+        row.setUserId(USER_ID);
         row.setAssetSymbol("BTCUSDT");
         row.setSide(side);
         row.setStatus("CLOSED");

@@ -60,9 +60,9 @@ class ExternalContextControllerTest {
         mockMvc.perform(post("/api/external-context/news-events/import")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.msg").value("sourcePublishedAt is required"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("invalid request"));
     }
 
     private String macroJson(String id) {

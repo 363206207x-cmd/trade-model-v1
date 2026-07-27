@@ -357,6 +357,7 @@ CREATE INDEX IF NOT EXISTS idx_tm_real_position_symbol_status ON tm_real_positio
 
 CREATE TABLE IF NOT EXISTS tm_user_position (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT,
     asset_symbol VARCHAR(32) NOT NULL,
     side VARCHAR(10) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -397,6 +398,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_user_position_status_opened_at
     ON tm_user_position(status, opened_at);
 CREATE INDEX IF NOT EXISTS idx_tm_user_position_asset_status
     ON tm_user_position(asset_symbol, status);
+CREATE INDEX IF NOT EXISTS idx_tm_user_position_user_status_opened_at
+    ON tm_user_position(user_id, status, opened_at);
 
 CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -838,6 +841,12 @@ CREATE TABLE IF NOT EXISTS tm_user (
     last_login_at TIMESTAMP,
     CONSTRAINT uq_tm_user_username UNIQUE (username)
 );
+
+ALTER TABLE tm_user_position
+    ADD CONSTRAINT IF NOT EXISTS fk_tm_user_position_user
+    FOREIGN KEY (user_id) REFERENCES tm_user(id)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT;
 
 -- tm_asset_state 语义：每个 symbol 当前仅一行（会被后续分析覆盖更新）。
 MERGE INTO tm_rule_config KEY(rule_key) VALUES

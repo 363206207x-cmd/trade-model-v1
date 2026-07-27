@@ -8,6 +8,8 @@ import org.example.trademodel.enums.UserPositionSourceTypeEnum;
 import org.example.trademodel.enums.UserPositionStatusEnum;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,6 +26,8 @@ public class UserPositionServiceImpl implements UserPositionService {
     private static final String SOURCE_MANUAL = UserPositionSourceTypeEnum.MANUAL.name();
     private static final String STATUS_OPEN = UserPositionStatusEnum.OPEN.name();
     private static final String STATUS_CLOSED = UserPositionStatusEnum.CLOSED.name();
+    private static final Set<String> FORBIDDEN_OWNER_FIELDS = Set.of(
+            "userid", "ownerid", "accountid", "principalid", "tenantid");
 
     private final UserPositionMapper userPositionMapper;
 
@@ -31,7 +36,8 @@ public class UserPositionServiceImpl implements UserPositionService {
     }
 
     @Override
-    public UserPositionVO manualOpen(CreateUserPositionReq request) {
+    public UserPositionVO manualOpenForUser(Long userId, CreateUserPositionReq request) {
+        requireUserId(userId);
         if (request == null) {
             throw new IllegalArgumentException("manual open request is required");
         }
@@ -47,6 +53,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         LocalDateTime now = LocalDateTime.now();
 
         UserPositionDO row = new UserPositionDO();
+        row.setUserId(userId);
         row.setAssetSymbol(assetSymbol);
         row.setSide(side.name());
         row.setStatus(STATUS_OPEN);
@@ -64,12 +71,15 @@ public class UserPositionServiceImpl implements UserPositionService {
         applySafetyFlags(row);
         row.setCreatedAt(now);
         row.setUpdatedAt(now);
-        userPositionMapper.insert(row);
+        if (userPositionMapper.insert(row) != 1) {
+            throw new IllegalStateException("UserPosition insert failed");
+        }
         return toVo(row);
     }
 
     @Override
-    public UserPositionVO manualClose(Long id, CloseUserPositionReq request) {
+    public UserPositionVO manualCloseForUser(Long id, Long userId, CloseUserPositionReq request) {
+        requireUserId(userId);
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("UserPosition id is required");
         }
@@ -78,50 +88,58 @@ public class UserPositionServiceImpl implements UserPositionService {
         }
         rejectForbiddenInputFields(request.getExtraFields());
         BigDecimal closePrice = requirePositive(request.getClosePrice(), "close_price");
-        UserPositionDO existing = userPositionMapper.selectById(id);
+        UserPositionDO existing = userPositionMapper.selectByIdAndUserId(id, userId);
         if (existing == null) {
-            throw new IllegalArgumentException("UserPosition not found: " + id);
+            throw new UserPositionNotFoundException();
         }
-        UserPositionStatusEnum.requireClosable(existing.getStatus());
+        if (!STATUS_OPEN.equalsIgnoreCase(existing.getStatus())) {
+            throw new UserPositionConflictException("UserPosition is not OPEN");
+        }
         LocalDateTime now = LocalDateTime.now();
-        int updated = userPositionMapper.manualClose(
+        int updated = userPositionMapper.manualCloseByIdAndUserId(
                 id,
+                userId,
                 now,
                 closePrice,
                 trimToNull(request.getCloseReason()),
                 now
         );
         if (updated != 1) {
-            throw new IllegalStateException("UserPosition manual close failed");
+            UserPositionDO current = userPositionMapper.selectByIdAndUserId(id, userId);
+            if (current == null) {
+                throw new UserPositionNotFoundException();
+            }
+            throw new UserPositionConflictException("UserPosition close state changed concurrently");
         }
-        UserPositionDO closed = userPositionMapper.selectById(id);
+        UserPositionDO closed = userPositionMapper.selectByIdAndUserId(id, userId);
         if (closed == null) {
-            closed = existing;
-            closed.setStatus(STATUS_CLOSED);
-            closed.setClosedAt(now);
-            closed.setClosePrice(closePrice);
-            closed.setCloseReason(trimToNull(request.getCloseReason()));
-            closed.setUpdatedAt(now);
+            throw new UserPositionNotFoundException();
         }
         applySafetyFlags(closed);
         return toVo(closed);
     }
 
     @Override
-    public List<UserPositionVO> listOpenPositions() {
-        return userPositionMapper.listOpenPositions().stream()
-                .filter(row -> UserPositionStatusEnum.parse(row.getStatus()).visibleInOpenPositions())
+    public List<UserPositionVO> listOpenPositionsForUser(Long userId) {
+        requireUserId(userId);
+        List<UserPositionDO> rows = userPositionMapper.listOpenByUserId(userId);
+        return (rows == null ? List.<UserPositionDO>of() : rows).stream()
+                .filter(row -> row != null && STATUS_OPEN.equalsIgnoreCase(row.getStatus()))
                 .map(UserPositionServiceImpl::toVo)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public UserPositionVO findById(Long id) {
+    public UserPositionVO findByIdForUser(Long id, Long userId) {
+        requireUserId(userId);
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("UserPosition id is required");
         }
-        UserPositionDO row = userPositionMapper.selectById(id);
-        return row == null ? null : toVo(row);
+        UserPositionDO row = userPositionMapper.selectByIdAndUserId(id, userId);
+        if (row == null) {
+            throw new UserPositionNotFoundException();
+        }
+        return toVo(row);
     }
 
     private static void applySafetyFlags(UserPositionDO row) {
@@ -192,12 +210,19 @@ public class UserPositionServiceImpl implements UserPositionService {
             String normalized = field == null ? "" : field.replace("_", "")
                     .replace("-", "")
                     .toLowerCase(Locale.ROOT);
-            if (normalized.contains("order")
+            if (FORBIDDEN_OWNER_FIELDS.contains(normalized)
+                    || normalized.contains("order")
                     || normalized.contains("execution")
                     || normalized.contains("autotrading")
                     || normalized.contains("positionsync")) {
                 throw new IllegalArgumentException("Forbidden UserPosition input field: " + field);
             }
+        }
+    }
+
+    private static void requireUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
         }
     }
 

@@ -463,7 +463,7 @@ public class HotResetServiceImpl implements HotResetService {
 
     private UserPositionRiskResult currentRiskFailClosed() {
         try {
-            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRiskForSystem();
             return result != null ? result : UserPositionRiskResult.failClosed("HOT_RESET_RISK_CONTEXT_UNAVAILABLE");
         } catch (Exception e) {
             return UserPositionRiskResult.failClosed("HOT_RESET_RISK_CONTEXT_UNAVAILABLE");

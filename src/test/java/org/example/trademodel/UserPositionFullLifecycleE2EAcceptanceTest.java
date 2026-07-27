@@ -67,6 +67,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
 
     private static final String PLAN_ID = "plan-p3-e2e-user-position";
     private static final String ANALYSIS_ID = "analysis-p3-e2e-user-position";
+    private static final Long USER_ID = 17L;
 
     @Test
     void activeMonitorAndClosedReviewUseSameSourceResolution()
@@ -100,7 +101,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         DecisionResultMapper decisionResultMapper = mock(DecisionResultMapper.class);
         InMemoryPositionMonitorLogService monitorLogService = new InMemoryPositionMonitorLogService();
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
-        when(riskAdapter.currentRisk()).thenReturn(allowedRisk());
+        when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(allowedRisk());
 
         UserPositionServiceImpl userPositionService = new UserPositionServiceImpl(userPositionMapper);
         PositionMonitorService positionMonitorService = new PositionMonitorServiceImpl(
@@ -122,7 +123,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
                 new DefaultUserPositionReviewAdapter(userPositionMapper, executionPlanMapper, analysisRunMapper,
                         monitorLogService, reviewService);
 
-        UserPositionVO opened = userPositionService.manualOpen(openPositionRequest());
+        UserPositionVO opened = userPositionService.manualOpenForUser(USER_ID, openPositionRequest());
 
         assertThat(opened.getId()).isNotNull();
         assertThat(opened.getAssetSymbol()).isEqualTo("BTCUSDT");
@@ -131,11 +132,11 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotAutoTrading()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();
-        assertThat(userPositionService.listOpenPositions())
+        assertThat(userPositionService.listOpenPositionsForUser(USER_ID))
                 .extracting(UserPositionVO::getId)
                 .containsExactly(opened.getId());
 
-        PositionMonitorResultDTO monitorResult = positionMonitorService.monitorUserPosition(opened.getId());
+        PositionMonitorResultDTO monitorResult = positionMonitorService.monitorUserPositionForUser(opened.getId(), USER_ID);
 
         assertThat(monitorResult.getPositionId()).isEqualTo(opened.getId());
         assertThat(monitorResult.getLogicStatus()).isEqualTo("LOGIC_VALID");
@@ -145,30 +146,33 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(monitorResult.isNotAutoTrading()).isTrue();
         assertThat(monitorResult.isNotOrderExecution()).isTrue();
         assertThat(monitorResult.isNotPositionMutation()).isTrue();
-        verify(userPositionMapper, never()).manualClose(anyLong(), any(LocalDateTime.class), any(BigDecimal.class),
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                anyLong(), anyLong(), any(LocalDateTime.class), any(BigDecimal.class),
                 anyString(), any(LocalDateTime.class));
 
-        List<PositionMonitorLogDTO> monitorLogs = monitorLogService.listAllByPositionIdForReview(opened.getId());
+        List<PositionMonitorLogDTO> monitorLogs = monitorLogService
+                .listAllByPositionIdForUserReview(USER_ID, opened.getId());
         assertThat(monitorLogs).hasSize(1);
         assertThat(monitorLogs.get(0).getLogicStatus()).isEqualTo("LOGIC_VALID");
         assertThat(monitorLogs.get(0).getSuggestedAction()).isEqualTo("HOLD");
         assertThat(monitorLogs.get(0).getAnalysisId()).isEqualTo(ANALYSIS_ID);
 
-        UserPositionVO closed = userPositionService.manualClose(opened.getId(), closePositionRequest());
+        UserPositionVO closed = userPositionService.manualCloseForUser(opened.getId(), USER_ID, closePositionRequest());
 
         assertThat(closed.getStatus()).isEqualTo("CLOSED");
         assertThat(closed.getClosePrice()).isEqualByComparingTo("112");
         assertThat(closed.isNotTradeInstruction()).isTrue();
         assertThat(closed.isNotAutoTrading()).isTrue();
         assertThat(closed.isNotOrderExecution()).isTrue();
-        assertThat(userPositionService.listOpenPositions()).isEmpty();
+        assertThat(userPositionService.listOpenPositionsForUser(USER_ID)).isEmpty();
 
-        PositionMonitorBatchResultDTO monitorBatchAfterClose = positionMonitorService.monitorOpenUserPositions();
+        PositionMonitorBatchResultDTO monitorBatchAfterClose = positionMonitorService
+                .monitorClaimedOpenPositionsForSystem();
         assertThat(monitorBatchAfterClose.getTotalCount()).isZero();
         assertThat(monitorBatchAfterClose.getSuccessCount()).isZero();
         assertThat(monitorBatchAfterClose.getFailureCount()).isZero();
 
-        UserPositionReviewSummaryDTO reviewSummary = reviewAdapter.buildSummary(opened.getId());
+        UserPositionReviewSummaryDTO reviewSummary = reviewAdapter.buildSummaryForUser(USER_ID, opened.getId());
 
         assertThat(reviewSummary.getReviewStatus()).isEqualTo("REVIEW_SUMMARY_READY");
         assertThat(reviewSummary.getPositionStatus()).isEqualTo("CLOSED");
@@ -186,7 +190,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(reviewSummary.isNotOrderExecution()).isTrue();
         assertThat(reviewSummary.isNotUserPositionMutation()).isTrue();
 
-        UserPositionReviewFeedbackResultDTO feedbackResult = reviewAdapter.recordFeedback(opened.getId(), feedbackRequest());
+        UserPositionReviewFeedbackResultDTO feedbackResult = reviewAdapter
+                .recordFeedbackForUser(USER_ID, opened.getId(), feedbackRequest());
 
         assertThat(feedbackResult.isRuleFeedbackRecorded()).isTrue();
         assertThat(feedbackResult.getPositionId()).isEqualTo(opened.getId());
@@ -220,23 +225,34 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
             positions.put(row.getId(), row);
             return 1;
         }).when(mapper).insert(any(UserPositionDO.class));
-        when(mapper.selectById(anyLong())).thenAnswer(invocation -> positions.get(invocation.getArgument(0)));
-        when(mapper.listOpenPositions()).thenAnswer(invocation -> positions.values().stream()
-                .filter(row -> Set.of("OPEN", "PARTIALLY_CLOSED").contains(row.getStatus()))
+        when(mapper.selectByIdAndUserId(anyLong(), anyLong())).thenAnswer(invocation -> {
+            UserPositionDO row = positions.get(invocation.getArgument(0));
+            return row != null && invocation.getArgument(1).equals(row.getUserId()) ? row : null;
+        });
+        when(mapper.selectClaimedByIdForSystem(anyLong()))
+                .thenAnswer(invocation -> positions.get(invocation.getArgument(0)));
+        when(mapper.listOpenByUserId(anyLong())).thenAnswer(invocation -> positions.values().stream()
+                .filter(row -> invocation.getArgument(0).equals(row.getUserId()))
+                .filter(row -> "OPEN".equals(row.getStatus()))
                 .sorted(Comparator.comparing(UserPositionDO::getId).reversed())
                 .collect(Collectors.toList()));
-        when(mapper.manualClose(anyLong(), any(LocalDateTime.class), any(BigDecimal.class), anyString(),
-                any(LocalDateTime.class)))
+        when(mapper.listClaimedOpenForSystemMonitoring()).thenAnswer(invocation -> positions.values().stream()
+                .filter(row -> row.getUserId() != null && "OPEN".equals(row.getStatus()))
+                .sorted(Comparator.comparing(UserPositionDO::getId).reversed())
+                .collect(Collectors.toList()));
+        when(mapper.manualCloseByIdAndUserId(anyLong(), anyLong(), any(LocalDateTime.class),
+                any(BigDecimal.class), anyString(), any(LocalDateTime.class)))
                 .thenAnswer(invocation -> {
                     Long positionId = invocation.getArgument(0);
+                    Long userId = invocation.getArgument(1);
                     UserPositionDO row = positions.get(positionId);
-                    if (row == null || !"OPEN".equals(row.getStatus())) {
+                    if (row == null || !userId.equals(row.getUserId()) || !"OPEN".equals(row.getStatus())) {
                         return 0;
                     }
-                    row.setClosedAt(invocation.getArgument(1));
-                    row.setClosePrice(invocation.getArgument(2));
-                    row.setCloseReason(invocation.getArgument(3));
-                    row.setUpdatedAt(invocation.getArgument(4));
+                    row.setClosedAt(invocation.getArgument(2));
+                    row.setClosePrice(invocation.getArgument(3));
+                    row.setCloseReason(invocation.getArgument(4));
+                    row.setUpdatedAt(invocation.getArgument(5));
                     row.setStatus("CLOSED");
                     return 1;
                 });
@@ -354,7 +370,20 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         private final List<PositionMonitorLogDTO> logs = new ArrayList<>();
 
         @Override
-        public PositionMonitorLogDTO recordMonitorRun(RecordPositionMonitorLogCommand command) {
+        public PositionMonitorLogDTO recordMonitorRunForUser(
+                Long userId, RecordPositionMonitorLogCommand command) {
+            if (!USER_ID.equals(userId)) {
+                throw new AssertionError("unexpected owner");
+            }
+            return record(command);
+        }
+
+        @Override
+        public PositionMonitorLogDTO recordMonitorRunForSystem(RecordPositionMonitorLogCommand command) {
+            return record(command);
+        }
+
+        private PositionMonitorLogDTO record(RecordPositionMonitorLogCommand command) {
             PositionMonitorLogDTO dto = new PositionMonitorLogDTO();
             dto.setLogId(ids.incrementAndGet());
             dto.setPositionId(command.getPositionId());
@@ -383,12 +412,21 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         }
 
         @Override
-        public PositionMonitorLogDTO findById(Long logId) {
+        public PositionMonitorLogDTO findByIdForSystem(Long logId) {
             return logs.stream().filter(log -> log.getLogId().equals(logId)).findFirst().orElse(null);
         }
 
         @Override
-        public List<PositionMonitorLogDTO> listByPositionId(Long positionId, Integer limit) {
+        public List<PositionMonitorLogDTO> listByPositionIdForUser(
+                Long userId, Long positionId, Integer limit) {
+            if (!USER_ID.equals(userId)) {
+                return List.of();
+            }
+            return listByPositionIdForSystem(positionId, limit);
+        }
+
+        @Override
+        public List<PositionMonitorLogDTO> listByPositionIdForSystem(Long positionId, Integer limit) {
             return logs.stream()
                     .filter(log -> log.getPositionId().equals(positionId))
                     .sorted(Comparator.comparing(PositionMonitorLogDTO::getCreatedAt).reversed())
@@ -397,7 +435,15 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         }
 
         @Override
-        public List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId) {
+        public List<PositionMonitorLogDTO> listAllByPositionIdForUserReview(Long userId, Long positionId) {
+            if (!USER_ID.equals(userId)) {
+                return List.of();
+            }
+            return listAllByPositionIdForSystemReview(positionId);
+        }
+
+        @Override
+        public List<PositionMonitorLogDTO> listAllByPositionIdForSystemReview(Long positionId) {
             return logs.stream()
                     .filter(log -> log.getPositionId().equals(positionId))
                     .sorted(Comparator.comparing(PositionMonitorLogDTO::getCreatedAt))
@@ -405,7 +451,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         }
 
         @Override
-        public List<PositionMonitorLogDTO> listByAnalysisId(String analysisId, Integer limit) {
+        public List<PositionMonitorLogDTO> listByAnalysisIdForSystem(String analysisId, Integer limit) {
             return logs.stream()
                     .filter(log -> log.getAnalysisId().equals(analysisId))
                     .sorted(Comparator.comparing(PositionMonitorLogDTO::getCreatedAt).reversed())

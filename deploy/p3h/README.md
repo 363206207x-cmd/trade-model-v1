@@ -16,15 +16,15 @@ providers, and external calls disabled.
 
 The lifecycle entrypoint requires an explicit mode. `INITIALIZE_GREENFIELD`
 performs strict empty-object inventory, four-role/two-database bootstrap,
-Flyway V1-V8, business-read-only/auth-session grants, tmpfs Secret materialization,
+Flyway V1-V9, business-read-only/auth-session grants, tmpfs Secret materialization,
 application health, then proxy health. `RECOVER_GREENFIELD_INITIALIZATION`
 requires `I_CONFIRM_RECOVER_CONTROLLED_GREENFIELD_INITIALIZATION` and accepts
-only a checksum-valid continuous Flyway V1-VN prefix (or V8 before grants),
+only a checksum-valid continuous Flyway V1-VN prefix (or V9 before grants),
 the exact versioned rule-default rows and normalized PostgreSQL schema
 fingerprint, the exact P3-H role/database identity, known migration objects,
-and zero business rows. It continues migrate to V8, runs core verification, refreshes
+and zero business rows. It continues migrate to V9, runs core verification, refreshes
 grants, and then runs full read-only verification. `STEADY_STATE_START` accepts
-only an already valid V8 database, including `tm_user`, and uses the same core -> grants -> full
+only an already valid V9 database, including `tm_user`, and uses the same core -> grants -> full
 sequence. Recovery pre-validates the applied prefix while ignoring only
 pending migrations (`*:pending`); post-migrate validation remains strict. No
 mode runs baseline, repair, or clean.

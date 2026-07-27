@@ -1,6 +1,9 @@
 package org.example.trademodel.security;
 
+import org.example.trademodel.entity.PersonalUserDO;
+import org.example.trademodel.mapper.PersonalUserMapper;
 import org.example.trademodel.mapper.RuleVersionLogMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -11,6 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +41,21 @@ class AuthAccessControlSecurityTest {
 
     @Autowired
     private RuleVersionLogMapper ruleVersionLogMapper;
+
+    @Autowired
+    private PersonalUserMapper personalUserMapper;
+
+    @BeforeEach
+    void ensureCanonicalOperator() {
+        if (personalUserMapper.findByUsername("operator") != null) {
+            return;
+        }
+        PersonalUserDO user = new PersonalUserDO();
+        user.setUsername("operator");
+        user.setPasswordHash("{noop}test-only-password");
+        user.setCreatedAt(LocalDateTime.now());
+        personalUserMapper.insert(user);
+    }
 
     @Test
     void dashboardPageRequiresAuthenticationAndAllowsSessionPrincipal() throws Exception {
@@ -127,7 +146,7 @@ class AuthAccessControlSecurityTest {
     @Test
     void staticResourceMissesAreNotAuthenticationChallenges() throws Exception {
         mockMvc.perform(get("/css/not-present.css"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNotFound())
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
     }
 

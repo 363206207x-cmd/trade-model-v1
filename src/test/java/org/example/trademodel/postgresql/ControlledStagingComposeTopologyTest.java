@@ -72,20 +72,20 @@ class ControlledStagingComposeTopologyTest {
     }
 
     @Test
-    void appCannotStartBeforeV8AndTmUserContract() throws Exception {
+    void appCannotStartBeforeV9OwnershipAndTmUserContract() throws Exception {
         String grants = P3hContractTestSupport.read("deploy/p3h/postgres-readonly-grants.sql");
         String compose = P3hContractTestSupport.read("deploy/p3h/docker-compose.p3h.yml");
 
         assertThat(grants).contains(
-                "successful_migrations <> 8", "final_version <> '8'",
-                "P3-H Flyway V8 verification failed",
+                "successful_migrations <> 9", "final_version <> '9'",
+                "P3-H Flyway V9 verification failed",
                 "public.tm_user", "public.tm_user_id_seq");
         assertThat(serviceBlock(compose, "app", "proxy")).contains(
                 "secret-materializer:", "condition: service_completed_successfully");
     }
 
     @Test
-    void migrationServiceUsesCanonicalV8WithoutDuplicatingTmUserDdl() throws Exception {
+    void migrationServiceUsesCanonicalV9WithoutDuplicatingTmUserDdl() throws Exception {
         String compose = P3hContractTestSupport.read("deploy/p3h/docker-compose.p3h.yml");
         String start = P3hContractTestSupport.read("deploy/p3h/p3h-compose-start.sh");
 

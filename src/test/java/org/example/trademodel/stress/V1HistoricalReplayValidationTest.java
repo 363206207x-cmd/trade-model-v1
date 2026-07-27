@@ -41,6 +41,7 @@ import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.PushRecheckServiceImpl;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.junit.jupiter.api.Tag;
@@ -73,6 +74,7 @@ class V1HistoricalReplayValidationTest {
 
     private static final String FIXTURE_SOURCE = "LOCAL_REPLAY_FIXTURE_NOT_PROVIDER";
     private static final String SYMBOL = "BTCUSDT";
+    private static final Long USER_ID = 17L;
 
     @Test
     void replayStylePathsKeepOpportunityAndPlanDecisionsFailClosed() {
@@ -157,13 +159,14 @@ class V1HistoricalReplayValidationTest {
         assertSafeMonitor(highRisk);
 
         assertThatThrownBy(() -> harness.monitorClosed(207L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OPEN or PARTIALLY_CLOSED");
+                .isInstanceOf(UserPositionConflictException.class)
+                .hasMessageContaining("CLOSED");
         PositionMonitorBatchResultDTO afterClose = harness.afterCloseBatch();
         assertThat(afterClose.getTotalCount()).isZero();
         assertThat(afterClose.getSuccessCount()).isZero();
         assertThat(afterClose.getFailureCount()).isZero();
-        verify(harness.positionMapper, never()).manualClose(anyLong(), any(), any(), anyString(), any());
+        verify(harness.positionMapper, never())
+                .manualCloseByIdAndUserId(anyLong(), anyLong(), any(), any(), anyString(), any());
 
         System.out.println("HISTORICAL_REPLAY_MONITOR_SUMMARY valid=1 weakened=1 invalidated=2 take_profit_zone=1 high_risk=1 closed_active=0 source="
                 + FIXTURE_SOURCE);
@@ -214,7 +217,7 @@ class V1HistoricalReplayValidationTest {
         RuleConfigContractService config = mock(RuleConfigContractService.class);
         TmPushSnapshotDO snapshot = pushSnapshot(scenario, invalidation);
         when(snapshotMapper.selectByPushId(snapshot.getPushId())).thenReturn(snapshot);
-        when(riskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(riskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         when(config.requirePushRecheckThresholds()).thenReturn(
                 new RuleConfigContractService.PushRecheckThresholds(new BigDecimal("0.02"), 70, 85, 60));
         PushRecheckServiceImpl service = new PushRecheckServiceImpl(snapshotMapper,
@@ -464,6 +467,7 @@ class V1HistoricalReplayValidationTest {
                                                 String stopLoss, String takeProfit) {
         UserPositionDO position = new UserPositionDO();
         position.setId(id);
+        position.setUserId(USER_ID);
         position.setAssetSymbol(SYMBOL);
         position.setSide("LONG");
         position.setStatus(status);
@@ -619,8 +623,8 @@ class V1HistoricalReplayValidationTest {
         private final AtomicLong logIds = new AtomicLong(3000L);
 
         private MonitorHarness() {
-            when(logService.listByPositionId(anyLong(), anyInt())).thenReturn(List.of());
-            when(logService.recordMonitorRun(any())).thenAnswer(invocation -> {
+            when(logService.listByPositionIdForUser(eq(USER_ID), anyLong(), anyInt())).thenReturn(List.of());
+            when(logService.recordMonitorRunForUser(eq(USER_ID), any())).thenAnswer(invocation -> {
                 PositionMonitorLogDTO log = new PositionMonitorLogDTO();
                 log.setLogId(logIds.incrementAndGet());
                 return log;
@@ -634,27 +638,28 @@ class V1HistoricalReplayValidationTest {
 
         private PositionMonitorResultDTO monitor(MonitorPoint point) {
             String planId = "plan-replay-" + point.name();
-            when(positionMapper.selectById(point.id()))
+            when(positionMapper.selectByIdAndUserId(point.id(), USER_ID))
                     .thenReturn(paperPosition(point.id(), "OPEN",
                             PositionMonitorSourceContract.executionPlanReference(planId),
                             point.stopLoss(), point.takeProfit()));
             when(quoteClient.fetch24hTicker(SYMBOL)).thenReturn(Optional.of(quote(point.currentPrice())));
-            when(riskAdapter.currentRisk()).thenReturn(point.risk());
+            when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(point.risk());
             ExecutionPlanDO plan = monitorPlan(planId);
             lenient().when(planMapper.selectByPlanId(planId)).thenReturn(plan);
             lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), SYMBOL));
-            return service.monitorUserPosition(point.id());
+            return service.monitorUserPositionForUser(point.id(), USER_ID);
         }
 
         private void monitorClosed(Long id) {
-            when(positionMapper.selectById(id)).thenReturn(paperPosition(id, "CLOSED", "plan-closed", "90", "120"));
-            service.monitorUserPosition(id);
+            when(positionMapper.selectByIdAndUserId(id, USER_ID))
+                    .thenReturn(paperPosition(id, "CLOSED", "plan-closed", "90", "120"));
+            service.monitorUserPositionForUser(id, USER_ID);
         }
 
         private PositionMonitorBatchResultDTO afterCloseBatch() {
-            when(positionMapper.listOpenPositions()).thenReturn(List.of());
-            return service.monitorOpenUserPositions();
+            when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of());
+            return service.monitorClaimedOpenPositionsForSystem();
         }
     }
 

@@ -268,7 +268,7 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
     private PositionMonitorLogDTO latestLog(UserPositionDO position) {
         if (position == null || position.getId() == null) return null;
         try {
-            List<PositionMonitorLogDTO> rows = monitorLogService.listByPositionId(position.getId(), 1);
+            List<PositionMonitorLogDTO> rows = monitorLogService.listByPositionIdForSystem(position.getId(), 1);
             return rows == null || rows.isEmpty() ? null : rows.get(0);
         } catch (RuntimeException ignored) {
             return null;
@@ -287,7 +287,7 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
 
     private List<UserPositionDO> safeOpenPositions() {
         try {
-            List<UserPositionDO> rows = userPositionMapper.listOpenPositions();
+            List<UserPositionDO> rows = userPositionMapper.listClaimedOpenForSystemMonitoring();
             return rows == null ? List.of() : rows;
         } catch (RuntimeException ignored) {
             return List.of();

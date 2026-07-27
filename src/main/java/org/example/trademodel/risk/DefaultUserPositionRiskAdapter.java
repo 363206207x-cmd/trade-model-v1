@@ -24,9 +24,24 @@ public class DefaultUserPositionRiskAdapter implements UserPositionRiskAdapter {
     }
 
     @Override
-    public UserPositionRiskResult currentRisk() {
-        int closedCount = Math.max(0, userPositionMapper.countClosedPositions());
-        List<UserPositionDO> rows = Optional.ofNullable(userPositionMapper.listOpenPositions()).orElse(List.of());
+    public UserPositionRiskResult currentRiskForUser(Long userId) {
+        if (userId == null || userId <= 0) {
+            return UserPositionRiskResult.failClosed("OWNER_SCOPE_REQUIRED");
+        }
+        int closedCount = Math.max(0, userPositionMapper.countClosedByUserId(userId));
+        List<UserPositionDO> rows = Optional.ofNullable(userPositionMapper.listOpenByUserId(userId)).orElse(List.of());
+        return calculate(rows, closedCount);
+    }
+
+    @Override
+    public UserPositionRiskResult currentRiskForSystem() {
+        int closedCount = Math.max(0, userPositionMapper.countClaimedClosedForSystem());
+        List<UserPositionDO> rows = Optional.ofNullable(
+                userPositionMapper.listClaimedOpenForSystemMonitoring()).orElse(List.of());
+        return calculate(rows, closedCount);
+    }
+
+    private UserPositionRiskResult calculate(List<UserPositionDO> rows, int closedCount) {
         if (rows.isEmpty()) {
             return UserPositionRiskResult.noOpenPosition(closedCount);
         }

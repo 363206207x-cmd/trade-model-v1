@@ -27,7 +27,7 @@ flyway_state="$(${psql_primary} --command="
          count(*) FILTER (WHERE NOT success)::text || '|' ||
          coalesce(string_agg(version, ',' ORDER BY installed_rank) FILTER (WHERE success), '')
   FROM flyway_schema_history")"
-[ "${flyway_state}" = "8|8|0|1,2,3,4,5,6,7,8" ] \
+[ "${flyway_state}" = "9|9|0|1,2,3,4,5,6,7,8,9" ] \
   || { echo "P3H_STEADY_STATE_VERIFY: BLOCKED_FLYWAY_STATE" >&2; exit 2; }
 
 role_count="$(${psql_postgres} --command="
@@ -78,7 +78,8 @@ schema_violation_count="$(${psql_primary} --command="
     ('tm_user','username'),
     ('tm_user','password_hash'),
     ('tm_user','created_at'),
-    ('tm_user','last_login_at')
+    ('tm_user','last_login_at'),
+    ('tm_user_position','user_id')
   ), violations AS (
     SELECT 'missing_table' AS kind, e.name
     FROM expected_tables e
@@ -131,7 +132,7 @@ schema_violation_count="$(${psql_primary} --command="
 [ "${schema_violation_count}" = "0" ] \
   || { echo "P3H_STEADY_STATE_VERIFY: BLOCKED_SCHEMA_STATE" >&2; exit 2; }
 
-if ! /p3h/postgres-versioned-contract-verify.sh 8 STEADY_STATE; then
+if ! /p3h/postgres-versioned-contract-verify.sh 9 STEADY_STATE; then
   echo "P3H_STEADY_STATE_VERIFY: BLOCKED_VERSIONED_CONTENT_CONTRACT" >&2
   exit 2
 fi
@@ -139,7 +140,7 @@ fi
 echo "P3H_CORE_STATE_VERIFY: PASS"
 if [ "${P3H_STEADY_VERIFY_SCOPE}" = "CORE_STATE_VERIFY" ]; then
   echo "P3H_STEADY_STATE_VERIFY: PASS"
-  echo "P3H_FLYWAY_CURRENT_VERSION: 8"
+  echo "P3H_FLYWAY_CURRENT_VERSION: 9"
   echo "P3H_FLYWAY_FAILED_MIGRATIONS: 0"
   exit 0
 fi
@@ -305,7 +306,7 @@ fi
 
 echo "P3H_FULL_READONLY_STATE_VERIFY: PASS"
 echo "P3H_STEADY_STATE_VERIFY: PASS"
-echo "P3H_FLYWAY_CURRENT_VERSION: 8"
+echo "P3H_FLYWAY_CURRENT_VERSION: 9"
 echo "P3H_FLYWAY_FAILED_MIGRATIONS: 0"
 echo "P3H_ROLE_AND_GRANT_CONTRACT: PASS"
 echo "READONLY_ROLE_MEMBERSHIP_CONTRACT: PASS"

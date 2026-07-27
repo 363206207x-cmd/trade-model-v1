@@ -4,7 +4,7 @@ import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 
 public interface PositionMonitorService {
-    PositionMonitorResultDTO monitorUserPosition(Long positionId);
+    PositionMonitorResultDTO monitorUserPositionForUser(Long positionId, Long userId);
 
-    PositionMonitorBatchResultDTO monitorOpenUserPositions();
+    PositionMonitorBatchResultDTO monitorClaimedOpenPositionsForSystem();
 }

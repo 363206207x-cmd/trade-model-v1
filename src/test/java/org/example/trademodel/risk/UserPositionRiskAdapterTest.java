@@ -21,6 +21,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class UserPositionRiskAdapterTest {
+    private static final Long USER_ID = 17L;
+
     @Mock
     private UserPositionMapper userPositionMapper;
 
@@ -29,19 +31,19 @@ class UserPositionRiskAdapterTest {
     @BeforeEach
     void setUp() {
         adapter = new DefaultUserPositionRiskAdapter(userPositionMapper);
-        when(userPositionMapper.countClosedPositions()).thenReturn(0);
+        when(userPositionMapper.countClosedByUserId(USER_ID)).thenReturn(0);
     }
 
     @Test
     void openAndPartiallyClosedPositionsAreIncludedAndClosedPositionsAreExcluded() {
-        when(userPositionMapper.countClosedPositions()).thenReturn(1);
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.countClosedByUserId(USER_ID)).thenReturn(1);
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "2", "95"),
                 row(2L, "ETHUSDT", "SHORT", "PARTIALLY_CLOSED", "100", "1", "2", "105"),
                 row(3L, "SOLUSDT", "LONG", "CLOSED", "100", "1", "2", "95")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.getIncludedPositionCount()).isEqualTo(2);
         assertThat(result.getOpenPositionCount()).isEqualTo(1);
@@ -52,10 +54,10 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void emptyUserPositionsReturnExplicitSafeNoOpenState() {
-        when(userPositionMapper.countClosedPositions()).thenReturn(2);
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of());
+        when(userPositionMapper.countClosedByUserId(USER_ID)).thenReturn(2);
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of());
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.getRiskStatus()).isEqualTo("NO_OPEN_USER_POSITION");
         assertThat(result.getRiskLevel()).isEqualTo("LOW");
@@ -66,11 +68,11 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void highLeverageReturnsRiskBlocked() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "12", "95")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isRiskBlocked()).isTrue();
         assertThat(result.getRiskStatus()).isEqualTo("RISK_BLOCKED");
@@ -79,13 +81,13 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void highConcentrationReturnsRiskBlocked() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "20", "2", "95"),
                 row(2L, "BTCUSDT", "LONG", "OPEN", "100", "20", "2", "95"),
                 row(3L, "ETHUSDT", "SHORT", "OPEN", "100", "2", "2", "105")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isRiskBlocked()).isTrue();
         assertThat(result.getReasonCodes()).contains("CONCENTRATION_RISK_BLOCKED");
@@ -93,13 +95,13 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void balancedMultiAssetPositionsRemainAllowed() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "2", "95"),
                 row(2L, "ETHUSDT", "SHORT", "OPEN", "100", "1", "2", "105"),
                 row(3L, "SOLUSDT", "LONG", "OPEN", "100", "1", "2", "95")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.getRiskStatus()).isEqualTo("RISK_ALLOWED");
         assertThat(result.isRiskBlocked()).isFalse();
@@ -108,12 +110,12 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void conservativeDirectionalProxyBlocksCorrelationRisk() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "2", "95"),
                 row(2L, "ETHUSDT", "LONG", "OPEN", "100", "1", "2", "95")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isRiskBlocked()).isTrue();
         assertThat(result.getReasonCodes()).contains("CORRELATION_DIRECTIONAL_PROXY_BLOCKED");
@@ -122,11 +124,11 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void drawdownOrVarProxyBlocksLargeStopLossLoss() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "200", "1", "50")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isRiskBlocked()).isTrue();
         assertThat(result.getReasonCodes()).contains("DRAWDOWN_OR_VAR_RISK_BLOCKED");
@@ -136,9 +138,9 @@ class UserPositionRiskAdapterTest {
     void missingStopLossFailsClosed() {
         UserPositionDO row = row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "2", "95");
         row.setStopLoss(null);
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(row));
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(row));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isRiskBlocked()).isTrue();
         assertThat(result.getReasonCodes()).contains("STOP_LOSS_REQUIRED_FAIL_CLOSED");
@@ -149,9 +151,9 @@ class UserPositionRiskAdapterTest {
         UserPositionDO badPrice = row(1L, "BTCUSDT", "LONG", "OPEN", "0", "1", "2", "95");
         UserPositionDO badQuantity = row(2L, "ETHUSDT", "SHORT", "OPEN", "100", "0", "2", "105");
         UserPositionDO badLeverage = row(3L, "SOLUSDT", "LONG", "OPEN", "100", "1", "0", "95");
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(badPrice, badQuantity, badLeverage));
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(badPrice, badQuantity, badLeverage));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isRiskBlocked()).isTrue();
         assertThat(result.getReasonCodes()).contains(
@@ -162,11 +164,11 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void riskResultContainsSafetyFieldsAndNoExecutableActionFields() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "2", "95")
         ));
 
-        UserPositionRiskResult result = adapter.currentRisk();
+        UserPositionRiskResult result = adapter.currentRiskForUser(USER_ID);
 
         assertThat(result.isReviewOnly()).isTrue();
         assertThat(result.isManualReviewOnly()).isTrue();
@@ -185,22 +187,23 @@ class UserPositionRiskAdapterTest {
 
     @Test
     void adapterReadsOnlyUserPositionFactsAndDoesNotMutatePositions() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "BTCUSDT", "LONG", "OPEN", "100", "1", "2", "95")
         ));
 
         UserPositionRiskAdapter monitorCompatibleCaller = adapter;
-        UserPositionRiskResult result = monitorCompatibleCaller.currentRisk();
+        UserPositionRiskResult result = monitorCompatibleCaller.currentRiskForUser(USER_ID);
 
         assertThat(result.getIncludedPositionCount()).isEqualTo(1);
-        verify(userPositionMapper).countClosedPositions();
-        verify(userPositionMapper).listOpenPositions();
+        verify(userPositionMapper).countClosedByUserId(USER_ID);
+        verify(userPositionMapper).listOpenByUserId(USER_ID);
         verify(userPositionMapper, never()).insert(org.mockito.ArgumentMatchers.any());
-        verify(userPositionMapper, never()).manualClose(
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
-        verify(userPositionMapper, never()).selectById(org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(userPositionMapper, never()).selectByIdAndUserId(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     private static UserPositionDO row(Long id,
@@ -213,6 +216,7 @@ class UserPositionRiskAdapterTest {
                                       String stopLoss) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
+        row.setUserId(USER_ID);
         row.setAssetSymbol(symbol);
         row.setSide(side);
         row.setStatus(status);

@@ -34,7 +34,7 @@ class ControlledStagingLifecycleRound2ContractTest {
         assertThat(flyway).contains("migrate|validate");
         assertThat(flyway).doesNotContain("repair)", "clean)", "baseline)");
         assertThat(verify).contains(
-                "8|8|0|1,2,3,4,5,6,7,8",
+                "9|9|0|1,2,3,4,5,6,7,8,9",
                 "P3H_ROLE_AND_GRANT_CONTRACT: PASS");
     }
 
