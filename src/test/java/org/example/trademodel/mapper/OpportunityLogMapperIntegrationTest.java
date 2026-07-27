@@ -76,6 +76,21 @@ class OpportunityLogMapperIntegrationTest {
         eth.setMfeRatio(new BigDecimal("0.90"));
         eth.setMaeRatio(new BigDecimal("0.30"));
         opportunityLogMapper.insert(eth);
+        OpportunityLogDO ownerDerived = row("opp-owner-derived", "ana-owner:dec-owner",
+                "ana-owner", "dec-owner", "BTCUSDT", base.plusMinutes(2));
+        ownerDerived.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
+        ownerDerived.setOpportunityStatus(OpportunityLogStatus.EXECUTED_VALID);
+        ownerDerived.setHitOrder(OpportunityLogStatus.TARGET_FIRST);
+        ownerDerived.setUserPositionId(77L);
+        ownerDerived.setUserPositionPresent(true);
+        ownerDerived.setEvaluationAsOf(base.plusMinutes(30));
+        opportunityLogMapper.insert(ownerDerived);
+        OpportunityLogDO reviewDerived = row("opp-review-derived", "ana-review:dec-review",
+                "ana-review", "dec-review", "BTCUSDT", base.plusMinutes(3));
+        reviewDerived.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
+        reviewDerived.setEvaluationAsOf(base.plusMinutes(45));
+        reviewDerived.setReasonCodes("MULTIPLE_LINKED_USER_POSITIONS");
+        opportunityLogMapper.insert(reviewDerived);
 
         OpportunityLogStatsDTO stats = opportunityLogMapper.aggregateStats("BTCUSDT", base, base.plusMinutes(204));
         List<OpportunityLogCountRow> statusCounts = opportunityLogMapper.countByStatus("BTCUSDT", base, base.plusMinutes(204));

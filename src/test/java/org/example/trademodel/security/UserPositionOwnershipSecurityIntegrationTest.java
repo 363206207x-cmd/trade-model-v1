@@ -275,6 +275,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
                 .andExpect(jsonPath("$.data.userPositionPresent").value(false))
+                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
+                .andExpect(jsonPath("$.data.evaluationAsOf").doesNotExist())
                 .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID));
 
         mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
@@ -282,7 +284,31 @@ class UserPositionOwnershipSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userPositionId").value(linkedB.getId()))
                 .andExpect(jsonPath("$.data.userPositionPresent").value(true))
+                .andExpect(jsonPath("$.data.evaluationAsOf").doesNotExist())
                 .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.EXECUTED_VALID));
+    }
+
+    @Test
+    void opportunityLogReviewLifecycleAndTimestampDoNotLeakAcrossUsers() throws Exception {
+        OpportunityLogDO opportunity = resolvedOpportunity(openB);
+        opportunity.setOpportunityId("opp-owner-review-isolation");
+        opportunity.setOpportunityKey("ana-owner-review:dec-owner-review");
+        opportunity.setUserPositionId(null);
+        opportunity.setUserPositionPresent(false);
+        opportunity.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
+        opportunity.setOpportunityStatus(null);
+        opportunity.setResolvedAt(null);
+        opportunity.setReasonCodes("MULTIPLE_LINKED_USER_POSITIONS");
+        opportunityLogMapper.insert(opportunity);
+
+        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.PENDING_EVALUATION))
+                .andExpect(jsonPath("$.data.evaluationAsOf").doesNotExist())
+                .andExpect(jsonPath("$.data.reasonCodes").isEmpty())
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.userPositionPresent").value(false));
     }
 
     @Test
