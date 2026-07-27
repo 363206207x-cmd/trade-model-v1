@@ -4,6 +4,8 @@ import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.UserPositionVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -16,18 +18,27 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class UserPositionServiceImplTest {
+    private static final Long USER_ID = 17L;
+
     @Mock
     private UserPositionMapper userPositionMapper;
 
@@ -36,18 +47,20 @@ class UserPositionServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new UserPositionServiceImpl(userPositionMapper);
+        lenient().when(userPositionMapper.insert(any())).thenReturn(1);
     }
 
     @Test
     void manualOpenCreatesOpenManualUserPositionWithSafetyFlags() {
         CreateUserPositionReq request = validOpenRequest();
 
-        UserPositionVO vo = service.manualOpen(request);
+        UserPositionVO vo = service.manualOpenForUser(USER_ID, request);
 
         ArgumentCaptor<UserPositionDO> captor = ArgumentCaptor.forClass(UserPositionDO.class);
         verify(userPositionMapper).insert(captor.capture());
         UserPositionDO row = captor.getValue();
         assertThat(row.getAssetSymbol()).isEqualTo("BTCUSDT");
+        assertThat(row.getUserId()).isEqualTo(USER_ID);
         assertThat(row.getSide()).isEqualTo("LONG");
         assertThat(row.getStatus()).isEqualTo("OPEN");
         assertThat(row.getEntryPrice()).isEqualByComparingTo("100.50");
@@ -73,31 +86,31 @@ class UserPositionServiceImplTest {
     void manualOpenRejectsInvalidPriceQuantityLeverageAndSide() {
         CreateUserPositionReq missingSymbol = validOpenRequest();
         missingSymbol.setAssetSymbol(" ");
-        assertThatThrownBy(() -> service.manualOpen(missingSymbol))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, missingSymbol))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("asset_symbol");
 
         CreateUserPositionReq badSide = validOpenRequest();
         badSide.setSide("FLAT");
-        assertThatThrownBy(() -> service.manualOpen(badSide))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, badSide))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("LONG or SHORT");
 
         CreateUserPositionReq badPrice = validOpenRequest();
         badPrice.setEntryPrice(BigDecimal.ZERO);
-        assertThatThrownBy(() -> service.manualOpen(badPrice))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, badPrice))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("entry_price");
 
         CreateUserPositionReq badQuantity = validOpenRequest();
         badQuantity.setQuantity(new BigDecimal("-1"));
-        assertThatThrownBy(() -> service.manualOpen(badQuantity))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, badQuantity))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("quantity");
 
         CreateUserPositionReq badLeverage = validOpenRequest();
         badLeverage.setLeverage(BigDecimal.ZERO);
-        assertThatThrownBy(() -> service.manualOpen(badLeverage))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, badLeverage))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("leverage");
 
@@ -117,25 +130,25 @@ class UserPositionServiceImplTest {
     void manualOpenRejectsOrderExecutionAutoTradingAndPositionSyncInputFields() {
         CreateUserPositionReq request = validOpenRequest();
         request.putExtraField("orderAction", "BUY");
-        assertThatThrownBy(() -> service.manualOpen(request))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden UserPosition input field");
 
         CreateUserPositionReq executionRequest = validOpenRequest();
         executionRequest.putExtraField("execution_action", "OPEN");
-        assertThatThrownBy(() -> service.manualOpen(executionRequest))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, executionRequest))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden UserPosition input field");
 
         CreateUserPositionReq autoTradingRequest = validOpenRequest();
         autoTradingRequest.putExtraField("autoTradingAction", "OPEN");
-        assertThatThrownBy(() -> service.manualOpen(autoTradingRequest))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, autoTradingRequest))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden UserPosition input field");
 
         CreateUserPositionReq positionSyncRequest = validOpenRequest();
         positionSyncRequest.putExtraField("position_sync", "true");
-        assertThatThrownBy(() -> service.manualOpen(positionSyncRequest))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, positionSyncRequest))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden UserPosition input field");
 
@@ -143,59 +156,78 @@ class UserPositionServiceImplTest {
     }
 
     @Test
-    void manualCloseChangesOpenPositionToClosed() {
+    void manualCloseChangesOpenOrPartiallyClosedPositionToClosed() {
         UserPositionDO open = row(7L, "OPEN");
         UserPositionDO closed = row(7L, "CLOSED");
         closed.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
         closed.setClosePrice(new BigDecimal("105.25"));
-        when(userPositionMapper.selectById(7L)).thenReturn(open, closed);
-        when(userPositionMapper.manualClose(eq(7L), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any()))
+        UserPositionDO partiallyClosed = row(8L, "PARTIALLY_CLOSED");
+        UserPositionDO closedAfterPartial = row(8L, "CLOSED");
+        closedAfterPartial.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
+        closedAfterPartial.setClosePrice(new BigDecimal("106.25"));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(open, closed);
+        when(userPositionMapper.selectByIdAndUserId(8L, USER_ID))
+                .thenReturn(partiallyClosed, closedAfterPartial);
+        when(userPositionMapper.manualCloseByIdAndUserId(
+                eq(7L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any()))
+                .thenReturn(1);
+        when(userPositionMapper.manualCloseByIdAndUserId(
+                eq(8L), eq(USER_ID), any(), eq(new BigDecimal("106.25")), eq("manual exit"), any()))
                 .thenReturn(1);
 
-        UserPositionVO vo = service.manualClose(7L, closeRequest("105.25", "manual exit"));
+        UserPositionVO vo = service.manualCloseForUser(7L, USER_ID, closeRequest("105.25", "manual exit"));
+        UserPositionVO partialVo =
+                service.manualCloseForUser(8L, USER_ID, closeRequest("106.25", "manual exit"));
 
         assertThat(vo.getStatus()).isEqualTo("CLOSED");
         assertThat(vo.getClosePrice()).isEqualByComparingTo("105.25");
         assertThat(vo.isNotTradeInstruction()).isTrue();
         assertThat(vo.isNotAutoTrading()).isTrue();
-        verify(userPositionMapper).manualClose(eq(7L), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any());
+        assertThat(partialVo.getStatus()).isEqualTo("CLOSED");
+        assertThat(partialVo.getClosePrice()).isEqualByComparingTo("106.25");
+        verify(userPositionMapper).manualCloseByIdAndUserId(
+                eq(7L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any());
+        verify(userPositionMapper).manualCloseByIdAndUserId(
+                eq(8L), eq(USER_ID), any(), eq(new BigDecimal("106.25")), eq("manual exit"), any());
     }
 
     @Test
     void closingClosedPositionFailsClosed() {
-        when(userPositionMapper.selectById(9L)).thenReturn(row(9L, "CLOSED"));
+        when(userPositionMapper.selectByIdAndUserId(9L, USER_ID)).thenReturn(row(9L, "CLOSED"));
 
-        assertThatThrownBy(() -> service.manualClose(9L, closeRequest("105.25", "already closed")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Only OPEN or PARTIALLY_CLOSED");
+        assertThatThrownBy(() -> service.manualCloseForUser(9L, USER_ID, closeRequest("105.25", "already closed")))
+                .isInstanceOf(UserPositionConflictException.class)
+                .hasMessageContaining("not OPEN");
 
-        verify(userPositionMapper, never()).manualClose(any(), any(), any(), any(), any());
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void manualCloseRejectsInvalidClosePriceAndForbiddenFields() {
         CloseUserPositionReq badPrice = closeRequest("0", "bad");
-        assertThatThrownBy(() -> service.manualClose(1L, badPrice))
+        assertThatThrownBy(() -> service.manualCloseForUser(1L, USER_ID, badPrice))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("close_price");
 
         CloseUserPositionReq forbidden = closeRequest("10", "bad");
         forbidden.putExtraField("executionAction", "CLOSE");
-        assertThatThrownBy(() -> service.manualClose(1L, forbidden))
+        assertThatThrownBy(() -> service.manualCloseForUser(1L, USER_ID, forbidden))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden UserPosition input field");
 
-        verify(userPositionMapper, never()).manualClose(any(), any(), any(), any(), any());
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void listOpenPositionsReturnsOnlyOpenVisibleStatusesWithSafetyFields() {
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 row(1L, "OPEN"),
                 row(2L, "PARTIALLY_CLOSED")
         ));
 
-        List<UserPositionVO> rows = service.listOpenPositions();
+        List<UserPositionVO> rows = service.listOpenPositionsForUser(USER_ID);
 
         assertThat(rows).hasSize(2);
         assertThat(rows).extracting(UserPositionVO::getStatus)
@@ -209,10 +241,93 @@ class UserPositionServiceImplTest {
         });
     }
 
+    @Test
+    void everyUserScopedServiceEntryFailsClosedWithoutCanonicalOwner() {
+        assertThatThrownBy(() -> service.manualOpenForUser(null, validOpenRequest()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("userId");
+        assertThatThrownBy(() -> service.manualCloseForUser(1L, null, closeRequest("101", "manual")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("userId");
+        assertThatThrownBy(() -> service.listOpenPositionsForUser(null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("userId");
+        assertThatThrownBy(() -> service.findByIdForUser(1L, null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("userId");
+        verify(userPositionMapper, never()).insert(any());
+    }
+
+    @Test
+    void nonOwnerAndUnclaimedRowsShareNotFoundSemantics() {
+        when(userPositionMapper.selectByIdAndUserId(71L, USER_ID)).thenReturn(null);
+        when(userPositionMapper.selectByIdAndUserId(72L, USER_ID)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.findByIdForUser(71L, USER_ID))
+                .isInstanceOf(UserPositionNotFoundException.class)
+                .hasMessage("UserPosition not found");
+        assertThatThrownBy(() -> service.manualCloseForUser(
+                72L, USER_ID, closeRequest("101", "manual")))
+                .isInstanceOf(UserPositionNotFoundException.class)
+                .hasMessage("UserPosition not found");
+    }
+
+    @Test
+    void twoConcurrentCloseRequestsProduceOneSuccessAndOneConflict() throws Exception {
+        AtomicBoolean closedState = new AtomicBoolean(false);
+        UserPositionDO open = row(81L, "OPEN");
+        UserPositionDO closed = row(81L, "CLOSED");
+        closed.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
+        closed.setClosePrice(new BigDecimal("105.25"));
+        when(userPositionMapper.selectByIdAndUserId(81L, USER_ID))
+                .thenAnswer(invocation -> closedState.get() ? closed : open);
+        when(userPositionMapper.manualCloseByIdAndUserId(
+                eq(81L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any()))
+                .thenAnswer(invocation -> closedState.compareAndSet(false, true) ? 1 : 0);
+
+        CountDownLatch start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Object> first = executor.submit(() -> closeAfter(start));
+            Future<Object> second = executor.submit(() -> closeAfter(start));
+            start.countDown();
+            List<Object> results = List.of(first.get(), second.get());
+
+            assertThat(results.stream().filter(UserPositionVO.class::isInstance)).hasSize(1);
+            assertThat(results.stream().filter(UserPositionConflictException.class::isInstance)).hasSize(1);
+            assertThat(closedState).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void repeatedManualOpenIsNotSilentlyDeduplicatedOrRetried() {
+        AtomicLong ids = new AtomicLong(100L);
+        when(userPositionMapper.insert(any())).thenAnswer(invocation -> {
+            invocation.<UserPositionDO>getArgument(0).setId(ids.incrementAndGet());
+            return 1;
+        });
+
+        UserPositionVO first = service.manualOpenForUser(USER_ID, validOpenRequest());
+        UserPositionVO second = service.manualOpenForUser(USER_ID, validOpenRequest());
+
+        assertThat(first.getId()).isNotEqualTo(second.getId());
+        verify(userPositionMapper, times(2)).insert(any());
+    }
+
+    private Object closeAfter(CountDownLatch start) {
+        try {
+            start.await();
+            return service.manualCloseForUser(81L, USER_ID, closeRequest("105.25", "manual exit"));
+        } catch (UserPositionConflictException conflict) {
+            return conflict;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(interrupted);
+        }
+    }
+
     private void assertAutoSourceRejected(String sourceType) {
         CreateUserPositionReq request = validOpenRequest();
         request.setSourceType(sourceType);
-        assertThatThrownBy(() -> service.manualOpen(request))
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("source_type must be MANUAL");
     }
@@ -240,6 +355,7 @@ class UserPositionServiceImplTest {
     private static UserPositionDO row(Long id, String status) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
+        row.setUserId(USER_ID);
         row.setAssetSymbol("BTCUSDT");
         row.setSide("LONG");
         row.setStatus(status);

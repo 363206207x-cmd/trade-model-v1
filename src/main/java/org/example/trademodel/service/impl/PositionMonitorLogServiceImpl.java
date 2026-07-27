@@ -9,6 +9,8 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPol
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogicStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -33,14 +35,25 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
     }
 
     @Override
-    public PositionMonitorLogDTO recordMonitorRun(RecordPositionMonitorLogCommand command) {
+    public PositionMonitorLogDTO recordMonitorRunForUser(Long userId, RecordPositionMonitorLogCommand command) {
+        requireUserId(userId);
+        return recordMonitorRun(command, positionId -> userPositionMapper.selectByIdAndUserId(positionId, userId));
+    }
+
+    @Override
+    public PositionMonitorLogDTO recordMonitorRunForSystem(RecordPositionMonitorLogCommand command) {
+        return recordMonitorRun(command, userPositionMapper::selectClaimedByIdForSystem);
+    }
+
+    private PositionMonitorLogDTO recordMonitorRun(RecordPositionMonitorLogCommand command,
+                                                    java.util.function.Function<Long, UserPositionDO> positionLookup) {
         if (command == null) {
             throw new IllegalArgumentException("monitor log command is required");
         }
         Long positionId = requirePositiveId(command.getPositionId(), "position_id");
-        UserPositionDO position = userPositionMapper.selectById(positionId);
+        UserPositionDO position = positionLookup.apply(positionId);
         if (position == null) {
-            throw new IllegalArgumentException("UserPosition not found: " + positionId);
+            throw new UserPositionNotFoundException();
         }
         requireRecordablePositionStatus(position.getStatus());
 
@@ -87,13 +100,38 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
     }
 
     @Override
-    public PositionMonitorLogDTO findById(Long logId) {
+    public PositionMonitorLogDTO findByIdForSystem(Long logId) {
         Long id = requirePositiveId(logId, "log_id");
         return toDto(positionMonitorLogMapper.selectById(id));
     }
 
     @Override
-    public List<PositionMonitorLogDTO> listByPositionId(Long positionId, Integer limit) {
+    public List<PositionMonitorLogDTO> listByPositionIdForUser(Long userId, Long positionId, Integer limit) {
+        requireUserId(userId);
+        requireOwnedPosition(positionId, userId);
+        return listByPositionId(positionId, limit);
+    }
+
+    @Override
+    public List<PositionMonitorLogDTO> listAllByPositionIdForUserReview(Long userId, Long positionId) {
+        requireUserId(userId);
+        requireOwnedPosition(positionId, userId);
+        return listAllByPositionIdForReview(positionId);
+    }
+
+    @Override
+    public List<PositionMonitorLogDTO> listByPositionIdForSystem(Long positionId, Integer limit) {
+        requireClaimedPosition(positionId);
+        return listByPositionId(positionId, limit);
+    }
+
+    @Override
+    public List<PositionMonitorLogDTO> listAllByPositionIdForSystemReview(Long positionId) {
+        requireClaimedPosition(positionId);
+        return listAllByPositionIdForReview(positionId);
+    }
+
+    private List<PositionMonitorLogDTO> listByPositionId(Long positionId, Integer limit) {
         Long id = requirePositiveId(positionId, "position_id");
         int sanitizedLimit = sanitizeLimit(limit);
         return positionMonitorLogMapper.listByPositionId(id, sanitizedLimit).stream()
@@ -101,8 +139,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
                 .collect(Collectors.toList());
     }
 
-    @Override
-    public List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId) {
+    private List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId) {
         Long id = requirePositiveId(positionId, "position_id");
         return positionMonitorLogMapper.listAllByPositionIdForReview(id).stream()
                 .map(PositionMonitorLogServiceImpl::toDto)
@@ -110,7 +147,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
     }
 
     @Override
-    public List<PositionMonitorLogDTO> listByAnalysisId(String analysisId, Integer limit) {
+    public List<PositionMonitorLogDTO> listByAnalysisIdForSystem(String analysisId, Integer limit) {
         String id = requireText(analysisId, "analysis_id");
         int sanitizedLimit = sanitizeLimit(limit);
         return positionMonitorLogMapper.listByAnalysisId(id, sanitizedLimit).stream()
@@ -170,6 +207,26 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         return value;
     }
 
+    private void requireOwnedPosition(Long positionId, Long userId) {
+        Long id = requirePositiveId(positionId, "position_id");
+        if (userPositionMapper.selectByIdAndUserId(id, userId) == null) {
+            throw new UserPositionNotFoundException();
+        }
+    }
+
+    private void requireClaimedPosition(Long positionId) {
+        Long id = requirePositiveId(positionId, "position_id");
+        if (userPositionMapper.selectClaimedByIdForSystem(id) == null) {
+            throw new UserPositionNotFoundException();
+        }
+    }
+
+    private static void requireUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+    }
+
     private static BigDecimal requirePositive(BigDecimal value, String fieldName) {
         if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException(fieldName + " must be greater than 0");
@@ -207,7 +264,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
             return;
         }
         if ("CLOSED".equals(normalized)) {
-            throw new IllegalArgumentException("CLOSED UserPosition cannot record new monitor run logs");
+            throw new UserPositionConflictException("CLOSED UserPosition cannot record new monitor run logs");
         }
         throw new IllegalArgumentException("UserPosition status must be OPEN or PARTIALLY_CLOSED");
     }

@@ -136,7 +136,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 20, 0));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(90, "CANDIDATE", "CONFUSED", true, false, 0, true, "shock", "enter"));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.failClosed("AGGREGATE_HIGH_RISK"));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.failClosed("AGGREGATE_HIGH_RISK"));
         when(decisionResultMapper.markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any())).thenReturn(1);
         when(executionPlanMapper.markNeedsRevalidationForHotReset(any(), anyString(), anyString(), anyString(), any())).thenReturn(1);
         when(pushSnapshotMapper.invalidatePendingBySymbolForHotReset(anyString())).thenReturn(1);
@@ -175,7 +175,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         when(decisionResultMapper.markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any())).thenReturn(2);
         when(executionPlanMapper.markNeedsRevalidationForHotReset(any(), anyString(), anyString(), anyString(), any())).thenReturn(3);
         when(pushSnapshotMapper.invalidatePendingBySymbolForHotReset(anyString())).thenReturn(4);
@@ -215,7 +215,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
 
         service.evaluateAndExecute(command);
 
@@ -232,7 +232,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult success = service.evaluateAndExecute(command);
@@ -433,7 +433,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(preState, 10, 0));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, preState.name(), "OBSERVING", false, false, 0, false, "price", "base"));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult result = service.evaluateAndExecute(command);
@@ -446,7 +446,7 @@ class HotResetServiceImplTest {
     private void assertPostStateFor(HotResetCommand command, AssetStateEnum expected, ConfusedResult confusedResult) {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CONFUSED, 54, 1));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class))).thenReturn(confusedResult);
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         whenRebuildReturns(executed("ana-rebuild", false, false));
 
         HotResetResult result = service.evaluateAndExecute(command);
@@ -494,7 +494,7 @@ class HotResetServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
         when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
     }
 
     private void whenRebuildReturns(AnalysisRunResult result) {

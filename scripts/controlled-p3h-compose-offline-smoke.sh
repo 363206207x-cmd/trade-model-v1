@@ -981,9 +981,9 @@ CURRENT_STAGE="final-runtime-verification"
 if ! flyway_state="$(compose exec -T postgres psql --username=p3h_bootstrap \
   --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
   --command="SELECT count(*) || '|' || max(version) FROM flyway_schema_history WHERE success=true")"; then
-  blocked "BLOCKED_FLYWAY_V8_QUERY"
+  blocked "BLOCKED_FLYWAY_V9_QUERY"
 fi
-[ "${flyway_state}" = "8|8" ] || blocked "BLOCKED_FLYWAY_V8_VERIFICATION"
+[ "${flyway_state}" = "9|9" ] || blocked "BLOCKED_FLYWAY_V9_VERIFICATION"
 
 role_state="$(compose exec -T postgres psql --username=p3h_bootstrap \
   --dbname=trade_model_v1_p3h_primary --no-psqlrc --tuples-only --no-align \
@@ -1070,7 +1070,7 @@ fi
 echo "FIRST_BOOT: PASS"
 echo "PARTIAL_INITIALIZATION_RECOVERY: PASS"
 echo "RECOVERY_CONFIRMATION_STATUS: REQUIRED_AND_PROVEN"
-echo "RECOVERED_FLYWAY_VERSION: 8"
+echo "RECOVERED_FLYWAY_VERSION: 9"
 echo "RECOVERED_READONLY_CONTRACT: PASS"
 echo "STEADY_STATE_RESTART: PASS"
 echo "REBOOT_LIKE_RESTART: PASS"
@@ -1092,7 +1092,7 @@ echo "READONLY_DEFAULT_ACL_CONTRACT: PASS"
 echo "READONLY_SEQUENCE_PRIVILEGE_CONTRACT: PASS"
 echo "RULE_DEFAULT_CONTENT_CONTRACT: MATCH_EXACT_VERSIONED_ROWS"
 echo "RECOVERY_SCHEMA_CONTRACT: MATCH_EXACT_PREFIX"
-echo "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V8"
+echo "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V9"
 echo "READONLY_EFFECTIVE_TABLE_PRIVILEGES: PASS"
 echo "READONLY_COLUMN_PRIVILEGES: PASS"
 echo "PUBLIC_WRITE_PRIVILEGES: NONE"
@@ -1109,7 +1109,7 @@ echo "APP_IMAGE_SOURCE: PASS_EXACT_COMMITTED_GIT_ARCHIVE"
 echo "APP_IMAGE_REVISION: ${current_head}"
 echo "ROLE_PROVISIONING_STATUS: PASS"
 echo "DATABASE_PROVISIONING_STATUS: PASS_PRIMARY_AND_RECOVERY"
-echo "FLYWAY_V1_TO_V8_STATUS: PASS"
+echo "FLYWAY_V1_TO_V9_STATUS: PASS"
 echo "APP_SECRET_READABILITY_STATUS: PASS_ACTUAL_CONTAINER"
 echo "UNRELATED_UID_SECRET_READABILITY: DENIED"
 echo "SECRET_VALUES_IN_DOCKER_INSPECT: ABSENT"

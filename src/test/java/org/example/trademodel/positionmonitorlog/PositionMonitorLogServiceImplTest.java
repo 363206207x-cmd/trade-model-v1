@@ -6,6 +6,8 @@ import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.impl.PositionMonitorLogServiceImpl;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class PositionMonitorLogServiceImplTest {
+    private static final Long USER_ID = 17L;
+
     @Mock
     private PositionMonitorLogMapper positionMonitorLogMapper;
     @Mock
@@ -46,14 +50,15 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void recordMonitorRunWritesExactlyOneNormalLogWithSafetyFields() throws Exception {
-        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "OPEN"));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
         when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
             PositionMonitorLogDO row = invocation.getArgument(0);
             row.setLogId(101L);
             return 1;
         });
 
-        PositionMonitorLogDTO dto = service.recordMonitorRun(command("LOGIC_VALID", "LOW", "HOLD"));
+        PositionMonitorLogDTO dto = service.recordMonitorRunForUser(
+                USER_ID, command("LOGIC_VALID", "LOW", "HOLD"));
 
         ArgumentCaptor<PositionMonitorLogDO> captor = ArgumentCaptor.forClass(PositionMonitorLogDO.class);
         verify(positionMonitorLogMapper).insert(captor.capture());
@@ -78,16 +83,20 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void recordMonitorRunAllowsWeakenedInvalidatedAndHighRiskScenarios() {
-        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "PARTIALLY_CLOSED"));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID))
+                .thenReturn(position(7L, "PARTIALLY_CLOSED"));
         when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
             PositionMonitorLogDO row = invocation.getArgument(0);
             row.setLogId(202L);
             return 1;
         });
 
-        PositionMonitorLogDTO weakened = service.recordMonitorRun(command("LOGIC_WEAKENED", "MEDIUM", "MANUAL_REVIEW"));
-        PositionMonitorLogDTO invalidated = service.recordMonitorRun(command("PLAN_INVALIDATED", "HIGH", "RECHECK_PLAN"));
-        PositionMonitorLogDTO highRisk = service.recordMonitorRun(command("HIGH_RISK", "HIGH", "RISK_REVIEW"));
+        PositionMonitorLogDTO weakened = service.recordMonitorRunForUser(
+                USER_ID, command("LOGIC_WEAKENED", "MEDIUM", "MANUAL_REVIEW"));
+        PositionMonitorLogDTO invalidated = service.recordMonitorRunForUser(
+                USER_ID, command("PLAN_INVALIDATED", "HIGH", "RECHECK_PLAN"));
+        PositionMonitorLogDTO highRisk = service.recordMonitorRunForUser(
+                USER_ID, command("HIGH_RISK", "HIGH", "RISK_REVIEW"));
 
         assertThat(weakened.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(invalidated.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
@@ -100,7 +109,7 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void unverifiedMonitorLogDtoHidesInternalSentinel() {
-        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "OPEN"));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
         when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
             PositionMonitorLogDO row = invocation.getArgument(0);
             row.setLogId(203L);
@@ -110,7 +119,7 @@ class PositionMonitorLogServiceImplTest {
         command.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         command.setExecutionPlanId(null);
 
-        PositionMonitorLogDTO result = service.recordMonitorRun(command);
+        PositionMonitorLogDTO result = service.recordMonitorRunForUser(USER_ID, command);
 
         ArgumentCaptor<PositionMonitorLogDO> captor = ArgumentCaptor.forClass(PositionMonitorLogDO.class);
         verify(positionMonitorLogMapper).insert(captor.capture());
@@ -132,7 +141,7 @@ class PositionMonitorLogServiceImplTest {
         row.setExecutionPlanId("plan-verified");
         when(positionMonitorLogMapper.selectById(204L)).thenReturn(row);
 
-        PositionMonitorLogDTO result = service.findById(204L);
+        PositionMonitorLogDTO result = service.findByIdForSystem(204L);
 
         assertThat(result.getAnalysisId()).isEqualTo("analysis-verified");
         assertThat(result.getExecutionPlanId()).isEqualTo("plan-verified");
@@ -143,16 +152,17 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void closedOrMissingUserPositionRejectsNewMonitorRunLog() {
-        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "CLOSED"));
-        assertThatThrownBy(() -> service.recordMonitorRun(command("LOGIC_VALID", "LOW", "HOLD")))
-                .isInstanceOf(IllegalArgumentException.class)
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "CLOSED"));
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(
+                USER_ID, command("LOGIC_VALID", "LOW", "HOLD")))
+                .isInstanceOf(UserPositionConflictException.class)
                 .hasMessageContaining("CLOSED UserPosition");
 
-        when(userPositionMapper.selectById(8L)).thenReturn(null);
+        when(userPositionMapper.selectByIdAndUserId(8L, USER_ID)).thenReturn(null);
         RecordPositionMonitorLogCommand missing = command("LOGIC_VALID", "LOW", "HOLD");
         missing.setPositionId(8L);
-        assertThatThrownBy(() -> service.recordMonitorRun(missing))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, missing))
+                .isInstanceOf(UserPositionNotFoundException.class)
                 .hasMessageContaining("UserPosition not found");
 
         verify(positionMonitorLogMapper, never()).insert(any());
@@ -160,25 +170,26 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void invalidPriceLogicStatusSuggestedActionAndExecutableWordsFailClosed() {
-        when(userPositionMapper.selectById(7L)).thenReturn(position(7L, "OPEN"));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
 
         RecordPositionMonitorLogCommand badPrice = command("LOGIC_VALID", "LOW", "HOLD");
         badPrice.setCurrentPrice(BigDecimal.ZERO);
-        assertThatThrownBy(() -> service.recordMonitorRun(badPrice))
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, badPrice))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("current_price");
 
-        assertThatThrownBy(() -> service.recordMonitorRun(command("BOGUS", "LOW", "HOLD")))
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, command("BOGUS", "LOW", "HOLD")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("logic_status");
 
-        assertThatThrownBy(() -> service.recordMonitorRun(command("LOGIC_VALID", "LOW", "CLOSE")))
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(
+                USER_ID, command("LOGIC_VALID", "LOW", "CLOSE")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("suggested_action");
 
         RecordPositionMonitorLogCommand forbiddenReason = command("LOGIC_VALID", "LOW", "HOLD");
         forbiddenReason.setReason("please close this position");
-        assertThatThrownBy(() -> service.recordMonitorRun(forbiddenReason))
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, forbiddenReason))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden executable monitor log content");
 
@@ -191,17 +202,18 @@ class PositionMonitorLogServiceImplTest {
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         when(positionMonitorLogMapper.listByPositionId(7L, 20)).thenReturn(List.of(row));
         when(positionMonitorLogMapper.listByAnalysisId("ana-p0-4", 2)).thenReturn(List.of(row));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
 
-        List<PositionMonitorLogDTO> byPosition = service.listByPositionId(7L, null);
-        List<PositionMonitorLogDTO> byAnalysis = service.listByAnalysisId(" ana-p0-4 ", 2);
+        List<PositionMonitorLogDTO> byPosition = service.listByPositionIdForUser(USER_ID, 7L, null);
+        List<PositionMonitorLogDTO> byAnalysis = service.listByAnalysisIdForSystem(" ana-p0-4 ", 2);
 
         assertThat(byPosition).hasSize(1);
         assertThat(byAnalysis).hasSize(1);
         assertSafetyFields(byPosition.get(0));
-        assertThatThrownBy(() -> service.listByPositionId(7L, 0))
+        assertThatThrownBy(() -> service.listByPositionIdForUser(USER_ID, 7L, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("limit");
-        assertThatThrownBy(() -> service.listByPositionId(7L, 101))
+        assertThatThrownBy(() -> service.listByPositionIdForUser(USER_ID, 7L, 101))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("limit");
     }
@@ -213,8 +225,9 @@ class PositionMonitorLogServiceImplTest {
         PositionMonitorLogDO second = logRow(2L, 7L, "ana-p0-6", "PLAN_INVALIDATED", "RECHECK_PLAN",
                 LocalDateTime.of(2026, 6, 22, 9, 30));
         when(positionMonitorLogMapper.listAllByPositionIdForReview(7L)).thenReturn(List.of(first, second));
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "CLOSED"));
 
-        List<PositionMonitorLogDTO> logs = service.listAllByPositionIdForReview(7L);
+        List<PositionMonitorLogDTO> logs = service.listAllByPositionIdForUserReview(USER_ID, 7L);
 
         assertThat(logs).extracting(PositionMonitorLogDTO::getLogId).containsExactly(1L, 2L);
         assertSafetyFields(logs.get(0));
@@ -242,6 +255,7 @@ class PositionMonitorLogServiceImplTest {
     private static UserPositionDO position(Long id, String status) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
+        row.setUserId(USER_ID);
         row.setStatus(status);
         return row;
     }

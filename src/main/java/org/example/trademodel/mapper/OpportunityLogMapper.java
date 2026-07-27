@@ -14,6 +14,14 @@ import java.util.List;
 
 @Mapper
 public interface OpportunityLogMapper {
+    String SHARED_STATE_PREDICATE = " AND user_position_id IS NULL "
+            + "AND COALESCE(user_position_present, FALSE) = FALSE "
+            + "AND COALESCE(lifecycle_status, '') != 'REVIEW_REQUIRED' "
+            + "AND COALESCE(opportunity_status, '') NOT IN ('EXECUTED_VALID', 'EXECUTED_INVALID') "
+            + "AND COALESCE(reason_codes, '') NOT LIKE '%MULTIPLE_LINKED_USER_POSITIONS%' "
+            + "AND COALESCE(reason_codes, '') NOT LIKE '%LINKED_USER_POSITION_%' "
+            + "AND COALESCE(reason_codes, '') NOT LIKE '%USER_POSITION_PROJECTION_UNAVAILABLE%'";
+
     String BASE_SELECT = "SELECT opportunity_id AS opportunityId, opportunity_key AS opportunityKey, "
             + "analysis_id AS analysisId, decision_id AS decisionId, execution_plan_id AS executionPlanId, "
             + "push_id AS pushId, user_position_id AS userPositionId, symbol, timeframe, direction, "
@@ -106,6 +114,7 @@ public interface OpportunityLogMapper {
             "COALESCE(SUM(CASE WHEN opportunity_status IN ('EXECUTED_INVALID', 'MISSED_INVALID') THEN 1 ELSE 0 END), 0) AS invalidOpportunityCount",
             "FROM tm_opportunity_log",
             "WHERE 1 = 1",
+            SHARED_STATE_PREDICATE,
             "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
             "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
             "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
@@ -120,6 +129,7 @@ public interface OpportunityLogMapper {
             "SELECT COALESCE(opportunity_status, lifecycle_status, 'UNKNOWN') AS name, COUNT(*) AS count",
             "FROM tm_opportunity_log",
             "WHERE 1 = 1",
+            SHARED_STATE_PREDICATE,
             "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
             "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
             "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
@@ -136,6 +146,7 @@ public interface OpportunityLogMapper {
             "SELECT COALESCE(source_type, 'UNKNOWN') AS name, COUNT(*) AS count",
             "FROM tm_opportunity_log",
             "WHERE 1 = 1",
+            SHARED_STATE_PREDICATE,
             "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
             "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
             "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",

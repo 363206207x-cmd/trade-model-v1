@@ -50,7 +50,7 @@ class ControlledStagingLifecycleRound4ContractTest {
                 "cfg-deriv-min-data-quality",
                 "expect_full_readonly_verify_rejection V8_PROVIDER_RULE_VALUE",
                 "expect_full_readonly_verify_rejection V8_DERIV_RULE_VALUE");
-        assertThat(steadyVerify()).contains("postgres-versioned-contract-verify.sh 8 STEADY_STATE");
+        assertThat(steadyVerify()).contains("postgres-versioned-contract-verify.sh 9 STEADY_STATE");
     }
 
     @Test
@@ -76,16 +76,16 @@ class ControlledStagingLifecycleRound4ContractTest {
     }
 
     @Test
-    void schemaContractHasAuthoritativeV1ThroughV8Fingerprints() throws Exception {
+    void schemaContractHasAuthoritativeV1ThroughV9Fingerprints() throws Exception {
         String verifier = versionedVerifier();
-        for (int version = 1; version <= 8; version++) {
+        for (int version = 1; version <= 9; version++) {
             assertThat(verifier).contains(version + ") expected_schema_fingerprint=");
         }
         assertThat(verifier).doesNotContain("PENDING_V");
         assertThat(recoveryVerify()).contains(
                 "postgres-versioned-contract-verify.sh \"${applied_version}\" RECOVERY");
         assertThat(versionedVerifier()).contains(
-                "8) expected_schema_fingerprint=c491831c3a30a7f0cd411b4aedeee4ac",
+                "9) expected_schema_fingerprint=14c497071547839bdf74c015761633a4",
                 "STEADY_STATE_SCHEMA_CONTRACT: MATCH_EXACT_V${expected_version}");
     }
 

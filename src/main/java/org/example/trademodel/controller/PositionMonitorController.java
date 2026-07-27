@@ -4,6 +4,7 @@ import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.service.PositionMonitorService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,22 +15,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/position-monitor")
 public class PositionMonitorController {
     private final PositionMonitorService positionMonitorService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
-    public PositionMonitorController(PositionMonitorService positionMonitorService) {
+    public PositionMonitorController(PositionMonitorService positionMonitorService,
+                                     AuthenticatedUserIdResolver authenticatedUserIdResolver) {
         this.positionMonitorService = positionMonitorService;
+        this.authenticatedUserIdResolver = authenticatedUserIdResolver;
     }
 
     @PostMapping("/user-positions/{positionId}/run")
     public ResponseEntity<ApiResponse<PositionMonitorResultDTO>> monitorUserPosition(@PathVariable Long positionId) {
-        try {
-            return ResponseEntity.ok(ApiResponse.success(positionMonitorService.monitorUserPosition(positionId)));
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(ApiResponse.badRequest(ex.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                positionMonitorService.monitorUserPositionForUser(positionId, userId)));
     }
 
     @PostMapping("/user-positions/open/run")
     public ResponseEntity<ApiResponse<PositionMonitorBatchResultDTO>> monitorOpenUserPositions() {
-        return ResponseEntity.ok(ApiResponse.success(positionMonitorService.monitorOpenUserPositions()));
+        authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.status(403).body(ApiResponse.forbidden("system-only operation"));
     }
 }

@@ -30,6 +30,7 @@ import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
@@ -370,7 +371,9 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         service.setOriginalPlanSources(decisionMapper, planMapper, runMapper);
         service.setAssetStateMapper(stateMapper);
         service.setPlanValidityClock(Clock.fixed(now, ZoneOffset.UTC));
-        return new DashboardHomeController(service);
+        AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
+        when(resolver.requireCurrentUserId()).thenReturn(17L);
+        return new DashboardHomeController(service, resolver);
     }
 
     private static AnalysisRunDO analysisRun(String analysisId, String traceId, LocalDateTime time) {
@@ -551,7 +554,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
             statement.executeUpdate("DELETE FROM tm_position_monitor_log");
             statement.executeUpdate("DELETE FROM tm_user_position");
         }
-        assertThat(session.getMapper(UserPositionMapper.class).listOpenPositions()).isEmpty();
+        assertThat(session.getMapper(UserPositionMapper.class).listClaimedOpenForSystemMonitoring()).isEmpty();
     }
 
     private static SqlSessionFactory sqlSessions() {
@@ -607,12 +610,27 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         }
 
         @Override
+        public List<DecisionResultVO> getLatestDecisionResultsForUser(Long userId, int limit) {
+            return getLatestDecisionResults(limit);
+        }
+
+        @Override
         public DecisionResultVO getLatestDecisionResultBySymbol(String symbol) {
             return mapper.findLatestDecisionResultBySymbolJoined(symbol.trim().toUpperCase(Locale.ROOT));
         }
 
         @Override
+        public DecisionResultVO getLatestDecisionResultBySymbolForUser(Long userId, String symbol) {
+            return getLatestDecisionResultBySymbol(symbol);
+        }
+
+        @Override
         public int countOpenPositions() {
+            return 0;
+        }
+
+        @Override
+        public int countOpenPositionsForUser(Long userId) {
             return 0;
         }
     }

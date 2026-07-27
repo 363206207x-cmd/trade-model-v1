@@ -118,7 +118,7 @@ class DecisionEngineServiceTest {
                 ));
         lenient().when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, false, false, "none"));
-        lenient().when(userPositionRiskAdapter.currentRisk())
+        lenient().when(userPositionRiskAdapter.currentRiskForSystem())
                 .thenReturn(UserPositionRiskResult.noOpenPosition(0));
         lenient().when(ruleConfigContractService.requirePushRecheckThresholds())
                 .thenReturn(new RuleConfigContractService.PushRecheckThresholds(

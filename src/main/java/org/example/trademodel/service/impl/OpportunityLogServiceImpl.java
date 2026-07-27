@@ -101,7 +101,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         String key = run.getAnalysisId() + ":" + decision.getDecisionId();
         OpportunityLogDO existing = opportunityLogMapper.selectByOpportunityKey(key);
         if (existing != null) {
-            OpportunityLogDTO dto = OpportunityLogDTO.from(existing);
+            OpportunityLogDTO dto = toSharedDto(existing);
             dto.setDeduplicated(true);
             return dto;
         }
@@ -130,10 +130,23 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
 
     @Override
     @Transactional
-    public OpportunityLogDTO evaluateOpportunity(String opportunityId, LocalDateTime asOf) {
+    public OpportunityLogDTO evaluateOpportunityForUser(String opportunityId, Long userId, LocalDateTime asOf) {
+        requireUserId(userId);
+        evaluateSharedOpportunity(opportunityId, asOf);
+        return findByIdForUser(opportunityId, userId);
+    }
+
+    @Override
+    @Transactional
+    public OpportunityLogDTO evaluateOpportunityForSystem(String opportunityId, LocalDateTime asOf) {
+        return evaluateSharedOpportunity(opportunityId, asOf);
+    }
+
+    private OpportunityLogDTO evaluateSharedOpportunity(String opportunityId, LocalDateTime asOf) {
         OpportunityLogDO row = requireOpportunity(opportunityId);
+        normalizeSharedState(row);
         if (OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus()) || row.getOpportunityStatus() != null) {
-            OpportunityLogDTO dto = OpportunityLogDTO.from(row);
+            OpportunityLogDTO dto = toSharedDto(row);
             dto.setDeduplicated(true);
             return dto;
         }
@@ -143,32 +156,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime evaluationEnd = asOf != null ? asOf : now;
-        LinkedUserPosition linked = resolveLinkedUserPosition(row);
-        if (linked.reviewRequired) {
-            row.setUserPositionPresent(false);
-            row.setUserPositionId(null);
-            row.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
-            row.setReasonCodes(appendReason(row, "MULTIPLE_LINKED_USER_POSITIONS"));
-            row.setEvaluationAsOf(evaluationEnd);
-            row.setUpdatedAt(now);
-            opportunityLogMapper.updateEvaluation(row);
-            return OpportunityLogDTO.from(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
-        }
-        if (linked.position != null) {
-            if (linked.position.getOpenedAt() == null) {
-                row.setUserPositionPresent(false);
-                row.setUserPositionId(null);
-                row.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
-                row.setReasonCodes(appendReason(row, "LINKED_USER_POSITION_OPEN_TIME_MISSING"));
-                row.setEvaluationAsOf(evaluationEnd);
-                row.setUpdatedAt(now);
-                opportunityLogMapper.updateEvaluation(row);
-                return OpportunityLogDTO.from(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
-            }
-            if (linked.position.getClosedAt() != null && linked.position.getClosedAt().isBefore(evaluationEnd)) {
-                evaluationEnd = linked.position.getClosedAt();
-            }
-        }
         row.setUserPositionPresent(false);
         row.setUserPositionId(null);
         row.setEvaluationAsOf(evaluationEnd);
@@ -214,41 +201,74 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             return updateNonFinal(row, OpportunityLogStatus.PENDING_EVALUATION,
                     appendReason(row, "NO_TARGET_OR_INVALIDATION_HIT"));
         }
-        applyExecutionEvidence(row, linked, marketPath);
 
-        String finalStatus = classify(row, marketPath, risk);
+        String finalStatus = classifyShared(marketPath, risk, row);
         row.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
         row.setOpportunityStatus(finalStatus);
         row.setResolvedAt(now);
         row.setUpdatedAt(now);
         int updated = opportunityLogMapper.updateEvaluation(row);
         OpportunityLogDO persisted = opportunityLogMapper.selectByOpportunityId(row.getOpportunityId());
-        OpportunityLogDTO dto = OpportunityLogDTO.from(persisted);
+        OpportunityLogDTO dto = toSharedDto(persisted);
         dto.setDeduplicated(updated == 0);
         return dto;
     }
 
     @Override
-    public OpportunityLogDTO findById(String opportunityId) {
+    public OpportunityLogDTO findByIdForUser(String opportunityId, Long userId) {
+        requireUserId(userId);
         OpportunityLogDO row = opportunityLogMapper.selectByOpportunityId(opportunityId);
-        return row == null ? null : OpportunityLogDTO.from(row);
+        return row == null ? null : toUserScopedDto(row, userId);
     }
 
     @Override
-    public List<OpportunityLogDTO> query(String analysisId,
-                                         String decisionId,
-                                         String executionPlanId,
-                                         String symbol,
-                                         String opportunityStatus,
-                                         String lifecycleStatus,
-                                         LocalDateTime from,
-                                         LocalDateTime to,
-                                         int limit) {
+    public OpportunityLogDTO findByIdForSystem(String opportunityId) {
+        OpportunityLogDO row = opportunityLogMapper.selectByOpportunityId(opportunityId);
+        return row == null ? null : toSharedDto(row);
+    }
+
+    @Override
+    public List<OpportunityLogDTO> queryForUser(Long userId,
+                                                String analysisId,
+                                                String decisionId,
+                                                String executionPlanId,
+                                                String symbol,
+                                                String opportunityStatus,
+                                                String lifecycleStatus,
+                                                LocalDateTime from,
+                                                LocalDateTime to,
+                                                int limit) {
+        requireUserId(userId);
+        String statusFilter = trimToNull(opportunityStatus);
+        String lifecycleFilter = trimToNull(lifecycleStatus);
+        int sanitizedLimit = sanitizeLimit(limit);
+        int sourceLimit = statusFilter == null && lifecycleFilter == null ? sanitizedLimit : MAX_QUERY_LIMIT;
+        return opportunityLogMapper.query(trimToNull(analysisId), trimToNull(decisionId),
+                        trimToNull(executionPlanId), trimToNull(symbol), null, null,
+                        from, to, sourceLimit)
+                .stream()
+                .map(row -> toUserScopedDto(row, userId))
+                .filter(dto -> statusFilter == null || statusFilter.equals(dto.getOpportunityStatus()))
+                .filter(dto -> lifecycleFilter == null || lifecycleFilter.equals(dto.getLifecycleStatus()))
+                .limit(sanitizedLimit)
+                .toList();
+    }
+
+    @Override
+    public List<OpportunityLogDTO> queryForSystem(String analysisId,
+                                                  String decisionId,
+                                                  String executionPlanId,
+                                                  String symbol,
+                                                  String opportunityStatus,
+                                                  String lifecycleStatus,
+                                                  LocalDateTime from,
+                                                  LocalDateTime to,
+                                                  int limit) {
         return opportunityLogMapper.query(trimToNull(analysisId), trimToNull(decisionId), trimToNull(executionPlanId),
                         trimToNull(symbol), trimToNull(opportunityStatus), trimToNull(lifecycleStatus),
                         from, to, sanitizeLimit(limit))
                 .stream()
-                .map(OpportunityLogDTO::from)
+                .map(this::toSharedDto)
                 .toList();
     }
 
@@ -398,18 +418,208 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         return result;
     }
 
-    private LinkedUserPosition resolveLinkedUserPosition(OpportunityLogDO row) {
-        List<UserPositionDO> rows = new ArrayList<>();
-        if (!blank(row.getExecutionPlanId())) {
-            rows = safeList(userPositionMapper.listByExactSourceRefId(row.getExecutionPlanId()));
+    private LinkedUserPosition resolveLinkedUserPositionForUser(OpportunityLogDO row, Long userId) {
+        requireUserId(userId);
+        try {
+            List<UserPositionDO> rows = new ArrayList<>();
+            if (!blank(row.getExecutionPlanId())) {
+                rows = safeList(userPositionMapper.listByExactSourceRefIdAndUserId(row.getExecutionPlanId(), userId));
+            }
+            if (rows.isEmpty() && !blank(row.getAnalysisId())) {
+                rows = safeList(userPositionMapper.listByExactSourceRefIdAndUserId(row.getAnalysisId(), userId));
+            }
+            if (rows.size() > 1) {
+                return new LinkedUserPosition(null, true, false);
+            }
+            return new LinkedUserPosition(rows.isEmpty() ? null : rows.get(0), false, false);
+        } catch (RuntimeException ignored) {
+            return new LinkedUserPosition(null, false, true);
         }
-        if (rows.isEmpty() && !blank(row.getAnalysisId())) {
-            rows = safeList(userPositionMapper.listByExactSourceRefId(row.getAnalysisId()));
+    }
+
+    private OpportunityLogDTO toUserScopedDto(OpportunityLogDO row, Long userId) {
+        LinkedUserPosition linked = resolveLinkedUserPositionForUser(row, userId);
+        LocalDateTime firstOutcomeTime = firstOutcomeTime(row);
+        boolean present = linked.position != null
+                && linked.position.getOpenedAt() != null
+                && firstOutcomeTime != null
+                && !linked.position.getOpenedAt().isAfter(firstOutcomeTime);
+
+        OpportunityLogDTO dto = toSharedDto(row);
+        dto.setEvaluationAsOf(null);
+        dto.setUserPositionPresent(present);
+        dto.setUserPositionId(present ? linked.position.getId() : null);
+        dto.setReasonCodes(userScopedReasonCodes(row.getReasonCodes(), linked, firstOutcomeTime));
+        if (requiresUserReview(dto.getLifecycleStatus(), linked)) {
+            dto.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
+            dto.setOpportunityStatus(null);
+        } else if (OpportunityLogStatus.RESOLVED.equals(dto.getLifecycleStatus())) {
+            dto.setOpportunityStatus(classifyForUser(row, present));
         }
-        if (rows.size() > 1) {
-            return new LinkedUserPosition(null, true);
+        return dto;
+    }
+
+    private OpportunityLogDTO toSharedDto(OpportunityLogDO row) {
+        boolean userDerived = hasPersistedUserDerivedState(row);
+        OpportunityLogDTO dto = OpportunityLogDTO.from(row);
+        dto.setUserPositionId(null);
+        dto.setUserPositionPresent(false);
+        dto.setReasonCodes(sharedReasonCodes(row.getReasonCodes()));
+        if (!isSharedLifecycleStatus(row.getLifecycleStatus())) {
+            dto.setLifecycleStatus(OpportunityLogStatus.PENDING_EVALUATION);
+            dto.setOpportunityStatus(null);
+            dto.setResolvedAt(null);
+        } else if (!isSharedOpportunityStatus(row.getOpportunityStatus())) {
+            dto.setOpportunityStatus(OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus())
+                    ? classifyForUser(row, false)
+                    : null);
         }
-        return new LinkedUserPosition(rows.isEmpty() ? null : rows.get(0), false);
+        if (userDerived) {
+            dto.setEvaluationAsOf(null);
+        }
+        return dto;
+    }
+
+    private void normalizeSharedState(OpportunityLogDO row) {
+        boolean userDerived = hasPersistedUserDerivedState(row);
+        row.setUserPositionId(null);
+        row.setUserPositionPresent(false);
+        row.setReasonCodes(sharedReasonCodes(row.getReasonCodes()));
+        if (!isSharedLifecycleStatus(row.getLifecycleStatus())) {
+            row.setLifecycleStatus(OpportunityLogStatus.PENDING_EVALUATION);
+            row.setOpportunityStatus(null);
+            row.setResolvedAt(null);
+        } else if (!isSharedOpportunityStatus(row.getOpportunityStatus())) {
+            row.setOpportunityStatus(OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus())
+                    ? classifyForUser(row, false)
+                    : null);
+        }
+        if (userDerived) {
+            row.setEvaluationAsOf(null);
+        }
+    }
+
+    private static boolean requiresUserReview(String sharedLifecycleStatus, LinkedUserPosition linked) {
+        if (OpportunityLogStatus.SOURCE_INCOMPLETE.equals(sharedLifecycleStatus)) {
+            return false;
+        }
+        return linked.reviewRequired
+                || linked.lookupFailed
+                || linked.position != null && linked.position.getOpenedAt() == null;
+    }
+
+    private String classifyForUser(OpportunityLogDO row, boolean userPositionPresent) {
+        if (OpportunityLogStatus.TARGET_FIRST.equals(row.getHitOrder())) {
+            if (userPositionPresent) {
+                return OpportunityLogStatus.EXECUTED_VALID;
+            }
+            if (Boolean.TRUE.equals(row.getRiskBlockedEvidence())
+                    && row.getRiskBlockedAt() != null
+                    && row.getTargetHitAt() != null
+                    && !row.getRiskBlockedAt().isAfter(row.getTargetHitAt())) {
+                return OpportunityLogStatus.BLOCKED_BY_RISK_VALID;
+            }
+            return Boolean.TRUE.equals(row.getPushPresent())
+                    ? OpportunityLogStatus.PUSHED_NOT_FILLED_VALID
+                    : OpportunityLogStatus.MISSED_VALID;
+        }
+        if (OpportunityLogStatus.INVALIDATION_FIRST.equals(row.getHitOrder())) {
+            return userPositionPresent
+                    ? OpportunityLogStatus.EXECUTED_INVALID
+                    : OpportunityLogStatus.MISSED_INVALID;
+        }
+        return null;
+    }
+
+    private static String userScopedReasonCodes(String existing,
+                                                LinkedUserPosition linked,
+                                                LocalDateTime firstOutcomeTime) {
+        List<String> reasons = new ArrayList<>();
+        if (!blank(existing)) {
+            for (String value : existing.split(",")) {
+                String reason = value.trim();
+                if (!blank(reason) && !isUserPositionReason(reason)) {
+                    reasons.add(reason);
+                }
+            }
+        }
+        if (linked.reviewRequired) {
+            reasons.add("MULTIPLE_LINKED_USER_POSITIONS");
+        } else if (linked.lookupFailed) {
+            reasons.add("USER_POSITION_PROJECTION_UNAVAILABLE");
+        } else if (linked.position != null && linked.position.getOpenedAt() == null) {
+            reasons.add("LINKED_USER_POSITION_OPEN_TIME_MISSING");
+        } else if (linked.position != null && firstOutcomeTime != null
+                && linked.position.getOpenedAt().isAfter(firstOutcomeTime)) {
+            reasons.add("LINKED_USER_POSITION_OPENED_AFTER_OUTCOME");
+        }
+        return String.join(",", reasons);
+    }
+
+    private static boolean isUserPositionReason(String reason) {
+        return "MULTIPLE_LINKED_USER_POSITIONS".equals(reason)
+                || "LINKED_USER_POSITION_OPEN_TIME_MISSING".equals(reason)
+                || "LINKED_USER_POSITION_OPENED_AFTER_OUTCOME".equals(reason)
+                || "USER_POSITION_PROJECTION_UNAVAILABLE".equals(reason);
+    }
+
+    private static String sharedReasonCodes(String existing) {
+        if (blank(existing)) {
+            return existing;
+        }
+        List<String> reasons = new ArrayList<>();
+        for (String value : existing.split(",")) {
+            String reason = value.trim();
+            if (!blank(reason) && !isUserPositionReason(reason)) {
+                reasons.add(reason);
+            }
+        }
+        return String.join(",", reasons);
+    }
+
+    private static boolean hasPersistedUserDerivedState(OpportunityLogDO row) {
+        if (row.getUserPositionId() != null || Boolean.TRUE.equals(row.getUserPositionPresent())) {
+            return true;
+        }
+        if (!isSharedLifecycleStatus(row.getLifecycleStatus())
+                || !isSharedOpportunityStatus(row.getOpportunityStatus())) {
+            return true;
+        }
+        if (!blank(row.getReasonCodes())) {
+            for (String value : row.getReasonCodes().split(",")) {
+                if (isUserPositionReason(value.trim())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSharedLifecycleStatus(String status) {
+        return status == null
+                || OpportunityLogStatus.PENDING_EVALUATION.equals(status)
+                || OpportunityLogStatus.RESOLVED.equals(status)
+                || OpportunityLogStatus.SOURCE_INCOMPLETE.equals(status)
+                || OpportunityLogStatus.MARKET_PATH_UNAVAILABLE.equals(status)
+                || OpportunityLogStatus.AMBIGUOUS_MARKET_PATH.equals(status);
+    }
+
+    private static boolean isSharedOpportunityStatus(String status) {
+        return status == null
+                || OpportunityLogStatus.MISSED_VALID.equals(status)
+                || OpportunityLogStatus.MISSED_INVALID.equals(status)
+                || OpportunityLogStatus.PUSHED_NOT_FILLED_VALID.equals(status)
+                || OpportunityLogStatus.BLOCKED_BY_RISK_VALID.equals(status);
+    }
+
+    private static LocalDateTime firstOutcomeTime(OpportunityLogDO row) {
+        if (OpportunityLogStatus.TARGET_FIRST.equals(row.getHitOrder())) {
+            return row.getTargetHitAt();
+        }
+        if (OpportunityLogStatus.INVALIDATION_FIRST.equals(row.getHitOrder())) {
+            return row.getInvalidationHitAt();
+        }
+        return null;
     }
 
     private RiskEvidence riskEvidence(OpportunityLogDO row) {
@@ -468,38 +678,8 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         evidence.reasonCode = appendReason(evidence.reasonCode, reasonCode);
     }
 
-    private void applyExecutionEvidence(OpportunityLogDO row, LinkedUserPosition linked, MarketPathResult marketPath) {
-        if (linked.position == null) {
-            row.setUserPositionPresent(false);
-            row.setUserPositionId(null);
-            return;
-        }
-        LocalDateTime firstOutcomeTime = firstOutcomeTime(marketPath);
-        if (firstOutcomeTime != null && !linked.position.getOpenedAt().isAfter(firstOutcomeTime)) {
-            row.setUserPositionPresent(true);
-            row.setUserPositionId(linked.position.getId());
-            return;
-        }
-        row.setUserPositionPresent(false);
-        row.setUserPositionId(null);
-        row.setReasonCodes(appendReason(row, "LINKED_USER_POSITION_OPENED_AFTER_OUTCOME"));
-    }
-
-    private LocalDateTime firstOutcomeTime(MarketPathResult marketPath) {
+    private String classifyShared(MarketPathResult marketPath, RiskEvidence risk, OpportunityLogDO row) {
         if (OpportunityLogStatus.TARGET_FIRST.equals(marketPath.hitOrder)) {
-            return marketPath.targetHitAt;
-        }
-        if (OpportunityLogStatus.INVALIDATION_FIRST.equals(marketPath.hitOrder)) {
-            return marketPath.invalidationHitAt;
-        }
-        return null;
-    }
-
-    private String classify(OpportunityLogDO row, MarketPathResult marketPath, RiskEvidence risk) {
-        if (OpportunityLogStatus.TARGET_FIRST.equals(marketPath.hitOrder)) {
-            if (Boolean.TRUE.equals(row.getUserPositionPresent())) {
-                return OpportunityLogStatus.EXECUTED_VALID;
-            }
             if (risk.blocked && risk.blockedAt != null && !risk.blockedAt.isAfter(marketPath.targetHitAt)) {
                 return OpportunityLogStatus.BLOCKED_BY_RISK_VALID;
             }
@@ -509,9 +689,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             return OpportunityLogStatus.MISSED_VALID;
         }
         if (OpportunityLogStatus.INVALIDATION_FIRST.equals(marketPath.hitOrder)) {
-            return Boolean.TRUE.equals(row.getUserPositionPresent())
-                    ? OpportunityLogStatus.EXECUTED_INVALID
-                    : OpportunityLogStatus.MISSED_INVALID;
+            return OpportunityLogStatus.MISSED_INVALID;
         }
         throw new IllegalStateException("opportunity has no final hit order");
     }
@@ -536,7 +714,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         row.setReasonCodes(reasons);
         row.setUpdatedAt(LocalDateTime.now());
         opportunityLogMapper.updateEvaluation(row);
-        return OpportunityLogDTO.from(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
+        return toSharedDto(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
     }
 
     private OpportunityLogDO requireOpportunity(String opportunityId) {
@@ -732,6 +910,12 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         return String.join(",", clean);
     }
 
+    private static void requireUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+    }
+
     private static String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -803,10 +987,12 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     private static final class LinkedUserPosition {
         private final UserPositionDO position;
         private final boolean reviewRequired;
+        private final boolean lookupFailed;
 
-        private LinkedUserPosition(UserPositionDO position, boolean reviewRequired) {
+        private LinkedUserPosition(UserPositionDO position, boolean reviewRequired, boolean lookupFailed) {
             this.position = position;
             this.reviewRequired = reviewRequired;
+            this.lookupFailed = lookupFailed;
         }
     }
 

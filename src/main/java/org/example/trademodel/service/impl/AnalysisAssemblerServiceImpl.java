@@ -434,7 +434,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private boolean accountRiskAllowed() {
         if (userPositionRiskAdapter == null) return false;
         try {
-            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRiskForSystem();
             return result != null && !result.isRiskBlocked();
         } catch (RuntimeException failure) {
             return false;

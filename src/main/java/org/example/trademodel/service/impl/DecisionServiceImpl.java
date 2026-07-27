@@ -134,6 +134,16 @@ public class DecisionServiceImpl implements DecisionService {
 
     @Override
     public List<DecisionResultVO> getLatestDecisionResults(int limit) {
+        return getLatestDecisionResults(null, limit);
+    }
+
+    @Override
+    public List<DecisionResultVO> getLatestDecisionResultsForUser(Long userId, int limit) {
+        requireUserId(userId);
+        return getLatestDecisionResults(userId, limit);
+    }
+
+    private List<DecisionResultVO> getLatestDecisionResults(Long userId, int limit) {
         long methodStart = System.currentTimeMillis();
         int safeLimit = normalizeDashboardSummaryLimit(limit);
         long queryStart = System.currentTimeMillis();
@@ -146,7 +156,7 @@ public class DecisionServiceImpl implements DecisionService {
             return new ArrayList<>();
         }
         Map<String, MarketPriceSnapshot> quoteCache = new HashMap<>();
-        Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap();
+        Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap(userId);
         for (DecisionResultVO item : results) {
             if (item == null) {
                 continue;
@@ -171,6 +181,16 @@ public class DecisionServiceImpl implements DecisionService {
 
     @Override
     public DecisionResultVO getLatestDecisionResultBySymbol(String symbol) {
+        return getLatestDecisionResultBySymbol(null, symbol);
+    }
+
+    @Override
+    public DecisionResultVO getLatestDecisionResultBySymbolForUser(Long userId, String symbol) {
+        requireUserId(userId);
+        return getLatestDecisionResultBySymbol(userId, symbol);
+    }
+
+    private DecisionResultVO getLatestDecisionResultBySymbol(Long userId, String symbol) {
         String normalized = normalizeSymbol(symbol);
         if (normalized == null) {
             return null;
@@ -189,7 +209,7 @@ public class DecisionServiceImpl implements DecisionService {
             row.setPriceUpdateTimeMs(snapshot.sourceFetchedAt() == null ? null : snapshot.sourceFetchedAt().toEpochMilli());
         }
 
-        Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap();
+        Map<String, UserPositionDO> openPositionMap = loadOpenManualUserPositionMap(userId);
         applyManualUserPosition(row, openPositionMap.get(normalizeSymbol(row.getSymbol())));
         annotateReadModelFallback(row);
         runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", System.currentTimeMillis() - methodStart);
@@ -198,8 +218,14 @@ public class DecisionServiceImpl implements DecisionService {
 
     @Override
     public int countOpenPositions() {
+        return 0;
+    }
+
+    @Override
+    public int countOpenPositionsForUser(Long userId) {
+        requireUserId(userId);
         try {
-            List<UserPositionDO> openPositions = userPositionMapper.listOpenPositions();
+            List<UserPositionDO> openPositions = userPositionMapper.listOpenByUserId(userId);
             if (openPositions == null) {
                 return 0;
             }
@@ -226,10 +252,13 @@ public class DecisionServiceImpl implements DecisionService {
         }
     }
 
-    private Map<String, UserPositionDO> loadOpenManualUserPositionMap() {
+    private Map<String, UserPositionDO> loadOpenManualUserPositionMap(Long userId) {
         Map<String, UserPositionDO> openPositionMap = new HashMap<>();
+        if (userId == null || userId <= 0) {
+            return openPositionMap;
+        }
         try {
-            List<UserPositionDO> openPositions = userPositionMapper.listOpenPositions();
+            List<UserPositionDO> openPositions = userPositionMapper.listOpenByUserId(userId);
             if (openPositions != null) {
                 for (UserPositionDO position : openPositions) {
                     if (!isDashboardManualOpenPosition(position)) {
@@ -245,6 +274,12 @@ public class DecisionServiceImpl implements DecisionService {
             // 持仓表不存在或暂不可用时，按无持仓处理，避免影响首页刷新链路。
         }
         return openPositionMap;
+    }
+
+    private static void requireUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
     }
 
     private void applyManualUserPosition(DecisionResultVO item, UserPositionDO position) {

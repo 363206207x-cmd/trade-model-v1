@@ -7,11 +7,11 @@ import org.example.trademodel.vo.UserPositionVO;
 import java.util.List;
 
 public interface UserPositionService {
-    UserPositionVO manualOpen(CreateUserPositionReq request);
+    UserPositionVO manualOpenForUser(Long userId, CreateUserPositionReq request);
 
-    UserPositionVO manualClose(Long id, CloseUserPositionReq request);
+    UserPositionVO manualCloseForUser(Long id, Long userId, CloseUserPositionReq request);
 
-    List<UserPositionVO> listOpenPositions();
+    List<UserPositionVO> listOpenPositionsForUser(Long userId);
 
-    UserPositionVO findById(Long id);
+    UserPositionVO findByIdForUser(Long id, Long userId);
 }

@@ -52,7 +52,7 @@ class OpportunityOhlcvRuntimeIntegrationTest {
         OpportunityLogDO opportunity = opportunity(openTime);
         opportunityLogMapper.insert(opportunity);
 
-        OpportunityLogDTO evaluated = opportunityLogService.evaluateOpportunity(
+        OpportunityLogDTO evaluated = opportunityLogService.evaluateOpportunityForSystem(
                 opportunity.getOpportunityId(), LocalDateTime.ofInstant(
                         Instant.ofEpochMilli(closeTime + 1), ZoneId.systemDefault()));
 

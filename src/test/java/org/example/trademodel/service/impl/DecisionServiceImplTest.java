@@ -40,6 +40,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("smoke")
 class DecisionServiceImplTest {
+    private static final Long USER_ID = 17L;
 
     @Mock
     private DecisionResultMapper decisionResultMapper;
@@ -81,7 +82,6 @@ class DecisionServiceImplTest {
         row.setSymbol("BTCUSDT");
         populateCoreDashboardTruthFields(row);
         when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(row));
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
         List<DecisionResultVO> result = service.getLatestDecisionResults(10);
@@ -103,7 +103,6 @@ class DecisionServiceImplTest {
         row.setConfusedScore(null);
         row.setAssetStateSnapshot(null);
         when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(row));
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
         List<DecisionResultVO> result = service.getLatestDecisionResults(10);
@@ -129,7 +128,6 @@ class DecisionServiceImplTest {
         row.setConfusedScore(5);
         row.setAssetStateSnapshot("{\"state\":\"ACTIVE\"}");
         when(decisionResultMapper.findLatestDecisionResultsJoined(5)).thenReturn(List.of(row));
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.empty());
 
         List<DecisionResultVO> result = service.getLatestDecisionResults(5);
@@ -143,7 +141,6 @@ class DecisionServiceImplTest {
     @Test
     void getLatestDecisionResults_clampsDashboardLimitForGuardrail() {
         when(decisionResultMapper.findLatestDecisionResultsJoined(24)).thenReturn(Collections.emptyList());
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
 
         List<DecisionResultVO> result = service.getLatestDecisionResults(200);
 
@@ -157,7 +154,6 @@ class DecisionServiceImplTest {
         row.setSymbol("BTCUSDT");
         populateCoreDashboardTruthFields(row);
         when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
         DecisionResultVO result = service.getLatestDecisionResultBySymbol("btcusdt");
@@ -185,7 +181,6 @@ class DecisionServiceImplTest {
         row.setConfusedScore(null);
         row.setAssetStateSnapshot(null);
         when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
         DecisionResultVO result = service.getLatestDecisionResultBySymbol("btcusdt");
@@ -205,7 +200,6 @@ class DecisionServiceImplTest {
         row.setIsWorthOpening(Boolean.TRUE);
         row.setRecommendedAction("OPEN_LONG");
         when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(row));
-        when(userPositionMapper.listOpenPositions()).thenReturn(Collections.emptyList());
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
         List<DecisionResultVO> result = service.getLatestDecisionResults(10);
@@ -238,11 +232,12 @@ class DecisionServiceImplTest {
         pushRecheckCreatedSurface.setSourceType("PUSH_RECHECK");
 
         when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(manualDecision, executionPlanOnlyDecision));
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(manualOpen, manualClosed, pushRecheckCreatedSurface));
+        when(userPositionMapper.listOpenByUserId(USER_ID))
+                .thenReturn(List.of(manualOpen, manualClosed, pushRecheckCreatedSurface));
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
         when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.empty());
 
-        List<DecisionResultVO> result = service.getLatestDecisionResults(10);
+        List<DecisionResultVO> result = service.getLatestDecisionResultsForUser(USER_ID, 10);
 
         assertThat(result).hasSize(2);
         DecisionResultVO manualItem = result.get(0);
@@ -270,12 +265,12 @@ class DecisionServiceImplTest {
         DecisionResultVO row = new DecisionResultVO();
         row.setSymbol("BTCUSDT");
         when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 manualUserPosition("btcusdt", "OPEN", openedAt)
         ));
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
-        DecisionResultVO result = service.getLatestDecisionResultBySymbol("btcusdt");
+        DecisionResultVO result = service.getLatestDecisionResultBySymbolForUser(USER_ID, "btcusdt");
 
         assertThat(result).isNotNull();
         assertThat(result.getHasOpenPosition()).isTrue();
@@ -298,10 +293,10 @@ class DecisionServiceImplTest {
         UserPositionDO synced = manualUserPosition("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 35));
         synced.setSourceType("POSITION_SYNC");
         when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(closed, synced));
+        when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(closed, synced));
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
-        DecisionResultVO result = service.getLatestDecisionResultBySymbol("BTCUSDT");
+        DecisionResultVO result = service.getLatestDecisionResultBySymbolForUser(USER_ID, "BTCUSDT");
 
         assertThat(result).isNotNull();
         assertThat(result.getHasOpenPosition()).isFalse();
@@ -317,9 +312,10 @@ class DecisionServiceImplTest {
         UserPositionDO closedManual = manualUserPosition("SOLUSDT", "CLOSED", LocalDateTime.of(2026, 6, 22, 8, 40));
         UserPositionDO synced = manualUserPosition("BNBUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 45));
         synced.setSourceType("POSITION_SYNC");
-        when(userPositionMapper.listOpenPositions()).thenReturn(List.of(openManual, partialManual, closedManual, synced));
+        when(userPositionMapper.listOpenByUserId(USER_ID))
+                .thenReturn(List.of(openManual, partialManual, closedManual, synced));
 
-        int count = service.countOpenPositions();
+        int count = service.countOpenPositionsForUser(USER_ID);
 
         assertThat(count).isEqualTo(2);
     }
@@ -401,6 +397,7 @@ class DecisionServiceImplTest {
 
     private static UserPositionDO manualUserPosition(String symbol, String status, LocalDateTime openedAt) {
         UserPositionDO row = new UserPositionDO();
+        row.setUserId(USER_ID);
         row.setAssetSymbol(symbol);
         row.setSide("LONG");
         row.setStatus(status);

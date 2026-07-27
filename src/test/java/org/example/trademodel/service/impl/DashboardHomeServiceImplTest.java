@@ -52,6 +52,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -98,6 +99,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @ExtendWith(MockitoExtension.class)
 class DashboardHomeServiceImplTest {
+    private static final Long USER_ID = 17L;
     private static final String ACTIVE_VALID_PERIOD =
             "2026-07-01T00:00:00Z ~ 2026-07-02T00:00:00Z";
     private static final List<String> FORBIDDEN_TELEGRAM_STATUS_DEPENDENCIES = List.of(
@@ -232,15 +234,15 @@ class DashboardHomeServiceImplTest {
         sync.setActiveProviderType("BINANCE");
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth, sol, bnb));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth, sol, bnb));
         when(monitorService.getRecentAlerts(2)).thenReturn(List.of(alert));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position, nonManualPosition));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position, nonManualPosition));
         when(positionSyncService.getPositionSyncStatus()).thenReturn(sync);
         when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(7);
         when(pushSnapshotMapper.listPendingRecheck(anyString(), any(LocalDateTime.class), anyInt()))
                 .thenReturn(List.of());
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getSystemState().getPendingReview().getValue()).isEqualTo(4);
         assertThat(home.getSystemState().getPendingReview().getValue()).isNotEqualTo(99);
@@ -321,7 +323,7 @@ class DashboardHomeServiceImplTest {
         when(derivativesSnapshotReadPort.readCached(any(), any(), any(), any()))
                 .thenReturn(new ProviderCallResult<>(dashboardDerivativesSnapshot(), null, null));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getDerivatives().getStatus()).isEqualTo("正常");
         assertThat(home.getDerivatives().getOpenInterestStructure()).isEqualTo("增加");
@@ -344,7 +346,7 @@ class DashboardHomeServiceImplTest {
         nonManualPosition.setSourceType("SYSTEM");
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(nonManualPosition));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(nonManualPosition));
         when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(3);
         when(pushSnapshotMapper.countByPushStatuses(anyList())).thenAnswer(invocation -> {
             List<String> statuses = invocation.getArgument(0);
@@ -357,7 +359,7 @@ class DashboardHomeServiceImplTest {
             return 0;
         });
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo("WAITING_SYNC");
         assertThat(home.getDiagnostics().getTelegram()).isEqualTo("WAITING_SYNC");
@@ -377,7 +379,7 @@ class DashboardHomeServiceImplTest {
         configOnly.setUserId("dashboard-home");
         configOnly.setNotifyChannels("telegram");
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(configOnly.getNotifyChannels()).containsIgnoringCase("telegram");
         assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo("WAITING_SYNC");
@@ -397,7 +399,7 @@ class DashboardHomeServiceImplTest {
         );
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getHeader().getAiStatus()).isEqualTo("NOT_CALLED");
         assertThat(home.getHeader().getAiStatusLabel()).isEqualTo("未调用");
@@ -441,10 +443,10 @@ class DashboardHomeServiceImplTest {
         manualPosition.setStatus("OPEN");
         manualPosition.setSourceType("MANUAL");
 
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(manualPosition));
-        when(positionMonitorLogService.listByPositionId(13L, 1)).thenReturn(List.of());
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(manualPosition));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 13L, 1)).thenReturn(List.of());
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPushInbox().getHasOpenPosition()).isTrue();
         assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_AND_POSITION_RISK");
@@ -476,7 +478,7 @@ class DashboardHomeServiceImplTest {
                 .thenReturn(List.of());
         when(pushRecheckLogMapper.selectLatestByPushId(101L)).thenReturn(latestLog);
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPushInbox().getItems()).hasSize(1);
         DashboardHomeVO.PushItemVO item = home.getPushInbox().getItems().get(0);
@@ -508,10 +510,10 @@ class DashboardHomeServiceImplTest {
         monitorLog.setCurrentPrice(new BigDecimal("63500"));
         monitorLog.setLogicStatus("LOGIC_VALID");
 
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(positionMonitorLogService.listByPositionId(9L, 1)).thenReturn(List.of(monitorLog));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 9L, 1)).thenReturn(List.of(monitorLog));
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPositions()).hasSize(1);
         DashboardHomeVO.PositionVO homePosition = home.getPositions().get(0);
@@ -544,10 +546,10 @@ class DashboardHomeServiceImplTest {
         monitorLog.setSuggestedAction("TIGHTEN_STOP_REVIEW");
         monitorLog.setCreatedAt(LocalDateTime.of(2026, 7, 13, 10, 5));
 
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(positionMonitorLogService.listByPositionId(19L, 1)).thenReturn(List.of(monitorLog));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 19L, 1)).thenReturn(List.of(monitorLog));
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPositions()).hasSize(1);
         DashboardHomeVO.PositionVO row = home.getPositions().get(0);
@@ -577,9 +579,9 @@ class DashboardHomeServiceImplTest {
         closedPosition.setStatus("CLOSED");
         closedPosition.setSourceType("MANUAL");
 
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(closedPosition));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(closedPosition));
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPositions()).isEmpty();
         assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
@@ -597,10 +599,10 @@ class DashboardHomeServiceImplTest {
         setActivePlanValidity(decision);
         allowMatchingSnapshot(decision);
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getPositions()).isEmpty();
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("USABLE_REVIEW_PLAN");
@@ -627,10 +629,10 @@ class DashboardHomeServiceImplTest {
         monitorLog.setCurrentPrice(new BigDecimal("90"));
         monitorLog.setLogicStatus("LOGIC_VALID");
 
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(positionMonitorLogService.listByPositionId(10L, 1)).thenReturn(List.of(monitorLog));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 10L, 1)).thenReturn(List.of(monitorLog));
 
-        DashboardHomeVO home = service.getHome(null, 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         DashboardHomeVO.PositionVO homePosition = home.getPositions().get(0);
         assertThat(homePosition.getFloatingPnl()).isEqualByComparingTo("20");
@@ -643,7 +645,7 @@ class DashboardHomeServiceImplTest {
     void singlePositionForSymbolStillAutoSelects() {
         OriginalPlanFixture fixture = originalPlanFixture(301L, "SINGLE-A");
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, null);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
 
         assertThat(home.getPositionSelectionStatus()).isEqualTo("UNIQUE_POSITION_SELECTED");
         assertThat(home.getMatchingPositionCount()).isEqualTo(1);
@@ -656,7 +658,7 @@ class DashboardHomeServiceImplTest {
     void multiplePositionsSameSymbolWithoutPositionIdFailClosed() {
         MultiPositionFixture fixture = twoSameSymbolPositions();
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, null);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
 
         assertThat(home.getPositionSelectionStatus()).isEqualTo("POSITION_SELECTION_REQUIRED");
         assertThat(home.getMatchingPositionCount()).isEqualTo(2);
@@ -671,7 +673,7 @@ class DashboardHomeServiceImplTest {
     void selectedPositionIdBShowsOnlyPlanB() {
         MultiPositionFixture fixture = twoSameSymbolPositions();
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, fixture.positionB().getId());
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, fixture.positionB().getId());
         DashboardHomeVO.ExecutionSuggestionVO suggestion = home.getExecutionSuggestion();
 
         assertThat(home.getPositionSelectionStatus()).isEqualTo("EXACT_POSITION_SELECTED");
@@ -689,7 +691,7 @@ class DashboardHomeServiceImplTest {
     void selectedPositionIdANeverShowsPlanB() {
         MultiPositionFixture fixture = twoSameSymbolPositions();
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, fixture.positionA().getId());
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, fixture.positionA().getId());
         DashboardHomeVO.ExecutionSuggestionVO suggestion = home.getExecutionSuggestion();
 
         assertThat(home.getSelectedPositionId()).isEqualTo(fixture.positionA().getId());
@@ -710,9 +712,9 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO ethPlan = sourcePlanDecision("analysis-eth-B", "ETHUSDT", "ETH-B");
         stubMonitorExecutionPlanSource(btc, btcPlan, "plan-btc-A", "trace-shared", "trace-shared");
         stubMonitorExecutionPlanSource(eth, ethPlan, "plan-eth-B", "trace-eth", "trace-eth");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(btc, eth));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(btc, eth));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 312L);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, 312L);
 
         assertThat(home.getPositionSelectionStatus()).isEqualTo("POSITION_SYMBOL_MISMATCH");
         assertPositionSelectionBlocked(home.getExecutionSuggestion(), "POSITION_SYMBOL_MISMATCH",
@@ -725,7 +727,7 @@ class DashboardHomeServiceImplTest {
     void unknownSelectedPositionIdDoesNotFallbackToFirstPosition() {
         twoSameSymbolPositions();
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 999999L);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, 999999L);
 
         assertThat(home.getPositionSelectionStatus()).isEqualTo("POSITION_NOT_FOUND");
         assertThat(home.getSelectedPositionId()).isNull();
@@ -736,8 +738,8 @@ class DashboardHomeServiceImplTest {
     void nonPositiveSelectedPositionIdFailsClosed() {
         twoSameSymbolPositions();
 
-        DashboardHomeVO zero = service.getHome("BTCUSDT", 6, 0L);
-        DashboardHomeVO negative = service.getHome("BTCUSDT", 6, -1L);
+        DashboardHomeVO zero = service.getHomeForUser(USER_ID, "BTCUSDT", 6, 0L);
+        DashboardHomeVO negative = service.getHomeForUser(USER_ID, "BTCUSDT", 6, -1L);
 
         assertPositionSelectionBlocked(zero.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
         assertPositionSelectionBlocked(negative.getExecutionSuggestion(), "POSITION_NOT_FOUND", "所选持仓不存在");
@@ -750,9 +752,9 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture active = originalPlanFixture(321L, "ACTIVE-A");
         UserPositionVO closed = activeManualPosition(322L, "BTCUSDT", null);
         closed.setStatus("CLOSED");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(active.position(), closed));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(active.position(), closed));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 322L);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, 322L);
 
         assertThat(home.getPositions()).extracting(DashboardHomeVO.PositionVO::getPositionId)
                 .containsExactly(321L);
@@ -765,9 +767,9 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture active = originalPlanFixture(331L, "MANUAL-A");
         UserPositionVO systemPosition = activeManualPosition(332L, "BTCUSDT", null);
         systemPosition.setSourceType("SYSTEM");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(active.position(), systemPosition));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(active.position(), systemPosition));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6, 332L);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, 332L);
 
         assertThat(home.getPositions()).extracting(DashboardHomeVO.PositionVO::getPositionId)
                 .containsExactly(331L);
@@ -780,9 +782,9 @@ class DashboardHomeServiceImplTest {
         MultiPositionFixture fixture = twoSameSymbolPositions();
 
         DashboardHomeVO.ExecutionSuggestionVO selectedA = service
-                .getHome("BTCUSDT", 6, fixture.positionA().getId()).getExecutionSuggestion();
+                .getHomeForUser(USER_ID, "BTCUSDT", 6, fixture.positionA().getId()).getExecutionSuggestion();
         DashboardHomeVO.ExecutionSuggestionVO selectedB = service
-                .getHome("BTCUSDT", 6, fixture.positionB().getId()).getExecutionSuggestion();
+                .getHomeForUser(USER_ID, "BTCUSDT", 6, fixture.positionB().getId()).getExecutionSuggestion();
 
         assertThat(selectedA.getPositionMonitor().getPositionId()).isEqualTo(fixture.positionA().getId());
         assertThat(selectedA.getEntryZone()).isEqualTo("POSITION-A-entry");
@@ -799,10 +801,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
         stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-A");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
         assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("ACTIVE");
@@ -821,11 +823,11 @@ class DashboardHomeServiceImplTest {
     void positionWithNoSourceReferenceHidesOriginalPlan() {
         UserPositionVO position = activeManualPosition(32L, "BTCUSDT", null);
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(positionMonitorLogService.listByPositionId(32L, 1)).thenReturn(List.of());
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 32L, 1)).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         verify(executionPlanMapper, never()).selectByPlanId(anyString());
@@ -839,11 +841,11 @@ class DashboardHomeServiceImplTest {
         PositionMonitorLogDTO guessedSibling = analysisOnlyMonitor(position, "analysis-X");
         guessedSibling.setExecutionPlanId("plan-B");
         DecisionResultVO latestB = sourcePlanDecision("analysis-X", "BTCUSDT", "B");
-        when(positionMonitorLogService.listByPositionId(321L, 1)).thenReturn(List.of(guessedSibling));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 321L, 1)).thenReturn(List.of(guessedSibling));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertUnverifiedOriginalPlan(home.getExecutionSuggestion());
         assertThat(home.getPositions()).singleElement().satisfies(row -> {
@@ -860,10 +862,10 @@ class DashboardHomeServiceImplTest {
         UserPositionVO position = activeManualPosition(322L, "BTCUSDT", "legacy-untyped-source");
         PositionMonitorLogDTO legacy = analysisOnlyMonitor(position, "analysis-A");
         legacy.setExecutionPlanId("plan-A");
-        when(positionMonitorLogService.listByPositionId(322L, 1)).thenReturn(List.of(legacy));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 322L, 1)).thenReturn(List.of(legacy));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertUnverifiedOriginalPlan(home.getExecutionSuggestion());
         assertThat(home.getPositions().get(0).getSourceAnalysisId()).isNull();
@@ -877,10 +879,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
         stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-A");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
@@ -896,10 +898,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
         stubMonitorAnalysisSource(position, planA, "plan-A", "trace-A", "trace-A");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo("analysis-plan-A");
@@ -914,10 +916,10 @@ class DashboardHomeServiceImplTest {
         UserPositionVO position = activeManualPosition(341L, "BTCUSDT",
                 PositionMonitorSourceContract.analysisReference("analysis-shared"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-shared");
-        when(positionMonitorLogService.listByPositionId(341L, 1)).thenReturn(List.of(monitor));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 341L, 1)).thenReturn(List.of(monitor));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
@@ -929,10 +931,10 @@ class DashboardHomeServiceImplTest {
         UserPositionVO position = activeManualPosition(342L, "BTCUSDT",
                 PositionMonitorSourceContract.analysisReference("analysis-no-plan"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-no-plan");
-        when(positionMonitorLogService.listByPositionId(342L, 1)).thenReturn(List.of(monitor));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 342L, 1)).thenReturn(List.of(monitor));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         verify(decisionResultMapper, never()).findByAnalysisIdAndPlanIdJoined(anyString(), anyString());
@@ -945,11 +947,11 @@ class DashboardHomeServiceImplTest {
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-shared");
         ExecutionPlanDO latestSiblingB = validExecutionPlan("plan-B", "analysis-shared");
         latestSiblingB.setEntryZone("B-entry");
-        when(positionMonitorLogService.listByPositionId(343L, 1)).thenReturn(List.of(monitor));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 343L, 1)).thenReturn(List.of(monitor));
         lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-shared")).thenReturn(latestSiblingB);
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
@@ -965,10 +967,10 @@ class DashboardHomeServiceImplTest {
         lenient().when(executionPlanMapper.selectOnlyByAnalysisId("analysis-shared")).thenReturn(null);
         lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-shared"))
                 .thenReturn(validExecutionPlan("plan-B", "analysis-shared"));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestSiblingB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestSiblingB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo("plan-A");
@@ -985,12 +987,12 @@ class DashboardHomeServiceImplTest {
                 PositionMonitorSourceContract.executionPlanReference("plan-A"));
         PositionMonitorLogDTO monitor = analysisOnlyMonitor(position, "analysis-monitor-A");
         monitor.setExecutionPlanId("plan-A");
-        when(positionMonitorLogService.listByPositionId(345L, 1)).thenReturn(List.of(monitor));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 345L, 1)).thenReturn(List.of(monitor));
         when(executionPlanMapper.selectByPlanId("plan-A"))
                 .thenReturn(validExecutionPlan("plan-A", "analysis-plan-B"));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         verify(decisionResultMapper, never()).findByAnalysisIdAndPlanIdJoined(anyString(), anyString());
@@ -1003,10 +1005,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO otherAssetPlan = sourcePlanDecision("analysis-eth-A", "ETHUSDT", "ETH-A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
         stubMonitorExecutionPlanSource(position, otherAssetPlan, "plan-eth-A", "trace-eth", "trace-eth");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         assertThat(suggestion.getEntryZone()).isNotEqualTo("B-entry");
@@ -1020,11 +1022,11 @@ class DashboardHomeServiceImplTest {
         wrongPositionMonitor.setPositionId(999L);
         wrongPositionMonitor.setAnalysisId("analysis-other-position-A");
         wrongPositionMonitor.setExecutionPlanId("plan-other-position-A");
-        when(positionMonitorLogService.listByPositionId(351L, 1)).thenReturn(List.of(wrongPositionMonitor));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 351L, 1)).thenReturn(List.of(wrongPositionMonitor));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         verify(executionPlanMapper, never()).selectByPlanId("plan-other-position-A");
@@ -1037,10 +1039,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO planA = sourcePlanDecision("analysis-plan-A", "BTCUSDT", "A");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
         stubMonitorExecutionPlanSource(position, planA, "plan-A", "trace-A", "trace-current-B");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
         assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("STATE_MISMATCH");
@@ -1055,11 +1057,11 @@ class DashboardHomeServiceImplTest {
     void activePositionNeverFallsBackToLatestSymbolDecision() {
         UserPositionVO position = activeManualPosition(37L, "BTCUSDT", "plan-or-analysis-type-unknown");
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "B");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
-        when(positionMonitorLogService.listByPositionId(37L, 1)).thenReturn(List.of());
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 37L, 1)).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertUnverifiedOriginalPlan(home.getExecutionSuggestion());
         assertThat(home.getPositions().get(0).getSourceRefId()).isEqualTo("plan-or-analysis-type-unknown");
@@ -1081,9 +1083,9 @@ class DashboardHomeServiceImplTest {
         UserPositionMapper monitorPositionMapper = mock(UserPositionMapper.class);
         MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
-        when(monitorPositionMapper.selectById(positionId)).thenReturn(positionDO);
+        when(monitorPositionMapper.selectByIdAndUserId(positionId, USER_ID)).thenReturn(positionDO);
         when(quoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(monitorQuote("100")));
-        when(riskAdapter.currentRisk()).thenReturn(allowedMonitorRisk());
+        when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(allowedMonitorRisk());
 
         ExecutionPlanDO exactPlanA = validExecutionPlan(planAId, analysisA);
         exactPlanA.setEntryZone("PLAN-A-entry");
@@ -1109,7 +1111,7 @@ class DashboardHomeServiceImplTest {
                 analysisRunMapper,
                 null);
 
-        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPosition(positionId);
+        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPositionForUser(positionId, USER_ID);
 
         assertThat(monitorResult.getAnalysisId()).isEqualTo(analysisA);
         assertThat(monitorResult.getExecutionPlanId()).isEqualTo(planAId);
@@ -1122,13 +1124,13 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO latestDecisionB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "LATEST-B");
         when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(analysisA, planAId))
                 .thenReturn(joinedDecisionA);
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionVO));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestDecisionB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(positionVO));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestDecisionB));
         when(assetStateMapper.selectBySymbol("BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", "trace-monitor-A"));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion =
-                service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+                service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo(analysisA);
@@ -1153,9 +1155,9 @@ class DashboardHomeServiceImplTest {
         UserPositionMapper monitorPositionMapper = mock(UserPositionMapper.class);
         MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
-        when(monitorPositionMapper.selectById(positionId)).thenReturn(positionDO);
+        when(monitorPositionMapper.selectByIdAndUserId(positionId, USER_ID)).thenReturn(positionDO);
         when(quoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(monitorQuote("100")));
-        when(riskAdapter.currentRisk()).thenReturn(allowedMonitorRisk());
+        when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(allowedMonitorRisk());
         ExecutionPlanDO latestSiblingB = validExecutionPlan("plan-latest-B", ambiguousAnalysis);
         latestSiblingB.setEntryZone("LATEST-B-entry");
         lenient().when(executionPlanMapper.selectLatestByAnalysisId(ambiguousAnalysis))
@@ -1174,7 +1176,7 @@ class DashboardHomeServiceImplTest {
                 analysisRunMapper,
                 null);
 
-        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPosition(positionId);
+        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPositionForUser(positionId, USER_ID);
 
         assertThat(monitorResult.getAnalysisId()).isNull();
         assertThat(capturedLogs).singleElement().satisfies(log -> {
@@ -1183,11 +1185,11 @@ class DashboardHomeServiceImplTest {
         });
 
         DecisionResultVO latestDecisionB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "LATEST-B");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionVO));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestDecisionB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(positionVO));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestDecisionB));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion =
-                service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+                service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertUnverifiedOriginalPlan(suggestion);
         assertThat(suggestion.getEntryZone()).isNotEqualTo("LATEST-B-entry");
@@ -1221,7 +1223,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixture(381L, "INVALID-A");
         fixture.executionPlan().setExecutionPlanStatus("INVALID");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_INVALID", "原计划已失效，仅用于历史复核", "INVALID-A");
     }
@@ -1233,7 +1235,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setSourceGateStatus("BLOCKED");
         fixture.executionPlan().setSourceGateComplete(false);
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_BLOCKED",
                 "原计划已被门控阻断，仅用于历史复核", "BLOCKED-A");
@@ -1244,7 +1246,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixture(383L, "INCOMPLETE-A");
         fixture.executionPlan().setExecutionPlanStatus("INCOMPLETE");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_INCOMPLETE",
                 "原计划边界不完整，仅用于历史复核", "INCOMPLETE-A");
@@ -1256,7 +1258,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setSourceGateStatus("INCOMPLETE");
         fixture.executionPlan().setSourceGateComplete(false);
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_INCOMPLETE",
                 "原计划边界不完整，仅用于历史复核", "SOURCE-INCOMPLETE-A");
@@ -1268,7 +1270,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setSourceGateStatus("VALID");
         fixture.executionPlan().setSourceGateComplete(false);
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_INCOMPLETE",
                 "原计划边界不完整，仅用于历史复核", "SOURCE-FLAG-INCOMPLETE-A");
@@ -1280,7 +1282,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setNeedsRevalidation(true);
         fixture.executionPlan().setRevalidationReason("证据结构发生变化，等待重新验证");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "REVALIDATION_REQUIRED",
                 "原计划需要重新验证，仅用于历史复核：重验证原因已记录，等待人工复核", "REVALIDATE-A");
@@ -1293,7 +1295,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setRevalidationReason("EXTREME_PRICE_MOVE:PRICE_MOVE_THRESHOLD_BREACHED");
         fixture.executionPlan().setHotResetEventId("hot-reset-event-1");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "REVALIDATION_REQUIRED",
                 "原计划需要重新验证，仅用于历史复核：极端价格波动触发重新验证", "HOT-RESET-A");
@@ -1307,7 +1309,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setRevalidationReason(null);
         fixture.executionPlan().setHotResetEventId("hot-reset-event-2");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanLabel())
                 .isEqualTo("原计划需要重新验证，仅用于历史复核：热重置已触发重新验证")
@@ -1320,7 +1322,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setNeedsRevalidation(true);
         fixture.executionPlan().setRevalidationReason("热重置 UNKNOWN_INTERNAL_CODE");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanLabel())
                 .isEqualTo("原计划需要重新验证，仅用于历史复核：重验证原因已记录，等待人工复核")
@@ -1333,7 +1335,7 @@ class DashboardHomeServiceImplTest {
         fixture.executionPlan().setNeedsRevalidation(true);
         fixture.executionPlan().setRevalidationReason("{\"errorCode\":\"UNMAPPED_REASON\"}");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanLabel())
                 .isEqualTo("原计划需要重新验证，仅用于历史复核：重验证原因已记录，等待人工复核")
@@ -1355,7 +1357,7 @@ class DashboardHomeServiceImplTest {
             fixture.executionPlan().setRevalidationReason(item.get(0));
 
             DashboardHomeVO.ExecutionSuggestionVO suggestion =
-                    service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+                    service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
             assertThat(suggestion.getOriginalPlanLabel()).endsWith(item.get(1));
             assertThat(suggestion.getOriginalPlanLabel()).doesNotContain(item.get(0));
@@ -1367,7 +1369,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixture(390L, "MISSING-ENTRY-A");
         fixture.executionPlan().setEntryZone(null);
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
         assertThat(suggestion.getEntryZone()).isNull();
@@ -1379,7 +1381,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixture(391L, "MISSING-STOP-A");
         fixture.executionPlan().setStopLoss(null);
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
         assertThat(suggestion.getStopLoss()).isNull();
@@ -1390,7 +1392,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixture(392L, "MISSING-TP-A");
         fixture.executionPlan().setTakeProfitRules(null);
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
         assertThat(suggestion.getTakeProfitRules()).isNull();
@@ -1405,7 +1407,7 @@ class DashboardHomeServiceImplTest {
             fixture.executionPlan().setEntryZone(placeholder);
 
             DashboardHomeVO.ExecutionSuggestionVO suggestion =
-                    service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+                    service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
             assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
             assertThat(suggestion.getEntryZone()).isNull();
@@ -1420,7 +1422,7 @@ class DashboardHomeServiceImplTest {
         fixture.decision().setStopLoss("PLAN-B-stop");
         fixture.decision().setTakeProfitRules("PLAN-B-tp");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getOriginalPlanCurrentValidity()).isEqualTo("PLAN_INCOMPLETE");
         assertThat(suggestion.getEntryZone()).isNull();
@@ -1435,7 +1437,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixtureWithLatestB(387L, "HISTORICAL-A");
         fixture.executionPlan().setExecutionPlanStatus("BLOCKED");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_BLOCKED",
                 "原计划已被门控阻断，仅用于历史复核", "HISTORICAL-A");
@@ -1448,7 +1450,7 @@ class DashboardHomeServiceImplTest {
         OriginalPlanFixture fixture = originalPlanFixtureWithLatestB(388L, "INVALID-SOURCE-A");
         fixture.executionPlan().setExecutionPlanStatus("INVALID");
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_INVALID",
                 "原计划已失效，仅用于历史复核", "INVALID-SOURCE-A");
@@ -1463,7 +1465,7 @@ class DashboardHomeServiceImplTest {
         fixture.decision().setValidFrom(OffsetDateTime.parse("2026-06-01T00:00:00Z"));
         fixture.decision().setExpiresAt(OffsetDateTime.parse("2026-06-02T00:00:00Z"));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertVerifiedHistoricalPlan(suggestion, "PLAN_INVALID",
                 "原计划已失效，仅用于历史复核", "PRIORITY-A");
@@ -1498,10 +1500,10 @@ class DashboardHomeServiceImplTest {
         allowMatchingSnapshot(btc);
         allowMatchingSnapshot(eth);
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
 
-        DashboardHomeVO ethHome = service.getHome("ETHUSDT", 6);
+        DashboardHomeVO ethHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
 
         assertThat(ethHome.getSelectedSymbol()).isEqualTo("ETHUSDT");
         assertThat(ethHome.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-ETHUSDT");
@@ -1514,7 +1516,7 @@ class DashboardHomeServiceImplTest {
         assertThat(ethHome.getExecutionSuggestion().getValidPeriod()).isEqualTo(ACTIVE_VALID_PERIOD);
         assertThat(ethHome.getExecutionSuggestion().getInvalidCondition()).isEqualTo("ETH invalid");
 
-        DashboardHomeVO defaultHome = service.getHome(null, 6);
+        DashboardHomeVO defaultHome = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(defaultHome.getSelectedSymbol()).isEqualTo("BTCUSDT");
         assertThat(defaultHome.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-BTCUSDT");
@@ -1533,10 +1535,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO sol = decision("SOLUSDT", "BULLISH", "MEDIUM", "HIGH", 80, 40,
                 "LEVEL_3_DIVERGENCE", false, "{\"state\":\"HIGH_RISK\"}");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth, bnb, sol));
-        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth, bnb, sol));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
 
-        DashboardHomeVO home = service.getHome("SOLUSDT", 3);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "SOLUSDT", 3);
 
         assertThat(home.getSelectedSymbol()).isEqualTo("SOLUSDT");
         assertThat(home.getAssets())
@@ -1557,14 +1559,14 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_1", false, "{\"state\":\"OBSERVING\"}");
         solWithoutIdentity.setAnalysisId(null);
 
-        when(decisionService.getLatestDecisionResults(anyInt()))
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(btc, eth, solWithoutIdentity));
         when(analysisRunMapper.selectById("analysis-btc-exact"))
                 .thenReturn(analysisRun("analysis-btc-exact", "BTC/USDT"));
         when(analysisRunMapper.selectById("analysis-eth-exact"))
                 .thenReturn(analysisRun("analysis-eth-exact", "ETHUSDT"));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 3);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 3);
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isEqualTo("analysis-btc-exact");
         assertThat(asset(home, "ETH/USDT").getAnalysisId()).isEqualTo("analysis-eth-exact");
@@ -1578,10 +1580,10 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
         btc.setAnalysisId("analysis-orphan");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc));
         when(analysisRunMapper.selectById("analysis-orphan")).thenReturn(null);
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 1);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
         assertThat(asset(home, "BTC/USDT").getMarketBias()).isEqualTo("BULLISH");
@@ -1594,11 +1596,11 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
         btc.setAnalysisId("analysis-symbol-mismatch");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc));
         when(analysisRunMapper.selectById("analysis-symbol-mismatch"))
                 .thenReturn(analysisRun("analysis-symbol-mismatch", "ETHUSDT"));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 1);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
         verify(analysisRunMapper, never()).selectLatestBySymbol(anyString());
@@ -1610,9 +1612,9 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");
         btc.setAnalysisId(null);
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 1);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
         verify(analysisRunMapper, never()).selectById(anyString());
@@ -1628,13 +1630,13 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_2_REVIEW", false, "{\"state\":\"OBSERVING\"}");
         eth.setAnalysisId("analysis-eth-valid");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth));
         when(analysisRunMapper.selectById("analysis-btc-failing"))
                 .thenThrow(new IllegalStateException("isolated lookup failure"));
         when(analysisRunMapper.selectById("analysis-eth-valid"))
                 .thenReturn(analysisRun("analysis-eth-valid", "ETHUSDT"));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 2);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 2);
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
         assertThat(asset(home, "BTC/USDT").getMarketBias()).isEqualTo("BULLISH");
@@ -1650,12 +1652,12 @@ class DashboardHomeServiceImplTest {
         bnb.setProvider("BINANCE_PUBLIC");
         bnb.setFreshnessStatus("FRESH");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of());
-        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of());
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
         lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
                 .thenReturn(List.of(bnb));
 
-        DashboardHomeVO home = service.getHome(null, 3);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 3);
 
         assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
         assertThat(home.getAssets())
@@ -1698,14 +1700,14 @@ class DashboardHomeServiceImplTest {
         setActivePlanValidity(bnbDecision);
         allowMatchingSnapshot(bnbDecision);
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of());
-        lenient().when(decisionService.getLatestDecisionResultBySymbol("BNBUSDT"))
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of());
+        lenient().when(decisionService.getLatestDecisionResultBySymbolForUser(USER_ID, "BNBUSDT"))
                 .thenReturn(bnbDecision);
-        when(userPositionService.listOpenPositions()).thenReturn(List.of());
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
         lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
                 .thenReturn(List.of(bnbBar));
 
-        DashboardHomeVO home = service.getHome(null, 3);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 3);
 
         assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
         assertThat(home.getAssets().get(0).getSlotType()).isEqualTo("DECISION");
@@ -1727,9 +1729,9 @@ class DashboardHomeServiceImplTest {
         decision.setValidPeriod("2026-07-03 00:34:21 ~ 2026-07-04 00:34:21");
         decision.setInvalidCondition("结构失效：当前价高于近端 1m 摆动高点");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("UNSUPPORTED_TIMEFRAME");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
@@ -1758,9 +1760,9 @@ class DashboardHomeServiceImplTest {
         decision.setInvalidCondition("结构失效：当前价高于近端 5m 摆动高点");
         allowMatchingSnapshot(decision);
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("BOUNDARY_INCOMPLETE");
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
@@ -1774,9 +1776,9 @@ class DashboardHomeServiceImplTest {
     @Test
     void gptFinalTabShowsFinalDecisionFieldsOnly() {
         DecisionResultVO decision = decisionWithStructuredAiRoles();
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getAiDecision().getActiveTab()).isEqualTo("GPT_FINAL");
         assertThat(home.getAiDecision().getTabs()).extracting(DashboardHomeVO.AiTabVO::getRole)
@@ -1804,9 +1806,9 @@ class DashboardHomeServiceImplTest {
     @Test
     void geminiReviewTabShowsConflictReviewFieldsOnly() {
         DecisionResultVO decision = decisionWithStructuredAiRoles();
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
         assertThat(gemini.getReviewVerdict()).isEqualTo("提出反对意见");
@@ -1826,9 +1828,9 @@ class DashboardHomeServiceImplTest {
     @Test
     void grokChallengeTabShowsCounterEvidenceFieldsOnly() {
         DecisionResultVO decision = decisionWithStructuredAiRoles();
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
         assertThat(grok.getChallengeThesis()).isEqualTo("AI 复核结果已返回，等待人工复核");
@@ -1853,9 +1855,9 @@ class DashboardHomeServiceImplTest {
                         AiReviewStance.SUPPORT, "GPT_ONLY_EVIDENCE", "GPT only summary")),
                 synthesis("BULLISH", "HIGH", "HIGH", "CONFIRM", true, null)));
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
         assertThat(gpt.getCoreSupportingEvidence()).containsExactly("AI 证据已记录，需人工复核");
@@ -1889,10 +1891,10 @@ class DashboardHomeServiceImplTest {
         raw.setInvalidCondition("站回 3100");
         raw.setAiRoleResults("orchestrationMode=RULE_ONLY_FALLBACK; providers=OPENAI:SUCCESS:SUPPORT");
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(malformed, raw));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(malformed, raw));
 
-        DashboardHomeVO malformedHome = service.getHome("BTCUSDT", 6);
-        DashboardHomeVO rawHome = service.getHome("ETHUSDT", 6);
+        DashboardHomeVO malformedHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
+        DashboardHomeVO rawHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
 
         assertNoAiEvidence(malformedHome);
         assertNoAiEvidence(rawHome);
@@ -1908,9 +1910,9 @@ class DashboardHomeServiceImplTest {
                         AiReviewStance.ABSTAIN, "GPT_REVIEW", "只映射显式结论")),
                 synthesis("BULLISH", "HIGH", "HIGH", "REDUCED", true, null)));
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
         assertThat(gpt.getResultAvailable()).isTrue();
@@ -1956,9 +1958,9 @@ class DashboardHomeServiceImplTest {
                 List.of(role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
                         AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足")),
                 synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true, null)));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.AiTabVO tab = aiTab(service.getHome("BTCUSDT", 6), "GPT_FINAL");
+        DashboardHomeVO.AiTabVO tab = aiTab(service.getHomeForUser(USER_ID, "BTCUSDT", 6), "GPT_FINAL");
 
         assertThat(tab.getResultAvailable()).isTrue();
         assertThat(tab.getStance()).isEqualTo("ABSTAIN");
@@ -1976,9 +1978,9 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = decisionWithRoles(List.of(
                 role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
                         AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "证据不足")));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getAiDecision().getRunStatus()).isEqualTo("PARTIAL_SUCCESS");
         assertConsistencyNotApplicable(home);
@@ -1988,9 +1990,9 @@ class DashboardHomeServiceImplTest {
     void allThreeSuccessfulAbstainMakeConsistencyNotApplicable() {
         DecisionResultVO decision = allAbstainDecision();
         decision.setConfusedScore(100);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getAiDecision().getRunStatus()).isEqualTo("SUCCESS");
         assertThat(home.getAiDecision().getRunStatusLabel()).isEqualTo("复核成功");
@@ -2010,9 +2012,9 @@ class DashboardHomeServiceImplTest {
                         AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "支持"),
                 role(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
                         AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "弃权")));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getAiDecision().getConsistency().getAiApplicable()).isTrue();
         assertThat(home.getSystemState().getAiConflict().getValue()).isEqualTo("LEVEL_2_REVIEW");
@@ -2027,9 +2029,9 @@ class DashboardHomeServiceImplTest {
                         AiReviewStance.CHALLENGE, "GEMINI_CONTRADICTION_ONLY", "反对"),
                 role(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE,
                         AiReviewStance.ABSTAIN, "INSUFFICIENT_DATA", "弃权")));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(home.getAiDecision().getConsistency().getAiApplicable()).isTrue();
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
@@ -2039,9 +2041,9 @@ class DashboardHomeServiceImplTest {
 
     @Test
     void allAbstainKpiShowsNotApplicable() {
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(allAbstainDecision()));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(allAbstainDecision()));
 
-        DashboardHomeVO.StatusCardVO card = service.getHome("BTCUSDT", 6).getSystemState().getAiConflict();
+        DashboardHomeVO.StatusCardVO card = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getSystemState().getAiConflict();
 
         assertThat(card.getValue()).isNull();
         assertThat(card.getValueLabel()).isEqualTo("不适用");
@@ -2054,9 +2056,9 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = decisionWithRoles(List.of(
                 role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
                         AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "支持")));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.StatusCardVO card = service.getHome("BTCUSDT", 6).getSystemState().getAiConflict();
+        DashboardHomeVO.StatusCardVO card = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getSystemState().getAiConflict();
 
         assertThat(card.getValue()).isEqualTo("LEVEL_2_REVIEW");
         assertThat(card.getValueLabel()).isEqualTo("轻微分歧");
@@ -2067,8 +2069,10 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = decisionWithRoles(List.of(
                 role(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
                         AiReviewStance.SUPPORT, "RULE_DIRECTION_ALIGNED", "支持")));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new DashboardHomeController(service)).build();
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+        AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
+        when(resolver.requireCurrentUserId()).thenReturn(USER_ID);
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new DashboardHomeController(service, resolver)).build();
 
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -2083,7 +2087,7 @@ class DashboardHomeServiceImplTest {
         when(providerReadinessService.getReadiness())
                 .thenReturn(providerReadiness("CONFIGURED", "DISABLED", "WAITING_SYNC", "真实行情"));
 
-        DashboardHomeVO.HeaderVO header = service.getHome("BTCUSDT", 6).getHeader();
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
 
         assertThat(header.getAiStatus()).isEqualTo("DISABLED");
         assertThat(header.getAiStatusLabel()).isEqualTo("已禁用");
@@ -2105,10 +2109,10 @@ class DashboardHomeServiceImplTest {
                         AiReviewStance.SUPPORT, "INSUFFICIENT_DATA", "ETH summary")),
                 synthesis("BEARISH", "MEDIUM", "MEDIUM", "REDUCED", false, null)));
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(btc, eth));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth));
 
-        DashboardHomeVO ethHome = service.getHome("ETHUSDT", 6);
-        DashboardHomeVO defaultHome = service.getHome(null, 6);
+        DashboardHomeVO ethHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
+        DashboardHomeVO defaultHome = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).containsExactly("证据不足");
         assertThat(aiTab(defaultHome, "GPT_FINAL").getSupportEvidence()).containsExactly("规则方向与 AI 复核一致");
@@ -2117,9 +2121,9 @@ class DashboardHomeServiceImplTest {
     @Test
     void adjudicationConsistencyHasExplicitBackendContract() {
         DecisionResultVO decision = decisionWithStructuredAiRoles();
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
         assertThat(consistency.getLevel()).isEqualTo("LEVEL_2_REVIEW");
@@ -2139,9 +2143,9 @@ class DashboardHomeServiceImplTest {
                         AiReviewStance.CHALLENGE, "CONFLICT_TOO_HIGH", "GPT challenge")),
                 synthesis("BULLISH", "LOW", "HIGH", "CONFUSED", false, "CONFLICT_TOO_HIGH")));
 
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
         assertThat(consistency.getScore()).isEqualTo(80);
@@ -2154,7 +2158,7 @@ class DashboardHomeServiceImplTest {
     void authoritativeAssetStateRowOverridesDecisionSnapshotForAllEightStates() {
         DecisionResultVO decision = decision("BTCUSDT", "RANGE", "LOW", "MEDIUM", 80, 0,
                 null, false, "{\"state\":\"OBSERVING\"}");
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
         AssetStateEnum[] states = {
                 AssetStateEnum.OBSERVING,
                 AssetStateEnum.CANDIDATE,
@@ -2173,7 +2177,7 @@ class DashboardHomeServiceImplTest {
             row.setState(states[i]);
             when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row);
 
-            DashboardHomeVO.AssetVO asset = asset(service.getHome("BTCUSDT", 6), "BTC/USDT");
+            DashboardHomeVO.AssetVO asset = asset(service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
 
             assertThat(asset.getAssetState()).isEqualTo(states[i].name());
             assertThat(asset.getAssetStateLabel()).isEqualTo(labels[i]);
@@ -2188,9 +2192,9 @@ class DashboardHomeServiceImplTest {
         lowQuality.setStopLoss("95");
         lowQuality.setTakeProfitRules("110 / 115");
         lowQuality.setValidPeriod("12h");
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(lowQuality));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(lowQuality));
 
-        DashboardHomeVO.ExecutionSuggestionVO blocked = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO blocked = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(blocked.getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
         assertThat(blocked.getEntryZone()).isNull();
@@ -2199,7 +2203,7 @@ class DashboardHomeServiceImplTest {
 
         lowQuality.setDataQualityScore(80);
         lowQuality.setAnalysisId(null);
-        DashboardHomeVO.ExecutionSuggestionVO missingSnapshot = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO missingSnapshot = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
         assertThat(missingSnapshot.getStatus()).isEqualTo("ANALYSIS_SNAPSHOT_MISSING");
         assertThat(missingSnapshot.getDirection()).isNull();
         assertThat(missingSnapshot.getEntryZone()).isNull();
@@ -2209,9 +2213,9 @@ class DashboardHomeServiceImplTest {
     void zeroSuccessfulAiRolesRemainNotApplicableAndRuleOnly() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 80, 72,
                 "LEVEL_3_DIVERGENCE", true, "{\"state\":\"CANDIDATE\"}");
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.AiDecisionVO ai = service.getHome("BTCUSDT", 6).getAiDecision();
+        DashboardHomeVO.AiDecisionVO ai = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getAiDecision();
 
         assertThat(ai.getRunStatus()).isEqualTo("NOT_CALLED");
         assertThat(ai.getDecisionModeLabel()).isEqualTo("仅规则判断");
@@ -2235,9 +2239,9 @@ class DashboardHomeServiceImplTest {
         when(providerReadinessService.getReadiness()).thenReturn(aiDisabled);
 
         for (DecisionResultVO decision : List.of(snapshotBlocked, scoreBlocked)) {
-            when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+            when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-            DashboardHomeVO.ConsistencyVO consistency = service.getHome("BTCUSDT", 6)
+            DashboardHomeVO.ConsistencyVO consistency = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                     .getAiDecision().getConsistency();
 
             assertThat(consistency.getAiApplicable()).isFalse();
@@ -2254,21 +2258,21 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
         allowMatchingSnapshot(decision);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.ExecutionSuggestionVO beforeExpiry = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.ExecutionSuggestionVO beforeExpiry = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
         assertThat(beforeExpiry.getStatus()).isEqualTo("USABLE_REVIEW_PLAN");
         assertThat(beforeExpiry.getValidFrom()).hasToString("2026-07-01T00:00Z");
         assertThat(beforeExpiry.getExpiresAt()).hasToString("2026-07-02T00:00Z");
 
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-02T00:00:00Z"), ZoneOffset.UTC));
-        DashboardHomeVO.ExecutionSuggestionVO atExpiry = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.ExecutionSuggestionVO atExpiry = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
         assertThat(atExpiry.getStatus()).isEqualTo("PLAN_EXPIRED");
 
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-02T00:00:01Z"), ZoneOffset.UTC));
-        DashboardHomeVO.ExecutionSuggestionVO afterExpiry = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.ExecutionSuggestionVO afterExpiry = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
         assertThat(afterExpiry.getStatus()).isEqualTo("PLAN_EXPIRED");
         assertThat(afterExpiry.getEntryZone()).isNull();
@@ -2279,9 +2283,9 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = completePlanDecision(
                 "BTCUSDT", "2026/07/01 00:00:00 - 2026/07/02 00:00:00");
         allowMatchingSnapshot(decision);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
 
         assertThat(suggestion.getStatus()).isEqualTo("VALID_PERIOD_INVALID");
@@ -2295,9 +2299,9 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = completePlanDecision(
                 "BTCUSDT", "2026-07-01 00:00:00 ~ 2026-07-02 00:00:00");
         allowMatchingSnapshot(decision);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
 
         assertThat(suggestion.getStatus()).isEqualTo("LEGACY_TIMEZONE_UNVERIFIED");
@@ -2318,9 +2322,9 @@ class DashboardHomeServiceImplTest {
                 decision.setValidFrom(OffsetDateTime.parse("2026-07-01T08:00:00+08:00"));
                 decision.setExpiresAt(OffsetDateTime.parse("2026-07-02T08:00:00+08:00"));
                 allowMatchingSnapshot(decision);
-                when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+                when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-                DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6)
+                DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                         .getExecutionSuggestion();
 
                 assertThat(suggestion.getStatus()).as(timeZone).isEqualTo("USABLE_REVIEW_PLAN");
@@ -2349,14 +2353,14 @@ class DashboardHomeServiceImplTest {
         decisions.get(2).setConfusedScore(70);
         decisions.get(3).setConfusedScore(84);
         decisions.get(4).setConfusedScore(85);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(decisions);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(decisions);
 
-        DashboardHomeVO.StatusCardVO thresholdFallback = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.StatusCardVO thresholdFallback = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getSystemState().getConfused();
         assertThat(thresholdFallback.getValue()).isEqualTo(1);
 
         when(decisionService.getLightSystemStatus()).thenThrow(new IllegalStateException("status unavailable"));
-        DashboardHomeVO.StatusCardVO unavailable = service.getHome("BTCUSDT", 6)
+        DashboardHomeVO.StatusCardVO unavailable = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getSystemState().getConfused();
         assertThat(unavailable.getValue()).isNull();
         assertThat(unavailable.getStatus()).isEqualTo("WAITING_SYNC");
@@ -2375,9 +2379,9 @@ class DashboardHomeServiceImplTest {
         run.setTraceId("trace-original-plan");
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(state);
         when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO home = service.getHome("BTCUSDT", 6);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         assertThat(asset(home, "BTC/USDT").getAssetStateLabel()).isEqualTo("候选");
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("STATE_SNAPSHOT_MISMATCH");
@@ -2469,9 +2473,9 @@ class DashboardHomeServiceImplTest {
         role.setCallStatus(status);
         decision.setAiRoleResults(structuredAiRoleResults(List.of(role),
                 synthesis("BULLISH", "HIGH", "HIGH", "PREPARE_ONLY", true, "EVENT_WINDOW_REVIEW")));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(decision));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
-        DashboardHomeVO.AiTabVO tab = aiTab(service.getHome("BTCUSDT", 6), "GPT_FINAL");
+        DashboardHomeVO.AiTabVO tab = aiTab(service.getHomeForUser(USER_ID, "BTCUSDT", 6), "GPT_FINAL");
 
         assertThat(tab.getRunStatus()).isEqualTo(status.name());
         assertThat(tab.getResultAvailable()).isFalse();
@@ -2503,12 +2507,12 @@ class DashboardHomeServiceImplTest {
     }
 
     private void wireCapturedMonitorLogs(long positionId, List<PositionMonitorLogDTO> capturedLogs) {
-        when(positionMonitorLogService.listByPositionId(positionId, 1))
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, positionId, 1))
                 .thenAnswer(invocation -> capturedLogs.isEmpty()
                         ? List.of()
                         : List.of(capturedLogs.get(capturedLogs.size() - 1)));
-        when(positionMonitorLogService.recordMonitorRun(any())).thenAnswer(invocation -> {
-            RecordPositionMonitorLogCommand command = invocation.getArgument(0);
+        when(positionMonitorLogService.recordMonitorRunForUser(eq(USER_ID), any())).thenAnswer(invocation -> {
+            RecordPositionMonitorLogCommand command = invocation.getArgument(1);
             PositionMonitorLogDTO log = new PositionMonitorLogDTO();
             log.setLogId((long) capturedLogs.size() + 1);
             log.setPositionId(command.getPositionId());
@@ -2599,7 +2603,7 @@ class DashboardHomeServiceImplTest {
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         monitor.setExecutionPlanId(planId);
         monitor.setLogicStatus("LOGIC_VALID");
-        when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1)).thenReturn(List.of(monitor));
         return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
     }
 
@@ -2613,7 +2617,7 @@ class DashboardHomeServiceImplTest {
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         monitor.setExecutionPlanId(planId);
-        when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1)).thenReturn(List.of(monitor));
         return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
     }
 
@@ -2691,9 +2695,9 @@ class DashboardHomeServiceImplTest {
         UserPositionMapper monitorPositionMapper = mock(UserPositionMapper.class);
         MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
-        when(monitorPositionMapper.selectById(positionId)).thenReturn(positionDO);
+        when(monitorPositionMapper.selectByIdAndUserId(positionId, USER_ID)).thenReturn(positionDO);
         when(quoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(monitorQuote("100")));
-        when(riskAdapter.currentRisk()).thenReturn(allowedMonitorRisk());
+        when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(allowedMonitorRisk());
 
         DecisionResultVO sourceDecision = sourcePlanDecision(analysisId, "BTCUSDT", "AGREEMENT-A");
         ExecutionPlanDO plan = validExecutionPlan(planId, analysisId);
@@ -2716,7 +2720,7 @@ class DashboardHomeServiceImplTest {
                 analysisRunMapper,
                 null);
 
-        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPosition(positionId);
+        PositionMonitorResultDTO monitorResult = monitorService.monitorUserPositionForUser(positionId, USER_ID);
 
         assertThat(monitorResult.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
         assertThat(monitorResult.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
@@ -2730,12 +2734,12 @@ class DashboardHomeServiceImplTest {
 
         when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(analysisId, planId))
                 .thenReturn(sourceDecision);
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionVO));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(sourceDecision));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(positionVO));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(sourceDecision));
         when(assetStateMapper.selectBySymbol("BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", traceId));
 
-        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHome("BTCUSDT", 6).getExecutionSuggestion();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
 
         assertThat(suggestion.getStatus()).isEqualTo("POSITION_MONITORING");
         assertThat(suggestion.getOriginalPlanIdentity()).isEqualTo("VERIFIED");
@@ -2751,14 +2755,14 @@ class DashboardHomeServiceImplTest {
         ExecutionPlanDO plan = stubMonitorExecutionPlanSource(
                 position, sourceDecision, "plan-source-" + positionId,
                 "trace-source-" + positionId, "trace-source-" + positionId);
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(position));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
         return new OriginalPlanFixture(position, plan, sourceDecision);
     }
 
     private OriginalPlanFixture originalPlanFixtureWithLatestB(Long positionId, String marker) {
         OriginalPlanFixture fixture = originalPlanFixture(positionId, marker);
         DecisionResultVO latestB = sourcePlanDecision("analysis-latest-B", "BTCUSDT", "LATEST-B");
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(latestB));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(latestB));
         return fixture;
     }
 
@@ -2769,8 +2773,8 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO planB = sourcePlanDecision("analysis-position-B", "BTCUSDT", "POSITION-B");
         stubMonitorExecutionPlanSource(positionA, planA, "plan-position-A", "trace-shared", "trace-shared");
         stubMonitorExecutionPlanSource(positionB, planB, "plan-position-B", "trace-shared", "trace-shared");
-        when(userPositionService.listOpenPositions()).thenReturn(List.of(positionA, positionB));
-        when(decisionService.getLatestDecisionResults(anyInt())).thenReturn(List.of(planB));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(positionA, positionB));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(planB));
         return new MultiPositionFixture(positionA, positionB, planA, planB);
     }
 
@@ -2853,7 +2857,7 @@ class DashboardHomeServiceImplTest {
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         monitor.setExecutionPlanId(planId);
         monitor.setLogicStatus("LOGIC_VALID");
-        when(positionMonitorLogService.listByPositionId(position.getId(), 1)).thenReturn(List.of(monitor));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1)).thenReturn(List.of(monitor));
 
         ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
         copyExactPlanFields(plan, sourceDecision);

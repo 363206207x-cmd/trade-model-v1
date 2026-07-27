@@ -1,5 +1,6 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.common.GlobalExceptionHandler;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.PositionMonitorLogService;
@@ -7,6 +8,7 @@ import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
 import org.example.trademodel.service.OpportunityLogService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -45,23 +47,29 @@ class ReviewControllerPositionMonitorLogTest {
     private UserPositionReviewAdapter userPositionReviewAdapter;
     @Mock
     private OpportunityLogService opportunityLogService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(17L);
         mockMvc = MockMvcBuilders.standaloneSetup(new ReviewController(
                 reviewService,
                 reviewAggregateService,
                 ruleVersionLogQueryService,
                 positionMonitorLogService,
                 userPositionReviewAdapter,
-                opportunityLogService)).build();
+                opportunityLogService,
+                authenticatedUserIdResolver))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
     void genericMonitorLogApiDoesNotClaimVerifiedWithoutResolverEvidence() throws Exception {
-        when(positionMonitorLogService.listByPositionId(7L, 20)).thenReturn(List.of(dto(11L)));
+        when(positionMonitorLogService.listByPositionIdForUser(17L, 7L, 20)).thenReturn(List.of(dto(11L)));
 
         mockMvc.perform(get("/api/review/positions/7/monitor-logs"))
                 .andExpect(status().isOk())
@@ -92,7 +100,7 @@ class ReviewControllerPositionMonitorLogTest {
                 .andExpect(jsonPath("$.data[0].executablePayload").doesNotExist())
                 .andExpect(jsonPath("$.data[0].providerPayload").doesNotExist());
 
-        verify(positionMonitorLogService).listByPositionId(7L, 20);
+        verify(positionMonitorLogService).listByPositionIdForUser(17L, 7L, 20);
         verify(reviewService, never()).saveOrUpdate(org.mockito.ArgumentMatchers.any());
     }
 
@@ -101,7 +109,7 @@ class ReviewControllerPositionMonitorLogTest {
         PositionMonitorLogDTO unverified = dto(12L);
         unverified.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         unverified.setExecutionPlanId("must-not-survive");
-        when(positionMonitorLogService.listByPositionId(7L, 20)).thenReturn(List.of(unverified));
+        when(positionMonitorLogService.listByPositionIdForUser(17L, 7L, 20)).thenReturn(List.of(unverified));
 
         String body = mockMvc.perform(get("/api/review/positions/7/monitor-logs"))
                 .andExpect(status().isOk())
@@ -117,17 +125,17 @@ class ReviewControllerPositionMonitorLogTest {
 
     @Test
     void reviewEndpointRejectsUnsafeLimitAndDoesNotWriteLog() throws Exception {
-        when(positionMonitorLogService.listByPositionId(7L, 101))
+        when(positionMonitorLogService.listByPositionIdForUser(17L, 7L, 101))
                 .thenThrow(new IllegalArgumentException("limit must be <= 100"));
 
         mockMvc.perform(get("/api/review/positions/7/monitor-logs").param("limit", "101"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("limit must be <= 100"));
+                .andExpect(jsonPath("$.msg").value("invalid request"));
 
-        verify(positionMonitorLogService).listByPositionId(7L, 101);
+        verify(positionMonitorLogService).listByPositionIdForUser(17L, 7L, 101);
         verify(positionMonitorLogService, never())
-                .recordMonitorRun(org.mockito.ArgumentMatchers.any());
+                .recordMonitorRunForUser(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
     private static PositionMonitorLogDTO dto(Long logId) {

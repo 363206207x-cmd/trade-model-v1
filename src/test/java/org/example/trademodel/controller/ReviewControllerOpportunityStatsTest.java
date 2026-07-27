@@ -6,6 +6,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -42,6 +43,8 @@ class ReviewControllerOpportunityStatsTest {
     private UserPositionReviewAdapter userPositionReviewAdapter;
     @Mock
     private OpportunityLogService opportunityLogService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
@@ -53,7 +56,8 @@ class ReviewControllerOpportunityStatsTest {
                 ruleVersionLogQueryService,
                 positionMonitorLogService,
                 userPositionReviewAdapter,
-                opportunityLogService)).build();
+                opportunityLogService,
+                authenticatedUserIdResolver)).build();
     }
 
     @Test

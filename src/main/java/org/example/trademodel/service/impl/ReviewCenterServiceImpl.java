@@ -76,12 +76,15 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
     }
 
     @Override
-    public ReviewCenterDashboardVO getDashboard() {
+    public ReviewCenterDashboardVO getDashboardForUser(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
         ReviewCenterDashboardVO vo = new ReviewCenterDashboardVO();
-        vo.setPositionReviews(positionReviews());
-        vo.setOpportunityReviews(opportunityReviews());
+        vo.setPositionReviews(positionReviews(userId));
+        vo.setOpportunityReviews(opportunityReviews(userId));
         vo.setPushReviews(pushReviews());
-        vo.setRuleFeedback(ruleFeedback());
+        vo.setRuleFeedback(ruleFeedback(userId));
 
         ReviewCenterDashboardVO.Summary summary = new ReviewCenterDashboardVO.Summary();
         summary.setPositionReviewCount(vo.getPositionReviews().size());
@@ -107,19 +110,19 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         return count > 0 ? "READY" : "EMPTY";
     }
 
-    private List<ReviewCenterDashboardVO.PositionReviewItem> positionReviews() {
-        List<UserPositionDO> rows = userPositionMapper.listClosedManualPositions(DEFAULT_LIMIT);
+    private List<ReviewCenterDashboardVO.PositionReviewItem> positionReviews(Long userId) {
+        List<UserPositionDO> rows = userPositionMapper.listClosedManualByUserId(userId, DEFAULT_LIMIT);
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
         List<ReviewCenterDashboardVO.PositionReviewItem> out = new ArrayList<>(rows.size());
         for (UserPositionDO row : rows) {
-            out.add(toPositionReview(row));
+            out.add(toPositionReview(userId, row));
         }
         return out;
     }
 
-    private ReviewCenterDashboardVO.PositionReviewItem toPositionReview(UserPositionDO row) {
+    private ReviewCenterDashboardVO.PositionReviewItem toPositionReview(Long userId, UserPositionDO row) {
         ReviewCenterDashboardVO.PositionReviewItem item = new ReviewCenterDashboardVO.PositionReviewItem();
         item.setTime(firstNonNull(row.getClosedAt(), row.getUpdatedAt(), row.getOpenedAt()));
         item.setSymbol(row.getAssetSymbol());
@@ -129,7 +132,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         item.setActualExecution(compactActualExecution(row));
 
         try {
-            UserPositionReviewSummaryDTO summary = userPositionReviewAdapter.buildSummary(row.getId());
+            UserPositionReviewSummaryDTO summary = userPositionReviewAdapter.buildSummaryForUser(userId, row.getId());
             item.setPnl(summary.getGrossPnl());
             item.setFinalPnl(summary.getGrossPnl());
             item.setExecutionDeviation(summary.getExecutionDeviationStatus());
@@ -149,9 +152,9 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         return item;
     }
 
-    private List<ReviewCenterDashboardVO.OpportunityReviewItem> opportunityReviews() {
-        List<OpportunityLogDTO> rows = opportunityLogService.query(
-                null, null, null, null, null, null, null, null, DEFAULT_LIMIT);
+    private List<ReviewCenterDashboardVO.OpportunityReviewItem> opportunityReviews(Long userId) {
+        List<OpportunityLogDTO> rows = opportunityLogService.queryForUser(
+                userId, null, null, null, null, null, null, null, null, DEFAULT_LIMIT);
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
@@ -166,7 +169,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
             item.setOpportunityType(row.getOpportunityStatus());
             item.setWasPushed(row.getPushPresent());
             item.setWasClicked(null);
-            item.setWasExecuted(row.getUserPositionPresent());
+            item.setWasExecuted(null);
             item.setOutcome(row.getOpportunityStatus());
             item.setMaxFavorableExcursion(row.getMfeRatio());
             item.setMaxAdverseExcursion(row.getMaeRatio());
@@ -199,8 +202,8 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         return out;
     }
 
-    private List<ReviewCenterDashboardVO.RuleFeedbackItem> ruleFeedback() {
-        List<ReviewResultDO> rows = reviewResultMapper.listRecent(DEFAULT_LIMIT);
+    private List<ReviewCenterDashboardVO.RuleFeedbackItem> ruleFeedback(Long userId) {
+        List<ReviewResultDO> rows = reviewResultMapper.listRecentByUserId(userId, DEFAULT_LIMIT);
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }

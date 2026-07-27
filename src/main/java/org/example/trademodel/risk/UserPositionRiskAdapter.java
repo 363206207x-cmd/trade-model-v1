@@ -5,5 +5,7 @@ package org.example.trademodel.risk;
  * Future monitor code can consume this interface without depending on a controller.
  */
 public interface UserPositionRiskAdapter {
-    UserPositionRiskResult currentRisk();
+    UserPositionRiskResult currentRiskForUser(Long userId);
+
+    UserPositionRiskResult currentRiskForSystem();
 }

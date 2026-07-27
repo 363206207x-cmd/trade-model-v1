@@ -118,7 +118,9 @@ public interface AnalysisRunMapper {
     @Select("SELECT CAST(log_id AS VARCHAR) FROM tm_position_monitor_log WHERE analysis_id = #{analysisId} ORDER BY created_at, log_id")
     List<String> selectPositionMonitorLogIdsByAnalysisId(String analysisId);
 
-    @Select("SELECT id FROM tm_review_result WHERE analysis_id = #{analysisId} ORDER BY create_time, id")
+    @Select("SELECT id FROM tm_review_result WHERE analysis_id = #{analysisId} "
+            + "AND review_scope_key = 'SHARED' AND user_id IS NULL AND user_position_id IS NULL "
+            + "ORDER BY create_time, id")
     List<String> selectReviewResultIdsByAnalysisId(String analysisId);
 
     @Select("SELECT call_id FROM tm_ai_call_log WHERE trace_id = #{traceId} OR analysis_id = #{analysisId} ORDER BY started_at, call_id")

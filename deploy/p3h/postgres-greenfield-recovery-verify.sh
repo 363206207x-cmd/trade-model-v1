@@ -35,6 +35,7 @@ case "${applied_version}" in
   6) expected_versions=1,2,3,4,5,6 ;;
   7) expected_versions=1,2,3,4,5,6,7 ;;
   8) expected_versions=1,2,3,4,5,6,7,8 ;;
+  9) expected_versions=1,2,3,4,5,6,7,8,9 ;;
   *) echo "P3H_GREENFIELD_RECOVERY_VERIFY: BLOCKED_FLYWAY_PREFIX" >&2; exit 2 ;;
 esac
 if [ "${successful_count}" != "${applied_version}" ] \

@@ -66,7 +66,7 @@ A future PASS must show, without secrets:
 3. `flyway_schema_history` contains at least three successful migration rows.
 4. 27 `tm_%` tables exist in `public` schema.
 5. Representative required tables exist: `tm_analysis_run`, `tm_decision_result`, `tm_execution_plan`, `tm_user_position`, `tm_position_monitor_log`, `tm_review_result`, `tm_opportunity_log`, `tm_push_snapshot`, `tm_push_recheck_log`, `tm_ai_call_log`, and `tm_asset_state`.
-6. Representative required indexes exist: `idx_tm_user_position_status_opened_at`, `idx_tm_push_snapshot_analysis_id`, `idx_tm_ai_call_log_trace_id`, and `uk_tm_review_result_analysis_id`.
+6. Representative required indexes exist: `idx_tm_user_position_status_opened_at`, `idx_tm_push_snapshot_analysis_id`, `idx_tm_ai_call_log_trace_id`, `uk_tm_review_result_analysis_scope`, and `idx_tm_review_result_user_update`.
 
 ## Redaction Policy
 

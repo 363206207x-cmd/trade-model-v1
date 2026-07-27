@@ -2,6 +2,7 @@ package org.example.trademodel.mapper;
 
 import org.example.trademodel.TradeModelApplication;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.entity.PersonalUserDO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(classes = TradeModelApplication.class)
 @Transactional
@@ -20,15 +22,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UserPositionMapperIntegrationTest {
     @Autowired
     private UserPositionMapper userPositionMapper;
+    @Autowired
+    private PersonalUserMapper personalUserMapper;
 
     @Test
     void insertSelectAndManualClosePersistManualSafetyFields() {
+        Long userId = userId("mapper-owner-a");
         UserPositionDO row = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        row.setUserId(userId);
 
         userPositionMapper.insert(row);
 
         assertThat(row.getId()).isNotNull();
-        UserPositionDO persisted = userPositionMapper.selectById(row.getId());
+        UserPositionDO persisted = userPositionMapper.selectByIdAndUserId(row.getId(), userId);
+        assertThat(persisted.getUserId()).isEqualTo(userId);
         assertThat(persisted.getAssetSymbol()).isEqualTo("BTCUSDT");
         assertThat(persisted.getSide()).isEqualTo("LONG");
         assertThat(persisted.getStatus()).isEqualTo("OPEN");
@@ -40,8 +47,9 @@ class UserPositionMapperIntegrationTest {
         assertThat(persisted.getNotOrderExecution()).isTrue();
         assertThat(persisted.getNotPositionSync()).isTrue();
 
-        int updated = userPositionMapper.manualClose(
+        int updated = userPositionMapper.manualCloseByIdAndUserId(
                 row.getId(),
+                userId,
                 LocalDateTime.of(2026, 6, 22, 9, 0),
                 new BigDecimal("105.25"),
                 "manual close",
@@ -49,7 +57,7 @@ class UserPositionMapperIntegrationTest {
         );
 
         assertThat(updated).isEqualTo(1);
-        UserPositionDO closed = userPositionMapper.selectById(row.getId());
+        UserPositionDO closed = userPositionMapper.selectByIdAndUserId(row.getId(), userId);
         assertThat(closed.getStatus()).isEqualTo("CLOSED");
         assertThat(closed.getClosePrice()).isEqualByComparingTo("105.25000000");
         assertThat(closed.getCloseReason()).isEqualTo("manual close");
@@ -57,17 +65,110 @@ class UserPositionMapperIntegrationTest {
 
     @Test
     void listOpenPositionsExcludesClosedRows() {
-        userPositionMapper.insert(row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0)));
-        userPositionMapper.insert(row("ETHUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 5)));
-        userPositionMapper.insert(row("SOLUSDT", "CLOSED", LocalDateTime.of(2026, 6, 22, 8, 10)));
+        Long userId = userId("mapper-owner-b");
+        UserPositionDO open = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        open.setUserId(userId);
+        UserPositionDO partial = row("ETHUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 5));
+        partial.setUserId(userId);
+        UserPositionDO closed = row("SOLUSDT", "CLOSED", LocalDateTime.of(2026, 6, 22, 8, 10));
+        closed.setUserId(userId);
+        userPositionMapper.insert(open);
+        userPositionMapper.insert(partial);
+        userPositionMapper.insert(closed);
 
-        List<UserPositionDO> rows = userPositionMapper.listOpenPositions();
+        List<UserPositionDO> rows = userPositionMapper.listOpenByUserId(userId);
 
         assertThat(rows).extracting(UserPositionDO::getStatus)
-                .contains("OPEN", "PARTIALLY_CLOSED")
+                .containsExactly("PARTIALLY_CLOSED", "OPEN")
                 .doesNotContain("CLOSED");
         assertThat(rows).extracting(UserPositionDO::getAssetSymbol)
                 .doesNotContain("SOLUSDT");
+    }
+
+    @Test
+    void ownerQueriesIsolateSameSymbolAndQuarantineUnclaimedRows() {
+        Long userA = userId("mapper-owner-isolation-a");
+        Long userB = userId("mapper-owner-isolation-b");
+        UserPositionDO ownedA = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        ownedA.setUserId(userA);
+        UserPositionDO ownedB = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 1));
+        ownedB.setUserId(userB);
+        UserPositionDO unclaimed = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 2));
+        UserPositionDO partialA = row(
+                "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 3));
+        partialA.setUserId(userA);
+        UserPositionDO partialB = row(
+                "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 4));
+        partialB.setUserId(userB);
+        userPositionMapper.insert(ownedA);
+        userPositionMapper.insert(ownedB);
+        userPositionMapper.insert(unclaimed);
+        userPositionMapper.insert(partialA);
+        userPositionMapper.insert(partialB);
+
+        assertThat(userPositionMapper.listOpenByUserId(userA))
+                .extracting(UserPositionDO::getId)
+                .containsExactly(partialA.getId(), ownedA.getId());
+        assertThat(userPositionMapper.listOpenByUserId(userB))
+                .extracting(UserPositionDO::getId)
+                .containsExactly(partialB.getId(), ownedB.getId());
+        assertThat(userPositionMapper.selectByIdAndUserId(ownedB.getId(), userA)).isNull();
+        assertThat(userPositionMapper.selectByIdAndUserId(unclaimed.getId(), userA)).isNull();
+        assertThat(userPositionMapper.listClaimedOpenForSystemMonitoring())
+                .extracting(UserPositionDO::getId)
+                .contains(ownedA.getId(), ownedB.getId(), partialA.getId(), partialB.getId())
+                .doesNotContain(unclaimed.getId());
+    }
+
+    @Test
+    void conditionalCloseRequiresExactOwnerAndActiveState() {
+        Long userA = userId("mapper-close-owner-a");
+        Long userB = userId("mapper-close-owner-b");
+        UserPositionDO ownedA = row("ETHUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        ownedA.setUserId(userA);
+        UserPositionDO partialA = row(
+                "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 1));
+        partialA.setUserId(userA);
+        UserPositionDO unclaimed = row("SOLUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 1));
+        userPositionMapper.insert(ownedA);
+        userPositionMapper.insert(partialA);
+        userPositionMapper.insert(unclaimed);
+        LocalDateTime closedAt = LocalDateTime.of(2026, 6, 22, 9, 0);
+
+        assertThat(close(ownedA.getId(), userB, closedAt)).isZero();
+        assertThat(close(partialA.getId(), userB, closedAt)).isZero();
+        assertThat(close(unclaimed.getId(), userA, closedAt)).isZero();
+        assertThat(close(ownedA.getId(), userA, closedAt)).isEqualTo(1);
+        assertThat(close(partialA.getId(), userA, closedAt)).isEqualTo(1);
+        assertThat(close(ownedA.getId(), userA, closedAt.plusMinutes(1))).isZero();
+        assertThat(userPositionMapper.selectByIdAndUserId(ownedA.getId(), userA).getStatus())
+                .isEqualTo("CLOSED");
+        assertThat(userPositionMapper.selectByIdAndUserId(partialA.getId(), userA).getStatus())
+                .isEqualTo("CLOSED");
+    }
+
+    @Test
+    void ownerForeignKeyRejectsUnknownCanonicalUser() {
+        UserPositionDO row = row("XRPUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        row.setUserId(Long.MAX_VALUE);
+
+        assertThatThrownBy(() -> userPositionMapper.insert(row))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("FK_TM_USER_POSITION_USER");
+    }
+
+    private int close(Long positionId, Long userId, LocalDateTime closedAt) {
+        return userPositionMapper.manualCloseByIdAndUserId(
+                positionId, userId, closedAt, new BigDecimal("105.25"), "manual close", closedAt);
+    }
+
+    private Long userId(String username) {
+        PersonalUserDO user = new PersonalUserDO();
+        user.setUsername(username);
+        user.setPasswordHash("{noop}not-a-real-password");
+        user.setCreatedAt(LocalDateTime.now());
+        personalUserMapper.insert(user);
+        return user.getId();
     }
 
     private static UserPositionDO row(String symbol, String status, LocalDateTime openedAt) {

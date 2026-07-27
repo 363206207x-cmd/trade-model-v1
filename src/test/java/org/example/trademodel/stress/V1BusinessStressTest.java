@@ -44,6 +44,7 @@ import org.example.trademodel.service.impl.PushRecheckServiceImpl;
 import org.example.trademodel.service.impl.UserPositionServiceImpl;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.example.trademodel.vo.UserPositionVO;
@@ -83,6 +84,8 @@ import static org.mockito.Mockito.when;
 
 @Tag("business-stress")
 class V1BusinessStressTest {
+
+    private static final Long USER_ID = 17L;
 
     @Test
     void opportunityDiscoveryExecutionPlanAndRecheckScenariosStayDeterministicAndReviewOnly() {
@@ -164,8 +167,8 @@ class V1BusinessStressTest {
         assertThat(highRisk.getDirectionSupportStatus()).isEqualTo("RISK_BLOCKED");
 
         assertThatThrownBy(() -> harness.monitorClosedPosition(107L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OPEN or PARTIALLY_CLOSED");
+                .isInstanceOf(UserPositionConflictException.class)
+                .hasMessageContaining("CLOSED");
         PositionMonitorBatchResultDTO afterClose = harness.monitorOpenPositionsAfterClose();
         assertThat(afterClose.getTotalCount()).isZero();
         assertThat(afterClose.getSuccessCount()).isZero();
@@ -174,7 +177,8 @@ class V1BusinessStressTest {
         assertThat(harness.recordedLogs()).hasSize(6);
         assertThat(harness.recordedLogs()).extracting(PositionMonitorLogDTO::getLogicStatus)
                 .contains("LOGIC_VALID", "LOGIC_WEAKENED", "PLAN_INVALIDATED", "HIGH_RISK");
-        verify(harness.userPositionMapper(), never()).manualClose(anyLong(), any(), any(), anyString(), any());
+        verify(harness.userPositionMapper(), never())
+                .manualCloseByIdAndUserId(anyLong(), anyLong(), any(), any(), anyString(), any());
     }
 
     @Test
@@ -184,7 +188,8 @@ class V1BusinessStressTest {
         wireUserPositionMapper(mapper, positions);
         UserPositionServiceImpl userPositionService = new UserPositionServiceImpl(mapper);
 
-        UserPositionVO opened = userPositionService.manualOpen(openPaperPositionRequest("plan-paper-loop"));
+        UserPositionVO opened = userPositionService.manualOpenForUser(
+                USER_ID, openPaperPositionRequest("plan-paper-loop"));
 
         assertThat(opened.getStatus()).isEqualTo("OPEN");
         assertThat(opened.getSourceType()).isEqualTo("MANUAL");
@@ -192,19 +197,23 @@ class V1BusinessStressTest {
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();
         assertThat(opened.isNotAutoTrading()).isTrue();
-        assertThat(userPositionService.listOpenPositions()).extracting(UserPositionVO::getId).containsExactly(opened.getId());
+        assertThat(userPositionService.listOpenPositionsForUser(USER_ID))
+                .extracting(UserPositionVO::getId).containsExactly(opened.getId());
 
-        UserPositionVO closed = userPositionService.manualClose(opened.getId(), closePaperPositionRequest());
+        UserPositionVO closed = userPositionService.manualCloseForUser(
+                opened.getId(), USER_ID, closePaperPositionRequest());
 
         assertThat(closed.getStatus()).isEqualTo("CLOSED");
         assertThat(closed.getClosePrice()).isEqualByComparingTo("112");
-        assertThat(userPositionService.listOpenPositions()).isEmpty();
+        assertThat(userPositionService.listOpenPositionsForUser(USER_ID)).isEmpty();
         assertThat(closed.isNotTradeInstruction()).isTrue();
         assertThat(closed.isNotOrderExecution()).isTrue();
         assertThat(closed.isNotAutoTrading()).isTrue();
 
         verify(mapper).insert(any(UserPositionDO.class));
-        verify(mapper).manualClose(eq(opened.getId()), any(), eq(new BigDecimal("112")), eq("paper stress close"), any());
+        verify(mapper).manualCloseByIdAndUserId(
+                eq(opened.getId()), eq(USER_ID), any(), eq(new BigDecimal("112")),
+                eq("paper stress close"), any());
         assertNoForbiddenExecutableFields(UserPositionVO.class, PositionMonitorResultDTO.class, RecheckResult.class);
     }
 
@@ -252,7 +261,7 @@ class V1BusinessStressTest {
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         MarketQuoteClient marketQuoteClient = mock(MarketQuoteClient.class);
         RuleConfigContractService ruleConfigContractService = mock(RuleConfigContractService.class);
-        when(riskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(riskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         when(ruleConfigContractService.requirePushRecheckThresholds())
                 .thenReturn(new RuleConfigContractService.PushRecheckThresholds(new BigDecimal("0.02"), 70, 85, 60));
         TmPushSnapshotDO snapshot = basePushSnapshot();
@@ -447,6 +456,7 @@ class V1BusinessStressTest {
                                            String stopLoss, String takeProfit) {
         UserPositionDO position = new UserPositionDO();
         position.setId(id);
+        position.setUserId(USER_ID);
         position.setAssetSymbol(currentSymbol);
         position.setSide("LONG");
         position.setStatus(status);
@@ -528,21 +538,22 @@ class V1BusinessStressTest {
             positions.put(row.getId(), row);
             return 1;
         }).when(mapper).insert(any(UserPositionDO.class));
-        when(mapper.selectById(anyLong())).thenAnswer(invocation -> positions.get(invocation.getArgument(0)));
-        when(mapper.listOpenPositions()).thenAnswer(invocation -> positions.values().stream()
-                .filter(row -> Set.of("OPEN", "PARTIALLY_CLOSED").contains(row.getStatus()))
+        when(mapper.selectByIdAndUserId(anyLong(), eq(USER_ID)))
+                .thenAnswer(invocation -> positions.get(invocation.getArgument(0)));
+        when(mapper.listOpenByUserId(USER_ID)).thenAnswer(invocation -> positions.values().stream()
+                .filter(row -> "OPEN".equals(row.getStatus()))
                 .sorted(Comparator.comparing(UserPositionDO::getId))
                 .collect(Collectors.toList()));
-        when(mapper.manualClose(anyLong(), any(), any(), anyString(), any()))
+        when(mapper.manualCloseByIdAndUserId(anyLong(), eq(USER_ID), any(), any(), anyString(), any()))
                 .thenAnswer(invocation -> {
                     UserPositionDO row = positions.get(invocation.getArgument(0));
-                    if (row == null || !"OPEN".equals(row.getStatus())) {
+                    if (row == null || !USER_ID.equals(row.getUserId()) || !"OPEN".equals(row.getStatus())) {
                         return 0;
                     }
-                    row.setClosedAt(invocation.getArgument(1));
-                    row.setClosePrice(invocation.getArgument(2));
-                    row.setCloseReason(invocation.getArgument(3));
-                    row.setUpdatedAt(invocation.getArgument(4));
+                    row.setClosedAt(invocation.getArgument(2));
+                    row.setClosePrice(invocation.getArgument(3));
+                    row.setCloseReason(invocation.getArgument(4));
+                    row.setUpdatedAt(invocation.getArgument(5));
                     row.setStatus("CLOSED");
                     return 1;
                 });
@@ -668,24 +679,25 @@ class V1BusinessStressTest {
             UserPositionDO position = position(scenario.id(), "OPEN",
                     PositionMonitorSourceContract.executionPlanReference(planId),
                     "BTCUSDT", scenario.stopLoss(), scenario.takeProfit());
-            when(userPositionMapper.selectById(scenario.id())).thenReturn(position);
+            when(userPositionMapper.selectByIdAndUserId(scenario.id(), USER_ID)).thenReturn(position);
             when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("BTCUSDT", scenario.currentPrice())));
-            when(riskAdapter.currentRisk()).thenReturn(scenario.risk());
+            when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(scenario.risk());
             ExecutionPlanDO plan = monitorPlan(planId);
             lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
             lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), "BTCUSDT"));
-            return service.monitorUserPosition(scenario.id());
+            return service.monitorUserPositionForUser(scenario.id(), USER_ID);
         }
 
         private void monitorClosedPosition(Long id) {
-            when(userPositionMapper.selectById(id)).thenReturn(position(id, "CLOSED", "plan-closed", "BTCUSDT", "90", "120"));
-            service.monitorUserPosition(id);
+            when(userPositionMapper.selectByIdAndUserId(id, USER_ID))
+                    .thenReturn(position(id, "CLOSED", "plan-closed", "BTCUSDT", "90", "120"));
+            service.monitorUserPositionForUser(id, USER_ID);
         }
 
         private PositionMonitorBatchResultDTO monitorOpenPositionsAfterClose() {
-            when(userPositionMapper.listOpenPositions()).thenReturn(List.of());
-            return service.monitorOpenUserPositions();
+            when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of());
+            return service.monitorClaimedOpenPositionsForSystem();
         }
 
         private List<PositionMonitorLogDTO> recordedLogs() {
@@ -710,7 +722,20 @@ class V1BusinessStressTest {
         private final List<PositionMonitorLogDTO> logs = new ArrayList<>();
 
         @Override
-        public PositionMonitorLogDTO recordMonitorRun(RecordPositionMonitorLogCommand command) {
+        public PositionMonitorLogDTO recordMonitorRunForUser(
+                Long userId, RecordPositionMonitorLogCommand command) {
+            if (!USER_ID.equals(userId)) {
+                throw new AssertionError("unexpected owner");
+            }
+            return record(command);
+        }
+
+        @Override
+        public PositionMonitorLogDTO recordMonitorRunForSystem(RecordPositionMonitorLogCommand command) {
+            return record(command);
+        }
+
+        private PositionMonitorLogDTO record(RecordPositionMonitorLogCommand command) {
             PositionMonitorLogDTO dto = new PositionMonitorLogDTO();
             dto.setLogId(ids.incrementAndGet());
             dto.setPositionId(command.getPositionId());
@@ -735,12 +760,21 @@ class V1BusinessStressTest {
         }
 
         @Override
-        public PositionMonitorLogDTO findById(Long logId) {
+        public PositionMonitorLogDTO findByIdForSystem(Long logId) {
             return logs.stream().filter(log -> log.getLogId().equals(logId)).findFirst().orElse(null);
         }
 
         @Override
-        public List<PositionMonitorLogDTO> listByPositionId(Long positionId, Integer limit) {
+        public List<PositionMonitorLogDTO> listByPositionIdForUser(
+                Long userId, Long positionId, Integer limit) {
+            if (!USER_ID.equals(userId)) {
+                return List.of();
+            }
+            return listByPositionIdForSystem(positionId, limit);
+        }
+
+        @Override
+        public List<PositionMonitorLogDTO> listByPositionIdForSystem(Long positionId, Integer limit) {
             return logs.stream()
                     .filter(log -> log.getPositionId().equals(positionId))
                     .sorted(Comparator.comparing(PositionMonitorLogDTO::getCreatedAt).reversed())
@@ -749,7 +783,15 @@ class V1BusinessStressTest {
         }
 
         @Override
-        public List<PositionMonitorLogDTO> listAllByPositionIdForReview(Long positionId) {
+        public List<PositionMonitorLogDTO> listAllByPositionIdForUserReview(Long userId, Long positionId) {
+            if (!USER_ID.equals(userId)) {
+                return List.of();
+            }
+            return listAllByPositionIdForSystemReview(positionId);
+        }
+
+        @Override
+        public List<PositionMonitorLogDTO> listAllByPositionIdForSystemReview(Long positionId) {
             return logs.stream()
                     .filter(log -> log.getPositionId().equals(positionId))
                     .sorted(Comparator.comparing(PositionMonitorLogDTO::getCreatedAt))
@@ -757,7 +799,7 @@ class V1BusinessStressTest {
         }
 
         @Override
-        public List<PositionMonitorLogDTO> listByAnalysisId(String analysisId, Integer limit) {
+        public List<PositionMonitorLogDTO> listByAnalysisIdForSystem(String analysisId, Integer limit) {
             return logs.stream()
                     .filter(log -> analysisId.equals(log.getAnalysisId()))
                     .sorted(Comparator.comparing(PositionMonitorLogDTO::getCreatedAt).reversed())

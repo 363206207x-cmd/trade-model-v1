@@ -10,6 +10,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackResultDTO;
@@ -43,6 +44,7 @@ public class ReviewController {
     private final PositionMonitorLogService positionMonitorLogService;
     private final UserPositionReviewAdapter userPositionReviewAdapter;
     private final OpportunityLogService opportunityLogService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     @Autowired
     public ReviewController(ReviewService reviewService,
@@ -50,13 +52,15 @@ public class ReviewController {
                             RuleVersionLogQueryService ruleVersionLogQueryService,
                             PositionMonitorLogService positionMonitorLogService,
                             UserPositionReviewAdapter userPositionReviewAdapter,
-                            OpportunityLogService opportunityLogService) {
+                            OpportunityLogService opportunityLogService,
+                            AuthenticatedUserIdResolver authenticatedUserIdResolver) {
         this.reviewService = reviewService;
         this.reviewAggregateService = reviewAggregateService;
         this.ruleVersionLogQueryService = ruleVersionLogQueryService;
         this.positionMonitorLogService = positionMonitorLogService;
         this.userPositionReviewAdapter = userPositionReviewAdapter;
         this.opportunityLogService = opportunityLogService;
+        this.authenticatedUserIdResolver = authenticatedUserIdResolver;
     }
 
     /**
@@ -129,39 +133,30 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<java.util.List<PositionMonitorLogDTO>>> listPositionMonitorLogs(
             @PathVariable Long positionId,
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
-        try {
-            java.util.List<PositionMonitorLogDTO> rows = positionMonitorLogService.listByPositionId(positionId, limit);
-            java.util.List<PositionMonitorLogDTO> safeRows = rows == null ? java.util.List.of() : rows.stream()
-                    .map(PositionMonitorLogSourceViewPolicy::sanitize)
-                    .toList();
-            return ResponseEntity.ok(ApiResponse.success(safeRows));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.badRequest(e.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        java.util.List<PositionMonitorLogDTO> rows = positionMonitorLogService
+                .listByPositionIdForUser(userId, positionId, limit);
+        java.util.List<PositionMonitorLogDTO> safeRows = rows == null ? java.util.List.of() : rows.stream()
+                .map(PositionMonitorLogSourceViewPolicy::sanitize)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success(safeRows));
     }
 
     @GetMapping("/user-positions/{positionId}/summary")
     public ResponseEntity<ApiResponse<UserPositionReviewSummaryDTO>> getUserPositionReviewSummary(
             @PathVariable Long positionId) {
-        try {
-            return ResponseEntity.ok(ApiResponse.success(userPositionReviewAdapter.buildSummary(positionId)));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.badRequest(e.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                userPositionReviewAdapter.buildSummaryForUser(userId, positionId)));
     }
 
     @PostMapping("/user-positions/{positionId}/feedback")
     public ResponseEntity<ApiResponse<UserPositionReviewFeedbackResultDTO>> recordUserPositionReviewFeedback(
             @PathVariable Long positionId,
             @RequestBody UserPositionReviewFeedbackReq request) {
-        try {
-            return ResponseEntity.ok(ApiResponse.success(userPositionReviewAdapter.recordFeedback(positionId, request)));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.badRequest(e.getMessage()));
-        }
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                userPositionReviewAdapter.recordFeedbackForUser(userId, positionId, request)));
     }
 
     @GetMapping("/opportunities/stats")

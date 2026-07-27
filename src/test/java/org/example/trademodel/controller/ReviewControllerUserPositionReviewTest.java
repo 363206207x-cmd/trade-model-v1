@@ -1,11 +1,13 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.common.GlobalExceptionHandler;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
 import org.example.trademodel.service.OpportunityLogService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackResultDTO;
@@ -48,23 +50,29 @@ class ReviewControllerUserPositionReviewTest {
     private UserPositionReviewAdapter userPositionReviewAdapter;
     @Mock
     private OpportunityLogService opportunityLogService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(17L);
         mockMvc = MockMvcBuilders.standaloneSetup(new ReviewController(
                 reviewService,
                 reviewAggregateService,
                 ruleVersionLogQueryService,
                 positionMonitorLogService,
                 userPositionReviewAdapter,
-                opportunityLogService)).build();
+                opportunityLogService,
+                authenticatedUserIdResolver))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
     @Test
     void summaryEndpointReturnsReviewOnlyUserPositionSummaryAndDoesNotWriteFeedback() throws Exception {
-        when(userPositionReviewAdapter.buildSummary(7L)).thenReturn(summary());
+        when(userPositionReviewAdapter.buildSummaryForUser(17L, 7L)).thenReturn(summary());
 
         mockMvc.perform(get("/api/review/user-positions/7/summary"))
                 .andExpect(status().isOk())
@@ -100,7 +108,7 @@ class ReviewControllerUserPositionReviewTest {
                 .andExpect(jsonPath("$.data.executablePayload").doesNotExist())
                 .andExpect(jsonPath("$.data.providerPayload").doesNotExist());
 
-        verify(userPositionReviewAdapter).buildSummary(7L);
+        verify(userPositionReviewAdapter).buildSummaryForUser(17L, 7L);
         verify(reviewService, never()).saveOrUpdate(any());
     }
 
@@ -116,7 +124,9 @@ class ReviewControllerUserPositionReviewTest {
         result.setRuleFeedbackRecorded(true);
         result.setRuleChangeApplied(false);
         result.setRecordedAt(LocalDateTime.of(2026, 6, 22, 12, 0));
-        when(userPositionReviewAdapter.recordFeedback(any(), any(UserPositionReviewFeedbackReq.class))).thenReturn(result);
+        when(userPositionReviewAdapter.recordFeedbackForUser(
+                org.mockito.ArgumentMatchers.eq(17L), org.mockito.ArgumentMatchers.eq(7L),
+                any(UserPositionReviewFeedbackReq.class))).thenReturn(result);
 
         mockMvc.perform(post("/api/review/user-positions/7/feedback")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,19 +143,22 @@ class ReviewControllerUserPositionReviewTest {
                 .andExpect(jsonPath("$.data.notExecutable").value(true))
                 .andExpect(jsonPath("$.data.notAutoTrading").value(true));
 
-        verify(userPositionReviewAdapter).recordFeedback(any(), any(UserPositionReviewFeedbackReq.class));
-        verify(positionMonitorLogService, never()).recordMonitorRun(any());
+        verify(userPositionReviewAdapter).recordFeedbackForUser(
+                org.mockito.ArgumentMatchers.eq(17L), org.mockito.ArgumentMatchers.eq(7L),
+                any(UserPositionReviewFeedbackReq.class));
+        verify(positionMonitorLogService, never())
+                .recordMonitorRunForUser(org.mockito.ArgumentMatchers.anyLong(), any());
     }
 
     @Test
     void summaryEndpointRejectsOpenPositionErrorsAsBadRequest() throws Exception {
-        when(userPositionReviewAdapter.buildSummary(8L))
+        when(userPositionReviewAdapter.buildSummaryForUser(17L, 8L))
                 .thenThrow(new IllegalArgumentException("POSITION_NOT_CLOSED"));
 
         mockMvc.perform(get("/api/review/user-positions/8/summary"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.msg").value("POSITION_NOT_CLOSED"));
+                .andExpect(jsonPath("$.msg").value("invalid request"));
     }
 
     private static UserPositionReviewSummaryDTO summary() {

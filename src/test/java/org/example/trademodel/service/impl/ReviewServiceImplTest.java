@@ -4,9 +4,12 @@ import org.example.trademodel.dto.req.WriteReviewResultReq;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.RuleVersionLogDO;
 import org.example.trademodel.entity.ReviewResultDO;
+import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.RuleVersionLogMapper;
+import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.ReviewStateVO;
 import org.junit.jupiter.api.Test;
 
@@ -35,9 +38,12 @@ class ReviewServiceImplTest {
     @Mock
     private RuleVersionLogMapper ruleVersionLogMapper;
 
+    @Mock
+    private UserPositionMapper userPositionMapper;
+
     @Test
     void saveOrUpdate_insertBranch_writesRuleVersionLog_whenRuleVersionMissingAndErrorTypeBlank() {
-        ReviewServiceImpl service = new ReviewServiceImpl(reviewResultMapper, analysisRunMapper, ruleVersionLogMapper);
+        ReviewServiceImpl service = service();
 
         WriteReviewResultReq req = new WriteReviewResultReq();
         req.setAnalysisId(" a-1 ");
@@ -76,7 +82,7 @@ class ReviewServiceImplTest {
 
     @Test
     void saveOrUpdate_updateBranch_writesRuleVersionLog_eachSave() {
-        ReviewServiceImpl service = new ReviewServiceImpl(reviewResultMapper, analysisRunMapper, ruleVersionLogMapper);
+        ReviewServiceImpl service = service();
 
         WriteReviewResultReq req = new WriteReviewResultReq();
         req.setAnalysisId("a-2");
@@ -120,7 +126,7 @@ class ReviewServiceImplTest {
 
     @Test
     void saveOrUpdate_invalidErrorType_throwsBeforeDbAndSkipsAudit() {
-        ReviewServiceImpl service = new ReviewServiceImpl(reviewResultMapper, analysisRunMapper, ruleVersionLogMapper);
+        ReviewServiceImpl service = service();
 
         WriteReviewResultReq req = new WriteReviewResultReq();
         req.setAnalysisId("a-bad");
@@ -138,7 +144,7 @@ class ReviewServiceImplTest {
 
     @Test
     void saveOrUpdate_insertBranch_allowedErrorType_writesRuleVersionLog() {
-        ReviewServiceImpl service = new ReviewServiceImpl(reviewResultMapper, analysisRunMapper, ruleVersionLogMapper);
+        ReviewServiceImpl service = service();
 
         WriteReviewResultReq req = new WriteReviewResultReq();
         req.setAnalysisId("a-ok");
@@ -170,6 +176,68 @@ class ReviewServiceImplTest {
         assertThat(log.getChangeDetail()).contains("errorType=UNKNOWN");
     }
 
+    @Test
+    void userPositionSaveUsesExactOwnerPositionAndServerGeneratedScope() {
+        ReviewServiceImpl service = service();
+        UserPositionDO position = new UserPositionDO();
+        position.setId(31L);
+        position.setUserId(17L);
+        position.setStatus("CLOSED");
+        when(userPositionMapper.selectByIdAndUserId(31L, 17L)).thenReturn(position);
+
+        WriteReviewResultReq req = new WriteReviewResultReq();
+        req.setAnalysisId("shared-analysis");
+        req.setErrorType("RULE_TOO_STRICT");
+        req.setActualOutcome("OWNER_A");
+        req.setAdjustmentSuggestion("owner-a-only");
+
+        ReviewResultDO saved = reviewRow(
+                "review-owner-a", "shared-analysis", "RULE_TOO_STRICT", "OWNER_A", "owner-a-only");
+        saved.setUserId(17L);
+        saved.setUserPositionId(31L);
+        saved.setReviewScopeKey("USER:17:POSITION:31");
+        when(reviewResultMapper.selectByUserPositionScope(
+                "shared-analysis", 17L, 31L, "USER:17:POSITION:31"))
+                .thenReturn(null)
+                .thenReturn(saved);
+
+        ReviewStateVO result = service.saveOrUpdateForUserPosition(17L, 31L, req);
+
+        assertThat(result.getReviewId()).isEqualTo("review-owner-a");
+        ArgumentCaptor<ReviewResultDO> rowCaptor = ArgumentCaptor.forClass(ReviewResultDO.class);
+        verify(reviewResultMapper).insert(rowCaptor.capture());
+        assertThat(rowCaptor.getValue()).satisfies(row -> {
+            assertThat(row.getAnalysisId()).isEqualTo("shared-analysis");
+            assertThat(row.getUserId()).isEqualTo(17L);
+            assertThat(row.getUserPositionId()).isEqualTo(31L);
+            assertThat(row.getReviewScopeKey()).isEqualTo("USER:17:POSITION:31");
+        });
+        verify(reviewResultMapper, never()).selectByAnalysisId("shared-analysis");
+        verify(reviewResultMapper, never()).updateContentByAnalysisId(any());
+        verify(ruleVersionLogMapper, never()).insert(any());
+    }
+
+    @Test
+    void userPositionSaveRejectsNonOwnerBeforeReviewLookupOrWrite() {
+        ReviewServiceImpl service = service();
+        when(userPositionMapper.selectByIdAndUserId(41L, 17L)).thenReturn(null);
+        WriteReviewResultReq req = new WriteReviewResultReq();
+        req.setAnalysisId("shared-analysis");
+
+        assertThrows(UserPositionNotFoundException.class,
+                () -> service.saveOrUpdateForUserPosition(17L, 41L, req));
+
+        verify(reviewResultMapper, never()).selectByUserPositionScope(any(), any(), any(), any());
+        verify(reviewResultMapper, never()).insert(any());
+        verify(reviewResultMapper, never()).updateContentByUserPositionScope(any());
+        verify(ruleVersionLogMapper, never()).insert(any());
+    }
+
+    private ReviewServiceImpl service() {
+        return new ReviewServiceImpl(
+                reviewResultMapper, analysisRunMapper, ruleVersionLogMapper, userPositionMapper);
+    }
+
     private static ReviewResultDO reviewRow(String id,
                                             String analysisId,
                                             String errorType,
@@ -186,4 +254,3 @@ class ReviewServiceImplTest {
         return row;
     }
 }
-

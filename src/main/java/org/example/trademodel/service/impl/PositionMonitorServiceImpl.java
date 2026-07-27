@@ -36,6 +36,8 @@ import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.Persiste
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
+import org.example.trademodel.userposition.UserPositionConflictException;
+import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -129,31 +131,37 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     }
 
     @Override
-    public PositionMonitorResultDTO monitorUserPosition(Long positionId) {
+    public PositionMonitorResultDTO monitorUserPositionForUser(Long positionId, Long userId) {
         if (positionId == null || positionId <= 0) {
             throw new IllegalArgumentException("position_id is required");
         }
-        UserPositionDO position = userPositionMapper.selectById(positionId);
-        if (position == null) {
-            throw new IllegalArgumentException("UserPosition not found: " + positionId);
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
         }
-        return monitorActivePosition(position);
+        UserPositionDO position = userPositionMapper.selectByIdAndUserId(positionId, userId);
+        if (position == null) {
+            throw new UserPositionNotFoundException();
+        }
+        return monitorActivePosition(position, userId, false);
     }
 
     @Override
-    public PositionMonitorBatchResultDTO monitorOpenUserPositions() {
-        List<UserPositionDO> positions = Optional.ofNullable(userPositionMapper.listOpenPositions()).orElse(List.of());
+    public PositionMonitorBatchResultDTO monitorClaimedOpenPositionsForSystem() {
+        List<UserPositionDO> positions = Optional.ofNullable(
+                userPositionMapper.listClaimedOpenForSystemMonitoring()).orElse(List.of());
         List<PositionMonitorResultDTO> results = new ArrayList<>();
         List<PositionMonitorBatchResultDTO.FailureItem> failures = new ArrayList<>();
         int blockedCount = 0;
         for (UserPositionDO position : positions) {
             try {
-                PositionMonitorResultDTO result = monitorActivePosition(position);
+                PositionMonitorResultDTO result = monitorActivePosition(
+                        position, position == null ? null : position.getUserId(), true);
                 results.add(result);
                 if (result.isRiskBlocked() || "HIGH_RISK".equals(result.getLogicStatus())) {
                     blockedCount++;
                 }
-            } catch (IllegalArgumentException | IllegalStateException ex) {
+            } catch (UserPositionConflictException | UserPositionNotFoundException
+                     | PositionMonitorDataUnavailableException ex) {
                 failures.add(new PositionMonitorBatchResultDTO.FailureItem(
                         position == null ? null : position.getId(),
                         position == null ? null : position.getAssetSymbol(),
@@ -170,7 +178,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         return batch;
     }
 
-    private PositionMonitorResultDTO monitorActivePosition(UserPositionDO position) {
+    private PositionMonitorResultDTO monitorActivePosition(UserPositionDO position, Long userId, boolean systemScope) {
         validateActivePosition(position);
         String side = normalize(position.getSide());
         if (!"LONG".equals(side) && !"SHORT".equals(side)) {
@@ -180,7 +188,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         BigDecimal currentPrice = readCurrentPrice(assetSymbol);
         DerivativesBusinessAssessment derivativesAssessment = readDerivativesAssessment(
                 position, side, currentPrice);
-        UserPositionRiskResult risk = currentRiskOrBlocked();
+        UserPositionRiskResult risk = currentRiskOrBlocked(userId);
         Set<String> reasons = new LinkedHashSet<>();
         if (derivativesAssessment != null) {
             reasons.addAll(derivativesAssessment.reasonCodes());
@@ -212,7 +220,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             riskLevel = "HIGH";
             reasons.add("EXTERNAL_CONTEXT_REVIEW_REQUIRED");
         }
-        boolean riskIncreased = riskIncreased(position.getId(), riskLevel);
+        boolean riskIncreased = riskIncreased(position.getId(), userId, systemScope, riskLevel);
         if (riskBlocked) {
             reasons.add("RISK_BLOCKED");
         }
@@ -298,7 +306,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         command.setDecisionSnapshot(decisionSnapshot(planContext.analysisId));
         command.setRiskSnapshot(riskSnapshot(risk, externalContext));
         command.setTraceId("POSITION_MONITOR_" + position.getId());
-        PositionMonitorLogDTO log = positionMonitorLogService.recordMonitorRun(command);
+        PositionMonitorLogDTO log = systemScope
+                ? positionMonitorLogService.recordMonitorRunForSystem(command)
+                : positionMonitorLogService.recordMonitorRunForUser(userId, command);
 
         PositionMonitorResultDTO result = new PositionMonitorResultDTO();
         result.setPositionId(position.getId());
@@ -359,6 +369,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         }
         String status = normalize(position.getStatus());
         if (!"OPEN".equals(status) && !"PARTIALLY_CLOSED".equals(status)) {
+            if ("CLOSED".equals(status)) {
+                throw new UserPositionConflictException("CLOSED UserPosition cannot be monitored");
+            }
             throw new IllegalArgumentException("UserPosition status must be OPEN or PARTIALLY_CLOSED");
         }
     }
@@ -369,21 +382,21 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             result = marketPriceSnapshotService.get(assetSymbol, AssetPriority.P0_POSITION,
                     Duration.ofSeconds(15), "position-monitor-" + UUID.randomUUID());
         } catch (RuntimeException ex) {
-            throw new IllegalStateException("QUOTE_UNAVAILABLE", ex);
+            throw new PositionMonitorDataUnavailableException("QUOTE_UNAVAILABLE", ex);
         }
         if (!MarketPriceSnapshotPolicy.isFresh(result)) {
-            throw new IllegalStateException(MarketPriceSnapshotPolicy.failureCode(result));
+            throw new PositionMonitorDataUnavailableException(MarketPriceSnapshotPolicy.failureCode(result));
         }
         BigDecimal lastPrice = result.payload().lastPrice();
         if (!positive(lastPrice)) {
-            throw new IllegalStateException("INVALID_MARKET_PRICE");
+            throw new PositionMonitorDataUnavailableException("INVALID_MARKET_PRICE");
         }
         return lastPrice;
     }
 
-    private UserPositionRiskResult currentRiskOrBlocked() {
+    private UserPositionRiskResult currentRiskOrBlocked(Long userId) {
         try {
-            UserPositionRiskResult result = userPositionRiskAdapter.currentRisk();
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRiskForUser(userId);
             return result == null ? UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE") : result;
         } catch (RuntimeException ex) {
             return UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE");
@@ -494,8 +507,10 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         return PlanContext.missing();
     }
 
-    private boolean riskIncreased(Long positionId, String currentRiskLevel) {
-        List<PositionMonitorLogDTO> logs = positionMonitorLogService.listByPositionId(positionId, 1);
+    private boolean riskIncreased(Long positionId, Long userId, boolean systemScope, String currentRiskLevel) {
+        List<PositionMonitorLogDTO> logs = systemScope
+                ? positionMonitorLogService.listByPositionIdForSystem(positionId, 1)
+                : positionMonitorLogService.listByPositionIdForUser(userId, positionId, 1);
         if (logs == null || logs.isEmpty()) {
             return false;
         }
@@ -610,6 +625,16 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
     private static String normalize(String value) {
         return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static final class PositionMonitorDataUnavailableException extends IllegalStateException {
+        private PositionMonitorDataUnavailableException(String message) {
+            super(message);
+        }
+
+        private PositionMonitorDataUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     private static class PlanContext {

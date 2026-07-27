@@ -357,6 +357,7 @@ CREATE INDEX IF NOT EXISTS idx_tm_real_position_symbol_status ON tm_real_positio
 
 CREATE TABLE IF NOT EXISTS tm_user_position (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT,
     asset_symbol VARCHAR(32) NOT NULL,
     side VARCHAR(10) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -397,6 +398,10 @@ CREATE INDEX IF NOT EXISTS idx_tm_user_position_status_opened_at
     ON tm_user_position(status, opened_at);
 CREATE INDEX IF NOT EXISTS idx_tm_user_position_asset_status
     ON tm_user_position(asset_symbol, status);
+CREATE INDEX IF NOT EXISTS idx_tm_user_position_user_status_opened_at
+    ON tm_user_position(user_id, status, opened_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_id_user
+    ON tm_user_position(id, user_id);
 
 CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -658,18 +663,28 @@ CREATE INDEX IF NOT EXISTS idx_tm_missed_opportunity_biz_date ON tm_missed_oppor
 CREATE INDEX IF NOT EXISTS idx_tm_missed_opportunity_decision_id ON tm_missed_opportunity(decision_id);
 CREATE INDEX IF NOT EXISTS idx_tm_missed_opportunity_symbol ON tm_missed_opportunity(symbol);
 
--- 复盘结果（按 analysis_id 单行 upsert；用户经 /api/review/save 写入，与聚合摘要分离）
+-- 复盘结果：共享分析反馈与用户持仓反馈通过服务端 scope 隔离
 CREATE TABLE IF NOT EXISTS tm_review_result (
     id VARCHAR(64) PRIMARY KEY,
     analysis_id VARCHAR(64) NOT NULL,
+    user_id BIGINT,
+    user_position_id BIGINT,
+    review_scope_key VARCHAR(128) NOT NULL DEFAULT 'SHARED',
     error_type VARCHAR(200),
     actual_outcome VARCHAR(2000),
     adjustment_suggestion VARCHAR(4000),
     create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_review_result_owner_scope CHECK (
+        (review_scope_key = 'SHARED' AND user_id IS NULL AND user_position_id IS NULL)
+        OR (review_scope_key <> 'SHARED' AND user_id IS NOT NULL)
+    )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_review_result_analysis_id ON tm_review_result(analysis_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_review_result_analysis_scope
+    ON tm_review_result(analysis_id, review_scope_key);
+CREATE INDEX IF NOT EXISTS idx_tm_review_result_user_update
+    ON tm_review_result(user_id, update_time, id);
 
 -- 规则版本演进审计链（最小链路）：用于挂载人工复盘反馈的版本追踪信息
 -- 目标：确保 tm_review_result 保存后，审计链不停摆（即使 rule_version / error_type 为空也可落库）
@@ -838,6 +853,24 @@ CREATE TABLE IF NOT EXISTS tm_user (
     last_login_at TIMESTAMP,
     CONSTRAINT uq_tm_user_username UNIQUE (username)
 );
+
+ALTER TABLE tm_user_position
+    ADD CONSTRAINT IF NOT EXISTS fk_tm_user_position_user
+    FOREIGN KEY (user_id) REFERENCES tm_user(id)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT;
+
+ALTER TABLE tm_review_result
+    ADD CONSTRAINT IF NOT EXISTS fk_tm_review_result_user
+    FOREIGN KEY (user_id) REFERENCES tm_user(id)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT;
+
+ALTER TABLE tm_review_result
+    ADD CONSTRAINT IF NOT EXISTS fk_tm_review_result_user_position_owner
+    FOREIGN KEY (user_position_id, user_id) REFERENCES tm_user_position(id, user_id)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT;
 
 -- tm_asset_state 语义：每个 symbol 当前仅一行（会被后续分析覆盖更新）。
 MERGE INTO tm_rule_config KEY(rule_key) VALUES

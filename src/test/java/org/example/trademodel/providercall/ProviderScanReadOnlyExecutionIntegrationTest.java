@@ -160,7 +160,7 @@ class ProviderScanReadOnlyExecutionIntegrationTest {
         position.setAssetSymbol("BTCUSDT");
         position.setSourceType("MANUAL");
         position.setStatus("OPEN");
-        when(positionMapper.listOpenPositions()).thenReturn(List.of(position));
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
         AssetStateMapper stateMapper = mock(AssetStateMapper.class);
         when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
         PushSnapshotMapper pushSnapshotMapper = mock(PushSnapshotMapper.class);

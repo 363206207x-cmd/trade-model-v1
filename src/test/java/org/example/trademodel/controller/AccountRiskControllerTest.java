@@ -2,6 +2,7 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,17 +21,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountRiskControllerTest {
     @Mock
     private UserPositionRiskAdapter userPositionRiskAdapter;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new AccountRiskController(userPositionRiskAdapter)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new AccountRiskController(userPositionRiskAdapter, authenticatedUserIdResolver)).build();
     }
 
     @Test
     void currentUserPositionRiskReturnsReadOnlySafetyFields() throws Exception {
-        when(userPositionRiskAdapter.currentRisk()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(userPositionRiskAdapter.currentRiskForUser(7L)).thenReturn(UserPositionRiskResult.noOpenPosition(0));
 
         mockMvc.perform(get("/api/account-risk/user-positions/current"))
                 .andExpect(status().isOk())
@@ -47,6 +52,6 @@ class AccountRiskControllerTest {
                 .andExpect(jsonPath("$.data.notAutoReverse").value(true))
                 .andExpect(jsonPath("$.data.notUserPositionMutation").value(true));
 
-        verify(userPositionRiskAdapter).currentRisk();
+        verify(userPositionRiskAdapter).currentRiskForUser(7L);
     }
 }
