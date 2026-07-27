@@ -450,6 +450,72 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         }
     }
 
+    func testAssetDetailAnalysisEntryRequiresTheCurrentAuthoritativeIdentity() throws {
+        let webView = try loadAssetDetailFixture(selectedSymbol: "BTCUSDT")
+        let link = "document.querySelector('[data-analysis-detail-link]')"
+        XCTAssertTrue(waitUntil("window.__assetRequests.length === 1", in: webView))
+
+        XCTAssertTrue(try booleanValue("\(link).hidden", in: webView))
+        XCTAssertEqual(try stringValue("getComputedStyle(\(link)).display", in: webView), "none")
+        XCTAssertEqual(try numberValue("\(link).getBoundingClientRect().height", in: webView), 0)
+        XCTAssertEqual(try stringValue("\(link).getAttribute('href') || ''", in: webView), "")
+
+        try run("window.__resolveAsset(0, 'BTCUSDT', 'ana-a')", in: webView)
+        XCTAssertTrue(waitUntil("\(link).hidden === false", in: webView))
+        XCTAssertEqual(try stringValue("getComputedStyle(\(link)).display", in: webView), "flex")
+        XCTAssertTrue(try booleanValue(
+            "new URL(\(link).href).searchParams.get('analysisId') === 'ana-a'",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "new URL(\(link).href).searchParams.get('selectedSymbol') === 'BTCUSDT'",
+            in: webView
+        ))
+
+        try run("window.__startAsset('BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__assetRequests.length === 2", in: webView))
+        XCTAssertTrue(try booleanValue("\(link).hidden", in: webView))
+        XCTAssertEqual(try stringValue("getComputedStyle(\(link)).display", in: webView), "none")
+        XCTAssertEqual(try stringValue("\(link).getAttribute('href') || ''", in: webView), "")
+
+        try run("window.__startAsset('ETHUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__assetRequests.length === 3", in: webView))
+        XCTAssertTrue(waitUntil("window.__assetRequests[1].aborted === true", in: webView))
+        try run("window.__resolveAsset(1, 'BTCUSDT', 'ana-stale')", in: webView)
+        XCTAssertTrue(waitUntil("window.__assetRequests[1].settled === true", in: webView))
+        XCTAssertTrue(try booleanValue("\(link).hidden", in: webView))
+        XCTAssertEqual(try stringValue("\(link).getAttribute('href') || ''", in: webView), "")
+
+        try run("window.__resolveAsset(2, 'ETHUSDT', 'ana-b')", in: webView)
+        XCTAssertTrue(waitUntil("\(link).hidden === false", in: webView))
+        XCTAssertTrue(try booleanValue(
+            "new URL(\(link).href).searchParams.get('analysisId') === 'ana-b'",
+            in: webView
+        ))
+
+        try run("window.__startAsset('SOLUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__assetRequests.length === 4", in: webView))
+        try run("window.__resolveAsset(3, 'SOLUSDT', null)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-page-status]').dataset.status === 'ready'",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue("\(link).hidden", in: webView))
+        XCTAssertEqual(try stringValue("getComputedStyle(\(link)).display", in: webView), "none")
+        XCTAssertEqual(try stringValue("\(link).getAttribute('href') || ''", in: webView), "")
+
+        try run("window.__startAsset('DOGEUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__assetRequests.length === 5", in: webView))
+        try run("window.__rejectAsset(4)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-page-status]').dataset.status === 'error'",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue("\(link).hidden", in: webView))
+        XCTAssertEqual(try stringValue("getComputedStyle(\(link)).display", in: webView), "none")
+        XCTAssertEqual(try stringValue("\(link).getAttribute('href') || ''", in: webView), "")
+    }
+
     func testAnalysisDetailNewestResponseWinsAfterRetryStartsAnotherIdentity() throws {
         let webView = try loadAnalysisDetailFixture(analysisId: "ana-old")
         XCTAssertTrue(waitUntil("window.__analysisRequests.length === 1", in: webView))
@@ -597,6 +663,129 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 """, in: webView),
             0
         )
+    }
+
+    private func loadAssetDetailFixture(
+        selectedSymbol: String,
+        width: CGFloat = 430,
+        height: CGFloat = 932
+    ) throws -> WKWebView {
+        let loaded = expectation(description: "asset detail fixture loaded")
+        let delegate = NavigationDelegate { loaded.fulfill() }
+        navigationDelegate = delegate
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        webView.navigationDelegate = delegate
+        webView.loadHTMLString(
+            try assetDetailFixtureHTML(selectedSymbol: selectedSymbol),
+            baseURL: URL(string: "https://app.example.test/dashboard/asset-detail")
+        )
+        wait(for: [loaded], timeout: 5)
+        XCTAssertTrue(waitUntil("document.readyState === 'complete'", in: webView))
+        return webView
+    }
+
+    private func assetDetailFixtureHTML(selectedSymbol: String) throws -> String {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let templateURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/templates/asset-detail.html")
+        let styleURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/css/asset-detail.css")
+        let contractURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/js/frontend-contract.js")
+        let scriptURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/js/asset-detail.js")
+        guard FileManager.default.fileExists(atPath: templateURL.path),
+              FileManager.default.fileExists(atPath: styleURL.path),
+              FileManager.default.fileExists(atPath: contractURL.path),
+              FileManager.default.fileExists(atPath: scriptURL.path) else {
+            throw FixtureError.missingProductionResource
+        }
+
+        var html = try String(contentsOf: templateURL)
+        let styles = try String(contentsOf: styleURL)
+        let contractScript = try String(contentsOf: contractURL)
+        let detailScript = try String(contentsOf: scriptURL)
+        let requestProbe = """
+        <script>
+          window.__assetRequests = [];
+          window.fetch = function(url, options) {
+            return new Promise(function(resolve, reject) {
+              var request = {
+                url: String(url),
+                options: options || {},
+                resolve: resolve,
+                reject: reject,
+                aborted: false,
+                settled: false
+              };
+              if (request.options.signal) {
+                request.options.signal.addEventListener('abort', function() {
+                  request.aborted = true;
+                }, { once: true });
+              }
+              window.__assetRequests.push(request);
+            });
+          };
+          window.__startAsset = function(nextSymbol) {
+            document.querySelector('[data-asset-detail-root]').dataset.selectedSymbol = nextSymbol;
+            document.querySelector('[data-request-retry]').click();
+          };
+          window.__resolveAsset = function(index, responseSymbol, analysisId) {
+            var request = window.__assetRequests[index];
+            request.resolve({
+              ok: true,
+              status: 200,
+              json: function() {
+                return Promise.resolve({
+                  code: 200,
+                  data: {
+                    selectedSymbol: responseSymbol,
+                    assets: [{
+                      slotType: 'DECISION',
+                      rawSymbol: responseSymbol,
+                      symbol: responseSymbol,
+                      analysisId: analysisId,
+                      currentConclusion: 'CONCLUSION_' + responseSymbol
+                    }],
+                    aiDecision: null,
+                    executionSuggestion: null
+                  }
+                });
+              }
+            });
+            setTimeout(function() { request.settled = true; }, 0);
+          };
+          window.__rejectAsset = function(index) {
+            var request = window.__assetRequests[index];
+            request.reject(new Error('ASSET_FAILURE'));
+            setTimeout(function() { request.settled = true; }, 0);
+          };
+          var assetRoot = document.querySelector('[data-asset-detail-root]');
+          assetRoot.dataset.selectedSymbol = '\(selectedSymbol)';
+          assetRoot.dataset.mobileView = 'true';
+        </script>
+        """
+        html = html.replacingOccurrences(
+            of: "<link rel=\"stylesheet\" th:href=\"@{/css/asset-detail.css}\" href=\"/css/asset-detail.css\">",
+            with: "<style>\(styles)</style>"
+        )
+        html = html.replacingOccurrences(
+            of: "<script th:src=\"@{/js/frontend-contract.js}\" src=\"/js/frontend-contract.js\" defer></script>",
+            with: ""
+        )
+        html = html.replacingOccurrences(
+            of: "<script th:src=\"@{/js/asset-detail.js}\" src=\"/js/asset-detail.js\" defer></script>",
+            with: ""
+        )
+        html = html.replacingOccurrences(
+            of: "</body>",
+            with: "<script>\(contractScript)</script>\(requestProbe)<script>\(detailScript)</script></body>"
+        )
+        return html
     }
 
     private func loadAnalysisDetailFixture(

@@ -186,6 +186,41 @@ class AssetDetailFrontendContractTest {
     }
 
     @Test
+    void analysisEntryFailsClosedUntilTheCurrentAuthoritativeIdentityIsVerified() throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+        String css = Files.readString(STYLES);
+        String loadFunction = script.substring(script.indexOf("async function loadAssetDetail()"));
+
+        assertThat(html)
+                .contains("class=\"analysis-detail-link\"")
+                .contains("data-analysis-detail-link")
+                .contains("hidden")
+                .doesNotContain("href=\"/dashboard/analysis-detail\"");
+        assertThat(css)
+                .contains(".analysis-detail-link {\n  display: flex;")
+                .contains(".analysis-detail-link[hidden] {\n  display: none;\n}");
+        assertThat(script)
+                .contains("var requestGeneration = 0")
+                .contains("var activeRequestController = null")
+                .contains("function beginRequest(selectedSymbol)")
+                .contains("function isCurrentRequest(request)")
+                .contains("request.selectedSymbol === currentSelectedSymbol()")
+                .contains("request.controller === activeRequestController")
+                .contains("updateAnalysisDetailLink(null)")
+                .contains("link.hidden = true")
+                .contains("link.removeAttribute(\"href\")")
+                .contains("link.hidden = false")
+                .contains("analysisId: analysisId")
+                .contains("selectedSymbol: symbol")
+                .contains("if (!isCurrentRequest(request)) return")
+                .doesNotContain("latestAnalysis")
+                .doesNotContain("cachedAnalysisId");
+        assertThat(loadFunction.indexOf("updateAnalysisDetailLink(null)"))
+                .isLessThan(loadFunction.indexOf("fetch("));
+    }
+
+    @Test
     void responsiveDetailViewHasDarkModeTouchTargetsAndNoRootOverflow() throws Exception {
         String css = Files.readString(STYLES);
 

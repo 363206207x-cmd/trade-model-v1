@@ -275,6 +275,10 @@ dd {
   text-decoration: none;
 }
 
+.analysis-detail-link[hidden] {
+  display: none;
+}
+
 .analysis-detail-link > span:first-child {
   display: flex;
   min-width: 0;
