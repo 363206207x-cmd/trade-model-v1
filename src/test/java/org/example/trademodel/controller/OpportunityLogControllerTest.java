@@ -2,6 +2,7 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.OpportunityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -30,19 +31,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class OpportunityLogControllerTest {
+    private static final Long USER_ID = 17L;
+
     @Mock
     private OpportunityLogService opportunityLogService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new OpportunityLogController(opportunityLogService)).build();
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(USER_ID);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new OpportunityLogController(opportunityLogService, authenticatedUserIdResolver)).build();
     }
 
     @Test
     void findEndpointReturnsReviewOnlyOpportunityLog() throws Exception {
-        when(opportunityLogService.findById("opp-1")).thenReturn(dto());
+        when(opportunityLogService.findByIdForUser("opp-1", USER_ID)).thenReturn(dto());
 
         mockMvc.perform(get("/api/opportunity-log/opp-1"))
                 .andExpect(status().isOk())
@@ -66,7 +73,7 @@ class OpportunityLogControllerTest {
 
     @Test
     void queryEndpointDelegatesReadOnlyFilters() throws Exception {
-        when(opportunityLogService.query(eq("ana-1"), isNull(), isNull(), eq("BTCUSDT"),
+        when(opportunityLogService.queryForUser(eq(USER_ID), eq("ana-1"), isNull(), isNull(), eq("BTCUSDT"),
                 eq(OpportunityLogStatus.MISSED_VALID), isNull(), any(), any(), eq(25)))
                 .thenReturn(List.of(dto()));
 
@@ -83,7 +90,7 @@ class OpportunityLogControllerTest {
 
     @Test
     void evaluateEndpointOnlyAcceptsAsOfAndDoesNotCreateOpportunity() throws Exception {
-        when(opportunityLogService.evaluateOpportunity(eq("opp-1"), any())).thenReturn(dto());
+        when(opportunityLogService.evaluateOpportunityForUser(eq("opp-1"), eq(USER_ID), any())).thenReturn(dto());
 
         mockMvc.perform(post("/api/opportunity-log/opp-1/evaluate")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -92,7 +99,7 @@ class OpportunityLogControllerTest {
                 .andExpect(jsonPath("$.data.opportunityId").value("opp-1"))
                 .andExpect(jsonPath("$.data.notExecutable").value(true));
 
-        verify(opportunityLogService).evaluateOpportunity(eq("opp-1"), any());
+        verify(opportunityLogService).evaluateOpportunityForUser(eq("opp-1"), eq(USER_ID), any());
     }
 
     private static OpportunityLogDTO dto() {

@@ -45,6 +45,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class OpportunityLogServiceImplTest {
+    private static final Long USER_A_ID = 17L;
+
     @Mock
     private OpportunityLogMapper opportunityLogMapper;
     @Mock
@@ -116,7 +118,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.EXECUTED_VALID);
         assertThat(dto.getUserPositionId()).isEqualTo(77L);
@@ -138,7 +140,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(3));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_VALID);
         assertThat(dto.getUserPositionPresent()).isFalse();
@@ -156,7 +158,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(3));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.EXECUTED_VALID);
         assertThat(dto.getUserPositionId()).isEqualTo(77L);
@@ -172,7 +174,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "110", "89", "91")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(3));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_INVALID);
         assertThat(dto.getUserPositionPresent()).isFalse();
@@ -187,7 +189,7 @@ class OpportunityLogServiceImplTest {
         when(userPositionMapper.listClaimedByExactSourceRefIdForSystem("plan-1")).thenReturn(List.of(position));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(3));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(3));
 
         assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.REVIEW_REQUIRED);
         assertThat(dto.getOpportunityStatus()).isNull();
@@ -205,7 +207,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "112", "99", "108")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-short", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-short", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_INVALID);
         assertThat(dto.getHitOrder()).isEqualTo(OpportunityLogStatus.INVALIDATION_FIRST);
@@ -221,7 +223,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "122", "89", "101")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.AMBIGUOUS_MARKET_PATH);
         assertThat(dto.getOpportunityStatus()).isNull();
@@ -238,7 +240,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of());
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.MARKET_PATH_UNAVAILABLE);
         assertThat(dto.getOpportunityStatus()).isNull();
@@ -255,7 +257,7 @@ class OpportunityLogServiceImplTest {
         when(accountRiskSnapshotMapper.selectLatestByAnalysisId("ana-1")).thenReturn(riskBlocked(row.getAnchorTime().plusMinutes(5)));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.BLOCKED_BY_RISK_VALID);
         assertThat(dto.getRiskBlockedEvidence()).isTrue();
@@ -273,7 +275,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(bar(1, "100", "121", "99", "120")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.PUSHED_NOT_FILLED_VALID);
     }
@@ -286,7 +288,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of(userPosition(1L, "plan-1"), userPosition(2L, "plan-1")));
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.REVIEW_REQUIRED);
         assertThat(dto.getOpportunityStatus()).isNull();
@@ -310,7 +312,7 @@ class OpportunityLogServiceImplTest {
                 .thenReturn(List.of());
         when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1",
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1",
                 LocalDateTime.of(2026, 6, 23, 10, 5));
 
         assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.MARKET_PATH_UNAVAILABLE);
@@ -327,12 +329,70 @@ class OpportunityLogServiceImplTest {
         row.setMfeRatio(new BigDecimal("0.10"));
         when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
 
-        OpportunityLogDTO dto = service.evaluateOpportunity("opp-1", row.getAnchorTime().plusHours(2));
+        OpportunityLogDTO dto = service.evaluateOpportunityForSystem("opp-1", row.getAnchorTime().plusHours(2));
 
         assertThat(dto.getDeduplicated()).isTrue();
         assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_VALID);
         assertThat(dto.getMfeRatio()).isEqualByComparingTo("0.10");
         verify(opportunityLogMapper, never()).updateEvaluation(any());
+    }
+
+    @Test
+    void userScopedFindDoesNotExposeAnotherOwnersPersistedAssociation() {
+        OpportunityLogDO row = resolvedTargetFirst();
+        row.setUserPositionId(88L);
+        row.setUserPositionPresent(true);
+        row.setReasonCodes("TARGET_FIRST,MULTIPLE_LINKED_USER_POSITIONS");
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID)).thenReturn(List.of());
+        when(userPositionMapper.listByExactSourceRefIdAndUserId("ana-1", USER_A_ID)).thenReturn(List.of());
+
+        OpportunityLogDTO dto = service.findByIdForUser("opp-1", USER_A_ID);
+
+        assertThat(dto.getUserPositionId()).isNull();
+        assertThat(dto.getUserPositionPresent()).isFalse();
+        assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.MISSED_VALID);
+        assertThat(dto.getReasonCodes()).isEqualTo("TARGET_FIRST");
+        verify(userPositionMapper, never()).listClaimedByExactSourceRefIdForSystem(any());
+    }
+
+    @Test
+    void userScopedFindProjectsOnlyCurrentOwnersPositionAssociation() {
+        OpportunityLogDO row = resolvedTargetFirst();
+        row.setUserPositionId(88L);
+        row.setUserPositionPresent(true);
+        UserPositionDO owned = userPosition(17L, "plan-1", LocalDateTime.of(2026, 6, 23, 10, 30));
+        owned.setUserId(USER_A_ID);
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
+                .thenReturn(List.of(owned));
+
+        OpportunityLogDTO dto = service.findByIdForUser("opp-1", USER_A_ID);
+
+        assertThat(dto.getUserPositionId()).isEqualTo(17L);
+        assertThat(dto.getUserPositionPresent()).isTrue();
+        assertThat(dto.getOpportunityStatus()).isEqualTo(OpportunityLogStatus.EXECUTED_VALID);
+        verify(userPositionMapper, never()).listClaimedByExactSourceRefIdForSystem(any());
+    }
+
+    @Test
+    void userScopedEvaluateNeverUsesGlobalClaimedPositionLookup() {
+        OpportunityLogDO row = pendingLong();
+        UserPositionDO owned = userPosition(17L, "plan-1", LocalDateTime.of(2026, 6, 23, 10, 30));
+        owned.setUserId(USER_A_ID);
+        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
+                .thenReturn(List.of(owned));
+        when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
+                .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
+        when(opportunityLogMapper.updateEvaluation(row)).thenReturn(1);
+
+        OpportunityLogDTO dto = service.evaluateOpportunityForUser(
+                "opp-1", USER_A_ID, row.getAnchorTime().plusHours(2));
+
+        assertThat(dto.getUserPositionId()).isEqualTo(17L);
+        assertThat(dto.getUserPositionPresent()).isTrue();
+        verify(userPositionMapper, never()).listClaimedByExactSourceRefIdForSystem(any());
     }
 
     @Test
@@ -416,6 +476,16 @@ class OpportunityLogServiceImplTest {
         row.setEntryReference(new BigDecimal("100"));
         row.setTargetPrice(new BigDecimal("80"));
         row.setInvalidationPrice(new BigDecimal("110"));
+        return row;
+    }
+
+    private static OpportunityLogDO resolvedTargetFirst() {
+        OpportunityLogDO row = pendingLong();
+        row.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
+        row.setOpportunityStatus(OpportunityLogStatus.EXECUTED_VALID);
+        row.setTargetHit(true);
+        row.setTargetHitAt(LocalDateTime.of(2026, 6, 23, 11, 0));
+        row.setHitOrder(OpportunityLogStatus.TARGET_FIRST);
         return row;
     }
 

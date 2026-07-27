@@ -50,6 +50,12 @@ public interface UserPositionMapper {
     List<UserPositionDO> listClaimedByExactSourceRefIdForSystem(@Param("sourceRefId") String sourceRefId);
 
     @Select("SELECT * FROM tm_user_position " +
+            "WHERE user_id = #{userId} AND source_type = 'MANUAL' AND source_ref_id = #{sourceRefId} " +
+            "ORDER BY opened_at ASC, id ASC")
+    List<UserPositionDO> listByExactSourceRefIdAndUserId(@Param("sourceRefId") String sourceRefId,
+                                                        @Param("userId") Long userId);
+
+    @Select("SELECT * FROM tm_user_position " +
             "WHERE user_id = #{userId} AND status = 'CLOSED' AND source_type = 'MANUAL' " +
             "ORDER BY closed_at DESC, updated_at DESC, id DESC LIMIT #{limit}")
     List<UserPositionDO> listClosedManualByUserId(@Param("userId") Long userId, @Param("limit") int limit);

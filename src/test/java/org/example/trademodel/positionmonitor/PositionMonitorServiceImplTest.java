@@ -53,8 +53,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -432,7 +435,7 @@ class PositionMonitorServiceImplTest {
         UserPositionDO partial = position(22L, "SHORT", "PARTIALLY_CLOSED", "plan-batch-partial", "110", "80");
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(open, partial));
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
-        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(risk("LOW", false));
+        when(userPositionRiskAdapter.currentRiskForUser(USER_ID)).thenReturn(risk("LOW", false));
         when(executionPlanMapper.selectByPlanId("plan-batch-open"))
                 .thenReturn(plan("plan-batch-open", "ana-21", "VALID", true));
         when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.empty());
@@ -445,6 +448,84 @@ class PositionMonitorServiceImplTest {
         assertThat(batch.getResults()).extracting(PositionMonitorResultDTO::getPositionId).containsExactly(21L);
         assertThat(batch.getFailures()).hasSize(1);
         verify(positionMonitorLogService).recordMonitorRunForSystem(any());
+    }
+
+    @Test
+    void systemBatchCalculatesAndPersistsRiskWithinEachPositionOwnerScope() {
+        UserPositionDO ownerA = position(23L, "LONG", "OPEN", "plan-owner-a", "90", "120");
+        ownerA.setUserId(101L);
+        UserPositionDO ownerB = position(24L, "LONG", "OPEN", "plan-owner-b", "90", "120");
+        ownerB.setUserId(202L);
+        ownerB.setAssetSymbol("ETH");
+        UserPositionRiskResult riskA = risk("LOW", false);
+        riskA.setAggregateRiskScore(new BigDecimal("11"));
+        UserPositionRiskResult riskB = risk("HIGH", true);
+        riskB.setAggregateRiskScore(new BigDecimal("88"));
+
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(ownerA, ownerB));
+        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
+        when(userPositionRiskAdapter.currentRiskForUser(101L)).thenReturn(riskA);
+        when(userPositionRiskAdapter.currentRiskForUser(202L)).thenReturn(riskB);
+
+        PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
+
+        assertThat(batch.getSuccessCount()).isEqualTo(2);
+        ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
+                ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
+        verify(positionMonitorLogService, times(2)).recordMonitorRunForSystem(captor.capture());
+        assertThat(captor.getAllValues().get(0).getPositionId()).isEqualTo(23L);
+        assertThat(captor.getAllValues().get(0).getRiskSnapshot())
+                .contains("\"aggregateRiskScore\":11");
+        assertThat(captor.getAllValues().get(1).getPositionId()).isEqualTo(24L);
+        assertThat(captor.getAllValues().get(1).getRiskSnapshot())
+                .contains("\"aggregateRiskScore\":88");
+        verify(userPositionRiskAdapter, never()).currentRiskForSystem();
+    }
+
+    @Test
+    void closedConflictIsRecordedPerItemAndDoesNotStopSystemBatch() {
+        UserPositionDO staleClosed = position(25L, "LONG", "OPEN", "plan-stale", "90", "120");
+        staleClosed.setUserId(101L);
+        UserPositionDO next = position(26L, "LONG", "OPEN", "plan-next", "90", "120");
+        next.setUserId(202L);
+        next.setAssetSymbol("ETH");
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(staleClosed, next));
+        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
+        when(userPositionRiskAdapter.currentRiskForUser(101L)).thenReturn(risk("LOW", false));
+        when(userPositionRiskAdapter.currentRiskForUser(202L)).thenReturn(risk("LOW", false));
+        doThrow(new UserPositionConflictException("CLOSED UserPosition cannot record new monitor run logs"))
+                .doAnswer(invocation -> monitorLog(invocation.getArgument(0)))
+                .when(positionMonitorLogService).recordMonitorRunForSystem(any());
+
+        PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
+
+        assertThat(batch.getTotalCount()).isEqualTo(2);
+        assertThat(batch.getSuccessCount()).isEqualTo(1);
+        assertThat(batch.getFailureCount()).isEqualTo(1);
+        assertThat(batch.getFailures()).singleElement().satisfies(failure -> {
+            assertThat(failure.getPositionId()).isEqualTo(25L);
+            assertThat(failure.getReason()).contains("CLOSED UserPosition");
+        });
+        assertThat(batch.getResults()).extracting(PositionMonitorResultDTO::getPositionId)
+                .containsExactly(26L);
+        verify(positionMonitorLogService, times(2)).recordMonitorRunForSystem(any());
+    }
+
+    @Test
+    void unexpectedMonitorFailureStopsSystemBatch() {
+        UserPositionDO position = position(27L, "LONG", "OPEN", "plan-runtime-failure", "90", "120");
+        position.setUserId(101L);
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
+        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
+        when(userPositionRiskAdapter.currentRiskForUser(101L)).thenReturn(risk("LOW", false));
+        doThrow(new IllegalStateException("PositionMonitorLog insert failed"))
+                .when(positionMonitorLogService).recordMonitorRunForSystem(any());
+
+        assertThatThrownBy(service::monitorClaimedOpenPositionsForSystem)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("PositionMonitorLog insert failed");
     }
 
     @Test

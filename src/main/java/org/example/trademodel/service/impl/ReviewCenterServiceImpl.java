@@ -82,7 +82,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         }
         ReviewCenterDashboardVO vo = new ReviewCenterDashboardVO();
         vo.setPositionReviews(positionReviews(userId));
-        vo.setOpportunityReviews(opportunityReviews());
+        vo.setOpportunityReviews(opportunityReviews(userId));
         vo.setPushReviews(pushReviews());
         vo.setRuleFeedback(ruleFeedback());
 
@@ -152,9 +152,9 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         return item;
     }
 
-    private List<ReviewCenterDashboardVO.OpportunityReviewItem> opportunityReviews() {
-        List<OpportunityLogDTO> rows = opportunityLogService.query(
-                null, null, null, null, null, null, null, null, DEFAULT_LIMIT);
+    private List<ReviewCenterDashboardVO.OpportunityReviewItem> opportunityReviews(Long userId) {
+        List<OpportunityLogDTO> rows = opportunityLogService.queryForUser(
+                userId, null, null, null, null, null, null, null, null, DEFAULT_LIMIT);
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }

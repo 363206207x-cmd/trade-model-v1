@@ -154,12 +154,14 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         int blockedCount = 0;
         for (UserPositionDO position : positions) {
             try {
-                PositionMonitorResultDTO result = monitorActivePosition(position, null, true);
+                PositionMonitorResultDTO result = monitorActivePosition(
+                        position, position == null ? null : position.getUserId(), true);
                 results.add(result);
                 if (result.isRiskBlocked() || "HIGH_RISK".equals(result.getLogicStatus())) {
                     blockedCount++;
                 }
-            } catch (IllegalArgumentException | IllegalStateException ex) {
+            } catch (UserPositionConflictException | UserPositionNotFoundException
+                     | PositionMonitorDataUnavailableException ex) {
                 failures.add(new PositionMonitorBatchResultDTO.FailureItem(
                         position == null ? null : position.getId(),
                         position == null ? null : position.getAssetSymbol(),
@@ -186,7 +188,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         BigDecimal currentPrice = readCurrentPrice(assetSymbol);
         DerivativesBusinessAssessment derivativesAssessment = readDerivativesAssessment(
                 position, side, currentPrice);
-        UserPositionRiskResult risk = currentRiskOrBlocked(userId, systemScope);
+        UserPositionRiskResult risk = currentRiskOrBlocked(userId);
         Set<String> reasons = new LinkedHashSet<>();
         if (derivativesAssessment != null) {
             reasons.addAll(derivativesAssessment.reasonCodes());
@@ -380,23 +382,21 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             result = marketPriceSnapshotService.get(assetSymbol, AssetPriority.P0_POSITION,
                     Duration.ofSeconds(15), "position-monitor-" + UUID.randomUUID());
         } catch (RuntimeException ex) {
-            throw new IllegalStateException("QUOTE_UNAVAILABLE", ex);
+            throw new PositionMonitorDataUnavailableException("QUOTE_UNAVAILABLE", ex);
         }
         if (!MarketPriceSnapshotPolicy.isFresh(result)) {
-            throw new IllegalStateException(MarketPriceSnapshotPolicy.failureCode(result));
+            throw new PositionMonitorDataUnavailableException(MarketPriceSnapshotPolicy.failureCode(result));
         }
         BigDecimal lastPrice = result.payload().lastPrice();
         if (!positive(lastPrice)) {
-            throw new IllegalStateException("INVALID_MARKET_PRICE");
+            throw new PositionMonitorDataUnavailableException("INVALID_MARKET_PRICE");
         }
         return lastPrice;
     }
 
-    private UserPositionRiskResult currentRiskOrBlocked(Long userId, boolean systemScope) {
+    private UserPositionRiskResult currentRiskOrBlocked(Long userId) {
         try {
-            UserPositionRiskResult result = systemScope
-                    ? userPositionRiskAdapter.currentRiskForSystem()
-                    : userPositionRiskAdapter.currentRiskForUser(userId);
+            UserPositionRiskResult result = userPositionRiskAdapter.currentRiskForUser(userId);
             return result == null ? UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE") : result;
         } catch (RuntimeException ex) {
             return UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE");
@@ -625,6 +625,16 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
     private static String normalize(String value) {
         return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static final class PositionMonitorDataUnavailableException extends IllegalStateException {
+        private PositionMonitorDataUnavailableException(String message) {
+            super(message);
+        }
+
+        private PositionMonitorDataUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     private static class PlanContext {

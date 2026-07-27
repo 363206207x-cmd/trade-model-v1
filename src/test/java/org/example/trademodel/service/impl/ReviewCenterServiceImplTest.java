@@ -78,7 +78,7 @@ class ReviewCenterServiceImplTest {
     @Test
     void emptySourcesReturnEmptyArraysWithoutSyntheticRows() {
         when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
-        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
@@ -103,7 +103,7 @@ class ReviewCenterServiceImplTest {
     void mapsOnlyReadonlyFieldsFromExistingSources() {
         when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(position()));
         when(userPositionReviewAdapter.buildSummaryForUser(USER_ID, 7L)).thenReturn(positionSummary());
-        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(opportunity(OpportunityLogStatus.EXECUTED_VALID), opportunity(OpportunityLogStatus.PENDING_EVALUATION)));
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of(pushSnapshot()));
         when(pushRecheckLogMapper.selectLatestByPushId(3L)).thenReturn(pushLog());
@@ -151,7 +151,7 @@ class ReviewCenterServiceImplTest {
     @Test
     void pushExpiryUsesUtcNaiveExactBoundary() {
         when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of());
-        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
 
@@ -175,7 +175,7 @@ class ReviewCenterServiceImplTest {
         summary.setMonitorLogs(List.of(internal));
         when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(position()));
         when(userPositionReviewAdapter.buildSummaryForUser(USER_ID, 7L)).thenReturn(summary);
-        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());
@@ -204,7 +204,7 @@ class ReviewCenterServiceImplTest {
         summary.setMonitorLogs(List.of(guessedSibling));
         when(userPositionMapper.listClosedManualByUserId(eq(USER_ID), anyInt())).thenReturn(List.of(position()));
         when(userPositionReviewAdapter.buildSummaryForUser(USER_ID, 7L)).thenReturn(summary);
-        when(opportunityLogService.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogService.queryForUser(eq(USER_ID), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(pushSnapshotMapper.listRecent(anyInt())).thenReturn(List.of());
         when(reviewResultMapper.listRecent(anyInt())).thenReturn(List.of());

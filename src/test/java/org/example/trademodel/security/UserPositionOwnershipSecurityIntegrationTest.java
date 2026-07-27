@@ -2,10 +2,13 @@ package org.example.trademodel.security;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PersonalUserDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PersonalUserMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
     private PersonalUserMapper personalUserMapper;
     @Autowired
     private UserPositionMapper userPositionMapper;
+    @Autowired
+    private OpportunityLogMapper opportunityLogMapper;
 
     private Long userAId;
     private Long userBId;
@@ -259,6 +264,28 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     @Test
+    void opportunityLogAssociationIsProjectedOnlyForCurrentOwner() throws Exception {
+        UserPositionDO linkedB = insertPosition(
+                userBId, "SOLUSDT", "OPEN", 6, "plan-owned-by-b");
+        OpportunityLogDO opportunity = resolvedOpportunity(linkedB);
+        opportunityLogMapper.insert(opportunity);
+
+        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.userPositionPresent").value(false))
+                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID));
+
+        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+                        .with(user(USER_B).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userPositionId").value(linkedB.getId()))
+                .andExpect(jsonPath("$.data.userPositionPresent").value(true))
+                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.EXECUTED_VALID));
+    }
+
+    @Test
     void dashboardRiskAndReviewCenterRemainOwnerScoped() throws Exception {
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "BTCUSDT")
@@ -301,6 +328,14 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     private UserPositionDO insertPosition(Long userId, String symbol, String status, int minute) {
+        return insertPosition(userId, symbol, status, minute, null);
+    }
+
+    private UserPositionDO insertPosition(Long userId,
+                                          String symbol,
+                                          String status,
+                                          int minute,
+                                          String sourceRefId) {
         LocalDateTime openedAt = LocalDateTime.of(2026, 7, 1, 8, minute);
         UserPositionDO row = new UserPositionDO();
         row.setUserId(userId);
@@ -319,6 +354,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
             row.setCloseReason("manual fixture close");
         }
         row.setSourceType("MANUAL");
+        row.setSourceRefId(sourceRefId);
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);
@@ -327,6 +363,38 @@ class UserPositionOwnershipSecurityIntegrationTest {
         row.setCreatedAt(openedAt);
         row.setUpdatedAt(openedAt);
         userPositionMapper.insert(row);
+        return row;
+    }
+
+    private static OpportunityLogDO resolvedOpportunity(UserPositionDO linkedPosition) {
+        LocalDateTime anchor = LocalDateTime.of(2026, 7, 1, 8, 0);
+        OpportunityLogDO row = new OpportunityLogDO();
+        row.setOpportunityId("opp-owner-isolation");
+        row.setOpportunityKey("ana-owner-isolation:dec-owner-isolation");
+        row.setAnalysisId("ana-owner-isolation");
+        row.setDecisionId("dec-owner-isolation");
+        row.setExecutionPlanId(linkedPosition.getSourceRefId());
+        row.setUserPositionId(linkedPosition.getId());
+        row.setSymbol(linkedPosition.getAssetSymbol());
+        row.setTimeframe("1h");
+        row.setDirection("LONG");
+        row.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
+        row.setOpportunityStatus(OpportunityLogStatus.EXECUTED_VALID);
+        row.setAnchorTime(anchor);
+        row.setEvaluationAsOf(anchor.plusHours(2));
+        row.setResolvedAt(anchor.plusHours(2));
+        row.setTargetHit(true);
+        row.setInvalidationHit(false);
+        row.setTargetHitAt(anchor.plusHours(1));
+        row.setHitOrder(OpportunityLogStatus.TARGET_FIRST);
+        row.setPushPresent(false);
+        row.setRiskBlockedEvidence(false);
+        row.setUserPositionPresent(true);
+        row.setSourceType("AUTHORITATIVE_ANALYSIS");
+        row.setSourceReference("analysisId=ana-owner-isolation");
+        row.setReasonCodes("TARGET_FIRST");
+        row.setCreatedAt(anchor);
+        row.setUpdatedAt(anchor.plusHours(2));
         return row;
     }
 

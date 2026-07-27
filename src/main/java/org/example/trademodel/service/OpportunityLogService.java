@@ -16,19 +16,34 @@ public interface OpportunityLogService {
                                                       Long accountRiskSnapshotId,
                                                       String traceId);
 
-    OpportunityLogDTO evaluateOpportunity(String opportunityId, LocalDateTime asOf);
+    OpportunityLogDTO evaluateOpportunityForUser(String opportunityId, Long userId, LocalDateTime asOf);
 
-    OpportunityLogDTO findById(String opportunityId);
+    OpportunityLogDTO evaluateOpportunityForSystem(String opportunityId, LocalDateTime asOf);
 
-    List<OpportunityLogDTO> query(String analysisId,
-                                  String decisionId,
-                                  String executionPlanId,
-                                  String symbol,
-                                  String opportunityStatus,
-                                  String lifecycleStatus,
-                                  LocalDateTime from,
-                                  LocalDateTime to,
-                                  int limit);
+    OpportunityLogDTO findByIdForUser(String opportunityId, Long userId);
+
+    OpportunityLogDTO findByIdForSystem(String opportunityId);
+
+    List<OpportunityLogDTO> queryForUser(Long userId,
+                                         String analysisId,
+                                         String decisionId,
+                                         String executionPlanId,
+                                         String symbol,
+                                         String opportunityStatus,
+                                         String lifecycleStatus,
+                                         LocalDateTime from,
+                                         LocalDateTime to,
+                                         int limit);
+
+    List<OpportunityLogDTO> queryForSystem(String analysisId,
+                                           String decisionId,
+                                           String executionPlanId,
+                                           String symbol,
+                                           String opportunityStatus,
+                                           String lifecycleStatus,
+                                           LocalDateTime from,
+                                           LocalDateTime to,
+                                           int limit);
 
     OpportunityLogStatsDTO getStats(String symbol, LocalDateTime from, LocalDateTime to);
 }
