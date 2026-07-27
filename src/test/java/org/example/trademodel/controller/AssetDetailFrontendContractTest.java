@@ -164,18 +164,60 @@ class AssetDetailFrontendContractTest {
     }
 
     @Test
-    void pageStopsAtTheFe02BoundaryWithoutFe03AnalysisContent() throws Exception {
+    void pageKeepsFe02ContentBoundaryWhileExposingTheVerifiedFe03Entry() throws Exception {
         String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
 
         assertThat(html)
                 .contains("资产摘要 / Asset Summary")
                 .contains("AI 当前观点 / AI Current View")
                 .contains("执行建议 / Execution Plan")
+                .contains("data-analysis-detail-link")
+                .contains("查看分析详情")
                 .doesNotContain("Market Analysis")
                 .doesNotContain("Evidence &amp; Scoring")
                 .doesNotContain("Multi Timeframe")
-                .doesNotContain("analysis-section")
-                .doesNotContain("analysis-entry");
+                .doesNotContain("analysis-section");
+        assertThat(script)
+                .contains("contract.hasText(asset.analysisId)")
+                .contains("updateAnalysisDetailLink(asset)")
+                .contains("updateAnalysisDetailLink(null)")
+                .doesNotContain("executionSuggestion.sourceAnalysisId");
+    }
+
+    @Test
+    void analysisEntryFailsClosedUntilTheCurrentAuthoritativeIdentityIsVerified() throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+        String css = Files.readString(STYLES);
+        String loadFunction = script.substring(script.indexOf("async function loadAssetDetail()"));
+
+        assertThat(html)
+                .contains("class=\"analysis-detail-link\"")
+                .contains("data-analysis-detail-link")
+                .contains("hidden")
+                .doesNotContain("href=\"/dashboard/analysis-detail\"");
+        assertThat(css)
+                .contains(".analysis-detail-link {\n  display: flex;")
+                .contains(".analysis-detail-link[hidden] {\n  display: none;\n}");
+        assertThat(script)
+                .contains("var requestGeneration = 0")
+                .contains("var activeRequestController = null")
+                .contains("function beginRequest(selectedSymbol)")
+                .contains("function isCurrentRequest(request)")
+                .contains("request.selectedSymbol === currentSelectedSymbol()")
+                .contains("request.controller === activeRequestController")
+                .contains("updateAnalysisDetailLink(null)")
+                .contains("link.hidden = true")
+                .contains("link.removeAttribute(\"href\")")
+                .contains("link.hidden = false")
+                .contains("analysisId: analysisId")
+                .contains("selectedSymbol: symbol")
+                .contains("if (!isCurrentRequest(request)) return")
+                .doesNotContain("latestAnalysis")
+                .doesNotContain("cachedAnalysisId");
+        assertThat(loadFunction.indexOf("updateAnalysisDetailLink(null)"))
+                .isLessThan(loadFunction.indexOf("fetch("));
     }
 
     @Test

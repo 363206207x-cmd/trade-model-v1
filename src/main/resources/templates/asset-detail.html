@@ -23,7 +23,8 @@
 
   <main class="asset-detail"
         data-asset-detail-root
-        th:attr="data-selected-symbol=${selectedSymbol}"
+        data-mobile-view="false"
+        th:attr="data-selected-symbol=${selectedSymbol},data-mobile-view=${mobileView}"
         aria-busy="true">
     <section class="page-intro" aria-labelledby="asset-detail-title">
       <p class="eyebrow">V1 Product UI / 资产分析</p>
@@ -87,6 +88,15 @@
         <span>当前结论</span>
         <strong data-asset-field="conclusion">暂无可验证结论</strong>
       </div>
+      <a class="analysis-detail-link"
+         data-analysis-detail-link
+         hidden>
+        <span>
+          <strong>查看分析详情</strong>
+          <small>市场判断、证据与评分、多周期摘要</small>
+        </span>
+        <span aria-hidden="true">›</span>
+      </a>
     </section>
 
     <section class="content-section ai-section" aria-labelledby="ai-current-view-title">

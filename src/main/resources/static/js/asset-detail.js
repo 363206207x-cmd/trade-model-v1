@@ -12,9 +12,45 @@
     "POSITION_SYMBOL_MISMATCH"
   ];
   var activeRole = "GPT_FINAL";
+  var requestGeneration = 0;
+  var activeRequestController = null;
 
   function normalizeSymbol(value) {
     return String(value || "").trim().toUpperCase().replace(/\//g, "");
+  }
+
+  function currentSelectedSymbol() {
+    return normalizeSymbol(root.dataset.selectedSymbol);
+  }
+
+  function beginRequest(selectedSymbol) {
+    requestGeneration += 1;
+    if (activeRequestController) {
+      activeRequestController.abort();
+    }
+    activeRequestController = typeof AbortController === "function"
+      ? new AbortController()
+      : null;
+    return {
+      selectedSymbol: selectedSymbol,
+      generation: requestGeneration,
+      controller: activeRequestController,
+      pageRoot: root
+    };
+  }
+
+  function isCurrentRequest(request) {
+    return request
+      && request.generation === requestGeneration
+      && request.selectedSymbol === currentSelectedSymbol()
+      && request.pageRoot === root
+      && root.isConnected
+      && document.querySelector("[data-asset-detail-root]") === root
+      && request.controller === activeRequestController;
+  }
+
+  function isAbortError(error) {
+    return error && error.name === "AbortError";
   }
 
   function text(value, fallback) {
@@ -42,6 +78,28 @@
   function setRetryVisible(visible) {
     var retry = document.querySelector("[data-request-retry]");
     if (retry) retry.hidden = !visible;
+  }
+
+  function updateAnalysisDetailLink(asset) {
+    var link = document.querySelector("[data-analysis-detail-link]");
+    if (!link) return;
+    var analysisId = asset && contract.hasText(asset.analysisId)
+      ? String(asset.analysisId).trim()
+      : "";
+    var symbol = normalizeSymbol(asset && (asset.rawSymbol || asset.symbol));
+    if (!analysisId || !symbol) {
+      link.hidden = true;
+      link.removeAttribute("href");
+      return;
+    }
+
+    var query = new URLSearchParams({
+      analysisId: analysisId,
+      selectedSymbol: symbol
+    });
+    if (root.dataset.mobileView === "true") query.set("view", "mobile");
+    link.href = "/dashboard/analysis-detail?" + query.toString();
+    link.hidden = false;
   }
 
   function exactAsset(home, requestedSymbol) {
@@ -83,6 +141,7 @@
       statePill.dataset.tone = state.tone;
       statePill.dataset.state = state.code;
     }
+    updateAnalysisDetailLink(asset);
   }
 
   function rolePanel(role) {
@@ -218,6 +277,7 @@
       statePill.dataset.tone = "neutral";
       statePill.dataset.state = "unknown";
     }
+    updateAnalysisDetailLink(null);
     renderAi(null);
     renderExecution(null);
     setRetryVisible(retryable === true);
@@ -249,14 +309,19 @@
   }
 
   async function loadAssetDetail() {
+    var selectedSymbol = currentSelectedSymbol();
+    var request = beginRequest(selectedSymbol);
     root.setAttribute("aria-busy", "true");
     setRetryVisible(false);
     setPageStatus("正在同步", "loading");
+    updateAnalysisDetailLink(null);
 
-    var selectedSymbol = normalizeSymbol(root.dataset.selectedSymbol);
     if (!/^[A-Z0-9]{2,32}$/.test(selectedSymbol) || selectedSymbol === "DEFAULT_SLOT") {
-      root.setAttribute("aria-busy", "false");
-      failClosed("资产标识不可验证", false);
+      if (isCurrentRequest(request)) {
+        root.setAttribute("aria-busy", "false");
+        activeRequestController = null;
+        failClosed("资产标识不可验证", false);
+      }
       return;
     }
 
@@ -265,16 +330,22 @@
         selectedSymbol: selectedSymbol,
         limit: "12"
       });
-      var response = await fetch("/api/dashboard/home?" + query.toString(), {
+      var requestOptions = {
         method: "GET",
         credentials: "same-origin",
         headers: { Accept: "application/json" }
-      });
+      };
+      if (request.controller) requestOptions.signal = request.controller.signal;
+      var response = await fetch("/api/dashboard/home?" + query.toString(), requestOptions);
+      if (!isCurrentRequest(request)) return;
       if (!response.ok) throw new Error("ASSET_DETAIL_REQUEST_FAILED");
-      var parsed = contract.parseApiEnvelope(await response.json());
+      var payload = await response.json();
+      if (!isCurrentRequest(request)) return;
+      var parsed = contract.parseApiEnvelope(payload);
       if (!parsed.ok) throw new Error("ASSET_DETAIL_RESPONSE_INVALID");
       var asset = exactAsset(parsed.data, selectedSymbol);
       if (!asset) throw new Error("ASSET_DETAIL_NOT_VERIFIED");
+      if (!isCurrentRequest(request)) return;
 
       renderAsset(asset);
       renderAi(parsed.data.aiDecision);
@@ -282,9 +353,13 @@
       setRetryVisible(false);
       setPageStatus("已同步", "ready");
     } catch (error) {
+      if (!isCurrentRequest(request) || isAbortError(error)) return;
       failClosed("数据暂不可用", true);
     } finally {
-      root.setAttribute("aria-busy", "false");
+      if (isCurrentRequest(request)) {
+        root.setAttribute("aria-busy", "false");
+        activeRequestController = null;
+      }
     }
   }
 
