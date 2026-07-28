@@ -84,34 +84,42 @@ The following remain mandatory:
   monitoring history, or settings-save result;
 - no auto-open, auto-close, auto-reverse, auto-reduce, order, or trading action.
 
-## 6. Delivery Gate After FE-04A/B
+## 6. Delivery Gate After FE-04C
 
 This registration is effective project governance on clean, synced `main`.
 FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are effective
 on merged main `aaf905b4f74ecafcf514aa34d7c06361461a0eb4`
-through PR #1146. Overall FE-04 remains `IN_PROGRESS_PARTIAL`; this merged
-slice does not prove FE-04 complete.
+through PR #1146. FE-04C read-only Position Monitoring is effective on merged
+main `cc39f0c6315812b1178427c29b8b422da511ba0d` through PR #1148.
+Overall FE-04 remains `IN_PROGRESS_PARTIAL`; these merged slices do not prove
+FE-04 complete.
 
-The next bounded implementation package is FE-04C Position Monitoring.
-FE-04C remains `NOT_STARTED`. Its first package may implement only:
+The effective FE-04C capability is limited to:
 
-- Position List;
-- Position Monitor Card;
-- exact `positionId`;
-- owner-scoped read-only monitoring;
-- monitor-status display;
-- existing monitor logs.
+- Mobile Position Monitoring;
+- Desktop Position Monitoring;
+- the frozen Position Monitor Card projection;
+- exact string-preserved `positionId`;
+- owner-scoped GET-only position, summary, and monitor-log reads;
+- existing monitor-log display;
+- loading, empty, error, partial, missing, and fail-closed states.
 
-The package must inherit the P3-H3 ownership foundation, use exact
-`positionId`, and provide no symbol or latest-position fallback. Available
-read capabilities are UserPosition list/detail, owner-scoped summary, and
-monitor logs. A unified read DTO, closed-position history, and human-handling
-history remain `PARTIAL` and must stay fail closed.
+The implementation inherits the P3-H3 ownership foundation and uses exact
+`positionId` with no symbol, latest-position, time, or numeric-coercion
+fallback. Monitor-log read failure remains unavailable and must not be
+represented as `WAITING_MONITOR`. A unified read DTO, closed-position history,
+and human-handling history remain `PARTIAL` and stay fail closed.
 
-The package must not add edit, manual close, partial-close UI, replay, trade
-execution, automatic action, or an automatic call to the write-type monitor-run
-endpoint. It must not implement FE-04D/FE-04E/FE-04F, expand APIs, or move
-trading capability.
+FE-04C does not add edit, manual close, partial-close UI, replay, trade
+execution, automatic action, or an automatic call to the write-type
+monitor-run endpoint. It does not expand APIs or move trading capability.
+
+FE-04D AI Analysis is the next separately gated package, but only its
+read-only readiness audit is allowed after this governance alignment is merged
+to clean, synced `main`. The audit must verify the frozen AI Analysis frame,
+existing API/DTO capability, authoritative navigation identity, exactly three
+AI roles, and all fail-closed states. FE-04D implementation remains blocked
+until that audit explicitly passes.
 
 ```text
 FE04_FIGMA_BASELINE: FROZEN
@@ -120,7 +128,10 @@ FE04_FRONTEND_STATUS: IN_PROGRESS_PARTIAL
 FE04A_STATUS: EFFECTIVE_MERGED_MAIN
 FE04B_STATUS: EFFECTIVE_MERGED_MAIN
 FE04_AB_MERGE_COMMIT: aaf905b4f74ecafcf514aa34d7c06361461a0eb4
-FE04C_STATUS: NOT_STARTED
-FE04_IMPLEMENTATION_ALLOWED: FE-04C_FIRST_READONLY_PACKAGE_ONLY
-NEXT_IMPLEMENTATION_PACKAGE: FE-04C_POSITION_MONITORING
+FE04C_STATUS: EFFECTIVE_MERGED_MAIN
+FE04C_MERGE_COMMIT: cc39f0c6315812b1178427c29b8b422da511ba0d
+FE04C_CAPABILITY: READONLY_POSITION_MONITORING_ONLY
+FE04D_STATUS: NOT_STARTED_READINESS_GATE_PENDING
+FE04_IMPLEMENTATION_ALLOWED: NONE_PENDING_FE04D_READINESS_GATE
+NEXT_ALLOWED_ACTION: FE-04D_AI_ANALYSIS_READINESS_GATE_ONLY
 ```

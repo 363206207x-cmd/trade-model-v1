@@ -54,7 +54,7 @@ Current capability binding:
 | Tab | Target responsibility | Current binding | Status |
 |---|---|---|---|
 | 首页 | Dashboard summary and selected-asset context | `/dashboard/mobile` | `READY` |
-| 持仓 | UserPosition list and exact-position monitoring entry | Owner-scoped position reads exist; FE-04 page is not implemented | `PARTIAL` |
+| 持仓 | UserPosition list and exact-position monitoring entry | FE-04C Mobile/Desktop Position Monitoring is effective on merged main with exact `positionId`, owner-scoped GET-only reads, and existing monitor logs | `PARTIAL` |
 | AI分析 | Search asset, create/open analysis, and enter FE-03 | Analysis creation/detail exists; market search landing does not | `PARTIAL` |
 | 消息 | Opportunity and UserPosition-risk events | Reduced in-app/read-only records exist; complete product inbox does not | `PARTIAL` |
 | 我的 | Account/session, watch management, and supported settings | Logout/minimal shell only; watch/settings writes are unavailable | `PARTIAL` |
@@ -292,5 +292,7 @@ Its exact mobile, desktop, and component node identities are registered in
 `docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`.
 
 This merged-main registration does not alter the semantic contract, complete
-FE-04, or make any missing runtime capability available. FE-04 frontend remains
-`NOT_STARTED`.
+FE-04, or make any missing runtime capability available. FE-04 frontend is
+`IN_PROGRESS_PARTIAL`: FE-04A, FE-04B, and the bounded FE-04C read-only
+Position Monitoring package are effective on merged main; later packages
+remain separately gated.
