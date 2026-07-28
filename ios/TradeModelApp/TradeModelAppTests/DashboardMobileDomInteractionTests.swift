@@ -73,17 +73,21 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         XCTAssertEqual(try booleanValue("\(cardSelector).hasAttribute('aria-busy')", in: webView), false)
     }
 
-    func testUnverifiedExecutionPlanClearsPreviouslyVisibleBoundaries() throws {
+    func testUnverifiedExecutionPlanKeepsBackendStateAndClearsPreviouslyVisibleBoundaries() throws {
         let webView = try loadFixture()
 
         try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
         XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
         try run("window.__resolveDashboard(0, 'ETHUSDT', false)", in: webView)
         XCTAssertTrue(waitUntil(
-            "document.querySelector('[data-execution-field=\"statusLabel\"]').textContent === '当前暂无可验证的执行建议'",
+            "document.querySelector('[data-execution-field=\"statusLabel\"]').textContent === 'READY_ETHUSDT'",
             in: webView
         ))
 
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"statusLabel\"]').textContent", in: webView),
+            "READY_ETHUSDT"
+        )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-execution-field=\"direction\"]').textContent", in: webView),
             "--"

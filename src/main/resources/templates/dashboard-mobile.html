@@ -211,7 +211,7 @@
       <div class="semantic-state-line">
         <span>执行建议状态</span>
         <strong data-execution-field="statusLabel"
-                th:text="${planExact ? (home.executionSuggestion.statusLabel != null ? home.executionSuggestion.statusLabel : '执行建议，仅供人工复核') : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? (home.executionSuggestion.statusLabel != null ? home.executionSuggestion.statusLabel : '请选择具体持仓') : '当前暂无可验证的执行建议')}">当前暂无可验证的执行建议</strong>
+                th:text="${home.executionSuggestion.statusLabel != null and home.executionSuggestion.statusLabel != '' ? home.executionSuggestion.statusLabel : (planExact ? '执行建议，仅供人工复核' : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? '请选择具体持仓' : '当前暂无可验证的执行建议'))}">当前暂无可验证的执行建议</strong>
       </div>
       <p class="semantic-explanation" data-execution-field="blockedReason"
          th:text="${home.executionSuggestion.blockedReason != null and home.executionSuggestion.blockedReason != '' ? home.executionSuggestion.blockedReason : (planExact ? '系统建议，仅供人工复核' : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? '请选择具体持仓' : '计划来源不可验证'))}">计划来源不可验证</p>

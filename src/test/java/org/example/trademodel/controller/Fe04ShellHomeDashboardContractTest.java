@@ -1,7 +1,11 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.vo.DashboardHomeVO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
+import org.thymeleaf.templateresolver.StringTemplateResolver;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +18,8 @@ class Fe04ShellHomeDashboardContractTest {
             Path.of("src/main/resources/templates/dashboard-mobile.html");
     private static final Path MOBILE_SCRIPT =
             Path.of("src/main/resources/static/js/dashboard-mobile.js");
+    private static final Path FRONTEND_CONTRACT =
+            Path.of("src/main/resources/static/js/frontend-contract.js");
     private static final Path MOBILE_STYLES =
             Path.of("src/main/resources/static/css/dashboard-mobile.css");
     private static final Path DESKTOP =
@@ -206,6 +212,7 @@ class Fe04ShellHomeDashboardContractTest {
             throws Exception {
         String mobile = Files.readString(MOBILE);
         String script = Files.readString(MOBILE_SCRIPT);
+        String frontendContract = Files.readString(FRONTEND_CONTRACT);
         String execution = slice(
                 mobile,
                 "<section class=\"execution-section\"",
@@ -217,6 +224,7 @@ class Fe04ShellHomeDashboardContractTest {
 
         assertThat(execution)
                 .contains(
+                        "home.executionSuggestion.statusLabel != null and home.executionSuggestion.statusLabel != '' ? home.executionSuggestion.statusLabel",
                         "home.executionSuggestion.blockedReason != null and home.executionSuggestion.blockedReason != '' ? home.executionSuggestion.blockedReason",
                         "planExact and home.executionSuggestion.entryZone != null",
                         "planExact and home.executionSuggestion.stopLoss != null",
@@ -227,6 +235,53 @@ class Fe04ShellHomeDashboardContractTest {
                         "text(safeSuggestion.blockedReason, access.reason)",
                         "setText(\"[data-execution-conflict]\", safeSuggestion.blockedReason, \"--\")",
                         "access.visible && planFields.indexOf(field) >= 0");
+        assertThat(frontendContract)
+                .contains(
+                        "statusLabel: displayText(plan.statusLabel, \"当前暂无可验证的执行建议\")",
+                        "reason: displayText(plan.blockedReason, \"计划来源不可验证\")");
+    }
+
+    @Test
+    void initialMobileRenderKeepsBackendConflictStateAndFailsClosedPlanBoundaries()
+            throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        DashboardHomeVO.ExecutionSuggestionVO suggestion =
+                new DashboardHomeVO.ExecutionSuggestionVO();
+        suggestion.setStatus("CONFLICT_BLOCKED");
+        suggestion.setStatusLabel("冲突阻断");
+        suggestion.setBlockedReason("AI冲突达到阻断阈值");
+        suggestion.setEntryZone("LEAK_ENTRY");
+        suggestion.setStopLoss("LEAK_STOP");
+        suggestion.setTakeProfitRules("LEAK_TAKE_PROFIT");
+        home.setSelectedSymbol("BTCUSDT");
+        home.setExecutionSuggestion(suggestion);
+
+        String execution = slice(
+                Files.readString(MOBILE),
+                "<section class=\"execution-section\"",
+                "</section>") + "</section>";
+        StringTemplateResolver resolver = new StringTemplateResolver();
+        resolver.setCacheable(false);
+        SpringTemplateEngine engine = new SpringTemplateEngine();
+        engine.setTemplateResolver(resolver);
+        Context context = new Context();
+        context.setVariable("home", home);
+
+        String rendered = engine.process(
+                "<html xmlns:th=\"http://www.thymeleaf.org\"><body>"
+                        + execution
+                        + "</body></html>",
+                context);
+
+        assertThat(rendered)
+                .contains(
+                        "data-exact-plan-visible=\"false\"",
+                        "data-execution-field=\"statusLabel\">冲突阻断</strong>",
+                        "data-execution-field=\"blockedReason\">AI冲突达到阻断阈值</p>",
+                        "data-execution-field=\"entryZone\">--</dd>",
+                        "data-execution-field=\"stopLoss\">--</dd>",
+                        "data-execution-field=\"takeProfitRules\">--</dd>")
+                .doesNotContain("LEAK_ENTRY", "LEAK_STOP", "LEAK_TAKE_PROFIT");
     }
 
     @Test

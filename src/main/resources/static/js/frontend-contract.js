@@ -115,8 +115,8 @@
     if (!hasText(plan.sourceExecutionPlanId)) {
       return {
         visible: false,
-        statusLabel: "当前暂无可验证的执行建议",
-        reason: "计划来源不可验证"
+        statusLabel: displayText(plan.statusLabel, "当前暂无可验证的执行建议"),
+        reason: displayText(plan.blockedReason, "计划来源不可验证")
       };
     }
 
