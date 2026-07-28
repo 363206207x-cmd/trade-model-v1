@@ -154,6 +154,82 @@ class Fe04ShellHomeDashboardContractTest {
     }
 
     @Test
+    void desktopAiConsistencyStaysInsideThreeRoleRegionAndUsesConsistencyFieldsOnly()
+            throws Exception {
+        String desktop = Files.readString(DESKTOP);
+        String aiPanel = slice(
+                desktop,
+                "<section class=\"card\" id=\"homeAiPanel\"",
+                "</section>");
+        String consistencyRenderer = slice(
+                desktop,
+                "function renderHomeConsistencyCard(options)",
+                "function renderGptFinalHomeRole");
+        String payloadRenderer = slice(
+                desktop,
+                "function renderHomeAiDecisionFromPayload(aiDecision)",
+                "function renderHomePushInboxFromPayload");
+
+        assertThat(aiPanel)
+                .contains(
+                        "id=\"homeConsistencyContent\"",
+                        "AI 一致性摘要",
+                        "一致性等级",
+                        "冲突等级",
+                        "是否进入冲突阻断",
+                        "一句话摘要",
+                        "GPT_FINAL",
+                        "GEMINI_REVIEW",
+                        "GROK_CHALLENGE")
+                .doesNotContain(
+                        "homeConsistencyPanel",
+                        "consistency-ring",
+                        "一致性评分",
+                        "AI 计划模式");
+        assertThat(consistencyRenderer)
+                .contains("options.level", "options.conflictLevel", "options.confused", "options.summary")
+                .doesNotContain(
+                        "actualConsistencyScore",
+                        "consistencyScore",
+                        "agreementScore",
+                        "finalTendency",
+                        "planMode",
+                        "directionalPushBlocked",
+                        "downgradeReason");
+        assertThat(payloadRenderer)
+                .contains("var c = ai.consistency || {}")
+                .doesNotContain("finalRole", "finalPlanMode", "planMode");
+    }
+
+    @Test
+    void mobileConflictBlockKeepsBackendReasonWhileUnverifiedBoundariesStayHidden()
+            throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String script = Files.readString(MOBILE_SCRIPT);
+        String execution = slice(
+                mobile,
+                "<section class=\"execution-section\"",
+                "</section>");
+        String updater = slice(
+                script,
+                "function updateExecution(suggestion, selectedAsset, selectedCard)",
+                "function updateConsistency(consistency)");
+
+        assertThat(execution)
+                .contains(
+                        "home.executionSuggestion.blockedReason != null and home.executionSuggestion.blockedReason != '' ? home.executionSuggestion.blockedReason",
+                        "planExact and home.executionSuggestion.entryZone != null",
+                        "planExact and home.executionSuggestion.stopLoss != null",
+                        "planExact and home.executionSuggestion.takeProfitRules != null")
+                .doesNotContain("planExact and home.executionSuggestion.blockedReason");
+        assertThat(updater)
+                .contains(
+                        "text(safeSuggestion.blockedReason, access.reason)",
+                        "setText(\"[data-execution-conflict]\", safeSuggestion.blockedReason, \"--\")",
+                        "access.visible && planFields.indexOf(field) >= 0");
+    }
+
+    @Test
     void frozenShellRetainsTouchDynamicTypeAndRootOverflowGuards() throws Exception {
         String css = Files.readString(MOBILE_STYLES);
         String desktop = Files.readString(DESKTOP);

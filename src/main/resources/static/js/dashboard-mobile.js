@@ -149,7 +149,7 @@
         return;
       }
       if (field === "blockedReason") {
-        node.textContent = access.reason;
+        node.textContent = text(safeSuggestion.blockedReason, access.reason);
         return;
       }
       if (field === "worthOpening") {

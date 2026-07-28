@@ -93,6 +93,22 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             "--"
         )
         XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"stopLoss\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"takeProfitRules\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"blockedReason\"]').textContent", in: webView),
+            "RISK_ETHUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-conflict]').textContent", in: webView),
+            "RISK_ETHUSDT"
+        )
+        XCTAssertEqual(
             try stringValue("document.getElementById('execution-advice').dataset.exactPlanVisible", in: webView),
             "false"
         )

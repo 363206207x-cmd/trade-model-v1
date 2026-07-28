@@ -276,25 +276,34 @@ public class DashboardControllerTest {
 
     @Test
     void consistencyCardShowsSemanticLabels() throws Exception {
-        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String card = consistencyCardSection();
 
-        assertThat(html).contains("一致性等级");
-        assertThat(html).contains("一致性评分");
-        assertThat(html).contains("最终倾向");
-        assertThat(html).contains("冲突等级");
-        assertThat(html).contains("AI 计划模式");
-        assertThat(html).contains("是否进入冲突阻断");
-        assertThat(html).contains("降级原因");
-        assertThat(html).contains("一句话摘要");
+        assertThat(card).contains(
+                "一致性等级",
+                "冲突等级",
+                "是否进入冲突阻断",
+                "一句话摘要");
+        assertThat(card).doesNotContain(
+                "一致性评分",
+                "最终倾向",
+                "AI 计划模式",
+                "降级原因");
     }
 
     @Test
     void consistencyCardDoesNotFakeScore() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
+        String renderer = functionBody("renderHomeConsistencyCard");
 
-        assertThat(html).contains("actualConsistencyScore");
-        assertThat(html).contains("<span>--</span>");
-        assertThat(html).contains("consistency.consistencyScore", "consistency.agreementScore");
+        assertThat(renderer).doesNotContain(
+                "actualConsistencyScore",
+                "consistencyScore",
+                "agreementScore",
+                "consistency-ring");
+        assertThat(html).doesNotContain(
+                "function actualConsistencyScore",
+                ".consistency-ring",
+                ".consistency-score-wrap");
         assertThat(html).doesNotContain("100 - Number(c.score)");
         assertThat(html).doesNotContain("100 - conflictScore");
         assertThat(html).doesNotContain("options.level || options.conflictLevel");
@@ -315,11 +324,12 @@ public class DashboardControllerTest {
 
         assertThat(statusFunction.indexOf("aiApplicable === false"))
                 .isLessThan(statusFunction.indexOf("confused === true"));
-        assertThat(payloadRenderer).contains("aiApplicable", "directionalPushBlocked");
+        assertThat(payloadRenderer).contains("aiApplicable", "var c = ai.consistency || {}");
         assertThat(functionBody("renderHomeConsistencyCard"))
                 .contains(
                         "冲突等级", "aiApplicable ? options.conflictLevel : \"不适用\"",
-                        "AI 计划模式", "不适用", "资产方向阻断");
+                        "是否进入冲突阻断", "不适用")
+                .doesNotContain("AI 计划模式", "资产方向阻断", "finalPlanMode");
     }
 
     @Test
@@ -328,10 +338,9 @@ public class DashboardControllerTest {
 
         assertThat(payloadRenderer).contains(
                 "var aiApplicable",
-                "conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : \"不适用\"",
-                "planMode: aiApplicable ? planModeLabel(planMode) : \"不适用\"");
-        assertThat(payloadRenderer).contains(
-                "finalTendency: aiApplicable && finalBias ? marketBiasLabel(finalBias) : \"暂无\"");
+                "conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : \"不适用\"");
+        assertThat(payloadRenderer).doesNotContain(
+                "planMode", "finalPlanMode", "finalTendency", "finalBias");
     }
 
     @Test
@@ -358,9 +367,10 @@ public class DashboardControllerTest {
         assertThat(functionBody("renderAbstainedAiRole"))
                 .contains("运行状态", "复核成功", "角色结论", "证据不足，暂不判断");
         assertThat(card).contains(
-                "var scoreText = score == null ? \"--\"",
                 "aiApplicable ? options.conflictLevel : \"不适用\"",
-                "aiApplicable ? options.planMode : \"不适用\"");
+                "aiApplicable && options.confused ? \"是\" : \"否\"");
+        assertThat(card).doesNotContain(
+                "score", "planMode", "finalPlanMode", "finalTendency");
     }
 
     @Test
@@ -432,7 +442,7 @@ public class DashboardControllerTest {
         assertThat(visibleDom).doesNotContain("pendingCount", "degraded",
                 "latestAnalysisFailureCode", "failureReasonCode");
         assertThat(visibleDom).contains(
-                "待复核机会", "资产方向阻断", "持仓摘要", "持仓数据不足时保持空状态");
+                "待复核机会", "AI 一致性摘要", "持仓摘要", "持仓数据不足时保持空状态");
 
         String localRealRenderer = functionBody("renderLocalRealPipelineStatus");
         assertThat(localRealRenderer).contains("localRealFailureLabel", "latestFailureLabel");
@@ -4015,9 +4025,9 @@ public class DashboardControllerTest {
 
     private String consistencyCardSection() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
-        int startIndex = html.indexOf("id=\"homeConsistencyPanel\"");
+        int startIndex = html.indexOf("<div class=\"home-consistency-summary\"");
         assertThat(startIndex).isGreaterThanOrEqualTo(0);
-        int endIndex = html.indexOf("id=\"watchlistStatusPanel\"", startIndex);
+        int endIndex = html.indexOf("<div class=\"home-ai-summary-cards\"", startIndex);
         assertThat(endIndex).isGreaterThan(startIndex);
         return html.substring(startIndex, endIndex);
     }

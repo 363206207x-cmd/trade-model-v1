@@ -214,7 +214,7 @@
                 th:text="${planExact ? (home.executionSuggestion.statusLabel != null ? home.executionSuggestion.statusLabel : '执行建议，仅供人工复核') : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? (home.executionSuggestion.statusLabel != null ? home.executionSuggestion.statusLabel : '请选择具体持仓') : '当前暂无可验证的执行建议')}">当前暂无可验证的执行建议</strong>
       </div>
       <p class="semantic-explanation" data-execution-field="blockedReason"
-         th:text="${planExact ? '系统建议，仅供人工复核' : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? (home.executionSuggestion.blockedReason != null ? home.executionSuggestion.blockedReason : '请选择具体持仓') : '计划来源不可验证')}">计划来源不可验证</p>
+         th:text="${home.executionSuggestion.blockedReason != null and home.executionSuggestion.blockedReason != '' ? home.executionSuggestion.blockedReason : (planExact ? '系统建议，仅供人工复核' : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? '请选择具体持仓' : '计划来源不可验证'))}">计划来源不可验证</p>
       <dl class="definition-list execution-grid">
         <div><dt>方向</dt><dd data-execution-field="direction"
                               th:text="${planExact and home.executionSuggestion.direction != null ? home.executionSuggestion.direction : '--'}">--</dd></div>
@@ -239,7 +239,7 @@
       <div class="conflict-block-summary">
         <span>冲突阻断</span>
         <strong data-execution-conflict
-                th:text="${planExact and home.executionSuggestion.blockedReason != null ? home.executionSuggestion.blockedReason : '--'}">--</strong>
+                th:text="${home.executionSuggestion.blockedReason != null and home.executionSuggestion.blockedReason != '' ? home.executionSuggestion.blockedReason : '--'}">--</strong>
       </div>
       <p class="safety-copy">仅供人工复核，不是交易指令，不会自动下单或创建持仓。</p>
     </section>

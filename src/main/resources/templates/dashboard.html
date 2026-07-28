@@ -823,7 +823,7 @@
             align-items: start;
         }
         .ai-decision-row {
-            grid-template-columns: minmax(0, 3fr) minmax(230px, 1fr);
+            grid-template-columns: minmax(0, 1fr);
             align-items: start;
         }
         .compact-list {
@@ -1178,6 +1178,16 @@
             line-height: 1.42;
             white-space: pre-line;
         }
+        .home-consistency-summary {
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--bg-elevated);
+        }
+        .home-consistency-summary > .ai-card-title {
+            margin-bottom: 7px;
+        }
         .consistency-panel {
             display: grid;
             gap: 9px;
@@ -1185,7 +1195,7 @@
         .consistency-topline {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
             gap: 10px;
             min-width: 0;
         }
@@ -1201,48 +1211,6 @@
             color: var(--brand-accent);
             font-size: 0.75rem;
             font-weight: 800;
-            white-space: nowrap;
-        }
-        .consistency-score-wrap {
-            display: grid;
-            justify-items: center;
-            gap: 3px;
-            flex: 0 0 auto;
-        }
-        .consistency-ring {
-            width: 70px;
-            height: 70px;
-            margin: 0;
-            border-radius: 50%;
-            display: grid;
-            place-items: center;
-            background: conic-gradient(var(--brand-accent) 0 var(--consistency-score, 68%), #9b5cf6 var(--consistency-score, 68%) 82%, rgba(148, 163, 184, 0.22) 82% 100%);
-            position: relative;
-        }
-        .consistency-ring::after {
-            content: "";
-            position: absolute;
-            inset: 8px;
-            border-radius: 50%;
-            background: var(--bg-surface);
-        }
-        .consistency-ring span {
-            position: relative;
-            z-index: 1;
-            font-weight: 800;
-            color: var(--text-primary);
-        }
-        .consistency-ring.is-empty {
-            opacity: 0.58;
-            background: conic-gradient(rgba(148, 163, 184, 0.22) 0 100%);
-        }
-        .consistency-ring.is-empty span {
-            color: var(--text-secondary);
-        }
-        .consistency-ring-label {
-            color: var(--text-secondary);
-            font-size: 0.64rem;
-            font-weight: 700;
             white-space: nowrap;
         }
         .consistency-list {
@@ -3200,35 +3168,27 @@
                         <p class="ai-boundary-line"></p>
                     </div>
                 </div>
+                <div class="home-consistency-summary" aria-label="AI 一致性摘要">
+                    <p class="ai-card-title">AI 一致性摘要</p>
+                    <div id="homeConsistencyContent" class="consistency-panel">
+                        <div class="consistency-topline">
+                            <span class="consistency-status-pill">等待同步</span>
+                        </div>
+                        <div class="consistency-list">
+                            <div class="consistency-row"><span>一致性等级</span><span class="value">等待同步</span></div>
+                            <div class="consistency-row"><span>冲突等级</span><span class="value">等待同步</span></div>
+                            <div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">否</span></div>
+                        </div>
+                        <div class="consistency-summary">
+                            <span>一句话摘要</span>
+                            <p>等待 AI 三角色结果同步后生成一致性结论</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="home-ai-summary-cards" id="homeAiSummaryCards" aria-label="AI 三角色摘要">
                     <article class="home-ai-summary-card" data-home-ai-role="GPT_FINAL"><strong>GPT_FINAL</strong><span>最终裁决官</span><p>当前观点待同步</p></article>
                     <article class="home-ai-summary-card" data-home-ai-role="GEMINI_REVIEW"><strong>GEMINI_REVIEW</strong><span>冲突复核官</span><p>当前复核待同步</p></article>
                     <article class="home-ai-summary-card" data-home-ai-role="GROK_CHALLENGE"><strong>GROK_CHALLENGE</strong><span>反方挑战官</span><p>当前挑战待同步</p></article>
-                </div>
-            </section>
-            <section class="card" id="homeConsistencyPanel" aria-label="AI 一致性摘要">
-                <p class="ai-card-title" style="margin-bottom:9px;">AI 一致性摘要</p>
-                <div id="homeConsistencyContent" class="consistency-panel">
-                    <div class="consistency-topline">
-                        <span class="consistency-status-pill">等待同步</span>
-                        <div class="consistency-score-wrap">
-                            <div class="consistency-ring is-empty" style="--consistency-score:0%"><span>--</span></div>
-                            <span class="consistency-ring-label">一致性评分</span>
-                        </div>
-                    </div>
-                    <div class="consistency-list">
-                        <div class="consistency-row"><span>一致性等级</span><span class="value">等待同步</span></div>
-                        <div class="consistency-row"><span>最终倾向</span><span class="value">暂无</span></div>
-                        <div class="consistency-row"><span>冲突等级</span><span class="value">等待同步</span></div>
-                        <div class="consistency-row"><span>AI 计划模式</span><span class="value">等待同步</span></div>
-                        <div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">否</span></div>
-                        <div class="consistency-row"><span>资产方向阻断</span><span class="value">否</span></div>
-                        <div class="consistency-row"><span>降级原因</span><span class="value">暂无降级原因</span></div>
-                    </div>
-                    <div class="consistency-summary">
-                        <span>一句话摘要</span>
-                        <p>等待 AI 三角色结果同步后生成一致性结论</p>
-                    </div>
                 </div>
             </section>
         </div>
@@ -6144,20 +6104,6 @@
             + '</span></div>';
     }
 
-    function actualConsistencyScore(consistency) {
-        consistency = consistency || {};
-        var raw = firstNonEmpty(
-            consistency.consistencyScore,
-            consistency.agreementScore,
-            consistency.consistency_score,
-            consistency.agreement_score
-        );
-        if (raw == null || String(raw).trim() === "") return null;
-        var score = Number(raw);
-        if (!isFinite(score)) return null;
-        return Math.max(0, Math.min(100, Math.round(score)));
-    }
-
     function consistencyStatusText(level, confused, aiApplicable) {
         var raw = String(level || "").trim();
         if (aiApplicable === false || raw === "不适用") return "不适用";
@@ -6179,25 +6125,16 @@
 
     function renderHomeConsistencyCard(options) {
         options = options || {};
-        var consistency = options.consistency || {};
         var aiApplicable = options.aiApplicable !== false;
-        var score = actualConsistencyScore(consistency);
         var status = consistencyStatusText(options.level, options.confused, aiApplicable);
-        var ringClass = score == null ? ' is-empty' : '';
-        var scoreText = score == null ? "--" : String(score);
         var summary = aiRoleFallbackValue(options.summary, "等待 AI 三角色结果同步后生成一致性结论");
         return '<div class="consistency-topline">'
             + '<span class="consistency-status-pill">' + escapeHtml(status) + '</span>'
-            + '<div class="consistency-score-wrap"><div class="consistency-ring' + ringClass + '" style="--consistency-score:' + (score != null ? score : 0) + '%"><span>' + escapeHtml(scoreText) + '</span></div><span class="consistency-ring-label">一致性评分</span></div>'
             + '</div>'
             + '<div class="consistency-list">'
             + consistencyRow("一致性等级", status, "等待同步")
-            + consistencyRow("最终倾向", options.finalTendency, "暂无")
             + consistencyRow("冲突等级", aiApplicable ? options.conflictLevel : "不适用", aiApplicable ? "等待同步" : "不适用")
-            + consistencyRow("AI 计划模式", aiApplicable ? options.planMode : "不适用", aiApplicable ? "等待同步" : "不适用")
             + consistencyRow("是否进入冲突阻断", aiApplicable && options.confused ? "是" : "否", "否")
-            + consistencyRow("资产方向阻断", options.directionalPushBlocked ? "是" : "否", "否")
-            + consistencyRow("降级原因", options.downgradeReason, "暂无降级原因")
             + '</div>'
             + '<div class="consistency-summary"><span>一句话摘要</span><p>' + escapeHtml(summary) + '</p></div>';
     }
@@ -6714,20 +6651,12 @@
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
             var c = ai.consistency || {};
-            var finalRole = tabList.find(function (t) { return t.role === "GPT_FINAL"; }) || {};
-            var finalBias = finalRole.finalMarketBias || finalRole.direction || "";
-            var planMode = finalRole.finalPlanMode || "";
             var aiApplicable = c.aiApplicable !== false && c.ai_applicable !== false;
             consistency.innerHTML = renderHomeConsistencyCard({
-                consistency: c,
                 level: c.consistencyLevel || c.consistency_level || "",
-                finalTendency: aiApplicable && finalBias ? marketBiasLabel(finalBias) : "暂无",
                 conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : "不适用",
-                planMode: aiApplicable ? planModeLabel(planMode) : "不适用",
                 aiApplicable: aiApplicable,
                 confused: !!c.confused,
-                directionalPushBlocked: !!(c.directionalPushBlocked || c.directional_push_blocked),
-                downgradeReason: c.downgradeReason || c.downgrade_reason || finalRole.downgradeReason || c.blockReason || "",
                 summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
             });
         }
