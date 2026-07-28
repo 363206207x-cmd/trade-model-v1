@@ -285,3 +285,12 @@ FE-04 implementation remains a separate task and must continue to obey:
 - no fabricated evidence, scores, timeframe detail, search result, watch state,
   message delivery, or settings-save success.
 
+## 11. Registered Figma Baseline
+
+The approved FE-04 Figma baseline is frozen in `Trade Model Design System`.
+Its exact mobile, desktop, and component node identities are registered in
+`docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`.
+
+This merged-main registration does not alter the semantic contract, complete
+FE-04, or make any missing runtime capability available. FE-04 frontend remains
+`NOT_STARTED`.
