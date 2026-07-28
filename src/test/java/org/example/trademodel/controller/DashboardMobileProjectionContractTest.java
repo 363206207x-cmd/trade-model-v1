@@ -75,7 +75,8 @@ class DashboardMobileProjectionContractTest {
                 .doesNotContain("完整持仓页待实现")
                 .doesNotContain("route-unresolved")
                 .doesNotContain("href=\"/review/dashboard\"")
-                .doesNotContain("/positions")
+                .contains("href=\"/dashboard/mobile/positions\"")
+                .doesNotContain("/api/user-positions")
                 .doesNotContain("/api/order")
                 .doesNotContain("/api/trade");
     }
@@ -135,10 +136,10 @@ class DashboardMobileProjectionContractTest {
         assertThat(html.indexOf("mobile-consistency-title")).isGreaterThan(html.indexOf("mobile-ai-title"));
 
         String bottomNav = html.substring(html.indexOf("<nav class=\"bottom-nav\""));
-        assertThat(count(bottomNav, "<button")).isEqualTo(5);
-        assertThat(count(bottomNav, "<a ")).isEqualTo(0);
-        assertThat(bottomNav.indexOf(">首页</button>")).isLessThan(bottomNav.indexOf(">持仓</button>"));
-        assertThat(bottomNav.indexOf(">持仓</button>")).isLessThan(bottomNav.indexOf(">AI分析</button>"));
+        assertThat(count(bottomNav, "<button")).isEqualTo(4);
+        assertThat(count(bottomNav, "<a ")).isEqualTo(1);
+        assertThat(bottomNav.indexOf(">首页</button>")).isLessThan(bottomNav.indexOf(">持仓</a>"));
+        assertThat(bottomNav.indexOf(">持仓</a>")).isLessThan(bottomNav.indexOf(">AI分析</button>"));
         assertThat(bottomNav.indexOf(">AI分析</button>")).isLessThan(bottomNav.indexOf(">消息</button>"));
         assertThat(bottomNav.indexOf(">消息</button>")).isLessThan(bottomNav.indexOf(">我的</button>"));
         assertThat(bottomNav)

@@ -339,7 +339,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
         XCTAssertEqual(
             try numberValue("document.querySelectorAll('.bottom-nav [data-unavailable-nav][aria-disabled=\"true\"]').length", in: webView),
-            4
+            3
         )
         XCTAssertEqual(try numberValue("document.querySelectorAll('.status-cell').length", in: webView), 8)
         XCTAssertEqual(try numberValue("document.querySelectorAll('[data-ai-role-summary]').length", in: webView), 3)
@@ -364,7 +364,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
-    func testHeaderSearchAndSectionNavigationStayInsideExistingMobileProjection() throws {
+    func testHeaderSearchAndPositionNavigationStayInsideExistingMobileProjection() throws {
         let webView = try loadFixture()
 
         try run("document.querySelector('[data-header-search]').click()", in: webView)
@@ -378,10 +378,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             "page"
         )
 
-        try run("document.querySelector('[data-position-nav]').click()", in: webView)
         XCTAssertEqual(
-            try stringValue("document.querySelector('[data-nav-availability-status]').textContent", in: webView),
-            "持仓暂未开放"
+            try stringValue("document.querySelector('[data-position-nav]').getAttribute('href')", in: webView),
+            "/dashboard/mobile/positions"
         )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-home-nav]').getAttribute('aria-current')", in: webView),
@@ -716,6 +715,392 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 """, in: webView),
             0
         )
+    }
+
+    func testPositionMonitoringRequiresExplicitSelectionBeforeExactReads() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[0].url", in: webView),
+            "/api/dashboard/home?limit=20"
+        )
+        try run("window.__resolvePositionHome(0)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-page-status]').textContent === '等待选择'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(try numberValue("window.__positionRequests.length", in: webView), 1)
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selection-state] strong').textContent", in: webView),
+            "请选择具体持仓"
+        )
+        XCTAssertTrue(try booleanValue("document.querySelector('[data-selected-position]').hidden", in: webView))
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('[data-position-list] [data-position-id]').length", in: webView),
+            2
+        )
+    }
+
+    func testPositionMonitoringBindsDetailAndLogsToTheSameExactPositionId() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[0].url", in: webView),
+            "/api/dashboard/home?limit=20&positionId=42"
+        )
+        try run("window.__resolvePositionHome(0)", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[1].url", in: webView),
+            "/api/user-positions/42"
+        )
+
+        try run("window.__resolvePositionDetail(1, '42', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[2].url", in: webView),
+            "/api/review/positions/42/monitor-logs?limit=20"
+        )
+        try run("window.__resolvePositionLogs(2, '42')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-monitor-log-count]').textContent === '1 条'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selected-position-id]').textContent", in: webView),
+            "positionId · 42"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-field=\"symbol\"]').textContent", in: webView),
+            "BTCUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-field=\"entryPrice\"]').textContent", in: webView),
+            "66000"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-monitor-field=\"monitorStatus\"]').textContent", in: webView),
+            "LOGIC_VALID"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-monitor-log-list] strong').textContent", in: webView),
+            "LOGIC_VALID"
+        )
+        XCTAssertTrue(try booleanValue(
+            "window.__positionRequests.every(request => request.options.method === 'GET')",
+            in: webView
+        ))
+    }
+
+    func testPositionMonitoringRejectsCrossPositionLogsWithoutRenderingThem() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__resolvePositionHome(0)", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolvePositionDetail(1, '42', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        try run("window.__resolvePositionLogs(2, '99')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-monitor-log-error]').hidden === false",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(
+            try numberValue("document.querySelector('[data-monitor-log-list]').children.length", in: webView),
+            0
+        )
+        XCTAssertFalse(try booleanValue("document.body.textContent.includes('LOG_99')", in: webView))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-page-status]').textContent", in: webView),
+            "部分数据可用"
+        )
+    }
+
+    func testPositionMonitoringRejectsMismatchedPositionDetailBeforeReadingLogs() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__resolvePositionHome(0)", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolvePositionDetail(1, '43', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-page-state-title]').textContent === '持仓读取失败'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(try numberValue("window.__positionRequests.length", in: webView), 2)
+        XCTAssertTrue(try booleanValue("document.querySelector('[data-selected-position]').hidden", in: webView))
+        XCTAssertTrue(try booleanValue("document.querySelector('[data-position-content]').hidden", in: webView))
+    }
+
+    func testPositionMonitoringLoadFailureRetriesTheSameIdentityAndRemainsAccessible() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__rejectPositionRequest(0)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-position-retry]').hidden === false",
+            in: webView,
+            timeout: 2
+        ))
+        try run("document.querySelector('[data-position-retry]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[1].url", in: webView),
+            "/api/dashboard/home?limit=20&positionId=42"
+        )
+        XCTAssertFalse(try booleanValue("document.documentElement.scrollWidth > window.innerWidth", in: webView))
+        XCTAssertFalse(try booleanValue("document.body.scrollWidth > window.innerWidth", in: webView))
+        XCTAssertEqual(
+            try numberValue("""
+                Array.from(document.querySelectorAll('button,a[href]'))
+                  .filter(node => {
+                    const rect = node.getBoundingClientRect();
+                    const style = getComputedStyle(node);
+                    return rect.width > 0 && rect.height > 0
+                      && style.display !== 'none' && style.visibility !== 'hidden'
+                      && rect.height < 44;
+                  }).length
+                """, in: webView),
+            0
+        )
+    }
+
+    func testPositionMonitoringDesktopProjectionKeepsTheSameReadonlyContract() throws {
+        let webView = try loadPositionMonitoringFixture(
+            positionId: "42",
+            width: 1440,
+            height: 900
+        )
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__resolvePositionHome(0)", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolvePositionDetail(1, '42', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        try run("window.__resolvePositionLogs(2, '42')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-monitor-log-count]').textContent === '1 条'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(
+            try stringValue("getComputedStyle(document.querySelector('.desktop-sidebar')).display", in: webView),
+            "flex"
+        )
+        XCTAssertEqual(
+            try stringValue("getComputedStyle(document.querySelector('.mobile-navigation')).display", in: webView),
+            "none"
+        )
+        XCTAssertFalse(try booleanValue(
+            "document.querySelector('[data-selected-position]').hidden",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue("getComputedStyle(document.querySelector('.monitor-layout')).display", in: webView),
+            "grid"
+        )
+        let monitorColumns = try stringValue(
+            "getComputedStyle(document.querySelector('.monitor-layout')).gridTemplateColumns",
+            in: webView
+        )
+        XCTAssertTrue(monitorColumns.contains("800px"), monitorColumns)
+        XCTAssertTrue(monitorColumns.contains("280px"), monitorColumns)
+        XCTAssertEqual(
+            try stringValue("document.querySelector('.desktop-navigation .active').getAttribute('href')", in: webView),
+            "/dashboard/positions"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-list] [data-position-id=\"42\"]').getAttribute('href')", in: webView),
+            "/dashboard/positions?positionId=42"
+        )
+        XCTAssertFalse(try booleanValue("document.documentElement.scrollWidth > window.innerWidth", in: webView))
+    }
+
+    private func loadPositionMonitoringFixture(
+        positionId: String,
+        width: CGFloat = 430,
+        height: CGFloat = 932
+    ) throws -> WKWebView {
+        let loaded = expectation(description: "position monitoring fixture loaded")
+        let delegate = NavigationDelegate { loaded.fulfill() }
+        navigationDelegate = delegate
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        webView.navigationDelegate = delegate
+        webView.loadHTMLString(
+            try positionMonitoringFixtureHTML(positionId: positionId, mobileView: width < 760),
+            baseURL: URL(string: "https://app.example.test/dashboard/mobile/positions")
+        )
+        wait(for: [loaded], timeout: 5)
+        XCTAssertTrue(waitUntil("document.readyState === 'complete'", in: webView))
+        return webView
+    }
+
+    private func positionMonitoringFixtureHTML(positionId: String, mobileView: Bool) throws -> String {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let templateURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/templates/position-monitoring.html")
+        let styleURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/css/position-monitoring.css")
+        let contractURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/js/frontend-contract.js")
+        let scriptURL = repositoryRoot
+            .appendingPathComponent("src/main/resources/static/js/position-monitoring.js")
+        guard FileManager.default.fileExists(atPath: templateURL.path),
+              FileManager.default.fileExists(atPath: styleURL.path),
+              FileManager.default.fileExists(atPath: contractURL.path),
+              FileManager.default.fileExists(atPath: scriptURL.path) else {
+            throw FixtureError.missingProductionResource
+        }
+
+        var html = try String(contentsOf: templateURL)
+        let styles = try String(contentsOf: styleURL)
+        let contractScript = try String(contentsOf: contractURL)
+        let positionScript = try String(contentsOf: scriptURL)
+        let requestProbe = """
+        <script>
+          window.__positionRequests = [];
+          window.fetch = function(url, options) {
+            return new Promise(function(resolve, reject) {
+              var request = {
+                url: String(url),
+                options: options || {},
+                resolve: resolve,
+                reject: reject,
+                aborted: false
+              };
+              if (request.options.signal) {
+                request.options.signal.addEventListener('abort', function() {
+                  request.aborted = true;
+                  reject(new DOMException('Aborted', 'AbortError'));
+                }, { once: true });
+              }
+              window.__positionRequests.push(request);
+            });
+          };
+          window.__resolvePositionHome = function(index) {
+            window.__positionRequests[index].resolve({
+              ok: true,
+              status: 200,
+              json: function() {
+                return Promise.resolve({
+                  code: 200,
+                  data: {
+                    positions: [
+                      {
+                        positionId: 42,
+                        symbol: 'BTCUSDT',
+                        direction: 'LONG',
+                        directionLabel: '多',
+                        positionStatus: 'OPEN',
+                        entryLogicStatus: 'LOGIC_VALID',
+                        entryLogicStatusLabel: '逻辑仍成立',
+                        directionSupportStatusLabel: '仍支持原方向',
+                        reversalStatusLabel: '未反转',
+                        riskLevelLabel: '中',
+                        monitorConclusion: '当前逻辑仍成立',
+                        suggestedManualActionText: '继续人工监控',
+                        lastMonitorAt: '2026-07-28T10:00:00'
+                      },
+                      {
+                        positionId: 43,
+                        symbol: 'BTCUSDT',
+                        direction: 'SHORT',
+                        directionLabel: '空',
+                        positionStatus: 'PARTIALLY_CLOSED',
+                        entryLogicStatus: 'HIGH_RISK',
+                        lastMonitorAt: '2026-07-28T10:05:00'
+                      }
+                    ]
+                  }
+                });
+              }
+            });
+          };
+          window.__resolvePositionDetail = function(index, id, symbol) {
+            window.__positionRequests[index].resolve({
+              ok: true,
+              status: 200,
+              json: function() {
+                return Promise.resolve({
+                  code: 200,
+                  data: {
+                    id: Number(id),
+                    assetSymbol: symbol,
+                    side: 'LONG',
+                    status: 'OPEN',
+                    entryPrice: 66000,
+                    quantity: 0.25,
+                    leverage: 2,
+                    stopLoss: 64000,
+                    takeProfit: 70000,
+                    openedAt: '2026-07-28T09:00:00'
+                  }
+                });
+              }
+            });
+          };
+          window.__resolvePositionLogs = function(index, id) {
+            window.__positionRequests[index].resolve({
+              ok: true,
+              status: 200,
+              json: function() {
+                return Promise.resolve({
+                  code: 200,
+                  data: [{
+                    positionId: Number(id),
+                    logicStatus: 'LOGIC_VALID',
+                    reason: 'LOG_' + id,
+                    riskLevel: 'MEDIUM',
+                    suggestedAction: 'HOLD_REVIEW',
+                    sourceStatusLabel: '来源已验证',
+                    createdAt: '2026-07-28T10:00:00'
+                  }]
+                });
+              }
+            });
+          };
+          window.__rejectPositionRequest = function(index) {
+            window.__positionRequests[index].reject(new Error('POSITION_FAILURE'));
+          };
+          var positionRoot = document.querySelector('[data-position-monitor-root]');
+          positionRoot.dataset.requestedPositionId = '\(positionId)';
+          positionRoot.dataset.invalidPositionId = 'false';
+          positionRoot.dataset.mobileView = '\(mobileView)';
+        </script>
+        """
+        html = html.replacingOccurrences(
+            of: "<link rel=\"stylesheet\" th:href=\"@{/css/position-monitoring.css}\" href=\"/css/position-monitoring.css\">",
+            with: "<style>\(styles)</style>"
+        )
+        html = html.replacingOccurrences(
+            of: "<script th:src=\"@{/js/frontend-contract.js}\" src=\"/js/frontend-contract.js\" defer></script>",
+            with: ""
+        )
+        html = html.replacingOccurrences(
+            of: "<script th:src=\"@{/js/position-monitoring.js}\" src=\"/js/position-monitoring.js\" defer></script>",
+            with: ""
+        )
+        html = html.replacingOccurrences(
+            of: "</body>",
+            with: "<script>\(contractScript)</script>\(requestProbe)<script>\(positionScript)</script></body>"
+        )
+        return html
     }
 
     private func loadAssetDetailFixture(
@@ -1257,7 +1642,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
           </main>
           <nav class="bottom-nav" data-mobile-five-tab-navigation>
             <button type="button" data-home-nav aria-current="page">首页</button>
-            <button type="button" data-position-nav data-unavailable-nav aria-disabled="true">持仓</button>
+            <a href="/dashboard/mobile/positions" data-position-nav>持仓</a>
             <button type="button" data-ai-nav data-unavailable-nav aria-disabled="true">AI分析</button>
             <button type="button" data-message-nav data-unavailable-nav aria-disabled="true">消息</button>
             <button type="button" data-profile-nav data-unavailable-nav aria-disabled="true">我的</button>
