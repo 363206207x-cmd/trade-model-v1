@@ -467,6 +467,120 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
+    func testAiAnalysisUnavailableRolesNeverExposeConclusionFields() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        try run("window.__resolveDashboard(0, 'ETHUSDT', true, true, false)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-ai-analysis-root]').dataset.analysisState === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+
+        try run("document.querySelector('[data-ai-nav]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-ai-analysis-role-summary]')).map(node => node.textContent).join('|')",
+                in: webView
+            ),
+            "STATUS_GPT_ETHUSDT|STATUS_GEMINI_ETHUSDT|STATUS_GROK_ETHUSDT"
+        )
+        XCTAssertFalse(try booleanValue(
+            "document.querySelector('[data-mobile-ai-view]').textContent.includes('STALE_')",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-direction]').textContent",
+                in: webView
+            ),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-confidence]').textContent",
+                in: webView
+            ),
+            "--"
+        )
+    }
+
+    func testAiAnalysisFiveFailClosedStatesStayDistinct() throws {
+        let webView = try loadFixture()
+
+        XCTAssertEqual(
+            try stringValue(
+                "['loading','empty','error','partial','missing'].map(state => "
+                    + "TradeModelFrontendContract.aiAnalysisStateView(state).statusLabel).join('|')",
+                in: webView
+            ),
+            "正在同步|暂无可分析资产|当前不可查看|部分数据待同步|分析身份待同步"
+        )
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        try run("document.querySelector('[data-ai-nav]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-root]').dataset.analysisState",
+                in: webView
+            ),
+            "loading"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "AI 角色结果正在同步"
+        )
+
+        try run("window.__rejectDashboard(0)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-ai-analysis-root]').dataset.analysisState === 'error'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "AI 角色数据加载失败，当前不可查看"
+        )
+
+        try run("document.querySelector('[data-home-nav]').click()", in: webView)
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').click()", in: webView)
+        try run("window.__resolveDashboard(1, 'SOLUSDT', true, false)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-ai-analysis-root]').dataset.analysisState === 'missing'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "缺少权威 analysisId，当前不可查看"
+        )
+
+        try run("document.querySelector('[data-symbol=\"BTCUSDT\"]').click()", in: webView)
+        try run("window.__resolveDashboard(2, 'BTCUSDT', true, true, true)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-ai-analysis-root]').dataset.analysisState === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "GPT_BTCUSDT"
+        )
+    }
+
     func testOnlyAssetPagerCanOverflowHorizontallyAndAllVisibleNavigationTargetsFit() throws {
         let webView = try loadFixture(width: 440, height: 852)
 
@@ -1695,8 +1809,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 window.__pendingRequests.push(request);
               });
             };
-            window.__resolveDashboard = function(index, symbol, verified, analysisAvailable) {
+            window.__resolveDashboard = function(index, symbol, verified, analysisAvailable, roleAvailable) {
               var request = window.__pendingRequests[index];
+              var resultAvailable = roleAvailable !== false;
               var data = {
                 selectedSymbol: symbol,
                 assets: [{
@@ -1729,15 +1844,43 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                     aiApplicable: true
                   },
                   tabs: [
-                    { role: 'GPT_FINAL', resultAvailable: true, finalConclusion: 'GPT_' + symbol },
-                    { role: 'GEMINI_REVIEW', resultAvailable: true, reviewConclusion: 'GEMINI_' + symbol },
-                    { role: 'GROK_CHALLENGE', resultAvailable: true, challengeConclusion: 'GROK_' + symbol }
+                    {
+                      role: 'GPT_FINAL',
+                      resultAvailable: resultAvailable,
+                      runStatusLabel: resultAvailable ? '可用' : '未调用',
+                      statusMessage: 'STATUS_GPT_' + symbol,
+                      finalConclusion: resultAvailable ? 'GPT_' + symbol : 'STALE_GPT_' + symbol,
+                      finalMarketBias: resultAvailable ? 'DIR_' + symbol : 'STALE_DIR_' + symbol,
+                      finalConfidence: resultAvailable ? 'CONF_' + symbol : 'STALE_CONF_' + symbol
+                    },
+                    {
+                      role: 'GEMINI_REVIEW',
+                      resultAvailable: resultAvailable,
+                      runStatusLabel: resultAvailable ? '可用' : '未调用',
+                      statusMessage: 'STATUS_GEMINI_' + symbol,
+                      reviewConclusion: resultAvailable ? 'GEMINI_' + symbol : 'STALE_GEMINI_' + symbol
+                    },
+                    {
+                      role: 'GROK_CHALLENGE',
+                      resultAvailable: resultAvailable,
+                      runStatusLabel: resultAvailable ? '可用' : '未调用',
+                      statusMessage: 'STATUS_GROK_' + symbol,
+                      challengeConclusion: resultAvailable ? 'GROK_' + symbol : 'STALE_GROK_' + symbol
+                    }
                   ]
                 }
               };
               request.resolve({
                 ok: true,
                 json: function() { return Promise.resolve({ code: 200, data: data }); }
+              });
+            };
+            window.__rejectDashboard = function(index) {
+              window.__pendingRequests[index].resolve({
+                ok: false,
+                json: function() {
+                  return Promise.resolve({ code: 500, msg: 'LOAD_FAILED' });
+                }
               });
             };
           </script>

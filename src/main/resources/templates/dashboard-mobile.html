@@ -310,14 +310,14 @@
       <div class="ai-role-summary-list" data-ai-role-root aria-label="AI 三角色摘要">
         <article class="ai-role-summary-card" th:each="tab : ${home.aiDecision.tabs}"
                  th:if="${tab.role == 'GPT_FINAL' or tab.role == 'GEMINI_REVIEW' or tab.role == 'GROK_CHALLENGE'}"
-                 th:attr="data-ai-role-summary=${tab.role}">
+                 th:attr="data-ai-role-summary=${tab.role},data-result-available=${tab.resultAvailable == true}">
           <div class="role-heading">
             <div><span th:text="${tab.role}">AI_ROLE</span><h3 th:text="${tab.roleLabel != null ? tab.roleLabel : tab.role}">AI 角色</h3></div>
             <strong th:text="${tab.runStatusLabel != null ? tab.runStatusLabel : '待同步'}">待同步</strong>
           </div>
           <p class="role-status"
-             th:text="${tab.role == 'GPT_FINAL' ? (tab.finalConclusion != null ? tab.finalConclusion : (tab.decisionSummary != null ? tab.decisionSummary : '当前观点待同步')) : (tab.role == 'GEMINI_REVIEW' ? (tab.reviewConclusion != null ? tab.reviewConclusion : (tab.reviewVerdict != null ? tab.reviewVerdict : '当前复核待同步')) : (tab.challengeConclusion != null ? tab.challengeConclusion : (tab.challengeThesis != null ? tab.challengeThesis : '当前挑战待同步')))}">当前角色观点待同步</p>
-          <dl class="role-summary-metrics" th:if="${tab.role == 'GPT_FINAL'}">
+             th:text="${tab.resultAvailable == true ? (tab.role == 'GPT_FINAL' ? (tab.finalConclusion != null ? tab.finalConclusion : (tab.decisionSummary != null ? tab.decisionSummary : (tab.statusMessage != null ? tab.statusMessage : '当前观点待同步'))) : (tab.role == 'GEMINI_REVIEW' ? (tab.reviewConclusion != null ? tab.reviewConclusion : (tab.reviewVerdict != null ? tab.reviewVerdict : (tab.statusMessage != null ? tab.statusMessage : '当前复核待同步'))) : (tab.challengeConclusion != null ? tab.challengeConclusion : (tab.challengeThesis != null ? tab.challengeThesis : (tab.statusMessage != null ? tab.statusMessage : '当前挑战待同步'))))) : (tab.statusMessage != null ? tab.statusMessage : '当前角色观点不可用')}">当前角色观点待同步</p>
+          <dl class="role-summary-metrics" th:if="${tab.role == 'GPT_FINAL' and tab.resultAvailable == true}">
             <div><dt>方向</dt><dd th:text="${tab.finalMarketBias != null ? tab.finalMarketBias : '--'}">--</dd></div>
             <div><dt>置信度</dt><dd th:text="${tab.finalConfidence != null ? tab.finalConfidence : '--'}">--</dd></div>
           </dl>

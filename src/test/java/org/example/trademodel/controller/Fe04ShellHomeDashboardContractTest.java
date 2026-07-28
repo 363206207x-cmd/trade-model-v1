@@ -219,7 +219,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains(
                         "card.dataset.analysisId",
                         "renderAiAnalysis(safeAi, selectedAssetCard())",
-                        "frontendContract.normalizeAiTabs(identityReady ? tabs : [])",
+                        "frontendContract.normalizeAiTabs(canReadRoles ? tabs : [])",
                         "/dashboard/analysis-detail?analysisId=",
                         "frontendContract.readUrlParam(\"view\") === \"ai\"")
                 .doesNotContain("latestAnalysis")
@@ -228,7 +228,7 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(desktop)
                 .contains(
                         "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))",
-                        "frontendContract.normalizeAiTabs(identityReady && !failed && !loading ? ai.tabs : [])",
+                        "analysisState === \"partial\" ? ai.tabs : []",
                         "/dashboard/analysis-detail?analysisId=",
                         "frontendContract.readUrlParam(\"view\") === \"ai\"")
                 .doesNotContain("latestAnalysisId");
@@ -245,32 +245,75 @@ class Fe04ShellHomeDashboardContractTest {
         String mobile = Files.readString(MOBILE);
         String script = Files.readString(MOBILE_SCRIPT);
         String desktop = Files.readString(DESKTOP);
+        String contract = Files.readString(FRONTEND_CONTRACT);
 
-        assertThat(mobile + desktop)
+        assertThat(mobile + desktop + contract)
                 .contains(
                         "分析身份待同步",
                         "当前不可查看",
                         "等待同步",
                         "--",
                         "不补造");
+        assertThat(contract)
+                .contains(
+                        "function aiAnalysisState(identityReady, failed, loading, empty)",
+                        "if (failed) return \"error\"",
+                        "if (loading) return \"loading\"",
+                        "if (empty) return \"empty\"",
+                        "if (!identityReady) return \"missing\"",
+                        "return \"partial\"",
+                        "AI 分析加载失败，当前不可查看",
+                        "暂无可分析资产",
+                        "缺少权威 analysisId，当前不可查看");
         assertThat(script)
                 .contains(
                         "var empty = !card && !failed && !loading",
-                        "root.dataset.analysisState = failed",
-                        "? \"empty\"",
+                        "frontendContract.aiAnalysisState(",
+                        "frontendContract.aiAnalysisStateView(analysisState)",
+                        "root.dataset.analysisState = analysisState",
                         "runStatus: \"LOADING\"",
                         "runStatus: \"LOAD_FAILED\"",
-                        "renderAiAnalysisRoles(safeAi.tabs, identityReady && !failed && !loading)")
+                        "renderAiAnalysisRoles(safeAi.tabs, analysisState)")
                 .doesNotContain("/api/analysis/create")
                 .doesNotContain("/api/watch");
         assertThat(desktop)
                 .contains(
                         "var empty = !asset && !failed && !loading",
-                        "root.dataset.analysisState = failed",
-                        "? \"empty\"",
-                        "缺少可验证分析数据，当前不可查看")
+                        "frontendContract.aiAnalysisState(",
+                        "frontendContract.aiAnalysisStateView(analysisState)",
+                        "root.dataset.analysisState = analysisState")
                 .doesNotContain("fetch(\"/api/analysis")
                 .doesNotContain("fetch(\"/api/watch");
+    }
+
+    @Test
+    void aiAnalysisRequiresExplicitRoleAvailabilityBeforeRenderingConclusions()
+            throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String script = Files.readString(MOBILE_SCRIPT);
+        String desktop = Files.readString(DESKTOP);
+        String contract = Files.readString(FRONTEND_CONTRACT);
+
+        assertThat(contract)
+                .contains("normalized.resultAvailable = normalized.resultAvailable === true");
+        assertThat(mobile)
+                .contains(
+                        "data-result-available=${tab.resultAvailable == true}",
+                        "tab.resultAvailable == true ?",
+                        "tab.role == 'GPT_FINAL' and tab.resultAvailable == true");
+        assertThat(script)
+                .contains(
+                        "if (tab.resultAvailable !== true)",
+                        "var resultAvailable = canReadRoles && tab.resultAvailable === true",
+                        "var resultAvailable = card.dataset.resultAvailable === \"true\"",
+                        "if (resultAvailable && role === \"GPT_FINAL\")")
+                .doesNotContain("Number(tab.resultAvailable)");
+        assertThat(desktop)
+                .contains(
+                        "function desktopAiRoleSummary(tab)",
+                        "if (tab.resultAvailable !== true)",
+                        "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true")
+                .doesNotContain("Boolean(tab.resultAvailable)");
     }
 
     @Test

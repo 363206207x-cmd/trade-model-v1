@@ -6848,6 +6848,9 @@
     }
 
     function desktopAiRoleSummary(tab) {
+        if (tab.resultAvailable !== true) {
+            return cleanBlankValue(tab.statusMessage) || "当前角色观点不可用";
+        }
         if (tab.role === "GPT_FINAL") {
             return cleanBlankValue(tab.finalConclusion || tab.decisionSummary || tab.statusMessage)
                 || "当前观点待同步";
@@ -6928,63 +6931,72 @@
         var failed = runStatus.indexOf("FAIL") >= 0 || runStatus.indexOf("ERROR") >= 0;
         var loading = runStatus === "LOADING" || runStatus === "PENDING";
         var empty = !asset && !failed && !loading;
-        root.dataset.analysisState = failed
-            ? "error"
-            : (loading ? "loading" : (empty ? "empty" : (!identityReady ? "missing" : "partial")));
-        setText("desktopAiStateStatus", failed
-            ? "当前不可查看"
-            : (loading
-                ? "正在同步"
-                : (empty
-                    ? "暂无可分析资产"
-                    : (!identityReady
-                        ? "分析身份待同步"
-                        : cleanBlankValue(ai.runStatusLabel) || "部分数据待同步"))));
+        var analysisState = frontendContract.aiAnalysisState(
+            identityReady,
+            failed,
+            loading,
+            empty
+        );
+        var stateView = frontendContract.aiAnalysisStateView(analysisState);
+        root.dataset.analysisState = analysisState;
+        setText(
+            "desktopAiStateStatus",
+            analysisState === "partial"
+                ? cleanBlankValue(ai.runStatusLabel) || stateView.statusLabel
+                : stateView.statusLabel
+        );
         setText("desktopAiSymbol", symbol || "--");
         setText("desktopAiAnalysisId", analysisId || "待同步");
         setText(
             "desktopAiDirection",
-            identityReady ? cleanBlankValue(asset.marketBiasLabel || asset.marketBias) || "--" : "--"
+            analysisState === "partial"
+                ? cleanBlankValue(asset.marketBiasLabel || asset.marketBias) || "--"
+                : "--"
         );
         setText(
             "desktopAiRunStatus",
-            identityReady ? cleanBlankValue(ai.runStatusLabel) || "等待同步" : "当前不可查看"
+            analysisState === "partial"
+                ? cleanBlankValue(ai.runStatusLabel) || stateView.runStatusLabel
+                : stateView.runStatusLabel
         );
-        var consistency = identityReady ? (ai.consistency || {}) : {};
-        setText("desktopAiConsistencyLevel", cleanBlankValue(consistency.consistencyLevel) || "等待同步");
+        var consistency = analysisState === "partial" ? (ai.consistency || {}) : {};
+        setText(
+            "desktopAiConsistencyLevel",
+            cleanBlankValue(consistency.consistencyLevel) || stateView.consistencyLevel
+        );
         setText(
             "desktopAiConsistencySummary",
             cleanBlankValue(consistency.consistencySummary)
-                || (identityReady
-                    ? "等待 AI 三角色结果同步后生成一致性结论"
-                    : "缺少权威 analysisId，当前不可查看")
+                || stateView.consistencySummary
         );
-        setText(
-            "desktopAiDetailStatus",
-            identityReady ? "权威 analysisId 已就绪" : "需要权威 analysisId"
-        );
+        setText("desktopAiDetailStatus", stateView.detailStatus);
         updateDesktopAiDetailLink(analysisId, symbol);
 
-        var tabs = frontendContract.normalizeAiTabs(identityReady && !failed && !loading ? ai.tabs : []);
+        var tabs = frontendContract.normalizeAiTabs(
+            analysisState === "partial" ? ai.tabs : []
+        );
         tabs.forEach(function (tab) {
             var panel = document.querySelector(
                 '[data-desktop-ai-role-panel="' + tab.role + '"]'
             );
             if (!panel) return;
+            var resultAvailable = analysisState === "partial" && tab.resultAvailable === true;
             var status = panel.querySelector("[data-desktop-ai-role-status]");
             var summary = panel.querySelector("[data-desktop-ai-role-summary]");
-            if (status) status.textContent = identityReady && !failed && !loading
+            if (status) status.textContent = analysisState === "partial"
                 ? cleanBlankValue(tab.runStatusLabel) || "待同步"
-                : "待同步";
-            if (summary) summary.textContent = identityReady && !failed && !loading
+                : stateView.roleStatusLabel;
+            if (summary) summary.textContent = analysisState === "partial"
                 ? desktopAiRoleSummary(tab)
-                : "缺少可验证分析数据，当前不可查看";
+                : stateView.roleSummary;
             var direction = panel.querySelector("[data-desktop-ai-role-direction]");
             var confidence = panel.querySelector("[data-desktop-ai-role-confidence]");
-            if (direction) direction.textContent = identityReady && !failed
-                ? cleanBlankValue(tab.finalMarketBias) || "--" : "--";
-            if (confidence) confidence.textContent = identityReady && !failed
-                ? cleanBlankValue(tab.finalConfidence) || "--" : "--";
+            if (direction) direction.textContent = resultAvailable
+                ? cleanBlankValue(tab.finalMarketBias) || "--"
+                : "--";
+            if (confidence) confidence.textContent = resultAvailable
+                ? cleanBlankValue(tab.finalConfidence) || "--"
+                : "--";
         });
     }
 
@@ -7172,6 +7184,9 @@
         var ai = aiDecision || {};
         var tabList = frontendContract.normalizeAiTabs(ai.tabs);
         function summary(tab) {
+            if (tab.resultAvailable !== true) {
+                return cleanBlankValue(tab.statusMessage) || "当前角色观点不可用";
+            }
             if (tab.role === "GPT_FINAL") {
                 return cleanBlankValue(tab.finalConclusion || tab.decisionSummary || tab.statusMessage)
                     || "当前观点待同步";

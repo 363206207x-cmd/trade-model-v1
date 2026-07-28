@@ -219,6 +219,9 @@
   }
 
   function roleSummary(tab) {
+    if (tab.resultAvailable !== true) {
+      return text(tab.statusMessage, "当前角色观点不可用");
+    }
     if (tab.role === "GPT_FINAL") {
       return text(
         tab.finalConclusion,
@@ -248,7 +251,7 @@
     heading.appendChild(element("strong", "", text(tab.runStatusLabel, "等待同步")));
     panel.appendChild(heading);
     panel.appendChild(element("p", "role-status", roleSummary(tab)));
-    if (tab.role === "GPT_FINAL") {
+    if (tab.role === "GPT_FINAL" && tab.resultAvailable === true) {
       var metrics = element("dl", "role-summary-metrics");
       appendDefinition(metrics, "方向", tab.finalMarketBias, false);
       appendDefinition(metrics, "置信度", tab.finalConfidence, false);
@@ -298,32 +301,35 @@
     setActiveAiRole(activeAiRole, false);
   }
 
-  function renderAiAnalysisRoles(tabs, identityReady) {
-    var normalized = frontendContract.normalizeAiTabs(identityReady ? tabs : []);
+  function renderAiAnalysisRoles(tabs, analysisState) {
+    var stateView = frontendContract.aiAnalysisStateView(analysisState);
+    var canReadRoles = analysisState === "partial";
+    var normalized = frontendContract.normalizeAiTabs(canReadRoles ? tabs : []);
     normalized.forEach(function (tab) {
       var panel = document.querySelector(
         '[data-ai-analysis-role-panel="' + tab.role + '"]'
       );
       if (!panel) return;
+      var resultAvailable = canReadRoles && tab.resultAvailable === true;
       var status = panel.querySelector("[data-ai-analysis-role-status]");
       var summary = panel.querySelector("[data-ai-analysis-role-summary]");
       if (status) {
-        status.textContent = identityReady
+        status.textContent = canReadRoles
           ? text(tab.runStatusLabel, "待同步")
-          : "待同步";
+          : stateView.roleStatusLabel;
       }
       if (summary) {
-        summary.textContent = identityReady
+        summary.textContent = canReadRoles
           ? roleSummary(tab)
-          : "缺少权威 analysisId，当前不可查看";
+          : stateView.roleSummary;
       }
       var direction = panel.querySelector("[data-ai-analysis-role-direction]");
       var confidence = panel.querySelector("[data-ai-analysis-role-confidence]");
       if (direction) {
-        direction.textContent = identityReady ? text(tab.finalMarketBias, "--") : "--";
+        direction.textContent = resultAvailable ? text(tab.finalMarketBias, "--") : "--";
       }
       if (confidence) {
-        confidence.textContent = identityReady ? text(tab.finalConfidence, "--") : "--";
+        confidence.textContent = resultAvailable ? text(tab.finalConfidence, "--") : "--";
       }
     });
   }
@@ -339,43 +345,40 @@
     var failed = runStatus.indexOf("FAIL") >= 0 || runStatus.indexOf("ERROR") >= 0;
     var loading = runStatus === "LOADING" || runStatus === "PENDING";
     var empty = !card && !failed && !loading;
-    root.dataset.analysisState = failed
-      ? "error"
-      : (loading ? "loading" : (empty ? "empty" : (!identityReady ? "missing" : "partial")));
+    var analysisState = frontendContract.aiAnalysisState(
+      identityReady,
+      failed,
+      loading,
+      empty
+    );
+    var stateView = frontendContract.aiAnalysisStateView(analysisState);
+    root.dataset.analysisState = analysisState;
     setText(
       "[data-ai-analysis-state-status]",
-      failed
-        ? "当前不可查看"
-        : (loading
-          ? "正在同步"
-          : (empty
-            ? "暂无可分析资产"
-            : (!identityReady ? "分析身份待同步" : safeAi.runStatusLabel))),
-      identityReady ? "部分数据待同步" : "分析身份待同步"
+      analysisState === "partial" ? safeAi.runStatusLabel : stateView.statusLabel,
+      stateView.statusLabel
     );
     setText(
       "[data-ai-analysis-run-status]",
-      identityReady ? safeAi.runStatusLabel : null,
-      identityReady ? "等待同步" : "当前不可查看"
+      analysisState === "partial" ? safeAi.runStatusLabel : stateView.runStatusLabel,
+      stateView.runStatusLabel
     );
-    var consistency = identityReady ? (safeAi.consistency || {}) : {};
+    var consistency = analysisState === "partial" ? (safeAi.consistency || {}) : {};
     setText(
       "[data-ai-analysis-consistency-level]",
       consistency.consistencyLevel,
-      "等待同步"
+      stateView.consistencyLevel
     );
     setText(
       "[data-ai-analysis-consistency-summary]",
       consistency.consistencySummary,
-      identityReady
-        ? "等待 AI 三角色结果同步后生成一致性结论"
-        : "缺少权威 analysisId，当前不可查看"
+      stateView.consistencySummary
     );
     setText(
       "[data-ai-analysis-detail-status]",
-      identityReady ? "权威 analysisId 已就绪" : "需要权威 analysisId"
+      stateView.detailStatus
     );
-    renderAiAnalysisRoles(safeAi.tabs, identityReady && !failed && !loading);
+    renderAiAnalysisRoles(safeAi.tabs, analysisState);
   }
 
   function initialAiDecisionFromHome() {
@@ -395,19 +398,21 @@
         var label = card.querySelector(".role-heading h3");
         var summary = card.querySelector(".role-status");
         var values = card.querySelectorAll(".role-summary-metrics dd");
+        var resultAvailable = card.dataset.resultAvailable === "true";
         var tab = {
           role: role,
           roleLabel: label ? label.textContent : roleLabel(role),
           runStatusLabel: status ? status.textContent : "待同步",
+          resultAvailable: resultAvailable,
           statusMessage: summary ? summary.textContent : null
         };
-        if (role === "GPT_FINAL") {
+        if (resultAvailable && role === "GPT_FINAL") {
           tab.finalConclusion = tab.statusMessage;
           tab.finalMarketBias = values[0] ? values[0].textContent : null;
           tab.finalConfidence = values[1] ? values[1].textContent : null;
-        } else if (role === "GEMINI_REVIEW") {
+        } else if (resultAvailable && role === "GEMINI_REVIEW") {
           tab.reviewConclusion = tab.statusMessage;
-        } else if (role === "GROK_CHALLENGE") {
+        } else if (resultAvailable && role === "GROK_CHALLENGE") {
           tab.challengeConclusion = tab.statusMessage;
         }
         return tab;
