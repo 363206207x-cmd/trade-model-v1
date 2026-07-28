@@ -118,9 +118,29 @@ class DashboardHomeControllerTest {
                         .param("positionId", "42")
                         .param("limit", "6"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.selectedPositionId").value(42))
+                .andExpect(jsonPath("$.data.selectedPositionId").value("42"))
                 .andExpect(jsonPath("$.data.positionSelectionStatus").value("EXACT_POSITION_SELECTED"));
 
         verify(dashboardHomeService).getHomeForUser(7L, "BTCUSDT", 6, 42L);
+    }
+
+    @Test
+    void homeSerializesPositionIdentityBeyondJavascriptSafeIntegerAsStrings() throws Exception {
+        long positionId = 9_007_199_254_740_993L;
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedPositionId(positionId);
+        DashboardHomeVO.PositionVO position = new DashboardHomeVO.PositionVO();
+        position.setPositionId(positionId);
+        position.setPositionStatus("OPEN");
+        home.setPositions(List.of(position));
+        when(dashboardHomeService.getHomeForUser(7L, null, null, positionId)).thenReturn(home);
+
+        mockMvc.perform(get("/api/dashboard/home")
+                        .param("positionId", Long.toString(positionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.selectedPositionId")
+                        .value("9007199254740993"))
+                .andExpect(jsonPath("$.data.positions[0].positionId")
+                        .value("9007199254740993"));
     }
 }

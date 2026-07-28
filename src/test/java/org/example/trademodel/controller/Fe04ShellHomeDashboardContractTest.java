@@ -31,8 +31,8 @@ class Fe04ShellHomeDashboardContractTest {
         String navigation = slice(html, "<nav class=\"bottom-nav\"", "</nav>");
 
         assertThat(navigation.indexOf(">首页</button>"))
-                .isLessThan(navigation.indexOf(">持仓</button>"));
-        assertThat(navigation.indexOf(">持仓</button>"))
+                .isLessThan(navigation.indexOf(">持仓</a>"));
+        assertThat(navigation.indexOf(">持仓</a>"))
                 .isLessThan(navigation.indexOf(">AI分析</button>"));
         assertThat(navigation.indexOf(">AI分析</button>"))
                 .isLessThan(navigation.indexOf(">消息</button>"));
@@ -40,7 +40,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .isLessThan(navigation.indexOf(">我的</button>"));
         assertThat(navigation)
                 .contains("data-home-nav aria-current=\"page\"")
-                .contains("data-position-nav data-unavailable-nav aria-disabled=\"true\"")
+                .contains("href=\"/dashboard/mobile/positions\" data-position-nav")
                 .contains("data-ai-nav data-unavailable-nav aria-disabled=\"true\"")
                 .contains("data-message-nav data-unavailable-nav aria-disabled=\"true\"")
                 .contains("data-profile-nav data-unavailable-nav aria-disabled=\"true\"");
@@ -157,6 +157,20 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("完整证据")
                 .doesNotContain("八大评分")
                 .doesNotContain("多周期");
+    }
+
+    @Test
+    void positionNavigationUsesTheReadonlyFe04cRoutesWhileOtherDestinationsStayUnavailable()
+            throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String desktop = Files.readString(DESKTOP);
+
+        assertThat(mobile)
+                .contains("<a href=\"/dashboard/mobile/positions\" data-position-nav>持仓</a>")
+                .doesNotContain("data-position-nav data-unavailable-nav");
+        assertThat(desktop)
+                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">Position</a>")
+                .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">Position");
     }
 
     @Test

@@ -91,9 +91,9 @@ class UserPositionOwnershipSecurityIntegrationTest {
         String body = mockMvc.perform(get("/api/user-positions/open").with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].id").value(partialA.getId()))
+                .andExpect(jsonPath("$.data[0].id").value(String.valueOf(partialA.getId())))
                 .andExpect(jsonPath("$.data[0].status").value("PARTIALLY_CLOSED"))
-                .andExpect(jsonPath("$.data[1].id").value(openA.getId()))
+                .andExpect(jsonPath("$.data[1].id").value(String.valueOf(openA.getId())))
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(body).doesNotContain("userId", "user_id", "ownerId", "owner_id");
@@ -154,7 +154,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         JsonNode data = objectMapper.readTree(response).path("data");
-        Long id = data.path("id").longValue();
+        assertThat(data.path("id").isTextual()).isTrue();
+        Long id = Long.valueOf(data.path("id").textValue());
         UserPositionDO persisted = userPositionMapper.selectByIdAndUserId(id, userAId);
         assertThat(persisted).isNotNull();
         assertThat(persisted.getUserId()).isEqualTo(userAId);
@@ -210,7 +211,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(closeJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(partialA.getId()))
+                .andExpect(jsonPath("$.data.id").value(String.valueOf(partialA.getId())))
                 .andExpect(jsonPath("$.data.status").value("CLOSED"));
 
         mockMvc.perform(post("/api/user-positions/{id}/manual-close", closedA.getId())
@@ -229,7 +230,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
                         .with(user(USER_A).roles("OPERATOR")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(closeJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(openA.getId()))
+                .andExpect(jsonPath("$.data.id").value(String.valueOf(openA.getId())))
                 .andExpect(jsonPath("$.data.status").value("CLOSED"));
 
         assertThat(userPositionMapper.selectByIdAndUserId(second.getId(), userAId).getStatus())

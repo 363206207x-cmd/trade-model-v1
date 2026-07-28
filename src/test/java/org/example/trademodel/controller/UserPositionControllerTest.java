@@ -64,7 +64,7 @@ class UserPositionControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.id").value(11))
+                .andExpect(jsonPath("$.data.id").value("11"))
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
                 .andExpect(jsonPath("$.data.sourceType").value("MANUAL"))
                 .andExpect(jsonPath("$.data.manualReviewRequired").value(true))
@@ -121,6 +121,17 @@ class UserPositionControllerTest {
         mockMvc.perform(get("/api/user-positions/404"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    void getByIdSerializesLargePositionIdentityAsString() throws Exception {
+        long positionId = 9_007_199_254_740_993L;
+        when(userPositionService.findByIdForUser(positionId, 7L))
+                .thenReturn(vo(positionId, "OPEN"));
+
+        mockMvc.perform(get("/api/user-positions/{id}", positionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value("9007199254740993"));
     }
 
     @Test

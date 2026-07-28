@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>持仓监控 · Trade Model</title>
+  <link rel="stylesheet" th:href="@{/css/position-monitoring.css}" href="/css/position-monitoring.css">
+  <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js" defer></script>
+  <script th:src="@{/js/position-monitoring.js}" src="/js/position-monitoring.js" defer></script>
+</head>
+<body>
+  <div class="position-shell"
+       data-position-monitor-root
+       data-mobile-view="false"
+       data-requested-position-id=""
+       data-invalid-position-id="false"
+       th:attr="data-mobile-view=${mobileView},
+                data-requested-position-id=${requestedPositionId},
+                data-invalid-position-id=${invalidPositionId}"
+       aria-busy="true">
+    <aside class="desktop-sidebar" aria-label="产品导航">
+      <p class="desktop-brand">TRADE MODEL V1</p>
+      <nav class="desktop-navigation" aria-label="产品页面">
+        <a href="/dashboard">首页</a>
+        <a href="/dashboard/positions" class="active" aria-current="page">持仓</a>
+        <span aria-disabled="true">AI分析</span>
+        <span aria-disabled="true">消息</span>
+        <span aria-disabled="true">我的</span>
+      </nav>
+    </aside>
+
+    <main class="position-page">
+      <header class="position-header">
+        <div>
+          <p class="page-kicker">真实持仓</p>
+          <h1 id="position-page-title" tabindex="-1">持仓监控</h1>
+          <p class="desktop-subtitle">真实用户持仓 · 建议与生命周期严格分离</p>
+        </div>
+        <span class="page-status" data-page-status data-status="loading"
+              role="status" aria-live="polite">正在同步</span>
+      </header>
+
+      <section class="page-state" data-page-state role="status" aria-live="polite">
+        <span class="state-mark" aria-hidden="true">•••</span>
+        <div>
+          <h2 data-page-state-title>正在读取持仓</h2>
+          <p data-page-state-message>请稍候。</p>
+        </div>
+        <button class="retry-button" type="button" data-position-retry hidden>重新加载</button>
+      </section>
+
+      <div class="position-content" data-position-content hidden>
+        <section class="position-list-section" aria-labelledby="position-list-title">
+          <div class="section-heading">
+            <div>
+              <p class="page-kicker">用户事实</p>
+              <h2 id="position-list-title">用户持仓</h2>
+            </div>
+            <span data-position-count>0 个持仓</span>
+          </div>
+          <div class="position-picker" data-position-list role="list"></div>
+          <p class="section-empty" data-position-list-empty hidden>暂无手动持仓</p>
+        </section>
+
+        <section class="selection-state" data-selection-state aria-live="polite">
+          <strong>请选择具体持仓</strong>
+          <span>选择后查看该持仓的只读监控结果。</span>
+        </section>
+
+        <div class="selected-position" data-selected-position hidden>
+          <section class="lifecycle-card" aria-labelledby="position-lifecycle-title">
+            <div class="section-heading">
+              <h2 id="position-lifecycle-title">持仓生命周期</h2>
+              <span data-selected-position-id>positionId · --</span>
+            </div>
+            <div class="lifecycle-row" aria-label="持仓生命周期">
+              <span data-lifecycle="OPEN">OPEN</span>
+              <span data-lifecycle="PARTIALLY_CLOSED">PARTIALLY_CLOSED</span>
+              <span data-lifecycle="CLOSED">CLOSED</span>
+            </div>
+            <p>当前生命周期：<strong data-position-field="lifecycle">--</strong></p>
+          </section>
+
+          <div class="monitor-layout">
+            <div class="monitor-primary">
+              <section class="business-card user-position-card"
+                       aria-labelledby="user-position-card-title">
+                <div class="card-heading">
+                  <h2 id="user-position-card-title">User Position Card</h2>
+                  <span>用户事实</span>
+                </div>
+                <dl class="field-list">
+                  <div><dt>资产</dt><dd data-position-field="symbol">--</dd></div>
+                  <div><dt>持仓方向</dt><dd data-position-field="direction">待同步</dd></div>
+                  <div><dt>用户入场价</dt><dd data-position-field="entryPrice">--</dd></div>
+                  <div><dt>开仓时间</dt><dd data-position-field="openedAt">--</dd></div>
+                  <div><dt>持仓数量</dt><dd data-position-field="positionSize">--</dd></div>
+                  <div><dt>实际杠杆</dt><dd data-position-field="leverage">--</dd></div>
+                  <div><dt>用户止损</dt><dd data-position-field="userStopLoss">--</dd></div>
+                  <div><dt>用户止盈</dt><dd data-position-field="userTakeProfit">--</dd></div>
+                </dl>
+              </section>
+
+              <section class="business-card position-monitor-card"
+                       aria-labelledby="position-monitor-card-title"
+                       data-position-monitor-card>
+                <div class="card-heading">
+                  <h2 id="position-monitor-card-title">Position Monitoring Card</h2>
+                  <span data-monitor-source>只读监控</span>
+                </div>
+                <dl class="field-list">
+                  <div><dt>监控状态</dt><dd data-monitor-field="monitorStatus">WAITING_MONITOR</dd></div>
+                  <div><dt>入场逻辑仍有效</dt><dd data-monitor-field="logic">待同步</dd></div>
+                  <div><dt>方向支持</dt><dd data-monitor-field="directionSupport">待同步</dd></div>
+                  <div><dt>反转状态</dt><dd data-monitor-field="reversal">待同步</dd></div>
+                  <div><dt>风险等级</dt><dd data-monitor-field="risk">--</dd></div>
+                  <div><dt>监控结论</dt><dd data-monitor-field="conclusion">当前不可查看</dd></div>
+                  <div><dt>当前建议</dt><dd data-monitor-field="suggestion">当前不可查看</dd></div>
+                  <div><dt>最近监控时间</dt><dd data-monitor-field="lastMonitorAt">--</dd></div>
+                </dl>
+                <p class="review-only-note">建议仅供人工复核。</p>
+              </section>
+
+              <section class="reference-card" aria-labelledby="plan-reference-title">
+                <div class="section-heading">
+                  <h2 id="plan-reference-title">关联执行计划</h2>
+                  <span>只读参考</span>
+                </div>
+                <p>当前不可查看</p>
+              </section>
+            </div>
+
+            <aside class="monitor-secondary">
+              <section class="monitor-summary" aria-labelledby="monitor-summary-title">
+                <h2 id="monitor-summary-title">监控状态</h2>
+                <dl class="compact-field-list">
+                  <div><dt>状态</dt><dd data-monitor-mirror="monitorStatus">WAITING_MONITOR</dd></div>
+                  <div><dt>方向支持</dt><dd data-monitor-mirror="directionSupport">待同步</dd></div>
+                  <div><dt>反转</dt><dd data-monitor-mirror="reversal">待同步</dd></div>
+                  <div><dt>风险</dt><dd data-monitor-mirror="risk">--</dd></div>
+                  <div><dt>建议</dt><dd data-monitor-mirror="suggestion">当前不可查看</dd></div>
+                </dl>
+              </section>
+
+              <section class="monitor-history" aria-labelledby="monitor-history-title">
+                <div class="section-heading">
+                  <h2 id="monitor-history-title">监控记录</h2>
+                  <span data-monitor-log-count>0 条</span>
+                </div>
+                <div data-monitor-log-list></div>
+                <p class="section-empty" data-monitor-log-empty>等待首次监控</p>
+                <div class="inline-error" data-monitor-log-error hidden>
+                  <span>监控记录当前不可查看</span>
+                  <button type="button" data-monitor-log-retry>重试</button>
+                </div>
+              </section>
+
+              <section class="review-entry-state" aria-label="复盘入口">
+                <strong>复盘入口当前不可用</strong>
+                <span>仅 CLOSED 持仓可进入复盘。</span>
+              </section>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="mobile-navigation" aria-label="主要导航">
+      <a href="/dashboard/mobile">首页</a>
+      <a href="/dashboard/mobile/positions" class="active" aria-current="page">持仓</a>
+      <span aria-disabled="true">AI分析</span>
+      <span aria-disabled="true">消息</span>
+      <span aria-disabled="true">我的</span>
+    </nav>
+  </div>
+</body>
+</html>
