@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04C merged-main governance alignment; FE-04A Shell & Navigation, FE-04B Home Dashboard Integration, and FE-04C read-only Position Monitoring are effective on merged main
-Next Business Phase: FE-04D AI Analysis readiness gate
-Next Business Phase Allowed: READINESS_GATE_ONLY; after this governance alignment reaches clean, synced main, only a read-only FE-04D contract/API/Figma readiness audit may begin; FE-04D implementation, FE-04E/FE-04F, API expansion, write actions, P4, and production deployment remain blocked
+Current Work Package: FE-04D AI Analysis readiness governance alignment; the read-only gate is complete and FE-04D implementation remains not started
+Next Business Phase: FE-04D AI Analysis restricted first implementation package
+Next Business Phase Allowed: RESTRICTED_FIRST_PACKAGE_AFTER_GOVERNANCE_MERGE; after this readiness record reaches clean, synced main, only the bounded frontend package for the AI Analysis tab, existing asset context, authoritative analysisId, three-role summary, and FE-03 detail reuse may begin; market search, watch-asset writes, fabricated deep analysis, API expansion, FE-04E/FE-04F, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -30,13 +30,13 @@ The registered component nodes are Asset Card `28:154`, Execution Plan Card
 The design baseline is `FROZEN` and its repository registration is
 `REGISTERED_ON_MAIN`. FE-04 frontend remains `IN_PROGRESS_PARTIAL`: FE-04A,
 FE-04B, and the bounded FE-04C read-only Position Monitoring package are
-effective on merged main, while FE-04D, FE-04E, and FE-04F remain
-unimplemented. No API, schema, Figma node, or trading capability is changed by
-this governance alignment.
+effective on merged main. The FE-04D readiness gate is complete, but FE-04D,
+FE-04E, and FE-04F remain unimplemented. No API, schema, Figma node, or trading
+capability is changed by this governance alignment.
 
 ---
 
-## FE-02 through FE-04C Merged-Main Progression
+## FE-02 through FE-04D Readiness Progression
 
 The bounded frontend and prerequisite packages leading into FE-04D are
 effective on merged main:
@@ -68,9 +68,27 @@ execution, automatic action, API expansion, or an automatic call to the
 write-type monitor-run endpoint. Overall FE-04 therefore remains
 `IN_PROGRESS_PARTIAL`.
 
-FE-04D AI Analysis is `NOT_STARTED_READINESS_GATE_PENDING`. The next action is
-only a read-only contract/API/Figma readiness audit. FE-04D implementation is
-not authorized by this governance alignment.
+### FE-04D AI Analysis Readiness Result
+
+The read-only FE-04D gate is `READINESS_GATE_COMPLETE`; implementation remains
+`NOT_STARTED`. The audit verified authoritative `analysisId` navigation,
+reuse of FE-03 Analysis Detail, exactly `GPT_FINAL`, `GEMINI_REVIEW`, and
+`GROK_CHALLENGE`, the registered Mobile `296:4` / Desktop `296:10` Figma
+frames and AI Role Card `35:97`, and existing fail-closed behavior.
+
+Current capability remains intentionally partial: market-asset search is
+`PARTIAL`, authenticated watch-asset writes are `BLOCKED`, and complete
+exact-analysis AI provenance, eight-score detail, four-timeframe detail, and
+complete evidence-chain reads are unavailable. These gaps must not be
+simulated.
+
+Authorization is `RESTRICTED_FIRST_PACKAGE`, effective only after this
+governance record reaches clean, synced `main`. That package may implement the
+AI Analysis tab for an existing selected asset, preserve the authoritative
+`analysisId`, render only returned three-role summaries, and reuse FE-03 for
+deep detail. Search and add-to-watch controls must remain unavailable; missing
+score, evidence, timeframe, trace, or AI data must fail closed. No new API,
+schema, Figma, AI, trading, or write capability is authorized.
 
 ## P3-U2 iPhone Private Test App Foundation
 
@@ -126,8 +144,10 @@ Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, P3-H3, FE-04A,
 FE-04B, and FE-04C are now effective on merged main. The FE-04 Figma baseline
-is registered on main. The next bounded action is the FE-04D AI Analysis
-readiness gate only. FE-04D implementation, FE-04E/FE-04F, API expansion,
+is registered on main, and the FE-04D read-only readiness gate is complete.
+After this governance record reaches clean, synced main, the next bounded
+action is only the FE-04D restricted first frontend package. Market search,
+watch-asset writes, unsupported deep analysis, FE-04E/FE-04F, API expansion,
 write actions, P4, and production deployment remain blocked.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
@@ -1327,6 +1347,6 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: NONE; PR #1148 is merged and FE-04C runtime is effective, while this governance alignment remains local pending repository delivery
+- CURRENT_PACKAGE_PR: NONE; PR #1148 is merged and FE-04C runtime is effective, while the FE-04D readiness governance alignment remains local pending repository delivery
 - OPEN_PR_COUNT: not re-verified by this local documentation task; runtime status remains derived by `scripts/v1-state.sh`
 - UNRELATED_OPEN_PRS: not re-verified by this local documentation task; runtime status remains derived by `scripts/v1-state.sh`
