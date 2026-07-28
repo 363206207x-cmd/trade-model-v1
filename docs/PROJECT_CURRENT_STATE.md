@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04C Position Monitoring first-package governance alignment; FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are effective on merged main, while FE-04C remains NOT_STARTED
-Next Business Phase: FE-04C Position Monitoring first implementation package
-Next Business Phase Allowed: RUNTIME_GATED; on clean, synced main only the bounded, read-only FE-04C package may begin; FE-04D/FE-04E/FE-04F, API expansion, write actions, P4, and production deployment remain blocked
+Current Work Package: FE-04C merged-main governance alignment; FE-04A Shell & Navigation, FE-04B Home Dashboard Integration, and FE-04C read-only Position Monitoring are effective on merged main
+Next Business Phase: FE-04D AI Analysis readiness gate
+Next Business Phase Allowed: READINESS_GATE_ONLY; after this governance alignment reaches clean, synced main, only a read-only FE-04D contract/API/Figma readiness audit may begin; FE-04D implementation, FE-04E/FE-04F, API expansion, write actions, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -28,16 +28,17 @@ The registered component nodes are Asset Card `28:154`, Execution Plan Card
 `299:54`, and Push Detail Card `300:234`.
 
 The design baseline is `FROZEN` and its repository registration is
-`REGISTERED_ON_MAIN`. FE-04 frontend is `IN_PROGRESS_PARTIAL`: FE-04A and
-FE-04B are effective on merged main, while FE-04C and later packages remain
+`REGISTERED_ON_MAIN`. FE-04 frontend remains `IN_PROGRESS_PARTIAL`: FE-04A,
+FE-04B, and the bounded FE-04C read-only Position Monitoring package are
+effective on merged main, while FE-04D, FE-04E, and FE-04F remain
 unimplemented. No API, schema, Figma node, or trading capability is changed by
-this governance record.
+this governance alignment.
 
 ---
 
-## FE-02 through FE-04A/B Merged-Main Progression
+## FE-02 through FE-04C Merged-Main Progression
 
-The bounded frontend and prerequisite packages leading into FE-04C are
+The bounded frontend and prerequisite packages leading into FE-04D are
 effective on merged main:
 
 1. FE-02 Asset Detail is effective on merged main
@@ -51,14 +52,25 @@ effective on merged main:
 5. FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are
    effective on merged main `aaf905b4f74ecafcf514aa34d7c06361461a0eb4`
    through PR #1146.
+6. FE-04C read-only Position Monitoring is effective on merged main
+   `cc39f0c6315812b1178427c29b8b422da511ba0d` through PR #1148.
 
-These merged packages satisfy the prerequisites for the bounded FE-04C
-Position Monitoring package. FE-04C remains `NOT_STARTED` and is the
-`NEXT_IMPLEMENTATION_PACKAGE`. Its first package is limited to Position List,
-Position Monitor Card, exact `positionId`, owner-scoped read-only monitoring,
-monitor-status display, and existing monitor logs. It may not add edit, manual
-close, partial-close UI, replay, trade execution, automatic action, API
-expansion, or an automatic call to the write-type monitor-run endpoint.
+FE-04C provides Mobile and Desktop Position Monitoring, the frozen Position
+Monitor Card projection, exact string-preserved `positionId`, owner-scoped
+GET-only reads, existing monitor-log display, and loading/empty/error/partial/
+missing fail-closed states. It preserves `OPEN`, `PARTIALLY_CLOSED`, and
+`CLOSED` lifecycle semantics; `WAITING_MONITOR` remains a UI empty state rather
+than a persisted monitor status. Missing or failed monitor-log reads do not
+fabricate `WAITING_MONITOR`.
+
+FE-04C does not add edit, manual close, partial-close UI, replay, trade
+execution, automatic action, API expansion, or an automatic call to the
+write-type monitor-run endpoint. Overall FE-04 therefore remains
+`IN_PROGRESS_PARTIAL`.
+
+FE-04D AI Analysis is `NOT_STARTED_READINESS_GATE_PENDING`. The next action is
+only a read-only contract/API/Figma readiness audit. FE-04D implementation is
+not authorized by this governance alignment.
 
 ## P3-U2 iPhone Private Test App Foundation
 
@@ -113,11 +125,10 @@ These changes are effective on merged main; real production PostgreSQL V8, real 
 Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, P3-H3, FE-04A,
-and FE-04B are now effective on merged main. The FE-04 Figma baseline is
-registered on main. The next bounded implementation package is FE-04C Position
-Monitoring, restricted to owner-scoped, exact-`positionId`, read-only
-monitoring through existing APIs. FE-04D/FE-04E/FE-04F, API expansion, write
-actions, P4, and production deployment remain blocked.
+FE-04B, and FE-04C are now effective on merged main. The FE-04 Figma baseline
+is registered on main. The next bounded action is the FE-04D AI Analysis
+readiness gate only. FE-04D implementation, FE-04E/FE-04F, API expansion,
+write actions, P4, and production deployment remain blocked.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
@@ -1316,6 +1327,6 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: NONE; FE-04 Figma baseline registration is a local documentation package pending repository delivery
+- CURRENT_PACKAGE_PR: NONE; PR #1148 is merged and FE-04C runtime is effective, while this governance alignment remains local pending repository delivery
 - OPEN_PR_COUNT: not re-verified by this local documentation task; runtime status remains derived by `scripts/v1-state.sh`
 - UNRELATED_OPEN_PRS: not re-verified by this local documentation task; runtime status remains derived by `scripts/v1-state.sh`
