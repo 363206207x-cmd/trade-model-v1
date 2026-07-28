@@ -154,6 +154,10 @@ h3 {
 .execution-section,
 .position-section,
 .ai-section,
+.ai-analysis-toolbar,
+.ai-analysis-context-section,
+.ai-analysis-role-section,
+.ai-analysis-deep-section,
 .mobile-footer {
   min-width: 0;
   max-width: 100%;
@@ -240,7 +244,11 @@ h3 {
 .watch-section,
 .execution-section,
 .position-section,
-.ai-section {
+.ai-section,
+.ai-analysis-toolbar,
+.ai-analysis-context-section,
+.ai-analysis-role-section,
+.ai-analysis-deep-section {
   padding-top: 14px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
@@ -931,6 +939,173 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.mobile-ai-analysis {
+  background: var(--surface);
+}
+
+.ai-analysis-header {
+  min-height: 64px;
+}
+
+.ai-analysis-identity-pill,
+.ai-analysis-run-status {
+  max-width: 46%;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 720;
+  line-height: 1.3;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.ai-analysis-toolbar {
+  padding-top: 12px;
+  padding-bottom: 14px;
+}
+
+.ai-analysis-search-label {
+  display: block;
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 680;
+}
+
+.ai-analysis-search {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font: inherit;
+}
+
+.ai-analysis-search:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.ai-analysis-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ai-analysis-context-grid > div {
+  min-width: 0;
+  padding: 10px;
+  background: var(--surface-raised);
+}
+
+.ai-analysis-context-grid .full-row {
+  grid-column: 1 / -1;
+}
+
+.ai-analysis-context-grid dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.ai-analysis-context-grid dd {
+  margin-top: 4px;
+  font-size: 0.84rem;
+  font-weight: 680;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.ai-analysis-role-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.ai-analysis-role-tabs button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 4px;
+  border: 0;
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 720;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.ai-analysis-role-tabs button[aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ai-analysis-role-panels {
+  min-height: 172px;
+  margin-top: 10px;
+}
+
+.ai-analysis-role-panel {
+  min-width: 0;
+  min-height: 172px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.ai-analysis-role-panel .role-status {
+  margin-bottom: 12px;
+}
+
+.ai-analysis-detail-status {
+  margin: 12px 0 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.ai-analysis-detail-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 720;
+  text-decoration: none;
+}
+
+.ai-analysis-detail-link[aria-disabled="true"] {
+  border-color: var(--line-strong);
+  color: var(--muted);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.ai-analysis-deep-section .section-description {
+  margin-top: 10px;
+}
+
+.mobile-ai-analysis[data-analysis-state="error"] .ai-analysis-identity-pill,
+.mobile-ai-analysis[data-analysis-state="missing"] .ai-analysis-identity-pill {
+  color: var(--warning);
+}
+
 .bottom-nav {
   position: fixed;
   z-index: 20;
@@ -1007,6 +1182,10 @@ h3 {
   .execution-section,
   .position-section,
   .ai-section,
+  .ai-analysis-toolbar,
+  .ai-analysis-context-section,
+  .ai-analysis-role-section,
+  .ai-analysis-deep-section,
   .mobile-footer {
     padding-inline: 15px;
   }

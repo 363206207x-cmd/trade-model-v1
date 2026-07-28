@@ -2101,6 +2101,267 @@
                 grid-template-columns: 1fr;
             }
         }
+        .desktop-ai-analysis-view {
+            display: grid;
+            gap: 14px;
+            width: 100%;
+            max-width: 1152px;
+            margin: 0 auto;
+        }
+        .desktop-ai-analysis-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 4px 0 12px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .desktop-ai-analysis-header h2,
+        .desktop-ai-section-head h3,
+        .desktop-ai-reuse-panel h3 {
+            margin: 0;
+            color: var(--text-primary);
+            letter-spacing: 0;
+        }
+        .desktop-ai-analysis-header h2 {
+            font-size: 1.28rem;
+        }
+        .desktop-ai-analysis-header p,
+        .desktop-ai-toolbar p,
+        .desktop-ai-reuse-panel > p,
+        .desktop-ai-boundary-note {
+            margin: 4px 0 0;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .desktop-ai-kicker {
+            margin: 0 0 3px;
+            color: var(--brand-accent);
+            font-size: 0.69rem;
+            font-weight: 760;
+        }
+        .desktop-ai-identity-pill,
+        .desktop-ai-symbol {
+            display: inline-flex;
+            align-items: center;
+            min-height: 30px;
+            max-width: 48%;
+            padding: 5px 9px;
+            border: 1px solid rgba(47, 117, 255, 0.22);
+            border-radius: 999px;
+            background: rgba(47, 117, 255, 0.08);
+            color: var(--brand-accent);
+            font-size: 0.72rem;
+            font-weight: 720;
+            line-height: 1.35;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+        .desktop-ai-toolbar {
+            display: grid;
+            grid-template-columns: minmax(260px, 460px) minmax(0, 1fr);
+            gap: 16px;
+            align-items: end;
+            padding: 12px 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-surface);
+        }
+        .desktop-ai-toolbar label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+        .desktop-ai-toolbar input {
+            width: 100%;
+            min-height: 44px;
+            padding: 9px 11px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            font: inherit;
+            opacity: 1;
+        }
+        .desktop-ai-context-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .desktop-ai-context-panel,
+        .desktop-ai-role-inspector,
+        .desktop-ai-reuse-panel {
+            min-width: 0;
+            padding: 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-surface);
+        }
+        .desktop-ai-section-head,
+        .desktop-ai-role-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .desktop-ai-definition-grid,
+        .desktop-ai-role-metrics,
+        .desktop-ai-boundary-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            margin: 12px 0 0;
+            padding: 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--border-subtle);
+            overflow: hidden;
+        }
+        .desktop-ai-definition-grid > div,
+        .desktop-ai-role-metrics > div,
+        .desktop-ai-boundary-list > div {
+            min-width: 0;
+            padding: 9px 10px;
+            background: var(--bg-elevated);
+        }
+        .desktop-ai-definition-grid .wide {
+            grid-column: 1 / -1;
+        }
+        .desktop-ai-definition-grid dt,
+        .desktop-ai-role-metrics dt,
+        .desktop-ai-boundary-list dt {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+        }
+        .desktop-ai-definition-grid dd,
+        .desktop-ai-role-metrics dd,
+        .desktop-ai-boundary-list dd {
+            margin: 3px 0 0;
+            color: var(--text-primary);
+            font-size: 0.77rem;
+            font-weight: 680;
+            overflow-wrap: anywhere;
+        }
+        .desktop-ai-consistency-summary {
+            min-height: 70px;
+            margin: 12px 0 0;
+            padding: 11px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        .desktop-ai-workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 5fr) minmax(280px, 3fr);
+            gap: 12px;
+            align-items: start;
+        }
+        .desktop-ai-role-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            margin-top: 12px;
+            padding: 2px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--border-subtle);
+            overflow: hidden;
+        }
+        .desktop-ai-role-tabs button {
+            min-width: 0;
+            min-height: 44px;
+            padding: 8px 6px;
+            border: 0;
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            font: inherit;
+            font-size: 0.7rem;
+            font-weight: 720;
+            overflow-wrap: anywhere;
+        }
+        .desktop-ai-role-tabs button[aria-selected="true"] {
+            background: rgba(47, 117, 255, 0.1);
+            color: var(--brand-accent);
+        }
+        .desktop-ai-role-tabs button:focus-visible,
+        .desktop-ai-detail-link:focus-visible {
+            outline: 3px solid rgba(47, 117, 255, 0.52);
+            outline-offset: 2px;
+        }
+        .desktop-ai-role-panels {
+            min-height: 196px;
+            margin-top: 10px;
+        }
+        .desktop-ai-role-panel {
+            min-height: 196px;
+            padding: 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .desktop-ai-role-head strong,
+        .desktop-ai-role-head span {
+            display: block;
+            overflow-wrap: anywhere;
+        }
+        .desktop-ai-role-head strong {
+            color: var(--brand-accent);
+            font-size: 0.78rem;
+        }
+        .desktop-ai-role-head span,
+        .desktop-ai-role-head em {
+            margin-top: 3px;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-style: normal;
+        }
+        .desktop-ai-role-panel > p {
+            margin: 18px 0 0;
+            color: var(--text-primary);
+            font-size: 0.86rem;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+        .desktop-ai-detail-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            margin-top: 12px;
+            padding: 8px 13px;
+            border: 1px solid var(--brand-accent);
+            border-radius: 8px;
+            color: var(--brand-accent);
+            font-size: 0.78rem;
+            font-weight: 720;
+            text-decoration: none;
+        }
+        .desktop-ai-detail-link[aria-disabled="true"] {
+            border-color: var(--border-subtle);
+            color: var(--text-secondary);
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        .desktop-ai-boundary-list {
+            grid-template-columns: 1fr;
+        }
+        [data-desktop-ai-analysis-root][data-analysis-state="error"] .desktop-ai-identity-pill,
+        [data-desktop-ai-analysis-root][data-analysis-state="missing"] .desktop-ai-identity-pill {
+            color: #a16207;
+            border-color: rgba(234, 179, 8, 0.34);
+            background: rgba(234, 179, 8, 0.1);
+        }
+        @media (max-width: 980px) {
+            .desktop-ai-toolbar,
+            .desktop-ai-context-grid,
+            .desktop-ai-workspace {
+                grid-template-columns: 1fr;
+            }
+        }
         .ai-provenance-note {
             margin: 8px 0 0;
             color: var(--text-secondary);
@@ -2958,7 +3219,7 @@
 <body data-monitor-mode="system">
     <header class="top-bar">
         <div class="brand-block">
-            <h1>首页总览 <span class="header-update">更新时间：<span id="lastUpdatedText">--:--:--</span></span></h1>
+            <h1><span data-desktop-page-title tabindex="-1">首页总览</span> <span class="header-update">更新时间：<span id="lastUpdatedText">--:--:--</span></span></h1>
         </div>
         <div class="top-right">
             <span class="status-pill"><span class="runtime-dot" id="runtimeDot"></span><span class="pill-label">数据状态</span><span class="pill-value status-muted" id="runtimeText">待同步</span></span>
@@ -2992,18 +3253,19 @@
                     </span>
                 </div>
                 <nav class="product-navigation" aria-label="产品页面">
-                    <a href="/dashboard" class="product-nav-item active" aria-current="page">Dashboard</a>
+                    <a href="/dashboard" class="product-nav-item active" aria-current="page" data-desktop-home-nav>Dashboard</a>
                     <a href="/dashboard/positions" class="product-nav-item">Position</a>
-                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">AI Analysis</button>
+                    <a href="/dashboard?view=ai" class="product-nav-item" data-desktop-ai-nav>AI Analysis</a>
                     <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">Message</button>
                     <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">Profile</button>
                 </nav>
                 <div class="sidebar-slot-list" id="sidebarSlotList" hidden></div>
-                <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">其余页面暂未开放</p>
+                <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">消息与个人页暂未开放</p>
                 <div class="sidebar-divider" aria-hidden="true"></div>
                 <p class="sidebar-brand-subtitle">状态与方向分开显示，结论仅供人工复核。</p>
             </aside>
             <main class="dashboard-main">
+        <div data-desktop-home-view data-desktop-dashboard-root>
         <!-- 第一层 -->
         <div class="layer1">
             <div class="card kpi-card" id="cardTrend">
@@ -3496,6 +3758,130 @@
                 </section>
             </div>
         </details>
+        </div>
+
+        <section class="desktop-ai-analysis-view" data-desktop-ai-view data-desktop-ai-analysis-root
+                 data-analysis-state="loading" hidden aria-labelledby="desktopAiAnalysisTitle">
+            <header class="desktop-ai-analysis-header">
+                <div>
+                    <p class="desktop-ai-kicker">单资产分析 / AI Analysis</p>
+                    <h2 id="desktopAiAnalysisTitle" tabindex="-1">AI 分析</h2>
+                    <p>规则层方向优先；AI 仅按固定职责提供复核摘要。</p>
+                </div>
+                <span class="desktop-ai-identity-pill" id="desktopAiStateStatus" role="status">正在同步</span>
+            </header>
+
+            <section class="desktop-ai-toolbar" aria-labelledby="desktopAiSearchTitle">
+                <div>
+                    <label id="desktopAiSearchTitle" for="desktopAiMarketSearch">搜索市场资产</label>
+                    <input id="desktopAiMarketSearch" type="search" placeholder="暂未开放"
+                           disabled aria-disabled="true">
+                </div>
+                <p>市场资产搜索与观察资产写入暂未开放，不生成本地模拟结果。</p>
+            </section>
+
+            <div class="desktop-ai-context-grid">
+                <section class="desktop-ai-context-panel" aria-labelledby="desktopAiContextTitle">
+                    <div class="desktop-ai-section-head">
+                        <div>
+                            <p class="desktop-ai-kicker">权威分析上下文</p>
+                            <h3 id="desktopAiContextTitle">当前资产</h3>
+                        </div>
+                        <span class="desktop-ai-symbol" id="desktopAiSymbol">--</span>
+                    </div>
+                    <dl class="desktop-ai-definition-grid">
+                        <div class="wide"><dt>analysisId</dt><dd id="desktopAiAnalysisId">待同步</dd></div>
+                        <div><dt>规则基础方向</dt><dd id="desktopAiDirection">--</dd></div>
+                        <div><dt>分析状态</dt><dd id="desktopAiRunStatus">等待同步</dd></div>
+                    </dl>
+                </section>
+                <section class="desktop-ai-context-panel" aria-labelledby="desktopAiConsistencyTitle">
+                    <div class="desktop-ai-section-head">
+                        <div>
+                            <p class="desktop-ai-kicker">不是第四角色</p>
+                            <h3 id="desktopAiConsistencyTitle">AI 一致性摘要</h3>
+                        </div>
+                        <span class="desktop-ai-symbol" id="desktopAiConsistencyLevel">等待同步</span>
+                    </div>
+                    <p class="desktop-ai-consistency-summary" id="desktopAiConsistencySummary">
+                        等待 AI 三角色结果同步后生成一致性结论
+                    </p>
+                </section>
+            </div>
+
+            <div class="desktop-ai-workspace">
+                <section class="desktop-ai-role-inspector" aria-labelledby="desktopAiRolesTitle">
+                    <div class="desktop-ai-section-head">
+                        <div>
+                            <p class="desktop-ai-kicker">固定职责，不进行投票</p>
+                            <h3 id="desktopAiRolesTitle">三 AI 摘要</h3>
+                        </div>
+                    </div>
+                    <div class="desktop-ai-role-tabs" role="tablist" aria-label="AI 角色">
+                        <button type="button" role="tab" id="desktop-ai-tab-gpt"
+                                aria-selected="true" aria-controls="desktop-ai-panel-gpt"
+                                data-desktop-ai-tab="GPT_FINAL">GPT_FINAL</button>
+                        <button type="button" role="tab" id="desktop-ai-tab-gemini"
+                                aria-selected="false" aria-controls="desktop-ai-panel-gemini"
+                                data-desktop-ai-tab="GEMINI_REVIEW" tabindex="-1">GEMINI_REVIEW</button>
+                        <button type="button" role="tab" id="desktop-ai-tab-grok"
+                                aria-selected="false" aria-controls="desktop-ai-panel-grok"
+                                data-desktop-ai-tab="GROK_CHALLENGE" tabindex="-1">GROK_CHALLENGE</button>
+                    </div>
+                    <div class="desktop-ai-role-panels">
+                        <article class="desktop-ai-role-panel" id="desktop-ai-panel-gpt"
+                                 role="tabpanel" tabindex="0" aria-labelledby="desktop-ai-tab-gpt"
+                                 data-desktop-ai-role-panel="GPT_FINAL">
+                            <div class="desktop-ai-role-head">
+                                <div><strong>GPT_FINAL</strong><span>最终裁决官</span></div>
+                                <em data-desktop-ai-role-status>待同步</em>
+                            </div>
+                            <p data-desktop-ai-role-summary>当前观点待同步</p>
+                            <dl class="desktop-ai-role-metrics">
+                                <div><dt>方向</dt><dd data-desktop-ai-role-direction>--</dd></div>
+                                <div><dt>置信度</dt><dd data-desktop-ai-role-confidence>--</dd></div>
+                            </dl>
+                        </article>
+                        <article class="desktop-ai-role-panel" id="desktop-ai-panel-gemini"
+                                 role="tabpanel" tabindex="0" aria-labelledby="desktop-ai-tab-gemini"
+                                 data-desktop-ai-role-panel="GEMINI_REVIEW" hidden>
+                            <div class="desktop-ai-role-head">
+                                <div><strong>GEMINI_REVIEW</strong><span>冲突复核官</span></div>
+                                <em data-desktop-ai-role-status>待同步</em>
+                            </div>
+                            <p data-desktop-ai-role-summary>当前复核待同步</p>
+                        </article>
+                        <article class="desktop-ai-role-panel" id="desktop-ai-panel-grok"
+                                 role="tabpanel" tabindex="0" aria-labelledby="desktop-ai-tab-grok"
+                                 data-desktop-ai-role-panel="GROK_CHALLENGE" hidden>
+                            <div class="desktop-ai-role-head">
+                                <div><strong>GROK_CHALLENGE</strong><span>反方挑战官</span></div>
+                                <em data-desktop-ai-role-status>待同步</em>
+                            </div>
+                            <p data-desktop-ai-role-summary>当前挑战待同步</p>
+                        </article>
+                    </div>
+                </section>
+
+                <aside class="desktop-ai-reuse-panel" aria-labelledby="desktopAiReuseTitle">
+                    <div>
+                        <p class="desktop-ai-kicker">复用 FE-03</p>
+                        <h3 id="desktopAiReuseTitle">深层分析</h3>
+                    </div>
+                    <p id="desktopAiDetailStatus">需要权威 analysisId</p>
+                    <a class="desktop-ai-detail-link" id="desktopAiDetailLink"
+                       data-enabled-label="查看 Analysis Detail"
+                       data-disabled-label="当前不可查看"
+                       aria-disabled="true" tabindex="-1">当前不可查看</a>
+                    <dl class="desktop-ai-boundary-list">
+                        <div><dt>八大评分</dt><dd>由 FE-03 展示</dd></div>
+                        <div><dt>多周期</dt><dd>由 FE-03 展示</dd></div>
+                        <div><dt>证据链</dt><dd>由 FE-03 展示</dd></div>
+                    </dl>
+                    <p class="desktop-ai-boundary-note">完整数据缺失时显示待同步，不补造评分、证据或多周期结论。</p>
+                </aside>
+            </div>
+        </section>
             </main>
         </div>
     </div>
@@ -3900,6 +4286,7 @@
     var selectedPositionId = null;
     var dashboardHomeRequestSequence = 0;
     var dashboardHomeAbortController = null;
+    var activeDesktopAiRole = "GPT_FINAL";
     var searchQuery = "";
     var modeValue = "system";
     var lastExternalContextPayload = {};
@@ -6460,11 +6847,161 @@
         }).slice(0, 6);
     }
 
-    function updateAssetDetailLink(asset) {
-        var link = document.getElementById("assetDetailLink");
+    function desktopAiRoleSummary(tab) {
+        if (tab.role === "GPT_FINAL") {
+            return cleanBlankValue(tab.finalConclusion || tab.decisionSummary || tab.statusMessage)
+                || "当前观点待同步";
+        }
+        if (tab.role === "GEMINI_REVIEW") {
+            return cleanBlankValue(tab.reviewConclusion || tab.reviewVerdict || tab.statusMessage)
+                || "当前复核待同步";
+        }
+        return cleanBlankValue(tab.challengeConclusion || tab.challengeThesis || tab.statusMessage)
+            || "当前挑战待同步";
+    }
+
+    function setActiveDesktopAiRole(role, focusTab) {
+        if (!frontendContract.AI_ROLES.some(function (item) { return item.role === role; })) return;
+        activeDesktopAiRole = role;
+        Array.prototype.forEach.call(
+            document.querySelectorAll("[data-desktop-ai-tab]"),
+            function (tab) {
+                var selected = tab.getAttribute("data-desktop-ai-tab") === role;
+                tab.setAttribute("aria-selected", String(selected));
+                tab.tabIndex = selected ? 0 : -1;
+                if (selected && focusTab) tab.focus();
+            }
+        );
+        Array.prototype.forEach.call(
+            document.querySelectorAll("[data-desktop-ai-role-panel]"),
+            function (panel) {
+                panel.hidden = panel.getAttribute("data-desktop-ai-role-panel") !== role;
+            }
+        );
+    }
+
+    function bindDesktopAiRoleTabs() {
+        var tabs = Array.prototype.slice.call(
+            document.querySelectorAll("[data-desktop-ai-tab]")
+        );
+        tabs.forEach(function (tab, index) {
+            tab.addEventListener("click", function () {
+                setActiveDesktopAiRole(tab.getAttribute("data-desktop-ai-tab"), false);
+            });
+            tab.addEventListener("keydown", function (event) {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+                event.preventDefault();
+                var offset = event.key === "ArrowRight" ? 1 : -1;
+                var nextIndex = (index + offset + tabs.length) % tabs.length;
+                var next = tabs[nextIndex];
+                setActiveDesktopAiRole(next.getAttribute("data-desktop-ai-tab"), true);
+            });
+        });
+        setActiveDesktopAiRole(activeDesktopAiRole, false);
+    }
+
+    function updateDesktopAiDetailLink(analysisId, symbol) {
+        var link = document.getElementById("desktopAiDetailLink");
         if (!link) return;
+        if (!analysisId || !symbol) {
+            link.removeAttribute("href");
+            link.setAttribute("aria-disabled", "true");
+            link.tabIndex = -1;
+            link.textContent = link.getAttribute("data-disabled-label") || "当前不可查看";
+            return;
+        }
+        link.href = "/dashboard/analysis-detail?analysisId=" + encodeURIComponent(analysisId)
+            + "&selectedSymbol=" + encodeURIComponent(symbol);
+        link.removeAttribute("aria-disabled");
+        link.tabIndex = 0;
+        link.textContent = link.getAttribute("data-enabled-label") || "查看 Analysis Detail";
+    }
+
+    function renderDesktopAiAnalysis(aiDecision, asset) {
+        var root = document.querySelector("[data-desktop-ai-analysis-root]");
+        if (!root) return;
+        var ai = aiDecision || {};
         var analysisId = cleanBlankValue(asset && asset.analysisId);
         var symbol = normalizeDisplaySymbol(asset && (asset.rawSymbol || asset.symbol));
+        var identityReady = !!analysisId && !!symbol;
+        var runStatus = String(ai.runStatus || "").trim().toUpperCase();
+        var failed = runStatus.indexOf("FAIL") >= 0 || runStatus.indexOf("ERROR") >= 0;
+        var loading = runStatus === "LOADING" || runStatus === "PENDING";
+        var empty = !asset && !failed && !loading;
+        root.dataset.analysisState = failed
+            ? "error"
+            : (loading ? "loading" : (empty ? "empty" : (!identityReady ? "missing" : "partial")));
+        setText("desktopAiStateStatus", failed
+            ? "当前不可查看"
+            : (loading
+                ? "正在同步"
+                : (empty
+                    ? "暂无可分析资产"
+                    : (!identityReady
+                        ? "分析身份待同步"
+                        : cleanBlankValue(ai.runStatusLabel) || "部分数据待同步"))));
+        setText("desktopAiSymbol", symbol || "--");
+        setText("desktopAiAnalysisId", analysisId || "待同步");
+        setText(
+            "desktopAiDirection",
+            identityReady ? cleanBlankValue(asset.marketBiasLabel || asset.marketBias) || "--" : "--"
+        );
+        setText(
+            "desktopAiRunStatus",
+            identityReady ? cleanBlankValue(ai.runStatusLabel) || "等待同步" : "当前不可查看"
+        );
+        var consistency = identityReady ? (ai.consistency || {}) : {};
+        setText("desktopAiConsistencyLevel", cleanBlankValue(consistency.consistencyLevel) || "等待同步");
+        setText(
+            "desktopAiConsistencySummary",
+            cleanBlankValue(consistency.consistencySummary)
+                || (identityReady
+                    ? "等待 AI 三角色结果同步后生成一致性结论"
+                    : "缺少权威 analysisId，当前不可查看")
+        );
+        setText(
+            "desktopAiDetailStatus",
+            identityReady ? "权威 analysisId 已就绪" : "需要权威 analysisId"
+        );
+        updateDesktopAiDetailLink(analysisId, symbol);
+
+        var tabs = frontendContract.normalizeAiTabs(identityReady && !failed && !loading ? ai.tabs : []);
+        tabs.forEach(function (tab) {
+            var panel = document.querySelector(
+                '[data-desktop-ai-role-panel="' + tab.role + '"]'
+            );
+            if (!panel) return;
+            var status = panel.querySelector("[data-desktop-ai-role-status]");
+            var summary = panel.querySelector("[data-desktop-ai-role-summary]");
+            if (status) status.textContent = identityReady && !failed && !loading
+                ? cleanBlankValue(tab.runStatusLabel) || "待同步"
+                : "待同步";
+            if (summary) summary.textContent = identityReady && !failed && !loading
+                ? desktopAiRoleSummary(tab)
+                : "缺少可验证分析数据，当前不可查看";
+            var direction = panel.querySelector("[data-desktop-ai-role-direction]");
+            var confidence = panel.querySelector("[data-desktop-ai-role-confidence]");
+            if (direction) direction.textContent = identityReady && !failed
+                ? cleanBlankValue(tab.finalMarketBias) || "--" : "--";
+            if (confidence) confidence.textContent = identityReady && !failed
+                ? cleanBlankValue(tab.finalConfidence) || "--" : "--";
+        });
+    }
+
+    function updateAssetDetailLink(asset) {
+        var link = document.getElementById("assetDetailLink");
+        var analysisId = cleanBlankValue(asset && asset.analysisId);
+        var symbol = normalizeDisplaySymbol(asset && (asset.rawSymbol || asset.symbol));
+        updateDesktopAiDetailLink(analysisId, symbol);
+        setText("desktopAiSymbol", symbol || "--");
+        setText("desktopAiAnalysisId", analysisId || "待同步");
+        setText(
+            "desktopAiDirection",
+            analysisId && symbol
+                ? cleanBlankValue(asset && (asset.marketBiasLabel || asset.marketBias)) || "--"
+                : "--"
+        );
+        if (!link) return;
         if (!analysisId || !symbol) {
             link.removeAttribute("href");
             link.setAttribute("aria-disabled", "true");
@@ -6531,9 +7068,16 @@
                 Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (tile) {
                     tile.classList.toggle("selected", tile === el);
                 });
-                updateAssetDetailLink(list.find(function (asset) {
+                var selectedAsset = list.find(function (asset) {
                     return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === sym;
-                }) || null);
+                }) || null;
+                updateAssetDetailLink(selectedAsset);
+                renderDesktopAiAnalysis({
+                    runStatus: "LOADING",
+                    runStatusLabel: "正在同步",
+                    consistency: {},
+                    tabs: []
+                }, selectedAsset);
                 syncDashboardSelectionUrl();
                 refreshAssetContext();
             }
@@ -6660,6 +7204,7 @@
                 summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
             });
         }
+        renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}));
     }
 
     function renderHomePushInboxFromPayload(pushInbox) {
@@ -6737,6 +7282,8 @@
             execution.innerHTML = '<div class="execution-card-body"><div class="execution-fail-status" role="status"><p class="main">当前不展示执行计划</p><p class="sub">首页数据暂不可用，等待重新同步</p></div></div>';
         }
         renderHomeAiDecisionFromPayload({
+            runStatus: "LOAD_FAILED",
+            runStatusLabel: "当前不可查看",
             consistency: { aiApplicable: false },
             tabs: []
         });
@@ -10495,8 +11042,57 @@
         });
     }
 
+    function setDesktopProductView(view, focusHeading) {
+        var showAi = view === "ai";
+        var homeView = document.querySelector("[data-desktop-home-view]");
+        var aiView = document.querySelector("[data-desktop-ai-view]");
+        var homeControl = document.querySelector("[data-desktop-home-nav]");
+        var aiControl = document.querySelector("[data-desktop-ai-nav]");
+        if (!homeView || !aiView) return;
+        homeView.hidden = showAi;
+        aiView.hidden = !showAi;
+        if (homeControl) {
+            homeControl.classList.toggle("active", !showAi);
+            if (showAi) homeControl.removeAttribute("aria-current");
+            else homeControl.setAttribute("aria-current", "page");
+        }
+        if (aiControl) {
+            aiControl.classList.toggle("active", showAi);
+            if (showAi) aiControl.setAttribute("aria-current", "page");
+            else aiControl.removeAttribute("aria-current");
+        }
+        var pageTitle = document.querySelector("[data-desktop-page-title]");
+        if (pageTitle) pageTitle.textContent = showAi ? "AI 分析" : "首页总览";
+        frontendContract.replaceUrlParam("view", showAi ? "ai" : null);
+        if (focusHeading) {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            window.setTimeout(function () {
+                var heading = showAi
+                    ? document.getElementById("desktopAiAnalysisTitle")
+                    : document.querySelector("[data-desktop-page-title]");
+                if (heading) heading.focus({ preventScroll: true });
+            }, 240);
+        }
+    }
+
     function bindDesktopProductNavigation() {
         var status = document.querySelector("[data-desktop-nav-status]");
+        var homeControl = document.querySelector("[data-desktop-home-nav]");
+        var aiControl = document.querySelector("[data-desktop-ai-nav]");
+        if (homeControl) {
+            homeControl.addEventListener("click", function (event) {
+                event.preventDefault();
+                setDesktopProductView("home", true);
+                if (status) status.textContent = "Dashboard";
+            });
+        }
+        if (aiControl) {
+            aiControl.addEventListener("click", function (event) {
+                event.preventDefault();
+                setDesktopProductView("ai", true);
+                if (status) status.textContent = "AI Analysis";
+            });
+        }
         Array.prototype.forEach.call(
             document.querySelectorAll("[data-desktop-unavailable-nav]"),
             function (control) {
@@ -10504,6 +11100,10 @@
                     if (status) status.textContent = (control.textContent || "该页面") + " 暂未开放";
                 });
             }
+        );
+        setDesktopProductView(
+            frontendContract.readUrlParam("view") === "ai" ? "ai" : "home",
+            false
         );
     }
 
@@ -10531,6 +11131,7 @@
             if (btn) btn.textContent = "白天主题";
         }
         restoreDashboardSelectionFromUrl();
+        bindDesktopAiRoleTabs();
         bindDesktopProductNavigation();
         modeValue = "system";
         updateModeHint();

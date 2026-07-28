@@ -234,7 +234,10 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
         )
         XCTAssertEqual(
-            try numberValue("document.querySelectorAll('[data-role-panel], [role=\"tablist\"]').length", in: webView),
+            try numberValue(
+                "document.querySelector('[data-mobile-home-view]').querySelectorAll('[data-role-panel], [role=\"tablist\"]').length",
+                in: webView
+            ),
             0
         )
         XCTAssertEqual(
@@ -321,7 +324,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
 
         XCTAssertEqual(
             try stringValue(
-                "Array.from(document.querySelectorAll('main > header, main > section')).map(node => node.id || node.className).join('|')",
+                "Array.from(document.querySelectorAll('[data-mobile-home-view] > header, [data-mobile-home-view] > section')).map(node => node.id || node.className).join('|')",
                 in: webView
             ),
             "mobile-header|mobile-status|mobile-alerts|watch-assets|execution-advice|position-monitor|ai-review"
@@ -339,7 +342,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
         XCTAssertEqual(
             try numberValue("document.querySelectorAll('.bottom-nav [data-unavailable-nav][aria-disabled=\"true\"]').length", in: webView),
-            3
+            2
         )
         XCTAssertEqual(try numberValue("document.querySelectorAll('.status-cell').length", in: webView), 8)
         XCTAssertEqual(try numberValue("document.querySelectorAll('[data-ai-role-summary]').length", in: webView), 3)
@@ -352,7 +355,10 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
     func testNativeToolbarProjectionDoesNotRepeatVisibleProductTitle() throws {
         let webView = try loadFixture()
 
-        XCTAssertEqual(try numberValue("document.querySelectorAll('h1').length", in: webView), 1)
+        XCTAssertEqual(
+            try numberValue("Array.from(document.querySelectorAll('h1')).filter(node => !node.closest('[hidden]')).length", in: webView),
+            1
+        )
         XCTAssertEqual(
             try stringValue("document.querySelector('h1').textContent", in: webView),
             "首页"
@@ -387,6 +393,78 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             "page"
         )
         XCTAssertEqual(try numberValue("document.querySelectorAll('.bottom-nav [aria-current]').length", in: webView), 1)
+    }
+
+    func testAiAnalysisTabUsesAuthoritativeIdentityAndReusesFe03Detail() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-ai-nav]').click()", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-mobile-home-view]').hidden && !document.querySelector('[data-mobile-ai-view]').hidden",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-nav]').getAttribute('aria-current')", in: webView),
+            "page"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-id]').textContent", in: webView),
+            "ANA_BTCUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-root]').dataset.analysisIdentity", in: webView),
+            "verified"
+        )
+        XCTAssertTrue(try booleanValue(
+            "document.querySelector('[data-ai-analysis-detail-link]').getAttribute('href').includes('analysisId=ANA_BTCUSDT')",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-ai-analysis-tab]')).map(node => node.dataset.aiAnalysisTab).join('|')",
+                in: webView
+            ),
+            "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
+        )
+        XCTAssertTrue(try booleanValue("document.querySelector('.ai-analysis-search').disabled", in: webView))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('.ai-analysis-role-tabs').getAttribute('role')", in: webView),
+            "tablist"
+        )
+        XCTAssertGreaterThanOrEqual(
+            try numberValue(
+                "Math.min(...Array.from(document.querySelectorAll('[data-ai-analysis-tab], [data-ai-analysis-detail-link]')).map(node => node.getBoundingClientRect().height))",
+                in: webView
+            ),
+            44
+        )
+        try run("document.documentElement.dataset.mobileTextSize = 'accessibility'", in: webView)
+        XCTAssertGreaterThan(
+            try numberValue("parseFloat(getComputedStyle(document.getElementById('mobile-ai-analysis-title')).fontSize)", in: webView),
+            20
+        )
+        XCTAssertLessThanOrEqual(
+            try numberValue("document.documentElement.scrollWidth", in: webView),
+            try numberValue("window.innerWidth", in: webView)
+        )
+
+        try run("document.querySelector('[data-ai-analysis-tab=\"GEMINI_REVIEW\"]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-tab][aria-selected=\"true\"]').dataset.aiAnalysisTab", in: webView),
+            "GEMINI_REVIEW"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-role-panel]:not([hidden])').dataset.aiAnalysisRolePanel", in: webView),
+            "GEMINI_REVIEW"
+        )
+
+        try run("document.querySelector('[data-home-nav]').click()", in: webView)
+        XCTAssertTrue(waitUntil(
+            "!document.querySelector('[data-mobile-home-view]').hidden && document.querySelector('[data-mobile-ai-view]').hidden",
+            in: webView,
+            timeout: 2
+        ))
     }
 
     func testOnlyAssetPagerCanOverflowHorizontallyAndAllVisibleNavigationTargetsFit() throws {
@@ -1665,7 +1743,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
           </script>
         </head>
         <body>
-          <main class="mobile-home" data-mobile-home-root>
+          <main class="mobile-home" data-mobile-home-root data-mobile-home-view>
             <header class="mobile-header">
               <div class="product-lockup">
                 <p class="product-name">TRADE MODEL V1</p>
@@ -1707,6 +1785,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                   <button class="watch-tool-button" type="button" data-asset-add disabled
                           aria-disabled="true" aria-describedby="watch-add-contract-status">添加</button>
                   <a class="watch-tool-button watch-detail-link" data-asset-detail-link
+                     data-enabled-label="分析详情" data-disabled-label="当前不可查看"
                      aria-disabled="true" tabindex="-1">当前不可查看</a>
                 </div>
               </div>
@@ -1719,17 +1798,17 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
               <strong data-selected-asset-token>\(selectedSymbol)</strong>
               <div class="asset-pager" role="radiogroup">
-                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
+                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-direction-label="震荡" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
                 </button>
-                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
+                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-direction-label="偏多" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">待复核候选</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
                 </button>
-                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
+                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-direction-label="偏空" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">高风险</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>
@@ -1774,10 +1853,68 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             <div style="height: 1800px"></div>
             <div id="fixture-end-marker" style="height: 1px"></div>
           </main>
+          <main class="mobile-home mobile-ai-analysis" id="mobile-ai-analysis"
+                data-mobile-ai-view data-ai-analysis-root hidden>
+            <header class="mobile-header ai-analysis-header">
+              <h1 id="mobile-ai-analysis-title" tabindex="-1">AI 分析</h1>
+              <span data-ai-analysis-state-status>正在同步</span>
+            </header>
+            <section class="ai-analysis-toolbar">
+              <h2>单资产分析</h2>
+              <input class="ai-analysis-search" type="search" placeholder="暂未开放"
+                     disabled aria-disabled="true">
+              <p>市场资产搜索与观察资产写入暂未开放。</p>
+            </section>
+            <section class="ai-analysis-context-section">
+              <span data-ai-analysis-symbol>--</span>
+              <dl class="ai-analysis-context-grid">
+                <div class="full-row"><dt>analysisId</dt><dd data-ai-analysis-id>待同步</dd></div>
+                <div><dt>规则基础方向</dt><dd data-ai-analysis-direction>--</dd></div>
+                <div><dt>一致性等级</dt><dd data-ai-analysis-consistency-level>等待同步</dd></div>
+                <div class="full-row"><dt>一致性摘要</dt><dd data-ai-analysis-consistency-summary>等待同步</dd></div>
+              </dl>
+            </section>
+            <section class="ai-analysis-role-section">
+              <strong data-ai-analysis-run-status>等待同步</strong>
+              <div class="ai-analysis-role-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected="true"
+                        data-ai-analysis-tab="GPT_FINAL">GPT_FINAL</button>
+                <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                        data-ai-analysis-tab="GEMINI_REVIEW">GEMINI_REVIEW</button>
+                <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                        data-ai-analysis-tab="GROK_CHALLENGE">GROK_CHALLENGE</button>
+              </div>
+              <div class="ai-analysis-role-panels" data-ai-analysis-role-root>
+                <article class="ai-analysis-role-panel" role="tabpanel"
+                         data-ai-analysis-role-panel="GPT_FINAL">
+                  <div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong data-ai-analysis-role-status>待同步</strong></div>
+                  <p data-ai-analysis-role-summary>当前观点待同步</p>
+                  <dl class="role-summary-metrics"><div><dt>方向</dt><dd data-ai-analysis-role-direction>--</dd></div><div><dt>置信度</dt><dd data-ai-analysis-role-confidence>--</dd></div></dl>
+                </article>
+                <article class="ai-analysis-role-panel" role="tabpanel" hidden
+                         data-ai-analysis-role-panel="GEMINI_REVIEW">
+                  <div class="role-heading"><div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div><strong data-ai-analysis-role-status>待同步</strong></div>
+                  <p data-ai-analysis-role-summary>当前复核待同步</p>
+                </article>
+                <article class="ai-analysis-role-panel" role="tabpanel" hidden
+                         data-ai-analysis-role-panel="GROK_CHALLENGE">
+                  <div class="role-heading"><div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div><strong data-ai-analysis-role-status>待同步</strong></div>
+                  <p data-ai-analysis-role-summary>当前挑战待同步</p>
+                </article>
+              </div>
+            </section>
+            <section class="ai-analysis-deep-section">
+              <p data-ai-analysis-detail-status>需要权威 analysisId</p>
+              <a class="ai-analysis-detail-link" data-ai-analysis-detail-link
+                 data-enabled-label="查看 Analysis Detail"
+                 data-disabled-label="当前不可查看"
+                 aria-disabled="true" tabindex="-1">当前不可查看</a>
+            </section>
+          </main>
           <nav class="bottom-nav" data-mobile-five-tab-navigation>
             <button type="button" data-home-nav aria-current="page">首页</button>
             <a href="/dashboard/mobile/positions" data-position-nav>持仓</a>
-            <button type="button" data-ai-nav data-unavailable-nav aria-disabled="true">AI分析</button>
+            <button type="button" data-ai-nav>AI分析</button>
             <button type="button" data-message-nav data-unavailable-nav aria-disabled="true">消息</button>
             <button type="button" data-profile-nav data-unavailable-nav aria-disabled="true">我的</button>
           </nav>

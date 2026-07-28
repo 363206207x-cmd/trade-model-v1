@@ -163,20 +163,22 @@ class PositionMonitoringFrontendContractTest {
     }
 
     @Test
-    void homeNavigationActivatesOnlyTheImplementedPositionDestination() throws Exception {
+    void homeNavigationActivatesImplementedPositionAndAiDestinations() throws Exception {
         String mobile = Files.readString(HOME_MOBILE);
         String desktop = Files.readString(HOME_DESKTOP);
 
         assertThat(mobile)
                 .contains("<a href=\"/dashboard/mobile/positions\" data-position-nav>持仓</a>")
-                .contains("data-ai-nav data-unavailable-nav")
+                .contains("<button type=\"button\" data-ai-nav>AI分析</button>")
                 .contains("data-message-nav data-unavailable-nav")
-                .contains("data-profile-nav data-unavailable-nav");
+                .contains("data-profile-nav data-unavailable-nav")
+                .doesNotContain("data-ai-nav data-unavailable-nav");
         assertThat(desktop)
                 .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">Position</a>")
-                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">AI Analysis")
+                .contains("data-desktop-ai-nav>AI Analysis</a>")
                 .contains("data-desktop-unavailable-nav aria-disabled=\"true\">Message")
-                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">Profile");
+                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">Profile")
+                .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">AI Analysis");
     }
 
     @Test

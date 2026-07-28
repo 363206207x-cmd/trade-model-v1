@@ -26,7 +26,7 @@ class Fe04ShellHomeDashboardContractTest {
             Path.of("src/main/resources/templates/dashboard.html");
 
     @Test
-    void mobileShellUsesTheFrozenFiveDestinationOrderAndFailsClosed() throws Exception {
+    void mobileShellUsesTheFrozenFiveDestinationOrderAndActivatesAiAnalysis() throws Exception {
         String html = Files.readString(MOBILE);
         String navigation = slice(html, "<nav class=\"bottom-nav\"", "</nav>");
 
@@ -41,9 +41,10 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(navigation)
                 .contains("data-home-nav aria-current=\"page\"")
                 .contains("href=\"/dashboard/mobile/positions\" data-position-nav")
-                .contains("data-ai-nav data-unavailable-nav aria-disabled=\"true\"")
+                .contains("<button type=\"button\" data-ai-nav>AI分析</button>")
                 .contains("data-message-nav data-unavailable-nav aria-disabled=\"true\"")
-                .contains("data-profile-nav data-unavailable-nav aria-disabled=\"true\"");
+                .contains("data-profile-nav data-unavailable-nav aria-disabled=\"true\"")
+                .doesNotContain("data-ai-nav data-unavailable-nav");
     }
 
     @Test
@@ -171,6 +172,105 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(desktop)
                 .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">Position</a>")
                 .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">Position");
+    }
+
+    @Test
+    void restrictedAiAnalysisViewsReuseAuthoritativeIdentityAndFe03WithoutNewCapabilities()
+            throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String mobileScript = Files.readString(MOBILE_SCRIPT);
+        String mobileStyles = Files.readString(MOBILE_STYLES);
+        String desktop = Files.readString(DESKTOP);
+        String mobileAi = slice(
+                mobile,
+                "<main class=\"mobile-home mobile-ai-analysis\"",
+                "</main>");
+        String desktopAi = slice(
+                desktop,
+                "<section class=\"desktop-ai-analysis-view\"",
+                "</section>\n            </main>");
+
+        assertThat(mobileAi)
+                .contains(
+                        "data-mobile-ai-view",
+                        "data-ai-analysis-id",
+                        "data-ai-analysis-tab=\"GPT_FINAL\"",
+                        "data-ai-analysis-tab=\"GEMINI_REVIEW\"",
+                        "data-ai-analysis-tab=\"GROK_CHALLENGE\"",
+                        "data-ai-analysis-detail-link",
+                        "市场资产搜索与观察资产写入暂未开放",
+                        "placeholder=\"暂未开放\" disabled",
+                        "八大评分、多周期与证据链仅由 FE-03 Analysis Detail 展示")
+                .doesNotContain("data-ai-analysis-tab=\"AI_CONSISTENCY\"")
+                .doesNotContain("data-watch-write")
+                .doesNotContain("data-market-search-result");
+        assertThat(desktopAi)
+                .contains(
+                        "data-desktop-ai-analysis-root",
+                        "id=\"desktopAiAnalysisId\"",
+                        "data-desktop-ai-tab=\"GPT_FINAL\"",
+                        "data-desktop-ai-tab=\"GEMINI_REVIEW\"",
+                        "data-desktop-ai-tab=\"GROK_CHALLENGE\"",
+                        "id=\"desktopAiDetailLink\"",
+                        "市场资产搜索与观察资产写入暂未开放",
+                        "placeholder=\"暂未开放\"")
+                .doesNotContain("data-desktop-ai-tab=\"AI_CONSISTENCY\"");
+        assertThat(mobileScript)
+                .contains(
+                        "card.dataset.analysisId",
+                        "renderAiAnalysis(safeAi, selectedAssetCard())",
+                        "frontendContract.normalizeAiTabs(identityReady ? tabs : [])",
+                        "/dashboard/analysis-detail?analysisId=",
+                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                .doesNotContain("latestAnalysis")
+                .doesNotContain("Number(analysisId)")
+                .doesNotContain("parseInt(analysisId");
+        assertThat(desktop)
+                .contains(
+                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))",
+                        "frontendContract.normalizeAiTabs(identityReady && !failed && !loading ? ai.tabs : [])",
+                        "/dashboard/analysis-detail?analysisId=",
+                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                .doesNotContain("latestAnalysisId");
+        assertThat(mobileStyles)
+                .contains(
+                        ".ai-analysis-role-tabs button",
+                        "min-height: 48px",
+                        ".ai-analysis-detail-link",
+                        "min-height: 44px");
+    }
+
+    @Test
+    void restrictedAiAnalysisFailsClosedForMissingIdentityAndLoadFailure() throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String script = Files.readString(MOBILE_SCRIPT);
+        String desktop = Files.readString(DESKTOP);
+
+        assertThat(mobile + desktop)
+                .contains(
+                        "分析身份待同步",
+                        "当前不可查看",
+                        "等待同步",
+                        "--",
+                        "不补造");
+        assertThat(script)
+                .contains(
+                        "var empty = !card && !failed && !loading",
+                        "root.dataset.analysisState = failed",
+                        "? \"empty\"",
+                        "runStatus: \"LOADING\"",
+                        "runStatus: \"LOAD_FAILED\"",
+                        "renderAiAnalysisRoles(safeAi.tabs, identityReady && !failed && !loading)")
+                .doesNotContain("/api/analysis/create")
+                .doesNotContain("/api/watch");
+        assertThat(desktop)
+                .contains(
+                        "var empty = !asset && !failed && !loading",
+                        "root.dataset.analysisState = failed",
+                        "? \"empty\"",
+                        "缺少可验证分析数据，当前不可查看")
+                .doesNotContain("fetch(\"/api/analysis")
+                .doesNotContain("fetch(\"/api/watch");
     }
 
     @Test
@@ -314,7 +414,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
                 .contains("data-desktop-unavailable-nav")
-                .contains("其余页面暂未开放");
+                .contains("消息与个人页暂未开放");
     }
 
     private String slice(String source, String start, String end) {

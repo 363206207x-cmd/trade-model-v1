@@ -8,6 +8,7 @@
   var AI_ROLES = frontendContract.AI_ROLES;
   var requestSequence = 0;
   var activeRequest = null;
+  var activeAiRole = "GPT_FINAL";
 
   function bindPreferredColorScheme() {
     if (!window.matchMedia) return;
@@ -77,25 +78,40 @@
   }
 
   function updateAssetDetailLink(card) {
-    var link = document.querySelector("[data-asset-detail-link]");
-    if (!link) return;
+    var links = document.querySelectorAll(
+      "[data-asset-detail-link], [data-ai-analysis-detail-link]"
+    );
     var analysisId = card ? String(card.dataset.analysisId || "").trim() : "";
     var symbol = card ? String(card.dataset.symbol || "").trim() : "";
-    if (!analysisId || !symbol) {
-      link.removeAttribute("href");
-      link.setAttribute("aria-disabled", "true");
-      link.tabIndex = -1;
-      link.textContent = "当前不可查看";
-      return;
+    var identityReady = !!analysisId && !!symbol;
+    setText("[data-ai-analysis-symbol]", symbol, "--");
+    setText("[data-ai-analysis-id]", analysisId, "待同步");
+    setText(
+      "[data-ai-analysis-direction]",
+      card ? card.dataset.directionLabel : null,
+      "--"
+    );
+    var analysisRoot = document.querySelector("[data-ai-analysis-root]");
+    if (analysisRoot) {
+      analysisRoot.dataset.analysisIdentity = identityReady ? "verified" : "missing";
     }
-    link.href = "/dashboard/analysis-detail?analysisId="
-      + encodeURIComponent(analysisId)
-      + "&selectedSymbol="
-      + encodeURIComponent(symbol)
-      + "&view=mobile";
-    link.removeAttribute("aria-disabled");
-    link.tabIndex = 0;
-    link.textContent = "分析详情";
+    links.forEach(function (link) {
+      if (!identityReady) {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+        link.tabIndex = -1;
+        link.textContent = link.dataset.disabledLabel || "当前不可查看";
+        return;
+      }
+      link.href = "/dashboard/analysis-detail?analysisId="
+        + encodeURIComponent(analysisId)
+        + "&selectedSymbol="
+        + encodeURIComponent(symbol)
+        + "&view=mobile";
+      link.removeAttribute("aria-disabled");
+      link.tabIndex = 0;
+      link.textContent = link.dataset.enabledLabel || "分析详情";
+    });
   }
 
   function setSelectedAsset(symbol) {
@@ -251,11 +267,166 @@
     });
   }
 
+  function setActiveAiRole(role, focusTab) {
+    if (!AI_ROLES.some(function (item) { return item.role === role; })) return;
+    activeAiRole = role;
+    document.querySelectorAll("[data-ai-analysis-tab]").forEach(function (tab) {
+      var selected = tab.dataset.aiAnalysisTab === role;
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      if (selected && focusTab) tab.focus();
+    });
+    document.querySelectorAll("[data-ai-analysis-role-panel]").forEach(function (panel) {
+      panel.hidden = panel.dataset.aiAnalysisRolePanel !== role;
+    });
+  }
+
+  function bindAiRoleTabs() {
+    var tabs = Array.from(document.querySelectorAll("[data-ai-analysis-tab]"));
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener("click", function () {
+        setActiveAiRole(tab.dataset.aiAnalysisTab, false);
+      });
+      tab.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        event.preventDefault();
+        var offset = event.key === "ArrowRight" ? 1 : -1;
+        var next = tabs[(index + offset + tabs.length) % tabs.length];
+        setActiveAiRole(next.dataset.aiAnalysisTab, true);
+      });
+    });
+    setActiveAiRole(activeAiRole, false);
+  }
+
+  function renderAiAnalysisRoles(tabs, identityReady) {
+    var normalized = frontendContract.normalizeAiTabs(identityReady ? tabs : []);
+    normalized.forEach(function (tab) {
+      var panel = document.querySelector(
+        '[data-ai-analysis-role-panel="' + tab.role + '"]'
+      );
+      if (!panel) return;
+      var status = panel.querySelector("[data-ai-analysis-role-status]");
+      var summary = panel.querySelector("[data-ai-analysis-role-summary]");
+      if (status) {
+        status.textContent = identityReady
+          ? text(tab.runStatusLabel, "待同步")
+          : "待同步";
+      }
+      if (summary) {
+        summary.textContent = identityReady
+          ? roleSummary(tab)
+          : "缺少权威 analysisId，当前不可查看";
+      }
+      var direction = panel.querySelector("[data-ai-analysis-role-direction]");
+      var confidence = panel.querySelector("[data-ai-analysis-role-confidence]");
+      if (direction) {
+        direction.textContent = identityReady ? text(tab.finalMarketBias, "--") : "--";
+      }
+      if (confidence) {
+        confidence.textContent = identityReady ? text(tab.finalConfidence, "--") : "--";
+      }
+    });
+  }
+
+  function renderAiAnalysis(aiDecision, card) {
+    var root = document.querySelector("[data-ai-analysis-root]");
+    if (!root) return;
+    var safeAi = aiDecision || {};
+    var analysisId = card ? String(card.dataset.analysisId || "").trim() : "";
+    var symbol = card ? String(card.dataset.symbol || "").trim() : "";
+    var identityReady = !!analysisId && !!symbol;
+    var runStatus = String(safeAi.runStatus || "").trim().toUpperCase();
+    var failed = runStatus.indexOf("FAIL") >= 0 || runStatus.indexOf("ERROR") >= 0;
+    var loading = runStatus === "LOADING" || runStatus === "PENDING";
+    var empty = !card && !failed && !loading;
+    root.dataset.analysisState = failed
+      ? "error"
+      : (loading ? "loading" : (empty ? "empty" : (!identityReady ? "missing" : "partial")));
+    setText(
+      "[data-ai-analysis-state-status]",
+      failed
+        ? "当前不可查看"
+        : (loading
+          ? "正在同步"
+          : (empty
+            ? "暂无可分析资产"
+            : (!identityReady ? "分析身份待同步" : safeAi.runStatusLabel))),
+      identityReady ? "部分数据待同步" : "分析身份待同步"
+    );
+    setText(
+      "[data-ai-analysis-run-status]",
+      identityReady ? safeAi.runStatusLabel : null,
+      identityReady ? "等待同步" : "当前不可查看"
+    );
+    var consistency = identityReady ? (safeAi.consistency || {}) : {};
+    setText(
+      "[data-ai-analysis-consistency-level]",
+      consistency.consistencyLevel,
+      "等待同步"
+    );
+    setText(
+      "[data-ai-analysis-consistency-summary]",
+      consistency.consistencySummary,
+      identityReady
+        ? "等待 AI 三角色结果同步后生成一致性结论"
+        : "缺少权威 analysisId，当前不可查看"
+    );
+    setText(
+      "[data-ai-analysis-detail-status]",
+      identityReady ? "权威 analysisId 已就绪" : "需要权威 analysisId"
+    );
+    renderAiAnalysisRoles(safeAi.tabs, identityReady && !failed && !loading);
+  }
+
+  function initialAiDecisionFromHome() {
+    var source = document.getElementById("ai-review");
+    if (!source) return {};
+    var consistency = {};
+    ["consistencyLevel", "level", "consistencySummary"].forEach(function (field) {
+      var node = source.querySelector('[data-consistency-field="' + field + '"]');
+      if (node) consistency[field] = node.textContent;
+    });
+    var confused = source.querySelector('[data-consistency-field="confused"]');
+    if (confused) consistency.confused = confused.textContent.trim() === "是";
+    var tabs = Array.from(source.querySelectorAll("[data-ai-role-summary]")).map(
+      function (card) {
+        var role = card.dataset.aiRoleSummary;
+        var status = card.querySelector(".role-heading strong");
+        var label = card.querySelector(".role-heading h3");
+        var summary = card.querySelector(".role-status");
+        var values = card.querySelectorAll(".role-summary-metrics dd");
+        var tab = {
+          role: role,
+          roleLabel: label ? label.textContent : roleLabel(role),
+          runStatusLabel: status ? status.textContent : "待同步",
+          statusMessage: summary ? summary.textContent : null
+        };
+        if (role === "GPT_FINAL") {
+          tab.finalConclusion = tab.statusMessage;
+          tab.finalMarketBias = values[0] ? values[0].textContent : null;
+          tab.finalConfidence = values[1] ? values[1].textContent : null;
+        } else if (role === "GEMINI_REVIEW") {
+          tab.reviewConclusion = tab.statusMessage;
+        } else if (role === "GROK_CHALLENGE") {
+          tab.challengeConclusion = tab.statusMessage;
+        }
+        return tab;
+      }
+    );
+    var runStatus = source.querySelector("[data-ai-run-status]");
+    return {
+      runStatusLabel: runStatus ? runStatus.textContent : "等待同步",
+      consistency: consistency,
+      tabs: tabs
+    };
+  }
+
   function updateAi(aiDecision) {
     var safeAi = aiDecision || {};
     setText("[data-ai-run-status]", safeAi.runStatusLabel, "等待同步");
     updateConsistency(safeAi.consistency);
     renderRoles(safeAi.tabs);
+    renderAiAnalysis(safeAi, selectedAssetCard());
   }
 
   function failClosedAfterLoadError() {
@@ -264,6 +435,7 @@
       blockedReason: "无法同步当前资产，请稍后重试。"
     }, null, selectedAssetCard());
     updateAi({
+      runStatus: "LOAD_FAILED",
       runStatusLabel: "同步失败",
       consistency: {},
       tabs: []
@@ -289,6 +461,12 @@
     } else {
       delete card.dataset.worthOpening;
     }
+    var directionLabel = asset && (asset.marketBiasLabel || asset.marketBias);
+    if (frontendContract.hasText(directionLabel)) {
+      card.dataset.directionLabel = String(directionLabel);
+    } else {
+      delete card.dataset.directionLabel;
+    }
   }
 
   async function selectAsset(symbol, sourceCard) {
@@ -305,6 +483,7 @@
       blockedReason: "当前资产上下文同步中"
     }, null, sourceCard);
     updateAi({
+      runStatus: "LOADING",
       runStatusLabel: "正在同步",
       consistency: {},
       tabs: []
@@ -451,6 +630,35 @@
 
   }
 
+  function setMobileProductView(view, focusHeading) {
+    var showAi = view === "ai";
+    var homeView = document.querySelector("[data-mobile-home-view]");
+    var aiView = document.querySelector("[data-mobile-ai-view]");
+    if (!homeView || !aiView) return;
+    homeView.hidden = showAi;
+    aiView.hidden = !showAi;
+    var homeControl = document.querySelector("[data-home-nav]");
+    var aiControl = document.querySelector("[data-ai-nav]");
+    if (homeControl) {
+      if (showAi) homeControl.removeAttribute("aria-current");
+      else homeControl.setAttribute("aria-current", "page");
+    }
+    if (aiControl) {
+      if (showAi) aiControl.setAttribute("aria-current", "page");
+      else aiControl.removeAttribute("aria-current");
+    }
+    frontendContract.replaceUrlParam("view", showAi ? "ai" : null);
+    window.scrollTo({ top: 0, behavior: focusHeading ? "smooth" : "auto" });
+    if (focusHeading) {
+      window.setTimeout(function () {
+        var heading = document.getElementById(
+          showAi ? "mobile-ai-analysis-title" : "mobile-page-context"
+        );
+        if (heading) heading.focus({ preventScroll: true });
+      }, 260);
+    }
+  }
+
   function bindNavigation() {
     function moveTo(targetId, focusId) {
       if (targetId) {
@@ -469,7 +677,14 @@
     var homeControl = document.querySelector("[data-home-nav]");
     if (homeControl) {
       homeControl.addEventListener("click", function () {
-        moveTo(null, "mobile-page-context");
+        setMobileProductView("home", true);
+      });
+    }
+
+    var aiControl = document.querySelector("[data-ai-nav]");
+    if (aiControl) {
+      aiControl.addEventListener("click", function () {
+        setMobileProductView("ai", true);
       });
     }
 
@@ -501,6 +716,11 @@
         }, 280);
       });
     }
+
+    setMobileProductView(
+      frontendContract.readUrlParam("view") === "ai" ? "ai" : "home",
+      false
+    );
   }
 
   function bindRootHorizontalContainment() {
@@ -531,6 +751,8 @@
         "待同步"
       );
     }
+    bindAiRoleTabs();
+    updateAi(initialAiDecisionFromHome());
     bindNavigation();
   }
 
